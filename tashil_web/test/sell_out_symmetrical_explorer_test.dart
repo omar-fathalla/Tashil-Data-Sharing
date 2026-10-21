@@ -50,9 +50,12 @@ void main() {
       expect(find.text('إجمالي الفروع النشطة'), findsOneWidget);
       expect(find.text('Active Stores & Outlets'), findsOneWidget);
 
-      // 3. Verify Full-Width Branch Sales Ranking Chart with Year 2026 Default
+      // 3. Verify Full-Width Branch Sales Ranking Chart with Year 2026 Default & Two-Row Layout
       expect(find.byKey(const ValueKey('full_width_branch_sales_chart')), findsOneWidget);
-      expect(find.textContaining('شارت ترتيب مبيعات فروع السلسلة من الأعلى للأقل'), findsOneWidget);
+      expect(find.text('شارت ترتيب مبيعات فروع السلسلة من الأعلى للأقل'), findsOneWidget);
+      expect(find.text('Branch Sales Ranking Chart'), findsOneWidget);
+      expect(find.textContaining('الصف الأول: الفروع الأعلى مبيعاً'), findsOneWidget);
+      expect(find.textContaining('الصف الثاني: باقي فروع السلسلة'), findsOneWidget);
       expect(find.byKey(const ValueKey('branch_chart_year_2026')), findsOneWidget);
       expect(find.byKey(const ValueKey('branch_chart_year_2025')), findsOneWidget);
 
@@ -156,6 +159,20 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(ValueKey('sell_out_targets_${apiClient.tenantId}')), findsOneWidget);
+
+      // Open Add Target Manually dialog and verify dynamic future years formula (2026, 2027, 2028)
+      await tester.tap(find.text('Add Target Manually'));
+      await tester.pumpAndSettle();
+
+      final yearDropdown = find.byKey(const ValueKey('target_dialog_year_dropdown'));
+      expect(yearDropdown, findsOneWidget);
+      await tester.tap(yearDropdown);
+      await tester.pumpAndSettle();
+
+      expect(find.text('2026'), findsWidgets);
+      expect(find.text('2027'), findsWidgets);
+      expect(find.text('2028'), findsWidgets);
+      expect(find.text('2024'), findsNothing);
     });
 
     testWidgets('switches to Tab 3 (Uploaded Sheets) and displays upload banner and archived files table',

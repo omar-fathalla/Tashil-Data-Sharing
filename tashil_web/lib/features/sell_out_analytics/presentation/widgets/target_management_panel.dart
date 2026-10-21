@@ -82,6 +82,21 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
   String get _unitLabelAr => _isSellIn ? 'كرتونة' : 'وحدة';
   String get _unitLabelEn => _isSellIn ? 'Cases' : 'Units';
 
+  /// Dynamic base year (locked at minimum 2026, advances automatically in future years e.g. 2027, 2028)
+  int get _baseCurrentYear {
+    final nowYear = DateTime.now().year;
+    return nowYear >= 2026 ? nowYear : 2026;
+  }
+
+  /// Dynamic Target Planning Years Formula:
+  /// Locks floor at current year (e.g. 2026) and always provides 2 future years ahead:
+  /// - In 2026 -> [2026, 2027, 2028]
+  /// - In 2027 -> [2027, 2028, 2029]
+  List<int> get _targetPlanningYears {
+    final base = _baseCurrentYear;
+    return [base, base + 1, base + 2];
+  }
+
   @override
   void initState() {
     super.initState();
@@ -184,9 +199,14 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
     String chain = existing?.retailerChain ??
         prefillChain ??
         (_selectedChain != 'all' ? _selectedChain : 'fathalla');
+    final planningYears = List<int>.from(_targetPlanningYears);
     int year = existing?.year ??
         prefillYear ??
-        (_selectedYear > 0 ? _selectedYear : 2026);
+        (_selectedYear >= _baseCurrentYear ? _selectedYear : _baseCurrentYear);
+    if (!planningYears.contains(year)) {
+      planningYears.add(year);
+      planningYears.sort();
+    }
     int month = existing?.month ?? 0;
     final branchCtrl = TextEditingController(
       text: prefillBranch ??
@@ -313,6 +333,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                           const SizedBox(height: 14.0),
                         ],
                         DropdownButtonFormField<String>(
+                          isExpanded: true,
                           value: _chainOptions.any((c) => c.code == chain)
                               ? chain
                               : 'fathalla',
@@ -325,7 +346,10 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                               .map(
                                 (c) => DropdownMenuItem<String>(
                                   value: c.code,
-                                  child: Text(c.label),
+                                  child: Text(
+                                    c.label,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               )
                               .toList(),
@@ -338,17 +362,22 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                           children: [
                             Expanded(
                               child: DropdownButtonFormField<int>(
+                                key: const ValueKey('target_dialog_year_dropdown'),
+                                isExpanded: true,
                                 value: year,
                                 decoration: const InputDecoration(
                                   labelText: 'السنة (Year) *',
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
-                                items: const [2026, 2025, 2024]
+                                items: planningYears
                                     .map(
                                       (yr) => DropdownMenuItem<int>(
                                         value: yr,
-                                        child: Text('$yr'),
+                                        child: Text(
+                                          '$yr',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
                                     )
                                     .toList(),
@@ -360,6 +389,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                             const SizedBox(width: 12.0),
                             Expanded(
                               child: DropdownButtonFormField<int>(
+                                isExpanded: true,
                                 value: month,
                                 decoration: const InputDecoration(
                                   labelText: 'الفترة / الشهر (Period)',
@@ -370,7 +400,10 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                     .map(
                                       (m) => DropdownMenuItem<int>(
                                         value: m.month,
-                                        child: Text(m.labelAr),
+                                        child: Text(
+                                          m.labelAr,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
                                     )
                                     .toList(),
@@ -1099,12 +1132,14 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   SizedBox(
-                    width: 160.0,
+                    width: 175.0,
                     child: DropdownButtonFormField<int>(
                       isExpanded: true,
-                      value: _selectedYear,
+                      value: [0, ..._targetPlanningYears].contains(_selectedYear)
+                          ? _selectedYear
+                          : 0,
                       decoration: InputDecoration(
-                        labelText: 'Year',
+                        labelText: 'Target Year',
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12.0,
@@ -1114,11 +1149,14 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                           borderRadius: BorderRadius.circular(12.0),
                         ),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 0, child: Text('All Years')),
-                        DropdownMenuItem(value: 2026, child: Text('2026')),
-                        DropdownMenuItem(value: 2025, child: Text('2025')),
-                        DropdownMenuItem(value: 2024, child: Text('2024')),
+                      items: [
+                        const DropdownMenuItem(value: 0, child: Text('All Years')),
+                        ..._targetPlanningYears.map(
+                          (yr) => DropdownMenuItem<int>(
+                            value: yr,
+                            child: Text('$yr'),
+                          ),
+                        ),
                       ],
                       onChanged: (v) {
                         if (v != null) {

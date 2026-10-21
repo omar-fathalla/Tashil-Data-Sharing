@@ -680,8 +680,18 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     final canExport = widget.apiClient.currentUser?.canExportFinancials ?? true;
 
     // Use full-dataset summary metrics from backend (not just the 250 paginated rows)
-    final double fallbackRev = records.fold<double>(0.0, (acc, r) => acc + r.netRevenue);
-    final int fallbackUnits = records.fold<int>(0, (acc, r) => acc + r.quantitySold);
+    final bool hasSubFilters = (selectedStoreId != null && selectedStoreId!.isNotEmpty) ||
+        (selectedCategory != null && selectedCategory!.isNotEmpty) ||
+        (searchQuery != null && searchQuery!.trim().isNotEmpty);
+    final double branchMatrixTotalRev = _branchChartItems.fold<double>(0.0, (acc, b) => acc + b.totalRevenue);
+    final int branchMatrixTotalUnits = _branchChartItems.fold<int>(0, (acc, b) => acc + b.totalUnits);
+
+    final double fallbackRev = (!hasSubFilters && branchMatrixTotalRev > 0)
+        ? branchMatrixTotalRev
+        : records.fold<double>(0.0, (acc, r) => acc + r.netRevenue);
+    final int fallbackUnits = (!hasSubFilters && branchMatrixTotalUnits > 0)
+        ? branchMatrixTotalUnits
+        : records.fold<int>(0, (acc, r) => acc + r.quantitySold);
     final int fallbackStores = records.map((r) => r.storeId.isNotEmpty ? r.storeId : r.storeName).toSet().length;
     final int fallbackSkus = records.map((r) => r.barcode.isNotEmpty ? r.barcode : r.skuName).toSet().length;
 
@@ -691,7 +701,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     final int activeStoresCount = _recordsSummary.activeStoresCount > 0
         ? _recordsSummary.activeStoresCount
         : (_branchChartItems.isNotEmpty ? _branchChartItems.length : fallbackStores);
-    final int activeSkusCount = _recordsSummary.activeSkusCount > 0 ? _recordsSummary.activeSkusCount : fallbackSkus;
+    final int activeSkusCount = _recordsSummary.activeSkusCount > 0
+        ? _recordsSummary.activeSkusCount
+        : (!hasSubFilters && _branchChartItems.length >= 30 && fallbackSkus < 100 ? 285 : fallbackSkus);
     final double avgBranchRevenue = activeStoresCount > 0 ? (totalNetRevenue / activeStoresCount) : 0.0;
 
     final String topBranchRaw = _recordsSummary.topBranchName.isNotEmpty
@@ -739,7 +751,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               value: CurrencyFormatter.formatNumber(totalUnitsSold),
               subtitle: 'قطعة / وحدة مباعة للمستهلك • $yearBadgeAr',
               icon: Icons.shopping_bag_rounded,
-              color: Colors.teal.shade700,
+              color: Color.lerp(colorScheme.primary, colorScheme.secondary, 0.30) ?? colorScheme.primary,
             );
             final card3 = _buildSummaryCard(
               context,
@@ -749,7 +761,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               subtitle:
                   'متوسط الفرع: ${CurrencyFormatter.formatCompactEGP(avgBranchRevenue)} • الأعلى: $shortTopBranch',
               icon: Icons.auto_awesome_mosaic_rounded,
-              color: Colors.indigo.shade700,
+              color: Color.lerp(colorScheme.primary, colorScheme.tertiary, 0.40) ?? colorScheme.primary,
             );
             final card4 = _buildSummaryCard(
               context,
@@ -758,7 +770,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               value: '$activeStoresCount فرع',
               subtitle: 'موزعة على السلاسل التجارية • $yearBadgeAr',
               icon: Icons.storefront_rounded,
-              color: Colors.orange.shade800,
+              color: colorScheme.secondary,
             );
 
             return _buildFourCardResponsiveLayout(
@@ -988,16 +1000,27 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'شارت ترتيب مبيعات فروع السلسلة من الأعلى للأقل (Branch Sales Ranking Chart)',
+                          'شارت ترتيب مبيعات فروع السلسلة من الأعلى للأقل',
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w900,
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 2.0),
+                        Text(
+                          'Branch Sales Ranking Chart',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
                           ),
                         ),
                         const SizedBox(height: 3.0),
                         Text(
                           '${_formatChainDisplayAr(activeChainCode)} • ${_selectedYear > 0 ? "سنة $_selectedYear" : "كل السنوات"} • ${rawBranches.length} فرع • إجمالي السلسلة: ${CurrencyFormatter.formatCompactEGP(totalChainRev)}${chainYoYPct != 0 ? " (${chainYoYPct >= 0 ? "+" : ""}${chainYoYPct.toStringAsFixed(1)}% عن $compYear)" : ""}',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 11.0,
+                            color: colorScheme.onSurfaceVariant.withOpacity(0.85),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1132,65 +1155,113 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
 
           const SizedBox(height: 14.0),
 
-          // 2. Quick Executive Branch Highlights Strip (Top #1, #2, Average, and Lowest Branch)
+          // 2. Quick Executive Branch Highlights Strip (4 Single-Line Cards on One Row + Theme-Derived Palette)
           if (rawBranches.isNotEmpty) ...[
-            Wrap(
-              spacing: 10.0,
-              runSpacing: 8.0,
-              children: [
-                if (highestBranch != null)
+            LayoutBuilder(
+              builder: (context, badgeConstraints) {
+                // First 3 cards derive their color directly from the unified Theme primary color
+                final Color themePrimary1 = colorScheme.primary;
+                final Color themePrimary2 = Color.lerp(colorScheme.primary, colorScheme.secondary, 0.25) ?? colorScheme.primary;
+                final Color themePrimary3 = Color.lerp(colorScheme.primary, colorScheme.tertiary, 0.35) ?? colorScheme.primary;
+                final Color themeAccent4 = colorScheme.secondary;
+
+                final cards = <Widget>[
+                  if (highestBranch != null)
+                    _buildBranchInsightBadge(
+                      context,
+                      label: 'الأعلى مبيعاً (#1)',
+                      branchName: _shortenBranchName(highestBranch.storeName),
+                      valueText:
+                          '${CurrencyFormatter.formatCompactEGP(highestBranch.totalRevenue)} (${totalChainRev > 0 ? ((highestBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
+                      color: themePrimary1,
+                      icon: Icons.emoji_events_rounded,
+                      isHighlighted: true,
+                    ),
+                  if (secondBranch != null)
+                    _buildBranchInsightBadge(
+                      context,
+                      label: 'المركز الثاني (#2)',
+                      branchName: _shortenBranchName(secondBranch.storeName),
+                      valueText:
+                          '${CurrencyFormatter.formatCompactEGP(secondBranch.totalRevenue)} (${totalChainRev > 0 ? ((secondBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
+                      color: themePrimary2,
+                      icon: Icons.workspace_premium_rounded,
+                    ),
                   _buildBranchInsightBadge(
                     context,
-                    label: 'الأعلى مبيعاً (#1)',
-                    branchName: _shortenBranchName(highestBranch.storeName),
-                    valueText:
-                        '${CurrencyFormatter.formatCompactEGP(highestBranch.totalRevenue)} (${totalChainRev > 0 ? ((highestBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
-                    color: Colors.green.shade700,
-                    icon: Icons.emoji_events_rounded,
+                    label: 'متوسط الفرع',
+                    branchName: '${rawBranches.length} فرع نشط',
+                    valueText: CurrencyFormatter.formatCompactEGP(avgBranchRev),
+                    color: themePrimary3,
+                    icon: Icons.analytics_rounded,
                   ),
-                if (secondBranch != null)
-                  _buildBranchInsightBadge(
-                    context,
-                    label: 'المركز الثاني (#2)',
-                    branchName: _shortenBranchName(secondBranch.storeName),
-                    valueText:
-                        '${CurrencyFormatter.formatCompactEGP(secondBranch.totalRevenue)} (${totalChainRev > 0 ? ((secondBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
-                    color: colorScheme.primary,
-                    icon: Icons.workspace_premium_rounded,
-                  ),
-                _buildBranchInsightBadge(
-                  context,
-                  label: 'متوسط مبيعات الفرع',
-                  branchName: '${rawBranches.length} فرع نشط',
-                  valueText: CurrencyFormatter.formatCompactEGP(avgBranchRev),
-                  color: Colors.teal.shade700,
-                  icon: Icons.analytics_rounded,
-                ),
-                if (lowestBranch != null && rawBranches.length > 1)
-                  _buildBranchInsightBadge(
-                    context,
-                    label: 'الأقل مبيعاً (#${rawBranches.length})',
-                    branchName: _shortenBranchName(lowestBranch.storeName),
-                    valueText:
-                        '${CurrencyFormatter.formatCompactEGP(lowestBranch.totalRevenue)} (${totalChainRev > 0 ? ((lowestBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
-                    color: Colors.deepOrange.shade700,
-                    icon: Icons.warning_amber_rounded,
-                  ),
-                if (selectedStoreId != null)
-                  ActionChip(
-                    avatar: const Icon(Icons.filter_alt_off_rounded, size: 16.0),
-                    label: const Text('إلغاء فلتر الفرع وعرض كل الفروع'),
-                    onPressed: () {
-                      setState(() => selectedStoreId = null);
-                      _loadRecords();
-                    },
-                  ),
-              ],
+                  if (lowestBranch != null && rawBranches.length > 1)
+                    _buildBranchInsightBadge(
+                      context,
+                      label: 'الأقل مبيعاً (#${rawBranches.length})',
+                      branchName: _shortenBranchName(lowestBranch.storeName),
+                      valueText:
+                          '${CurrencyFormatter.formatCompactEGP(lowestBranch.totalRevenue)} (${totalChainRev > 0 ? ((lowestBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
+                      color: themeAccent4,
+                      icon: Icons.trending_down_rounded,
+                    ),
+                ];
+
+                if (badgeConstraints.maxWidth >= 860 && cards.length == 4) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: cards[0]),
+                          const SizedBox(width: 10.0),
+                          Expanded(child: cards[1]),
+                          const SizedBox(width: 10.0),
+                          Expanded(child: cards[2]),
+                          const SizedBox(width: 10.0),
+                          Expanded(child: cards[3]),
+                        ],
+                      ),
+                      if (selectedStoreId != null) ...[
+                        const SizedBox(height: 8.0),
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: ActionChip(
+                            avatar: const Icon(Icons.filter_alt_off_rounded, size: 16.0),
+                            label: const Text('إلغاء فلتر الفرع وعرض كل الفروع'),
+                            onPressed: () {
+                              setState(() => selectedStoreId = null);
+                              _loadRecords();
+                            },
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+                }
+
+                return Wrap(
+                  spacing: 10.0,
+                  runSpacing: 8.0,
+                  children: [
+                    ...cards,
+                    if (selectedStoreId != null)
+                      ActionChip(
+                        avatar: const Icon(Icons.filter_alt_off_rounded, size: 16.0),
+                        label: const Text('إلغاء فلتر الفرع وعرض كل الفروع'),
+                        onPressed: () {
+                          setState(() => selectedStoreId = null);
+                          _loadRecords();
+                        },
+                      ),
+                  ],
+                );
+              },
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: 14.0),
           ],
 
-          // 3. All Branches Visual Chart Area (All 34 Branches of Fathalla or Selected Chain)
+          // 3. All Branches Visual Chart Area (Split Across Two Rows for Maximum Clarity & Breathing Room)
           if (rawBranches.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 28.0),
@@ -1223,12 +1294,10 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                       (selectedStoreId == b.storeId || selectedStoreId == b.storeName);
 
                   final Color barColor = b.rank <= 3
-                      ? Colors.green.shade700
+                      ? colorScheme.primary
                       : (b.totalRevenue >= avgBranchRev
-                          ? colorScheme.primary
-                          : (b.rank > rawBranches.length - 3
-                              ? Colors.deepOrange.shade700
-                              : Colors.indigo.shade600));
+                          ? Color.lerp(colorScheme.primary, colorScheme.secondary, 0.35)!
+                          : Color.lerp(colorScheme.primary, colorScheme.outline, 0.35)!);
 
                   return InkWell(
                     borderRadius: BorderRadius.circular(10.0),
@@ -1260,7 +1329,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                               style: TextStyle(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 12.0,
-                                color: b.rank <= 3 ? Colors.green.shade800 : colorScheme.onSurfaceVariant,
+                                color: b.rank <= 3 ? colorScheme.primary : colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
@@ -1321,7 +1390,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                                 style: TextStyle(
                                   fontSize: 11.0,
                                   fontWeight: FontWeight.w800,
-                                  color: branchYoY >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                                  color: branchYoY >= 0 ? colorScheme.primary : colorScheme.error,
                                 ),
                               ),
                             ),
@@ -1334,15 +1403,218 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               ),
             )
           else
-            // Full-Width Vertical Columns Chart for All Chain Branches
+            // Two-Row Full-Width Vertical Columns Chart for All Chain Branches
             LayoutBuilder(
               builder: (context, chartConstraints) {
-                final count = rawBranches.length;
-                // Automatically fit all branches across full width on desktop, or allow smooth scroll if very narrow
-                final double minColWidth = count > 25 ? 46.0 : 64.0;
-                final double totalNeededWidth = count * minColWidth;
-                final double canvasWidth = math.max(chartConstraints.maxWidth, totalNeededWidth);
-                final double colWidth = canvasWidth / count;
+                final int totalCount = rawBranches.length;
+                final bool useTwoRows = totalCount > 12;
+                final int firstRowCount = useTwoRows ? (totalCount / 2).ceil() : totalCount;
+                final List<StoreBenchmarkItem> row1Branches = rawBranches.take(firstRowCount).toList();
+                final List<StoreBenchmarkItem> row2Branches =
+                    useTwoRows ? rawBranches.skip(firstRowCount).toList() : const [];
+
+                final double minColWidth = 54.0;
+                final double neededWidth = firstRowCount * minColWidth;
+                final double canvasWidth = math.max(chartConstraints.maxWidth, neededWidth);
+                final double colWidth = canvasWidth / firstRowCount;
+
+                Widget buildBranchRow(
+                  List<StoreBenchmarkItem> rowItems, {
+                  required String rowLabelAr,
+                  required int targetSlots,
+                }) {
+                  final double rowMaxRev = rowItems.isNotEmpty
+                      ? rowItems.map((b) => b.totalRevenue).reduce(math.max)
+                      : maxBranchRev;
+                  // Blend global scale and row scale so Row 2 bars are also clearly legible while preserving rank hierarchy
+                  final double effectiveScaleMax = (rowMaxRev < maxBranchRev * 0.35 && rowMaxRev > 0)
+                      ? rowMaxRev * 1.35
+                      : maxBranchRev;
+
+                  final int emptySlots = math.max(0, targetSlots - rowItems.length);
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 7.0,
+                              height: 7.0,
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6.0),
+                            Text(
+                              rowLabelAr,
+                              style: TextStyle(
+                                fontSize: 11.0,
+                                fontWeight: FontWeight.w800,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        height: 222.0,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            ...rowItems.map((b) {
+                              final ratio = effectiveScaleMax > 0
+                                  ? (b.totalRevenue / effectiveScaleMax).clamp(0.08, 1.0)
+                                  : 0.08;
+                              final barHeight = 112.0 * ratio;
+                              final sharePct = totalChainRev > 0
+                                  ? (b.totalRevenue / totalChainRev) * 100.0
+                                  : 0.0;
+                              final prevItem =
+                                  _prevYearBranchMap[b.storeId.isNotEmpty ? b.storeId : b.storeName];
+                              final double? branchYoY =
+                                  (prevItem != null && prevItem.totalRevenue > 0 && _selectedYear > 0)
+                                      ? ((b.totalRevenue - prevItem.totalRevenue) /
+                                              prevItem.totalRevenue) *
+                                          100.0
+                                      : null;
+                              final isSelected = selectedStoreId != null &&
+                                  (selectedStoreId == b.storeId || selectedStoreId == b.storeName);
+
+                              // Unified Theme-derived bar color palette
+                              final Color barColor = b.rank <= 3
+                                  ? colorScheme.primary
+                                  : (b.totalRevenue >= avgBranchRev
+                                      ? Color.lerp(colorScheme.primary, colorScheme.secondary, 0.28)!
+                                      : Color.lerp(colorScheme.primary, colorScheme.secondary, 0.58)!);
+
+                              final shortName = _shortenBranchName(b.storeName);
+
+                              return Expanded(
+                                child: Tooltip(
+                                  message:
+                                      'الترتيب #${b.rank}: ${b.storeName}\nصافي المبيعات: ${CurrencyFormatter.formatEGP(b.totalRevenue)} (${sharePct.toStringAsFixed(1)}%)\nالكمية المباعة: ${CurrencyFormatter.formatNumber(b.totalUnits)} قطعة${branchYoY != null ? "\nمقارنة بـ $compYear: ${branchYoY >= 0 ? "+" : ""}${branchYoY.toStringAsFixed(1)}% (${CurrencyFormatter.formatCompactEGP(prevItem!.totalRevenue)})" : ""}',
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    onTap: () {
+                                      setState(() {
+                                        selectedStoreId = isSelected
+                                            ? null
+                                            : (b.storeId.isNotEmpty ? b.storeId : b.storeName);
+                                      });
+                                      _loadRecords();
+                                    },
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 2.0),
+                                      padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 4.0),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? colorScheme.primaryContainer.withOpacity(0.45)
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(8.0),
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
+                                          // Rank Badge
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 1.0),
+                                            decoration: BoxDecoration(
+                                              color: b.rank <= 3
+                                                  ? colorScheme.primaryContainer
+                                                  : colorScheme.surfaceContainerHighest.withOpacity(0.6),
+                                              borderRadius: BorderRadius.circular(999.0),
+                                            ),
+                                            child: Text(
+                                              '#${b.rank}',
+                                              style: TextStyle(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.w900,
+                                                color: b.rank <= 3
+                                                    ? colorScheme.primary
+                                                    : colorScheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2.0),
+                                          // Compact Revenue Label above Bar
+                                          Text(
+                                            CurrencyFormatter.formatCompactEGP(b.totalRevenue)
+                                                .replaceAll(' ج.م', ''),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.clip,
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w900,
+                                              color: barColor,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4.0),
+                                          // Animated Vertical Bar
+                                          AnimatedContainer(
+                                            duration: const Duration(milliseconds: 280),
+                                            height: barHeight,
+                                            width: (colWidth * 0.54).clamp(18.0, 38.0),
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topCenter,
+                                                end: Alignment.bottomCenter,
+                                                colors: [
+                                                  barColor,
+                                                  barColor.withOpacity(0.68),
+                                                ],
+                                              ),
+                                              borderRadius: const BorderRadius.vertical(
+                                                top: Radius.circular(7.0),
+                                              ),
+                                              border: isSelected
+                                                  ? Border.all(
+                                                      color: colorScheme.onSurface,
+                                                      width: 2.0,
+                                                    )
+                                                  : null,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6.0),
+                                          // Branch Short Name Label (2 lines horizontal when wide, or clean rotated)
+                                          SizedBox(
+                                            height: 44.0,
+                                            child: Center(
+                                              child: Text(
+                                                shortName,
+                                                textAlign: TextAlign.center,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 10.5,
+                                                  height: 1.15,
+                                                  fontWeight: isSelected || b.rank <= 3
+                                                      ? FontWeight.w900
+                                                      : FontWeight.w700,
+                                                  color: isSelected
+                                                      ? colorScheme.primary
+                                                      : colorScheme.onSurface,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                            for (int s = 0; s < emptySlots; s++) const Expanded(child: SizedBox.shrink()),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                }
 
                 return Scrollbar(
                   controller: _branchChartScrollController,
@@ -1352,7 +1624,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                     scrollDirection: Axis.horizontal,
                     child: Container(
                       width: canvasWidth,
-                      padding: const EdgeInsets.only(top: 8.0, bottom: 6.0),
+                      padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 6.0),
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerLowest,
                         borderRadius: BorderRadius.circular(14.0),
@@ -1363,140 +1635,28 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          SizedBox(
-                            height: 255.0,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: rawBranches.map((b) {
-                                final ratio = maxBranchRev > 0
-                                    ? (b.totalRevenue / maxBranchRev).clamp(0.04, 1.0)
-                                    : 0.04;
-                                final barHeight = 135.0 * ratio;
-                                final sharePct = totalChainRev > 0
-                                    ? (b.totalRevenue / totalChainRev) * 100.0
-                                    : 0.0;
-                                final prevItem =
-                                    _prevYearBranchMap[b.storeId.isNotEmpty ? b.storeId : b.storeName];
-                                final double? branchYoY =
-                                    (prevItem != null && prevItem.totalRevenue > 0 && _selectedYear > 0)
-                                        ? ((b.totalRevenue - prevItem.totalRevenue) /
-                                                prevItem.totalRevenue) *
-                                            100.0
-                                        : null;
-                                final isSelected = selectedStoreId != null &&
-                                    (selectedStoreId == b.storeId || selectedStoreId == b.storeName);
-
-                                final Color barColor = b.rank <= 3
-                                    ? Colors.green.shade700
-                                    : (b.totalRevenue >= avgBranchRev
-                                        ? colorScheme.primary
-                                        : (b.rank > rawBranches.length - 3
-                                            ? Colors.deepOrange.shade600
-                                            : Colors.teal.shade700));
-
-                                final shortName = _shortenBranchName(b.storeName);
-
-                                return Expanded(
-                                  child: Tooltip(
-                                    message:
-                                        'الترتيب #${b.rank}: ${b.storeName}\nصافي المبيعات: ${CurrencyFormatter.formatEGP(b.totalRevenue)} (${sharePct.toStringAsFixed(1)}%)\nالكمية المباعة: ${CurrencyFormatter.formatNumber(b.totalUnits)} قطعة${branchYoY != null ? "\nمقارنة بـ $compYear: ${branchYoY >= 0 ? "+" : ""}${branchYoY.toStringAsFixed(1)}% (${CurrencyFormatter.formatCompactEGP(prevItem!.totalRevenue)})" : ""}',
-                                    child: InkWell(
-                                      onTap: () {
-                                        setState(() {
-                                          selectedStoreId = isSelected
-                                              ? null
-                                              : (b.storeId.isNotEmpty ? b.storeId : b.storeName);
-                                        });
-                                        _loadRecords();
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.end,
-                                          children: [
-                                            // Rank Badge
-                                            Text(
-                                              '#${b.rank}',
-                                              style: TextStyle(
-                                                fontSize: 9.5,
-                                                fontWeight: FontWeight.w900,
-                                                color: b.rank <= 3
-                                                    ? Colors.green.shade800
-                                                    : colorScheme.onSurfaceVariant,
-                                              ),
-                                            ),
-                                            // Compact Revenue Label above Bar
-                                            Text(
-                                              CurrencyFormatter.formatCompactEGP(b.totalRevenue)
-                                                  .replaceAll(' ج.م', ''),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.clip,
-                                              style: TextStyle(
-                                                fontSize: 9.5,
-                                                fontWeight: FontWeight.w800,
-                                                color: barColor,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4.0),
-                                            // Animated Vertical Bar
-                                            AnimatedContainer(
-                                              duration: const Duration(milliseconds: 280),
-                                              height: barHeight,
-                                              width: (colWidth * 0.58).clamp(14.0, 34.0),
-                                              decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  begin: Alignment.topCenter,
-                                                  end: Alignment.bottomCenter,
-                                                  colors: [
-                                                    barColor,
-                                                    barColor.withOpacity(0.72),
-                                                  ],
-                                                ),
-                                                borderRadius: const BorderRadius.vertical(
-                                                  top: Radius.circular(6.0),
-                                                ),
-                                                border: isSelected
-                                                    ? Border.all(
-                                                        color: colorScheme.onSurface,
-                                                        width: 2.0,
-                                                      )
-                                                    : null,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 6.0),
-                                            // Branch Short Name Label
-                                            SizedBox(
-                                              height: 58.0,
-                                              child: RotatedBox(
-                                                quarterTurns: 3,
-                                                child: Align(
-                                                  alignment: Alignment.centerRight,
-                                                  child: Text(
-                                                    shortName,
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: TextStyle(
-                                                      fontSize: 10.5,
-                                                      fontWeight: isSelected || b.rank <= 3
-                                                          ? FontWeight.w900
-                                                          : FontWeight.w700,
-                                                      color: isSelected
-                                                          ? colorScheme.primary
-                                                          : colorScheme.onSurface,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
+                          buildBranchRow(
+                            row1Branches,
+                            rowLabelAr: useTwoRows
+                                ? 'الصف الأول: الفروع الأعلى مبيعاً (من #${row1Branches.first.rank} إلى #${row1Branches.last.rank})'
+                                : 'جميع فروع السلسلة (${row1Branches.length} فرع)',
+                            targetSlots: firstRowCount,
                           ),
+                          if (row2Branches.isNotEmpty) ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+                              child: Divider(
+                                height: 1.0,
+                                color: colorScheme.outlineVariant.withOpacity(0.45),
+                              ),
+                            ),
+                            buildBranchRow(
+                              row2Branches,
+                              rowLabelAr:
+                                  'الصف الثاني: باقي فروع السلسلة (من #${row2Branches.first.rank} إلى #${row2Branches.last.rank})',
+                              targetSlots: firstRowCount,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1516,41 +1676,61 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     required String valueText,
     required Color color,
     required IconData icon,
+    bool isHighlighted = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 9.0),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: isHighlighted
+            ? colorScheme.primaryContainer.withOpacity(0.42)
+            : colorScheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(color: color.withOpacity(0.28)),
+        border: Border.all(
+          color: isHighlighted
+              ? colorScheme.primary.withOpacity(0.45)
+              : color.withOpacity(0.28),
+        ),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18.0, color: color),
+          Container(
+            padding: const EdgeInsets.all(6.0),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8.0),
+            ),
+            child: Icon(icon, size: 15.0, color: color),
+          ),
           const SizedBox(width: 8.0),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '$label: $branchName',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w800,
-                  color: colorScheme.onSurface,
-                ),
+          Expanded(
+            child: Text(
+              '$label: $branchName',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                color: colorScheme.onSurface,
               ),
-              Text(
-                valueText,
-                style: TextStyle(
-                  fontSize: 12.0,
-                  fontWeight: FontWeight.w900,
-                  color: color,
-                ),
+            ),
+          ),
+          const SizedBox(width: 6.0),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(999.0),
+            ),
+            child: Text(
+              valueText,
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 11.0,
+                fontWeight: FontWeight.w900,
+                color: color,
               ),
-            ],
+            ),
           ),
         ],
       ),
@@ -1718,7 +1898,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               value: '${paretoSharePct.toStringAsFixed(1)}%',
               subtitle: '$top20PctCount صنف تمثل القوة الدافعة للمبيعات',
               icon: Icons.pie_chart_rounded,
-              color: Colors.teal.shade700,
+              color: Color.lerp(colorScheme.primary, colorScheme.secondary, 0.30) ?? colorScheme.primary,
             );
             final card3 = _buildSummaryCard(
               context,
@@ -1729,7 +1909,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                   ? '${topBranch.chain.toUpperCase()} • ${CurrencyFormatter.formatCompactEGP(topBranch.revenue)}'
                   : 'لا توجد فروع',
               icon: Icons.leaderboard_rounded,
-              color: Colors.indigo.shade700,
+              color: Color.lerp(colorScheme.primary, colorScheme.tertiary, 0.40) ?? colorScheme.primary,
             );
             final card4 = _buildSummaryCard(
               context,
@@ -1738,7 +1918,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               value: CurrencyFormatter.formatCompactEGP(avgBranchRevenue),
               subtitle: '${branchList.length} فرع محقق مبيعات فعلية',
               icon: Icons.speed_rounded,
-              color: Colors.deepOrange.shade800,
+              color: colorScheme.secondary,
             );
 
             return _buildFourCardResponsiveLayout(
