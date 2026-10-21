@@ -381,7 +381,8 @@ class _CompetitorComparisonScreenState
       sumPriceIndex += g.priceIndex;
       if (g.ownUnitPrice < g.avgCompetitorPrice) {
         advantageSkusCount++;
-      } else if (g.lowerPricedCompetitorsCount > 0) {
+      }
+      if (g.lowerPricedCompetitorsCount > 0) {
         undercutRiskSkusCount++;
       }
     }
@@ -1247,7 +1248,8 @@ class _CompetitorComparisonScreenState
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.start,
             children: [
-              Expanded(
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
