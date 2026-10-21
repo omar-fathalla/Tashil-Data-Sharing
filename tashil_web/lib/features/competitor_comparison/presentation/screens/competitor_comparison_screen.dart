@@ -5,14 +5,14 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
-import '../../../../core/widgets/m3_segmented_button_group.dart';
-import '../../../../core/widgets/table_scroll_container.dart';
 
 /// CompetitorComparisonScreen (Compare)
-/// Displays 100% real uploaded branch sell-out data (Fathalla Market 2025 & 2026)
-/// with temporal filtering (Year 2026 default / Year 2025 + Month 1..4),
-/// an interactive Monthly Price Trajectory Chart (رسم بياني لحركة السعر شهرياً صعوداً وهبوطاً)
-/// for both the selected Own SKU and its competing SKUs, and a Monthly Evolution Matrix.
+/// Material Design 3 1-vs-1 Focused Competitive Intelligence Experience:
+/// - Selects an Own SKU as the Default Benchmark (e.g. Feba 3 Kg).
+/// - Displays each competing brand ONCE as a clean M3 selector card with its pack volume
+///   (e.g., Fairy 2L, Pril 4Kg, Wafeer 4Kg — never duplicated).
+/// - Clicking any competitor immediately displays its 1-vs-1 Monthly Price Trajectory
+///   (Jan, Feb, Mar, Apr) against the default Own SKU without visual clutter.
 class CompetitorComparisonScreen extends StatefulWidget {
   final ApiClient apiClient;
 
@@ -32,16 +32,15 @@ class _CompetitorComparisonScreenState
   List<OwnSkuCompetitiveGroupModel> _allGroups = [];
   List<OwnSkuCompetitiveGroupModel> _filteredGroups = [];
   String? _selectedOwnBarcode;
+  String? _selectedCompetitorBarcode;
 
-  // Temporal State: Default to Year 2026 as requested
+  // Temporal State: Default to Year 2026
   int _selectedYear = 2026;
   int _selectedMonth = 0; // 0 = All Months (Jan - Apr), 1..4 = specific month
-  bool _showFullTwoYearTimeline = false; // Toggle between Selected Year (4m) vs 2025+2026 (8m)
-  String? _highlightedCompetitorBarcode; // Optional focus on a specific competitor on the chart
+  bool _showFullTwoYearTimeline = false;
 
   String _selectedChain = 'fathalla';
   String _selectedCategory = 'الكل';
-  String _competitorFilter = 'all'; // 'all', 'higher', 'lower', 'equal'
   String _searchQuery = '';
   bool _showWhatIfSimulator = false;
   double? _simulatedOwnPrice;
@@ -49,25 +48,6 @@ class _CompetitorComparisonScreenState
   final TextEditingController _searchController = TextEditingController();
   late String _lastTenantId;
 
-  final List<M3SegmentItem<String>> _compPositionSegments = const [
-    M3SegmentItem(
-      value: 'all',
-      label: 'كل المنافسين',
-      icon: Icons.compare_arrows_rounded,
-    ),
-    M3SegmentItem(
-      value: 'higher',
-      label: 'المنافس أغلى (أعلى)',
-      icon: Icons.trending_up_rounded,
-    ),
-    M3SegmentItem(
-      value: 'lower',
-      label: 'المنافس أرخص (أقل)',
-      icon: Icons.trending_down_rounded,
-    ),
-  ];
-
-  // Only real uploaded chains are shown (Fathalla Market from 2025 out.xlsx & 2026 out.xlsx)
   static const List<({String code, String labelAr})> _chainOptions = [
     (code: 'fathalla', labelAr: 'أسواق فتح الله (بيانات فعلية مرفوعة)'),
   ];
@@ -83,14 +63,6 @@ class _CompetitorComparisonScreenState
     (month: 2, labelAr: 'فبراير (02)'),
     (month: 3, labelAr: 'مارس (03)'),
     (month: 4, labelAr: 'أبريل (04)'),
-  ];
-
-  static const List<Color> _competitorSeriesColors = [
-    Color(0xFFD93025), // Red
-    Color(0xFFEA8600), // Amber/Orange
-    Color(0xFF9334E6), // Purple
-    Color(0xFF007B83), // Teal
-    Color(0xFFC5221F), // Crimson
   ];
 
   @override
@@ -116,11 +88,10 @@ class _CompetitorComparisonScreenState
       _selectedMonth = 0;
       _selectedChain = 'fathalla';
       _selectedCategory = 'الكل';
-      _competitorFilter = 'all';
       _searchQuery = '';
       _searchController.clear();
       _simulatedOwnPrice = null;
-      _highlightedCompetitorBarcode = null;
+      _selectedCompetitorBarcode = null;
       _loadCompetitiveData();
     }
   }
@@ -170,12 +141,20 @@ class _CompetitorComparisonScreenState
       if (!stillExists) {
         _selectedOwnBarcode = _filteredGroups.first.ownBarcode;
         _simulatedOwnPrice = null;
-        _highlightedCompetitorBarcode = null;
+        _selectedCompetitorBarcode = null;
+      }
+      final activeGroup = _selectedGroup;
+      if (activeGroup != null && activeGroup.competitors.isNotEmpty) {
+        final compExists = activeGroup.competitors
+            .any((c) => c.barcode == _selectedCompetitorBarcode);
+        if (!compExists) {
+          _selectedCompetitorBarcode = activeGroup.competitors.first.barcode;
+        }
       }
     } else {
       _selectedOwnBarcode = null;
       _simulatedOwnPrice = null;
-      _highlightedCompetitorBarcode = null;
+      _selectedCompetitorBarcode = null;
     }
   }
 
@@ -410,7 +389,6 @@ class _CompetitorComparisonScreenState
     final colorScheme = theme.colorScheme;
     final isCompactScreen = MediaQuery.sizeOf(context).width < 600.0;
 
-    // Aggregate KPIs across all Own SKUs in the selected temporal period
     final totalOwnSkus = _allGroups.length;
     int totalCompetitorSkus = 0;
     int advantageSkusCount = 0;
@@ -497,7 +475,7 @@ class _CompetitorComparisonScreenState
                     title: 'الفترة الزمنية النشطة ($_selectedYear)',
                     value: '$totalOwnSkus صنف أساسي',
                     subtitle:
-                        'أمام $totalCompetitorSkus منافس في $_activePeriodLabelAr',
+                        'أمام $totalCompetitorSkus منافس مباشر في $_activePeriodLabelAr',
                     icon: Icons.calendar_month_rounded,
                     containerColor: colorScheme.primaryContainer,
                     onContainerColor: colorScheme.onPrimaryContainer,
@@ -506,7 +484,7 @@ class _CompetitorComparisonScreenState
                     context: context,
                     title: 'ميزة سعرية تنافسية (نحن الأرخص 🟢)',
                     value: '$advantageSkusCount من $totalOwnSkus أصناف',
-                    subtitle: 'سعر بيعنا أقل من متوسط المنافسين في هذه الفترة',
+                    subtitle: 'سعر بيعنا أقل من متوسط المنافسين المباشرين',
                     icon: Icons.trending_down_rounded,
                     containerColor: const Color(0xFFE6F4EA),
                     onContainerColor: const Color(0xFF0D652D),
@@ -514,7 +492,8 @@ class _CompetitorComparisonScreenState
                   _buildKpiCard(
                     context: context,
                     title: 'حركة الأسعار عبر شهور $_selectedYear',
-                    value: '▲ $priceIncreasedSkusCount زاد | ▼ $priceDecreasedSkusCount نزل',
+                    value:
+                        '▲ $priceIncreasedSkusCount زاد | ▼ $priceDecreasedSkusCount نزل',
                     subtitle: 'تتبع شهري لارتفاع وانخفاض الأسعار (يناير - أبريل)',
                     icon: Icons.show_chart_rounded,
                     containerColor: const Color(0xFFFEF7E0),
@@ -559,7 +538,7 @@ class _CompetitorComparisonScreenState
 
             M3Spacing.gapMD,
 
-            // 3. Temporal & Chain Filter Toolbar (Year 2026 / 2025 + Month 1..4 + Real Chain + Category + Search)
+            // 3. Temporal & Chain Filter Toolbar
             _buildFilterToolbar(context),
 
             M3Spacing.gapMD,
@@ -580,16 +559,16 @@ class _CompetitorComparisonScreenState
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Right side in RTL: Master list of Own SKUs (370dp)
+                        // Right side in RTL: Master list of Own SKUs (360dp)
                         SizedBox(
-                          width: 370.0,
+                          width: 360.0,
                           child: _buildOwnSkusMasterPanel(
                             context,
                             selectedGroup,
                           ),
                         ),
                         M3Spacing.gapMD,
-                        // Left side in RTL: Detailed Competitor Comparison + Monthly Trajectory Chart
+                        // Left side in RTL: Focused 1-vs-1 Competitor Comparison & Monthly Trajectory
                         Expanded(
                           child: _buildCompetitorDetailPanel(
                             context,
@@ -659,7 +638,6 @@ class _CompetitorComparisonScreenState
               crossAxisAlignment: WrapCrossAlignment.center,
               alignment: WrapAlignment.spaceBetween,
               children: [
-                // Year Selector (Default 2026)
                 Wrap(
                   spacing: 8.0,
                   runSpacing: 8.0,
@@ -699,8 +677,6 @@ class _CompetitorComparisonScreenState
                       ),
                   ],
                 ),
-
-                // Month Selector (All Months or Jan / Feb / Mar / Apr)
                 Wrap(
                   spacing: 6.0,
                   runSpacing: 6.0,
@@ -712,7 +688,7 @@ class _CompetitorComparisonScreenState
                       color: colorScheme.primary,
                     ),
                     Text(
-                      'تصفية بالشهر:',
+                      'الشهور:',
                       style: theme.textTheme.labelLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -745,7 +721,6 @@ class _CompetitorComparisonScreenState
             crossAxisAlignment: WrapCrossAlignment.center,
             alignment: WrapAlignment.spaceBetween,
             children: [
-              // Search input
               SizedBox(
                 width: 340.0,
                 height: 42.0,
@@ -790,8 +765,6 @@ class _CompetitorComparisonScreenState
                   ),
                 ),
               ),
-
-              // Real Chain Indicator (Only real uploaded Fathalla Market data)
               Wrap(
                 spacing: 8.0,
                 runSpacing: 8.0,
@@ -892,7 +865,6 @@ class _CompetitorComparisonScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header
           Container(
             padding: const EdgeInsets.fromLTRB(18.0, 16.0, 18.0, 14.0),
             decoration: BoxDecoration(
@@ -925,14 +897,15 @@ class _CompetitorComparisonScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'اختر صنفك للمقارنة ($_selectedYear)',
+                        'صنفك الأساسي ($_selectedYear)',
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w800,
                           color: colorScheme.onSurface,
                         ),
                       ),
+                      const SizedBox(height: 2.0),
                       Text(
-                        'اضغط لعرض منحنى الأسعار الشهري والمنافسين',
+                        'اختر صنفك لعرض منافسيه المباشرين',
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -960,8 +933,6 @@ class _CompetitorComparisonScreenState
               ],
             ),
           ),
-
-          // List of Own SKUs
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Column(
@@ -991,7 +962,6 @@ class _CompetitorComparisonScreenState
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Calculate our price gap vs average competitor
     final vsAvgDiffEgp = group.ownUnitPrice - group.avgCompetitorPrice;
     final vsAvgDiffPct = group.avgCompetitorPrice > 0
         ? (vsAvgDiffEgp / group.avgCompetitorPrice) * 100.0
@@ -1016,7 +986,6 @@ class _CompetitorComparisonScreenState
             ? 'أغلى من السوق بـ +${vsAvgDiffPct.toStringAsFixed(1)}%'
             : 'مساوي لمتوسط السوق';
 
-    // Monthly trend badge for our own SKU across the selected year
     final double momPct = group.periodPriceChangePct;
     final bool priceRose = momPct > 0.5;
     final bool priceDropped = momPct < -0.5;
@@ -1031,7 +1000,9 @@ class _CompetitorComparisonScreenState
           setState(() {
             _selectedOwnBarcode = group.ownBarcode;
             _simulatedOwnPrice = group.ownUnitPrice;
-            _highlightedCompetitorBarcode = null;
+            _selectedCompetitorBarcode = group.competitors.isNotEmpty
+                ? group.competitors.first.barcode
+                : null;
           });
         },
         child: AnimatedContainer(
@@ -1139,7 +1110,6 @@ class _CompetitorComparisonScreenState
                     ),
                   ),
                   const SizedBox(width: 8.0),
-                  // Price pill
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -1215,18 +1185,14 @@ class _CompetitorComparisonScreenState
   }
 
   /// Detail Panel showing:
-  /// A. Selected Own SKU Benchmark Spotlight Card
-  /// B. Interactive What-If Price Simulator (if toggled)
-  /// C. Monthly Price Trajectory Chart (رسم بياني لحركة سعر الصنف والمنافسين عبر الشهور - زاد إمتى ونزل إمتى)
-  /// D. Direct Competitor Cards with Monthly Price Movement Strips
-  /// E. Monthly Price & Volume Evolution Matrix Table
+  /// 1. Default Own SKU Spotlight Card
+  /// 2. Interactive What-If Price Simulator (if toggled)
+  /// 3. Single Clean Competitor Selector Row (1 card per competitor brand + its volume, e.g., Fairy 2L, Pril 4Kg, Wafeer 4Kg)
+  /// 4. Focused 1-vs-1 Monthly Price Trajectory Chart & 4-Month Comparison Grid (Jan, Feb, Mar, Apr) for Default Own SKU + Selected Competitor ONLY.
   Widget _buildCompetitorDetailPanel(
     BuildContext context,
     OwnSkuCompetitiveGroupModel group,
   ) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     final effectiveOwnPrice =
         (_showWhatIfSimulator && _simulatedOwnPrice != null)
             ? _simulatedOwnPrice!
@@ -1236,8 +1202,12 @@ class _CompetitorComparisonScreenState
             (effectiveOwnPrice / group.packVolumeUnits).toStringAsFixed(2))
         : effectiveOwnPrice;
 
-    // Recompute competitor price differences dynamically if simulator is active
-    final adjustedCompetitors = group.competitors.map((c) {
+    // Deduplicate by brand and recompute price context against effectiveOwnPrice
+    final seenBrands = <String>{};
+    final adjustedCompetitors = <CompetitorSkuComparisonModel>[];
+    for (final c in group.competitors) {
+      final brandKey = c.brand.trim().toLowerCase();
+      if (!seenBrands.add(brandKey)) continue;
       final diffEgp = c.unitPrice - effectiveOwnPrice;
       final diffPct =
           effectiveOwnPrice > 0 ? (diffEgp / effectiveOwnPrice) * 100.0 : 0.0;
@@ -1249,18 +1219,23 @@ class _CompetitorComparisonScreenState
       } else {
         pos = 'equal';
       }
-      return c.copyWithPriceContext(
-        priceDiffEgp: double.parse(diffEgp.toStringAsFixed(2)),
-        priceDiffPct: double.parse(diffPct.toStringAsFixed(1)),
-        pricePosition: pos,
+      adjustedCompetitors.add(
+        c.copyWithPriceContext(
+          priceDiffEgp: double.parse(diffEgp.toStringAsFixed(2)),
+          priceDiffPct: double.parse(diffPct.toStringAsFixed(1)),
+          pricePosition: pos,
+        ),
       );
-    }).toList();
+    }
 
-    final visibleCompetitors = adjustedCompetitors.where((c) {
-      if (_competitorFilter == 'higher') return c.pricePosition == 'higher';
-      if (_competitorFilter == 'lower') return c.pricePosition == 'lower';
-      return true;
-    }).toList();
+    // Resolve the currently selected single competitor (default to first competitor)
+    CompetitorSkuComparisonModel? selectedCompetitor;
+    if (adjustedCompetitors.isNotEmpty) {
+      selectedCompetitor = adjustedCompetitors.firstWhere(
+        (c) => c.barcode == _selectedCompetitorBarcode,
+        orElse: () => adjustedCompetitors.first,
+      );
+    }
 
     final higherCount =
         adjustedCompetitors.where((c) => c.pricePosition == 'higher').length;
@@ -1272,7 +1247,7 @@ class _CompetitorComparisonScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // A. Selected Own SKU Benchmark Spotlight Card
+        // A. Default Own SKU Benchmark Spotlight Card
         _buildSelectedOwnSkuSpotlight(
           context,
           group: group,
@@ -1290,60 +1265,329 @@ class _CompetitorComparisonScreenState
             context,
             group: group,
             effectiveOwnPrice: effectiveOwnPrice,
-            adjustedCompetitors: adjustedCompetitors,
           ),
         ],
 
         M3Spacing.gapMD,
 
-        // C. Monthly Price Trajectory Chart Card (رسم بياني لحركة السعر شهرياً صعوداً وهبوطاً)
-        _buildMonthlyPriceTrajectoryChartCard(
+        // C. Clean M3 Competitor Brand Selector Row (1 Card per Brand with Pack Volume — e.g. Pril 4Kg, Fairy 2L, Wafeer 4Kg)
+        _buildCompetitorBrandSelectorSection(
           context,
           group: group,
           competitors: adjustedCompetitors,
+          selectedCompetitor: selectedCompetitor,
+          effectiveOwnPrice: effectiveOwnPrice,
         ),
 
-        M3Spacing.gapMD,
+        if (selectedCompetitor != null) ...[
+          M3Spacing.gapMD,
 
-        // D. Filter Header for Competitors + Cards Grid
-        Container(
-          padding: const EdgeInsets.all(18.0),
+          // D. Focused 1-vs-1 Monthly Trajectory Chart + Jan/Feb/Mar/Apr Comparison Cards
+          // (Shows Default Own SKU vs. Selected Competitor ONLY — never cluttered!)
+          _buildFocusedOneVsOneTrajectoryCard(
+            context,
+            group: group,
+            selectedCompetitor: selectedCompetitor,
+            effectiveOwnPrice: effectiveOwnPrice,
+            effectiveOwnPricePerVol: effectiveOwnPricePerVol,
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Clean Material Design 3 Competitor Brand Selector Row:
+  /// Shows 1 compact card per rival brand (e.g. Pril 4Kg, Fairy 2L, Wafeer 4Kg).
+  /// Clicking a card selects that competitor and updates the chart & monthly data below.
+  Widget _buildCompetitorBrandSelectorSection(
+    BuildContext context, {
+    required OwnSkuCompetitiveGroupModel group,
+    required List<CompetitorSkuComparisonModel> competitors,
+    required CompetitorSkuComparisonModel? selectedCompetitor,
+    required double effectiveOwnPrice,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(20.0),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(24.0),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.65),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10.0),
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                child: Icon(
+                  Icons.compare_arrows_rounded,
+                  color: colorScheme.onSecondaryContainer,
+                  size: 20.0,
+                ),
+              ),
+              const SizedBox(width: 12.0),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'اختر المنافس لعرض حركة أسعاره الشهرية أمام (${group.ownBrand} — ${group.packSizeLabel})',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6.0),
+                    Text(
+                      'اضغط على أي منافس بالأسفل لمقارنة حركة سعره في (يناير، فبراير، مارس، أبريل) مع صنفك الأساسي',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16.0),
+
+          // Responsive Grid/Row of Single-Brand Competitor Cards
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final count = competitors.length;
+              final isDesktop = constraints.maxWidth >= 720.0;
+              if (isDesktop && count > 0) {
+                return IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (int i = 0; i < count; i++) ...[
+                        Expanded(
+                          child: _buildSingleBrandCompetitorTile(
+                            context,
+                            competitor: competitors[i],
+                            isSelected: selectedCompetitor?.barcode ==
+                                competitors[i].barcode,
+                            effectiveOwnPrice: effectiveOwnPrice,
+                          ),
+                        ),
+                        if (i < count - 1) const SizedBox(width: 12.0),
+                      ],
+                    ],
+                  ),
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (int i = 0; i < count; i++) ...[
+                    _buildSingleBrandCompetitorTile(
+                      context,
+                      competitor: competitors[i],
+                      isSelected:
+                          selectedCompetitor?.barcode == competitors[i].barcode,
+                      effectiveOwnPrice: effectiveOwnPrice,
+                    ),
+                    if (i < count - 1) const SizedBox(height: 10.0),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSingleBrandCompetitorTile(
+    BuildContext context, {
+    required CompetitorSkuComparisonModel competitor,
+    required bool isSelected,
+    required double effectiveOwnPrice,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final bool isCompHigher = competitor.pricePosition == 'higher';
+    final bool isCompLower = competitor.pricePosition == 'lower';
+
+    final Color statusBg = isCompHigher
+        ? const Color(0xFFE6F4EA)
+        : isCompLower
+            ? const Color(0xFFFCE8E6)
+            : colorScheme.secondaryContainer;
+    final Color statusFg = isCompHigher
+        ? const Color(0xFF0D652D)
+        : isCompLower
+            ? const Color(0xFFA50E0E)
+            : colorScheme.onSecondaryContainer;
+
+    final String priceStatusText = isCompHigher
+        ? 'أغلى منك بـ +${competitor.priceDiffEgp.abs().toStringAsFixed(1)} ج (+${competitor.priceDiffPct.abs().toStringAsFixed(1)}%)'
+        : isCompLower
+            ? 'أرخص منك بـ -${competitor.priceDiffEgp.abs().toStringAsFixed(1)} ج (-${competitor.priceDiffPct.abs().toStringAsFixed(1)}%)'
+            : 'مساوي لسعرك';
+
+    const Color activeAccent = Color(0xFFD93025);
+
+    return Material(
+      color: isSelected
+          ? activeAccent.withValues(alpha: 0.08)
+          : colorScheme.surface,
+      borderRadius: BorderRadius.circular(20.0),
+      elevation: isSelected ? 3.0 : 0.0,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20.0),
+        onTap: () {
+          setState(() {
+            _selectedCompetitorBarcode = competitor.barcode;
+          });
+        },
+        child: AnimatedContainer(
+          duration: M3Motion.short4,
+          padding: const EdgeInsets.all(16.0),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(24.0),
+            borderRadius: BorderRadius.circular(20.0),
             border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.65),
+              color: isSelected
+                  ? activeAccent
+                  : colorScheme.outlineVariant.withValues(alpha: 0.7),
+              width: isSelected ? 2.2 : 1.0,
             ),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Wrap(
-                spacing: 12.0,
-                runSpacing: 12.0,
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Top row: Brand Name + Pack Volume Badge + Selected Checkmark
                   Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Icon(
-                        Icons.compare_arrows_rounded,
-                        color: colorScheme.primary,
+                      Flexible(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 10.0,
+                              height: 10.0,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? activeAccent
+                                    : colorScheme.outline,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8.0),
+                            Flexible(
+                              child: Text(
+                                competitor.brand,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  color: isSelected
+                                      ? activeAccent
+                                      : colorScheme.onSurface,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(width: 8.0),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10.0,
+                          vertical: 4.0,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? activeAccent
+                              : colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(999.0),
+                        ),
+                        child: Text(
+                          competitor.packSizeLabel,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: isSelected
+                                ? Colors.white
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8.0),
+                  Text(
+                    competitor.skuName,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14.0),
+
+              // Bottom row: Competitor Price + Higher/Lower Badge
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'الأصناف المنافسة المباشرة في $_activePeriodLabelAr (${visibleCompetitors.length} من ${adjustedCompetitors.length})',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
+                            'سعر بيع المنافس',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
                             ),
                           ),
                           Text(
-                            'مقارنة سعر البيع الفعلي (أعلى أم أقل من سعرك) + شريط تحرك السعر شهرياً لكل منافس',
-                            style: theme.textTheme.bodySmall?.copyWith(
+                            '${competitor.unitPrice.toStringAsFixed(1)} ج.م',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'سعر الـ ${competitor.volumeUnitLabel}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          Text(
+                            '${competitor.pricePerUnitVolume.toStringAsFixed(1)} ج/${competitor.volumeUnitLabel}',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
                               color: colorScheme.onSurfaceVariant,
                             ),
                           ),
@@ -1351,62 +1595,634 @@ class _CompetitorComparisonScreenState
                       ),
                     ],
                   ),
-                  M3SegmentedButtonGroup<String>(
-                    segments: _compPositionSegments,
-                    selectedValue: _competitorFilter,
-                    onSelectionChanged: (val) {
-                      setState(() => _competitorFilter = val);
-                    },
+                  const SizedBox(height: 10.0),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10.0,
+                      vertical: 6.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusBg,
+                      borderRadius: BorderRadius.circular(10.0),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          isCompHigher
+                              ? Icons.arrow_upward_rounded
+                              : isCompLower
+                                  ? Icons.arrow_downward_rounded
+                                  : Icons.drag_handle_rounded,
+                          size: 15.0,
+                          color: statusFg,
+                        ),
+                        const SizedBox(width: 4.0),
+                        Flexible(
+                          child: Text(
+                            priceStatusText,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w900,
+                              color: statusFg,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Focused 1-vs-1 Monthly Trajectory Card:
+  /// - Does NOT show the deleted title "منحنى حركة الأسعار الشهرية المقارن لسنة 2026".
+  /// - Gives generous line-height and top spacing to the description text.
+  /// - Plots ONLY 2 lines: Default Own SKU (Blue) vs. Selected Competitor (Red/Orange) across Jan, Feb, Mar, Apr.
+  /// - Displays 4 clean M3 Month Cards (يناير، فبراير، مارس، أبريل) comparing both SKUs side-by-side.
+  Widget _buildFocusedOneVsOneTrajectoryCard(
+    BuildContext context, {
+    required OwnSkuCompetitiveGroupModel group,
+    required CompetitorSkuComparisonModel selectedCompetitor,
+    required double effectiveOwnPrice,
+    required double effectiveOwnPricePerVol,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final List<SkuMonthlyPricePointModel> ownSeries = _showFullTwoYearTimeline
+        ? group.allMonthlyPrices
+        : group.monthlyPrices;
+    final List<SkuMonthlyPricePointModel> compSeries = _showFullTwoYearTimeline
+        ? selectedCompetitor.allMonthlyPrices
+        : selectedCompetitor.monthlyPrices;
+
+    const Color compColor = Color(0xFFD93025);
+
+    // Check Shrinkflation between our SKU and the selected competitor
+    final bool isCompLower = selectedCompetitor.pricePosition == 'lower';
+    final bool shrinkflationDetected = isCompLower &&
+        selectedCompetitor.pricePerUnitVolume > effectiveOwnPricePerVol;
+
+    return Container(
+      padding: const EdgeInsets.all(24.0),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(24.0),
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.3),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Top Bar: 1-vs-1 Badges (Default Own SKU vs Selected Competitor) + 2025/2026 Toggle
+          Wrap(
+            spacing: 12.0,
+            runSpacing: 12.0,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              // Clean 2-Item Comparison Header Pills (No duplicate chips!)
+              Wrap(
+                spacing: 10.0,
+                runSpacing: 8.0,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14.0,
+                      vertical: 8.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999.0),
+                      border:
+                          Border.all(color: colorScheme.primary, width: 1.5),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 12.0,
+                          height: 12.0,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8.0),
+                        Text(
+                          'صنفنا الأساسي: ${group.ownBrand} • ${group.packSizeLabel} (${effectiveOwnPrice.toStringAsFixed(1)} ج.م)',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    'مقابل',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14.0,
+                      vertical: 8.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: compColor.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(999.0),
+                      border: Border.all(color: compColor, width: 1.5),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 12.0,
+                          height: 12.0,
+                          decoration: const BoxDecoration(
+                            color: compColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8.0),
+                        Text(
+                          'المنافس المختار: ${selectedCompetitor.brand} • ${selectedCompetitor.packSizeLabel} (${selectedCompetitor.unitPrice.toStringAsFixed(1)} ج.م)',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: compColor,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
 
-              M3Spacing.gapMD,
+              FilterChip(
+                avatar: Icon(
+                  _showFullTwoYearTimeline
+                      ? Icons.visibility_rounded
+                      : Icons.date_range_rounded,
+                  size: 16.0,
+                ),
+                label: Text(
+                  _showFullTwoYearTimeline
+                      ? 'عرض شهور $_selectedYear فقط (يناير - أبريل)'
+                      : 'دمج مسار 2025 + 2026 (8 شهور)',
+                ),
+                selected: _showFullTwoYearTimeline,
+                onSelected: (v) {
+                  setState(() => _showFullTwoYearTimeline = v);
+                },
+              ),
+            ],
+          ),
 
-              if (visibleCompetitors.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32.0),
-                  child: Center(
+          // Generous vertical distance & line-height before the subtitle text as requested
+          const SizedBox(height: 16.0),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: Text(
+              'يرسم اتجاه سعر بيع صنفك (خط أزرق عريض) أمام سعر المنافس المختار (${selectedCompetitor.brand} — ${selectedCompetitor.packSizeLabel}) شهراً بشهر خلال (يناير، فبراير، مارس، أبريل) مع نسب الارتفاع (▲) والانخفاض (▼).',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.8,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 18.0),
+
+          // Focused 2-Line Price Trajectory Canvas Chart (Own SKU vs Selected Competitor ONLY)
+          Container(
+            height: 280.0,
+            padding: const EdgeInsets.fromLTRB(18.0, 24.0, 22.0, 14.0),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(20.0),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+              ),
+            ),
+            child: CustomPaint(
+              painter: _MonthlyPriceTrajectoryPainter(
+                ownSeries: ownSeries,
+                competitorSeries: compSeries,
+                ownColor: colorScheme.primary,
+                compColor: compColor,
+                gridColor: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                textColor: colorScheme.onSurfaceVariant,
+                selectedMonth: _selectedMonth,
+              ),
+              child: const SizedBox.expand(),
+            ),
+          ),
+
+          if (shrinkflationDetected) ...[
+            const SizedBox(height: 14.0),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14.0,
+                vertical: 10.0,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF7E0),
+                borderRadius: BorderRadius.circular(12.0),
+                border: Border.all(
+                  color: const Color(0xFFEA8600).withValues(alpha: 0.5),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.lightbulb_outline_rounded,
+                    size: 19.0,
+                    color: Color(0xFFB06000),
+                  ),
+                  const SizedBox(width: 10.0),
+                  Expanded(
                     child: Text(
-                      'لا توجد أصناف منافسة تطابق هذا الفلتر حالياً.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                      'تنبيه الحجم الصافي (Shrinkflation): رغم أن سعر عبوة ${selectedCompetitor.brand} (${selectedCompetitor.unitPrice.toStringAsFixed(1)} ج.م) أقل من عبوتك (${effectiveOwnPrice.toStringAsFixed(1)} ج.م)، إلا أن عبوة المنافس (${selectedCompetitor.packSizeLabel}) أصغر حجماً، وبالتالي سعر الـ ${selectedCompetitor.volumeUnitLabel} عندك أرخص فعلياً (${effectiveOwnPricePerVol.toStringAsFixed(1)} مقابل ${selectedCompetitor.pricePerUnitVolume.toStringAsFixed(1)} ج.م)!',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF8A4B00),
+                        fontWeight: FontWeight.w700,
+                        height: 1.5,
                       ),
                     ),
                   ),
-                )
-              else
-                Column(
-                  children: [
-                    for (int idx = 0;
-                        idx < visibleCompetitors.length;
-                        idx++) ...[
-                      _buildCompetitorComparisonCard(
-                        context,
-                        group: group,
-                        competitor: visibleCompetitors[idx],
-                        seriesColor: _competitorSeriesColors[
-                            idx % _competitorSeriesColors.length],
-                        effectiveOwnPrice: effectiveOwnPrice,
-                        effectiveOwnPricePerVol: effectiveOwnPricePerVol,
-                      ),
-                      const SizedBox(height: 12.0),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 22.0),
+
+          // Month-by-Month Side-by-Side Breakdown (Jan, Feb, Mar, Apr) for Own SKU vs Selected Competitor
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'مقارنة الشهور (${_showFullTwoYearTimeline ? "2025 - 2026" : "يناير، فبراير، مارس، أبريل $_selectedYear"}) — ${group.ownBrand} مقابل ${selectedCompetitor.brand}:',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              Text(
+                'اضغط على أي شهر لتصفية المؤشرات به',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12.0),
+
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isDesktop =
+                  constraints.maxWidth >= 820.0 && ownSeries.length <= 4;
+              if (isDesktop) {
+                return IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (int i = 0; i < ownSeries.length; i++) ...[
+                        Expanded(
+                          child: _buildOneVsOneMonthCard(
+                            context,
+                            ownPoint: ownSeries[i],
+                            compPoint: _findMatchingMonthPoint(
+                              compSeries,
+                              ownSeries[i].year,
+                              ownSeries[i].monthNum,
+                            ),
+                            ownBrand: group.ownBrand,
+                            compBrand: selectedCompetitor.brand,
+                            compColor: compColor,
+                            isSelectedMonth:
+                                _selectedMonth == ownSeries[i].monthNum &&
+                                    _selectedYear == ownSeries[i].year,
+                            onTap: () {
+                              setState(() {
+                                _selectedYear = ownSeries[i].year;
+                                _selectedMonth =
+                                    _selectedMonth == ownSeries[i].monthNum
+                                        ? 0
+                                        : ownSeries[i].monthNum;
+                              });
+                              _loadCompetitiveData();
+                            },
+                          ),
+                        ),
+                        if (i < ownSeries.length - 1)
+                          const SizedBox(width: 12.0),
+                      ],
                     ],
+                  ),
+                );
+              }
+
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (int i = 0; i < ownSeries.length; i++)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(end: 12.0),
+                        child: SizedBox(
+                          width: 245.0,
+                          child: _buildOneVsOneMonthCard(
+                            context,
+                            ownPoint: ownSeries[i],
+                            compPoint: _findMatchingMonthPoint(
+                              compSeries,
+                              ownSeries[i].year,
+                              ownSeries[i].monthNum,
+                            ),
+                            ownBrand: group.ownBrand,
+                            compBrand: selectedCompetitor.brand,
+                            compColor: compColor,
+                            isSelectedMonth:
+                                _selectedMonth == ownSeries[i].monthNum &&
+                                    _selectedYear == ownSeries[i].year,
+                            onTap: () {
+                              setState(() {
+                                _selectedYear = ownSeries[i].year;
+                                _selectedMonth =
+                                    _selectedMonth == ownSeries[i].monthNum
+                                        ? 0
+                                        : ownSeries[i].monthNum;
+                              });
+                              _loadCompetitiveData();
+                            },
+                          ),
+                        ),
+                      ),
                   ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  SkuMonthlyPricePointModel? _findMatchingMonthPoint(
+    List<SkuMonthlyPricePointModel> list,
+    int year,
+    int monthNum,
+  ) {
+    for (final pt in list) {
+      if (pt.year == year && pt.monthNum == monthNum) return pt;
+    }
+    for (final pt in list) {
+      if (pt.monthNum == monthNum) return pt;
+    }
+    return list.isNotEmpty ? list.last : null;
+  }
+
+  /// Single Month Card (e.g. يناير 2026) comparing:
+  /// - Our Default SKU price & MoM change (▲/▼)
+  /// - Selected Competitor price & MoM change (▲/▼)
+  /// - Net Price Gap in that month
+  Widget _buildOneVsOneMonthCard(
+    BuildContext context, {
+    required SkuMonthlyPricePointModel ownPoint,
+    required SkuMonthlyPricePointModel? compPoint,
+    required String ownBrand,
+    required String compBrand,
+    required Color compColor,
+    required bool isSelectedMonth,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    String formatDelta(SkuMonthlyPricePointModel pt) {
+      if (pt.trendDirection == 'baseline') return 'بداية الفترة';
+      if (pt.trendDirection == 'up') {
+        return '▲ +${pt.priceChangePct.toStringAsFixed(1)}%';
+      }
+      if (pt.trendDirection == 'down') {
+        return '▼ ${pt.priceChangePct.toStringAsFixed(1)}%';
+      }
+      return '• مستقر (0%)';
+    }
+
+    Color deltaColor(SkuMonthlyPricePointModel pt) {
+      if (pt.trendDirection == 'up') return const Color(0xFFB06000);
+      if (pt.trendDirection == 'down') return const Color(0xFF0D652D);
+      return colorScheme.onSurfaceVariant;
+    }
+
+    final double gapEgp =
+        compPoint != null ? (compPoint.unitPrice - ownPoint.unitPrice) : 0.0;
+    final bool compHigher = gapEgp > 1.0;
+    final bool compLower = gapEgp < -1.0;
+
+    return Material(
+      color: isSelectedMonth
+          ? colorScheme.primaryContainer.withValues(alpha: 0.55)
+          : colorScheme.surface,
+      borderRadius: BorderRadius.circular(18.0),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18.0),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18.0),
+            border: Border.all(
+              color: isSelectedMonth
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant.withValues(alpha: 0.7),
+              width: isSelectedMonth ? 2.0 : 1.0,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Month Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    ownPoint.monthLabelAr,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 2.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: compHigher
+                          ? const Color(0xFFE6F4EA)
+                          : compLower
+                              ? const Color(0xFFFCE8E6)
+                              : colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(6.0),
+                    ),
+                    child: Text(
+                      compHigher
+                          ? 'المنافس +${gapEgp.toStringAsFixed(1)} ج'
+                          : compLower
+                              ? 'المنافس ${gapEgp.toStringAsFixed(1)} ج'
+                              : 'سعر متقارب',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        color: compHigher
+                            ? const Color(0xFF0D652D)
+                            : compLower
+                                ? const Color(0xFFA50E0E)
+                                : colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12.0),
+              const Divider(height: 1.0),
+              const SizedBox(height: 10.0),
+
+              // Row 1: Our Default SKU in this month
+              Container(
+                padding: const EdgeInsets.all(10.0),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'صنفنا ($ownBrand)',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                        Text(
+                          formatDelta(ownPoint),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
+                            color: deltaColor(ownPoint),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4.0),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${ownPoint.unitPrice.toStringAsFixed(2)} ج.م',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                        Text(
+                          '${ownPoint.unitsSold} عبوة',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 8.0),
+
+              // Row 2: Selected Competitor in this month
+              if (compPoint != null)
+                Container(
+                  padding: const EdgeInsets.all(10.0),
+                  decoration: BoxDecoration(
+                    color: compColor.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'المنافس ($compBrand)',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: compColor,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Text(
+                            formatDelta(compPoint),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                              color: deltaColor(compPoint),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4.0),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${compPoint.unitPrice.toStringAsFixed(2)} ج.م',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          Text(
+                            '${compPoint.unitsSold} عبوة',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
             ],
           ),
         ),
-
-        M3Spacing.gapMD,
-
-        // E. Monthly Price & Volume Evolution Matrix Table (مصفوفة تطور الأسعار والكميات الشهرية)
-        _buildMonthlyEvolutionMatrixCard(
-          context,
-          group: group,
-          competitors: adjustedCompetitors,
-        ),
-      ],
+      ),
     );
   }
 
@@ -1422,21 +2238,24 @@ class _CompetitorComparisonScreenState
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Identify in which month our price increased or decreased the most in the selected year
     String monthlyMovementSummary = 'استقرار سعري خلال شهور $_selectedYear';
     Color movementBg = colorScheme.secondaryContainer;
     Color movementFg = colorScheme.onSecondaryContainer;
     IconData movementIcon = Icons.timeline_rounded;
 
-    final changes = group.monthlyPrices.where((m) => m.priceChangePct.abs() >= 0.5).toList();
+    final changes = group.monthlyPrices
+        .where((m) => m.priceChangePct.abs() >= 0.5)
+        .toList();
     if (changes.isNotEmpty) {
       final upMonths = changes
           .where((m) => m.priceChangePct > 0.5)
-          .map((m) => '${m.monthNameAr} (+${m.priceChangePct.toStringAsFixed(1)}%)')
+          .map((m) =>
+              '${m.monthNameAr} (+${m.priceChangePct.toStringAsFixed(1)}%)')
           .toList();
       final downMonths = changes
           .where((m) => m.priceChangePct < -0.5)
-          .map((m) => '${m.monthNameAr} (${m.priceChangePct.toStringAsFixed(1)}%)')
+          .map((m) =>
+              '${m.monthNameAr} (${m.priceChangePct.toStringAsFixed(1)}%)')
           .toList();
 
       final parts = <String>[];
@@ -1504,7 +2323,7 @@ class _CompetitorComparisonScreenState
                             borderRadius: BorderRadius.circular(999.0),
                           ),
                           child: Text(
-                            'صنف شركتي ($_activePeriodLabelAr)',
+                            'صنفنا الافتراضي ($_activePeriodLabelAr)',
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: colorScheme.onPrimary,
                               fontWeight: FontWeight.w800,
@@ -1543,12 +2362,6 @@ class _CompetitorComparisonScreenState
                             ),
                           ),
                         ),
-                        Text(
-                          'باركود: ${group.ownBarcode}',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 10.0),
@@ -1562,8 +2375,6 @@ class _CompetitorComparisonScreenState
                   ],
                 ),
               ),
-
-              // Summary Price Boxes
               Wrap(
                 spacing: 10.0,
                 runSpacing: 10.0,
@@ -1571,7 +2382,7 @@ class _CompetitorComparisonScreenState
                   _buildSpotlightMetricBox(
                     context,
                     label: _selectedMonth == 0
-                        ? 'متوسط سعر بيعنا ($_selectedYear)'
+                        ? 'سعر بيعنا ($_selectedYear)'
                         : 'سعر بيعنا في $_activePeriodLabelAr',
                     value: '${effectiveOwnPrice.toStringAsFixed(2)} ج.م',
                     subValue:
@@ -1603,12 +2414,9 @@ class _CompetitorComparisonScreenState
               ),
             ],
           ),
-
           const SizedBox(height: 16.0),
           const Divider(height: 1.0),
           const SizedBox(height: 12.0),
-
-          // Quick Verdict Chips (How many competitors are higher vs lower + Monthly trajectory summary)
           Wrap(
             spacing: 10.0,
             runSpacing: 8.0,
@@ -1648,429 +2456,6 @@ class _CompetitorComparisonScreenState
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  /// Interactive Monthly Price Trajectory Chart Card (رسم بياني لحركة سعر الصنف والمنافسين عبر الشهور)
-  /// Shows when our SKU and each competing SKU increased or decreased in price across months.
-  Widget _buildMonthlyPriceTrajectoryChartCard(
-    BuildContext context, {
-    required OwnSkuCompetitiveGroupModel group,
-    required List<CompetitorSkuComparisonModel> competitors,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    final List<SkuMonthlyPricePointModel> ownSeries = _showFullTwoYearTimeline
-        ? group.allMonthlyPrices
-        : group.monthlyPrices;
-
-    return Container(
-      padding: const EdgeInsets.all(20.0),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24.0),
-        border: Border.all(
-          color: colorScheme.primary.withValues(alpha: 0.3),
-          width: 1.2,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header + Timeline Toggle (Selected Year 4 Months vs Full 2025-2026 8 Months)
-          Wrap(
-            spacing: 12.0,
-            runSpacing: 10.0,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12.0),
-                    ),
-                    child: Icon(
-                      Icons.auto_graph_rounded,
-                      color: colorScheme.primary,
-                      size: 22.0,
-                    ),
-                  ),
-                  const SizedBox(width: 12.0),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _showFullTwoYearTimeline
-                            ? 'منحنى حركة الأسعار الشهرية المقارن (2025 + 2026 — 8 شهور فعلية)'
-                            : 'منحنى حركة الأسعار الشهرية المقارن لسنة $_selectedYear (زاد إمتى ونزل إمتى؟)',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        'يرسم اتجاه سعر بيع صنفك (خط أزرق عريض) أمام أسعار المنافسين شهراً بشهر مع نسب الارتفاع (▲) والانخفاض (▼)',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-
-              // Toggle between 4 months of selected year vs 8 months (2025 + 2026)
-              Wrap(
-                spacing: 8.0,
-                children: [
-                  FilterChip(
-                    avatar: Icon(
-                      _showFullTwoYearTimeline
-                          ? Icons.visibility_rounded
-                          : Icons.date_range_rounded,
-                      size: 16.0,
-                    ),
-                    label: Text(
-                      _showFullTwoYearTimeline
-                          ? 'عرض شهور $_selectedYear فقط (4 شهور)'
-                          : 'دمج مسار 2025 + 2026 (8 شهور)',
-                    ),
-                    selected: _showFullTwoYearTimeline,
-                    onSelected: (v) {
-                      setState(() => _showFullTwoYearTimeline = v);
-                    },
-                  ),
-                  if (_highlightedCompetitorBarcode != null)
-                    ActionChip(
-                      avatar: const Icon(Icons.layers_clear_rounded, size: 16.0),
-                      label: const Text('إظهار كل المنافسين'),
-                      onPressed: () {
-                        setState(() => _highlightedCompetitorBarcode = null);
-                      },
-                    ),
-                ],
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14.0),
-
-          // Interactive Legend (Our SKU + Competitors - Click a competitor to isolate/highlight its curve)
-          Wrap(
-            spacing: 10.0,
-            runSpacing: 8.0,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              // Own SKU Legend Pill
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12.0,
-                  vertical: 6.0,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(999.0),
-                  border: Border.all(color: colorScheme.primary, width: 1.5),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 14.0,
-                      height: 4.0,
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary,
-                        borderRadius: BorderRadius.circular(2.0),
-                      ),
-                    ),
-                    const SizedBox(width: 6.0),
-                    Text(
-                      'صنفنا: ${group.ownBrand} (${group.ownUnitPrice.toStringAsFixed(1)} ج.م)',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Competitor Legend Pills
-              for (int i = 0; i < competitors.length; i++)
-                Builder(
-                  builder: (context) {
-                    final comp = competitors[i];
-                    final cColor = _competitorSeriesColors[
-                        i % _competitorSeriesColors.length];
-                    final isHighlighted = _highlightedCompetitorBarcode == null ||
-                        _highlightedCompetitorBarcode == comp.barcode;
-
-                    return InkWell(
-                      borderRadius: BorderRadius.circular(999.0),
-                      onTap: () {
-                        setState(() {
-                          if (_highlightedCompetitorBarcode == comp.barcode) {
-                            _highlightedCompetitorBarcode = null;
-                          } else {
-                            _highlightedCompetitorBarcode = comp.barcode;
-                          }
-                        });
-                      },
-                      child: AnimatedOpacity(
-                        duration: M3Motion.short3,
-                        opacity: isHighlighted ? 1.0 : 0.35,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 6.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: cColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(999.0),
-                            border: Border.all(
-                              color: cColor,
-                              width: _highlightedCompetitorBarcode ==
-                                      comp.barcode
-                                  ? 2.0
-                                  : 1.0,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 12.0,
-                                height: 12.0,
-                                decoration: BoxDecoration(
-                                  color: cColor,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6.0),
-                              Text(
-                                '${comp.brand} — ${comp.packSizeLabel} (${comp.unitPrice.toStringAsFixed(1)} ج.م)',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: colorScheme.onSurface,
-                                ),
-                              ),
-                              const SizedBox(width: 4.0),
-                              Text(
-                                comp.periodPriceChangePct > 0.5
-                                    ? '▲+${comp.periodPriceChangePct.toStringAsFixed(1)}%'
-                                    : comp.periodPriceChangePct < -0.5
-                                        ? '▼${comp.periodPriceChangePct.toStringAsFixed(1)}%'
-                                        : '• مستقر',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: comp.periodPriceChangePct > 0.5
-                                      ? const Color(0xFFB06000)
-                                      : comp.periodPriceChangePct < -0.5
-                                          ? const Color(0xFF1967D2)
-                                          : colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-            ],
-          ),
-
-          const SizedBox(height: 18.0),
-
-          // Multi-line Price Trajectory Canvas Chart
-          Container(
-            height: 270.0,
-            padding: const EdgeInsets.fromLTRB(16.0, 20.0, 20.0, 12.0),
-            decoration: BoxDecoration(
-              color: colorScheme.surface,
-              borderRadius: BorderRadius.circular(18.0),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.55),
-              ),
-            ),
-            child: CustomPaint(
-              painter: _MonthlyPriceTrajectoryPainter(
-                ownSeries: ownSeries,
-                competitorSeriesList: [
-                  for (int i = 0; i < competitors.length; i++)
-                    if (_highlightedCompetitorBarcode == null ||
-                        _highlightedCompetitorBarcode ==
-                            competitors[i].barcode)
-                      (
-                        points: _showFullTwoYearTimeline
-                            ? competitors[i].allMonthlyPrices
-                            : competitors[i].monthlyPrices,
-                        color: _competitorSeriesColors[
-                            i % _competitorSeriesColors.length],
-                        label: competitors[i].brand,
-                      ),
-                ],
-                ownColor: colorScheme.primary,
-                gridColor: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                textColor: colorScheme.onSurfaceVariant,
-                selectedMonth: _selectedMonth,
-              ),
-              child: const SizedBox.expand(),
-            ),
-          ),
-
-          const SizedBox(height: 16.0),
-
-          // Month-by-Month Breakdown Cards for Our Own SKU (متى زاد ومتى نزل + الكمية المباعة)
-          Text(
-            'تفاصيل حركة سعر صنفنا شهراً بشهر (${_showFullTwoYearTimeline ? "2025 - 2026" : "سنة $_selectedYear"}) وأثرها على المبيعات:',
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 10.0),
-
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final pt in ownSeries)
-                  Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 10.0),
-                    child: _buildOwnMonthStepCard(
-                      context,
-                      point: pt,
-                      isSelectedMonth:
-                          _selectedMonth == pt.monthNum &&
-                          _selectedYear == pt.year,
-                      onTap: () {
-                        setState(() {
-                          _selectedYear = pt.year;
-                          _selectedMonth =
-                              _selectedMonth == pt.monthNum ? 0 : pt.monthNum;
-                        });
-                        _loadCompetitiveData();
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOwnMonthStepCard(
-    BuildContext context, {
-    required SkuMonthlyPricePointModel point,
-    required bool isSelectedMonth,
-    required VoidCallback onTap,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    final bool isUp = point.trendDirection == 'up';
-    final bool isDown = point.trendDirection == 'down';
-    final bool isBaseline = point.trendDirection == 'baseline';
-
-    final Color badgeBg = isUp
-        ? const Color(0xFFFEF7E0)
-        : isDown
-            ? const Color(0xFFE6F4EA)
-            : colorScheme.surfaceContainerHighest;
-    final Color badgeFg = isUp
-        ? const Color(0xFFB06000)
-        : isDown
-            ? const Color(0xFF0D652D)
-            : colorScheme.onSurfaceVariant;
-
-    final String deltaLabel = isBaseline
-        ? 'شهر الأساس (بداية الفترة)'
-        : isUp
-            ? '▲ زاد +${point.priceChangeEgp.toStringAsFixed(1)} ج (+${point.priceChangePct.toStringAsFixed(1)}%)'
-            : isDown
-                ? '▼ نزل ${point.priceChangeEgp.toStringAsFixed(1)} ج (${point.priceChangePct.toStringAsFixed(1)}%)'
-                : '• مستقر (بدون تغير)';
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(16.0),
-      onTap: onTap,
-      child: Container(
-        width: 195.0,
-        padding: const EdgeInsets.all(12.0),
-        decoration: BoxDecoration(
-          color: isSelectedMonth
-              ? colorScheme.primaryContainer.withValues(alpha: 0.7)
-              : colorScheme.surface,
-          borderRadius: BorderRadius.circular(16.0),
-          border: Border.all(
-            color: isSelectedMonth
-                ? colorScheme.primary
-                : colorScheme.outlineVariant.withValues(alpha: 0.7),
-            width: isSelectedMonth ? 2.0 : 1.0,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  point.monthLabelAr,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: colorScheme.primary,
-                  ),
-                ),
-                Text(
-                  '${point.unitsSold} عبوة',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6.0),
-            Text(
-              '${point.unitPrice.toStringAsFixed(2)} ج.م',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 6.0),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 8.0,
-                vertical: 3.0,
-              ),
-              decoration: BoxDecoration(
-                color: badgeBg,
-                borderRadius: BorderRadius.circular(8.0),
-              ),
-              child: Text(
-                deltaLabel,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                  color: badgeFg,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -2163,12 +2548,10 @@ class _CompetitorComparisonScreenState
     );
   }
 
-  /// Interactive What-If Price Simulator Card
   Widget _buildWhatIfPriceSimulatorCard(
     BuildContext context, {
     required OwnSkuCompetitiveGroupModel group,
     required double effectiveOwnPrice,
-    required List<CompetitorSkuComparisonModel> adjustedCompetitors,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -2273,715 +2656,6 @@ class _CompetitorComparisonScreenState
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Individual Competitor SKU Card showing Higher/Lower badge, price gap,
-  /// normalized liter/kg price, volume share, AND its Monthly Price Trajectory Strip.
-  Widget _buildCompetitorComparisonCard(
-    BuildContext context, {
-    required OwnSkuCompetitiveGroupModel group,
-    required CompetitorSkuComparisonModel competitor,
-    required Color seriesColor,
-    required double effectiveOwnPrice,
-    required double effectiveOwnPricePerVol,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    final bool isCompHigher = competitor.pricePosition == 'higher';
-    final bool isCompLower = competitor.pricePosition == 'lower';
-
-    final Color statusBg = isCompHigher
-        ? const Color(0xFFE6F4EA)
-        : isCompLower
-            ? const Color(0xFFFCE8E6)
-            : colorScheme.secondaryContainer;
-    final Color statusFg = isCompHigher
-        ? const Color(0xFF0D652D)
-        : isCompLower
-            ? const Color(0xFFA50E0E)
-            : colorScheme.onSecondaryContainer;
-    final IconData statusIcon = isCompHigher
-        ? Icons.arrow_upward_rounded
-        : isCompLower
-            ? Icons.arrow_downward_rounded
-            : Icons.drag_handle_rounded;
-
-    final String verdictTitle = isCompHigher
-        ? 'المنافس أعلى من سعرك بـ +${competitor.priceDiffEgp.abs().toStringAsFixed(1)} ج.م (+${competitor.priceDiffPct.abs().toStringAsFixed(1)}%)'
-        : isCompLower
-            ? 'المنافس أقل من سعرك بـ -${competitor.priceDiffEgp.abs().toStringAsFixed(1)} ج.م (-${competitor.priceDiffPct.abs().toStringAsFixed(1)}%)'
-            : 'سعر المنافس مساوي لسعرك تقريباً';
-
-    final String verdictSubtitle = isCompHigher
-        ? 'صنفك أرخص للمستهلك في $_activePeriodLabelAr (ميزة تنافسية لصالحك)'
-        : isCompLower
-            ? 'المنافس يبيع بسعر أرخص منك في $_activePeriodLabelAr'
-            : 'تطابق سعري مباشر على الرف';
-
-    final double volDiff =
-        competitor.pricePerUnitVolume - effectiveOwnPricePerVol;
-    final bool shrinkflationDetected =
-        isCompLower && competitor.pricePerUnitVolume > effectiveOwnPricePerVol;
-
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(18.0),
-        border: Border.all(
-          color: isCompLower
-              ? const Color(0xFFA50E0E).withValues(alpha: 0.35)
-              : colorScheme.outlineVariant.withValues(alpha: 0.7),
-          width: isCompLower ? 1.5 : 1.0,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Wrap(
-            spacing: 12.0,
-            runSpacing: 12.0,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              // Competitor Info
-              SizedBox(
-                width: 370.0,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 6.0,
-                      runSpacing: 6.0,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Container(
-                          width: 10.0,
-                          height: 10.0,
-                          decoration: BoxDecoration(
-                            color: seriesColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8.0,
-                            vertical: 3.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.secondaryContainer,
-                            borderRadius: BorderRadius.circular(6.0),
-                          ),
-                          child: Text(
-                            competitor.brand,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: colorScheme.onSecondaryContainer,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          competitor.supplierName,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8.0,
-                            vertical: 2.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(6.0),
-                          ),
-                          child: Text(
-                            'عبوة: ${competitor.packSizeLabel}',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        if (competitor.isPromoActive)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8.0,
-                              vertical: 2.0,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFEF7E0),
-                              borderRadius: BorderRadius.circular(6.0),
-                              border:
-                                  Border.all(color: const Color(0xFFEA8600)),
-                            ),
-                            child: const Text(
-                              'تخفيض سعري نشط (Promo)',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFFB06000),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 6.0),
-                    Text(
-                      competitor.skuName,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Big Higher / Lower Verdict Badge
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14.0,
-                  vertical: 10.0,
-                ),
-                decoration: BoxDecoration(
-                  color: statusBg,
-                  borderRadius: BorderRadius.circular(14.0),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(statusIcon, color: statusFg, size: 22.0),
-                    const SizedBox(width: 8.0),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          verdictTitle,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            color: statusFg,
-                          ),
-                        ),
-                        Text(
-                          verdictSubtitle,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: statusFg.withValues(alpha: 0.9),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Price & Normalized Price & Volume Metrics
-              Wrap(
-                spacing: 16.0,
-                runSpacing: 8.0,
-                children: [
-                  _buildMiniMetricColumn(
-                    context,
-                    label: 'سعر بيع المنافس',
-                    value: '${competitor.unitPrice.toStringAsFixed(2)} ج.م',
-                    subText:
-                        'مقابل ${effectiveOwnPrice.toStringAsFixed(2)} ج.م عندنا',
-                    valueColor: statusFg,
-                  ),
-                  _buildMiniMetricColumn(
-                    context,
-                    label: 'سعر الـ ${competitor.volumeUnitLabel} الصافي',
-                    value:
-                        '${competitor.pricePerUnitVolume.toStringAsFixed(1)} ج/${competitor.volumeUnitLabel}',
-                    subText: volDiff > 0
-                        ? 'أغلى بـ +${volDiff.toStringAsFixed(1)} ج/${competitor.volumeUnitLabel}'
-                        : volDiff < 0
-                            ? 'أرخص بـ ${volDiff.toStringAsFixed(1)} ج/${competitor.volumeUnitLabel}'
-                            : 'نفس سعر الـ ${competitor.volumeUnitLabel}',
-                  ),
-                  _buildMiniMetricColumn(
-                    context,
-                    label: 'مبيعات وحصة المنافس',
-                    value: '${competitor.categorySharePct.toStringAsFixed(1)}%',
-                    subText: '${competitor.unitsSold} عبوة مباعة',
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          // Monthly Price Trajectory Strip for this Competitor (متى زاد أو نزل سعر هذا المنافس عبر شهور السنة)
-          if (competitor.monthlyPrices.isNotEmpty) ...[
-            const SizedBox(height: 12.0),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12.0,
-                vertical: 9.0,
-              ),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12.0),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                ),
-              ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.timeline_rounded,
-                      size: 16.0,
-                      color: seriesColor,
-                    ),
-                    const SizedBox(width: 6.0),
-                    Text(
-                      'حركة سعر المنافس في شهور $_selectedYear:',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(width: 10.0),
-                    for (int mIdx = 0;
-                        mIdx < competitor.monthlyPrices.length;
-                        mIdx++) ...[
-                      Builder(
-                        builder: (context) {
-                          final mp = competitor.monthlyPrices[mIdx];
-                          final isUp = mp.trendDirection == 'up';
-                          final isDown = mp.trendDirection == 'down';
-                          final isBase = mp.trendDirection == 'baseline';
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10.0,
-                              vertical: 4.0,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isUp
-                                  ? const Color(0xFFFEF7E0)
-                                  : isDown
-                                      ? const Color(0xFFE6F4EA)
-                                      : colorScheme.surface,
-                              borderRadius: BorderRadius.circular(8.0),
-                              border: Border.all(
-                                color: _selectedMonth == mp.monthNum
-                                    ? seriesColor
-                                    : colorScheme.outlineVariant
-                                        .withValues(alpha: 0.5),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '${mp.monthNameAr}: ',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                Text(
-                                  '${mp.unitPrice.toStringAsFixed(1)} ج.م',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                if (!isBase) ...[
-                                  const SizedBox(width: 5.0),
-                                  Text(
-                                    isUp
-                                        ? '▲+${mp.priceChangePct.toStringAsFixed(1)}%'
-                                        : isDown
-                                            ? '▼${mp.priceChangePct.toStringAsFixed(1)}%'
-                                            : '•0%',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: isUp
-                                          ? const Color(0xFFB06000)
-                                          : isDown
-                                              ? const Color(0xFF0D652D)
-                                              : colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(width: 5.0),
-                                Text(
-                                  '(${mp.unitsSold}u)',
-                                  style: TextStyle(
-                                    fontSize: 10.0,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                      if (mIdx < competitor.monthlyPrices.length - 1)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                          child: Icon(
-                            Icons.arrow_back_rounded,
-                            size: 13.0,
-                            color: colorScheme.outline,
-                          ),
-                        ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-
-          // Shrinkflation Alert if competitor pack price looks cheaper only because of smaller pack volume!
-          if (shrinkflationDetected) ...[
-            const SizedBox(height: 10.0),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12.0,
-                vertical: 8.0,
-              ),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF7E0),
-                borderRadius: BorderRadius.circular(10.0),
-                border: Border.all(
-                  color: const Color(0xFFEA8600).withValues(alpha: 0.5),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.lightbulb_outline_rounded,
-                    size: 18.0,
-                    color: Color(0xFFB06000),
-                  ),
-                  const SizedBox(width: 8.0),
-                  Expanded(
-                    child: Text(
-                      'تنبيه ذكي (Shrinkflation): رغم أن سعر عبوة المنافس (${competitor.unitPrice.toStringAsFixed(1)} ج.م) يبدو أقل من عبوتك (${effectiveOwnPrice.toStringAsFixed(1)} ج.م)، إلا أن عبوة المنافس أصغر حجماً (${competitor.packSizeLabel})، وبالتالي سعر الـ ${competitor.volumeUnitLabel} عندك أرخص فعلياً (${effectiveOwnPricePerVol.toStringAsFixed(1)} مقابل ${competitor.pricePerUnitVolume.toStringAsFixed(1)} ج.م)!',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: const Color(0xFF8A4B00),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniMetricColumn(
-    BuildContext context, {
-    required String label,
-    required String value,
-    required String subText,
-    Color? valueColor,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-        Text(
-          value,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w900,
-            color: valueColor ?? colorScheme.onSurface,
-          ),
-        ),
-        Text(
-          subText,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-            fontSize: 10.5,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Monthly Price & Volume Evolution Matrix Table across the months of the selected year
-  /// Replaces the old synthetic multi-chain matrix with 100% real monthly trajectory data.
-  Widget _buildMonthlyEvolutionMatrixCard(
-    BuildContext context, {
-    required OwnSkuCompetitiveGroupModel group,
-    required List<CompetitorSkuComparisonModel> competitors,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    final months = [
-      (num: 1, name: 'يناير $_selectedYear'),
-      (num: 2, name: 'فبراير $_selectedYear'),
-      (num: 3, name: 'مارس $_selectedYear'),
-      (num: 4, name: 'أبريل $_selectedYear'),
-    ];
-
-    SkuMonthlyPricePointModel? findMonthPoint(
-      List<SkuMonthlyPricePointModel> list,
-      int monthNum,
-    ) {
-      for (final m in list) {
-        if (m.monthNum == monthNum) return m;
-      }
-      return list.isNotEmpty ? list.last : null;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(18.0),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24.0),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.65),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.table_chart_rounded, color: colorScheme.primary),
-              const SizedBox(width: 8.0),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'مصفوفة تطور الأسعار والكميات الشهرية لسنة $_selectedYear (أسواق فتح الله الفعلية)',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      'مقارنة دقيقة لسعر البيع والكميات المباعة ونسبة الارتفاع/الانخفاض لكل شهر بين صنفك وجميع المنافسين',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          M3Spacing.gapMD,
-          TableScrollContainer(
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(
-                colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-              ),
-              columns: [
-                const DataColumn(label: Text('الصنف / العلامة التجارية')),
-                const DataColumn(label: Text('العبوة')),
-                for (final m in months) DataColumn(label: Text(m.name)),
-                const DataColumn(label: Text('إجمالي التغير السعري')),
-              ],
-              rows: [
-                // Row 0: Our Own SKU
-                DataRow(
-                  color: WidgetStateProperty.all(
-                    colorScheme.primaryContainer.withValues(alpha: 0.35),
-                  ),
-                  cells: [
-                    DataCell(
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.stars_rounded,
-                            size: 18.0,
-                            color: colorScheme.primary,
-                          ),
-                          const SizedBox(width: 6.0),
-                          Text(
-                            '${group.ownBrand} — ${group.ownSkuName}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        group.packSizeLabel,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                    for (final m in months)
-                      DataCell(
-                        Builder(
-                          builder: (context) {
-                            final pt =
-                                findMonthPoint(group.monthlyPrices, m.num);
-                            if (pt == null) return const Text('-');
-                            final isUp = pt.trendDirection == 'up';
-                            final isDown = pt.trendDirection == 'down';
-                            return Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '${pt.unitPrice.toStringAsFixed(2)} ج.م',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        color: colorScheme.primary,
-                                      ),
-                                    ),
-                                    if (pt.trendDirection != 'baseline') ...[
-                                      const SizedBox(width: 4.0),
-                                      Text(
-                                        isUp
-                                            ? '▲+${pt.priceChangePct.toStringAsFixed(1)}%'
-                                            : isDown
-                                                ? '▼${pt.priceChangePct.toStringAsFixed(1)}%'
-                                                : '•',
-                                        style: TextStyle(
-                                          fontSize: 11.0,
-                                          fontWeight: FontWeight.w800,
-                                          color: isUp
-                                              ? const Color(0xFFB06000)
-                                              : isDown
-                                                  ? const Color(0xFF0D652D)
-                                                  : colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                Text(
-                                  '${pt.unitsSold} عبوة',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                    DataCell(
-                      Text(
-                        '${group.periodPriceChangePct >= 0 ? '+' : ''}${group.periodPriceChangePct.toStringAsFixed(1)}% (${group.periodPriceChangeEgp >= 0 ? '+' : ''}${group.periodPriceChangeEgp.toStringAsFixed(1)} ج.م)',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          color: group.periodPriceChangePct > 0.5
-                              ? const Color(0xFFB06000)
-                              : group.periodPriceChangePct < -0.5
-                                  ? const Color(0xFF1967D2)
-                                  : colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                // Competitor Rows
-                for (final comp in competitors)
-                  DataRow(
-                    cells: [
-                      DataCell(
-                        Text(
-                          '${comp.brand} — ${comp.skuName}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      DataCell(Text(comp.packSizeLabel)),
-                      for (final m in months)
-                        DataCell(
-                          Builder(
-                            builder: (context) {
-                              final pt =
-                                  findMonthPoint(comp.monthlyPrices, m.num);
-                              if (pt == null) return const Text('-');
-                              final isUp = pt.trendDirection == 'up';
-                              final isDown = pt.trendDirection == 'down';
-                              return Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        '${pt.unitPrice.toStringAsFixed(2)} ج.م',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                      if (pt.trendDirection != 'baseline') ...[
-                                        const SizedBox(width: 4.0),
-                                        Text(
-                                          isUp
-                                              ? '▲+${pt.priceChangePct.toStringAsFixed(1)}%'
-                                              : isDown
-                                                  ? '▼${pt.priceChangePct.toStringAsFixed(1)}%'
-                                                  : '•',
-                                          style: TextStyle(
-                                            fontSize: 11.0,
-                                            fontWeight: FontWeight.w800,
-                                            color: isUp
-                                                ? const Color(0xFFB06000)
-                                                : isDown
-                                                    ? const Color(0xFF0D652D)
-                                                    : colorScheme
-                                                        .onSurfaceVariant,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  Text(
-                                    '${pt.unitsSold} عبوة',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                      DataCell(
-                        Text(
-                          '${comp.periodPriceChangePct >= 0 ? '+' : ''}${comp.periodPriceChangePct.toStringAsFixed(1)}% (${comp.periodPriceChangeEgp >= 0 ? '+' : ''}${comp.periodPriceChangeEgp.toStringAsFixed(1)} ج.م)',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: comp.periodPriceChangePct > 0.5
-                                ? const Color(0xFFB06000)
-                                : comp.periodPriceChangePct < -0.5
-                                    ? const Color(0xFF1967D2)
-                                    : colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
           ),
         ],
       ),
@@ -3097,21 +2771,23 @@ class _CompetitorComparisonScreenState
   }
 }
 
-/// Custom Painter that renders the Multi-Line Monthly Price Trajectory Chart
-/// for our Own SKU (thick primary line with price + ▲/▼ badges) and all Competing SKUs.
+/// Focused 2-Line Monthly Price Trajectory Painter:
+/// Draws ONLY our Default Own SKU (Thick Primary Blue Line) and the Selected Competitor SKU (Thick Accent Line)
+/// with clear price callouts and ▲/▼ badges at each month (يناير، فبراير، مارس، أبريل).
 class _MonthlyPriceTrajectoryPainter extends CustomPainter {
   final List<SkuMonthlyPricePointModel> ownSeries;
-  final List<({List<SkuMonthlyPricePointModel> points, Color color, String label})>
-      competitorSeriesList;
+  final List<SkuMonthlyPricePointModel> competitorSeries;
   final Color ownColor;
+  final Color compColor;
   final Color gridColor;
   final Color textColor;
   final int selectedMonth;
 
   _MonthlyPriceTrajectoryPainter({
     required this.ownSeries,
-    required this.competitorSeriesList,
+    required this.competitorSeries,
     required this.ownColor,
+    required this.compColor,
     required this.gridColor,
     required this.textColor,
     required this.selectedMonth,
@@ -3121,15 +2797,14 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (ownSeries.isEmpty) return;
 
-    const double leftPad = 56.0;
-    const double rightPad = 24.0;
-    const double topPad = 24.0;
-    const double bottomPad = 34.0;
+    const double leftPad = 58.0;
+    const double rightPad = 28.0;
+    const double topPad = 28.0;
+    const double bottomPad = 36.0;
 
     final double chartW = math.max(10.0, size.width - leftPad - rightPad);
     final double chartH = math.max(10.0, size.height - topPad - bottomPad);
 
-    // Compute global min/max price across own + visible competitors
     double minP = double.infinity;
     double maxP = 0.0;
 
@@ -3137,20 +2812,18 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
       if (pt.unitPrice < minP) minP = pt.unitPrice;
       if (pt.unitPrice > maxP) maxP = pt.unitPrice;
     }
-    for (final comp in competitorSeriesList) {
-      for (final pt in comp.points) {
-        if (pt.unitPrice < minP) minP = pt.unitPrice;
-        if (pt.unitPrice > maxP) maxP = pt.unitPrice;
-      }
+    for (final pt in competitorSeries) {
+      if (pt.unitPrice < minP) minP = pt.unitPrice;
+      if (pt.unitPrice > maxP) maxP = pt.unitPrice;
     }
 
     if (!minP.isFinite || maxP <= 0) {
       minP = 0;
       maxP = 100;
     }
-    final double span = math.max(10.0, maxP - minP);
-    final double yMin = math.max(0.0, minP - span * 0.18);
-    final double yMax = maxP + span * 0.22;
+    final double span = math.max(12.0, maxP - minP);
+    final double yMin = math.max(0.0, minP - span * 0.22);
+    final double yMax = maxP + span * 0.25;
 
     double priceToY(double price) {
       final norm = (price - yMin) / math.max(1.0, yMax - yMin);
@@ -3162,7 +2835,7 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
       return leftPad + (idx / (count - 1)) * chartW;
     }
 
-    // 1. Draw Horizontal Grid Lines & Y-Axis Price Labels
+    // 1. Horizontal Grid Lines & Y-Axis Labels
     final gridPaint = Paint()
       ..color = gridColor
       ..strokeWidth = 1.0;
@@ -3182,7 +2855,7 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
           text: '${val.toStringAsFixed(0)} ج',
           style: TextStyle(
             color: textColor,
-            fontSize: 10.5,
+            fontSize: 11.0,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -3191,7 +2864,7 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
       tp.paint(canvas, Offset(leftPad - tp.width - 8.0, y - tp.height / 2));
     }
 
-    // 2. Draw X-Axis Month Labels & Vertical Guide Lines
+    // 2. X-Axis Month Labels & Vertical Guide Lines
     final int n = ownSeries.length;
     for (int i = 0; i < n; i++) {
       final x = indexToX(i, n);
@@ -3203,57 +2876,97 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
         Offset(x, topPad + chartH),
         Paint()
           ..color = isHighlightedMonth
-              ? ownColor.withValues(alpha: 0.35)
+              ? ownColor.withValues(alpha: 0.4)
               : gridColor.withValues(alpha: 0.45)
           ..strokeWidth = isHighlightedMonth ? 2.0 : 1.0,
       );
 
-      final label = n > 4 ? '${pt.monthNameAr} ${pt.year % 100}' : pt.monthNameAr;
+      final label =
+          n > 4 ? '${pt.monthNameAr} ${pt.year % 100}' : pt.monthNameAr;
       final tp = TextPainter(
         text: TextSpan(
           text: label,
           style: TextStyle(
             color: isHighlightedMonth ? ownColor : textColor,
-            fontSize: 11.5,
+            fontSize: 12.0,
             fontWeight:
-                isHighlightedMonth ? FontWeight.w900 : FontWeight.w700,
+                isHighlightedMonth ? FontWeight.w900 : FontWeight.w800,
           ),
         ),
         textDirection: TextDirection.rtl,
       )..layout();
-      tp.paint(canvas, Offset(x - tp.width / 2, topPad + chartH + 8.0));
+      tp.paint(canvas, Offset(x - tp.width / 2, topPad + chartH + 9.0));
     }
 
-    // 3. Draw Competitor Lines (dashed/secondary stroke + dots + price labels)
-    for (final comp in competitorSeriesList) {
-      final pts = comp.points;
-      if (pts.isEmpty) continue;
-      final path = Path();
-      for (int i = 0; i < pts.length; i++) {
-        final x = indexToX(i, pts.length);
-        final y = priceToY(pts[i].unitPrice);
+    // 3. Draw Selected Competitor Line + Callouts
+    if (competitorSeries.isNotEmpty) {
+      final compPath = Path();
+      final cn = competitorSeries.length;
+      for (int i = 0; i < cn; i++) {
+        final x = indexToX(i, cn);
+        final y = priceToY(competitorSeries[i].unitPrice);
         if (i == 0) {
-          path.moveTo(x, y);
+          compPath.moveTo(x, y);
         } else {
-          path.lineTo(x, y);
+          compPath.lineTo(x, y);
         }
       }
       canvas.drawPath(
-        path,
+        compPath,
         Paint()
-          ..color = comp.color.withValues(alpha: 0.85)
+          ..color = compColor
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.2
-          ..strokeCap = StrokeCap.round,
+          ..strokeWidth = 3.0
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
       );
 
-      for (int i = 0; i < pts.length; i++) {
-        final x = indexToX(i, pts.length);
-        final y = priceToY(pts[i].unitPrice);
-        canvas.drawCircle(
-          Offset(x, y),
-          4.0,
-          Paint()..color = comp.color,
+      for (int i = 0; i < cn; i++) {
+        final pt = competitorSeries[i];
+        final x = indexToX(i, cn);
+        final y = priceToY(pt.unitPrice);
+
+        canvas.drawCircle(Offset(x, y), 6.0, Paint()..color = Colors.white);
+        canvas.drawCircle(Offset(x, y), 4.5, Paint()..color = compColor);
+
+        final String arrow = pt.trendDirection == 'up'
+            ? '▲'
+            : pt.trendDirection == 'down'
+                ? '▼'
+                : '';
+        final calloutText = '${pt.unitPrice.toStringAsFixed(1)} $arrow'.trim();
+        final tp = TextPainter(
+          text: TextSpan(
+            text: calloutText,
+            style: TextStyle(
+              color: compColor,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          textDirection: TextDirection.rtl,
+        )..layout();
+
+        // Position callout below point if competitor price is lower than own price, else above
+        final ownPtY = i < ownSeries.length
+            ? priceToY(ownSeries[i].unitPrice)
+            : y;
+        final double dyOffset = (y >= ownPtY) ? 16.0 : -16.0;
+
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(
+              center: Offset(x, y + dyOffset),
+              width: tp.width + 10.0,
+              height: tp.height + 4.0,
+            ),
+            const Radius.circular(6.0),
+          ),
+          Paint()..color = Colors.white.withValues(alpha: 0.92),
+        );
+        tp.paint(
+          canvas,
+          Offset(x - tp.width / 2, y + dyOffset - tp.height / 2),
         );
       }
     }
@@ -3283,7 +2996,7 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
       Paint()
         ..shader = LinearGradient(
           colors: [
-            ownColor.withValues(alpha: 0.20),
+            ownColor.withValues(alpha: 0.18),
             ownColor.withValues(alpha: 0.01),
           ],
           begin: Alignment.topCenter,
@@ -3296,27 +3009,18 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
       Paint()
         ..color = ownColor
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.5
+        ..strokeWidth = 3.8
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
     );
 
-    // Draw Own SKU Points & Price + Trend Callouts
     for (int i = 0; i < n; i++) {
       final pt = ownSeries[i];
       final x = indexToX(i, n);
       final y = priceToY(pt.unitPrice);
 
-      canvas.drawCircle(
-        Offset(x, y),
-        6.5,
-        Paint()..color = Colors.white,
-      );
-      canvas.drawCircle(
-        Offset(x, y),
-        5.0,
-        Paint()..color = ownColor,
-      );
+      canvas.drawCircle(Offset(x, y), 7.0, Paint()..color = Colors.white);
+      canvas.drawCircle(Offset(x, y), 5.2, Paint()..color = ownColor);
 
       final String arrow = pt.trendDirection == 'up'
           ? '▲'
@@ -3329,32 +3033,37 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
           text: calloutText,
           style: TextStyle(
             color: ownColor,
-            fontSize: 10.5,
+            fontSize: 11.0,
             fontWeight: FontWeight.w900,
           ),
         ),
         textDirection: TextDirection.rtl,
       )..layout();
 
+      final compPtY = i < competitorSeries.length
+          ? priceToY(competitorSeries[i].unitPrice)
+          : y + 20.0;
+      final double dyOffset = (y <= compPtY) ? -17.0 : 17.0;
+
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromCenter(
-            center: Offset(x, y - 15.0),
+            center: Offset(x, y + dyOffset),
             width: tp.width + 10.0,
             height: tp.height + 4.0,
           ),
           const Radius.circular(6.0),
         ),
-        Paint()..color = Colors.white.withValues(alpha: 0.92),
+        Paint()..color = Colors.white.withValues(alpha: 0.94),
       );
-      tp.paint(canvas, Offset(x - tp.width / 2, y - 15.0 - tp.height / 2));
+      tp.paint(canvas, Offset(x - tp.width / 2, y + dyOffset - tp.height / 2));
     }
   }
 
   @override
   bool shouldRepaint(covariant _MonthlyPriceTrajectoryPainter oldDelegate) {
     return oldDelegate.ownSeries != ownSeries ||
-        oldDelegate.competitorSeriesList != competitorSeriesList ||
+        oldDelegate.competitorSeries != competitorSeries ||
         oldDelegate.selectedMonth != selectedMonth ||
         oldDelegate.ownColor != ownColor;
   }

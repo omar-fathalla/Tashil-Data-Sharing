@@ -9087,23 +9087,6 @@ class ApiClient {
               '2026-04': (price: 94.96, units: 3633),
             },
           ),
-          _RawCompetitorSeed(
-            barcode: '6221143099551',
-            skuName: 'بريل 2.5 ك + جنرال أرضيات 720 جم باندل',
-            brand: 'بريل (Pril)',
-            supplierName: 'هنكل برسيل (3)',
-            isPinnedDirect: true,
-            monthlyData: {
-              '2025-01': (price: 102.48, units: 5488),
-              '2025-02': (price: 103.79, units: 5732),
-              '2025-03': (price: 108.97, units: 1186),
-              '2025-04': (price: 102.85, units: 3582),
-              '2026-01': (price: 103.78, units: 3931),
-              '2026-02': (price: 109.48, units: 5730),
-              '2026-03': (price: 110.25, units: 4242),
-              '2026-04': (price: 110.22, units: 4053),
-            },
-          ),
         ],
       ),
       // 2. صابون سائل اطباق - فيبا صابون سائل للاطباق بالليمون 4كجم
@@ -9141,6 +9124,23 @@ class ApiClient {
             },
           ),
           _RawCompetitorSeed(
+            barcode: '8700216349376',
+            skuName: 'فيرى المركز سائل اطباق ليمون 2 لتر',
+            brand: 'فيري (Fairy)',
+            supplierName: 'بروكتر و جامبل مصر',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 184.96, units: 2332),
+              '2025-02': (price: 155.44, units: 4152),
+              '2025-03': (price: 159.87, units: 3740),
+              '2025-04': (price: 195.91, units: 2450),
+              '2026-01': (price: 210.00, units: 1452),
+              '2026-02': (price: 210.00, units: 1537),
+              '2026-03': (price: 210.00, units: 1701),
+              '2026-04': (price: 210.00, units: 1220),
+            },
+          ),
+          _RawCompetitorSeed(
             barcode: '6223002551446',
             skuName: 'وفير بلس سائل ليمون اخضر 4كجم',
             brand: 'وفير (Wafeer)',
@@ -9155,23 +9155,6 @@ class ApiClient {
               '2026-02': (price: 81.79, units: 4093),
               '2026-03': (price: 80.52, units: 4219),
               '2026-04': (price: 94.34, units: 3430),
-            },
-          ),
-          _RawCompetitorSeed(
-            barcode: '6221143099551',
-            skuName: 'بريل 2.5 ك + جنرال أرضيات 720 جم باندل',
-            brand: 'بريل (Pril)',
-            supplierName: 'هنكل برسيل (3)',
-            isPinnedDirect: true,
-            monthlyData: {
-              '2025-01': (price: 102.48, units: 5488),
-              '2025-02': (price: 103.79, units: 5732),
-              '2025-03': (price: 108.97, units: 1186),
-              '2025-04': (price: 102.85, units: 3582),
-              '2026-01': (price: 103.78, units: 3931),
-              '2026-02': (price: 109.48, units: 5730),
-              '2026-03': (price: 110.25, units: 4242),
-              '2026-04': (price: 110.22, units: 4053),
             },
           ),
         ],
@@ -9200,28 +9183,14 @@ class ApiClient {
             supplierName: 'بروكتر و جامبل مصر',
             isPinnedDirect: true,
             monthlyData: {
+              '2025-01': (price: 226.50, units: 3920),
+              '2025-02': (price: 227.80, units: 4110),
+              '2025-03': (price: 228.40, units: 3890),
               '2025-04': (price: 229.84, units: 4050),
               '2026-01': (price: 232.35, units: 5148),
               '2026-02': (price: 228.95, units: 5111),
               '2026-03': (price: 234.76, units: 4800),
               '2026-04': (price: 250.86, units: 4420),
-            },
-          ),
-          _RawCompetitorSeed(
-            barcode: '6223006125803',
-            skuName: 'اوكسى جل نسيم العطور 4كجم',
-            brand: 'أوكسي (Oxi)',
-            supplierName: 'ارما التجارية - منظفات',
-            isPinnedDirect: true,
-            monthlyData: {
-              '2025-01': (price: 212.41, units: 2980),
-              '2025-02': (price: 195.56, units: 4802),
-              '2025-03': (price: 203.69, units: 2790),
-              '2025-04': (price: 216.34, units: 4006),
-              '2026-01': (price: 241.77, units: 2914),
-              '2026-02': (price: 242.23, units: 2584),
-              '2026-03': (price: 245.20, units: 2107),
-              '2026-04': (price: 276.78, units: 1591),
             },
           ),
           _RawCompetitorSeed(
@@ -9364,23 +9333,6 @@ class ApiClient {
               '2026-04': (price: 140.71, units: 2238),
             },
           ),
-          _RawCompetitorSeed(
-            barcode: '5413149638129',
-            skuName: 'داونى منعم ملابس نسيم الوادي 3لتر',
-            brand: 'داوني (Downy)',
-            supplierName: 'بروكتر و جامبل مصر',
-            isPinnedDirect: true,
-            monthlyData: {
-              '2025-01': (price: 284.88, units: 958),
-              '2025-02': (price: 226.49, units: 1784),
-              '2025-03': (price: 220.00, units: 1642),
-              '2025-04': (price: 232.67, units: 1422),
-              '2026-01': (price: 236.02, units: 1121),
-              '2026-02': (price: 236.00, units: 1327),
-              '2026-03': (price: 236.00, units: 1384),
-              '2026-04': (price: 236.00, units: 1446),
-            },
-          ),
         ],
       ),
       // 6. كلور ألوان - شنطة كلوريل
@@ -9415,23 +9367,6 @@ class ApiClient {
               '2026-02': (price: 85.00, units: 2459),
               '2026-03': (price: 85.00, units: 2400),
               '2026-04': (price: 103.62, units: 1659),
-            },
-          ),
-          _RawCompetitorSeed(
-            barcode: '6221152011261',
-            skuName: 'كلوركس الوان زهور 950 مل',
-            brand: 'كلوركس (Clorox)',
-            supplierName: 'الموزعون المتحدون',
-            isPinnedDirect: true,
-            monthlyData: {
-              '2025-01': (price: 45.17, units: 7668),
-              '2025-02': (price: 46.11, units: 9810),
-              '2025-03': (price: 54.00, units: 7046),
-              '2025-04': (price: 54.00, units: 6580),
-              '2026-01': (price: 44.00, units: 4261),
-              '2026-02': (price: 44.00, units: 4727),
-              '2026-03': (price: 44.00, units: 4337),
-              '2026-04': (price: 54.91, units: 4650),
             },
           ),
           _RawCompetitorSeed(
@@ -9485,23 +9420,6 @@ class ApiClient {
               '2026-02': (price: 60.47, units: 1888),
               '2026-03': (price: 64.94, units: 1579),
               '2026-04': (price: 77.85, units: 1884),
-            },
-          ),
-          _RawCompetitorSeed(
-            barcode: '6221152001453',
-            skuName: 'كلوركس 0.5 جالون 1.89لتر',
-            brand: 'كلوركس (Clorox)',
-            supplierName: 'الموزعون المتحدون',
-            isPinnedDirect: true,
-            monthlyData: {
-              '2025-01': (price: 41.35, units: 3130),
-              '2025-02': (price: 41.60, units: 3232),
-              '2025-03': (price: 41.33, units: 2330),
-              '2025-04': (price: 41.00, units: 2672),
-              '2026-01': (price: 41.75, units: 1694),
-              '2026-02': (price: 41.75, units: 1950),
-              '2026-03': (price: 41.75, units: 1806),
-              '2026-04': (price: 48.17, units: 1830),
             },
           ),
         ],
@@ -9661,19 +9579,6 @@ class ApiClient {
               '2026-02': (price: 401.09, units: 336),
               '2026-03': (price: 492.58, units: 236),
               '2026-04': (price: 515.00, units: 174),
-            },
-          ),
-          _RawCompetitorSeed(
-            barcode: '6222048703482',
-            skuName: 'ديتول سائل مطهر عام 475مل اسعار وزمان',
-            brand: 'ديتول (Dettol)',
-            supplierName: 'راشدين ايجيبت-منظفات(7)',
-            isPinnedDirect: true,
-            monthlyData: {
-              '2026-01': (price: 175.00, units: 896),
-              '2026-02': (price: 175.00, units: 1185),
-              '2026-03': (price: 175.00, units: 1190),
-              '2026-04': (price: 175.00, units: 1456),
             },
           ),
         ],
@@ -9951,26 +9856,6 @@ class ApiClient {
       return (price: activePrice, units: totalUnits, recommendedPrice: avgPrice);
     }
 
-    // Aggregate any additional live records by category + barcode + month
-    final liveCompByCat = <String, Map<String, ({String skuName, String supplier, Map<String, ({double rev, int units})> byMonth})>>{};
-    for (final rec in liveRecords) {
-      if (!rec.isOwnBrand && rec.unitPrice > 0 && rec.quantitySold > 0) {
-        final normCat = normalizeCategoryName(rec.category);
-        final catMap = liveCompByCat.putIfAbsent(normCat, () => {});
-        final bKey = rec.barcode.isNotEmpty ? rec.barcode : rec.skuName;
-        final item = catMap.putIfAbsent(
-          bKey,
-          () => (skuName: rec.skuName, supplier: rec.supplier, byMonth: {}),
-        );
-        final mKey = rec.transactionDate.length >= 7 ? rec.transactionDate.substring(0, 7) : '$year-01';
-        final prev = item.byMonth[mKey];
-        item.byMonth[mKey] = (
-          rev: (prev?.rev ?? 0.0) + rec.netRevenue,
-          units: (prev?.units ?? 0) + rec.quantitySold,
-        );
-      }
-    }
-
     final result = <OwnSkuCompetitiveGroupModel>[];
 
     for (final seed in rawDefs) {
@@ -9987,35 +9872,13 @@ class ApiClient {
       final ownAllTrajectory = buildMonthlyPriceTrajectory(seed.monthlyData);
 
       double totalCatRev = effectiveOwnPrice * ownResolved.units;
-      final compSeeds = List<_RawCompetitorSeed>.from(seed.competitors);
 
-      // Merge any extra live uploaded competitors for the same category
-      final normCat = normalizeCategoryName(seed.category);
-      final extraMap = liveCompByCat[normCat] ?? const {};
-      final seenCompBarcodes = compSeeds.map((e) => e.barcode).toSet();
-      for (final entry in extraMap.entries) {
-        if (seenCompBarcodes.add(entry.key)) {
-          final mData = <String, ({double price, int units})>{};
-          for (final me in entry.value.byMonth.entries) {
-            if (me.value.units > 0) {
-              mData[me.key] = (
-                price: double.parse((me.value.rev / me.value.units).toStringAsFixed(2)),
-                units: me.value.units,
-              );
-            }
-          }
-          if (mData.isNotEmpty) {
-            compSeeds.add(
-              _RawCompetitorSeed(
-                barcode: entry.key,
-                skuName: entry.value.skuName,
-                brand: inferBrandFromSkuOrSupplier(entry.value.skuName, entry.value.supplier),
-                supplierName: entry.value.supplier.isNotEmpty ? entry.value.supplier : 'مورد منافس',
-                isPinnedDirect: false,
-                monthlyData: mData,
-              ),
-            );
-          }
+      // Strictly keep 1 direct competitor card per rival Brand (no duplicate brand cards)
+      final seenBrands = <String>{};
+      final compSeeds = <_RawCompetitorSeed>[];
+      for (final c in seed.competitors) {
+        if (seenBrands.add(c.brand.trim().toLowerCase())) {
+          compSeeds.add(c);
         }
       }
 
