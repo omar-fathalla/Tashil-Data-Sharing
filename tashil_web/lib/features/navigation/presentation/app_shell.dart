@@ -111,8 +111,8 @@ class _AppShellState extends State<AppShell> {
     ),
     _NavDestinationSpec(
       index: 6,
-      labelEn: 'Compare & Competitors',
-      labelAr: 'المنافسة ومقارنة الأصناف',
+      labelEn: 'Compare',
+      labelAr: 'Compare',
       shortLabel: 'Compare',
       icon: Icons.compare_arrows_outlined,
       selectedIcon: Icons.compare_arrows_rounded,

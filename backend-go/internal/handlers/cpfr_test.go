@@ -87,3 +87,65 @@ func TestCPFRAndSellInPlanEndToEnd(t *testing.T) {
 		t.Errorf("expected 0 sell-in archived files after delete, got %d", afterDelArchive.TotalCount)
 	}
 }
+
+func TestComprehensiveSellInTargetBreakdown(t *testing.T) {
+	t.Setenv("TASHIL_TARGETS_DIR", t.TempDir())
+
+	bqRepo := bigquery.NewClient("tashil-test", "retail", true)
+	cleanBytes, err := os.ReadFile(DefaultAdcoSellInCleanPath)
+	if err == nil && len(cleanBytes) > 0 {
+		fsRepo := firestore.NewClient("tashil-db", true)
+		agent := gemini.NewAgent("", "gemini-3.8-flash", true)
+		proc := ingestion.NewProcessor(agent, bqRepo, fsRepo)
+		_, _ = proc.ProcessSellInPlan(context.Background(), "tenant-adeco", "Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx", cleanBytes, false, "fathalla")
+	}
+
+	// User enters only Chain + Year + Target Revenue (leaving Branch, Category, and Units open)
+	_, err = bqRepo.UpsertTarget(context.Background(), "tenant-adeco", domain.TargetRecord{
+		TargetType:       "sell_in",
+		RetailerChain:    "fathalla",
+		Year:             2026,
+		Month:            0, // Full year
+		TargetRevenueEGP: 150000000,
+	})
+	if err != nil {
+		t.Fatalf("UpsertTarget failed: %v", err)
+	}
+
+	summary, err := bqRepo.GetTargetsSummary(context.Background(), "tenant-adeco", "sell_in", "fathalla", 2026)
+	if err != nil {
+		t.Fatalf("GetTargetsSummary failed: %v", err)
+	}
+	if len(summary.Items) != 1 {
+		t.Fatalf("expected 1 target item, got %d", len(summary.Items))
+	}
+
+	item := summary.Items[0]
+	if item.TargetUnits <= 0 || item.TargetWeightTons <= 0 {
+		t.Errorf("expected auto-calculated TargetUnits and TargetWeightTons > 0, got units=%.2f tons=%.2f", item.TargetUnits, item.TargetWeightTons)
+	}
+	if len(item.Branches) != 34 {
+		t.Errorf("expected 34 Fathalla branches in breakdown, got %d", len(item.Branches))
+	}
+	if len(item.MonthlyPhasing) != 12 {
+		t.Errorf("expected 12 months in annual phasing, got %d", len(item.MonthlyPhasing))
+	}
+	if len(item.SalesRepQuotas) == 0 {
+		t.Errorf("expected non-empty SalesRepQuotas")
+	}
+
+	var sumBranchRev, sumBranchUnits float64
+	for _, b := range item.Branches {
+		sumBranchRev += b.TargetRevenueEGP
+		sumBranchUnits += b.TargetUnits
+		if len(b.SKUs) == 0 && len(item.ChainSKUTotals) > 0 {
+			t.Errorf("expected SKUs inside branch %s", b.BranchName)
+		}
+	}
+	if diff := sumBranchRev - item.TargetRevenueEGP; diff > 1.0 || diff < -1.0 {
+		t.Errorf("expected sum of branch targets (%.2f) to equal chain target (%.2f)", sumBranchRev, item.TargetRevenueEGP)
+	}
+	if diff := sumBranchUnits - item.TargetUnits; diff > 1.0 || diff < -1.0 {
+		t.Errorf("expected sum of branch target units (%.2f) to equal chain target units (%.2f)", sumBranchUnits, item.TargetUnits)
+	}
+}

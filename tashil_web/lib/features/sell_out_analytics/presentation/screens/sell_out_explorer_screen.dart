@@ -45,13 +45,23 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
   String? selectedStoreId;
   String? selectedCategory;
   DateTimeRange? selectedDateRange;
+  int _selectedYear = 2026; // Default to 2026 as requested
   String searchQuery = '';
   bool isLoading = true;
   bool _isUploading = false;
   String? _replacingFileId;
   List<SellOutRecordModel> records = [];
+  SellOutRecordsSummaryModel _recordsSummary = const SellOutRecordsSummaryModel();
   List<String> _availableCategories = [];
   Map<String, List<Map<String, String>>> _chainStores = {};
+
+  // Full-Width Chain Branches Sales Ranking Chart State
+  String _chartChain = 'fathalla'; // Default to Fathalla Market (أسواق فتح الله)
+  bool _chartSortAscending = false; // false = High to Low (الأعلى للأقل)
+  bool _chartHorizontalMode = false; // false = Full-Width Columns, true = Horizontal Ranked Bars
+  List<StoreBenchmarkItem> _branchChartItems = const [];
+  Map<String, StoreBenchmarkItem> _prevYearBranchMap = const {};
+  double _prevYearTotalChainRevenue = 0.0;
 
   // Tab 1: Performance & Branch Analytics State
   String _perfChain = 'all';
@@ -73,7 +83,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
 
   late String _lastTenantId;
 
-  // Scroll Controllers for Responsive Data Tables
+  // Scroll Controllers for Responsive Data Tables & Branch Chart
+  late final ScrollController _branchChartScrollController;
   late final ScrollController _branchTableScrollController;
   late final ScrollController _skuPerfTableScrollController;
   late final ScrollController _archiveSheetsScrollController;
@@ -82,6 +93,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
   void initState() {
     super.initState();
     _perfSearchController = TextEditingController();
+    _branchChartScrollController = ScrollController();
     _branchTableScrollController = ScrollController();
     _skuPerfTableScrollController = ScrollController();
     _archiveSheetsScrollController = ScrollController();
@@ -92,6 +104,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
   @override
   void dispose() {
     _perfSearchController.dispose();
+    _branchChartScrollController.dispose();
     _branchTableScrollController.dispose();
     _skuPerfTableScrollController.dispose();
     _archiveSheetsScrollController.dispose();
@@ -108,6 +121,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       selectedStoreId = null;
       selectedCategory = null;
       selectedDateRange = null;
+      _selectedYear = 2026;
+      _chartChain = 'fathalla';
       searchQuery = '';
       _availableCategories = [];
       _chainStores = {};
@@ -140,6 +155,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
 
   Future<void> _loadRecords() async {
     if (mounted) setState(() => isLoading = true);
+    final effectiveYear = (selectedDateRange == null && _selectedYear > 0) ? _selectedYear : null;
     final res = await widget.apiClient.getRecords(
       chain: selectedChain,
       storeId: selectedStoreId,
@@ -147,12 +163,55 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       query: searchQuery,
       startDate: selectedDateRange != null ? _formatDate(selectedDateRange!.start) : null,
       endDate: selectedDateRange != null ? _formatDate(selectedDateRange!.end) : null,
+      year: effectiveYear,
       limit: 250,
     );
-    final dynamicStores = await widget.apiClient.getStores();
+    final summary = widget.apiClient.lastSellOutSummary ??
+        SellOutRecordsSummaryModel(
+          totalCount: res.length,
+          totalNetRevenue: res.fold<double>(0.0, (acc, r) => acc + r.netRevenue),
+          totalUnitsSold: res.fold<int>(0, (acc, r) => acc + r.quantitySold),
+          activeStoresCount: res.map((r) => r.storeId.isNotEmpty ? r.storeId : r.storeName).toSet().length,
+          activeSkusCount: res.map((r) => r.barcode.isNotEmpty ? r.barcode : r.skuName).toSet().length,
+        );
+
+    final activeChartChain = (selectedChain != null && selectedChain!.isNotEmpty)
+        ? selectedChain!
+        : _chartChain;
+    final compYear = (_selectedYear == 2026) ? 2025 : (_selectedYear == 2025 ? 2024 : 2025);
+
+    final results = await Future.wait([
+      widget.apiClient.getStores(),
+      widget.apiClient.getStoreBenchmarkMatrix(
+        chain: activeChartChain == 'all' ? null : activeChartChain,
+        year: _selectedYear > 0 ? _selectedYear : null,
+        startDate: selectedDateRange != null ? _formatDate(selectedDateRange!.start) : null,
+        endDate: selectedDateRange != null ? _formatDate(selectedDateRange!.end) : null,
+      ),
+      widget.apiClient.getStoreBenchmarkMatrix(
+        chain: activeChartChain == 'all' ? null : activeChartChain,
+        year: compYear,
+      ),
+    ]);
+
+    final dynamicStores = results[0] as List<Map<String, dynamic>>;
+    final currentBranchMatrix = results[1] as List<StoreBenchmarkItem>;
+    final prevBranchMatrix = results[2] as List<StoreBenchmarkItem>;
+
+    final prevMap = <String, StoreBenchmarkItem>{};
+    double prevTotalRev = 0.0;
+    for (final b in prevBranchMatrix) {
+      prevMap[b.storeId.isNotEmpty ? b.storeId : b.storeName] = b;
+      prevTotalRev += b.totalRevenue;
+    }
+
     if (mounted) {
       setState(() {
         records = res;
+        _recordsSummary = summary;
+        _branchChartItems = currentBranchMatrix;
+        _prevYearBranchMap = prevMap;
+        _prevYearTotalChainRevenue = prevTotalRev;
         if (_availableCategories.isEmpty || _chainStores.isEmpty) {
           final cats = <String>{};
           final storesByChain = <String, List<Map<String, String>>>{};
@@ -620,11 +679,42 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
   ) {
     final canExport = widget.apiClient.currentUser?.canExportFinancials ?? true;
 
-    // Compute Executive KPIs dynamically from active records
-    final double totalNetRevenue = records.fold<double>(0.0, (acc, r) => acc + r.netRevenue);
-    final double totalUnitsSold = records.fold<double>(0.0, (acc, r) => acc + r.quantitySold.toDouble());
-    final double avgUnitPrice = totalUnitsSold > 0 ? (totalNetRevenue / totalUnitsSold) : 0.0;
-    final int activeStoresCount = records.map((r) => r.storeId.isNotEmpty ? r.storeId : r.storeName).toSet().length;
+    // Use full-dataset summary metrics from backend (not just the 250 paginated rows)
+    final double fallbackRev = records.fold<double>(0.0, (acc, r) => acc + r.netRevenue);
+    final int fallbackUnits = records.fold<int>(0, (acc, r) => acc + r.quantitySold);
+    final int fallbackStores = records.map((r) => r.storeId.isNotEmpty ? r.storeId : r.storeName).toSet().length;
+    final int fallbackSkus = records.map((r) => r.barcode.isNotEmpty ? r.barcode : r.skuName).toSet().length;
+
+    final double totalNetRevenue = _recordsSummary.totalNetRevenue > 0 ? _recordsSummary.totalNetRevenue : fallbackRev;
+    final int totalUnitsSold = _recordsSummary.totalUnitsSold > 0 ? _recordsSummary.totalUnitsSold : fallbackUnits;
+    final int totalTransactionsCount = _recordsSummary.totalCount > 0 ? _recordsSummary.totalCount : records.length;
+    final int activeStoresCount = _recordsSummary.activeStoresCount > 0
+        ? _recordsSummary.activeStoresCount
+        : (_branchChartItems.isNotEmpty ? _branchChartItems.length : fallbackStores);
+    final int activeSkusCount = _recordsSummary.activeSkusCount > 0 ? _recordsSummary.activeSkusCount : fallbackSkus;
+    final double avgBranchRevenue = activeStoresCount > 0 ? (totalNetRevenue / activeStoresCount) : 0.0;
+
+    final String topBranchRaw = _recordsSummary.topBranchName.isNotEmpty
+        ? _recordsSummary.topBranchName
+        : (_branchChartItems.isNotEmpty ? _branchChartItems.first.storeName : '—');
+    final String shortTopBranch = topBranchRaw
+        .replaceFirst('فرع فتح الله - ', '')
+        .replaceFirst('فتح الله جملة ماركت - ', '')
+        .replaceFirst('فتح الله - ', '');
+
+    final String yearBadgeAr = selectedDateRange != null
+        ? 'الفترة: ${_formatDate(selectedDateRange!.start)} إلى ${_formatDate(selectedDateRange!.end)}'
+        : (_selectedYear > 0 ? 'سنة $_selectedYear' : 'كل السنوات (2025–2026)');
+    final String dateSpanAr = (_recordsSummary.minDate.isNotEmpty && _recordsSummary.maxDate.isNotEmpty)
+        ? ' (${_recordsSummary.minDate} -> ${_recordsSummary.maxDate})'
+        : '';
+
+    String yoySubtitleSuffix = '';
+    if (_selectedYear == 2026 && _prevYearTotalChainRevenue > 0 && totalNetRevenue > 0) {
+      final yoyPct = ((totalNetRevenue - _prevYearTotalChainRevenue) / _prevYearTotalChainRevenue) * 100.0;
+      final sign = yoyPct >= 0 ? '+' : '';
+      yoySubtitleSuffix = ' • نمو $sign${yoyPct.toStringAsFixed(1)}% عن 2025';
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -637,7 +727,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               titleAr: 'إجمالي صافي المبيعات',
               titleEn: 'Total Net Revenue (EGP)',
               value: CurrencyFormatter.formatCompactEGP(totalNetRevenue),
-              subtitle: '${records.length} حركة مبيعات مسجلة (${_archivedSellOutFiles.length} شيت مرفوع)',
+              subtitle:
+                  '$yearBadgeAr • ${CurrencyFormatter.formatNumber(totalTransactionsCount)} حركة بيع فعلية$dateSpanAr$yoySubtitleSuffix',
               icon: Icons.payments_rounded,
               color: colorScheme.primary,
             );
@@ -645,18 +736,19 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               context,
               titleAr: 'إجمالي الكمية المباعة',
               titleEn: 'Total Units Sold',
-              value: CurrencyFormatter.formatNumber(totalUnitsSold.round()),
-              subtitle: 'قطعة / وحدة مباعة للمستهلك',
+              value: CurrencyFormatter.formatNumber(totalUnitsSold),
+              subtitle: 'قطعة / وحدة مباعة للمستهلك • $yearBadgeAr',
               icon: Icons.shopping_bag_rounded,
               color: Colors.teal.shade700,
             );
             final card3 = _buildSummaryCard(
               context,
-              titleAr: 'متوسط سعر الوحدة',
-              titleEn: 'Average Unit Price (EGP)',
-              value: CurrencyFormatter.formatEGP(avgUnitPrice),
-              subtitle: 'متوسط سعر الصنف بالجنيه',
-              icon: Icons.price_check_rounded,
+              titleAr: 'الأصناف النشطة ومتوسط الفرع',
+              titleEn: 'Active SKUs & Branch Velocity',
+              value: '$activeSkusCount صنف نشط',
+              subtitle:
+                  'متوسط الفرع: ${CurrencyFormatter.formatCompactEGP(avgBranchRevenue)} • الأعلى: $shortTopBranch',
+              icon: Icons.auto_awesome_mosaic_rounded,
               color: Colors.indigo.shade700,
             );
             final card4 = _buildSummaryCard(
@@ -664,7 +756,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               titleAr: 'إجمالي الفروع النشطة',
               titleEn: 'Active Stores & Outlets',
               value: '$activeStoresCount فرع',
-              subtitle: 'موزعة على السلاسل التجارية',
+              subtitle: 'موزعة على السلاسل التجارية • $yearBadgeAr',
               icon: Icons.storefront_rounded,
               color: Colors.orange.shade800,
             );
@@ -710,18 +802,29 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
           M3Spacing.gapSM,
         ],
 
-        // 2. Cascading Filter Toolbar with integrated Upload, Export & Search
+        // 2. Full-Width Chain Branches Sales Ranking Chart (High to Low with Year 2026 Default & 2025 Switcher)
+        _buildFullWidthBranchSalesChart(context, theme, colorScheme),
+
+        M3Spacing.gapMD,
+
+        // 3. Cascading Filter Toolbar with integrated Year (2026 Default), Date Range, Upload, Export & Search
         CascadingFilterToolbar(
           key: ValueKey('toolbar_${widget.apiClient.tenantId}'),
           selectedChain: selectedChain,
           selectedStoreId: selectedStoreId,
           selectedCategory: selectedCategory,
           selectedDateRange: selectedDateRange,
+          selectedYear: _selectedYear,
           searchQuery: searchQuery,
           availableCategories: _availableCategories,
           chainStoresOverride: _chainStores,
           onChainChanged: (val) {
-            setState(() => selectedChain = val);
+            setState(() {
+              selectedChain = val;
+              if (val != null && val.isNotEmpty) {
+                _chartChain = val;
+              }
+            });
             _loadRecords();
           },
           onStoreChanged: (val) {
@@ -736,6 +839,15 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
             setState(() => selectedDateRange = range);
             _loadRecords();
           },
+          onYearChanged: (yr) {
+            if (yr != null) {
+              setState(() {
+                _selectedYear = yr;
+                selectedDateRange = null;
+              });
+              _loadRecords();
+            }
+          },
           onSearchChanged: (val) {
             searchQuery = val;
             _loadRecords();
@@ -748,12 +860,700 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
 
         M3Spacing.gapMD,
 
-        // 3. Virtualized SKU Table
+        // 4. Virtualized SKU Table
         VirtualizedSkuTable(
           records: records,
           isLoading: isLoading,
         ),
       ],
+    );
+  }
+
+  // ===========================================================================
+  // FULL-WIDTH CHAIN BRANCHES SALES RANKING CHART (HIGHEST TO LOWEST)
+  // ===========================================================================
+  static String _formatChainDisplayAr(String chainCode) {
+    switch (chainCode.trim().toLowerCase()) {
+      case 'fathalla':
+        return 'أسواق فتح الله (Fathalla Market)';
+      case 'gomla':
+        return 'جملة ماركت (Gomla Market)';
+      case 'beet-elgomla':
+        return 'بيت الجملة (Beet El-Gomla)';
+      case 'carrefour':
+        return 'كارفور (Carrefour)';
+      case 'spinneys':
+        return 'سبينيس (Spinneys)';
+      case 'institutions':
+        return 'قطاع المؤسسات (Institutions)';
+      case 'all':
+        return 'كل السلاسل التجارية (All Chains)';
+      default:
+        return chainCode.toUpperCase();
+    }
+  }
+
+  static String _shortenBranchName(String rawName) {
+    return rawName
+        .replaceFirst('فرع فتح الله - ', '')
+        .replaceFirst('فتح الله جملة ماركت - ', '')
+        .replaceFirst('فتح الله - ', '')
+        .replaceFirst('فرع بيت الجملة - ', '')
+        .replaceFirst('بيت الجملة - ', '')
+        .replaceFirst('فرع جملة ماركت - ', '')
+        .replaceFirst('جملة ماركت - ', '')
+        .trim();
+  }
+
+  Widget _buildFullWidthBranchSalesChart(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    final activeChainCode = (selectedChain != null && selectedChain!.isNotEmpty)
+        ? selectedChain!
+        : _chartChain;
+
+    // Build branch list from _branchChartItems (full backend store matrix for active chain & year)
+    final List<StoreBenchmarkItem> rawBranches = _branchChartItems.isNotEmpty
+        ? List<StoreBenchmarkItem>.from(_branchChartItems)
+        : [];
+
+    // Sort descending (High to Low) or ascending (Low to High)
+    rawBranches.sort((a, b) => _chartSortAscending
+        ? a.totalRevenue.compareTo(b.totalRevenue)
+        : b.totalRevenue.compareTo(a.totalRevenue));
+
+    final double totalChainRev = rawBranches.fold<double>(0.0, (acc, b) => acc + b.totalRevenue);
+    final double maxBranchRev = rawBranches.isNotEmpty
+        ? rawBranches.map((b) => b.totalRevenue).reduce(math.max)
+        : 1.0;
+    final double avgBranchRev = rawBranches.isNotEmpty ? (totalChainRev / rawBranches.length) : 0.0;
+
+    // Identify Highest (#1) and Lowest branch regardless of current sort direction
+    StoreBenchmarkItem? highestBranch;
+    StoreBenchmarkItem? secondBranch;
+    StoreBenchmarkItem? lowestBranch;
+    if (rawBranches.isNotEmpty) {
+      final descList = List<StoreBenchmarkItem>.from(rawBranches)
+        ..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
+      highestBranch = descList.first;
+      if (descList.length > 1) secondBranch = descList[1];
+      lowestBranch = descList.last;
+    }
+
+    final int compYear = (_selectedYear == 2026) ? 2025 : (_selectedYear == 2025 ? 2024 : 2025);
+    final double chainYoYPct = (_prevYearTotalChainRevenue > 0 && totalChainRev > 0 && _selectedYear > 0)
+        ? ((totalChainRev - _prevYearTotalChainRevenue) / _prevYearTotalChainRevenue) * 100.0
+        : 0.0;
+
+    return Container(
+      key: const ValueKey('full_width_branch_sales_chart'),
+      padding: const EdgeInsets.all(18.0),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20.0),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withOpacity(0.55),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 1. Chart Header + Interactive Chain & Year (2026 Default / 2025) Controls
+          Wrap(
+            spacing: 12.0,
+            runSpacing: 12.0,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10.0),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12.0),
+                    ),
+                    child: Icon(
+                      Icons.bar_chart_rounded,
+                      color: colorScheme.onPrimaryContainer,
+                      size: 24.0,
+                    ),
+                  ),
+                  const SizedBox(width: 12.0),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'شارت ترتيب مبيعات فروع السلسلة من الأعلى للأقل (Branch Sales Ranking Chart)',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 3.0),
+                        Text(
+                          '${_formatChainDisplayAr(activeChainCode)} • ${_selectedYear > 0 ? "سنة $_selectedYear" : "كل السنوات"} • ${rawBranches.length} فرع • إجمالي السلسلة: ${CurrencyFormatter.formatCompactEGP(totalChainRev)}${chainYoYPct != 0 ? " (${chainYoYPct >= 0 ? "+" : ""}${chainYoYPct.toStringAsFixed(1)}% عن $compYear)" : ""}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              // Controls: Chain Selector + Year Switcher (2026 Default, 2025) + Sort & View Mode
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 8.0,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  // Chain Dropdown inside Chart
+                  Container(
+                    height: 38.0,
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withOpacity(0.55),
+                      borderRadius: BorderRadius.circular(12.0),
+                      border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        key: const ValueKey('branch_chart_chain_dropdown'),
+                        value: const ['fathalla', 'gomla', 'beet-elgomla', 'carrefour', 'spinneys', 'all']
+                                .contains(activeChainCode)
+                            ? activeChainCode
+                            : 'fathalla',
+                        isDense: true,
+                        focusColor: Colors.transparent,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: colorScheme.onSurface,
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'fathalla', child: Text('أسواق فتح الله (Fathalla)')),
+                          DropdownMenuItem(value: 'gomla', child: Text('جملة ماركت (Gomla)')),
+                          DropdownMenuItem(value: 'beet-elgomla', child: Text('بيت الجملة (Beet El-Gomla)')),
+                          DropdownMenuItem(value: 'carrefour', child: Text('كارفور (Carrefour)')),
+                          DropdownMenuItem(value: 'spinneys', child: Text('سبينيس (Spinneys)')),
+                          DropdownMenuItem(value: 'all', child: Text('كل السلاسل (All Chains)')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _chartChain = val;
+                              selectedChain = val == 'all' ? null : val;
+                              selectedStoreId = null;
+                            });
+                            _loadRecords();
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+
+                  // Year Switcher Chips (Default: 2026, 2025, All)
+                  for (final yrItem in const [
+                    (year: 2026, label: 'سنة 2026'),
+                    (year: 2025, label: 'سنة 2025'),
+                    (year: 0, label: 'الكل'),
+                  ])
+                    ChoiceChip(
+                      key: ValueKey('branch_chart_year_${yrItem.year}'),
+                      label: Text(
+                        yrItem.label,
+                        style: TextStyle(
+                          fontSize: 12.0,
+                          fontWeight: FontWeight.w800,
+                          color: _selectedYear == yrItem.year
+                              ? colorScheme.onPrimary
+                              : colorScheme.onSurface,
+                        ),
+                      ),
+                      selected: _selectedYear == yrItem.year,
+                      selectedColor: colorScheme.primary,
+                      backgroundColor: colorScheme.surfaceContainerHighest.withOpacity(0.45),
+                      showCheckmark: false,
+                      visualDensity: VisualDensity.compact,
+                      onSelected: (_) {
+                        setState(() {
+                          _selectedYear = yrItem.year;
+                          selectedDateRange = null;
+                        });
+                        _loadRecords();
+                      },
+                    ),
+
+                  // Sort High-to-Low vs Low-to-High Button
+                  OutlinedButton.icon(
+                    key: const ValueKey('branch_chart_sort_toggle'),
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      minimumSize: const Size(0, 36.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                    ),
+                    onPressed: () {
+                      setState(() => _chartSortAscending = !_chartSortAscending);
+                    },
+                    icon: Icon(
+                      _chartSortAscending ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                      size: 16.0,
+                    ),
+                    label: Text(
+                      _chartSortAscending ? 'الأقل للأعلى' : 'الأعلى للأقل',
+                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+
+                  // View Mode Toggle (Vertical Columns vs Horizontal Ranked Bars)
+                  IconButton.outlined(
+                    key: const ValueKey('branch_chart_layout_toggle'),
+                    tooltip: _chartHorizontalMode
+                        ? 'عرض كأعمدة رأسية بالعرض الكامل'
+                        : 'عرض كأشرطة أفقية تفصيلية',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () {
+                      setState(() => _chartHorizontalMode = !_chartHorizontalMode);
+                    },
+                    icon: Icon(
+                      _chartHorizontalMode ? Icons.bar_chart_rounded : Icons.align_horizontal_left_rounded,
+                      size: 18.0,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14.0),
+
+          // 2. Quick Executive Branch Highlights Strip (Top #1, #2, Average, and Lowest Branch)
+          if (rawBranches.isNotEmpty) ...[
+            Wrap(
+              spacing: 10.0,
+              runSpacing: 8.0,
+              children: [
+                if (highestBranch != null)
+                  _buildBranchInsightBadge(
+                    context,
+                    label: 'الأعلى مبيعاً (#1)',
+                    branchName: _shortenBranchName(highestBranch.storeName),
+                    valueText:
+                        '${CurrencyFormatter.formatCompactEGP(highestBranch.totalRevenue)} (${totalChainRev > 0 ? ((highestBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
+                    color: Colors.green.shade700,
+                    icon: Icons.emoji_events_rounded,
+                  ),
+                if (secondBranch != null)
+                  _buildBranchInsightBadge(
+                    context,
+                    label: 'المركز الثاني (#2)',
+                    branchName: _shortenBranchName(secondBranch.storeName),
+                    valueText:
+                        '${CurrencyFormatter.formatCompactEGP(secondBranch.totalRevenue)} (${totalChainRev > 0 ? ((secondBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
+                    color: colorScheme.primary,
+                    icon: Icons.workspace_premium_rounded,
+                  ),
+                _buildBranchInsightBadge(
+                  context,
+                  label: 'متوسط مبيعات الفرع',
+                  branchName: '${rawBranches.length} فرع نشط',
+                  valueText: CurrencyFormatter.formatCompactEGP(avgBranchRev),
+                  color: Colors.teal.shade700,
+                  icon: Icons.analytics_rounded,
+                ),
+                if (lowestBranch != null && rawBranches.length > 1)
+                  _buildBranchInsightBadge(
+                    context,
+                    label: 'الأقل مبيعاً (#${rawBranches.length})',
+                    branchName: _shortenBranchName(lowestBranch.storeName),
+                    valueText:
+                        '${CurrencyFormatter.formatCompactEGP(lowestBranch.totalRevenue)} (${totalChainRev > 0 ? ((lowestBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
+                    color: Colors.deepOrange.shade700,
+                    icon: Icons.warning_amber_rounded,
+                  ),
+                if (selectedStoreId != null)
+                  ActionChip(
+                    avatar: const Icon(Icons.filter_alt_off_rounded, size: 16.0),
+                    label: const Text('إلغاء فلتر الفرع وعرض كل الفروع'),
+                    onPressed: () {
+                      setState(() => selectedStoreId = null);
+                      _loadRecords();
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16.0),
+          ],
+
+          // 3. All Branches Visual Chart Area (All 34 Branches of Fathalla or Selected Chain)
+          if (rawBranches.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 28.0),
+              child: Center(
+                child: Text(
+                  'لا توجد بيانات فروع مسجلة لهذه السلسلة في السنة المحددة.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            )
+          else if (_chartHorizontalMode)
+            // Horizontal Ranked Bars View (All Branches)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 420.0),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: rawBranches.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8.0),
+                itemBuilder: (context, idx) {
+                  final b = rawBranches[idx];
+                  final ratio = maxBranchRev > 0 ? (b.totalRevenue / maxBranchRev).clamp(0.02, 1.0) : 0.0;
+                  final sharePct = totalChainRev > 0 ? (b.totalRevenue / totalChainRev) * 100.0 : 0.0;
+                  final prevItem = _prevYearBranchMap[b.storeId.isNotEmpty ? b.storeId : b.storeName];
+                  final double? branchYoY = (prevItem != null && prevItem.totalRevenue > 0 && _selectedYear > 0)
+                      ? ((b.totalRevenue - prevItem.totalRevenue) / prevItem.totalRevenue) * 100.0
+                      : null;
+                  final isSelected = selectedStoreId != null &&
+                      (selectedStoreId == b.storeId || selectedStoreId == b.storeName);
+
+                  final Color barColor = b.rank <= 3
+                      ? Colors.green.shade700
+                      : (b.totalRevenue >= avgBranchRev
+                          ? colorScheme.primary
+                          : (b.rank > rawBranches.length - 3
+                              ? Colors.deepOrange.shade700
+                              : Colors.indigo.shade600));
+
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(10.0),
+                    onTap: () {
+                      setState(() {
+                        selectedStoreId = isSelected ? null : (b.storeId.isNotEmpty ? b.storeId : b.storeName);
+                      });
+                      _loadRecords();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? colorScheme.primaryContainer.withOpacity(0.45)
+                            : colorScheme.surfaceContainerLowest,
+                        borderRadius: BorderRadius.circular(10.0),
+                        border: Border.all(
+                          color: isSelected
+                              ? colorScheme.primary
+                              : colorScheme.outlineVariant.withOpacity(0.35),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 34.0,
+                            child: Text(
+                              '#${b.rank}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 12.0,
+                                color: b.rank <= 3 ? Colors.green.shade800 : colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 175.0,
+                            child: Text(
+                              _shortenBranchName(b.storeName),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+                            ),
+                          ),
+                          const SizedBox(width: 10.0),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(6.0),
+                              child: LinearProgressIndicator(
+                                value: ratio,
+                                minHeight: 14.0,
+                                backgroundColor: colorScheme.surfaceContainerHighest.withOpacity(0.55),
+                                color: barColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12.0),
+                          SizedBox(
+                            width: 95.0,
+                            child: Text(
+                              CurrencyFormatter.formatCompactEGP(b.totalRevenue),
+                              textAlign: TextAlign.end,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 12.5,
+                                color: barColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8.0),
+                          SizedBox(
+                            width: 52.0,
+                            child: Text(
+                              '${sharePct.toStringAsFixed(1)}%',
+                              textAlign: TextAlign.end,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          if (branchYoY != null) ...[
+                            const SizedBox(width: 8.0),
+                            SizedBox(
+                              width: 64.0,
+                              child: Text(
+                                '${branchYoY >= 0 ? "+" : ""}${branchYoY.toStringAsFixed(0)}%',
+                                textAlign: TextAlign.end,
+                                style: TextStyle(
+                                  fontSize: 11.0,
+                                  fontWeight: FontWeight.w800,
+                                  color: branchYoY >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            )
+          else
+            // Full-Width Vertical Columns Chart for All Chain Branches
+            LayoutBuilder(
+              builder: (context, chartConstraints) {
+                final count = rawBranches.length;
+                // Automatically fit all branches across full width on desktop, or allow smooth scroll if very narrow
+                final double minColWidth = count > 25 ? 46.0 : 64.0;
+                final double totalNeededWidth = count * minColWidth;
+                final double canvasWidth = math.max(chartConstraints.maxWidth, totalNeededWidth);
+                final double colWidth = canvasWidth / count;
+
+                return Scrollbar(
+                  controller: _branchChartScrollController,
+                  thumbVisibility: canvasWidth > chartConstraints.maxWidth,
+                  child: SingleChildScrollView(
+                    controller: _branchChartScrollController,
+                    scrollDirection: Axis.horizontal,
+                    child: Container(
+                      width: canvasWidth,
+                      padding: const EdgeInsets.only(top: 8.0, bottom: 6.0),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerLowest,
+                        borderRadius: BorderRadius.circular(14.0),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant.withOpacity(0.4),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(
+                            height: 255.0,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: rawBranches.map((b) {
+                                final ratio = maxBranchRev > 0
+                                    ? (b.totalRevenue / maxBranchRev).clamp(0.04, 1.0)
+                                    : 0.04;
+                                final barHeight = 135.0 * ratio;
+                                final sharePct = totalChainRev > 0
+                                    ? (b.totalRevenue / totalChainRev) * 100.0
+                                    : 0.0;
+                                final prevItem =
+                                    _prevYearBranchMap[b.storeId.isNotEmpty ? b.storeId : b.storeName];
+                                final double? branchYoY =
+                                    (prevItem != null && prevItem.totalRevenue > 0 && _selectedYear > 0)
+                                        ? ((b.totalRevenue - prevItem.totalRevenue) /
+                                                prevItem.totalRevenue) *
+                                            100.0
+                                        : null;
+                                final isSelected = selectedStoreId != null &&
+                                    (selectedStoreId == b.storeId || selectedStoreId == b.storeName);
+
+                                final Color barColor = b.rank <= 3
+                                    ? Colors.green.shade700
+                                    : (b.totalRevenue >= avgBranchRev
+                                        ? colorScheme.primary
+                                        : (b.rank > rawBranches.length - 3
+                                            ? Colors.deepOrange.shade600
+                                            : Colors.teal.shade700));
+
+                                final shortName = _shortenBranchName(b.storeName);
+
+                                return Expanded(
+                                  child: Tooltip(
+                                    message:
+                                        'الترتيب #${b.rank}: ${b.storeName}\nصافي المبيعات: ${CurrencyFormatter.formatEGP(b.totalRevenue)} (${sharePct.toStringAsFixed(1)}%)\nالكمية المباعة: ${CurrencyFormatter.formatNumber(b.totalUnits)} قطعة${branchYoY != null ? "\nمقارنة بـ $compYear: ${branchYoY >= 0 ? "+" : ""}${branchYoY.toStringAsFixed(1)}% (${CurrencyFormatter.formatCompactEGP(prevItem!.totalRevenue)})" : ""}',
+                                    child: InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          selectedStoreId = isSelected
+                                              ? null
+                                              : (b.storeId.isNotEmpty ? b.storeId : b.storeName);
+                                        });
+                                        _loadRecords();
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          children: [
+                                            // Rank Badge
+                                            Text(
+                                              '#${b.rank}',
+                                              style: TextStyle(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.w900,
+                                                color: b.rank <= 3
+                                                    ? Colors.green.shade800
+                                                    : colorScheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                            // Compact Revenue Label above Bar
+                                            Text(
+                                              CurrencyFormatter.formatCompactEGP(b.totalRevenue)
+                                                  .replaceAll(' ج.م', ''),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.clip,
+                                              style: TextStyle(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.w800,
+                                                color: barColor,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4.0),
+                                            // Animated Vertical Bar
+                                            AnimatedContainer(
+                                              duration: const Duration(milliseconds: 280),
+                                              height: barHeight,
+                                              width: (colWidth * 0.58).clamp(14.0, 34.0),
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  begin: Alignment.topCenter,
+                                                  end: Alignment.bottomCenter,
+                                                  colors: [
+                                                    barColor,
+                                                    barColor.withOpacity(0.72),
+                                                  ],
+                                                ),
+                                                borderRadius: const BorderRadius.vertical(
+                                                  top: Radius.circular(6.0),
+                                                ),
+                                                border: isSelected
+                                                    ? Border.all(
+                                                        color: colorScheme.onSurface,
+                                                        width: 2.0,
+                                                      )
+                                                    : null,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 6.0),
+                                            // Branch Short Name Label
+                                            SizedBox(
+                                              height: 58.0,
+                                              child: RotatedBox(
+                                                quarterTurns: 3,
+                                                child: Align(
+                                                  alignment: Alignment.centerRight,
+                                                  child: Text(
+                                                    shortName,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontSize: 10.5,
+                                                      fontWeight: isSelected || b.rank <= 3
+                                                          ? FontWeight.w900
+                                                          : FontWeight.w700,
+                                                      color: isSelected
+                                                          ? colorScheme.primary
+                                                          : colorScheme.onSurface,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBranchInsightBadge(
+    BuildContext context, {
+    required String label,
+    required String branchName,
+    required String valueText,
+    required Color color,
+    required IconData icon,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(color: color.withOpacity(0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18.0, color: color),
+          const SizedBox(width: 8.0),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$label: $branchName',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              Text(
+                valueText,
+                style: TextStyle(
+                  fontSize: 12.0,
+                  fontWeight: FontWeight.w900,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -776,25 +1576,39 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
         ? records
         : records.where((r) => r.retailerChain.toLowerCase() == _perfChain.toLowerCase()).toList();
 
-    // 1. Group records by Branch
+    // 1. Group records by Branch (use full backend StoreBenchmarkItem list if available for the selected chain)
     final branchMap = <String, ({String storeName, String chain, int units, double revenue})>{};
-    for (final r in effectiveRecords) {
-      final key = '${r.retailerChain}_${r.storeId.isNotEmpty ? r.storeId : r.storeName}';
-      final existing = branchMap[key];
-      if (existing == null) {
+    if (_branchChartItems.isNotEmpty &&
+        (_perfChain == 'all' || _perfChain.toLowerCase() == _chartChain.toLowerCase())) {
+      for (final item in _branchChartItems) {
+        final chainName = item.retailerChain.isNotEmpty ? item.retailerChain : _chartChain;
+        final key = '${chainName}_${item.storeId.isNotEmpty ? item.storeId : item.storeName}';
         branchMap[key] = (
-          storeName: r.storeName.isNotEmpty ? r.storeName : r.storeId,
-          chain: r.retailerChain,
-          units: r.quantitySold,
-          revenue: r.netRevenue,
+          storeName: item.storeName.isNotEmpty ? item.storeName : item.storeId,
+          chain: chainName,
+          units: item.totalUnits,
+          revenue: item.totalRevenue,
         );
-      } else {
-        branchMap[key] = (
-          storeName: existing.storeName,
-          chain: existing.chain,
-          units: existing.units + r.quantitySold,
-          revenue: existing.revenue + r.netRevenue,
-        );
+      }
+    } else {
+      for (final r in effectiveRecords) {
+        final key = '${r.retailerChain}_${r.storeId.isNotEmpty ? r.storeId : r.storeName}';
+        final existing = branchMap[key];
+        if (existing == null) {
+          branchMap[key] = (
+            storeName: r.storeName.isNotEmpty ? r.storeName : r.storeId,
+            chain: r.retailerChain,
+            units: r.quantitySold,
+            revenue: r.netRevenue,
+          );
+        } else {
+          branchMap[key] = (
+            storeName: existing.storeName,
+            chain: existing.chain,
+            units: existing.units + r.quantitySold,
+            revenue: existing.revenue + r.netRevenue,
+          );
+        }
       }
     }
     final branchList = branchMap.values.toList()
@@ -1160,10 +1974,11 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                     DataColumn(label: Text('صافي المبيعات (ج.م)'), numeric: true),
                     DataColumn(label: Text('حصة المبيعات %'), numeric: true),
                   ],
-                  rows: branchList.take(15).toList().asMap().entries.map((entry) {
+                  rows: branchList.asMap().entries.map((entry) {
                     final idx = entry.key + 1;
                     final b = entry.value;
-                    final sharePct = totalRevenueAll > 0 ? (b.revenue / totalRevenueAll) * 100 : 0.0;
+                    final branchTotalRev = branchList.fold<double>(0.0, (sum, item) => sum + item.revenue);
+                    final sharePct = branchTotalRev > 0 ? (b.revenue / branchTotalRev) * 100 : 0.0;
                     return DataRow(
                       cells: [
                         DataCell(

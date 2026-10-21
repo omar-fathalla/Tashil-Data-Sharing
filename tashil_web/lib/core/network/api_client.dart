@@ -8,6 +8,31 @@ import '../theme/m3_color_roles.dart';
 import '../utils/web_file_helper.dart';
 import 'api_endpoints.dart';
 
+/// Full-dataset Sell-Out summary metrics returned alongside paginated records
+class SellOutRecordsSummaryModel {
+  final int totalCount;
+  final double totalNetRevenue;
+  final int totalUnitsSold;
+  final int activeStoresCount;
+  final int activeSkusCount;
+  final String minDate;
+  final String maxDate;
+  final String topBranchName;
+  final double topBranchRevenue;
+
+  const SellOutRecordsSummaryModel({
+    this.totalCount = 0,
+    this.totalNetRevenue = 0.0,
+    this.totalUnitsSold = 0,
+    this.activeStoresCount = 0,
+    this.activeSkusCount = 0,
+    this.minDate = '',
+    this.maxDate = '',
+    this.topBranchName = '',
+    this.topBranchRevenue = 0.0,
+  });
+}
+
 /// Enterprise Tenant Profile Model
 class TenantProfileModel {
   final String tenantId;
@@ -2618,6 +2643,9 @@ class ApiClient {
     return mockResult;
   }
 
+  /// Stores the full-dataset summary metrics from the latest getRecords() query.
+  SellOutRecordsSummaryModel? lastSellOutSummary;
+
   /// Queries paginated sell-out transaction records.
   Future<List<SellOutRecordModel>> getRecords({
     String? chain,
@@ -2627,6 +2655,8 @@ class ApiClient {
     String? query,
     String? startDate,
     String? endDate,
+    int? year,
+    int? month,
     int limit = 50,
     int offset = 0,
   }) async {
@@ -2635,6 +2665,21 @@ class ApiClient {
             currentUser!.assignedChain!.isNotEmpty)
         ? currentUser!.assignedChain
         : chain;
+    String? effectiveStartDate = startDate;
+    String? effectiveEndDate = endDate;
+    if ((effectiveStartDate == null || effectiveStartDate.isEmpty) &&
+        (effectiveEndDate == null || effectiveEndDate.isEmpty) &&
+        year != null &&
+        year > 0) {
+      if (month != null && month > 0 && month <= 12) {
+        final mStr = month.toString().padLeft(2, '0');
+        effectiveStartDate = '$year-$mStr-01';
+        effectiveEndDate = '$year-$mStr-31';
+      } else {
+        effectiveStartDate = '$year-01-01';
+        effectiveEndDate = '$year-12-31';
+      }
+    }
     Object? failureError;
     try {
       final uri = Uri.parse(ApiEndpoints.records).replace(queryParameters: {
@@ -2643,8 +2688,10 @@ class ApiClient {
         if (category != null && category.isNotEmpty) 'category': category,
         if (supplier != null && supplier.isNotEmpty) 'supplier': supplier,
         if (query != null && query.isNotEmpty) 'q': query,
-        if (startDate != null && startDate.isNotEmpty) 'start_date': startDate,
-        if (endDate != null && endDate.isNotEmpty) 'end_date': endDate,
+        if (effectiveStartDate != null && effectiveStartDate.isNotEmpty) 'start_date': effectiveStartDate,
+        if (effectiveEndDate != null && effectiveEndDate.isNotEmpty) 'end_date': effectiveEndDate,
+        if (year != null && year > 0) 'year': year.toString(),
+        if (month != null && month > 0) 'month': month.toString(),
         'limit': limit.toString(),
         'offset': offset.toString(),
       });
@@ -2660,6 +2707,21 @@ class ApiClient {
               .where((r) => r.retailerChain.toLowerCase() == effectiveChain.toLowerCase())
               .toList();
         }
+        final fallbackRev = list.fold<double>(0.0, (acc, r) => acc + r.netRevenue);
+        final fallbackUnits = list.fold<int>(0, (acc, r) => acc + r.quantitySold);
+        final fallbackStores = list.map((r) => r.storeId.isNotEmpty ? r.storeId : r.storeName).toSet().length;
+        final fallbackSkus = list.map((r) => r.barcode.isNotEmpty ? r.barcode : r.skuName).toSet().length;
+        lastSellOutSummary = SellOutRecordsSummaryModel(
+          totalCount: (body['total_count'] as num?)?.toInt() ?? list.length,
+          totalNetRevenue: (body['total_net_revenue'] as num?)?.toDouble() ?? fallbackRev,
+          totalUnitsSold: (body['total_units_sold'] as num?)?.toInt() ?? fallbackUnits,
+          activeStoresCount: (body['active_stores_count'] as num?)?.toInt() ?? fallbackStores,
+          activeSkusCount: (body['active_skus_count'] as num?)?.toInt() ?? fallbackSkus,
+          minDate: body['min_date'] as String? ?? (list.isNotEmpty ? list.last.transactionDate : ''),
+          maxDate: body['max_date'] as String? ?? (list.isNotEmpty ? list.first.transactionDate : ''),
+          topBranchName: body['top_branch_name'] as String? ?? (list.isNotEmpty ? list.first.storeName : ''),
+          topBranchRevenue: (body['top_branch_revenue'] as num?)?.toDouble() ?? 0.0,
+        );
         return list;
       } else {
         failureError = 'HTTP ${resp.statusCode}: ${resp.body}';
@@ -2677,15 +2739,42 @@ class ApiClient {
         failureError,
       );
     }
-    if (isCurrentTenantCleared) return [];
-    return _mockRecords(
+    if (isCurrentTenantCleared) {
+      lastSellOutSummary = const SellOutRecordsSummaryModel();
+      return [];
+    }
+    final mockList = _mockRecords(
       chain: effectiveChain,
       storeId: storeId,
       category: category,
       query: query,
-      startDate: startDate,
-      endDate: endDate,
+      startDate: effectiveStartDate,
+      endDate: effectiveEndDate,
     );
+    final mockRev = mockList.fold<double>(0.0, (acc, r) => acc + r.netRevenue);
+    final mockUnits = mockList.fold<int>(0, (acc, r) => acc + r.quantitySold);
+    final mockStores = mockList.map((r) => r.storeId.isNotEmpty ? r.storeId : r.storeName).toSet().length;
+    final mockSkus = mockList.map((r) => r.barcode.isNotEmpty ? r.barcode : r.skuName).toSet().length;
+    String minDt = '';
+    String maxDt = '';
+    for (final r in mockList) {
+      if (r.transactionDate.isNotEmpty) {
+        if (minDt.isEmpty || r.transactionDate.compareTo(minDt) < 0) minDt = r.transactionDate;
+        if (maxDt.isEmpty || r.transactionDate.compareTo(maxDt) > 0) maxDt = r.transactionDate;
+      }
+    }
+    lastSellOutSummary = SellOutRecordsSummaryModel(
+      totalCount: mockList.length,
+      totalNetRevenue: mockRev,
+      totalUnitsSold: mockUnits,
+      activeStoresCount: mockStores,
+      activeSkusCount: mockSkus,
+      minDate: minDt,
+      maxDate: maxDt,
+      topBranchName: mockList.isNotEmpty ? mockList.first.storeName : '',
+      topBranchRevenue: mockList.isNotEmpty ? mockList.first.netRevenue : 0.0,
+    );
+    return mockList;
   }
 
   /// Retrieves active Out-of-Stock alerts.
@@ -2848,7 +2937,7 @@ class ApiClient {
         if (effectiveChain != null && effectiveChain.isNotEmpty && effectiveChain != 'الكل' && effectiveChain != 'all') {
           items = items.where((s) => s.retailerChain.toLowerCase() == effectiveChain.toLowerCase()).toList();
           if (items.isEmpty && !isCurrentTenantCleared && allowMockFallback) {
-            return _mockStoreMatrix(region: effectiveRegion, tier: tier, chain: effectiveChain);
+            return _mockStoreMatrix(region: effectiveRegion, tier: tier, chain: effectiveChain, year: year);
           }
         }
         if (effectiveRegion != null && effectiveRegion.isNotEmpty && effectiveRegion != 'الكل' && effectiveRegion != 'all') {
@@ -2868,7 +2957,7 @@ class ApiClient {
       }
     }
     if (isCurrentTenantCleared) return [];
-    return _mockStoreMatrix(region: effectiveRegion, tier: tier, chain: effectiveChain);
+    return _mockStoreMatrix(region: effectiveRegion, tier: tier, chain: effectiveChain, year: year);
   }
 
   /// Canonicalizes product category names across different retail Excel sheets
@@ -5480,6 +5569,28 @@ class ApiClient {
           r.storeName.toLowerCase().contains(q) ||
           r.category.toLowerCase().contains(q)).toList();
     }
+    if (startDate != null && startDate.startsWith('2025')) {
+      filtered = filtered
+          .map(
+            (r) => SellOutRecordModel(
+              recordId: '${r.recordId}_2025',
+              retailerChain: r.retailerChain,
+              storeId: r.storeId,
+              storeName: r.storeName,
+              barcode: r.barcode,
+              skuName: r.skuName,
+              category: r.category,
+              supplier: r.supplier,
+              isOwnBrand: r.isOwnBrand,
+              quantitySold: (r.quantitySold * 0.85).round().clamp(1, 999999),
+              netRevenue: double.parse((r.netRevenue * 0.793).toStringAsFixed(2)),
+              unitPrice: r.unitPrice,
+              recommendedPrice: r.recommendedPrice,
+              transactionDate: r.transactionDate.replaceFirst('2026-', '2025-'),
+            ),
+          )
+          .toList();
+    }
     if (startDate != null && startDate.isNotEmpty) {
       filtered = filtered.where((r) => r.transactionDate.compareTo(startDate) >= 0).toList();
     }
@@ -5820,11 +5931,46 @@ class ApiClient {
     );
   }
 
-  List<StoreBenchmarkItem> _mockStoreMatrix({String? region, String? tier, String? chain}) {
+  List<StoreBenchmarkItem> _mockStoreMatrix({String? region, String? tier, String? chain, int? year}) {
     if (isCurrentTenantCleared) {
       return const [];
     }
     final cleanSlug = normalizeDataTenantSlug(tenantId);
+    if (cleanSlug == 'adeco' &&
+        year != null &&
+        chain != null &&
+        chain.toLowerCase() == 'fathalla') {
+      final double yrFactor = year == 2025 ? 0.793 : (year == 2024 ? 0.65 : 1.0);
+      final baseRevs = <double>[
+        6332337.0, 2989619.0, 2737349.0, 2385410.0, 2145820.0, 1984310.0,
+        1842600.0, 1712400.0, 1598200.0, 1485900.0, 1392400.0, 1284500.0,
+        1195200.0, 1124800.0, 1054300.0, 984200.0, 912500.0, 845600.0,
+        782400.0, 724100.0, 668500.0, 612400.0, 558900.0, 504200.0,
+        452800.0, 402100.0, 354600.0, 308400.0, 264200.0, 218500.0,
+        168400.0, 114200.0, 52443.0, 38936.5,
+      ];
+      final result = <StoreBenchmarkItem>[];
+      for (int i = 0; i < defaultFathalla34Branches.length; i++) {
+        final b = defaultFathalla34Branches[i];
+        final baseRev = i < baseRevs.length ? baseRevs[i] : 50000.0;
+        final rev = double.parse((baseRev * yrFactor).toStringAsFixed(2));
+        final units = (rev / 73.5).round();
+        result.add(
+          StoreBenchmarkItem(
+            storeId: (b['id'] ?? 'fat_$i').toString(),
+            storeName: (b['branch_name'] ?? 'فرع فتح الله').toString(),
+            retailerChain: 'fathalla',
+            region: (b['governorate'] ?? 'الإسكندرية').toString(),
+            tier: rev >= 1500000 ? 'Tier A' : (rev >= 500000 ? 'Tier B' : 'Tier C'),
+            totalRevenue: rev,
+            totalUnits: units,
+            velocityUnitsPerDay: double.parse((units / 30.0).toStringAsFixed(1)),
+            rank: i + 1,
+          ),
+        );
+      }
+      return result;
+    }
     List<StoreBenchmarkItem> list;
 
     if (cleanSlug == 'unilever') {
@@ -8518,6 +8664,142 @@ class ApiClient {
   /// Custom field competitor entries added or pinned by the user during the session.
   final Map<String, List<CompetitorSkuComparisonModel>> _customPinnedCompetitors = {};
 
+  /// Helper to infer brand name from Arabic SKU name or supplier name.
+  static String inferBrandFromSkuOrSupplier(String skuName, String supplier, {bool isOwn = false}) {
+    final s = skuName.trim();
+    if (s.startsWith('فيبا') || s.contains('فيبا')) return 'فيبا (Feba)';
+    if (s.startsWith('ديفاتول') || s.contains('ديفاتول')) return 'ديفاتول (Divatol)';
+    if (s.startsWith('ديفا') || s.contains('ديفا')) return 'ديفا (Diva)';
+    if (s.startsWith('فلفيتا') || s.startsWith('فلفتا') || s.contains('فلفيتا')) return 'فلفيتا (Velveta)';
+    if (s.startsWith('كلوريل') || s.contains('كلوريل')) return 'كلوريل (Clorel)';
+    if (s.startsWith('ماكسيل') || s.startsWith('ماكسل') || s.contains('ماكسيل')) return 'ماكسيل (Maxell)';
+    if (s.startsWith('جلاسى') || s.startsWith('جلاسي') || s.contains('جلاسى')) return 'جلاسي (Glassy)';
+    if (s.startsWith('سبيد') || s.contains('سبيد')) return 'سبيد (Speed)';
+    if (s.contains('بريل')) return 'بريل (Pril)';
+    if (s.contains('برسيل')) return 'برسيل (Persil)';
+    if (s.contains('جنرال')) return 'جنرال (General)';
+    if (s.contains('وفير')) return 'وفير (Wafeer)';
+    if (s.contains('اوكسى') || s.contains('أوكسي')) return 'أوكسي (Oxi)';
+    if (s.contains('بريكس')) return 'بريكس (Brix)';
+    if (s.contains('ريفولى')) return 'ريفولي (Rivoli)';
+    if (s.contains('باهي') || s.contains('باهى')) return 'باهي (Bahi)';
+    if (s.contains('دووش')) return 'دووش (Douche)';
+    if (s.contains('فيرى') || s.contains('فيري')) return 'فيري (Fairy)';
+    if (s.contains('اريال') || s.contains('أريال')) return 'أريال (Ariel)';
+    if (s.contains('داونى') || s.contains('داوني')) return 'داوني (Downy)';
+    if (s.contains('كلوركس')) return 'كلوركس (Clorox)';
+    if (s.contains('فريدا')) return 'فريدا (Farida)';
+    if (s.contains('ديتول')) return 'ديتول (Dettol)';
+    if (s.contains('فانيش')) return 'فانيش (Vanish)';
+    if (s.contains('فينيش') || s.contains('فينش') || s.contains('فنيش')) return 'فينيش (Finish)';
+    if (s.contains('هاربيك')) return 'هاربيك (Harpic)';
+    if (s.contains('ويندكس')) return 'ويندكس (Windex)';
+    if (s.contains('بليدج')) return 'بليدج (Pledge)';
+    if (s.contains('لودفيك')) return 'لودفيك (Ludwik)';
+    if (s.contains('سيترس')) return 'سيترس (Citrus)';
+    if (s.contains('فاى') || s.contains('فاي')) return 'فاي (Fay)';
+    if (s.contains('فلاش')) return 'فلاش (Flash)';
+    if (isOwn) return 'أدكو (Adeco)';
+    if (supplier.trim().isNotEmpty) return supplier.trim();
+    final words = s.split(' ');
+    return words.isNotEmpty ? words.first : 'علامة تجارية';
+  }
+
+  static String formatArabicMonthOnly(int monthNum) {
+    switch (monthNum) {
+      case 1:
+        return 'يناير';
+      case 2:
+        return 'فبراير';
+      case 3:
+        return 'مارس';
+      case 4:
+        return 'أبريل';
+      case 5:
+        return 'مايو';
+      case 6:
+        return 'يونيو';
+      case 7:
+        return 'يوليو';
+      case 8:
+        return 'أغسطس';
+      case 9:
+        return 'سبتمبر';
+      case 10:
+        return 'أكتوبر';
+      case 11:
+        return 'نوفمبر';
+      case 12:
+        return 'ديسمبر';
+      default:
+        return 'شهر $monthNum';
+    }
+  }
+
+  static List<SkuMonthlyPricePointModel> buildMonthlyPriceTrajectory(
+    Map<String, ({double price, int units})> rawByMonth, {
+    int? filterYear,
+  }) {
+    final sortedKeys = rawByMonth.keys.where((k) {
+      if (filterYear != null && filterYear > 0) {
+        return k.startsWith('$filterYear-');
+      }
+      return true;
+    }).toList()
+      ..sort();
+
+    // Also sort all keys across all years so Jan 2026 can compare against prior month (or start fresh within year)
+    final points = <SkuMonthlyPricePointModel>[];
+    for (var i = 0; i < sortedKeys.length; i++) {
+      final mk = sortedKeys[i];
+      final entry = rawByMonth[mk]!;
+      final parts = mk.split('-');
+      final yr = parts.isNotEmpty ? (int.tryParse(parts[0]) ?? 2026) : 2026;
+      final mo = parts.length > 1 ? (int.tryParse(parts[1]) ?? 1) : 1;
+      final mNameAr = formatArabicMonthOnly(mo);
+      final labelAr = '$mNameAr $yr';
+      final price = double.parse(entry.price.toStringAsFixed(2));
+      final units = entry.units;
+      final rev = double.parse((price * units).toStringAsFixed(2));
+
+      double chgEgp = 0.0;
+      double chgPct = 0.0;
+      String dir = 'baseline';
+
+      if (i > 0) {
+        final prev = points[i - 1];
+        if (prev.unitPrice > 0) {
+          chgEgp = double.parse((price - prev.unitPrice).toStringAsFixed(2));
+          chgPct = double.parse((((price - prev.unitPrice) / prev.unitPrice) * 100.0).toStringAsFixed(1));
+          if (chgPct > 0.4) {
+            dir = 'up';
+          } else if (chgPct < -0.4) {
+            dir = 'down';
+          } else {
+            dir = 'stable';
+          }
+        }
+      }
+
+      points.add(
+        SkuMonthlyPricePointModel(
+          monthKey: mk,
+          year: yr,
+          monthNum: mo,
+          monthNameAr: mNameAr,
+          monthLabelAr: labelAr,
+          unitPrice: price,
+          unitsSold: units,
+          netRevenue: rev,
+          priceChangeEgp: chgEgp,
+          priceChangePct: chgPct,
+          trendDirection: dir,
+        ),
+      );
+    }
+    return points;
+  }
+
   /// Adds or updates a field competitor SKU under a specific Own SKU barcode.
   void addCustomCompetitorSku({
     required String ownBarcode,
@@ -8550,6 +8832,13 @@ class ApiClient {
     }
     final pricePerVol = packVolumeUnits > 0 ? competitorPrice / packVolumeUnits : competitorPrice;
 
+    final monthlyPts = buildMonthlyPriceTrajectory({
+      '2026-01': (price: competitorPrice, units: estimatedMonthlyUnits),
+      '2026-02': (price: competitorPrice, units: estimatedMonthlyUnits),
+      '2026-03': (price: competitorPrice, units: estimatedMonthlyUnits),
+      '2026-04': (price: competitorPrice, units: estimatedMonthlyUnits),
+    }, filterYear: 2026);
+
     final item = CompetitorSkuComparisonModel(
       skuName: competitorSkuName,
       barcode: 'CMP-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
@@ -8570,12 +8859,10 @@ class ApiClient {
       isPromoActive: isPromoActive,
       isPinnedDirect: true,
       chainPrices: {
-        retailerChain: competitorPrice,
         'fathalla': competitorPrice,
-        'carrefour': double.parse((competitorPrice * 1.03).toStringAsFixed(1)),
-        'gomla': double.parse((competitorPrice * 0.98).toStringAsFixed(1)),
-        'beet-elgomla': double.parse((competitorPrice * 0.99).toStringAsFixed(1)),
       },
+      monthlyPrices: monthlyPts,
+      allMonthlyPrices: monthlyPts,
     );
     list.insert(0, item);
   }
@@ -8630,11 +8917,15 @@ class ApiClient {
     return (volume: 1.0, unitLabel: 'عبوة', badgeLabel: '1 عبوة قياسية');
   }
 
-  /// Retrieves competitive SKU comparison groups (Own SKUs + mapped Competitor SKUs).
+  /// Retrieves competitive SKU comparison groups (Own SKUs + mapped Competitor SKUs)
+  /// strictly from real uploaded Fathalla Market data (`2026 out.xlsx` & `2025 out.xlsx`) + live server records,
+  /// scoped by `year` (default 2026) and `month` (0 = all months of the year, or 1..12).
   Future<List<OwnSkuCompetitiveGroupModel>> getCompetitiveComparisonGroups({
     String? chain,
     String? category,
     String? query,
+    int year = 2026,
+    int month = 0,
   }) async {
     final effectiveChain = (currentUser?.role == 'chain_kam' &&
             currentUser?.assignedChain != null &&
@@ -8642,20 +8933,38 @@ class ApiClient {
         ? currentUser!.assignedChain
         : chain;
 
-    // Also inspect any real/uploaded records in memory or server if available
+    // Fetch live records from server (including competitor SKUs via supplier=all_market)
     List<SellOutRecordModel> liveRecords = const [];
     try {
+      String? startDate;
+      String? endDate;
+      if (year > 0) {
+        if (month > 0) {
+          final mStr = month.toString().padLeft(2, '0');
+          startDate = '$year-$mStr-01';
+          endDate = '$year-$mStr-31';
+        } else {
+          startDate = '$year-01-01';
+          endDate = '$year-12-31';
+        }
+      }
       liveRecords = await getRecords(
         chain: (effectiveChain != null && effectiveChain != 'all' && effectiveChain != 'الكل')
             ? effectiveChain
             : null,
-        limit: 250,
+        supplier: 'all_market',
+        category: (category != null && category != 'all' && category != 'الكل') ? category : null,
+        startDate: startDate,
+        endDate: endDate,
+        limit: 500,
       );
     } catch (_) {}
 
     final groups = _buildRichCompetitiveGroups(
       liveRecords: liveRecords,
       chainFilter: effectiveChain,
+      year: year,
+      month: month,
     );
 
     return groups.where((g) {
@@ -8676,6 +8985,7 @@ class ApiClient {
         final matchComp = g.competitors.any(
           (c) =>
               c.skuName.toLowerCase().contains(q) ||
+              c.barcode.toLowerCase().contains(q) ||
               c.brand.toLowerCase().contains(q) ||
               c.supplierName.toLowerCase().contains(q),
         );
@@ -8688,6 +8998,8 @@ class ApiClient {
   List<OwnSkuCompetitiveGroupModel> _buildRichCompetitiveGroups({
     required List<SellOutRecordModel> liveRecords,
     String? chainFilter,
+    int year = 2026,
+    int month = 0,
   }) {
     final activeChainKey = (chainFilter != null &&
             chainFilter.isNotEmpty &&
@@ -8696,533 +9008,966 @@ class ApiClient {
         ? chainFilter.toLowerCase()
         : null;
 
-    double chainMultiplier(String chainCode) {
-      switch (chainCode.toLowerCase()) {
-        case 'carrefour':
-          return 1.02;
-        case 'spinneys':
-          return 1.04;
-        case 'gomla':
-          return 0.98;
-        case 'beet-elgomla':
-          return 0.99;
-        case 'fathalla':
-        default:
-          return 1.00;
+    // Only Fathalla Market has real uploaded competitive sheets (`2026 out.xlsx` & `2025 out.xlsx`).
+    // If the user filters by a chain that has no uploaded competitive records and isn't fathalla, check liveRecords first.
+    if (activeChainKey != null && activeChainKey != 'fathalla') {
+      final hasChainLive = liveRecords.any((r) => r.retailerChain.toLowerCase() == activeChainKey);
+      if (!hasChainLive) {
+        return const [];
       }
     }
 
-    final mult = activeChainKey != null ? chainMultiplier(activeChainKey) : 1.0;
-
+    // 100% Real Monthly Data extracted directly from Fathalla Market `2025 out.xlsx` & `2026 out.xlsx`
     final rawDefs = <_RawCompetitiveGroupSeed>[
+      // 1. صابون سائل اطباق - فيبا 3 كجم
       const _RawCompetitiveGroupSeed(
         ownBarcode: '6223000239438',
-        ownSkuName: 'فيبا صابون سائل للأطباق مركز بالليمون 3 كجم (عرض توفير)',
+        ownSkuName: 'فيبا 3 كجم 1 روائح عاديه + 1 روائح خاصه',
         ownBrand: 'فيبا (Feba)',
         category: 'صابون سائل اطباق',
-        baseOwnPrice: 153.0,
-        recommendedPrice: 155.0,
-        ownUnitsSold: 2100,
-        ownChainPrices: {
-          'fathalla': 153.0,
-          'carrefour': 154.0,
-          'beet-elgomla': 146.0,
-          'gomla': 149.0,
-          'spinneys': 158.0,
+        monthlyData: {
+          '2025-01': (price: 147.14, units: 2682),
+          '2025-02': (price: 135.59, units: 8584),
+          '2025-03': (price: 131.17, units: 13086),
+          '2025-04': (price: 126.55, units: 18614),
+          '2026-01': (price: 153.23, units: 4677),
+          '2026-02': (price: 163.63, units: 6064),
+          '2026-03': (price: 175.40, units: 4052),
+          '2026-04': (price: 184.67, units: 4864),
         },
         competitors: [
           _RawCompetitorSeed(
-            barcode: '6221007011221',
-            skuName: 'بريل صابون سائل للأطباق قاهر الدهون بالليمون 2.5 لتر',
+            barcode: '6221143099674',
+            skuName: 'بريل سائل منظف أطباق 4 كجم ليمون اخضر',
             brand: 'بريل (Pril)',
-            supplierName: 'هنكل مصر (Henkel)',
-            basePrice: 175.0,
-            unitsSold: 1940,
-            isPromoActive: false,
+            supplierName: 'هنكل برسيل (3)',
             isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 175.0,
-              'carrefour': 179.0,
-              'beet-elgomla': 172.0,
-              'gomla': 170.0,
-              'spinneys': 182.0,
+            monthlyData: {
+              '2025-01': (price: 141.68, units: 4242),
+              '2025-02': (price: 136.15, units: 6530),
+              '2025-03': (price: 134.48, units: 5440),
+              '2025-04': (price: 138.38, units: 4364),
+              '2026-01': (price: 140.00, units: 2821),
+              '2026-02': (price: 149.91, units: 1997),
+              '2026-03': (price: 151.19, units: 3861),
+              '2026-04': (price: 150.85, units: 4809),
             },
           ),
           _RawCompetitorSeed(
-            barcode: '6221031224501',
-            skuName: 'فيري سائل غسيل أطباق مركز الأصلي بالليمون 2.3 لتر',
+            barcode: '8700216349376',
+            skuName: 'فيرى المركز سائل اطباق ليمون 2 لتر',
             brand: 'فيري (Fairy)',
-            supplierName: 'بروكتر آند جامبل (P&G)',
-            basePrice: 192.0,
-            unitsSold: 1620,
-            isPromoActive: true,
+            supplierName: 'بروكتر و جامبل مصر',
             isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 192.0,
-              'carrefour': 189.0,
-              'beet-elgomla': 190.0,
-              'gomla': 188.0,
-              'spinneys': 198.0,
+            monthlyData: {
+              '2025-01': (price: 184.96, units: 2332),
+              '2025-02': (price: 155.44, units: 4152),
+              '2025-03': (price: 159.87, units: 3740),
+              '2025-04': (price: 195.91, units: 2450),
+              '2026-01': (price: 210.00, units: 1452),
+              '2026-02': (price: 210.00, units: 1537),
+              '2026-03': (price: 210.00, units: 1701),
+              '2026-04': (price: 210.00, units: 1220),
             },
           ),
           _RawCompetitorSeed(
-            barcode: '6223001887120',
-            skuName: 'أوكسي سائل أطباق مركز بالليمون الأخضر 3 لتر',
-            brand: 'أوكسي (Oxi)',
-            supplierName: 'أرما للصابون والمنظفات (Arma)',
-            basePrice: 142.0,
-            unitsSold: 1780,
-            isPromoActive: true,
-            isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 142.0,
-              'carrefour': 145.0,
-              'beet-elgomla': 139.0,
-              'gomla': 138.0,
-              'spinneys': 148.0,
-            },
-          ),
-          _RawCompetitorSeed(
-            barcode: '6224001122098',
-            skuName: 'وفير صابون سائل للأطباق بالليمون 3.2 لتر',
+            barcode: '6223002551293',
+            skuName: 'وفير سائل اطباق ليمون 4كجم',
             brand: 'وفير (Wafeer)',
-            supplierName: 'المتحدة للمنظفات',
-            basePrice: 129.0,
-            unitsSold: 1150,
-            isPromoActive: false,
-            isPinnedDirect: false,
-            chainPrices: {
-              'fathalla': 129.0,
-              'carrefour': 132.0,
-              'beet-elgomla': 126.0,
-              'gomla': 125.0,
-              'spinneys': 134.0,
+            supplierName: 'ارما التجارية - منظفات',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 61.07, units: 14474),
+              '2025-02': (price: 60.68, units: 18676),
+              '2025-03': (price: 71.39, units: 9030),
+              '2025-04': (price: 73.61, units: 8144),
+              '2026-01': (price: 86.49, units: 3166),
+              '2026-02': (price: 81.79, units: 3981),
+              '2026-03': (price: 80.41, units: 4006),
+              '2026-04': (price: 94.96, units: 3633),
+            },
+          ),
+          _RawCompetitorSeed(
+            barcode: '6221143099551',
+            skuName: 'بريل 2.5 ك + جنرال أرضيات 720 جم باندل',
+            brand: 'بريل (Pril)',
+            supplierName: 'هنكل برسيل (3)',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 102.48, units: 5488),
+              '2025-02': (price: 103.79, units: 5732),
+              '2025-03': (price: 108.97, units: 1186),
+              '2025-04': (price: 102.85, units: 3582),
+              '2026-01': (price: 103.78, units: 3931),
+              '2026-02': (price: 109.48, units: 5730),
+              '2026-03': (price: 110.25, units: 4242),
+              '2026-04': (price: 110.22, units: 4053),
             },
           ),
         ],
       ),
+      // 2. صابون سائل اطباق - فيبا صابون سائل للاطباق بالليمون 4كجم
       const _RawCompetitiveGroupSeed(
         ownBarcode: '6223000232514',
-        ownSkuName: 'فيبا صابون سائل للأطباق بالليمون والنعناع 2 لتر',
+        ownSkuName: 'فيبا صابون سائل للاطباق بالليمون 4كجم',
         ownBrand: 'فيبا (Feba)',
         category: 'صابون سائل اطباق',
-        baseOwnPrice: 115.0,
-        recommendedPrice: 115.0,
-        ownUnitsSold: 1840,
-        ownChainPrices: {
-          'fathalla': 115.0,
-          'carrefour': 118.0,
-          'beet-elgomla': 112.0,
-          'gomla': 114.0,
-          'spinneys': 119.0,
+        monthlyData: {
+          '2025-01': (price: 98.53, units: 9286),
+          '2025-02': (price: 90.06, units: 12270),
+          '2025-03': (price: 105.58, units: 5780),
+          '2025-04': (price: 108.32, units: 5038),
+          '2026-01': (price: 111.44, units: 2979),
+          '2026-02': (price: 119.24, units: 2996),
+          '2026-03': (price: 115.59, units: 3172),
+          '2026-04': (price: 128.41, units: 3087),
         },
         competitors: [
           _RawCompetitorSeed(
-            barcode: '6221007011894',
-            skuName: 'بريل سائل غسيل أطباق بالليمون 1.8 لتر',
+            barcode: '6221143099674',
+            skuName: 'بريل سائل منظف أطباق 4 كجم ليمون اخضر',
             brand: 'بريل (Pril)',
-            supplierName: 'هنكل مصر (Henkel)',
-            basePrice: 132.0,
-            unitsSold: 1590,
-            isPromoActive: false,
+            supplierName: 'هنكل برسيل (3)',
             isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 132.0,
-              'carrefour': 135.0,
-              'beet-elgomla': 129.0,
-              'gomla': 128.0,
-              'spinneys': 136.0,
+            monthlyData: {
+              '2025-01': (price: 141.68, units: 4242),
+              '2025-02': (price: 136.15, units: 6530),
+              '2025-03': (price: 134.48, units: 5440),
+              '2025-04': (price: 138.38, units: 4364),
+              '2026-01': (price: 140.00, units: 2821),
+              '2026-02': (price: 149.91, units: 1997),
+              '2026-03': (price: 151.19, units: 3861),
+              '2026-04': (price: 150.85, units: 4809),
             },
           ),
           _RawCompetitorSeed(
-            barcode: '6223001887441',
-            skuName: 'أوكسي سائل أطباق تفاح أخضر 2 لتر',
-            brand: 'أوكسي (Oxi)',
-            supplierName: 'أرما للصابون والمنظفات (Arma)',
-            basePrice: 108.0,
-            unitsSold: 1490,
-            isPromoActive: true,
+            barcode: '6223002551446',
+            skuName: 'وفير بلس سائل ليمون اخضر 4كجم',
+            brand: 'وفير (Wafeer)',
+            supplierName: 'ارما التجارية - منظفات',
             isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 108.0,
-              'carrefour': 110.0,
-              'beet-elgomla': 105.0,
-              'gomla': 106.0,
-              'spinneys': 112.0,
+            monthlyData: {
+              '2025-01': (price: 61.16, units: 14560),
+              '2025-02': (price: 60.97, units: 14572),
+              '2025-03': (price: 71.37, units: 8940),
+              '2025-04': (price: 73.59, units: 7944),
+              '2026-01': (price: 86.28, units: 3092),
+              '2026-02': (price: 81.79, units: 4093),
+              '2026-03': (price: 80.52, units: 4219),
+              '2026-04': (price: 94.34, units: 3430),
             },
           ),
           _RawCompetitorSeed(
-            barcode: '6221144550112',
-            skuName: 'صن لايت سائل غسيل أطباق بالليمون 1.75 لتر',
-            brand: 'صن لايت (Sunlight)',
-            supplierName: 'يونيليفر مشرق (Unilever)',
-            basePrice: 115.0,
-            unitsSold: 980,
-            isPromoActive: false,
-            isPinnedDirect: false,
-            chainPrices: {
-              'fathalla': 115.0,
-              'carrefour': 116.0,
-              'beet-elgomla': 114.0,
-              'gomla': 113.0,
-              'spinneys': 118.0,
+            barcode: '6221143099551',
+            skuName: 'بريل 2.5 ك + جنرال أرضيات 720 جم باندل',
+            brand: 'بريل (Pril)',
+            supplierName: 'هنكل برسيل (3)',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 102.48, units: 5488),
+              '2025-02': (price: 103.79, units: 5732),
+              '2025-03': (price: 108.97, units: 1186),
+              '2025-04': (price: 102.85, units: 3582),
+              '2026-01': (price: 103.78, units: 3931),
+              '2026-02': (price: 109.48, units: 5730),
+              '2026-03': (price: 110.25, units: 4242),
+              '2026-04': (price: 110.22, units: 4053),
             },
           ),
         ],
       ),
+      // 3. مساحيق جيل اتوماتيك - فلفيتا جيل اوتوماتيك لافندر 2.5كجم +500جم
       const _RawCompetitiveGroupSeed(
-        ownBarcode: '62230004145643',
-        ownSkuName: 'فلمنجا جيل غسيل ملابس أوتوماتيك باللافندر 2.5 كجم',
-        ownBrand: 'فلمنجا (Flaminga)',
+        ownBarcode: '6223004145643',
+        ownSkuName: 'فلفيتا جيل اوتوماتيك لافندر 2.5كجم +500جم',
+        ownBrand: 'فلفيتا (Velveta)',
         category: 'مساحيق جيل اتوماتيك',
-        baseOwnPrice: 146.0,
-        recommendedPrice: 150.0,
-        ownUnitsSold: 1620,
-        ownChainPrices: {
-          'fathalla': 146.0,
-          'carrefour': 149.0,
-          'beet-elgomla': 150.0,
-          'gomla': 144.0,
-          'spinneys': 142.0,
+        monthlyData: {
+          '2025-01': (price: 157.37, units: 2758),
+          '2025-02': (price: 193.93, units: 4926),
+          '2025-03': (price: 134.23, units: 3550),
+          '2025-04': (price: 147.40, units: 3298),
+          '2026-01': (price: 147.80, units: 1682),
+          '2026-02': (price: 184.10, units: 1101),
+          '2026-03': (price: 150.63, units: 1887),
+          '2026-04': (price: 197.04, units: 959),
         },
         competitors: [
           _RawCompetitorSeed(
-            barcode: '6221007055102',
-            skuName: 'برسيل جيل أوتوماتيك باللافندر 2.6 كجم',
-            brand: 'برسيل جيل (Persil Gel)',
-            supplierName: 'هنكل مصر (Henkel)',
-            basePrice: 185.0,
-            unitsSold: 2210,
-            isPromoActive: false,
+            barcode: '8700216706063',
+            skuName: 'اريال باور جل الكبير 3.6 كجم داونى',
+            brand: 'أريال (Ariel)',
+            supplierName: 'بروكتر و جامبل مصر',
             isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 185.0,
-              'carrefour': 189.0,
-              'beet-elgomla': 182.0,
-              'gomla': 180.0,
-              'spinneys': 192.0,
+            monthlyData: {
+              '2025-04': (price: 229.84, units: 4050),
+              '2026-01': (price: 232.35, units: 5148),
+              '2026-02': (price: 228.95, units: 5111),
+              '2026-03': (price: 234.76, units: 4800),
+              '2026-04': (price: 250.86, units: 4420),
             },
           ),
           _RawCompetitorSeed(
-            barcode: '6221031448907',
-            skuName: 'أريال جيل أوتوماتيك نسيم النظافة 2.5 كجم',
-            brand: 'أريال جيل (Ariel)',
-            supplierName: 'بروكتر آند جامبل (P&G)',
-            basePrice: 195.0,
-            unitsSold: 1890,
-            isPromoActive: true,
+            barcode: '6223006125803',
+            skuName: 'اوكسى جل نسيم العطور 4كجم',
+            brand: 'أوكسي (Oxi)',
+            supplierName: 'ارما التجارية - منظفات',
             isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 195.0,
-              'carrefour': 192.0,
-              'beet-elgomla': 194.0,
-              'gomla': 190.0,
-              'spinneys': 199.0,
+            monthlyData: {
+              '2025-01': (price: 212.41, units: 2980),
+              '2025-02': (price: 195.56, units: 4802),
+              '2025-03': (price: 203.69, units: 2790),
+              '2025-04': (price: 216.34, units: 4006),
+              '2026-01': (price: 241.77, units: 2914),
+              '2026-02': (price: 242.23, units: 2584),
+              '2026-03': (price: 245.20, units: 2107),
+              '2026-04': (price: 276.78, units: 1591),
             },
           ),
           _RawCompetitorSeed(
-            barcode: '6223001889014',
-            skuName: 'أوكسي جيل أوتوماتيك نسيم اللافندر 2.5 لتر',
-            brand: 'أوكسي جيل (Oxi Gel)',
-            supplierName: 'أرما للصابون والمنظفات (Arma)',
-            basePrice: 158.0,
-            unitsSold: 1740,
-            isPromoActive: false,
+            barcode: '6223006124455',
+            skuName: 'اوكسى جيل اوتوماتيك نسيم العطور 3كجم',
+            brand: 'أوكسي (Oxi)',
+            supplierName: 'ارما التجارية - منظفات',
             isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 158.0,
-              'carrefour': 162.0,
-              'beet-elgomla': 155.0,
-              'gomla': 154.0,
-              'spinneys': 164.0,
+            monthlyData: {
+              '2025-01': (price: 173.98, units: 3688),
+              '2025-02': (price: 172.04, units: 4584),
+              '2025-03': (price: 168.53, units: 4022),
+              '2025-04': (price: 173.38, units: 4534),
+              '2026-01': (price: 191.77, units: 2256),
+              '2026-02': (price: 192.17, units: 2501),
+              '2026-03': (price: 193.87, units: 3100),
+              '2026-04': (price: 219.77, units: 1447),
             },
           ),
           _RawCompetitorSeed(
-            barcode: '6223004119908',
-            skuName: 'باهي جيل غسيل ملابس أوتوماتيك 2.5 لتر',
-            brand: 'باهي (Bahi)',
-            supplierName: 'الوطنية للمنظفات',
-            basePrice: 132.0,
-            unitsSold: 1090,
-            isPromoActive: true,
-            isPinnedDirect: false,
-            chainPrices: {
-              'fathalla': 132.0,
-              'carrefour': 136.0,
-              'beet-elgomla': 129.0,
-              'gomla': 128.0,
-              'spinneys': 138.0,
+            barcode: '6221143091227',
+            skuName: 'برسيل جل 2.6 ك لافندر',
+            brand: 'برسيل (Persil)',
+            supplierName: 'هنكل برسيل (3)',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 167.20, units: 3550),
+              '2025-02': (price: 166.03, units: 3208),
+              '2025-03': (price: 174.79, units: 1912),
+              '2025-04': (price: 177.27, units: 2144),
+              '2026-01': (price: 168.27, units: 3441),
+              '2026-02': (price: 177.31, units: 2548),
+              '2026-03': (price: 171.70, units: 2154),
+              '2026-04': (price: 177.96, units: 2137),
             },
           ),
         ],
       ),
+      // 4. هاند وواش - ديفا هاند ووش500مل بامب + اقتصادى عرض2ق
       const _RawCompetitiveGroupSeed(
-        ownBarcode: '62230004145650',
-        ownSkuName: 'ديفا هاند ووش 500 مل بامب + 1 لتر هدية توت بري (1.5 لتر)',
+        ownBarcode: '6223004145650',
+        ownSkuName: 'ديفا هاند ووش500مل بامب + اقتصادى عرض2ق',
         ownBrand: 'ديفا (Diva)',
         category: 'هاند وواش',
-        baseOwnPrice: 73.0,
-        recommendedPrice: 75.0,
-        ownUnitsSold: 2450,
-        ownChainPrices: {
-          'fathalla': 73.0,
-          'carrefour': 76.0,
-          'beet-elgomla': 71.0,
-          'gomla': 70.0,
-          'spinneys': 78.0,
+        monthlyData: {
+          '2025-01': (price: 70.19, units: 10888),
+          '2025-02': (price: 69.16, units: 13488),
+          '2025-03': (price: 65.56, units: 13570),
+          '2025-04': (price: 68.01, units: 14650),
+          '2026-01': (price: 71.09, units: 5240),
+          '2026-02': (price: 74.16, units: 6308),
+          '2026-03': (price: 74.85, units: 6079),
+          '2026-04': (price: 76.86, units: 7457),
         },
         competitors: [
           _RawCompetitorSeed(
-            barcode: '6221144880012',
-            skuName: 'لايف بوي غسول يدين سائل عناية متكاملة 500 مل + عبوة 1 لتر',
-            brand: 'لايف بوي (Lifebuoy)',
-            supplierName: 'يونيليفر مشرق (Unilever)',
-            basePrice: 112.0,
-            unitsSold: 1680,
-            isPromoActive: false,
+            barcode: '788364597557',
+            skuName: 'فاى هاند صوب 500جم بامب + غيار',
+            brand: 'فاي (Fay)',
+            supplierName: 'قادوس كوزمتكس منظفات(8)',
             isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 112.0,
-              'carrefour': 115.0,
-              'beet-elgomla': 109.0,
-              'gomla': 108.0,
-              'spinneys': 118.0,
+            monthlyData: {
+              '2025-01': (price: 65.15, units: 9686),
+              '2025-02': (price: 65.42, units: 9514),
+              '2025-03': (price: 65.76, units: 8382),
+              '2025-04': (price: 66.04, units: 9138),
+              '2026-01': (price: 66.03, units: 4314),
+              '2026-02': (price: 66.07, units: 4726),
+              '2026-03': (price: 62.54, units: 4505),
+              '2026-04': (price: 75.67, units: 3693),
             },
           ),
           _RawCompetitorSeed(
-            barcode: '6221099331020',
-            skuName: 'ديتول غسول يدين سائل مضاد للبكتيريا 400 مل × 2 عبوة (800 مل)',
-            brand: 'ديتول (Dettol)',
-            supplierName: 'ريكيت بينكيزر (Reckitt)',
-            basePrice: 138.0,
-            unitsSold: 1320,
-            isPromoActive: true,
-            isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 138.0,
-              'carrefour': 134.0,
-              'beet-elgomla': 136.0,
-              'gomla': 135.0,
-              'spinneys': 142.0,
-            },
-          ),
-          _RawCompetitorSeed(
-            barcode: '6223009123401',
-            skuName: 'فريدا شاور وهاند ووش 500 مل + 1 لتر توفير (1.5 لتر)',
+            barcode: '6224008204190',
+            skuName: 'فريدا هاند ووش الوادى الاخضر 520مل 1+1',
             brand: 'فريدا (Farida)',
-            supplierName: 'فريدا للعطور والمنظفات',
-            basePrice: 68.0,
-            unitsSold: 1890,
-            isPromoActive: true,
+            supplierName: 'فريدال للصناعات العطرية',
             isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 68.0,
-              'carrefour': 71.0,
-              'beet-elgomla': 66.0,
-              'gomla': 65.0,
-              'spinneys': 72.0,
+            monthlyData: {
+              '2025-01': (price: 74.63, units: 1156),
+              '2025-02': (price: 71.00, units: 1880),
+              '2025-03': (price: 82.79, units: 944),
+              '2025-04': (price: 75.96, units: 1134),
+              '2026-01': (price: 79.70, units: 601),
+              '2026-02': (price: 74.00, units: 852),
+              '2026-03': (price: 74.26, units: 808),
+              '2026-04': (price: 97.93, units: 521),
+            },
+          ),
+          _RawCompetitorSeed(
+            barcode: '6223006128743',
+            skuName: 'دووش هاند ووش 450ملي موف نسيم اللافندر',
+            brand: 'دووش (Douche)',
+            supplierName: 'ارما التجارية - منظفات',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 30.40, units: 4522),
+              '2025-02': (price: 34.04, units: 2598),
+              '2025-03': (price: 34.12, units: 4632),
+              '2025-04': (price: 33.89, units: 2478),
+              '2026-01': (price: 34.01, units: 2638),
+              '2026-02': (price: 30.73, units: 2710),
+              '2026-03': (price: 30.10, units: 3046),
+              '2026-04': (price: 38.11, units: 1407),
             },
           ),
         ],
       ),
+      // 5. منعمات ملابس - فلفيتا منعم ملابس مركز 1 لتر عطر الاناقه
       const _RawCompetitiveGroupSeed(
-        ownBarcode: '6223000232620',
-        ownSkuName: 'فيبا كلور مبيض ومعقم للملابس والأسطح 1 لتر',
-        ownBrand: 'فيبا كلور (Feba Chlor)',
-        category: 'كلور عادى',
-        baseOwnPrice: 34.0,
-        recommendedPrice: 35.0,
-        ownUnitsSold: 3120,
-        ownChainPrices: {
-          'fathalla': 34.0,
-          'carrefour': 36.0,
-          'beet-elgomla': 32.0,
-          'gomla': 33.0,
-          'spinneys': 36.0,
-        },
-        competitors: [
-          _RawCompetitorSeed(
-            barcode: '6221022001015',
-            skuName: 'كلوركس مبيض ملابس وأسطح الأصلي 950 مل',
-            brand: 'كلوركس (Clorox)',
-            supplierName: 'كلوركس مصر (Clorox)',
-            basePrice: 42.0,
-            unitsSold: 3650,
-            isPromoActive: false,
-            isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 42.0,
-              'carrefour': 44.0,
-              'beet-elgomla': 40.0,
-              'gomla': 41.0,
-              'spinneys': 45.0,
-            },
-          ),
-          _RawCompetitorSeed(
-            barcode: '6223005112019',
-            skuName: 'كلوريل مبيض ومعقم ملابس مركز 1 لتر',
-            brand: 'كلوريل (Clorel)',
-            supplierName: 'العربية للكيماويات',
-            basePrice: 29.5,
-            unitsSold: 2180,
-            isPromoActive: true,
-            isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 29.5,
-              'carrefour': 31.0,
-              'beet-elgomla': 28.5,
-              'gomla': 28.0,
-              'spinneys': 32.0,
-            },
-          ),
-        ],
-      ),
-      const _RawCompetitiveGroupSeed(
-        ownBarcode: '6221155001073',
-        ownSkuName: 'فلڤيتا منعم ومعطر أقمشة مركز 2 لتر',
-        ownBrand: 'فلڤيتا (Velveta)',
+        ownBarcode: '6223000234488',
+        ownSkuName: 'فلفيتا منعم ملابس مركز 1 لتر عطر الاناقه',
+        ownBrand: 'فلفيتا (Velveta)',
         category: 'منعمات ملابس',
-        baseOwnPrice: 98.0,
-        recommendedPrice: 95.0,
-        ownUnitsSold: 1410,
-        ownChainPrices: {
-          'fathalla': 98.0,
-          'carrefour': 102.0,
-          'beet-elgomla': 95.0,
-          'gomla': 94.0,
-          'spinneys': 104.0,
+        monthlyData: {
+          '2025-01': (price: 103.60, units: 1746),
+          '2025-02': (price: 91.89, units: 2132),
+          '2025-03': (price: 110.47, units: 1076),
+          '2025-04': (price: 111.86, units: 1446),
+          '2026-01': (price: 96.45, units: 1040),
+          '2026-02': (price: 89.97, units: 1368),
+          '2026-03': (price: 109.47, units: 1191),
+          '2026-04': (price: 126.97, units: 898),
         },
         competitors: [
           _RawCompetitorSeed(
-            barcode: '6221031990123',
-            skuName: 'داوني منعم أقمشة مركز نسيم الوادي 1.5 لتر',
+            barcode: '8700216311618',
+            skuName: 'داونى مركز منعم ملابس لافندر ومسك 1لتر',
             brand: 'داوني (Downy)',
-            supplierName: 'بروكتر آند جامبل (P&G)',
-            basePrice: 135.0,
-            unitsSold: 2050,
-            isPromoActive: false,
+            supplierName: 'بروكتر و جامبل مصر',
             isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 135.0,
-              'carrefour': 139.0,
-              'beet-elgomla': 132.0,
-              'gomla': 130.0,
-              'spinneys': 142.0,
+            monthlyData: {
+              '2025-01': (price: 160.78, units: 1306),
+              '2025-02': (price: 146.05, units: 1692),
+              '2025-03': (price: 148.73, units: 1434),
+              '2025-04': (price: 157.48, units: 1416),
+              '2026-01': (price: 128.00, units: 1880),
+              '2026-02': (price: 136.23, units: 2343),
+              '2026-03': (price: 128.00, units: 2746),
+              '2026-04': (price: 140.71, units: 2238),
             },
           ),
           _RawCompetitorSeed(
-            barcode: '6221144991234',
-            skuName: 'كومفورت منعم أقمشة مركز بالربيع 2 لتر',
-            brand: 'كومفورت (Comfort)',
-            supplierName: 'يونيليفر مشرق (Unilever)',
-            basePrice: 118.0,
-            unitsSold: 1790,
-            isPromoActive: true,
+            barcode: '5413149638129',
+            skuName: 'داونى منعم ملابس نسيم الوادي 3لتر',
+            brand: 'داوني (Downy)',
+            supplierName: 'بروكتر و جامبل مصر',
             isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 118.0,
-              'carrefour': 115.0,
-              'beet-elgomla': 116.0,
-              'gomla': 115.0,
-              'spinneys': 122.0,
-            },
-          ),
-          _RawCompetitorSeed(
-            barcode: '6223009129908',
-            skuName: 'فريدا منعم ومعطر ملابس مركز 2 لتر',
-            brand: 'فريدا (Farida)',
-            supplierName: 'فريدا للعطور والمنظفات',
-            basePrice: 89.0,
-            unitsSold: 1640,
-            isPromoActive: true,
-            isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 89.0,
-              'carrefour': 92.0,
-              'beet-elgomla': 86.0,
-              'gomla': 85.0,
-              'spinneys': 94.0,
+            monthlyData: {
+              '2025-01': (price: 284.88, units: 958),
+              '2025-02': (price: 226.49, units: 1784),
+              '2025-03': (price: 220.00, units: 1642),
+              '2025-04': (price: 232.67, units: 1422),
+              '2026-01': (price: 236.02, units: 1121),
+              '2026-02': (price: 236.00, units: 1327),
+              '2026-03': (price: 236.00, units: 1384),
+              '2026-04': (price: 236.00, units: 1446),
             },
           ),
         ],
       ),
+      // 6. كلور ألوان - شنطة كلوريل
       const _RawCompetitiveGroupSeed(
-        ownBarcode: '6221155001066',
-        ownSkuName: 'ماكسيل مطهر ومنظف أرضيات برائحة الصنوبر 2 لتر',
+        ownBarcode: '6223000235553',
+        ownSkuName: 'شنطة(كلوريل1كجم2×1+1كجم4×1+1050مل عادى+1لتر الوان)',
+        ownBrand: 'كلوريل (Clorel)',
+        category: 'كلور ألوان',
+        monthlyData: {
+          '2025-01': (price: 81.93, units: 3502),
+          '2025-02': (price: 69.62, units: 4680),
+          '2025-03': (price: 80.35, units: 3054),
+          '2025-04': (price: 83.87, units: 3074),
+          '2026-01': (price: 85.79, units: 2212),
+          '2026-02': (price: 83.30, units: 2595),
+          '2026-03': (price: 84.66, units: 2203),
+          '2026-04': (price: 90.73, units: 2286),
+        },
+        competitors: [
+          _RawCompetitorSeed(
+            barcode: '6221152011452',
+            skuName: 'كلوركس الوان عادي 2 لتر',
+            brand: 'كلوركس (Clorox)',
+            supplierName: 'الموزعون المتحدون',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 85.00, units: 4042),
+              '2025-02': (price: 85.00, units: 4496),
+              '2025-03': (price: 85.00, units: 3500),
+              '2025-04': (price: 85.00, units: 4664),
+              '2026-01': (price: 85.00, units: 2261),
+              '2026-02': (price: 85.00, units: 2459),
+              '2026-03': (price: 85.00, units: 2400),
+              '2026-04': (price: 103.62, units: 1659),
+            },
+          ),
+          _RawCompetitorSeed(
+            barcode: '6221152011261',
+            skuName: 'كلوركس الوان زهور 950 مل',
+            brand: 'كلوركس (Clorox)',
+            supplierName: 'الموزعون المتحدون',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 45.17, units: 7668),
+              '2025-02': (price: 46.11, units: 9810),
+              '2025-03': (price: 54.00, units: 7046),
+              '2025-04': (price: 54.00, units: 6580),
+              '2026-01': (price: 44.00, units: 4261),
+              '2026-02': (price: 44.00, units: 4727),
+              '2026-03': (price: 44.00, units: 4337),
+              '2026-04': (price: 54.91, units: 4650),
+            },
+          ),
+          _RawCompetitorSeed(
+            barcode: '6223014211956',
+            skuName: 'بريكس كلور الوان(موف) 950 مل',
+            brand: 'بريكس (Brix)',
+            supplierName: 'ارما التجارية - منظفات',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 25.28, units: 3984),
+              '2025-02': (price: 25.02, units: 4962),
+              '2025-03': (price: 25.12, units: 5110),
+              '2025-04': (price: 25.08, units: 5340),
+              '2026-01': (price: 34.98, units: 2178),
+              '2026-02': (price: 39.38, units: 1837),
+              '2026-03': (price: 39.00, units: 1293),
+              '2026-04': (price: 42.42, units: 1847),
+            },
+          ),
+        ],
+      ),
+      // 7. كلور عادى - كلوريل الوان2ك+كلوريل 2كجم عادى عرض(1+1)
+      const _RawCompetitiveGroupSeed(
+        ownBarcode: '6223000239452',
+        ownSkuName: 'كلوريل الوان2ك+كلوريل 2كجم عادى عرض(1+1)3مجموعة',
+        ownBrand: 'كلوريل (Clorel)',
+        category: 'كلور عادى',
+        monthlyData: {
+          '2025-01': (price: 87.72, units: 1408),
+          '2025-02': (price: 84.94, units: 3980),
+          '2025-03': (price: 85.28, units: 2830),
+          '2025-04': (price: 85.69, units: 3590),
+          '2026-01': (price: 91.40, units: 1849),
+          '2026-02': (price: 89.28, units: 1958),
+          '2026-03': (price: 90.11, units: 1769),
+          '2026-04': (price: 98.63, units: 2127),
+        },
+        competitors: [
+          _RawCompetitorSeed(
+            barcode: '6221152989317',
+            skuName: 'كلوركس الوان 950 مل + كلوركس مبيض 950 مل',
+            brand: 'كلوركس (Clorox)',
+            supplierName: 'الموزعون المتحدون',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 60.77, units: 3286),
+              '2025-02': (price: 62.85, units: 4168),
+              '2025-03': (price: 66.44, units: 2452),
+              '2025-04': (price: 60.30, units: 3744),
+              '2026-01': (price: 66.75, units: 734),
+              '2026-02': (price: 60.47, units: 1888),
+              '2026-03': (price: 64.94, units: 1579),
+              '2026-04': (price: 77.85, units: 1884),
+            },
+          ),
+          _RawCompetitorSeed(
+            barcode: '6221152001453',
+            skuName: 'كلوركس 0.5 جالون 1.89لتر',
+            brand: 'كلوركس (Clorox)',
+            supplierName: 'الموزعون المتحدون',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 41.35, units: 3130),
+              '2025-02': (price: 41.60, units: 3232),
+              '2025-03': (price: 41.33, units: 2330),
+              '2025-04': (price: 41.00, units: 2672),
+              '2026-01': (price: 41.75, units: 1694),
+              '2026-02': (price: 41.75, units: 1950),
+              '2026-03': (price: 41.75, units: 1806),
+              '2026-04': (price: 48.17, units: 1830),
+            },
+          ),
+        ],
+      ),
+      // 8. مسحوق غسالات اطباق - فيبا دش لغسالات الاطباق 1ك+ ملح 1ك هدية
+      const _RawCompetitiveGroupSeed(
+        ownBarcode: '6223000234266',
+        ownSkuName: 'فيبا دش لغسالات الاطباق 1ك+ ملح 1ك هدية',
+        ownBrand: 'فيبا (Feba)',
+        category: 'مسحوق غسالات اطباق',
+        monthlyData: {
+          '2025-01': (price: 278.05, units: 1052),
+          '2025-02': (price: 275.00, units: 1476),
+          '2025-03': (price: 281.45, units: 1310),
+          '2025-04': (price: 275.06, units: 1612),
+          '2026-01': (price: 261.41, units: 653),
+          '2026-02': (price: 290.52, units: 531),
+          '2026-03': (price: 279.99, units: 534),
+          '2026-04': (price: 306.18, units: 398),
+        },
+        competitors: [
+          _RawCompetitorSeed(
+            barcode: '5900498024937',
+            skuName: 'لودفيك مسحوق غسالات اطباق 1ك',
+            brand: 'لودفيك (Ludwik)',
+            supplierName: 'اجروبلس للصناعات الكيماوية',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 233.00, units: 502),
+              '2025-02': (price: 254.56, units: 714),
+              '2025-03': (price: 265.45, units: 486),
+              '2025-04': (price: 266.00, units: 622),
+              '2026-01': (price: 266.00, units: 197),
+              '2026-02': (price: 266.00, units: 252),
+              '2026-03': (price: 266.00, units: 247),
+              '2026-04': (price: 269.44, units: 237),
+            },
+          ),
+          _RawCompetitorSeed(
+            barcode: '6223000971000',
+            skuName: 'ديش برو مسحوق غسالات الاطباق 1كجم',
+            brand: 'ديش برو (Dish Pro)',
+            supplierName: 'المصرية للمنظفات الصناعية',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 145.00, units: 758),
+              '2025-02': (price: 157.62, units: 718),
+              '2025-03': (price: 174.12, units: 746),
+              '2025-04': (price: 173.92, units: 780),
+              '2026-01': (price: 173.86, units: 263),
+              '2026-02': (price: 173.84, units: 259),
+              '2026-03': (price: 173.84, units: 259),
+              '2026-04': (price: 175.00, units: 230),
+            },
+          ),
+          _RawCompetitorSeed(
+            barcode: '6223005877819',
+            skuName: 'فنيش مسحوق غسالات اطباق 1ك بالليمون 2+1مجانا',
+            brand: 'فينيش (Finish)',
+            supplierName: 'راشدين ايجيبت - هوم',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 796.00, units: 146),
+              '2025-02': (price: 796.00, units: 198),
+              '2025-03': (price: 796.00, units: 148),
+              '2025-04': (price: 796.00, units: 190),
+              '2026-01': (price: 704.90, units: 147),
+              '2026-02': (price: 700.00, units: 194),
+              '2026-03': (price: 703.22, units: 134),
+              '2026-04': (price: 700.87, units: 166),
+            },
+          ),
+        ],
+      ),
+      // 9. ملمع زجاج وكريستال - جلاسى ملمع زجاج رشاش
+      const _RawCompetitiveGroupSeed(
+        ownBarcode: '6223004149283',
+        ownSkuName: 'جلاسى ملمع زجاج رشاش 500مل+100مل+غيار500مل+100مل',
+        ownBrand: 'جلاسي (Glassy)',
+        category: 'ملمع زجاج وكريستال',
+        monthlyData: {
+          '2025-01': (price: 46.76, units: 3164),
+          '2025-02': (price: 44.99, units: 4568),
+          '2025-03': (price: 48.04, units: 3472),
+          '2025-04': (price: 45.72, units: 4058),
+          '2026-01': (price: 50.53, units: 2469),
+          '2026-02': (price: 49.00, units: 2959),
+          '2026-03': (price: 49.00, units: 2173),
+          '2026-04': (price: 58.40, units: 1647),
+        },
+        competitors: [
+          _RawCompetitorSeed(
+            barcode: '6224007537374',
+            skuName: 'فريدا جلاس ملمع و منظف زجاج 600مل رشاش+غيار',
+            brand: 'فريدا (Farida)',
+            supplierName: 'فريدال للصناعات العطرية',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 50.85, units: 3876),
+              '2025-02': (price: 48.83, units: 5240),
+              '2025-03': (price: 48.79, units: 4594),
+              '2025-04': (price: 50.29, units: 4048),
+              '2026-01': (price: 57.13, units: 2171),
+              '2026-02': (price: 49.00, units: 3808),
+              '2026-03': (price: 49.29, units: 3143),
+              '2026-04': (price: 62.38, units: 1979),
+            },
+          ),
+          _RawCompetitorSeed(
+            barcode: '6223001342793',
+            skuName: 'ويندكس رشاش 500 مل منظف وملمع زجاج شكل جديد ازرق',
+            brand: 'ويندكس (Windex)',
+            supplierName: 'جونسون واكس(قباء)',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 48.97, units: 1330),
+              '2025-02': (price: 47.39, units: 2086),
+              '2025-03': (price: 54.81, units: 1114),
+              '2025-04': (price: 54.98, units: 1220),
+              '2026-01': (price: 60.80, units: 764),
+              '2026-02': (price: 58.03, units: 918),
+              '2026-03': (price: 61.34, units: 733),
+              '2026-04': (price: 60.83, units: 762),
+            },
+          ),
+        ],
+      ),
+      // 10. مطهر عام - ديفاتول سائل مطهر 500مل عرض 2ق
+      const _RawCompetitiveGroupSeed(
+        ownBarcode: '6223004146091',
+        ownSkuName: 'ديفاتول سائل مطهر 500مل عرض 2ق',
+        ownBrand: 'ديفاتول (Divatol)',
+        category: 'مطهر عام',
+        monthlyData: {
+          '2025-01': (price: 196.63, units: 740),
+          '2025-02': (price: 161.16, units: 1044),
+          '2025-03': (price: 193.14, units: 486),
+          '2025-04': (price: 182.00, units: 848),
+          '2026-01': (price: 208.64, units: 408),
+          '2026-02': (price: 205.00, units: 337),
+          '2026-03': (price: 205.00, units: 318),
+          '2026-04': (price: 218.62, units: 297),
+        },
+        competitors: [
+          _RawCompetitorSeed(
+            barcode: '6223005875341',
+            skuName: 'ديتول 475 مل *2 ق خصم 40% على العبوة الثانية',
+            brand: 'ديتول (Dettol)',
+            supplierName: 'راشدين ايجيبت-منظفات(7)',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 451.80, units: 626),
+              '2025-02': (price: 471.43, units: 502),
+              '2025-03': (price: 482.57, units: 318),
+              '2025-04': (price: 489.00, units: 334),
+              '2026-01': (price: 451.36, units: 214),
+              '2026-02': (price: 401.09, units: 336),
+              '2026-03': (price: 492.58, units: 236),
+              '2026-04': (price: 515.00, units: 174),
+            },
+          ),
+          _RawCompetitorSeed(
+            barcode: '6222048703482',
+            skuName: 'ديتول سائل مطهر عام 475مل اسعار وزمان',
+            brand: 'ديتول (Dettol)',
+            supplierName: 'راشدين ايجيبت-منظفات(7)',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2026-01': (price: 175.00, units: 896),
+              '2026-02': (price: 175.00, units: 1185),
+              '2026-03': (price: 175.00, units: 1190),
+              '2026-04': (price: 175.00, units: 1456),
+            },
+          ),
+        ],
+      ),
+      // 11. مزيلات بقع ملابس - فلفيتا مزيل بقع ملابس 1لتر بالاوكسجين
+      const _RawCompetitiveGroupSeed(
+        ownBarcode: '6223004148231',
+        ownSkuName: 'فلفيتا مزيل بقع ملابس 1لتر بالاوكسجين',
+        ownBrand: 'فلفيتا (Velveta)',
+        category: 'مزيلات بقع ملابس',
+        monthlyData: {
+          '2025-01': (price: 78.77, units: 1400),
+          '2025-02': (price: 75.00, units: 1758),
+          '2025-03': (price: 72.77, units: 1288),
+          '2025-04': (price: 80.81, units: 1572),
+          '2026-01': (price: 57.00, units: 1589),
+          '2026-02': (price: 60.00, units: 1438),
+          '2026-03': (price: 80.40, units: 1135),
+          '2026-04': (price: 93.21, units: 1061),
+        },
+        competitors: [
+          _RawCompetitorSeed(
+            barcode: '6223005870209',
+            skuName: 'فانيش مزيل بقع الملابس سائل 450 مل',
+            brand: 'فانيش (Vanish)',
+            supplierName: 'راشدين ايجيبت - هوم',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 168.56, units: 1698),
+              '2025-02': (price: 175.35, units: 1922),
+              '2025-03': (price: 181.65, units: 1386),
+              '2025-04': (price: 174.96, units: 1986),
+              '2026-01': (price: 184.00, units: 831),
+              '2026-02': (price: 184.00, units: 848),
+              '2026-03': (price: 184.00, units: 788),
+              '2026-04': (price: 183.96, units: 1004),
+            },
+          ),
+          _RawCompetitorSeed(
+            barcode: '6223014212960',
+            skuName: 'بريكس مزيل للبقع 500 جم',
+            brand: 'بريكس (Brix)',
+            supplierName: 'ارما التجارية - منظفات',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 79.00, units: 1236),
+              '2025-02': (price: 79.00, units: 1640),
+              '2025-03': (price: 79.00, units: 1248),
+              '2025-04': (price: 79.00, units: 1792),
+              '2026-01': (price: 90.00, units: 647),
+              '2026-02': (price: 90.00, units: 482),
+              '2026-03': (price: 90.00, units: 959),
+              '2026-04': (price: 95.68, units: 1102),
+            },
+          ),
+          _RawCompetitorSeed(
+            barcode: '6221152989430',
+            skuName: 'كلوركس باودر 250 جم 2+1',
+            brand: 'كلوركس (Clorox)',
+            supplierName: 'الموزعون المتحدون',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 147.28, units: 976),
+              '2025-02': (price: 131.61, units: 1562),
+              '2025-03': (price: 130.61, units: 1140),
+              '2025-04': (price: 140.59, units: 1342),
+              '2026-01': (price: 164.46, units: 619),
+              '2026-02': (price: 157.83, units: 721),
+              '2026-03': (price: 158.87, units: 486),
+              '2026-04': (price: 163.60, units: 611),
+            },
+          ),
+        ],
+      ),
+      // 12. منظف ارضيات - ماكسيل ماجيك فلور 1.8لتر
+      const _RawCompetitiveGroupSeed(
+        ownBarcode: '6223000233245',
+        ownSkuName: 'ماكسيل ماجيك فلور 1.8لتر',
         ownBrand: 'ماكسيل (Maxell)',
         category: 'منظف ارضيات',
-        baseOwnPrice: 82.0,
-        recommendedPrice: 85.0,
-        ownUnitsSold: 1920,
-        ownChainPrices: {
-          'fathalla': 82.0,
-          'carrefour': 85.0,
-          'beet-elgomla': 79.0,
-          'gomla': 80.0,
-          'spinneys': 86.0,
+        monthlyData: {
+          '2025-01': (price: 86.78, units: 342),
+          '2025-02': (price: 84.56, units: 422),
+          '2025-03': (price: 65.31, units: 482),
+          '2025-04': (price: 73.43, units: 500),
+          '2026-01': (price: 73.17, units: 202),
+          '2026-02': (price: 69.00, units: 197),
+          '2026-03': (price: 66.67, units: 190),
+          '2026-04': (price: 77.56, units: 250),
         },
         competitors: [
           _RawCompetitorSeed(
-            barcode: '6221007088234',
-            skuName: 'جنرال منظف وملمع أرضيات بالصنوبر واللافندر 1.8 لتر',
+            barcode: '6221143099445',
+            skuName: 'جنرال سائل منظف أرضيات 3 لتر برائحة لافندر',
             brand: 'جنرال (General)',
-            supplierName: 'هنكل مصر (Henkel)',
-            basePrice: 96.0,
-            unitsSold: 1810,
-            isPromoActive: false,
+            supplierName: 'هنكل برسيل (3)',
             isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 96.0,
-              'carrefour': 99.0,
-              'beet-elgomla': 94.0,
-              'gomla': 93.0,
-              'spinneys': 102.0,
+            monthlyData: {
+              '2025-01': (price: 119.54, units: 672),
+              '2025-02': (price: 129.00, units: 1106),
+              '2025-03': (price: 129.00, units: 810),
+              '2025-04': (price: 129.00, units: 862),
+              '2026-01': (price: 139.00, units: 281),
+              '2026-02': (price: 139.00, units: 285),
+              '2026-03': (price: 139.00, units: 192),
+              '2026-04': (price: 139.00, units: 453),
             },
           ),
           _RawCompetitorSeed(
-            barcode: '6223009127700',
-            skuName: 'فريدا منظف ومطهر أرضيات معطر 2 لتر',
+            barcode: '6223006124363',
+            skuName: 'بريكس منظف ارضيات 730مل *2ق انواع',
+            brand: 'بريكس (Brix)',
+            supplierName: 'ارما التجارية - منظفات',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 52.70, units: 2148),
+              '2025-02': (price: 57.62, units: 2032),
+              '2025-03': (price: 57.04, units: 1186),
+              '2025-04': (price: 58.31, units: 2032),
+              '2026-01': (price: 67.00, units: 943),
+              '2026-02': (price: 67.00, units: 1246),
+              '2026-03': (price: 66.92, units: 1275),
+              '2026-04': (price: 71.71, units: 1372),
+            },
+          ),
+        ],
+      ),
+      // 13. منظفات مطبخ - ماكسيل ماجيك منظف للافران 500 مل
+      const _RawCompetitiveGroupSeed(
+        ownBarcode: '6223000237762',
+        ownSkuName: 'ماكسيل ماجيك منظف للافران 500 مل',
+        ownBrand: 'ماكسيل (Maxell)',
+        category: 'منظفات مطبخ',
+        monthlyData: {
+          '2025-01': (price: 82.00, units: 850),
+          '2025-02': (price: 81.93, units: 1112),
+          '2025-03': (price: 65.10, units: 1286),
+          '2025-04': (price: 71.29, units: 886),
+          '2026-01': (price: 88.69, units: 504),
+          '2026-02': (price: 94.00, units: 720),
+          '2026-03': (price: 80.14, units: 722),
+          '2026-04': (price: 83.40, units: 581),
+        },
+        competitors: [
+          _RawCompetitorSeed(
+            barcode: '6221152091034',
+            skuName: 'كلوركس منظف للمطابخ ليمون بخاخ 500مل',
+            brand: 'كلوركس (Clorox)',
+            supplierName: 'الموزعون المتحدون',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 92.00, units: 468),
+              '2025-02': (price: 92.00, units: 644),
+              '2025-03': (price: 92.00, units: 518),
+              '2025-04': (price: 92.00, units: 598),
+              '2026-01': (price: 92.00, units: 496),
+              '2026-02': (price: 92.00, units: 649),
+              '2026-03': (price: 92.00, units: 481),
+              '2026-04': (price: 105.88, units: 433),
+            },
+          ),
+          _RawCompetitorSeed(
+            barcode: '6224007537381',
+            skuName: 'فريدا مزيل دهون ومعقم بالبرتقال 550جم',
             brand: 'فريدا (Farida)',
-            supplierName: 'فريدا للعطور والمنظفات',
-            basePrice: 76.0,
-            unitsSold: 2040,
-            isPromoActive: true,
+            supplierName: 'فريدال للصناعات العطرية',
             isPinnedDirect: true,
-            chainPrices: {
-              'fathalla': 76.0,
-              'carrefour': 78.0,
-              'beet-elgomla': 74.0,
-              'gomla': 73.0,
-              'spinneys': 80.0,
+            monthlyData: {
+              '2025-01': (price: 55.41, units: 1120),
+              '2025-02': (price: 53.87, units: 1946),
+              '2025-03': (price: 50.12, units: 2142),
+              '2025-04': (price: 52.77, units: 1088),
+              '2026-01': (price: 55.52, units: 843),
+              '2026-02': (price: 52.00, units: 1203),
+              '2026-03': (price: 52.30, units: 910),
+              '2026-04': (price: 64.85, units: 738),
+            },
+          ),
+        ],
+      ),
+      // 14. منظفات تواليت - ماكسيل منظف تواليت 700مل عرض 2ق
+      const _RawCompetitiveGroupSeed(
+        ownBarcode: '6223004147203',
+        ownSkuName: 'ماكسيل منظف تواليت 700مل عرض 2ق',
+        ownBrand: 'ماكسيل (Maxell)',
+        category: 'منظفات تواليت',
+        monthlyData: {
+          '2025-01': (price: 87.98, units: 1294),
+          '2025-02': (price: 77.37, units: 1728),
+          '2025-03': (price: 99.23, units: 740),
+          '2025-04': (price: 104.98, units: 1380),
+          '2026-01': (price: 105.11, units: 895),
+          '2026-02': (price: 100.00, units: 877),
+          '2026-03': (price: 100.00, units: 737),
+          '2026-04': (price: 108.58, units: 688),
+        },
+        competitors: [
+          _RawCompetitorSeed(
+            barcode: '6222048702379',
+            skuName: 'هاربيك منظف تواليت 700 مل باور بلس 2ق خصم30%',
+            brand: 'هاربيك (Harpic)',
+            supplierName: 'راشدين ايجيبت - هوم',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 255.00, units: 324),
+              '2025-02': (price: 260.04, units: 376),
+              '2025-03': (price: 259.45, units: 246),
+              '2025-04': (price: 258.34, units: 328),
+              '2026-01': (price: 284.02, units: 175),
+              '2026-02': (price: 279.77, units: 244),
+              '2026-03': (price: 277.98, units: 160),
+              '2026-04': (price: 285.99, units: 170),
             },
           ),
           _RawCompetitorSeed(
-            barcode: '6221099771122',
-            skuName: 'ديتول مطهر ومنظف أسطح وأرضيات 4×1 صنوبر 1.5 لتر',
-            brand: 'ديتول (Dettol)',
-            supplierName: 'ريكيت بينكيزر (Reckitt)',
-            basePrice: 128.0,
-            unitsSold: 1290,
-            isPromoActive: false,
-            isPinnedDirect: false,
-            chainPrices: {
-              'fathalla': 128.0,
-              'carrefour': 132.0,
-              'beet-elgomla': 125.0,
-              'gomla': 124.0,
-              'spinneys': 135.0,
+            barcode: '6223006128644',
+            skuName: 'بريكس منظف تواليت 700 مل ازرق',
+            brand: 'بريكس (Brix)',
+            supplierName: 'ارما التجارية - منظفات',
+            isPinnedDirect: true,
+            monthlyData: {
+              '2025-01': (price: 52.60, units: 962),
+              '2025-02': (price: 59.95, units: 1306),
+              '2025-03': (price: 60.00, units: 1092),
+              '2025-04': (price: 60.00, units: 1308),
+              '2026-01': (price: 75.00, units: 538),
+              '2026-02': (price: 75.00, units: 606),
+              '2026-03': (price: 75.00, units: 629),
+              '2026-04': (price: 80.86, units: 786),
             },
           ),
         ],
       ),
     ];
 
-    // Also incorporate any non-own-brand records discovered from uploaded Excel sheets
-    final uploadedCompetitorsByCat = <String, List<SellOutRecordModel>>{};
+    // Helper to resolve price & units for a given (year, month) from a monthlyData map
+    ({double price, int units, double recommendedPrice}) resolvePeriodMetrics(
+      Map<String, ({double price, int units})> monthlyData,
+      int targetYear,
+      int targetMonth,
+    ) {
+      if (targetMonth > 0) {
+        final key = '$targetYear-${targetMonth.toString().padLeft(2, '0')}';
+        final exact = monthlyData[key];
+        if (exact != null && exact.price > 0) {
+          return (price: exact.price, units: exact.units, recommendedPrice: exact.price);
+        }
+      }
+      // Filter all months in targetYear
+      final yearKeys = monthlyData.keys
+          .where((k) => targetYear <= 0 || k.startsWith('$targetYear-'))
+          .toList()
+        ..sort();
+      if (yearKeys.isEmpty) {
+        final allKeys = monthlyData.keys.toList()..sort();
+        if (allKeys.isEmpty) return (price: 0.0, units: 0, recommendedPrice: 0.0);
+        final last = monthlyData[allKeys.last]!;
+        return (price: last.price, units: last.units, recommendedPrice: last.price);
+      }
+      double totalRev = 0.0;
+      int totalUnits = 0;
+      double latestPrice = 0.0;
+      for (final k in yearKeys) {
+        final pt = monthlyData[k]!;
+        totalRev += pt.price * pt.units;
+        totalUnits += pt.units;
+        if (pt.price > 0) latestPrice = pt.price;
+      }
+      // When viewing a full year (month == 0), use the latest month's active shelf price as current selling price
+      // and also compute weighted average price as reference.
+      final avgPrice = totalUnits > 0
+          ? double.parse((totalRev / totalUnits).toStringAsFixed(2))
+          : latestPrice;
+      final activePrice = latestPrice > 0 ? latestPrice : avgPrice;
+      return (price: activePrice, units: totalUnits, recommendedPrice: avgPrice);
+    }
+
+    // Aggregate any additional live records by category + barcode + month
+    final liveCompByCat = <String, Map<String, ({String skuName, String supplier, Map<String, ({double rev, int units})> byMonth})>>{};
     for (final rec in liveRecords) {
-      if (!rec.isOwnBrand && rec.unitPrice > 0) {
+      if (!rec.isOwnBrand && rec.unitPrice > 0 && rec.quantitySold > 0) {
         final normCat = normalizeCategoryName(rec.category);
-        uploadedCompetitorsByCat.putIfAbsent(normCat, () => []).add(rec);
+        final catMap = liveCompByCat.putIfAbsent(normCat, () => {});
+        final bKey = rec.barcode.isNotEmpty ? rec.barcode : rec.skuName;
+        final item = catMap.putIfAbsent(
+          bKey,
+          () => (skuName: rec.skuName, supplier: rec.supplier, byMonth: {}),
+        );
+        final mKey = rec.transactionDate.length >= 7 ? rec.transactionDate.substring(0, 7) : '$year-01';
+        final prev = item.byMonth[mKey];
+        item.byMonth[mKey] = (
+          rev: (prev?.rev ?? 0.0) + rec.netRevenue,
+          units: (prev?.units ?? 0) + rec.quantitySold,
+        );
       }
     }
 
@@ -9230,50 +9975,69 @@ class ApiClient {
 
     for (final seed in rawDefs) {
       final ownPack = extractPackVolume(seed.ownSkuName);
-      final effectiveOwnPrice = activeChainKey != null
-          ? (seed.ownChainPrices[activeChainKey] ??
-              double.parse((seed.baseOwnPrice * mult).toStringAsFixed(1)))
-          : seed.baseOwnPrice;
+      final ownResolved = resolvePeriodMetrics(seed.monthlyData, year, month);
+      final effectiveOwnPrice = ownResolved.price;
+      if (effectiveOwnPrice <= 0) continue;
+
       final ownPricePerVol = ownPack.volume > 0
           ? double.parse((effectiveOwnPrice / ownPack.volume).toStringAsFixed(2))
           : effectiveOwnPrice;
 
-      // Total category revenue to compute realistic category share %
-      double totalCatRev = effectiveOwnPrice * seed.ownUnitsSold;
+      final ownYearTrajectory = buildMonthlyPriceTrajectory(seed.monthlyData, filterYear: year);
+      final ownAllTrajectory = buildMonthlyPriceTrajectory(seed.monthlyData);
+
+      double totalCatRev = effectiveOwnPrice * ownResolved.units;
       final compSeeds = List<_RawCompetitorSeed>.from(seed.competitors);
 
-      // Merge any live uploaded competitors for the same category
+      // Merge any extra live uploaded competitors for the same category
       final normCat = normalizeCategoryName(seed.category);
-      final extraUploaded = uploadedCompetitorsByCat[normCat] ?? const [];
+      final extraMap = liveCompByCat[normCat] ?? const {};
       final seenCompBarcodes = compSeeds.map((e) => e.barcode).toSet();
-      for (final up in extraUploaded) {
-        if (seenCompBarcodes.add(up.barcode)) {
-          compSeeds.add(
-            _RawCompetitorSeed(
-              barcode: up.barcode,
-              skuName: up.skuName,
-              brand: up.supplier.isNotEmpty ? up.supplier : 'منافس بالسوق',
-              supplierName: up.supplier.isNotEmpty ? up.supplier : 'شركة منافسة',
-              basePrice: up.unitPrice,
-              unitsSold: up.quantitySold > 0 ? up.quantitySold : 450,
-              isPromoActive: false,
-              isPinnedDirect: false,
-              chainPrices: {
-                up.retailerChain.toLowerCase(): up.unitPrice,
-                'fathalla': up.unitPrice,
-                'carrefour': double.parse((up.unitPrice * 1.02).toStringAsFixed(1)),
-              },
-            ),
-          );
+      for (final entry in extraMap.entries) {
+        if (seenCompBarcodes.add(entry.key)) {
+          final mData = <String, ({double price, int units})>{};
+          for (final me in entry.value.byMonth.entries) {
+            if (me.value.units > 0) {
+              mData[me.key] = (
+                price: double.parse((me.value.rev / me.value.units).toStringAsFixed(2)),
+                units: me.value.units,
+              );
+            }
+          }
+          if (mData.isNotEmpty) {
+            compSeeds.add(
+              _RawCompetitorSeed(
+                barcode: entry.key,
+                skuName: entry.value.skuName,
+                brand: inferBrandFromSkuOrSupplier(entry.value.skuName, entry.value.supplier),
+                supplierName: entry.value.supplier.isNotEmpty ? entry.value.supplier : 'مورد منافس',
+                isPinnedDirect: false,
+                monthlyData: mData,
+              ),
+            );
+          }
         }
       }
 
+      final resolvedCompMetrics = <({
+        _RawCompetitorSeed seed,
+        double price,
+        int units,
+        List<SkuMonthlyPricePointModel> yearTrajectory,
+        List<SkuMonthlyPricePointModel> allTrajectory,
+      })>[];
+
       for (final c in compSeeds) {
-        final cPrice = activeChainKey != null
-            ? (c.chainPrices[activeChainKey] ??
-                double.parse((c.basePrice * mult).toStringAsFixed(1)))
-            : c.basePrice;
-        totalCatRev += cPrice * c.unitsSold;
+        final cm = resolvePeriodMetrics(c.monthlyData, year, month);
+        if (cm.price <= 0) continue;
+        totalCatRev += cm.price * cm.units;
+        resolvedCompMetrics.add((
+          seed: c,
+          price: cm.price,
+          units: cm.units,
+          yearTrajectory: buildMonthlyPriceTrajectory(c.monthlyData, filterYear: year),
+          allTrajectory: buildMonthlyPriceTrajectory(c.monthlyData),
+        ));
       }
 
       final customList = _customPinnedCompetitors[seed.ownBarcode] ??
@@ -9284,12 +10048,11 @@ class ApiClient {
       }
 
       final ownCatSharePct = totalCatRev > 0
-          ? double.parse((((effectiveOwnPrice * seed.ownUnitsSold) / totalCatRev) * 100.0).toStringAsFixed(1))
+          ? double.parse((((effectiveOwnPrice * ownResolved.units) / totalCatRev) * 100.0).toStringAsFixed(1))
           : 25.0;
 
       final builtCompetitors = <CompetitorSkuComparisonModel>[];
 
-      // Prepend any user-added custom field competitors
       for (final custom in customList) {
         final diffEgp = custom.unitPrice - effectiveOwnPrice;
         final diffPct = effectiveOwnPrice > 0 ? (diffEgp / effectiveOwnPrice) * 100.0 : 0.0;
@@ -9307,12 +10070,11 @@ class ApiClient {
         );
       }
 
-      for (final c in compSeeds) {
+      for (final item in resolvedCompMetrics) {
+        final c = item.seed;
         final cPack = extractPackVolume(c.skuName);
-        final cPrice = activeChainKey != null
-            ? (c.chainPrices[activeChainKey] ??
-                double.parse((c.basePrice * mult).toStringAsFixed(1)))
-            : c.basePrice;
+        final cPrice = item.price;
+        final cUnits = item.units;
         final cPricePerVol = cPack.volume > 0
             ? double.parse((cPrice / cPack.volume).toStringAsFixed(2))
             : cPrice;
@@ -9320,16 +10082,20 @@ class ApiClient {
         final diffPct = effectiveOwnPrice > 0 ? (diffEgp / effectiveOwnPrice) * 100.0 : 0.0;
         final String pos;
         if (diffPct > 1.5) {
-          pos = 'higher'; // Competitor price is higher than ours
+          pos = 'higher';
         } else if (diffPct < -1.5) {
-          pos = 'lower'; // Competitor price is lower than ours
+          pos = 'lower';
         } else {
           pos = 'equal';
         }
-        final cRev = cPrice * c.unitsSold;
+        final cRev = double.parse((cPrice * cUnits).toStringAsFixed(2));
         final cShare = totalCatRev > 0
             ? double.parse(((cRev / totalCatRev) * 100.0).toStringAsFixed(1))
             : 15.0;
+
+        // Check if competitor dropped price in latest month (active promo signal)
+        final hasRecentDiscount = item.yearTrajectory.isNotEmpty &&
+            item.yearTrajectory.last.priceChangePct < -1.5;
 
         builtCompetitors.add(
           CompetitorSkuComparisonModel(
@@ -9346,12 +10112,14 @@ class ApiClient {
             priceDiffEgp: double.parse(diffEgp.toStringAsFixed(2)),
             priceDiffPct: double.parse(diffPct.toStringAsFixed(1)),
             pricePosition: pos,
-            unitsSold: c.unitsSold,
+            unitsSold: cUnits,
             netRevenue: cRev,
             categorySharePct: cShare,
-            isPromoActive: c.isPromoActive,
+            isPromoActive: hasRecentDiscount,
             isPinnedDirect: c.isPinnedDirect,
-            chainPrices: c.chainPrices,
+            chainPrices: {'fathalla': cPrice},
+            monthlyPrices: item.yearTrajectory,
+            allMonthlyPrices: item.allTrajectory,
           ),
         );
       }
@@ -9370,7 +10138,6 @@ class ApiClient {
             .reduce((a, b) => a > b ? a : b);
       }
 
-      // Price index: Own Price / Avg Competitor Price * 100 (100 = at market average, <100 = cheaper than market, >100 = premium/more expensive)
       final priceIndex = avgComp > 0
           ? double.parse(((effectiveOwnPrice / avgComp) * 100.0).toStringAsFixed(1))
           : 100.0;
@@ -9385,17 +10152,21 @@ class ApiClient {
           packVolumeUnits: ownPack.volume,
           volumeUnitLabel: ownPack.unitLabel,
           ownUnitPrice: effectiveOwnPrice,
-          ownRecommendedPrice: seed.recommendedPrice,
+          ownRecommendedPrice: ownResolved.recommendedPrice,
           ownPricePerUnitVolume: ownPricePerVol,
-          ownUnitsSold: seed.ownUnitsSold,
-          ownNetRevenue: effectiveOwnPrice * seed.ownUnitsSold,
+          ownUnitsSold: ownResolved.units,
+          ownNetRevenue: double.parse((effectiveOwnPrice * ownResolved.units).toStringAsFixed(2)),
           ownCategorySharePct: ownCatSharePct,
           avgCompetitorPrice: double.parse(avgComp.toStringAsFixed(2)),
           minCompetitorPrice: double.parse(minComp.toStringAsFixed(2)),
           maxCompetitorPrice: double.parse(maxComp.toStringAsFixed(2)),
           priceIndex: priceIndex,
-          ownChainPrices: seed.ownChainPrices,
+          ownChainPrices: {'fathalla': effectiveOwnPrice},
           competitors: builtCompetitors,
+          monthlyPrices: ownYearTrajectory,
+          allMonthlyPrices: ownAllTrajectory,
+          selectedYear: year,
+          selectedMonth: month,
         ),
       );
     }
@@ -9409,22 +10180,16 @@ class _RawCompetitorSeed {
   final String skuName;
   final String brand;
   final String supplierName;
-  final double basePrice;
-  final int unitsSold;
-  final bool isPromoActive;
   final bool isPinnedDirect;
-  final Map<String, double> chainPrices;
+  final Map<String, ({double price, int units})> monthlyData;
 
   const _RawCompetitorSeed({
     required this.barcode,
     required this.skuName,
     required this.brand,
     required this.supplierName,
-    required this.basePrice,
-    required this.unitsSold,
-    required this.isPromoActive,
     required this.isPinnedDirect,
-    required this.chainPrices,
+    required this.monthlyData,
   });
 }
 
@@ -9433,10 +10198,7 @@ class _RawCompetitiveGroupSeed {
   final String ownSkuName;
   final String ownBrand;
   final String category;
-  final double baseOwnPrice;
-  final double recommendedPrice;
-  final int ownUnitsSold;
-  final Map<String, double> ownChainPrices;
+  final Map<String, ({double price, int units})> monthlyData;
   final List<_RawCompetitorSeed> competitors;
 
   const _RawCompetitiveGroupSeed({
@@ -9444,11 +10206,38 @@ class _RawCompetitiveGroupSeed {
     required this.ownSkuName,
     required this.ownBrand,
     required this.category,
-    required this.baseOwnPrice,
-    required this.recommendedPrice,
-    required this.ownUnitsSold,
-    required this.ownChainPrices,
+    required this.monthlyData,
     required this.competitors,
+  });
+}
+
+/// Represents a monthly price & volume data point for an Own or Competitor SKU.
+class SkuMonthlyPricePointModel {
+  final String monthKey; // e.g. '2026-01'
+  final int year;
+  final int monthNum;
+  final String monthNameAr; // e.g. 'يناير'
+  final String monthLabelAr; // e.g. 'يناير 2026'
+  final double unitPrice;
+  final int unitsSold;
+  final double netRevenue;
+  final double priceChangeEgp;
+  final double priceChangePct;
+  /// `'up'`, `'down'`, `'stable'`, or `'baseline'`
+  final String trendDirection;
+
+  const SkuMonthlyPricePointModel({
+    required this.monthKey,
+    required this.year,
+    required this.monthNum,
+    required this.monthNameAr,
+    required this.monthLabelAr,
+    required this.unitPrice,
+    required this.unitsSold,
+    required this.netRevenue,
+    required this.priceChangeEgp,
+    required this.priceChangePct,
+    required this.trendDirection,
   });
 }
 
@@ -9476,6 +10265,8 @@ class CompetitorSkuComparisonModel {
   final bool isPromoActive;
   final bool isPinnedDirect;
   final Map<String, double> chainPrices;
+  final List<SkuMonthlyPricePointModel> monthlyPrices;
+  final List<SkuMonthlyPricePointModel> allMonthlyPrices;
 
   const CompetitorSkuComparisonModel({
     required this.skuName,
@@ -9497,7 +10288,22 @@ class CompetitorSkuComparisonModel {
     this.isPromoActive = false,
     this.isPinnedDirect = true,
     this.chainPrices = const {},
+    this.monthlyPrices = const [],
+    this.allMonthlyPrices = const [],
   });
+
+  double get periodPriceChangePct {
+    if (monthlyPrices.length < 2) return 0.0;
+    final first = monthlyPrices.first.unitPrice;
+    final last = monthlyPrices.last.unitPrice;
+    if (first <= 0) return 0.0;
+    return double.parse((((last - first) / first) * 100.0).toStringAsFixed(1));
+  }
+
+  double get periodPriceChangeEgp {
+    if (monthlyPrices.length < 2) return 0.0;
+    return double.parse((monthlyPrices.last.unitPrice - monthlyPrices.first.unitPrice).toStringAsFixed(2));
+  }
 
   CompetitorSkuComparisonModel copyWithPriceContext({
     required double priceDiffEgp,
@@ -9524,6 +10330,8 @@ class CompetitorSkuComparisonModel {
       isPromoActive: isPromoActive,
       isPinnedDirect: isPinnedDirect,
       chainPrices: chainPrices,
+      monthlyPrices: monthlyPrices,
+      allMonthlyPrices: allMonthlyPrices,
     );
   }
 }
@@ -9550,6 +10358,10 @@ class OwnSkuCompetitiveGroupModel {
   final double priceIndex;
   final Map<String, double> ownChainPrices;
   final List<CompetitorSkuComparisonModel> competitors;
+  final List<SkuMonthlyPricePointModel> monthlyPrices;
+  final List<SkuMonthlyPricePointModel> allMonthlyPrices;
+  final int selectedYear;
+  final int selectedMonth;
 
   const OwnSkuCompetitiveGroupModel({
     required this.ownBarcode,
@@ -9571,7 +10383,24 @@ class OwnSkuCompetitiveGroupModel {
     required this.priceIndex,
     required this.ownChainPrices,
     required this.competitors,
+    this.monthlyPrices = const [],
+    this.allMonthlyPrices = const [],
+    this.selectedYear = 2026,
+    this.selectedMonth = 0,
   });
+
+  double get periodPriceChangePct {
+    if (monthlyPrices.length < 2) return 0.0;
+    final first = monthlyPrices.first.unitPrice;
+    final last = monthlyPrices.last.unitPrice;
+    if (first <= 0) return 0.0;
+    return double.parse((((last - first) / first) * 100.0).toStringAsFixed(1));
+  }
+
+  double get periodPriceChangeEgp {
+    if (monthlyPrices.length < 2) return 0.0;
+    return double.parse((monthlyPrices.last.unitPrice - monthlyPrices.first.unitPrice).toStringAsFixed(2));
+  }
 
   int get higherPricedCompetitorsCount =>
       competitors.where((c) => c.pricePosition == 'higher').length;
@@ -9721,6 +10550,335 @@ class SellInExplorerResponse {
   }
 }
 
+class TargetSKUBreakdownModel {
+  final String skuName;
+  final String brand;
+  final String sector;
+  final String subCategory;
+  final double sharePct;
+  final double casePriceEgp;
+  final double targetRevenueEgp;
+  final double targetUnits;
+  final double targetWeightTons;
+  final double actualRevenueEgp;
+  final double actualUnits;
+  final double actualWeightTons;
+  final double expectedRevenueEgp;
+  final double expectedUnits;
+  final double varianceRevenueEgp;
+  final double varianceUnits;
+  final double achievementPct;
+  final double remainingStockCases;
+  final String stockStatus;
+  final String stockStatusAr;
+  final double promoSharePct;
+
+  const TargetSKUBreakdownModel({
+    required this.skuName,
+    required this.brand,
+    required this.sector,
+    required this.subCategory,
+    required this.sharePct,
+    required this.casePriceEgp,
+    required this.targetRevenueEgp,
+    required this.targetUnits,
+    required this.targetWeightTons,
+    required this.actualRevenueEgp,
+    required this.actualUnits,
+    required this.actualWeightTons,
+    required this.expectedRevenueEgp,
+    required this.expectedUnits,
+    required this.varianceRevenueEgp,
+    required this.varianceUnits,
+    required this.achievementPct,
+    required this.remainingStockCases,
+    required this.stockStatus,
+    required this.stockStatusAr,
+    required this.promoSharePct,
+  });
+
+  factory TargetSKUBreakdownModel.fromJson(Map<String, dynamic> json) {
+    return TargetSKUBreakdownModel(
+      skuName: json['sku_name'] as String? ?? '',
+      brand: json['brand'] as String? ?? '',
+      sector: json['sector'] as String? ?? 'MT',
+      subCategory: json['sub_category'] as String? ?? '',
+      sharePct: (json['share_pct'] as num?)?.toDouble() ?? 0.0,
+      casePriceEgp: (json['case_price_egp'] as num?)?.toDouble() ?? 0.0,
+      targetRevenueEgp: (json['target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      targetUnits: (json['target_units'] as num?)?.toDouble() ?? 0.0,
+      targetWeightTons: (json['target_weight_tons'] as num?)?.toDouble() ?? 0.0,
+      actualRevenueEgp: (json['actual_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      actualUnits: (json['actual_units'] as num?)?.toDouble() ?? 0.0,
+      actualWeightTons: (json['actual_weight_tons'] as num?)?.toDouble() ?? 0.0,
+      expectedRevenueEgp: (json['expected_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      expectedUnits: (json['expected_units'] as num?)?.toDouble() ?? 0.0,
+      varianceRevenueEgp: (json['variance_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      varianceUnits: (json['variance_units'] as num?)?.toDouble() ?? 0.0,
+      achievementPct: (json['achievement_pct'] as num?)?.toDouble() ?? 0.0,
+      remainingStockCases: (json['remaining_stock_cases'] as num?)?.toDouble() ?? 0.0,
+      stockStatus: json['stock_status'] as String? ?? 'optimal',
+      stockStatusAr: json['stock_status_ar'] as String? ?? 'رصيد آمن ومتوازن',
+      promoSharePct: (json['promo_share_pct'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+class TargetBranchBreakdownModel {
+  final String branchCode;
+  final String branchName;
+  final String regionCode;
+  final String governorate;
+  final String salesRep;
+  final String kaOfficer;
+  final double shareOfChainPct;
+  final int activeSkusCount;
+  final double targetRevenueEgp;
+  final double targetUnits;
+  final double targetWeightTons;
+  final double grossTargetUnits;
+  final double actualRevenueEgp;
+  final double actualUnits;
+  final double actualWeightTons;
+  final double expectedRevenueEgp;
+  final double expectedUnits;
+  final double varianceRevenueEgp;
+  final double varianceUnits;
+  final double achievementRevPct;
+  final double achievementUnitsPct;
+  final String status;
+  final String statusAr;
+  final List<TargetSKUBreakdownModel> skus;
+
+  const TargetBranchBreakdownModel({
+    required this.branchCode,
+    required this.branchName,
+    required this.regionCode,
+    required this.governorate,
+    required this.salesRep,
+    required this.kaOfficer,
+    required this.shareOfChainPct,
+    required this.activeSkusCount,
+    required this.targetRevenueEgp,
+    required this.targetUnits,
+    required this.targetWeightTons,
+    required this.grossTargetUnits,
+    required this.actualRevenueEgp,
+    required this.actualUnits,
+    required this.actualWeightTons,
+    required this.expectedRevenueEgp,
+    required this.expectedUnits,
+    required this.varianceRevenueEgp,
+    required this.varianceUnits,
+    required this.achievementRevPct,
+    required this.achievementUnitsPct,
+    required this.status,
+    required this.statusAr,
+    required this.skus,
+  });
+
+  factory TargetBranchBreakdownModel.fromJson(Map<String, dynamic> json) {
+    final skusList = (json['skus'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(TargetSKUBreakdownModel.fromJson)
+        .toList();
+    return TargetBranchBreakdownModel(
+      branchCode: json['branch_code'] as String? ?? '',
+      branchName: json['branch_name'] as String? ?? '',
+      regionCode: json['region_code'] as String? ?? 'ALX',
+      governorate: json['governorate'] as String? ?? '',
+      salesRep: json['sales_rep'] as String? ?? '',
+      kaOfficer: json['ka_officer'] as String? ?? '',
+      shareOfChainPct: (json['share_of_chain_pct'] as num?)?.toDouble() ?? 0.0,
+      activeSkusCount: (json['active_skus_count'] as num?)?.toInt() ?? skusList.length,
+      targetRevenueEgp: (json['target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      targetUnits: (json['target_units'] as num?)?.toDouble() ?? 0.0,
+      targetWeightTons: (json['target_weight_tons'] as num?)?.toDouble() ?? 0.0,
+      grossTargetUnits: (json['gross_target_units'] as num?)?.toDouble() ?? 0.0,
+      actualRevenueEgp: (json['actual_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      actualUnits: (json['actual_units'] as num?)?.toDouble() ?? 0.0,
+      actualWeightTons: (json['actual_weight_tons'] as num?)?.toDouble() ?? 0.0,
+      expectedRevenueEgp: (json['expected_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      expectedUnits: (json['expected_units'] as num?)?.toDouble() ?? 0.0,
+      varianceRevenueEgp: (json['variance_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      varianceUnits: (json['variance_units'] as num?)?.toDouble() ?? 0.0,
+      achievementRevPct: (json['achievement_rev_pct'] as num?)?.toDouble() ?? 0.0,
+      achievementUnitsPct: (json['achievement_units_pct'] as num?)?.toDouble() ?? 0.0,
+      status: json['status'] as String? ?? 'at_risk',
+      statusAr: json['status_ar'] as String? ?? 'أقل من المستهدف',
+      skus: skusList,
+    );
+  }
+}
+
+class TargetBrandBreakdownModel {
+  final String brand;
+  final String sector;
+  final String sectorNameAr;
+  final double sharePct;
+  final int activeSkusCount;
+  final double targetRevenueEgp;
+  final double targetUnits;
+  final double targetWeightTons;
+  final double actualRevenueEgp;
+  final double actualUnits;
+  final double expectedRevenueEgp;
+  final double varianceRevenueEgp;
+  final double varianceUnits;
+  final double achievementPct;
+
+  const TargetBrandBreakdownModel({
+    required this.brand,
+    required this.sector,
+    required this.sectorNameAr,
+    required this.sharePct,
+    required this.activeSkusCount,
+    required this.targetRevenueEgp,
+    required this.targetUnits,
+    required this.targetWeightTons,
+    required this.actualRevenueEgp,
+    required this.actualUnits,
+    required this.expectedRevenueEgp,
+    required this.varianceRevenueEgp,
+    required this.varianceUnits,
+    required this.achievementPct,
+  });
+
+  factory TargetBrandBreakdownModel.fromJson(Map<String, dynamic> json) {
+    return TargetBrandBreakdownModel(
+      brand: json['brand'] as String? ?? '',
+      sector: json['sector'] as String? ?? 'MT',
+      sectorNameAr: json['sector_name_ar'] as String? ?? '',
+      sharePct: (json['share_pct'] as num?)?.toDouble() ?? 0.0,
+      activeSkusCount: (json['active_skus_count'] as num?)?.toInt() ?? 0,
+      targetRevenueEgp: (json['target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      targetUnits: (json['target_units'] as num?)?.toDouble() ?? 0.0,
+      targetWeightTons: (json['target_weight_tons'] as num?)?.toDouble() ?? 0.0,
+      actualRevenueEgp: (json['actual_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      actualUnits: (json['actual_units'] as num?)?.toDouble() ?? 0.0,
+      expectedRevenueEgp: (json['expected_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      varianceRevenueEgp: (json['variance_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      varianceUnits: (json['variance_units'] as num?)?.toDouble() ?? 0.0,
+      achievementPct: (json['achievement_pct'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+class TargetSalesRepQuotaModel {
+  final String salesRep;
+  final String kaOfficer;
+  final String salesManager;
+  final String regionCode;
+  final String governorate;
+  final int branchesCount;
+  final int activeSkusCount;
+  final double sharePct;
+  final double targetRevenueEgp;
+  final double targetUnits;
+  final double targetWeightTons;
+  final double actualRevenueEgp;
+  final double actualUnits;
+  final double expectedRevenueEgp;
+  final double varianceRevenueEgp;
+  final double achievementPct;
+  final double mtTargetRevenueEgp;
+  final double ccTargetRevenueEgp;
+
+  const TargetSalesRepQuotaModel({
+    required this.salesRep,
+    required this.kaOfficer,
+    required this.salesManager,
+    required this.regionCode,
+    required this.governorate,
+    required this.branchesCount,
+    required this.activeSkusCount,
+    required this.sharePct,
+    required this.targetRevenueEgp,
+    required this.targetUnits,
+    required this.targetWeightTons,
+    required this.actualRevenueEgp,
+    required this.actualUnits,
+    required this.expectedRevenueEgp,
+    required this.varianceRevenueEgp,
+    required this.achievementPct,
+    required this.mtTargetRevenueEgp,
+    required this.ccTargetRevenueEgp,
+  });
+
+  factory TargetSalesRepQuotaModel.fromJson(Map<String, dynamic> json) {
+    return TargetSalesRepQuotaModel(
+      salesRep: json['sales_rep'] as String? ?? '',
+      kaOfficer: json['ka_officer'] as String? ?? '',
+      salesManager: json['sales_manager'] as String? ?? '',
+      regionCode: json['region_code'] as String? ?? '',
+      governorate: json['governorate'] as String? ?? '',
+      branchesCount: (json['branches_count'] as num?)?.toInt() ?? 0,
+      activeSkusCount: (json['active_skus_count'] as num?)?.toInt() ?? 0,
+      sharePct: (json['share_pct'] as num?)?.toDouble() ?? 0.0,
+      targetRevenueEgp: (json['target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      targetUnits: (json['target_units'] as num?)?.toDouble() ?? 0.0,
+      targetWeightTons: (json['target_weight_tons'] as num?)?.toDouble() ?? 0.0,
+      actualRevenueEgp: (json['actual_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      actualUnits: (json['actual_units'] as num?)?.toDouble() ?? 0.0,
+      expectedRevenueEgp: (json['expected_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      varianceRevenueEgp: (json['variance_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      achievementPct: (json['achievement_pct'] as num?)?.toDouble() ?? 0.0,
+      mtTargetRevenueEgp: (json['mt_target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      ccTargetRevenueEgp: (json['cc_target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+class TargetMonthBreakdownModel {
+  final int year;
+  final int month;
+  final String monthLabelAr;
+  final String monthLabelEn;
+  final double seasonalitySharePct;
+  final double targetRevenueEgp;
+  final double targetUnits;
+  final double targetWeightTons;
+  final double actualRevenueEgp;
+  final double actualUnits;
+  final double expectedRevenueEgp;
+  final double varianceRevenueEgp;
+  final double achievementPct;
+
+  const TargetMonthBreakdownModel({
+    required this.year,
+    required this.month,
+    required this.monthLabelAr,
+    required this.monthLabelEn,
+    required this.seasonalitySharePct,
+    required this.targetRevenueEgp,
+    required this.targetUnits,
+    required this.targetWeightTons,
+    required this.actualRevenueEgp,
+    required this.actualUnits,
+    required this.expectedRevenueEgp,
+    required this.varianceRevenueEgp,
+    required this.achievementPct,
+  });
+
+  factory TargetMonthBreakdownModel.fromJson(Map<String, dynamic> json) {
+    return TargetMonthBreakdownModel(
+      year: (json['year'] as num?)?.toInt() ?? 2026,
+      month: (json['month'] as num?)?.toInt() ?? 1,
+      monthLabelAr: json['month_label_ar'] as String? ?? '',
+      monthLabelEn: json['month_label_en'] as String? ?? '',
+      seasonalitySharePct: (json['seasonality_share_pct'] as num?)?.toDouble() ?? 0.0,
+      targetRevenueEgp: (json['target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      targetUnits: (json['target_units'] as num?)?.toDouble() ?? 0.0,
+      targetWeightTons: (json['target_weight_tons'] as num?)?.toDouble() ?? 0.0,
+      actualRevenueEgp: (json['actual_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      actualUnits: (json['actual_units'] as num?)?.toDouble() ?? 0.0,
+      expectedRevenueEgp: (json['expected_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      varianceRevenueEgp: (json['variance_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      achievementPct: (json['achievement_pct'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
 class TargetComparisonModel {
   final String id;
   final String tenantId;
@@ -9740,10 +10898,31 @@ class TargetComparisonModel {
   final double actualUnits;
   final double varianceUnits;
   final double achievementUnitsPct;
+  final double targetWeightTons;
+  final double actualWeightTons;
+  final double expectedRevenueEgp;
+  final double expectedUnits;
+  final double expectedAchievementPct;
+  final double avgCasePriceEgp;
+  final double historicalReturnRatePct;
+  final double grossTargetRevenueEgp;
+  final double grossTargetUnits;
+  final double promoSharePct;
+  final double promoTargetRevenueEgp;
+  final double regularTargetRevenueEgp;
+  final double mtTargetRevenueEgp;
+  final double ccTargetRevenueEgp;
+  final int branchesCount;
+  final int activeSkusCount;
   final String status;
   final String statusAr;
   final String notes;
   final String updatedAt;
+  final List<TargetBranchBreakdownModel> branches;
+  final List<TargetSKUBreakdownModel> chainSkuTotals;
+  final List<TargetBrandBreakdownModel> brands;
+  final List<TargetSalesRepQuotaModel> salesRepQuotas;
+  final List<TargetMonthBreakdownModel> monthlyPhasing;
 
   const TargetComparisonModel({
     required this.id,
@@ -9764,20 +10943,62 @@ class TargetComparisonModel {
     required this.actualUnits,
     required this.varianceUnits,
     required this.achievementUnitsPct,
+    this.targetWeightTons = 0.0,
+    this.actualWeightTons = 0.0,
+    this.expectedRevenueEgp = 0.0,
+    this.expectedUnits = 0.0,
+    this.expectedAchievementPct = 0.0,
+    this.avgCasePriceEgp = 585.0,
+    this.historicalReturnRatePct = 1.8,
+    this.grossTargetRevenueEgp = 0.0,
+    this.grossTargetUnits = 0.0,
+    this.promoSharePct = 28.5,
+    this.promoTargetRevenueEgp = 0.0,
+    this.regularTargetRevenueEgp = 0.0,
+    this.mtTargetRevenueEgp = 0.0,
+    this.ccTargetRevenueEgp = 0.0,
+    this.branchesCount = 0,
+    this.activeSkusCount = 0,
     required this.status,
     required this.statusAr,
     required this.notes,
     required this.updatedAt,
+    this.branches = const [],
+    this.chainSkuTotals = const [],
+    this.brands = const [],
+    this.salesRepQuotas = const [],
+    this.monthlyPhasing = const [],
   });
 
   factory TargetComparisonModel.fromJson(Map<String, dynamic> json) {
+    final branchesList = (json['branches'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(TargetBranchBreakdownModel.fromJson)
+        .toList();
+    final chainSkusList = (json['chain_sku_totals'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(TargetSKUBreakdownModel.fromJson)
+        .toList();
+    final brandsList = (json['brands'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(TargetBrandBreakdownModel.fromJson)
+        .toList();
+    final repsList = (json['sales_rep_quotas'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(TargetSalesRepQuotaModel.fromJson)
+        .toList();
+    final monthsList = (json['monthly_phasing'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(TargetMonthBreakdownModel.fromJson)
+        .toList();
+
     return TargetComparisonModel(
       id: json['id'] as String? ?? '',
       tenantId: json['tenant_id'] as String? ?? '',
       targetType: json['target_type'] as String? ?? 'sell_out',
       retailerChain: json['retailer_chain'] as String? ?? 'all',
       chainDisplayName: json['chain_display_name'] as String? ?? '',
-      year: (json['year'] as num?)?.toInt() ?? 2025,
+      year: (json['year'] as num?)?.toInt() ?? 2026,
       month: (json['month'] as num?)?.toInt() ?? 0,
       monthLabel: json['month_label'] as String? ?? '',
       branchName: json['branch_name'] as String? ?? 'كل الفروع',
@@ -9790,10 +11011,31 @@ class TargetComparisonModel {
       actualUnits: (json['actual_units'] as num?)?.toDouble() ?? 0.0,
       varianceUnits: (json['variance_units'] as num?)?.toDouble() ?? 0.0,
       achievementUnitsPct: (json['achievement_units_pct'] as num?)?.toDouble() ?? 0.0,
+      targetWeightTons: (json['target_weight_tons'] as num?)?.toDouble() ?? 0.0,
+      actualWeightTons: (json['actual_weight_tons'] as num?)?.toDouble() ?? 0.0,
+      expectedRevenueEgp: (json['expected_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      expectedUnits: (json['expected_units'] as num?)?.toDouble() ?? 0.0,
+      expectedAchievementPct: (json['expected_achievement_pct'] as num?)?.toDouble() ?? 0.0,
+      avgCasePriceEgp: (json['avg_case_price_egp'] as num?)?.toDouble() ?? 585.0,
+      historicalReturnRatePct: (json['historical_return_rate_pct'] as num?)?.toDouble() ?? 1.8,
+      grossTargetRevenueEgp: (json['gross_target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      grossTargetUnits: (json['gross_target_units'] as num?)?.toDouble() ?? 0.0,
+      promoSharePct: (json['promo_share_pct'] as num?)?.toDouble() ?? 28.5,
+      promoTargetRevenueEgp: (json['promo_target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      regularTargetRevenueEgp: (json['regular_target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      mtTargetRevenueEgp: (json['mt_target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      ccTargetRevenueEgp: (json['cc_target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      branchesCount: (json['branches_count'] as num?)?.toInt() ?? branchesList.length,
+      activeSkusCount: (json['active_skus_count'] as num?)?.toInt() ?? chainSkusList.length,
       status: json['status'] as String? ?? 'at_risk',
       statusAr: json['status_ar'] as String? ?? 'أقل من المستهدف',
       notes: json['notes'] as String? ?? '',
       updatedAt: json['updated_at'] as String? ?? '',
+      branches: branchesList,
+      chainSkuTotals: chainSkusList,
+      brands: brandsList,
+      salesRepQuotas: repsList,
+      monthlyPhasing: monthsList,
     );
   }
 }
@@ -9807,6 +11049,15 @@ class TargetsSummaryModel {
   final double overallAchievementPct;
   final double totalTargetUnits;
   final double totalActualUnits;
+  final double totalTargetWeightTons;
+  final double totalActualWeightTons;
+  final double totalExpectedRevenueEgp;
+  final double totalExpectedUnits;
+  final double totalGrossTargetRevenueEgp;
+  final double totalGrossTargetUnits;
+  final double avgCasePriceEgp;
+  final int totalBranchesCovered;
+  final int totalSkusCovered;
   final List<TargetComparisonModel> items;
 
   const TargetsSummaryModel({
@@ -9818,6 +11069,15 @@ class TargetsSummaryModel {
     required this.overallAchievementPct,
     required this.totalTargetUnits,
     required this.totalActualUnits,
+    this.totalTargetWeightTons = 0.0,
+    this.totalActualWeightTons = 0.0,
+    this.totalExpectedRevenueEgp = 0.0,
+    this.totalExpectedUnits = 0.0,
+    this.totalGrossTargetRevenueEgp = 0.0,
+    this.totalGrossTargetUnits = 0.0,
+    this.avgCasePriceEgp = 585.0,
+    this.totalBranchesCovered = 0,
+    this.totalSkusCovered = 0,
     required this.items,
   });
 
@@ -9847,6 +11107,15 @@ class TargetsSummaryModel {
       overallAchievementPct: (json['overall_achievement_pct'] as num?)?.toDouble() ?? 0.0,
       totalTargetUnits: (json['total_target_units'] as num?)?.toDouble() ?? 0.0,
       totalActualUnits: (json['total_actual_units'] as num?)?.toDouble() ?? 0.0,
+      totalTargetWeightTons: (json['total_target_weight_tons'] as num?)?.toDouble() ?? 0.0,
+      totalActualWeightTons: (json['total_actual_weight_tons'] as num?)?.toDouble() ?? 0.0,
+      totalExpectedRevenueEgp: (json['total_expected_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      totalExpectedUnits: (json['total_expected_units'] as num?)?.toDouble() ?? 0.0,
+      totalGrossTargetRevenueEgp: (json['total_gross_target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
+      totalGrossTargetUnits: (json['total_gross_target_units'] as num?)?.toDouble() ?? 0.0,
+      avgCasePriceEgp: (json['avg_case_price_egp'] as num?)?.toDouble() ?? 585.0,
+      totalBranchesCovered: (json['total_branches_covered'] as num?)?.toInt() ?? 0,
+      totalSkusCovered: (json['total_skus_covered'] as num?)?.toInt() ?? 0,
       items: list,
     );
   }

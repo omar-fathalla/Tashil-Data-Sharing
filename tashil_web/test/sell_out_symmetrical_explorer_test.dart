@@ -44,16 +44,54 @@ void main() {
       expect(find.text('إجمالي الكمية المباعة'), findsOneWidget);
       expect(find.text('Total Units Sold'), findsOneWidget);
 
-      expect(find.text('متوسط سعر الوحدة'), findsOneWidget);
-      expect(find.text('Average Unit Price (EGP)'), findsOneWidget);
+      expect(find.text('الأصناف النشطة ومتوسط الفرع'), findsOneWidget);
+      expect(find.text('Active SKUs & Branch Velocity'), findsOneWidget);
 
       expect(find.text('إجمالي الفروع النشطة'), findsOneWidget);
       expect(find.text('Active Stores & Outlets'), findsOneWidget);
 
-      // 3. Verify Action Buttons: Upload Sell-Out, Export Excel, Print PDF
+      // 3. Verify Full-Width Branch Sales Ranking Chart with Year 2026 Default
+      expect(find.byKey(const ValueKey('full_width_branch_sales_chart')), findsOneWidget);
+      expect(find.textContaining('شارت ترتيب مبيعات فروع السلسلة من الأعلى للأقل'), findsOneWidget);
+      expect(find.byKey(const ValueKey('branch_chart_year_2026')), findsOneWidget);
+      expect(find.byKey(const ValueKey('branch_chart_year_2025')), findsOneWidget);
+
+      // 4. Verify Action Buttons: Upload Sell-Out, Export Excel, Print PDF
       expect(find.byKey(const ValueKey('upload_sellout_button')), findsOneWidget);
       expect(find.byKey(const ValueKey('export_excel_button')), findsOneWidget);
       expect(find.byKey(const ValueKey('export_pdf_button')), findsOneWidget);
+    });
+
+    testWidgets('switches Year between 2026 (Default) and 2025 in Full-Width Branch Sales Chart',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: SellOutExplorerScreen(apiClient: apiClient),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Default year is 2026
+      expect(find.textContaining('سنة 2026'), findsWidgets);
+      expect(find.textContaining('34 فرع'), findsWidgets);
+
+      // Switch to Year 2025 using the chart year button
+      final year2025Btn = find.byKey(const ValueKey('branch_chart_year_2025'));
+      await tester.ensureVisible(year2025Btn);
+      await tester.tap(year2025Btn);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('سنة 2025'), findsWidgets);
     });
 
     testWidgets('switches to Tab 1 (Performance & Branch Analytics) and displays Pareto & Branch Velocity',

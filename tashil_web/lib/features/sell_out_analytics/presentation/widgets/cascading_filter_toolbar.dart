@@ -14,6 +14,7 @@ class CascadingFilterToolbar extends StatefulWidget {
   final String? selectedStoreId;
   final String? selectedCategory;
   final DateTimeRange? selectedDateRange;
+  final int? selectedYear;
   final String searchQuery;
   final List<String>? availableCategories;
   final Map<String, List<Map<String, String>>>? chainStoresOverride;
@@ -21,6 +22,7 @@ class CascadingFilterToolbar extends StatefulWidget {
   final ValueChanged<String?> onStoreChanged;
   final ValueChanged<String?> onCategoryChanged;
   final ValueChanged<DateTimeRange?>? onDateRangeChanged;
+  final ValueChanged<int?>? onYearChanged;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onExportExcel;
   final VoidCallback? onExportPdf;
@@ -33,6 +35,7 @@ class CascadingFilterToolbar extends StatefulWidget {
     required this.selectedStoreId,
     required this.selectedCategory,
     this.selectedDateRange,
+    this.selectedYear,
     required this.searchQuery,
     this.availableCategories,
     this.chainStoresOverride,
@@ -40,6 +43,7 @@ class CascadingFilterToolbar extends StatefulWidget {
     required this.onStoreChanged,
     required this.onCategoryChanged,
     this.onDateRangeChanged,
+    this.onYearChanged,
     required this.onSearchChanged,
     required this.onExportExcel,
     this.onExportPdf,
@@ -660,6 +664,54 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
       );
     }
 
+    Widget buildYearSelectorPill() {
+      if (widget.onYearChanged == null) return const SizedBox.shrink();
+      final activeYr = widget.selectedYear ?? 2026;
+      return Container(
+        key: const ValueKey('sellout_year_selector_pill'),
+        height: 38.0,
+        padding: const EdgeInsets.symmetric(horizontal: 10.0),
+        decoration: BoxDecoration(
+          color: colorScheme.primaryContainer.withOpacity(0.55),
+          borderRadius: BorderRadius.circular(20.0),
+          border: Border.all(
+            color: colorScheme.primary.withOpacity(0.5),
+          ),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<int>(
+            value: const [2026, 2025, 2024, 0].contains(activeYr) ? activeYr : 2026,
+            isDense: true,
+            focusColor: Colors.transparent,
+            dropdownColor: colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(14.0),
+            icon: Icon(
+              Icons.arrow_drop_down_rounded,
+              size: 18.0,
+              color: colorScheme.primary,
+            ),
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.w800,
+              fontSize: 11.5,
+              color: colorScheme.onPrimaryContainer,
+            ),
+            items: const [
+              DropdownMenuItem(value: 2026, child: Text('Year: 2026 (Default)')),
+              DropdownMenuItem(value: 2025, child: Text('Year: 2025')),
+              DropdownMenuItem(value: 2024, child: Text('Year: 2024')),
+              DropdownMenuItem(value: 0, child: Text('All Years (2025–2026)')),
+            ],
+            onChanged: (val) {
+              if (val != null) {
+                widget.onYearChanged!(val);
+              }
+            },
+          ),
+        ),
+      );
+    }
+
     Widget buildDateRangeButton({bool expand = false}) {
       final child = InkWell(
         key: const ValueKey('sellout_date_range_chip'),
@@ -929,6 +981,10 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      if (widget.onYearChanged != null) ...[
+                        buildYearSelectorPill(),
+                        const SizedBox(width: 8.0),
+                      ],
                       buildDateRangeButton(expand: false),
                       const Spacer(),
                       if (widget.onUpload != null) ...[

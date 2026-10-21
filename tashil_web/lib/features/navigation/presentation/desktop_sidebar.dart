@@ -69,7 +69,7 @@ class DesktopSidebar extends StatelessWidget {
       _NavDestination(
         icon: Icons.compare_arrows_outlined,
         selectedIcon: Icons.compare_arrows_rounded,
-        label: 'Compare (المنافسة)',
+        label: 'Compare',
       ),
       _NavDestination(
         icon: Icons.campaign_outlined,

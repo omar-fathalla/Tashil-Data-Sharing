@@ -232,6 +232,116 @@ type CPFRDashboardPayload struct {
 	PromoAndReturns          PromoAndReturnSummary     `json:"promo_and_returns"`
 }
 
+// TargetSKUBreakdown represents the SKU-level target allocation inside a specific branch or rolled up across an entire chain.
+type TargetSKUBreakdown struct {
+	SKUName             string  `json:"sku_name"`
+	Brand               string  `json:"brand"`
+	Sector              string  `json:"sector"` // "MT" | "CC"
+	SubCategory         string  `json:"sub_category"`
+	SharePct            float64 `json:"share_pct"`
+	CasePriceEGP        float64 `json:"case_price_egp"`
+	TargetRevenueEGP    float64 `json:"target_revenue_egp"`
+	TargetUnits         float64 `json:"target_units"` // Cases for Sell-In
+	TargetWeightTons    float64 `json:"target_weight_tons"`
+	ActualRevenueEGP    float64 `json:"actual_revenue_egp"`
+	ActualUnits         float64 `json:"actual_units"`
+	ActualWeightTons    float64 `json:"actual_weight_tons"`
+	ExpectedRevenueEGP  float64 `json:"expected_revenue_egp"`
+	ExpectedUnits       float64 `json:"expected_units"`
+	VarianceRevenueEGP  float64 `json:"variance_revenue_egp"`
+	VarianceUnits       float64 `json:"variance_units"`
+	AchievementPct      float64 `json:"achievement_pct"`
+	RemainingStockCases float64 `json:"remaining_stock_cases"`
+	StockStatus         string  `json:"stock_status"`    // "urgent_replenishment" | "optimal" | "overstock"
+	StockStatusAr       string  `json:"stock_status_ar"` // "سحب عالي / أولوية توريد" | "رصيد آمن ومتوازن" | "تكدس مخزني - تهدئة توريد"
+	PromoSharePct       float64 `json:"promo_share_pct"`
+}
+
+// TargetBranchBreakdown represents the Branch-level target allocation inside a chain, along with all SKUs allocated to that branch.
+type TargetBranchBreakdown struct {
+	BranchCode          string               `json:"branch_code"`
+	BranchName          string               `json:"branch_name"`
+	RegionCode          string               `json:"region_code"`
+	Governorate         string               `json:"governorate"`
+	SalesRep            string               `json:"sales_rep"`
+	KAOfficer           string               `json:"ka_officer"`
+	ShareOfChainPct     float64              `json:"share_of_chain_pct"`
+	ActiveSKUsCount     int                  `json:"active_skus_count"`
+	TargetRevenueEGP    float64              `json:"target_revenue_egp"`
+	TargetUnits         float64              `json:"target_units"`
+	TargetWeightTons    float64              `json:"target_weight_tons"`
+	GrossTargetUnits    float64              `json:"gross_target_units"`
+	ActualRevenueEGP    float64              `json:"actual_revenue_egp"`
+	ActualUnits         float64              `json:"actual_units"`
+	ActualWeightTons    float64              `json:"actual_weight_tons"`
+	ExpectedRevenueEGP  float64              `json:"expected_revenue_egp"`
+	ExpectedUnits       float64              `json:"expected_units"`
+	VarianceRevenueEGP  float64              `json:"variance_revenue_egp"`
+	VarianceUnits       float64              `json:"variance_units"`
+	AchievementRevPct   float64              `json:"achievement_rev_pct"`
+	AchievementUnitsPct float64              `json:"achievement_units_pct"`
+	Status              string               `json:"status"`
+	StatusAr            string               `json:"status_ar"`
+	SKUs                []TargetSKUBreakdown `json:"skus"`
+}
+
+// TargetBrandBreakdown summarizes the chain target allocation by Brand & Sector (MT vs CC).
+type TargetBrandBreakdown struct {
+	Brand              string  `json:"brand"`
+	Sector             string  `json:"sector"`
+	SectorNameAr       string  `json:"sector_name_ar"`
+	SharePct           float64 `json:"share_pct"`
+	ActiveSKUsCount    int     `json:"active_skus_count"`
+	TargetRevenueEGP   float64 `json:"target_revenue_egp"`
+	TargetUnits        float64 `json:"target_units"`
+	TargetWeightTons   float64 `json:"target_weight_tons"`
+	ActualRevenueEGP   float64 `json:"actual_revenue_egp"`
+	ActualUnits        float64 `json:"actual_units"`
+	ExpectedRevenueEGP float64 `json:"expected_revenue_egp"`
+	VarianceRevenueEGP float64 `json:"variance_revenue_egp"`
+	VarianceUnits      float64 `json:"variance_units"`
+	AchievementPct     float64 `json:"achievement_pct"`
+}
+
+// TargetSalesRepQuota summarizes the automatic target quota assigned to each Field Sales Rep & KA Officer based on their branches/SKUs.
+type TargetSalesRepQuota struct {
+	SalesRep           string  `json:"sales_rep"`
+	KAOfficer          string  `json:"ka_officer"`
+	SalesManager       string  `json:"sales_manager"`
+	RegionCode         string  `json:"region_code"`
+	Governorate        string  `json:"governorate"`
+	BranchesCount      int     `json:"branches_count"`
+	ActiveSKUsCount    int     `json:"active_skus_count"`
+	SharePct           float64 `json:"share_pct"`
+	TargetRevenueEGP   float64 `json:"target_revenue_egp"`
+	TargetUnits        float64 `json:"target_units"`
+	TargetWeightTons   float64 `json:"target_weight_tons"`
+	ActualRevenueEGP   float64 `json:"actual_revenue_egp"`
+	ActualUnits        float64 `json:"actual_units"`
+	ExpectedRevenueEGP float64 `json:"expected_revenue_egp"`
+	VarianceRevenueEGP float64 `json:"variance_revenue_egp"`
+	AchievementPct     float64 `json:"achievement_pct"`
+	MTTargetRevenueEGP float64 `json:"mt_target_revenue_egp"`
+	CCTargetRevenueEGP float64 `json:"cc_target_revenue_egp"`
+}
+
+// TargetMonthBreakdown breaks down an annual or multi-month target across individual calendar months using historical seasonality.
+type TargetMonthBreakdown struct {
+	Year               int     `json:"year"`
+	Month              int     `json:"month"`
+	MonthLabelAr       string  `json:"month_label_ar"`
+	MonthLabelEn       string  `json:"month_label_en"`
+	SeasonalitySharePct float64 `json:"seasonality_share_pct"`
+	TargetRevenueEGP   float64 `json:"target_revenue_egp"`
+	TargetUnits        float64 `json:"target_units"`
+	TargetWeightTons   float64 `json:"target_weight_tons"`
+	ActualRevenueEGP   float64 `json:"actual_revenue_egp"`
+	ActualUnits        float64 `json:"actual_units"`
+	ExpectedRevenueEGP float64 `json:"expected_revenue_egp"`
+	VarianceRevenueEGP float64 `json:"variance_revenue_egp"`
+	AchievementPct     float64 `json:"achievement_pct"`
+}
+
 // TargetRecord represents a saved Sell-Out or Sell-In target for a tenant, chain, period (year/month), and optional branch/category.
 type TargetRecord struct {
 	ID               string  `json:"id"`
@@ -250,43 +360,73 @@ type TargetRecord struct {
 	UpdatedAt        string  `json:"updated_at"`
 }
 
-// TargetComparisonItem combines a saved TargetRecord with real-time Actual performance from Sell-Out or Sell-In records.
+// TargetComparisonItem combines a saved TargetRecord with real-time Actual performance and comprehensive hierarchical drill-down (Chain -> Branch -> SKU).
 type TargetComparisonItem struct {
-	ID                  string  `json:"id"`
-	TenantID            string  `json:"tenant_id"`
-	TargetType          string  `json:"target_type"`
-	RetailerChain       string  `json:"retailer_chain"`
-	ChainDisplayName    string  `json:"chain_display_name"`
-	Year                int     `json:"year"`
-	Month               int     `json:"month"`
-	MonthLabel          string  `json:"month_label"`
-	BranchName          string  `json:"branch_name"`
-	Category            string  `json:"category"`
-	TargetRevenueEGP    float64 `json:"target_revenue_egp"`
-	ActualRevenueEGP    float64 `json:"actual_revenue_egp"`
-	VarianceRevenueEGP  float64 `json:"variance_revenue_egp"`
-	AchievementRevPct   float64 `json:"achievement_rev_pct"`
-	TargetUnits         float64 `json:"target_units"`
-	ActualUnits         float64 `json:"actual_units"`
-	VarianceUnits       float64 `json:"variance_units"`
-	AchievementUnitsPct float64 `json:"achievement_units_pct"`
-	Status              string  `json:"status"`    // "exceeded" | "on_track" | "at_risk"
-	StatusAr            string  `json:"status_ar"` // "تجاوز المستهدف" | "قيد التحقيق" | "أقل من المستهدف"
-	Notes               string  `json:"notes"`
-	UpdatedAt           string  `json:"updated_at"`
+	ID                      string                  `json:"id"`
+	TenantID                string                  `json:"tenant_id"`
+	TargetType              string                  `json:"target_type"`
+	RetailerChain           string                  `json:"retailer_chain"`
+	ChainDisplayName        string                  `json:"chain_display_name"`
+	Year                    int                     `json:"year"`
+	Month                   int                     `json:"month"`
+	MonthLabel              string                  `json:"month_label"`
+	BranchName              string                  `json:"branch_name"`
+	Category                string                  `json:"category"`
+	TargetRevenueEGP        float64                 `json:"target_revenue_egp"`
+	ActualRevenueEGP        float64                 `json:"actual_revenue_egp"`
+	VarianceRevenueEGP      float64                 `json:"variance_revenue_egp"`
+	AchievementRevPct       float64                 `json:"achievement_rev_pct"`
+	TargetUnits             float64                 `json:"target_units"`
+	ActualUnits             float64                 `json:"actual_units"`
+	VarianceUnits           float64                 `json:"variance_units"`
+	AchievementUnitsPct     float64                 `json:"achievement_units_pct"`
+	TargetWeightTons        float64                 `json:"target_weight_tons"`
+	ActualWeightTons        float64                 `json:"actual_weight_tons"`
+	ExpectedRevenueEGP      float64                 `json:"expected_revenue_egp"`
+	ExpectedUnits           float64                 `json:"expected_units"`
+	ExpectedAchievementPct  float64                 `json:"expected_achievement_pct"`
+	AvgCasePriceEGP         float64                 `json:"avg_case_price_egp"`
+	HistoricalReturnRatePct float64                 `json:"historical_return_rate_pct"`
+	GrossTargetRevenueEGP   float64                 `json:"gross_target_revenue_egp"`
+	GrossTargetUnits        float64                 `json:"gross_target_units"`
+	PromoSharePct           float64                 `json:"promo_share_pct"`
+	PromoTargetRevenueEGP   float64                 `json:"promo_target_revenue_egp"`
+	RegularTargetRevenueEGP float64                 `json:"regular_target_revenue_egp"`
+	MTTargetRevenueEGP      float64                 `json:"mt_target_revenue_egp"`
+	CCTargetRevenueEGP      float64                 `json:"cc_target_revenue_egp"`
+	BranchesCount           int                     `json:"branches_count"`
+	ActiveSKUsCount         int                     `json:"active_skus_count"`
+	Status                  string                  `json:"status"`    // "exceeded" | "on_track" | "at_risk"
+	StatusAr                string                  `json:"status_ar"` // "تجاوز المستهدف" | "قيد التحقيق" | "أقل من المستهدف"
+	Notes                   string                  `json:"notes"`
+	UpdatedAt               string                  `json:"updated_at"`
+	Branches                []TargetBranchBreakdown `json:"branches"`
+	ChainSKUTotals          []TargetSKUBreakdown    `json:"chain_sku_totals"`
+	Brands                  []TargetBrandBreakdown  `json:"brands"`
+	SalesRepQuotas          []TargetSalesRepQuota   `json:"sales_rep_quotas"`
+	MonthlyPhasing          []TargetMonthBreakdown  `json:"monthly_phasing"`
 }
 
 // TargetsSummaryResponse returns the list of target comparisons along with rolled-up totals.
 type TargetsSummaryResponse struct {
-	TenantID              string                 `json:"tenant_id"`
-	TargetType            string                 `json:"target_type"`
-	TotalTargetRevenueEGP float64                `json:"total_target_revenue_egp"`
-	TotalActualRevenueEGP float64                `json:"total_actual_revenue_egp"`
-	TotalVarianceEGP      float64                `json:"total_variance_egp"`
-	OverallAchievementPct float64                `json:"overall_achievement_pct"`
-	TotalTargetUnits      float64                `json:"total_target_units"`
-	TotalActualUnits      float64                `json:"total_actual_units"`
-	Items                 []TargetComparisonItem `json:"items"`
+	TenantID                  string                 `json:"tenant_id"`
+	TargetType                string                 `json:"target_type"`
+	TotalTargetRevenueEGP     float64                `json:"total_target_revenue_egp"`
+	TotalActualRevenueEGP     float64                `json:"total_actual_revenue_egp"`
+	TotalVarianceEGP          float64                `json:"total_variance_egp"`
+	OverallAchievementPct     float64                `json:"overall_achievement_pct"`
+	TotalTargetUnits          float64                `json:"total_target_units"`
+	TotalActualUnits          float64                `json:"total_actual_units"`
+	TotalTargetWeightTons     float64                `json:"total_target_weight_tons"`
+	TotalActualWeightTons     float64                `json:"total_actual_weight_tons"`
+	TotalExpectedRevenueEGP   float64                `json:"total_expected_revenue_egp"`
+	TotalExpectedUnits        float64                `json:"total_expected_units"`
+	TotalGrossTargetRevenueEGP float64               `json:"total_gross_target_revenue_egp"`
+	TotalGrossTargetUnits     float64                `json:"total_gross_target_units"`
+	AvgCasePriceEGP           float64                `json:"avg_case_price_egp"`
+	TotalBranchesCovered      int                    `json:"total_branches_covered"`
+	TotalSKUsCovered          int                    `json:"total_skus_covered"`
+	Items                     []TargetComparisonItem `json:"items"`
 }
 
 // InferBrandFromItemName uses AI-grade heuristic brand extraction across Arabic & English FMCG and retail goods.

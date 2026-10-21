@@ -10,6 +10,12 @@ import '../../../../core/widgets/table_scroll_container.dart';
 /// TargetManagementPanel provides a unified Target entry, Excel upload, and
 /// real-time Actual vs. Target achievement comparison experience for both
 /// Sell-Out (مبيعات الكاشير) and Sell-In (توريدات السلاسل).
+///
+/// For Sell-In, it includes a 3-Tier Comprehensive Hierarchical Drill-Down Engine:
+/// Level 1: Chain Target Summary (Value EGP, Cases, Tons, Gross w/ Return Buffer, Promo Mix, MT/CC)
+/// Level 2: Chain Branches Breakdown (how much Value, Cases & Tons each branch must achieve)
+/// Level 3: Branch SKUs Breakdown (exact quantity of goods per SKU inside each branch) +
+///          Total Chain SKUs Rollup + Sales Rep Quotas + 12-Month Seasonality Phasing.
 class TargetManagementPanel extends StatefulWidget {
   final ApiClient apiClient;
   final String targetType; // 'sell_out' or 'sell_in'
@@ -31,6 +37,29 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
   int _selectedYear = 0; // 0 = All Years
   TargetsSummaryModel? _summary;
   List<RetailChainModel> _companyChains = const [];
+
+  // Selected Target for Comprehensive 3-Level Drill-Down
+  String? _selectedTargetId;
+  // Active sub-view inside the Comprehensive Breakdown:
+  // 0 = فروع السلسلة (Level 2: Branches)
+  // 1 = أصناف وبضاعة الفرع المختار (Level 3: SKUs inside Selected Branch)
+  // 2 = إجمالي بضاعة وأصناف السلسلة بالكامل (Chain Total SKUs)
+  // 3 = كوتة المناديب والماركات (Sales Reps & Brands Quotas)
+  // 4 = التوزيع الشهري الموسمي (12-Month Phasing)
+  int _drillSubTab = 0;
+
+  // Selected branch index or code inside Level 2 -> Level 3
+  String? _selectedBranchName;
+  String _branchSearchQuery = '';
+  String _branchRegionFilter = 'all';
+
+  // Level 3 / Chain SKUs filters & pagination
+  String _skuSearchQuery = '';
+  String _skuBrandFilter = 'all';
+  String _skuSectorFilter = 'all';
+  String _skuStockStatusFilter = 'all';
+  int _skuPage = 0;
+  static const int _skuPageSize = 25;
 
   static const List<({int month, String labelAr, String labelEn})> _months = [
     (month: 0, labelAr: 'إجمالي السنة (كل الشهور)', labelEn: 'Full Year'),
@@ -80,19 +109,58 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
       setState(() {
         _summary = res;
         _isLoading = false;
+        if (res.items.isNotEmpty) {
+          final stillExists = res.items.any((i) => i.id == _selectedTargetId);
+          if (!stillExists) {
+            _selectedTargetId = res.items.first.id;
+          }
+          final activeTarget = _activeTargetItem;
+          if (activeTarget != null && activeTarget.branches.isNotEmpty) {
+            final branchExists = activeTarget.branches.any(
+              (b) => b.branchName == _selectedBranchName,
+            );
+            if (!branchExists) {
+              _selectedBranchName = activeTarget.branches.first.branchName;
+            }
+          }
+        } else {
+          _selectedTargetId = null;
+          _selectedBranchName = null;
+        }
       });
     }
   }
 
+  TargetComparisonModel? get _activeTargetItem {
+    final items = _summary?.items ?? const [];
+    if (items.isEmpty) return null;
+    if (_selectedTargetId != null) {
+      for (final item in items) {
+        if (item.id == _selectedTargetId) return item;
+      }
+    }
+    return items.first;
+  }
+
+  TargetBranchBreakdownModel? _getActiveBranch(TargetComparisonModel target) {
+    if (target.branches.isEmpty) return null;
+    if (_selectedBranchName != null) {
+      for (final b in target.branches) {
+        if (b.branchName == _selectedBranchName) return b;
+      }
+    }
+    return target.branches.first;
+  }
+
   List<({String code, String label})> get _chainOptions {
     final opts = <({String code, String label})>[
-      (code: 'all', label: 'All Chains'),
-      (code: 'fathalla', label: 'Fathalla Market'),
-      (code: 'gomla', label: 'Gomla Market'),
-      (code: 'beet-elgomla', label: 'Beet El Gomla'),
-      (code: 'chain-1080314', label: 'El Wakala'),
-      (code: 'carrefour', label: 'Carrefour'),
-      (code: 'spinneys', label: 'Spinneys'),
+      (code: 'all', label: 'All Chains (كل السلاسل)'),
+      (code: 'fathalla', label: 'Fathalla Market (أسواق فتح الله)'),
+      (code: 'gomla', label: 'Gomla Market (جملة ماركت)'),
+      (code: 'beet-elgomla', label: 'Beet El Gomla (بيت الجملة)'),
+      (code: 'chain-1080314', label: 'El Wakala (الوكالة)'),
+      (code: 'carrefour', label: 'Carrefour (كارفور)'),
+      (code: 'spinneys', label: 'Spinneys (سبينيس)'),
     ];
     final seen = opts.map((e) => e.code.toLowerCase()).toSet();
     for (final c in _companyChains) {
@@ -105,27 +173,51 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
     return opts;
   }
 
-  Future<void> _openTargetFormDialog({TargetComparisonModel? existing}) async {
-    String chain = existing?.retailerChain ?? (_selectedChain != 'all' ? _selectedChain : 'fathalla');
-    int year = existing?.year ?? (_selectedYear > 0 ? _selectedYear : 2025);
+  Future<void> _openTargetFormDialog({
+    TargetComparisonModel? existing,
+    String? prefillChain,
+    int? prefillYear,
+    String? prefillBranch,
+    double? prefillRev,
+    double? prefillUnits,
+  }) async {
+    String chain = existing?.retailerChain ??
+        prefillChain ??
+        (_selectedChain != 'all' ? _selectedChain : 'fathalla');
+    int year = existing?.year ??
+        prefillYear ??
+        (_selectedYear > 0 ? _selectedYear : 2026);
     int month = existing?.month ?? 0;
     final branchCtrl = TextEditingController(
-      text: existing != null && existing.branchName != 'كل الفروع' ? existing.branchName : '',
+      text: prefillBranch ??
+          (existing != null && existing.branchName != 'كل الفروع'
+              ? existing.branchName
+              : ''),
     );
     final categoryCtrl = TextEditingController(
-      text: existing != null && existing.category != 'كل الفئات' ? existing.category : '',
+      text: existing != null && existing.category != 'كل الفئات'
+          ? existing.category
+          : '',
     );
     final revCtrl = TextEditingController(
-      text: existing != null && existing.targetRevenueEgp > 0
-          ? existing.targetRevenueEgp.toStringAsFixed(0)
-          : '',
+      text: prefillRev != null && prefillRev > 0
+          ? prefillRev.toStringAsFixed(0)
+          : (existing != null && existing.targetRevenueEgp > 0
+              ? existing.targetRevenueEgp.toStringAsFixed(0)
+              : ''),
     );
     final unitsCtrl = TextEditingController(
-      text: existing != null && existing.targetUnits > 0
-          ? existing.targetUnits.toStringAsFixed(0)
-          : '',
+      text: prefillUnits != null && prefillUnits > 0
+          ? prefillUnits.toStringAsFixed(0)
+          : (existing != null && existing.targetUnits > 0
+              ? existing.targetUnits.toStringAsFixed(0)
+              : ''),
     );
     final notesCtrl = TextEditingController(text: existing?.notes ?? '');
+
+    final avgCasePrice = (_summary?.avgCasePriceEgp ?? 587.5) > 0
+        ? (_summary?.avgCasePriceEgp ?? 587.5)
+        : 587.5;
 
     final saved = await showDialog<bool>(
       context: context,
@@ -134,6 +226,24 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
         final colorScheme = theme.colorScheme;
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
+            final parsedRev = double.tryParse(
+                  revCtrl.text.replaceAll(',', '').trim(),
+                ) ??
+                0.0;
+            final parsedUnits = double.tryParse(
+                  unitsCtrl.text.replaceAll(',', '').trim(),
+                ) ??
+                0.0;
+
+            final effectiveRev = parsedRev > 0
+                ? parsedRev
+                : (parsedUnits > 0 ? parsedUnits * avgCasePrice : 0.0);
+            final effectiveUnits = parsedUnits > 0
+                ? parsedUnits
+                : (parsedRev > 0 ? (parsedRev / avgCasePrice) : 0.0);
+            final effectiveTons = effectiveUnits * 0.0145;
+            final grossUnitsWithBuffer = effectiveUnits * 1.018;
+
             return Directionality(
               textDirection: TextDirection.rtl,
               child: AlertDialog(
@@ -151,9 +261,9 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                       child: Text(
                         existing == null
                             ? (_isSellIn
-                                ? 'إضافة Target جديد للتوريد (Sell-In)'
+                                ? 'إضافة Target شامل للتوريد (السلسلة ← الفروع ← الأصناف)'
                                 : 'إضافة Target جديد للمبيعات (Sell-Out)')
-                            : 'تعديل المستهدف (Target)',
+                            : 'تعديل المستهدف الشامل (Target)',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
@@ -162,16 +272,52 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                   ],
                 ),
                 content: SizedBox(
-                  width: 520.0,
+                  width: 580.0,
                   child: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        if (_isSellIn) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12.0),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer.withOpacity(0.35),
+                              borderRadius: BorderRadius.circular(14.0),
+                              border: Border.all(
+                                color: colorScheme.primary.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome_rounded,
+                                  color: colorScheme.primary,
+                                  size: 20.0,
+                                ),
+                                const SizedBox(width: 10.0),
+                                Expanded(
+                                  child: Text(
+                                    'أدخل السلسلة والسنة والقيمة المستهدفة (أو الكمية بالكرتونة) واترك الباقي مفتوحاً؛ سيقوم النظام تلقائياً بتوليد Target شامل مقسم على كل فروع السلسلة وأصناف كل فرع وإجمالي بضاعة السلسلة ومناديب المبيعات.',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: colorScheme.onSurface,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14.0),
+                        ],
                         DropdownButtonFormField<String>(
-                          value: _chainOptions.any((c) => c.code == chain) ? chain : 'fathalla',
+                          value: _chainOptions.any((c) => c.code == chain)
+                              ? chain
+                              : 'fathalla',
                           decoration: const InputDecoration(
-                            labelText: 'سلسلة التجزئة (Retail Chain)',
+                            labelText: 'سلسلة التجزئة (Retail Chain) *',
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
@@ -194,7 +340,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                               child: DropdownButtonFormField<int>(
                                 value: year,
                                 decoration: const InputDecoration(
-                                  labelText: 'السنة (Year)',
+                                  labelText: 'السنة (Year) *',
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -216,7 +362,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                               child: DropdownButtonFormField<int>(
                                 value: month,
                                 decoration: const InputDecoration(
-                                  labelText: 'الشهر (Month)',
+                                  labelText: 'الفترة / الشهر (Period)',
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -241,10 +387,15 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                             Expanded(
                               child: TextField(
                                 controller: revCtrl,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                onChanged: (_) => setDialogState(() {}),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
                                 decoration: const InputDecoration(
-                                  labelText: 'القيمة المستهدفة بالجنيه (Target EGP) *',
-                                  hintText: 'مثال: 10000000',
+                                  labelText:
+                                      'القيمة المستهدفة بالجنيه (Target EGP) *',
+                                  hintText: 'مثال: 150000000',
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -254,10 +405,15 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                             Expanded(
                               child: TextField(
                                 controller: unitsCtrl,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                onChanged: (_) => setDialogState(() {}),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
                                 decoration: InputDecoration(
-                                  labelText: 'الكمية المستهدفة ($_unitLabelAr)',
-                                  hintText: 'مثال: 120000',
+                                  labelText:
+                                      'الكمية المستهدفة ($_unitLabelAr) (تُحسب تلقائياً إن تُركت)',
+                                  hintText: 'مثال: 250000',
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -265,6 +421,95 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                             ),
                           ],
                         ),
+                        if (_isSellIn && (effectiveRev > 0 || effectiveUnits > 0)) ...[
+                          const SizedBox(height: 10.0),
+                          Container(
+                            padding: const EdgeInsets.all(12.0),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest
+                                  .withOpacity(0.55),
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'معاينة الحسابات التلقائية الشاملة للسلسلة:',
+                                      style: theme.textTheme.labelMedium
+                                          ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: colorScheme.primary,
+                                      ),
+                                    ),
+                                    if (parsedRev > 0 && parsedUnits <= 0)
+                                      TextButton.icon(
+                                        style: TextButton.styleFrom(
+                                          visualDensity: VisualDensity.compact,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8.0,
+                                          ),
+                                        ),
+                                        onPressed: () {
+                                          unitsCtrl.text = effectiveUnits
+                                              .round()
+                                              .toString();
+                                          setDialogState(() {});
+                                        },
+                                        icon: const Icon(
+                                          Icons.sync_rounded,
+                                          size: 15.0,
+                                        ),
+                                        label: const Text(
+                                          'تعبئة الكراتين تلقائياً',
+                                          style: TextStyle(fontSize: 11.5),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6.0),
+                                Wrap(
+                                  spacing: 14.0,
+                                  runSpacing: 6.0,
+                                  children: [
+                                    Text(
+                                      '• القيمة: ${CurrencyFormatter.formatEGP(effectiveRev)}',
+                                      style: const TextStyle(
+                                        fontSize: 12.0,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    Text(
+                                      '• إجمالي البضاعة: ${CurrencyFormatter.formatNumber(effectiveUnits.round())} كرتونة',
+                                      style: const TextStyle(
+                                        fontSize: 12.0,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    Text(
+                                      '• الوزن اللوجستي: ${effectiveTons.toStringAsFixed(1)} طن',
+                                      style: const TextStyle(
+                                        fontSize: 12.0,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    Text(
+                                      '• شامل تأمين المرتجعات: ${CurrencyFormatter.formatNumber(grossUnitsWithBuffer.round())} كرتونة',
+                                      style: TextStyle(
+                                        fontSize: 12.0,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.teal.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 12.0),
                         Row(
                           children: [
@@ -273,7 +518,8 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                 controller: branchCtrl,
                                 decoration: const InputDecoration(
                                   labelText: 'الفرع / الإقليم (اختياري)',
-                                  hintText: 'اتركه فارغاً لكل الفروع',
+                                  hintText:
+                                      'اتركه مفتوحاً لتوزيع التارجت على كل الفروع تلقائياً',
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -285,7 +531,8 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                 controller: categoryCtrl,
                                 decoration: const InputDecoration(
                                   labelText: 'الفئة / العلامة (اختياري)',
-                                  hintText: 'اتركه فارغاً لكل الفئات',
+                                  hintText:
+                                      'اتركه مفتوحاً لتوزيع التارجت على كل الأصناف تلقائياً',
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -297,8 +544,9 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                         TextField(
                           controller: notesCtrl,
                           decoration: const InputDecoration(
-                            labelText: 'ملاحظات (اختياري)',
-                            hintText: 'مثال: مستهدف الربع الأول أو حملة رمضان',
+                            labelText: 'ملاحظات الخطة (اختياري)',
+                            hintText:
+                                'مثال: المستهدف السنوي الشامل لتوريدات السلسلة والفروع والأصناف',
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
@@ -314,7 +562,11 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                   ),
                   FilledButton.icon(
                     icon: const Icon(Icons.save_rounded, size: 18.0),
-                    label: const Text('حفظ الـ Target'),
+                    label: Text(
+                      _isSellIn
+                          ? 'حفظ وتوليد الـ Target الشامل'
+                          : 'حفظ الـ Target',
+                    ),
                     onPressed: () async {
                       final rev = double.tryParse(
                             revCtrl.text.replaceAll(',', '').trim(),
@@ -352,7 +604,9 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                         if (!mounted) return;
                         M3Feedback.showSuccess(
                           context,
-                          'تم حفظ الـ Target وتحديث نسبة التحقيق بنجاح',
+                          _isSellIn
+                              ? 'تم حفظ الـ Target الشامل وتوزيعه تلقائياً على الفروع والأصناف والمناديب بنجاح'
+                              : 'تم حفظ الـ Target وتحديث نسبة التحقيق بنجاح',
                         );
                         await _loadTargets();
                       } catch (e) {
@@ -384,7 +638,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
         fileBytes: picked.bytes,
         targetType: widget.targetType,
         chain: _selectedChain != 'all' ? _selectedChain : 'fathalla',
-        year: _selectedYear > 0 ? _selectedYear : 2025,
+        year: _selectedYear > 0 ? _selectedYear : 2026,
       );
       if (!mounted) return;
       M3Feedback.showSuccess(
@@ -416,46 +670,37 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
     final rows = [
       [
         'أسواق فتح الله',
-        2025,
-        1,
+        2026,
+        0,
         'كل الفروع',
         'كل الفئات',
-        8500000,
-        125000,
-        'مستهدف شهر يناير 2025',
+        150000000,
+        255000,
+        'مستهدف السنة الشامل (يُوزع تلقائياً على الفروع والأصناف)',
       ],
       [
-        'أسواق فتح الله',
-        2025,
-        2,
+        'جملة ماركت',
+        2026,
+        0,
         'كل الفروع',
         'كل الفئات',
-        9500000,
-        138000,
-        'مستهدف شهر فبراير 2025',
+        45000000,
+        76000,
+        'مستهدف جملة ماركت السنوي الشامل',
       ],
       [
-        'أسواق فتح الله',
-        2025,
-        3,
+        'بيت الجملة',
+        2026,
+        0,
         'كل الفروع',
         'كل الفئات',
-        9000000,
-        130000,
-        'مستهدف شهر مارس 2025',
-      ],
-      [
-        'أسواق فتح الله',
-        2025,
-        4,
-        'كل الفروع',
-        'كل الفئات',
-        7500000,
-        110000,
-        'مستهدف شهر أبريل 2025',
+        38000000,
+        64000,
+        'مستهدف بيت الجملة السنوي الشامل',
       ],
     ];
-    final csvData = ExcelExportService.generateCsv(headers: headers, rows: rows);
+    final csvData =
+        ExcelExportService.generateCsv(headers: headers, rows: rows);
     final filename = 'tashil_${widget.targetType}_targets_template.csv';
     ExcelExportService.downloadCsv(filename, csvData);
     M3Feedback.showSuccess(
@@ -470,6 +715,104 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
       M3Feedback.showError(context, 'لا توجد مستهدفات مسجلة لتصديرها حالياً');
       return;
     }
+    final active = _activeTargetItem;
+    if (_isSellIn && active != null && active.branches.isNotEmpty) {
+      // Export full comprehensive report: Chain + All Branches + Top SKUs
+      final headers = [
+        'المستوى (Level)',
+        'السلسلة (Chain)',
+        'الفترة (Period)',
+        'الفرع (Branch)',
+        'المحافظة / الإقليم',
+        'مندوب المبيعات (Sales Rep)',
+        'الصنف / الماركة (SKU / Brand)',
+        'القطاع (Sector)',
+        'حصة النطاق % (Share %)',
+        'القيمة المستهدفة بالجنيه (Target EGP)',
+        'المحقق الفعلي بالجنيه (Actual EGP)',
+        'الفجوة بالجنيه (Variance EGP)',
+        'الكمية المستهدفة بالكرتونة (Target Cases)',
+        'الكمية الفعلية بالكرتونة (Actual Cases)',
+        'الوزن المستهدف بالطن (Target Tons)',
+        'نسبة التحقيق % (Achievement %)',
+        'الحالة / الرصيد',
+      ];
+      final rows = <List<dynamic>>[];
+      for (final item in items) {
+        rows.add([
+          '1. إجمالي السلسلة (Chain)',
+          item.chainDisplayName,
+          item.monthLabel,
+          item.branchName,
+          'كل الأقاليم',
+          'إدارة كبار العملاء (KA)',
+          'إجمالي كافة الأصناف (${item.activeSkusCount} صنف)',
+          'MT + CC',
+          '100%',
+          item.targetRevenueEgp,
+          item.actualRevenueEgp,
+          item.varianceRevenueEgp,
+          item.targetUnits,
+          item.actualUnits,
+          item.targetWeightTons,
+          '${item.achievementRevPct.toStringAsFixed(1)}%',
+          item.statusAr,
+        ]);
+        for (final b in item.branches) {
+          rows.add([
+            '2. فرع السلسلة (Branch)',
+            item.chainDisplayName,
+            item.monthLabel,
+            b.branchName,
+            '${b.governorate} (${b.regionCode})',
+            b.salesRep,
+            'إجمالي أصناف الفرع (${b.activeSkusCount} صنف)',
+            'MT + CC',
+            '${b.shareOfChainPct.toStringAsFixed(2)}%',
+            b.targetRevenueEgp,
+            b.actualRevenueEgp,
+            b.varianceRevenueEgp,
+            b.targetUnits,
+            b.actualUnits,
+            b.targetWeightTons,
+            '${b.achievementRevPct.toStringAsFixed(1)}%',
+            b.statusAr,
+          ]);
+        }
+        for (final s in item.chainSkuTotals) {
+          rows.add([
+            '3. إجمالي الصنف بالسلسلة (Chain SKU)',
+            item.chainDisplayName,
+            item.monthLabel,
+            'إجمالي فروع السلسلة',
+            'كل الأقاليم',
+            'كل المناديب',
+            '${s.skuName} (${s.brand})',
+            s.sector,
+            '${s.sharePct.toStringAsFixed(2)}%',
+            s.targetRevenueEgp,
+            s.actualRevenueEgp,
+            s.varianceRevenueEgp,
+            s.targetUnits,
+            s.actualUnits,
+            s.targetWeightTons,
+            '${s.achievementPct.toStringAsFixed(1)}%',
+            s.stockStatusAr,
+          ]);
+        }
+      }
+      final csvData =
+          ExcelExportService.generateCsv(headers: headers, rows: rows);
+      final filename =
+          'tashil_comprehensive_sellin_target_${DateTime.now().millisecondsSinceEpoch}.csv';
+      ExcelExportService.downloadCsv(filename, csvData);
+      M3Feedback.showSuccess(
+        context,
+        'تم تصدير التقرير الشامل للمستهدفات (السلسلة + الفروع + إجمالي الأصناف: ${rows.length} صف)',
+      );
+      return;
+    }
+
     final headers = [
       'السلسلة',
       'الفترة / الشهر',
@@ -504,7 +847,8 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
           ],
         )
         .toList();
-    final csvData = ExcelExportService.generateCsv(headers: headers, rows: rows);
+    final csvData =
+        ExcelExportService.generateCsv(headers: headers, rows: rows);
     final filename =
         'tashil_${widget.targetType}_target_vs_actual_${DateTime.now().millisecondsSinceEpoch}.csv';
     ExcelExportService.downloadCsv(filename, csvData);
@@ -514,11 +858,77 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
     );
   }
 
+  void _exportBranchSkusExcel(
+    TargetComparisonModel target,
+    TargetBranchBreakdownModel branch,
+  ) {
+    final headers = [
+      'السلسلة',
+      'الفترة',
+      'اسم الفرع',
+      'كود الفرع',
+      'المحافظة / الإقليم',
+      'مندوب المبيعات',
+      'اسم الصنف (SKU)',
+      'العلامة التجارية (Brand)',
+      'القطاع (Sector)',
+      'حصة الصنف بالفرع %',
+      'متوسط سعر الكرتونة (ج.م)',
+      'الكمية المستهدفة للفرع بالكرتونة (Target Cases)',
+      'القيمة المستهدفة للفرع بالجنيه (Target EGP)',
+      'الوزن المستهدف بالطن (Tons)',
+      'الكمية الفعلية المسحوبة (Actual Cases)',
+      'القيمة الفعلية المسحوبة (Actual EGP)',
+      'المتبقي بالكرتونة (Variance Cases)',
+      'المتبقي بالجنيه (Variance EGP)',
+      'نسبة التحقيق %',
+      'الرصيد المتبقي بالفرع (Cases)',
+      'حالة الرصيد بالفرع',
+    ];
+    final rows = branch.skus
+        .map(
+          (s) => [
+            target.chainDisplayName,
+            target.monthLabel,
+            branch.branchName,
+            branch.branchCode,
+            '${branch.governorate} (${branch.regionCode})',
+            branch.salesRep,
+            s.skuName,
+            s.brand,
+            s.sector,
+            '${s.sharePct.toStringAsFixed(2)}%',
+            s.casePriceEgp,
+            s.targetUnits,
+            s.targetRevenueEgp,
+            s.targetWeightTons,
+            s.actualUnits,
+            s.actualRevenueEgp,
+            s.varianceUnits,
+            s.varianceRevenueEgp,
+            '${s.achievementPct.toStringAsFixed(1)}%',
+            s.remainingStockCases,
+            s.stockStatusAr,
+          ],
+        )
+        .toList();
+    final csvData =
+        ExcelExportService.generateCsv(headers: headers, rows: rows);
+    final filename =
+        'tashil_branch_sku_targets_${branch.branchCode}_${DateTime.now().millisecondsSinceEpoch}.csv';
+    ExcelExportService.downloadCsv(filename, csvData);
+    M3Feedback.showSuccess(
+      context,
+      'تم تصدير مستهدفات أصناف (${branch.branchName}) بالكامل (${rows.length} صنف)',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final summary = _summary ?? TargetsSummaryModel.empty(widget.targetType);
+    final activeTarget = _activeTargetItem;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -530,13 +940,20 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
             final card1 = _buildKpiCard(
               context,
               titleAr: _isSellIn
-                  ? 'إجمالي مستهدف التوريد'
+                  ? 'إجمالي مستهدف التوريد الشامل'
                   : 'إجمالي مستهدف المبيعات',
-              titleEn: _isSellIn ? 'Target Sell-In (EGP)' : 'Target Sell-Out (EGP)',
-              value: CurrencyFormatter.formatCompactEGP(summary.totalTargetRevenueEgp),
-              subtitleAr:
-                  '${CurrencyFormatter.formatNumber(summary.totalTargetUnits.round())} $_unitLabelAr مستهدفة',
-              subtitleEn: 'Target $_unitLabelEn',
+              titleEn: _isSellIn
+                  ? 'Comprehensive Target Sell-In'
+                  : 'Target Sell-Out (EGP)',
+              value: CurrencyFormatter.formatCompactEGP(
+                summary.totalTargetRevenueEgp,
+              ),
+              subtitleAr: _isSellIn
+                  ? '${CurrencyFormatter.formatNumber(summary.totalTargetUnits.round())} كرتونة • ${summary.totalTargetWeightTons.toStringAsFixed(1)} طن'
+                  : '${CurrencyFormatter.formatNumber(summary.totalTargetUnits.round())} $_unitLabelAr مستهدفة',
+              subtitleEn: _isSellIn
+                  ? 'Gross w/ Buffer: ${CurrencyFormatter.formatNumber(summary.totalGrossTargetUnits.round())} Cases'
+                  : 'Target $_unitLabelEn',
               icon: Icons.flag_circle_rounded,
               color: colorScheme.primary,
             );
@@ -545,11 +962,17 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
               titleAr: _isSellIn
                   ? 'المحقق الفعلي للتوريد'
                   : 'المحقق الفعلي للمبيعات',
-              titleEn: _isSellIn ? 'Actual Sell-In (EGP)' : 'Actual Sell-Out (EGP)',
-              value: CurrencyFormatter.formatCompactEGP(summary.totalActualRevenueEgp),
-              subtitleAr:
-                  '${CurrencyFormatter.formatNumber(summary.totalActualUnits.round())} $_unitLabelAr محققة فعلياً',
-              subtitleEn: 'Actual $_unitLabelEn',
+              titleEn:
+                  _isSellIn ? 'Actual Sell-In (EGP)' : 'Actual Sell-Out (EGP)',
+              value: CurrencyFormatter.formatCompactEGP(
+                summary.totalActualRevenueEgp,
+              ),
+              subtitleAr: _isSellIn
+                  ? '${CurrencyFormatter.formatNumber(summary.totalActualUnits.round())} كرتونة • ${summary.totalActualWeightTons.toStringAsFixed(1)} طن'
+                  : '${CurrencyFormatter.formatNumber(summary.totalActualUnits.round())} $_unitLabelAr محققة فعلياً',
+              subtitleEn: _isSellIn && summary.totalExpectedRevenueEgp > 0
+                  ? 'EXP: ${CurrencyFormatter.formatCompactEGP(summary.totalExpectedRevenueEgp)}'
+                  : 'Actual $_unitLabelEn',
               icon: Icons.insights_rounded,
               color: Colors.teal.shade700,
             );
@@ -579,23 +1002,25 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
             final card4 = _buildKpiCard(
               context,
               titleAr: _isSellIn
-                  ? 'الفجوة / الفرق في التوريد'
+                  ? 'الفجوة ونطاق التغطية الشامل'
                   : 'الفجوة / الفرق في المبيعات',
-              titleEn: 'Variance (EGP)',
+              titleEn: 'Variance & Scope Coverage',
               value:
                   '${summary.totalVarianceEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatCompactEGP(summary.totalVarianceEgp)}',
-              subtitleAr: summary.totalVarianceEgp >= 0
-                  ? 'فائض فوق المستهدف'
-                  : 'المتبقي لتحقيق المستهدف',
+              subtitleAr: _isSellIn && summary.totalBranchesCovered > 0
+                  ? 'موزع على ${summary.totalBranchesCovered} فرع • ${summary.totalSkusCovered} صنف'
+                  : (summary.totalVarianceEgp >= 0
+                      ? 'فائض فوق المستهدف'
+                      : 'المتبقي لتحقيق المستهدف'),
               subtitleEn: summary.totalVarianceEgp >= 0
                   ? 'Surplus Above Target'
                   : 'Remaining to Target',
               icon: summary.totalVarianceEgp >= 0
                   ? Icons.trending_up_rounded
-                  : Icons.trending_down_rounded,
+                  : Icons.account_tree_rounded,
               color: summary.totalVarianceEgp >= 0
                   ? Colors.green.shade700
-                  : colorScheme.error,
+                  : Colors.indigo.shade700,
             );
 
             if (width >= 1100) {
@@ -667,7 +1092,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              // Filters: Year + Chain in English
+              // Filters: Year + Chain
               Wrap(
                 spacing: 12.0,
                 runSpacing: 8.0,
@@ -704,7 +1129,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                     ),
                   ),
                   SizedBox(
-                    width: 220.0,
+                    width: 240.0,
                     child: DropdownButtonFormField<String>(
                       isExpanded: true,
                       value: _chainOptions.any((c) => c.code == _selectedChain)
@@ -743,7 +1168,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                 ],
               ),
 
-              // Action Buttons: MD3 Large Button Size & in English
+              // Action Buttons
               Wrap(
                 spacing: 10.0,
                 runSpacing: 10.0,
@@ -752,7 +1177,11 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                   FilledButton.icon(
                     onPressed: () => _openTargetFormDialog(),
                     icon: const Icon(Icons.add_task_rounded, size: 20.0),
-                    label: const Text('Add Target Manually'),
+                    label: Text(
+                      _isSellIn
+                          ? 'إضافة Target شامل (Chain → Branch → SKU)'
+                          : 'Add Target Manually',
+                    ),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(0, 48.0),
                       padding: const EdgeInsets.symmetric(
@@ -815,7 +1244,9 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                   OutlinedButton.icon(
                     onPressed: _exportTargetsComparisonCsv,
                     icon: const Icon(Icons.table_view_rounded, size: 20.0),
-                    label: const Text('Export Report'),
+                    label: Text(
+                      _isSellIn ? 'تصدير التارجت الشامل Excel' : 'Export Report',
+                    ),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, 48.0),
                       padding: const EdgeInsets.symmetric(
@@ -839,7 +1270,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
 
         M3Spacing.gapMD,
 
-        // 3. Target vs. Actual Comparison Table
+        // 3. Level 1: Chain Target vs. Actual Summary Table
         Container(
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLowest,
@@ -854,125 +1285,213 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                   child: Center(child: CircularProgressIndicator()),
                 )
               : summary.items.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 48.0,
-                        horizontal: 24.0,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.track_changes_outlined,
-                            size: 48.0,
-                            color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                  ? _buildEmptyTargetsState(context, theme, colorScheme)
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            18.0,
+                            16.0,
+                            18.0,
+                            8.0,
                           ),
-                          const SizedBox(height: 12.0),
-                          Text(
-                            _isSellIn
-                                ? 'لم يتم تسجيل مستهدفات توريد (Sell-In Targets) لهذه الفترة بعد'
-                                : 'لم يتم تسجيل مستهدفات مبيعات (Sell-Out Targets) لهذه الفترة بعد',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 6.0),
-                          Text(
-                            'اضغط على "إضافة Target يدوياً" أو قم برفع شيت إكسيل المستهدفات ليقوم النظام بمقارنته تلقائياً مع الأرقام الفعلية وحساب نسبة التحقيق.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    )
-                  : TableScrollContainer(
-                      showSwipeHint: true,
-                      child: DataTable(
-                        headingRowColor: WidgetStatePropertyAll(
-                          colorScheme.surfaceContainerHigh.withOpacity(0.5),
-                        ),
-                        columns: [
-                          const DataColumn(label: Text('السلسلة (Chain)')),
-                          const DataColumn(label: Text('الفترة (Period)')),
-                          const DataColumn(label: Text('النطاق (الفرع / الفئة)')),
-                          const DataColumn(
-                            numeric: true,
-                            label: Text('المستهدف (Target EGP)'),
-                          ),
-                          const DataColumn(
-                            numeric: true,
-                            label: Text('المحقق الفعلي (Actual EGP)'),
-                          ),
-                          const DataColumn(
-                            numeric: true,
-                            label: Text('الفرق (Variance)'),
-                          ),
-                          DataColumn(
-                            numeric: true,
-                            label: Text('الكمية ($_unitLabelAr: فعلي / مستهدف)'),
-                          ),
-                          const DataColumn(
-                            label: Text('نسبة التحقيق (Achievement %)'),
-                          ),
-                          const DataColumn(label: Text('إجراءات')),
-                        ],
-                        rows: summary.items.map((item) {
-                          final isPositive = item.varianceRevenueEgp >= 0;
-                          final badgeColor = item.achievementRevPct >= 100
-                              ? Colors.green.shade700
-                              : (item.achievementRevPct >= 85
-                                  ? Colors.orange.shade800
-                                  : colorScheme.error);
-                          return DataRow(
-                            cells: [
-                              DataCell(
-                                Text(
-                                  item.chainDisplayName,
-                                  style: const TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              DataCell(Text(item.monthLabel)),
-                              DataCell(
-                                Text('${item.branchName} • ${item.category}'),
-                              ),
-                              DataCell(
-                                Text(
-                                  CurrencyFormatter.formatEGP(item.targetRevenueEgp),
-                                  style: const TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              DataCell(
-                                Text(
-                                  CurrencyFormatter.formatEGP(item.actualRevenueEgp),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.layers_rounded,
                                     color: colorScheme.primary,
+                                    size: 22.0,
                                   ),
-                                ),
+                                  const SizedBox(width: 8.0),
+                                  Text(
+                                    _isSellIn
+                                        ? 'المستوى الأول (Level 1): المستهدف الشامل على مستوى السلسلة التجارية'
+                                        : 'جدول مقارنة المستهدفات بالمحقق الفعلي',
+                                    style:
+                                        theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              DataCell(
+                              if (_isSellIn)
                                 Text(
-                                  '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(item.varianceRevenueEgp)}',
-                                  style: TextStyle(
+                                  'اضغط على أي سلسلة بالأسفل لاستعراض تفكيك الفروع والأصناف بالتفصيل',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.primary,
                                     fontWeight: FontWeight.w700,
-                                    color: isPositive
-                                        ? Colors.green.shade700
-                                        : colorScheme.error,
                                   ),
                                 ),
+                            ],
+                          ),
+                        ),
+                        TableScrollContainer(
+                          showSwipeHint: true,
+                          child: DataTable(
+                            showCheckboxColumn: false,
+                            headingRowColor: WidgetStatePropertyAll(
+                              colorScheme.surfaceContainerHigh.withOpacity(0.5),
+                            ),
+                            columns: [
+                              const DataColumn(label: Text('السلسلة (Chain)')),
+                              const DataColumn(label: Text('الفترة (Period)')),
+                              const DataColumn(
+                                label: Text('النطاق والتفكيك الشامل'),
                               ),
-                              DataCell(
-                                Text(
-                                  '${CurrencyFormatter.formatNumber(item.actualUnits.round())} / ${CurrencyFormatter.formatNumber(item.targetUnits.round())}',
+                              const DataColumn(
+                                numeric: true,
+                                label: Text('المستهدف (Target EGP)'),
+                              ),
+                              const DataColumn(
+                                numeric: true,
+                                label: Text('المحقق الفعلي (Actual EGP)'),
+                              ),
+                              const DataColumn(
+                                numeric: true,
+                                label: Text('الفرق (Variance)'),
+                              ),
+                              DataColumn(
+                                numeric: true,
+                                label: Text(
+                                  'إجمالي البضاعة ($_unitLabelAr: فعلي / مستهدف)',
                                 ),
                               ),
-                              DataCell(
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
+                              if (_isSellIn)
+                                const DataColumn(
+                                  numeric: true,
+                                  label: Text('الوزن (فعلي / مستهدف طن)'),
+                                ),
+                              const DataColumn(
+                                label: Text('نسبة التحقيق (Achievement %)'),
+                              ),
+                              const DataColumn(label: Text('إجراءات')),
+                            ],
+                            rows: summary.items.map((item) {
+                              final isSelected = item.id == activeTarget?.id;
+                              final isPositive = item.varianceRevenueEgp >= 0;
+                              final badgeColor = item.achievementRevPct >= 100
+                                  ? Colors.green.shade700
+                                  : (item.achievementRevPct >= 85
+                                      ? Colors.orange.shade800
+                                      : colorScheme.error);
+                              return DataRow(
+                                selected: isSelected,
+                                onSelectChanged: (_) {
+                                  setState(() {
+                                    _selectedTargetId = item.id;
+                                    if (item.branches.isNotEmpty) {
+                                      _selectedBranchName =
+                                          item.branches.first.branchName;
+                                    }
+                                  });
+                                },
+                                cells: [
+                                  DataCell(
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (isSelected && _isSellIn)
+                                          Padding(
+                                            padding: const EdgeInsetsDirectional
+                                                .only(end: 6.0),
+                                            child: Icon(
+                                              Icons.check_circle_rounded,
+                                              size: 18.0,
+                                              color: colorScheme.primary,
+                                            ),
+                                          ),
+                                        Text(
+                                          item.chainDisplayName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  DataCell(Text(item.monthLabel)),
+                                  DataCell(
+                                    _isSellIn && item.branchesCount > 0
+                                        ? Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10.0,
+                                              vertical: 4.0,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: colorScheme
+                                                  .primaryContainer
+                                                  .withOpacity(0.5),
+                                              borderRadius:
+                                                  BorderRadius.circular(8.0),
+                                            ),
+                                            child: Text(
+                                              '${item.branchesCount} فرع • ${item.activeSkusCount} صنف',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 12.0,
+                                                color: colorScheme.primary,
+                                              ),
+                                            ),
+                                          )
+                                        : Text(
+                                            '${item.branchName} • ${item.category}',
+                                          ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      CurrencyFormatter.formatEGP(
+                                        item.targetRevenueEgp,
+                                      ),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      CurrencyFormatter.formatEGP(
+                                        item.actualRevenueEgp,
+                                      ),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        color: colorScheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(item.varianceRevenueEgp)}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: isPositive
+                                            ? Colors.green.shade700
+                                            : colorScheme.error,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      '${CurrencyFormatter.formatNumber(item.actualUnits.round())} / ${CurrencyFormatter.formatNumber(item.targetUnits.round())} $_unitLabelAr',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  if (_isSellIn)
+                                    DataCell(
+                                      Text(
+                                        '${item.actualWeightTons.toStringAsFixed(1)} / ${item.targetWeightTons.toStringAsFixed(1)} طن',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.indigo.shade700,
+                                        ),
+                                      ),
+                                    ),
+                                  DataCell(
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 10.0,
@@ -980,7 +1499,8 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: badgeColor.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(999.0),
+                                        borderRadius:
+                                            BorderRadius.circular(999.0),
                                       ),
                                       child: Text(
                                         '${item.achievementRevPct.toStringAsFixed(1)}% (${item.statusAr})',
@@ -991,55 +1511,1813 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                         ),
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                              DataCell(
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      tooltip: 'تعديل المستهدف',
-                                      icon: const Icon(Icons.edit_outlined, size: 18.0),
-                                      onPressed: () =>
-                                          _openTargetFormDialog(existing: item),
+                                  ),
+                                  DataCell(
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (_isSellIn)
+                                          TextButton.icon(
+                                            onPressed: () {
+                                              setState(() {
+                                                _selectedTargetId = item.id;
+                                                _drillSubTab = 0;
+                                                if (item.branches.isNotEmpty) {
+                                                  _selectedBranchName = item
+                                                      .branches
+                                                      .first
+                                                      .branchName;
+                                                }
+                                              });
+                                            },
+                                            icon: const Icon(
+                                              Icons.account_tree_outlined,
+                                              size: 16.0,
+                                            ),
+                                            label: const Text('تفاصيل الفروع'),
+                                          ),
+                                        IconButton(
+                                          tooltip: 'تعديل المستهدف',
+                                          icon: const Icon(
+                                            Icons.edit_outlined,
+                                            size: 18.0,
+                                          ),
+                                          onPressed: () =>
+                                              _openTargetFormDialog(
+                                            existing: item,
+                                          ),
+                                        ),
+                                        IconButton(
+                                          tooltip: 'حذف المستهدف',
+                                          icon: Icon(
+                                            Icons.delete_outline_rounded,
+                                            size: 18.0,
+                                            color: colorScheme.error,
+                                          ),
+                                          onPressed: () async {
+                                            try {
+                                              await widget.apiClient
+                                                  .deleteTarget(
+                                                id: item.id,
+                                                targetType: widget.targetType,
+                                              );
+                                              if (!context.mounted) return;
+                                              M3Feedback.showSuccess(
+                                                context,
+                                                'تم حذف المستهدف بنجاح',
+                                              );
+                                              await _loadTargets();
+                                            } catch (e) {
+                                              if (!context.mounted) return;
+                                              M3Feedback.showError(
+                                                context,
+                                                'تعذر حذف المستهدف: $e',
+                                              );
+                                            }
+                                          },
+                                        ),
+                                      ],
                                     ),
-                                    IconButton(
-                                      tooltip: 'حذف المستهدف',
-                                      icon: Icon(
-                                        Icons.delete_outline_rounded,
-                                        size: 18.0,
-                                        color: colorScheme.error,
-                                      ),
-                                      onPressed: () async {
-                                        try {
-                                          await widget.apiClient.deleteTarget(
-                                            id: item.id,
-                                            targetType: widget.targetType,
-                                          );
-                                          if (!context.mounted) return;
-                                          M3Feedback.showSuccess(
-                                            context,
-                                            'تم حذف المستهدف بنجاح',
-                                          );
-                                          await _loadTargets();
-                                        } catch (e) {
-                                          if (!context.mounted) return;
-                                          M3Feedback.showError(
-                                            context,
-                                            'تعذر حذف المستهدف: $e',
-                                          );
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                        }).toList(),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
+                    ),
+        ),
+
+        // 4. Comprehensive 3-Tier Hierarchical Drill-Down Workspace (For Sell-In)
+        if (_isSellIn && activeTarget != null && activeTarget.branches.isNotEmpty) ...[
+          M3Spacing.gapMD,
+          _buildComprehensiveSellInWorkspace(
+            context,
+            theme,
+            colorScheme,
+            activeTarget,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildEmptyTargetsState(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        vertical: 42.0,
+        horizontal: 24.0,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.account_tree_rounded,
+            size: 52.0,
+            color: colorScheme.primary.withOpacity(0.75),
+          ),
+          const SizedBox(height: 14.0),
+          Text(
+            _isSellIn
+                ? 'ابدأ الآن بإنشاء الـ Target الشامل للسلسلة (السلسلة ← الفروع ← الأصناف)'
+                : 'لم يتم تسجيل مستهدفات مبيعات (Sell-Out Targets) لهذه الفترة بعد',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8.0),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680.0),
+            child: Text(
+              _isSellIn
+                  ? 'بمجرد إدخال اسم السلسلة والسنة والقيمة المستهدفة (أو الكمية بالكرتونة) وترك الباقي مفتوحاً، سيقوم النظام تلقائياً بتوليد خريطة مستهدفات شاملة توضح المطلوب من كل فرع من فروع السلسلة، وكمية البضاعة المطلوبة من كل صنف داخل كل فرع، وإجمالي البضاعة للسلسلة بالكامل.'
+                  : 'اضغط على "إضافة Target يدوياً" أو قم برفع شيت إكسيل المستهدفات ليقوم النظام بمقارنته تلقائياً مع الأرقام الفعلية وحساب نسبة التحقيق.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 18.0),
+          Wrap(
+            spacing: 12.0,
+            runSpacing: 10.0,
+            alignment: WrapAlignment.center,
+            children: [
+              FilledButton.icon(
+                onPressed: () => _openTargetFormDialog(),
+                icon: const Icon(Icons.add_task_rounded),
+                label: Text(
+                  _isSellIn
+                      ? 'إدخال Target شامل جديد للسلسلة'
+                      : 'إضافة Target يدوياً',
+                ),
+              ),
+              if (_isSellIn)
+                FilledButton.tonalIcon(
+                  onPressed: () => _openTargetFormDialog(
+                    prefillChain:
+                        _selectedChain != 'all' ? _selectedChain : 'fathalla',
+                    prefillYear: _selectedYear > 0 ? _selectedYear : 2026,
+                    prefillRev: 150000000,
+                    prefillUnits: 255000,
+                  ),
+                  icon: const Icon(Icons.auto_awesome_rounded),
+                  label: const Text(
+                    'تجربة سريعة: Target شامل لأسواق فتح الله (2026)',
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // COMPREHENSIVE 3-TIER HIERARCHICAL DRILL-DOWN WORKSPACE (CHAIN -> BRANCH -> SKU)
+  // ===========================================================================
+  Widget _buildComprehensiveSellInWorkspace(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    TargetComparisonModel target,
+  ) {
+    final activeBranch = _getActiveBranch(target);
+
+    return Container(
+      padding: const EdgeInsets.all(18.0),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(20.0),
+        border: Border.all(
+          color: colorScheme.primary.withOpacity(0.35),
+          width: 1.4,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // A. Interactive Breadcrumb Header & Chain Intelligence Strip
+          Container(
+            padding: const EdgeInsets.all(14.0),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer.withOpacity(0.28),
+              borderRadius: BorderRadius.circular(16.0),
+              border: Border.all(
+                color: colorScheme.primary.withOpacity(0.25),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8.0,
+                  runSpacing: 8.0,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.account_tree_rounded,
+                      color: colorScheme.primary,
+                      size: 22.0,
+                    ),
+                    Text(
+                      'شجرة التفكيك الشامل للـ Target:',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: colorScheme.primary,
                       ),
                     ),
+                    ActionChip(
+                      avatar: const Icon(Icons.storefront_rounded, size: 16.0),
+                      label: Text(
+                        '1. السلسلة: ${target.chainDisplayName} (${target.monthLabel})',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      onPressed: () => setState(() => _drillSubTab = 0),
+                    ),
+                    const Icon(Icons.arrow_back_ios_new_rounded, size: 13.0),
+                    ActionChip(
+                      avatar:
+                          const Icon(Icons.location_city_rounded, size: 16.0),
+                      backgroundColor: _drillSubTab == 0
+                          ? colorScheme.primaryContainer
+                          : null,
+                      label: Text(
+                        '2. فروع السلسلة (${target.branches.length} فرع)',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      onPressed: () => setState(() => _drillSubTab = 0),
+                    ),
+                    if (activeBranch != null) ...[
+                      const Icon(Icons.arrow_back_ios_new_rounded, size: 13.0),
+                      ActionChip(
+                        avatar: const Icon(
+                          Icons.inventory_2_rounded,
+                          size: 16.0,
+                        ),
+                        backgroundColor: _drillSubTab == 1
+                            ? colorScheme.primaryContainer
+                            : null,
+                        label: Text(
+                          '3. أصناف وبضاعة: ${activeBranch.branchName} (${activeBranch.skus.length} صنف)',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        onPressed: () => setState(() {
+                          _drillSubTab = 1;
+                          _skuPage = 0;
+                        }),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 10.0),
+                const Divider(height: 1.0),
+                const SizedBox(height: 10.0),
+                // Smart Intelligence Pills (Gross Target w/ Return Buffer, Promo vs Regular, MT vs CC, Tonnage)
+                Wrap(
+                  spacing: 10.0,
+                  runSpacing: 8.0,
+                  children: [
+                    _buildInfoPill(
+                      context,
+                      icon: Icons.inventory_rounded,
+                      label:
+                          'إجمالي بضاعة السلسلة المستهدفة: ${CurrencyFormatter.formatNumber(target.targetUnits.round())} كرتونة (${target.targetWeightTons.toStringAsFixed(1)} طن)',
+                      color: colorScheme.primary,
+                    ),
+                    _buildInfoPill(
+                      context,
+                      icon: Icons.shield_outlined,
+                      label:
+                          'إجمالي التوريد شامل احتياطي المرتجعات (+${target.historicalReturnRatePct.toStringAsFixed(1)}%): ${CurrencyFormatter.formatNumber(target.grossTargetUnits.round())} كرتونة (${CurrencyFormatter.formatCompactEGP(target.grossTargetRevenueEgp)})',
+                      color: Colors.teal.shade700,
+                    ),
+                    _buildInfoPill(
+                      context,
+                      icon: Icons.local_offer_outlined,
+                      label:
+                          'مزيج التوريد: عادي ${CurrencyFormatter.formatCompactEGP(target.regularTargetRevenueEgp)} • عروض (${target.promoSharePct.toStringAsFixed(1)}%) ${CurrencyFormatter.formatCompactEGP(target.promoTargetRevenueEgp)}',
+                      color: Colors.deepOrange.shade700,
+                    ),
+                    _buildInfoPill(
+                      context,
+                      icon: Icons.category_outlined,
+                      label:
+                          'القطاعات: منظفات (MT) ${CurrencyFormatter.formatCompactEGP(target.mtTargetRevenueEgp)} • عناية بالسيارات رابيدو (CC) ${CurrencyFormatter.formatCompactEGP(target.ccTargetRevenueEgp)}',
+                      color: Colors.indigo.shade700,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16.0),
+
+          // B. 5 Sub-Tabs Switcher for the Comprehensive Target Breakdown
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildSubTabButton(
+                  context,
+                  index: 0,
+                  icon: Icons.store_mall_directory_rounded,
+                  label:
+                      '1. تارجت فروع السلسلة (${target.branches.length} فرع)',
+                ),
+                const SizedBox(width: 8.0),
+                _buildSubTabButton(
+                  context,
+                  index: 1,
+                  icon: Icons.receipt_long_rounded,
+                  label:
+                      '2. أصناف وبضاعة الفرع المختار (${activeBranch?.skus.length ?? 0} صنف)',
+                ),
+                const SizedBox(width: 8.0),
+                _buildSubTabButton(
+                  context,
+                  index: 2,
+                  icon: Icons.warehouse_rounded,
+                  label:
+                      '3. إجمالي بضاعة السلسلة بالكامل (${target.chainSkuTotals.length} صنف)',
+                ),
+                const SizedBox(width: 8.0),
+                _buildSubTabButton(
+                  context,
+                  index: 3,
+                  icon: Icons.badge_rounded,
+                  label:
+                      '4. كوتة المناديب والماركات (${target.salesRepQuotas.length} مندوب)',
+                ),
+                const SizedBox(width: 8.0),
+                _buildSubTabButton(
+                  context,
+                  index: 4,
+                  icon: Icons.calendar_month_rounded,
+                  label:
+                      '5. التوزيع الشهري الموسمي (${target.monthlyPhasing.length} شهر)',
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16.0),
+
+          // C. Active Sub-View Content
+          if (_drillSubTab == 0)
+            _buildBranchesBreakdownView(context, theme, colorScheme, target)
+          else if (_drillSubTab == 1 && activeBranch != null)
+            _buildBranchSkusBreakdownView(
+              context,
+              theme,
+              colorScheme,
+              target,
+              activeBranch,
+            )
+          else if (_drillSubTab == 2)
+            _buildChainTotalSkusView(context, theme, colorScheme, target)
+          else if (_drillSubTab == 3)
+            _buildRepsAndBrandsQuotaView(context, theme, colorScheme, target)
+          else
+            _buildMonthlyPhasingView(context, theme, colorScheme, target),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoPill(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10.0),
+        border: Border.all(color: color.withOpacity(0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15.0, color: color),
+          const SizedBox(width: 6.0),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.0,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubTabButton(
+    BuildContext context, {
+    required int index,
+    required IconData icon,
+    required String label,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final selected = _drillSubTab == index;
+    return FilledButton.tonalIcon(
+      onPressed: () => setState(() {
+        _drillSubTab = index;
+        _skuPage = 0;
+      }),
+      icon: Icon(
+        icon,
+        size: 18.0,
+        color: selected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+      ),
+      label: Text(label),
+      style: FilledButton.styleFrom(
+        backgroundColor: selected
+            ? colorScheme.primary
+            : colorScheme.surfaceContainerHighest.withOpacity(0.6),
+        foregroundColor:
+            selected ? colorScheme.onPrimary : colorScheme.onSurface,
+        textStyle: const TextStyle(
+          fontSize: 13.0,
+          fontWeight: FontWeight.w800,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 11.0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // SUB-VIEW 0 (LEVEL 2): CHAIN BRANCHES TARGET BREAKDOWN
+  // ===========================================================================
+  Widget _buildBranchesBreakdownView(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    TargetComparisonModel target,
+  ) {
+    final q = _branchSearchQuery.trim().toLowerCase();
+    final filteredBranches = target.branches.where((b) {
+      if (_branchRegionFilter != 'all' &&
+          b.regionCode.toUpperCase() != _branchRegionFilter) {
+        return false;
+      }
+      if (q.isNotEmpty) {
+        final matchName = b.branchName.toLowerCase().contains(q);
+        final matchCode = b.branchCode.toLowerCase().contains(q);
+        final matchGov = b.governorate.toLowerCase().contains(q);
+        final matchRep = b.salesRep.toLowerCase().contains(q);
+        if (!matchName && !matchCode && !matchGov && !matchRep) return false;
+      }
+      return true;
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: 12.0,
+          runSpacing: 10.0,
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'المستوى الثاني (Level 2): توزيع مستهدف السلسلة على الفروع (${filteredBranches.length} من ${target.branches.length} فرع)',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2.0),
+                Text(
+                  'يوضح لكل فرع المطلوب تحقيقه بالجنيه وكمية البضاعة بالكرتونة والوزن بالطن • اضغط على أي فرع للدخول إلى أصناف وبضاعة الفرع بالتفصيل',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            Wrap(
+              spacing: 10.0,
+              runSpacing: 8.0,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: 175.0,
+                  child: DropdownButtonFormField<String>(
+                    value: _branchRegionFilter,
+                    isDense: true,
+                    decoration: InputDecoration(
+                      labelText: 'الإقليم / المحافظة',
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10.0,
+                        vertical: 9.0,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10.0),
+                      ),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('كل الأقاليم')),
+                      DropdownMenuItem(
+                        value: 'ALX',
+                        child: Text('الإسكندرية ومطروح (ALX)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'CIR',
+                        child: Text('القاهرة الكبرى (CIR)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'TNT',
+                        child: Text('الغربية وطنطا (TNT)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'BHR',
+                        child: Text('البحيرة ودمنهور (BHR)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'MNS',
+                        child: Text('المنصورة ودمياط (MNS)'),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setState(() => _branchRegionFilter = v);
+                    },
+                  ),
+                ),
+                SizedBox(
+                  width: 240.0,
+                  child: TextField(
+                    onChanged: (v) => setState(() => _branchSearchQuery = v),
+                    decoration: InputDecoration(
+                      hintText: 'ابحث باسم الفرع أو الكود أو المندوب...',
+                      prefixIcon: const Icon(Icons.search_rounded, size: 18.0),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10.0,
+                        vertical: 10.0,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10.0),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 12.0),
+        TableScrollContainer(
+          showSwipeHint: true,
+          child: DataTable(
+            showCheckboxColumn: false,
+            headingRowColor: WidgetStatePropertyAll(
+              colorScheme.surfaceContainerHigh.withOpacity(0.55),
+            ),
+            columns: const [
+              DataColumn(label: Text('الفرع (Branch)')),
+              DataColumn(label: Text('الإقليم والمندوب المسؤول')),
+              DataColumn(numeric: true, label: Text('حصة الفرع %')),
+              DataColumn(
+                numeric: true,
+                label: Text('المستهدف للفرع (Target EGP)'),
+              ),
+              DataColumn(
+                numeric: true,
+                label: Text('بضاعة الفرع المستهدفة (كرتونة)'),
+              ),
+              DataColumn(
+                numeric: true,
+                label: Text('الوزن (طن)'),
+              ),
+              DataColumn(
+                numeric: true,
+                label: Text('المحقق الفعلي (Actual EGP & Cases)'),
+              ),
+              DataColumn(
+                numeric: true,
+                label: Text('المتبقي على الفرع (Variance)'),
+              ),
+              DataColumn(label: Text('نسبة التحقيق %')),
+              DataColumn(label: Text('أصناف الفرع وتخصيص')),
+            ],
+            rows: filteredBranches.map((b) {
+              final isPositive = b.varianceRevenueEgp >= 0;
+              final badgeColor = b.achievementRevPct >= 100
+                  ? Colors.green.shade700
+                  : (b.achievementRevPct >= 85
+                      ? Colors.orange.shade800
+                      : colorScheme.error);
+              return DataRow(
+                selected: b.branchName == _selectedBranchName,
+                onSelectChanged: (_) {
+                  setState(() {
+                    _selectedBranchName = b.branchName;
+                    _drillSubTab = 1;
+                    _skuPage = 0;
+                  });
+                },
+                cells: [
+                  DataCell(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          b.branchName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13.0,
+                          ),
+                        ),
+                        Text(
+                          'كود: ${b.branchCode} • ${b.activeSkusCount} صنف',
+                          style: TextStyle(
+                            fontSize: 11.0,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  DataCell(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${b.governorate} (${b.regionCode})',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                        Text(
+                          'المندوب: ${b.salesRep}',
+                          style: TextStyle(
+                            fontSize: 11.0,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      '${b.shareOfChainPct.toStringAsFixed(2)}%',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      CurrencyFormatter.formatEGP(b.targetRevenueEgp),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  DataCell(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${CurrencyFormatter.formatNumber(b.targetUnits.round())} كرتونة',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13.0,
+                          ),
+                        ),
+                        Text(
+                          'شامل المرتجع: ${CurrencyFormatter.formatNumber(b.grossTargetUnits.round())} ك',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: Colors.teal.shade700,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      '${b.targetWeightTons.toStringAsFixed(2)} طن',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.indigo.shade700,
+                      ),
+                    ),
+                  ),
+                  DataCell(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          CurrencyFormatter.formatEGP(b.actualRevenueEgp),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                        Text(
+                          '${CurrencyFormatter.formatNumber(b.actualUnits.round())} كرتونة',
+                          style: TextStyle(
+                            fontSize: 11.0,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  DataCell(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(b.varianceRevenueEgp)}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12.5,
+                            color: isPositive
+                                ? Colors.green.shade700
+                                : colorScheme.error,
+                          ),
+                        ),
+                        Text(
+                          '${b.varianceUnits >= 0 ? '+' : ''}${CurrencyFormatter.formatNumber(b.varianceUnits.round())} كرتونة',
+                          style: TextStyle(
+                            fontSize: 11.0,
+                            color: isPositive
+                                ? Colors.green.shade700
+                                : colorScheme.error,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  DataCell(
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9.0,
+                        vertical: 4.0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: badgeColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(999.0),
+                      ),
+                      child: Text(
+                        '${b.achievementRevPct.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12.0,
+                          color: badgeColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                  DataCell(
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FilledButton.tonalIcon(
+                          style: FilledButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10.0,
+                              vertical: 6.0,
+                            ),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _selectedBranchName = b.branchName;
+                              _drillSubTab = 1;
+                              _skuPage = 0;
+                            });
+                          },
+                          icon: const Icon(
+                            Icons.inventory_2_outlined,
+                            size: 15.0,
+                          ),
+                          label: Text(
+                            'أصناف الفرع (${b.skus.length})',
+                            style: const TextStyle(
+                              fontSize: 12.0,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4.0),
+                        IconButton(
+                          tooltip: 'تخصيص تارجت منفصل لهذا الفرع',
+                          icon: const Icon(Icons.tune_rounded, size: 18.0),
+                          onPressed: () => _openTargetFormDialog(
+                            prefillChain: target.retailerChain,
+                            prefillYear: target.year,
+                            prefillBranch: b.branchName,
+                            prefillRev: b.targetRevenueEgp,
+                            prefillUnits: b.targetUnits,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // SUB-VIEW 1 (LEVEL 3): SKUs & GOODS INSIDE THE SELECTED BRANCH
+  // ===========================================================================
+  Widget _buildBranchSkusBreakdownView(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    TargetComparisonModel target,
+    TargetBranchBreakdownModel branch,
+  ) {
+    final brands = <String>{'all'};
+    for (final s in branch.skus) {
+      if (s.brand.trim().isNotEmpty) brands.add(s.brand.trim());
+    }
+
+    final q = _skuSearchQuery.trim().toLowerCase();
+    final filteredSkus = branch.skus.where((s) {
+      if (_skuBrandFilter != 'all' && s.brand != _skuBrandFilter) return false;
+      if (_skuSectorFilter != 'all' &&
+          s.sector.toUpperCase() != _skuSectorFilter) {
+        return false;
+      }
+      if (_skuStockStatusFilter != 'all' &&
+          s.stockStatus != _skuStockStatusFilter) {
+        return false;
+      }
+      if (q.isNotEmpty) {
+        final mName = s.skuName.toLowerCase().contains(q);
+        final mBrand = s.brand.toLowerCase().contains(q);
+        final mCat = s.subCategory.toLowerCase().contains(q);
+        if (!mName && !mBrand && !mCat) return false;
+      }
+      return true;
+    }).toList();
+
+    final totalPages =
+        (filteredSkus.length / _skuPageSize).ceil().clamp(1, 9999);
+    final safePage = _skuPage.clamp(0, totalPages - 1);
+    final startIdx = safePage * _skuPageSize;
+    final endIdx = (startIdx + _skuPageSize).clamp(0, filteredSkus.length);
+    final pageSkus = filteredSkus.sublist(startIdx, endIdx);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Branch Selector & Summary Bar
+        Container(
+          padding: const EdgeInsets.all(14.0),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHigh.withOpacity(0.45),
+            borderRadius: BorderRadius.circular(14.0),
+          ),
+          child: Wrap(
+            spacing: 14.0,
+            runSpacing: 10.0,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => setState(() => _drillSubTab = 0),
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 17.0),
+                    label: const Text('العودة لكل الفروع'),
+                  ),
+                  const SizedBox(width: 12.0),
+                  SizedBox(
+                    width: 310.0,
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: branch.branchName,
+                      decoration: InputDecoration(
+                        labelText: 'الفرع المختار (Level 3 Branch)',
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12.0,
+                          vertical: 10.0,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10.0),
+                        ),
+                      ),
+                      items: target.branches
+                          .map(
+                            (b) => DropdownMenuItem<String>(
+                              value: b.branchName,
+                              child: Text(
+                                '${b.branchName} (${CurrencyFormatter.formatNumber(b.targetUnits.round())} كرتونة)',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) {
+                          setState(() {
+                            _selectedBranchName = v;
+                            _skuPage = 0;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              Wrap(
+                spacing: 12.0,
+                runSpacing: 8.0,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _buildInfoPill(
+                    context,
+                    icon: Icons.payments_outlined,
+                    label:
+                        'تارجت الفرع: ${CurrencyFormatter.formatEGP(branch.targetRevenueEgp)} (${branch.shareOfChainPct.toStringAsFixed(2)}% من السلسلة)',
+                    color: colorScheme.primary,
+                  ),
+                  _buildInfoPill(
+                    context,
+                    icon: Icons.inventory_2_outlined,
+                    label:
+                        'إجمالي بضاعة الفرع: ${CurrencyFormatter.formatNumber(branch.targetUnits.round())} كرتونة • ${branch.targetWeightTons.toStringAsFixed(2)} طن',
+                    color: Colors.teal.shade700,
+                  ),
+                  _buildInfoPill(
+                    context,
+                    icon: Icons.person_outline_rounded,
+                    label: 'المندوب: ${branch.salesRep}',
+                    color: Colors.indigo.shade700,
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: () => _exportBranchSkusExcel(target, branch),
+                    icon: const Icon(Icons.download_rounded, size: 18.0),
+                    label: const Text('تصدير أصناف الفرع Excel'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 12.0),
+
+        // SKU Filter Bar (Brand, Sector, Stock Health, Search)
+        _buildSkuFilterToolbar(context, brands.toList(), filteredSkus.length),
+
+        const SizedBox(height: 12.0),
+
+        // Branch SKUs Table
+        _buildSkuBreakdownDataTable(
+          context,
+          theme,
+          colorScheme,
+          pageSkus,
+          scopeLabel: branch.branchName,
+        ),
+
+        const SizedBox(height: 10.0),
+        _buildPaginationFooter(
+          context,
+          totalItems: filteredSkus.length,
+          currentPage: safePage,
+          totalPages: totalPages,
+          onPageChanged: (next) => setState(() => _skuPage = next),
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // SUB-VIEW 2: CHAIN-WIDE TOTAL SKUs ROLLUP (إجمالي البضاعة المطلوبة للسلسلة)
+  // ===========================================================================
+  Widget _buildChainTotalSkusView(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    TargetComparisonModel target,
+  ) {
+    final brands = <String>{'all'};
+    for (final s in target.chainSkuTotals) {
+      if (s.brand.trim().isNotEmpty) brands.add(s.brand.trim());
+    }
+
+    final q = _skuSearchQuery.trim().toLowerCase();
+    final filteredSkus = target.chainSkuTotals.where((s) {
+      if (_skuBrandFilter != 'all' && s.brand != _skuBrandFilter) return false;
+      if (_skuSectorFilter != 'all' &&
+          s.sector.toUpperCase() != _skuSectorFilter) {
+        return false;
+      }
+      if (_skuStockStatusFilter != 'all' &&
+          s.stockStatus != _skuStockStatusFilter) {
+        return false;
+      }
+      if (q.isNotEmpty) {
+        final mName = s.skuName.toLowerCase().contains(q);
+        final mBrand = s.brand.toLowerCase().contains(q);
+        final mCat = s.subCategory.toLowerCase().contains(q);
+        if (!mName && !mBrand && !mCat) return false;
+      }
+      return true;
+    }).toList();
+
+    final totalPages =
+        (filteredSkus.length / _skuPageSize).ceil().clamp(1, 9999);
+    final safePage = _skuPage.clamp(0, totalPages - 1);
+    final startIdx = safePage * _skuPageSize;
+    final endIdx = (startIdx + _skuPageSize).clamp(0, filteredSkus.length);
+    final pageSkus = filteredSkus.sublist(startIdx, endIdx);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'إجمالي البضاعة والأصناف المطلوبة للسلسلة بالكامل (${target.chainDisplayName} — ${target.chainSkuTotals.length} صنف)',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 4.0),
+        Text(
+          'تجميع شامل لكل صنف على مستوى كافة فروع السلسلة (${target.branches.length} فرع) يوضح إجمالي الكراتين والأطنان والقيمة المطلوبة من كل صنف وماركة.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 12.0),
+        _buildSkuFilterToolbar(context, brands.toList(), filteredSkus.length),
+        const SizedBox(height: 12.0),
+        _buildSkuBreakdownDataTable(
+          context,
+          theme,
+          colorScheme,
+          pageSkus,
+          scopeLabel: 'إجمالي ${target.chainDisplayName}',
+        ),
+        const SizedBox(height: 10.0),
+        _buildPaginationFooter(
+          context,
+          totalItems: filteredSkus.length,
+          currentPage: safePage,
+          totalPages: totalPages,
+          onPageChanged: (next) => setState(() => _skuPage = next),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSkuFilterToolbar(
+    BuildContext context,
+    List<String> brands,
+    int matchedCount,
+  ) {
+    return Wrap(
+      spacing: 10.0,
+      runSpacing: 8.0,
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Wrap(
+          spacing: 10.0,
+          runSpacing: 8.0,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: 170.0,
+              child: DropdownButtonFormField<String>(
+                isExpanded: true,
+                value: brands.contains(_skuBrandFilter) ? _skuBrandFilter : 'all',
+                decoration: InputDecoration(
+                  labelText: 'الماركة (Brand)',
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10.0,
+                    vertical: 9.0,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                ),
+                items: brands
+                    .map(
+                      (b) => DropdownMenuItem<String>(
+                        value: b,
+                        child: Text(
+                          b == 'all' ? 'كل الماركات' : b,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) {
+                    setState(() {
+                      _skuBrandFilter = v;
+                      _skuPage = 0;
+                    });
+                  }
+                },
+              ),
+            ),
+            SizedBox(
+              width: 165.0,
+              child: DropdownButtonFormField<String>(
+                value: _skuSectorFilter,
+                decoration: InputDecoration(
+                  labelText: 'القطاع (Sector)',
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10.0,
+                    vertical: 9.0,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'all', child: Text('كل القطاعات')),
+                  DropdownMenuItem(
+                    value: 'MT',
+                    child: Text('منظفات (MT)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'CC',
+                    child: Text('عناية سيارات رابيدو (CC)'),
+                  ),
+                ],
+                onChanged: (v) {
+                  if (v != null) {
+                    setState(() {
+                      _skuSectorFilter = v;
+                      _skuPage = 0;
+                    });
+                  }
+                },
+              ),
+            ),
+            SizedBox(
+              width: 195.0,
+              child: DropdownButtonFormField<String>(
+                value: _skuStockStatusFilter,
+                decoration: InputDecoration(
+                  labelText: 'حالة الرصيد المتبقي',
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10.0,
+                    vertical: 9.0,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'all', child: Text('كل الحالات')),
+                  DropdownMenuItem(
+                    value: 'urgent_replenishment',
+                    child: Text('سحب عالي / أولوية توريد'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'optimal',
+                    child: Text('رصيد آمن ومتوازن'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'overstock',
+                    child: Text('تكدس مخزني - تهدئة توريد'),
+                  ),
+                ],
+                onChanged: (v) {
+                  if (v != null) {
+                    setState(() {
+                      _skuStockStatusFilter = v;
+                      _skuPage = 0;
+                    });
+                  }
+                },
+              ),
+            ),
+            SizedBox(
+              width: 240.0,
+              child: TextField(
+                onChanged: (v) => setState(() {
+                  _skuSearchQuery = v;
+                  _skuPage = 0;
+                }),
+                decoration: InputDecoration(
+                  hintText: 'ابحث باسم الصنف أو العبوة...',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 18.0),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10.0,
+                    vertical: 10.0,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        Text(
+          'إجمالي الأصناف المطابقة: $matchedCount صنف',
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSkuBreakdownDataTable(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    List<TargetSKUBreakdownModel> skus, {
+    required String scopeLabel,
+  }) {
+    return TableScrollContainer(
+      showSwipeHint: true,
+      child: DataTable(
+        headingRowColor: WidgetStatePropertyAll(
+          colorScheme.surfaceContainerHigh.withOpacity(0.55),
+        ),
+        columns: [
+          DataColumn(label: Text('اسم الصنف في ($scopeLabel)')),
+          const DataColumn(label: Text('الماركة والقطاع')),
+          const DataColumn(numeric: true, label: Text('حصة الصنف %')),
+          const DataColumn(numeric: true, label: Text('سعر الكرتونة')),
+          const DataColumn(
+            numeric: true,
+            label: Text('كمية البضاعة المستهدفة (كرتونة)'),
+          ),
+          const DataColumn(
+            numeric: true,
+            label: Text('القيمة المستهدفة (Target EGP)'),
+          ),
+          const DataColumn(numeric: true, label: Text('الوزن (طن)')),
+          const DataColumn(
+            numeric: true,
+            label: Text('المسحوب الفعلي (Cases & EGP)'),
+          ),
+          const DataColumn(
+            numeric: true,
+            label: Text('المتبقي المطلوب توريده'),
+          ),
+          const DataColumn(label: Text('حالة الرصيد المتبقي')),
+        ],
+        rows: skus.map((s) {
+          final isPositive = s.varianceRevenueEgp >= 0;
+          final stockColor = s.stockStatus == 'urgent_replenishment'
+              ? colorScheme.error
+              : (s.stockStatus == 'overstock'
+                  ? Colors.orange.shade800
+                  : Colors.green.shade700);
+          return DataRow(
+            cells: [
+              DataCell(
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 270.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        s.skuName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12.5,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (s.subCategory.isNotEmpty)
+                        Text(
+                          s.subCategory,
+                          style: TextStyle(
+                            fontSize: 11.0,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              DataCell(
+                Text(
+                  '${s.brand} (${s.sector})',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+              DataCell(Text('${s.sharePct.toStringAsFixed(2)}%')),
+              DataCell(Text(CurrencyFormatter.formatEGP(s.casePriceEgp))),
+              DataCell(
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10.0,
+                    vertical: 4.0,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer.withOpacity(0.55),
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  child: Text(
+                    '${CurrencyFormatter.formatNumber(s.targetUnits.round())} كرتونة',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: colorScheme.primary,
+                      fontSize: 13.0,
+                    ),
+                  ),
+                ),
+              ),
+              DataCell(
+                Text(
+                  CurrencyFormatter.formatEGP(s.targetRevenueEgp),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              DataCell(
+                Text(
+                  '${s.targetWeightTons.toStringAsFixed(2)} طن',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.indigo.shade700,
+                  ),
+                ),
+              ),
+              DataCell(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '${CurrencyFormatter.formatNumber(s.actualUnits.round())} كرتونة',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    Text(
+                      CurrencyFormatter.formatEGP(s.actualRevenueEgp),
+                      style: TextStyle(
+                        fontSize: 11.0,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              DataCell(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '${s.varianceUnits >= 0 ? '+' : ''}${CurrencyFormatter.formatNumber(s.varianceUnits.round())} كرتونة',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12.5,
+                        color: isPositive
+                            ? Colors.green.shade700
+                            : colorScheme.error,
+                      ),
+                    ),
+                    Text(
+                      '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(s.varianceRevenueEgp)}',
+                      style: TextStyle(
+                        fontSize: 11.0,
+                        color: isPositive
+                            ? Colors.green.shade700
+                            : colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              DataCell(
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9.0,
+                    vertical: 4.0,
+                  ),
+                  decoration: BoxDecoration(
+                    color: stockColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  child: Text(
+                    '${s.stockStatusAr} (${s.remainingStockCases.round()} ك)',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11.5,
+                      color: stockColor,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildPaginationFooter(
+    BuildContext context, {
+    required int totalItems,
+    required int currentPage,
+    required int totalPages,
+    required ValueChanged<int> onPageChanged,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'صفحة ${currentPage + 1} من $totalPages (إجمالي $totalItems صنف)',
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+        ),
+        Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed:
+                  currentPage > 0 ? () => onPageChanged(currentPage - 1) : null,
+              icon: const Icon(Icons.chevron_right_rounded, size: 18.0),
+              label: const Text('السابق'),
+            ),
+            const SizedBox(width: 8.0),
+            OutlinedButton.icon(
+              onPressed: currentPage < totalPages - 1
+                  ? () => onPageChanged(currentPage + 1)
+                  : null,
+              icon: const Icon(Icons.chevron_left_rounded, size: 18.0),
+              label: const Text('التالي'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // SUB-VIEW 3: SALES REPS QUOTAS & BRANDS BREAKDOWN
+  // ===========================================================================
+  Widget _buildRepsAndBrandsQuotaView(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    TargetComparisonModel target,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'أولاً: كوتة وتارجت مناديب المبيعات ومسؤولي السلاسل المحسوبة تلقائياً (${target.salesRepQuotas.length} مندوب)',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 4.0),
+        Text(
+          'يتم تجميع تارجت كل مندوب تلقائياً من حصص الفروع والأصناف المسندة إليه داخل السلسلة.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 10.0),
+        TableScrollContainer(
+          showSwipeHint: true,
+          child: DataTable(
+            headingRowColor: WidgetStatePropertyAll(
+              colorScheme.surfaceContainerHigh.withOpacity(0.55),
+            ),
+            columns: const [
+              DataColumn(label: Text('مندوب المبيعات (Sales Rep)')),
+              DataColumn(label: Text('الإقليم / المحافظة')),
+              DataColumn(numeric: true, label: Text('عدد الفروع')),
+              DataColumn(numeric: true, label: Text('حصة المندوب %')),
+              DataColumn(
+                numeric: true,
+                label: Text('المستهدف للمندوب (Target EGP)'),
+              ),
+              DataColumn(
+                numeric: true,
+                label: Text('الكمية المستهدفة (كرتونة)'),
+              ),
+              DataColumn(numeric: true, label: Text('الوزن (طن)')),
+              DataColumn(
+                numeric: true,
+                label: Text('منظفات MT / رابيدو CC'),
+              ),
+              DataColumn(
+                numeric: true,
+                label: Text('المحقق الفعلي (Actual EGP)'),
+              ),
+              DataColumn(label: Text('نسبة التحقيق %')),
+            ],
+            rows: target.salesRepQuotas.map((r) {
+              return DataRow(
+                cells: [
+                  DataCell(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          r.salesRep,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        Text(
+                          'مسؤول السلاسل: ${r.kaOfficer}',
+                          style: TextStyle(
+                            fontSize: 11.0,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  DataCell(Text('${r.governorate} (${r.regionCode})')),
+                  DataCell(Text('${r.branchesCount} فروع')),
+                  DataCell(Text('${r.sharePct.toStringAsFixed(1)}%')),
+                  DataCell(
+                    Text(
+                      CurrencyFormatter.formatEGP(r.targetRevenueEgp),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      '${CurrencyFormatter.formatNumber(r.targetUnits.round())} كرتونة',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  DataCell(Text('${r.targetWeightTons.toStringAsFixed(1)} طن')),
+                  DataCell(
+                    Text(
+                      'MT: ${CurrencyFormatter.formatCompactEGP(r.mtTargetRevenueEgp)} • CC: ${CurrencyFormatter.formatCompactEGP(r.ccTargetRevenueEgp)}',
+                      style: const TextStyle(fontSize: 12.0),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      CurrencyFormatter.formatEGP(r.actualRevenueEgp),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      '${r.achievementPct.toStringAsFixed(1)}%',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 22.0),
+        Text(
+          'ثانياً: توزيع تارجت السلسلة على العلامات التجارية والقطاعات (${target.brands.length} ماركة)',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 10.0),
+        TableScrollContainer(
+          showSwipeHint: true,
+          child: DataTable(
+            headingRowColor: WidgetStatePropertyAll(
+              colorScheme.surfaceContainerHigh.withOpacity(0.55),
+            ),
+            columns: const [
+              DataColumn(label: Text('العلامة التجارية (Brand)')),
+              DataColumn(label: Text('القطاع (Sector)')),
+              DataColumn(numeric: true, label: Text('عدد الأصناف')),
+              DataColumn(numeric: true, label: Text('حصة الماركة %')),
+              DataColumn(
+                numeric: true,
+                label: Text('المستهدف بالجنيه (Target EGP)'),
+              ),
+              DataColumn(
+                numeric: true,
+                label: Text('البضاعة المستهدفة (كرتونة)'),
+              ),
+              DataColumn(numeric: true, label: Text('الوزن (طن)')),
+              DataColumn(
+                numeric: true,
+                label: Text('المحقق الفعلي (Actual EGP)'),
+              ),
+              DataColumn(label: Text('نسبة التحقيق %')),
+            ],
+            rows: target.brands.map((b) {
+              return DataRow(
+                cells: [
+                  DataCell(
+                    Text(
+                      b.brand,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  DataCell(Text(b.sectorNameAr)),
+                  DataCell(Text('${b.activeSkusCount} صنف')),
+                  DataCell(Text('${b.sharePct.toStringAsFixed(1)}%')),
+                  DataCell(
+                    Text(
+                      CurrencyFormatter.formatEGP(b.targetRevenueEgp),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      '${CurrencyFormatter.formatNumber(b.targetUnits.round())} كرتونة',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  DataCell(Text('${b.targetWeightTons.toStringAsFixed(1)} طن')),
+                  DataCell(
+                    Text(
+                      CurrencyFormatter.formatEGP(b.actualRevenueEgp),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      '${b.achievementPct.toStringAsFixed(1)}%',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // SUB-VIEW 4: 12-MONTH SEASONALITY PHASING
+  // ===========================================================================
+  Widget _buildMonthlyPhasingView(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    TargetComparisonModel target,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'التوزيع الشهري الموسمي للمستهدف (${target.chainDisplayName} — ${target.year})',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 4.0),
+        Text(
+          'يقوم النظام بتقسيم مستهدف السنة على الشهور حسب الأوزان الموسمية لسحب السلسلة ومقارنته بالمسحوبات الفعلية والمتوقع بنهاية الشهر (EXP).',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 10.0),
+        TableScrollContainer(
+          showSwipeHint: true,
+          child: DataTable(
+            headingRowColor: WidgetStatePropertyAll(
+              colorScheme.surfaceContainerHigh.withOpacity(0.55),
+            ),
+            columns: const [
+              DataColumn(label: Text('الشهر (Month)')),
+              DataColumn(numeric: true, label: Text('الوزن الموسمي %')),
+              DataColumn(
+                numeric: true,
+                label: Text('مستهدف الشهر (Target EGP)'),
+              ),
+              DataColumn(
+                numeric: true,
+                label: Text('بضاعة الشهر المستهدفة (كرتونة)'),
+              ),
+              DataColumn(numeric: true, label: Text('الوزن (طن)')),
+              DataColumn(
+                numeric: true,
+                label: Text('الفعلي المحقق (Actual EGP & Cases)'),
+              ),
+              DataColumn(
+                numeric: true,
+                label: Text('المتوقع لنهاية الشهر (EXP EGP)'),
+              ),
+              DataColumn(
+                numeric: true,
+                label: Text('الفجوة / الفرق (Variance)'),
+              ),
+              DataColumn(label: Text('نسبة التحقيق %')),
+            ],
+            rows: target.monthlyPhasing.map((m) {
+              final isPositive = m.varianceRevenueEgp >= 0;
+              return DataRow(
+                cells: [
+                  DataCell(
+                    Text(
+                      m.monthLabelAr,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  DataCell(Text('${m.seasonalitySharePct.toStringAsFixed(1)}%')),
+                  DataCell(
+                    Text(
+                      CurrencyFormatter.formatEGP(m.targetRevenueEgp),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      '${CurrencyFormatter.formatNumber(m.targetUnits.round())} كرتونة',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  DataCell(Text('${m.targetWeightTons.toStringAsFixed(1)} طن')),
+                  DataCell(
+                    Text(
+                      '${CurrencyFormatter.formatEGP(m.actualRevenueEgp)} (${CurrencyFormatter.formatNumber(m.actualUnits.round())} ك)',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      CurrencyFormatter.formatEGP(m.expectedRevenueEgp),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.teal.shade700,
+                      ),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(m.varianceRevenueEgp)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: isPositive
+                            ? Colors.green.shade700
+                            : colorScheme.error,
+                      ),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      '${m.achievementPct.toStringAsFixed(1)}%',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
         ),
       ],
     );

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
@@ -62,12 +63,20 @@ func (h *AnalyticsHandler) HandleExecutiveSummary(w http.ResponseWriter, r *http
 	_ = json.NewEncoder(w).Encode(kpis)
 }
 
-// PaginatedRecordsResponse formats data table payload.
+// PaginatedRecordsResponse formats data table payload along with full-dataset KPI aggregations.
 type PaginatedRecordsResponse struct {
-	Records    interface{} `json:"records"`
-	TotalCount int         `json:"total_count"`
-	Limit      int         `json:"limit"`
-	Offset     int         `json:"offset"`
+	Records           interface{} `json:"records"`
+	TotalCount        int         `json:"total_count"`
+	Limit             int         `json:"limit"`
+	Offset            int         `json:"offset"`
+	TotalNetRevenue   float64     `json:"total_net_revenue"`
+	TotalUnitsSold    int         `json:"total_units_sold"`
+	ActiveStoresCount int         `json:"active_stores_count"`
+	ActiveSKUsCount   int         `json:"active_skus_count"`
+	MinDate           string      `json:"min_date"`
+	MaxDate           string      `json:"max_date"`
+	TopBranchName     string      `json:"top_branch_name"`
+	TopBranchRevenue  float64     `json:"top_branch_revenue"`
 }
 
 // HandleRecords serves GET /api/v1/analytics/records.
@@ -88,16 +97,30 @@ func (h *AnalyticsHandler) HandleRecords(w http.ResponseWriter, r *http.Request)
 		offset = 0
 	}
 
+	startDate := q.Get("start_date")
+	endDate := q.Get("end_date")
+	yr, _ := strconv.Atoi(q.Get("year"))
+	mo, _ := strconv.Atoi(q.Get("month"))
+	if startDate == "" && endDate == "" && yr > 0 {
+		if mo > 0 && mo <= 12 {
+			startDate = fmt.Sprintf("%04d-%02d-01", yr, mo)
+			endDate = fmt.Sprintf("%04d-%02d-31", yr, mo)
+		} else {
+			startDate = fmt.Sprintf("%04d-01-01", yr)
+			endDate = fmt.Sprintf("%04d-12-31", yr)
+		}
+	}
+
 	filter := bigquery.RecordFilter{
 		RetailerChain: q.Get("chain"),
 		StoreID:       q.Get("store_id"),
 		Category:      q.Get("category"),
 		Supplier:      q.Get("supplier"),
 		SearchQuery:   q.Get("q"),
-		StartDate:     q.Get("start_date"),
-		EndDate:       q.Get("end_date"),
-		Limit:         limit,
-		Offset:        offset,
+		StartDate:     startDate,
+		EndDate:       endDate,
+		Limit:         0, // Fetch full matched set to compute accurate KPI totals before slicing
+		Offset:        0,
 	}
 
 	if claims, ok := middleware.GetUserClaims(r.Context()); ok && claims != nil {
@@ -106,17 +129,85 @@ func (h *AnalyticsHandler) HandleRecords(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	records, total, err := h.bqRepo.GetSellOutRecords(r.Context(), tenantID, filter)
+	allMatched, total, err := h.bqRepo.GetSellOutRecords(r.Context(), tenantID, filter)
 	if err != nil {
 		http.Error(w, `{"error":"failed to query sell out records"}`, http.StatusInternalServerError)
 		return
 	}
 
+	var totalRev float64
+	var totalUnits int
+	storesSet := make(map[string]bool)
+	skusSet := make(map[string]bool)
+	branchRev := make(map[string]float64)
+	branchNames := make(map[string]string)
+	minDate := ""
+	maxDate := ""
+
+	for _, rec := range allMatched {
+		totalRev += rec.NetRevenue
+		totalUnits += rec.QuantitySold
+		storeKey := rec.StoreID
+		if storeKey == "" {
+			storeKey = rec.StoreName
+		}
+		if storeKey != "" {
+			storesSet[storeKey] = true
+			branchRev[storeKey] += rec.NetRevenue
+			if rec.StoreName != "" {
+				branchNames[storeKey] = rec.StoreName
+			} else {
+				branchNames[storeKey] = storeKey
+			}
+		}
+		skuKey := rec.Barcode
+		if skuKey == "" {
+			skuKey = rec.SKUName
+		}
+		if skuKey != "" {
+			skusSet[skuKey] = true
+		}
+		if rec.TransactionDate != "" {
+			if minDate == "" || rec.TransactionDate < minDate {
+				minDate = rec.TransactionDate
+			}
+			if maxDate == "" || rec.TransactionDate > maxDate {
+				maxDate = rec.TransactionDate
+			}
+		}
+	}
+
+	topBranchName := ""
+	topBranchRev := 0.0
+	for k, rev := range branchRev {
+		if rev > topBranchRev {
+			topBranchRev = rev
+			topBranchName = branchNames[k]
+		}
+	}
+
+	pageRecords := make([]domain.SellOutFact, 0)
+	if offset < len(allMatched) {
+		end := offset + limit
+		if end > len(allMatched) {
+			end = len(allMatched)
+		}
+		pageRecords = allMatched[offset:end]
+	}
+
 	resp := PaginatedRecordsResponse{
-		Records:    records,
-		TotalCount: total,
-		Limit:      limit,
-		Offset:     offset,
+		Records:           pageRecords,
+		TotalCount:        total,
+		Limit:             limit,
+		Offset:            offset,
+		TotalNetRevenue:   math.Round(totalRev*100) / 100,
+		TotalUnitsSold:    totalUnits,
+		ActiveStoresCount: len(storesSet),
+		ActiveSKUsCount:   len(skusSet),
+		MinDate:           minDate,
+		MaxDate:           maxDate,
+		TopBranchName:     topBranchName,
+		TopBranchRevenue:  math.Round(topBranchRev*100) / 100,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
