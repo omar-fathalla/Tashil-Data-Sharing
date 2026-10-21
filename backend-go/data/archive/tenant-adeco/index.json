@@ -1,0 +1,38 @@
+[
+  {
+    "id": "arch_adeco_fathalla_1792258238476465882",
+    "batch_id": "batch_20261017210057_fe2abb07",
+    "tenant_id": "tenant-adeco",
+    "file_name": "2026 out.xlsx",
+    "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "file_size_bytes": 5374089,
+    "retail_chain": "fathalla",
+    "chain_name_ar": "أسواق فتح الله",
+    "chain_name_en": "Fathalla Market",
+    "target_year": "2026",
+    "target_month": "01-04",
+    "rows_ingested": 58658,
+    "branches_count": 36,
+    "total_revenue": 72743837.93,
+    "uploaded_at": "2026-10-17T18:00:57Z",
+    "storage_path": "data/archive/tenant-adeco/arch_adeco_fathalla_1792258238476465882_2026 out.xlsx"
+  },
+  {
+    "id": "arch_adeco_fathalla_1792255997606803322",
+    "batch_id": "batch_20261017210055_d7bf5ad6",
+    "tenant_id": "tenant-adeco",
+    "file_name": "2025 out.xlsx",
+    "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "file_size_bytes": 2587614,
+    "retail_chain": "fathalla",
+    "chain_name_ar": "أسواق فتح الله",
+    "chain_name_en": "Fathalla Market",
+    "target_year": "2025",
+    "target_month": "01-04",
+    "rows_ingested": 28015,
+    "branches_count": 36,
+    "total_revenue": 32179040.58,
+    "uploaded_at": "2026-10-17T18:00:55Z",
+    "storage_path": "data/archive/tenant-adeco/arch_adeco_fathalla_1792255997606803322_2025 out.xlsx"
+  }
+]

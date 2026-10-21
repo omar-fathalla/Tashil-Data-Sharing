@@ -1,0 +1,89 @@
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"testing"
+
+	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
+	"github.com/tashil/data-sharing/backend/internal/service/firestore"
+	"github.com/tashil/data-sharing/backend/internal/service/gemini"
+	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
+)
+
+func TestCPFRAndSellInPlanEndToEnd(t *testing.T) {
+	cleanBytes, err := os.ReadFile(DefaultAdcoSellInCleanPath)
+	if err != nil {
+		t.Skipf("Clean sell-in plan workbook not present at %s: %v", DefaultAdcoSellInCleanPath, err)
+	}
+
+	if !gemini.IsSellInPlanWorkbook(cleanBytes) {
+		t.Fatalf("expected IsSellInPlanWorkbook to return true for clean workbook")
+	}
+
+	bqRepo := bigquery.NewClient("tashil-test", "retail", true)
+	_ = bqRepo.ClearTenantData(context.Background(), "all")
+	fsRepo := firestore.NewClient("tashil-db", true)
+	agent := gemini.NewAgent("", "gemini-3.8-flash", true)
+	proc := ingestion.NewProcessor(agent, bqRepo, fsRepo)
+
+	res, err := proc.ProcessSellInPlan(context.Background(), "tenant-adeco", "Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx", cleanBytes, false, "fathalla")
+	if err != nil {
+		t.Fatalf("ProcessSellInPlan failed: %v", err)
+	}
+	if res.ValidRows < 7800 {
+		t.Fatalf("expected >= 7800 valid sell-in rows, got %d", res.ValidRows)
+	}
+
+	analyticsHandler := NewAnalyticsHandler(bqRepo)
+	req := authenticatedRequest(http.MethodGet, "/api/v1/analytics/cpfr?lead_time_days=4&safety_stock_days=7", "tenant-adeco")
+	w := httptest.NewRecorder()
+	analyticsHandler.HandleCPFRDashboard(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected HTTP 200 from /api/v1/analytics/cpfr, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var payload domain.CPFRDashboardPayload
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode CPFRDashboardPayload: %v", err)
+	}
+
+	// Verify cumulative Sell-In and Remaining Stock when no Sell-Out is uploaded yet
+	if payload.Jan2026SellInEGP < 10000000 {
+		t.Errorf("expected Jan2026SellInEGP >= 10,000,000, got %.2f", payload.Jan2026SellInEGP)
+	}
+	if payload.Jan2026SellOutEGP != 0 || payload.Jan2026SellThroughPct != 0 {
+		t.Errorf("expected 0 Sell-Out and 0%% Sell-Through when no Sell-Out file is uploaded, got %.2f (%.2f%%)", payload.Jan2026SellOutEGP, payload.Jan2026SellThroughPct)
+	}
+	if len(payload.MonthlyReconciliation) != 10 {
+		t.Errorf("expected 10 months of reconciliation (Jan-Oct 2026), got %d", len(payload.MonthlyReconciliation))
+	}
+	if len(payload.InventoryAndPOItems) == 0 {
+		t.Errorf("expected non-empty InventoryAndPOItems with Suggested PO")
+	}
+	if len(payload.SalesRepScorecards) < 14 {
+		t.Errorf("expected at least 14 sales rep scorecards, got %d", len(payload.SalesRepScorecards))
+	}
+	if payload.PromoAndReturns.PromoRecordsCount != 813 || payload.PromoAndReturns.ReturnRecordsCount != 605 {
+		t.Errorf("expected 813 promo records and 605 return records, got %d promo and %d return",
+			payload.PromoAndReturns.PromoRecordsCount, payload.PromoAndReturns.ReturnRecordsCount)
+	}
+
+	// Verify Sell-In file is listed in Sell-In archive and can be deleted cleanly
+	sellInArchive := proc.ListArchivedFiles(context.Background(), "tenant-adeco", "", "", "", "sell_in")
+	if sellInArchive.TotalCount != 1 {
+		t.Errorf("expected 1 sell-in archived file, got %d", sellInArchive.TotalCount)
+	}
+	if _, err := proc.DeleteArchivedFile(context.Background(), "tenant-adeco", res.ArchiveID); err != nil {
+		t.Fatalf("DeleteArchivedFile for sell-in failed: %v", err)
+	}
+	afterDelArchive := proc.ListArchivedFiles(context.Background(), "tenant-adeco", "", "", "", "sell_in")
+	if afterDelArchive.TotalCount != 0 {
+		t.Errorf("expected 0 sell-in archived files after delete, got %d", afterDelArchive.TotalCount)
+	}
+}

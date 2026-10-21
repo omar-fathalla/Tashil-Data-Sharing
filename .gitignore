@@ -1,0 +1,31 @@
+# macOS / OS
+.DS_Store
+*.log
+*.swp
+
+# Flutter / Dart
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+**/build/
+**/coverage/
+**/ios/Pods/
+**/ios/.symlinks/
+**/android/.gradle/
+**/android/local.properties
+**/android/key.properties
+*.jks
+*.keystore
+*.aab
+*.apk
+
+# Node / Firebase
+node_modules/
+.firebase/
+firebase-debug.log*
+
+# Secrets / Archives
+*.tar.gz
+*.zip

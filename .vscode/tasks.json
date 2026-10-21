@@ -1,0 +1,41 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Ensure Go Backend Running",
+            "type": "shell",
+            "command": "bash",
+            "args": ["${workspaceFolder}/scripts/start_backend.sh"],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared",
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Stop Go Backend",
+            "type": "shell",
+            "command": "bash",
+            "args": ["${workspaceFolder}/scripts/stop_backend.sh"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Start Go Backend (Terminal)",
+            "type": "shell",
+            "command": "go run cmd/server/main.go",
+            "options": {
+                "cwd": "${workspaceFolder}/backend-go"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "problemMatcher": []
+        }
+    ]
+}
