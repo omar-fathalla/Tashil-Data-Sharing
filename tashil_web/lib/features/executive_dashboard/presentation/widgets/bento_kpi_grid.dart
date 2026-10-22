@@ -12,9 +12,9 @@ class BentoKpiGrid extends StatelessWidget {
     required this.kpis,
   });
 
-  static String _formatSignedPct(double pct, String suffix) {
+  static String _formatSignedPctValue(double pct) {
     final sign = pct >= 0 ? '+' : '';
-    return '$sign$pct% $suffix';
+    return '$sign$pct%';
   }
 
   static String _shortChainNameAr(ChainShareItem item) {
@@ -76,13 +76,16 @@ class BentoKpiGrid extends StatelessWidget {
             SizedBox(
               width: cardWidth,
               child: _KpiCard(
-                title: 'إجمالي مبيعات التجزئة (Sell-Out)',
+                title: 'إجمالي مبيعات التجزئة',
+                titleEn: 'Total Retail Sell-Out',
                 value: CurrencyFormatter.formatCompactEGP(kpis.totalRevenue),
                 subtitle: CurrencyFormatter.formatEGP(kpis.totalRevenue),
                 icon: Icons.payments_rounded,
                 growthPct: kpis.revenueGrowthPct,
-                badgeLabel: _formatSignedPct(kpis.revenueMomPct, 'شهري MoM'),
-                secondaryBadgeLabel: _formatSignedPct(kpis.revenueYoyPct, 'سنوي YoY'),
+                badgeLabel: '${_formatSignedPctValue(kpis.revenueMomPct)} شهري',
+                badgeLabelEn: 'MoM',
+                secondaryBadgeLabel: '${_formatSignedPctValue(kpis.revenueYoyPct)} سنوي',
+                secondaryBadgeLabelEn: 'YoY',
                 isPositive: kpis.revenueMomPct >= 0,
               ),
             ),
@@ -90,12 +93,15 @@ class BentoKpiGrid extends StatelessWidget {
               width: cardWidth,
               child: _KpiCard(
                 title: 'إجمالي الوحدات المباعة',
+                titleEn: 'Total Units Sold',
                 value: CurrencyFormatter.formatCompactUnits(kpis.totalUnitsSold),
                 subtitle: '${CurrencyFormatter.formatUnits(kpis.totalUnitsSold)} عبوة',
                 icon: Icons.inventory_2_rounded,
                 growthPct: kpis.unitsGrowthPct,
-                badgeLabel: _formatSignedPct(kpis.unitsMomPct, 'شهري MoM'),
-                secondaryBadgeLabel: _formatSignedPct(kpis.unitsYoyPct, 'سنوي YoY'),
+                badgeLabel: '${_formatSignedPctValue(kpis.unitsMomPct)} شهري',
+                badgeLabelEn: 'MoM',
+                secondaryBadgeLabel: '${_formatSignedPctValue(kpis.unitsYoyPct)} سنوي',
+                secondaryBadgeLabelEn: 'YoY',
                 isPositive: kpis.unitsMomPct >= 0,
               ),
             ),
@@ -103,13 +109,18 @@ class BentoKpiGrid extends StatelessWidget {
               width: cardWidth,
               child: _KpiCard(
                 title: 'الفروع النشطة المغطاة',
+                titleEn: 'Active Covered Branches',
                 value: '${kpis.activeStoresCount} فرع',
                 subtitle: _buildActiveBranchesSubtitle(),
                 icon: Icons.store_rounded,
                 growthPct: 0.0,
                 badgeLabel: kpis.activeStoresCount > 0 ? 'تغطية 100%' : 'تم التصفير (0 فرع)',
+                badgeLabelEn: kpis.activeStoresCount > 0 ? '100% Coverage' : '0 Branches',
                 secondaryBadgeLabel: kpis.tenantMarketSharePct > 0
                     ? 'الحصة السوقية: ${kpis.tenantMarketSharePct.toStringAsFixed(2)}% • ${kpis.totalSkusCount} صنف'
+                    : null,
+                secondaryBadgeLabelEn: kpis.tenantMarketSharePct > 0
+                    ? 'Market Share • ${kpis.totalSkusCount} SKUs'
                     : null,
                 isPositive: true,
                 usePrimaryBadge: true,
@@ -118,13 +129,16 @@ class BentoKpiGrid extends StatelessWidget {
             SizedBox(
               width: cardWidth,
               child: _KpiCard(
-                title: 'نسبة النواقص (OOS Rate)',
+                title: 'نسبة النواقص',
+                titleEn: 'Out-of-Stock Rate (OOS Rate)',
                 value: '${kpis.oosRatePct.toStringAsFixed(1)}%',
                 subtitle: 'خسارة تقديرية: ${CurrencyFormatter.formatCompactEGP(kpis.estimatedLostRevenue)}',
                 icon: Icons.warning_amber_rounded,
                 growthPct: -kpis.oosRatePct,
-                badgeLabel: 'توافر الرفوف OSA: ${kpis.osaRatePct.toStringAsFixed(1)}%',
-                secondaryBadgeLabel: 'نسبة النواقص (OOS Rate): ${kpis.oosRatePct.toStringAsFixed(1)}% • ${kpis.totalOOSIncidents} صنف ناقص',
+                badgeLabel: 'توافر الرفوف: ${kpis.osaRatePct.toStringAsFixed(1)}%',
+                badgeLabelEn: 'On-Shelf Availability (OSA)',
+                secondaryBadgeLabel: 'نسبة النواقص: ${kpis.oosRatePct.toStringAsFixed(1)}% • ${kpis.totalOOSIncidents} صنف ناقص',
+                secondaryBadgeLabelEn: 'OOS Rate • ${kpis.totalOOSIncidents} OOS Incidents',
                 isPositive: false,
                 isAlert: true,
               ),
@@ -138,24 +152,30 @@ class BentoKpiGrid extends StatelessWidget {
 
 class _KpiCard extends StatelessWidget {
   final String title;
+  final String titleEn;
   final String value;
   final String subtitle;
   final IconData icon;
   final double growthPct;
   final String badgeLabel;
+  final String? badgeLabelEn;
   final String? secondaryBadgeLabel;
+  final String? secondaryBadgeLabelEn;
   final bool isPositive;
   final bool isAlert;
   final bool usePrimaryBadge;
 
   const _KpiCard({
     required this.title,
+    required this.titleEn,
     required this.value,
     required this.subtitle,
     required this.icon,
     required this.growthPct,
     required this.badgeLabel,
+    this.badgeLabelEn,
     this.secondaryBadgeLabel,
+    this.secondaryBadgeLabelEn,
     required this.isPositive,
     this.isAlert = false,
     this.usePrimaryBadge = false,
@@ -213,15 +233,32 @@ class _KpiCard extends StatelessWidget {
                       color: badgeBg,
                       borderRadius: BorderRadius.circular(12.0),
                     ),
-                    child: Text(
-                      badgeLabel,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: badgeFg,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11.0,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          badgeLabel,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: badgeFg,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11.0,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (badgeLabelEn != null)
+                          Text(
+                            badgeLabelEn!,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: badgeFg.withOpacity(0.85),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 9.5,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -231,12 +268,25 @@ class _KpiCard extends StatelessWidget {
             Text(
               title,
               style: theme.textTheme.titleSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w800,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 4.0),
+            const SizedBox(height: 2.0),
+            Text(
+              titleEn,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: isAlert ? colorScheme.error : colorScheme.primary,
+                fontWeight: FontWeight.w700,
+                fontSize: 11.0,
+                letterSpacing: 0.15,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 6.0),
             Text(
               value,
               style: theme.textTheme.headlineMedium?.copyWith(
@@ -264,17 +314,37 @@ class _KpiCard extends StatelessWidget {
                       : colorScheme.primaryContainer.withOpacity(0.55),
                   borderRadius: BorderRadius.circular(8.0),
                 ),
-                child: Text(
-                  secondaryBadgeLabel!,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: isAlert
-                        ? colorScheme.onErrorContainer
-                        : colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 10.5,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      secondaryBadgeLabel!,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: isAlert
+                            ? colorScheme.onErrorContainer
+                            : colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 10.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (secondaryBadgeLabelEn != null)
+                      Text(
+                        secondaryBadgeLabelEn!,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: (isAlert
+                                  ? colorScheme.onErrorContainer
+                                  : colorScheme.onPrimaryContainer)
+                              .withOpacity(0.8),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 9.5,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
                 ),
               ),
             ],

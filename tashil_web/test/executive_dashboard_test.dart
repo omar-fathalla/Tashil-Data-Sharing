@@ -54,10 +54,14 @@ void main() {
       ),
     );
 
-    expect(find.text('إجمالي مبيعات التجزئة (Sell-Out)'), findsOneWidget);
+    expect(find.text('إجمالي مبيعات التجزئة'), findsOneWidget);
+    expect(find.text('Total Retail Sell-Out'), findsOneWidget);
     expect(find.text('إجمالي الوحدات المباعة'), findsOneWidget);
+    expect(find.text('Total Units Sold'), findsOneWidget);
     expect(find.text('الفروع النشطة المغطاة'), findsOneWidget);
-    expect(find.text('نسبة النواقص (OOS Rate)'), findsOneWidget);
+    expect(find.text('Active Covered Branches'), findsOneWidget);
+    expect(find.text('نسبة النواقص'), findsOneWidget);
+    expect(find.text('Out-of-Stock Rate (OOS Rate)'), findsOneWidget);
 
     expect(find.text('16 فرع'), findsOneWidget);
     expect(find.text('4.2%'), findsOneWidget);
@@ -104,10 +108,12 @@ void main() {
       ),
     );
 
-    // Must format negative percentages cleanly without '+-'
-    expect(find.text('-16.0% شهري MoM'), findsOneWidget);
-    expect(find.text('-4.5% سنوي YoY'), findsOneWidget);
-    expect(find.text('-8.2% شهري MoM'), findsOneWidget);
+    // Must format negative percentages cleanly without '+-' with Arabic on Line 1 and English on Line 2
+    expect(find.text('-16.0% شهري'), findsOneWidget);
+    expect(find.text('MoM'), findsWidgets);
+    expect(find.text('-4.5% سنوي'), findsOneWidget);
+    expect(find.text('YoY'), findsWidgets);
+    expect(find.text('-8.2% شهري'), findsOneWidget);
     expect(find.textContaining('+-'), findsNothing);
 
     // Dynamic single-chain subtitle for Gomla Market (not hardcoded Fathalla)
@@ -115,7 +121,7 @@ void main() {
     expect(find.textContaining('فروع فتح الله'), findsNothing);
   });
 
-  testWidgets('ChainSharePie displays chain share names and percentages', (WidgetTester tester) async {
+  testWidgets('ChainSharePie displays chain share names (Arabic Line 1, English Line 2) and percentages', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light(),
@@ -127,8 +133,12 @@ void main() {
       ),
     );
 
-    expect(find.text('كارفور (Carrefour)'), findsOneWidget);
-    expect(find.text('فتح الله (Fathalla)'), findsOneWidget);
+    expect(find.text('الحصص البيعية للسلاسل'), findsOneWidget);
+    expect(find.text('Chain Market Share'), findsOneWidget);
+    expect(find.text('كارفور'), findsOneWidget);
+    expect(find.text('Carrefour'), findsOneWidget);
+    expect(find.text('فتح الله'), findsOneWidget);
+    expect(find.text('Fathalla'), findsOneWidget);
     expect(find.text('45.0%'), findsOneWidget);
     expect(find.text('32.0%'), findsOneWidget);
   });
@@ -473,11 +483,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('منحنى نمو المبيعات الشهري حسب السلاسل (Sell-Out Trend)'), findsOneWidget);
-    expect(find.text('أسواق فتح الله (Fathalla Market)'), findsOneWidget);
-    expect(find.text('جملة ماركت (Gomla Market)'), findsOneWidget);
+    expect(find.text('منحنى نمو المبيعات الشهري حسب السلاسل'), findsOneWidget);
+    expect(find.text('Sell-Out Trend'), findsOneWidget);
+    expect(find.text('أسواق فتح الله'), findsOneWidget);
+    expect(find.text('Fathalla Market'), findsOneWidget);
+    expect(find.text('جملة ماركت'), findsOneWidget);
+    expect(find.text('Gomla Market'), findsOneWidget);
     expect(find.text('يناير'), findsOneWidget);
+    expect(find.text('Jan'), findsOneWidget);
     expect(find.text('فبراير'), findsOneWidget);
+    expect(find.text('Feb'), findsOneWidget);
     expect(ChainSharePie.colorForChain('fathalla'), isNot(equals(ChainSharePie.colorForChain('gomla'))));
 
     // Also verify single-month series (e.g. 2026-01 or 2024-04) renders without error
@@ -493,6 +508,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('يناير'), findsOneWidget);
+    expect(find.text('Jan'), findsOneWidget);
 
     // Verify when only 'beet-elgomla' exists (or after deleting Fathalla and Gomla),
     // neither Fathalla nor Gomla is rendered in legend or curves.
@@ -549,12 +565,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('بيت الجملة (Beet El Gomla)'), findsOneWidget);
-    expect(find.text('أسواق فتح الله (Fathalla Market)'), findsNothing);
-    expect(find.text('جملة ماركت (Gomla Market)'), findsNothing);
+    expect(find.text('بيت الجملة'), findsOneWidget);
+    expect(find.text('Beet El Gomla'), findsOneWidget);
+    expect(find.text('أسواق فتح الله'), findsNothing);
+    expect(find.text('جملة ماركت'), findsNothing);
   });
 
-  testWidgets('ExecutiveScreen Retail Chain filter dropdown filters KPIs and ChainSharePie to selected chain', (WidgetTester tester) async {
+  testWidgets('ExecutiveScreen Retail Chain filter dropdown filters KPIs and ChainSharePie to selected chain and places SelloutTrendChart at 100% width above ChainSharePie', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -571,6 +588,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // Verify SelloutTrendChart spans 100% of the content width and is stacked above ChainSharePie
+    final trendRect = tester.getRect(find.byType(SelloutTrendChart));
+    final pieRect = tester.getRect(find.byType(ChainSharePie));
+    final gridRect = tester.getRect(find.byType(BentoKpiGrid));
+    expect(trendRect.width, closeTo(gridRect.width, 1.0));
+    expect(pieRect.width, closeTo(gridRect.width, 1.0));
+    expect(pieRect.top, greaterThanOrEqualTo(trendRect.bottom));
+
     final chainDropdown = find.byKey(const ValueKey('executive_chain_dropdown'));
     expect(chainDropdown, findsOneWidget);
     expect(find.text('Chain: All'), findsOneWidget);
@@ -578,14 +603,85 @@ void main() {
     await tester.tap(chainDropdown);
     await tester.pumpAndSettle();
 
-    expect(find.text('Fathalla (أسواق فتح الله)'), findsOneWidget);
-    expect(find.text('Gomla Market (جملة ماركت)'), findsOneWidget);
+    expect(find.text('فتح الله'), findsWidgets);
+    expect(find.text('Fathalla'), findsWidgets);
+    expect(find.text('جملة ماركت'), findsWidgets);
+    expect(find.text('Gomla'), findsWidgets);
 
-    await tester.tap(find.text('Gomla Market (جملة ماركت)'));
+    await tester.tap(find.descendant(
+      of: find.byType(PopupMenuItem<String>),
+      matching: find.text('جملة ماركت'),
+    ));
     await tester.pumpAndSettle();
 
     expect(find.text('Chain: Gomla'), findsOneWidget);
     expect(find.text('100.0%'), findsOneWidget);
+
+    // Verify ParetoCategorySection cards also render Arabic on Line 1 and English on Line 2
+    expect(find.text('الحصة السوقية مقارنة بالمنافسين'), findsOneWidget);
+    expect(find.text('Market Share vs. Competitors'), findsOneWidget);
+    expect(find.text('مساهمة الفئات والمجموعات السلعية'), findsOneWidget);
+    expect(find.text('Category Contribution'), findsOneWidget);
+    expect(find.text('الأصناف القائدة للمبيعات (باريتو 80/20)'), findsOneWidget);
+    expect(find.text('Pareto 80/20 Power SKUs'), findsOneWidget);
+  });
+
+  testWidgets('ChainSharePie.splitBilingualLabel handles edge cases and SelloutTrendChart renders all 12 months at full width', (WidgetTester tester) async {
+    expect(ChainSharePie.splitBilingualLabel(''), equals((ar: '', en: null)));
+    expect(
+      ChainSharePie.splitBilingualLabel('أسواق فتح الله (Fathalla Market)'),
+      equals((ar: 'أسواق فتح الله', en: 'Fathalla Market')),
+    );
+    expect(
+      ChainSharePie.splitBilingualLabel('All Chains (كل السلاسل)'),
+      equals((ar: 'كل السلاسل', en: 'All Chains')),
+    );
+    expect(
+      ChainSharePie.splitBilingualLabel('شركة أديكو'),
+      equals((ar: 'شركة أديكو', en: null)),
+    );
+    expect(
+      ChainSharePie.splitBilingualLabel('بروكتر آند جامبل (حساب 2) (P&G)'),
+      equals((ar: 'بروكتر آند جامبل (حساب 2)', en: 'P&G')),
+    );
+
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final fullYearTrends = List.generate(12, (i) {
+      final m = (i + 1).toString().padLeft(2, '0');
+      return DailyTrendItem(
+        date: '2025-$m-28',
+        monthKey: '2025-$m',
+        revenue: 500000.0 + (i * 25000.0),
+        units: 6000 + (i * 300),
+        storeCount: 34,
+        chainRevenues: {'fathalla': 500000.0 + (i * 25000.0)},
+        chainUnits: {'fathalla': 6000 + (i * 300)},
+      );
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: SelloutTrendChart(trends: fullYearTrends),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // All 12 months should have both Arabic (Line 1) and English (Line 2) labels rendered
+    expect(find.text('يناير'), findsOneWidget);
+    expect(find.text('Jan'), findsOneWidget);
+    expect(find.text('يونيو'), findsOneWidget);
+    expect(find.text('Jun'), findsOneWidget);
+    expect(find.text('ديسمبر'), findsOneWidget);
+    expect(find.text('Dec'), findsOneWidget);
   });
 }
 

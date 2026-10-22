@@ -206,6 +206,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
         final chainColor = c.code == 'all'
             ? colorScheme.primary
             : ChainSharePie.colorForChain(c.code);
+        final parts = ChainSharePie.splitBilingualLabel(c.fullName);
         return PopupMenuItem<String>(
           value: c.code,
           child: Row(
@@ -229,13 +230,29 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
                 ),
               const SizedBox(width: 10.0),
               Flexible(
-                child: Text(
-                  c.fullName,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: isSelected ? chainColor : colorScheme.onSurface,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      parts.ar,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                        color: isSelected ? chainColor : colorScheme.onSurface,
+                      ),
+                    ),
+                    if (parts.en != null)
+                      Text(
+                        parts.en!,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w500,
+                          color: isSelected ? chainColor : colorScheme.onSurfaceVariant,
+                          fontSize: 10.5,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
@@ -452,7 +469,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
     return SingleChildScrollView(
       padding: isCompact ? M3Spacing.pSm : M3Spacing.pMd,
       child: M3ContentBoundary(
-        maxWidth: 1440.0,
+        maxWidth: double.infinity,
         alignment: Alignment.topCenter,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
@@ -501,35 +518,13 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
 
                             M3Spacing.gapMD,
 
-                            // Charts Layout (Side by Side on desktop, stacked on mobile)
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                if (constraints.maxWidth >= 900) {
-                                  return Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        flex: 7,
-                                        child: SelloutTrendChart(trends: kpis!.dailyTrends),
-                                      ),
-                                      M3Spacing.hGapSM,
-                                      Expanded(
-                                        flex: 5,
-                                        child: ChainSharePie(chainShares: kpis!.chainShares),
-                                      ),
-                                    ],
-                                  );
-                                }
+                            // Full-width Monthly Sell-Out Trend Chart (100% width for all 12 months)
+                            SelloutTrendChart(trends: kpis!.dailyTrends),
 
-                                return Column(
-                                  children: [
-                                    SelloutTrendChart(trends: kpis!.dailyTrends),
-                                    M3Spacing.gapSM,
-                                    ChainSharePie(chainShares: kpis!.chainShares),
-                                  ],
-                                );
-                              },
-                            ),
+                            M3Spacing.gapMD,
+
+                            // Chain Market Share section directly below the trend chart
+                            ChainSharePie(chainShares: kpis!.chainShares),
 
                             M3Spacing.gapMD,
 

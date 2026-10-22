@@ -402,9 +402,9 @@ class M3PageHeader extends StatelessWidget {
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Line 1: Bold English Title on the LEFT
+                // Line 1: Bold Arabic Title
                 Directionality(
-                  textDirection: TextDirection.ltr,
+                  textDirection: TextDirection.rtl,
                   child: Row(
                     children: [
                       if (leading != null) ...[
@@ -413,33 +413,33 @@ class M3PageHeader extends StatelessWidget {
                       ],
                       Expanded(
                         child: Text(
-                          titleEn,
-                          textDirection: TextDirection.ltr,
-                          textAlign: TextAlign.left,
+                          subtitleAr,
+                          textDirection: TextDirection.rtl,
+                          textAlign: TextAlign.right,
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w800,
-                            fontSize: 20.0,
+                            fontSize: 18.0,
                             color: colorScheme.onSurface,
-                            letterSpacing: -0.3,
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 4.0),
-                // Line 2: Smaller Arabic Subtitle directly underneath the Title
+                const SizedBox(height: 3.0),
+                // Line 2: English Title directly underneath
                 Directionality(
-                  textDirection: TextDirection.rtl,
+                  textDirection: TextDirection.ltr,
                   child: Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      subtitleAr,
-                      textDirection: TextDirection.rtl,
+                      titleEn,
+                      textDirection: TextDirection.ltr,
                       textAlign: TextAlign.right,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.15,
                       ),
                     ),
                   ),
@@ -467,7 +467,7 @@ class M3PageHeader extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Directionality(
-                        textDirection: TextDirection.ltr,
+                        textDirection: TextDirection.rtl,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -477,28 +477,27 @@ class M3PageHeader extends StatelessWidget {
                             ],
                             Flexible(
                               child: Text(
-                                titleEn,
-                                textDirection: TextDirection.ltr,
-                                textAlign: TextAlign.left,
-                                style: theme.textTheme.headlineMedium?.copyWith(
+                                subtitleAr,
+                                textDirection: TextDirection.rtl,
+                                style: theme.textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.w800,
                                   color: colorScheme.onSurface,
-                                  letterSpacing: -0.3,
                                 ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 4.0),
+                      const SizedBox(height: 3.0),
                       Directionality(
-                        textDirection: TextDirection.rtl,
+                        textDirection: TextDirection.ltr,
                         child: Text(
-                          subtitleAr,
-                          textDirection: TextDirection.rtl,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w500,
+                          titleEn,
+                          textDirection: TextDirection.ltr,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.15,
                           ),
                         ),
                       ),

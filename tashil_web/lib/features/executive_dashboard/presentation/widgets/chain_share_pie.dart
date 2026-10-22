@@ -88,6 +88,34 @@ class ChainSharePie extends StatelessWidget {
     }
   }
 
+  /// Splits a combined bilingual string like `'أسواق فتح الله (Fathalla Market)'`
+  /// or `'Fathalla (أسواق فتح الله)'` or `'بروكتر آند جامبل (حساب 2) (P&G)'`
+  /// into an Arabic line (`ar`) and an English line (`en`).
+  static ({String ar, String? en}) splitBilingualLabel(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.endsWith(')')) {
+      final lastOpen = trimmed.lastIndexOf('(');
+      if (lastOpen > 0) {
+        final first = trimmed.substring(0, lastOpen).trim();
+        final second = trimmed.substring(lastOpen + 1, trimmed.length - 1).trim();
+        final arabicRegex = RegExp(r'[\u0600-\u06FF]');
+        final latinRegex = RegExp(r'[A-Za-z]');
+        final firstHasAr = arabicRegex.hasMatch(first);
+        final secondHasAr = arabicRegex.hasMatch(second);
+        final firstHasEn = latinRegex.hasMatch(first);
+        final secondHasEn = latinRegex.hasMatch(second);
+
+        if (firstHasAr && !secondHasAr && secondHasEn) {
+          return (ar: first, en: second);
+        }
+        if (secondHasAr && !firstHasAr && firstHasEn) {
+          return (ar: second, en: first);
+        }
+      }
+    }
+    return (ar: trimmed, en: null);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -97,41 +125,70 @@ class ChainSharePie extends StatelessWidget {
       child: Padding(
         padding: M3Spacing.pMd,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(
-                    'الحصص البيعية للسلاسل (Chain Market Share)',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'الحصص البيعية للسلاسل',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2.0),
+                      Text(
+                        'Chain Market Share',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8.0),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(12.0),
                   ),
-                  child: Text(
-                    '${chainShares.length} ${chainShares.length == 1 ? "سلسلة نشطة" : "سلاسل نشطة"}',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${chainShares.length} ${chainShares.length == 1 ? "سلسلة نشطة" : "سلاسل نشطة"}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '${chainShares.length} Active ${chainShares.length == 1 ? "Chain" : "Chains"}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 9.5,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 6.0),
                 Icon(Icons.pie_chart_rounded, size: 20.0, color: colorScheme.primary),
               ],
             ),
-            const SizedBox(height: 2.0),
+            const SizedBox(height: 4.0),
             Text(
-              'توزيع إيرادات الـ Sell-Out وحجم الاستهلاك للسلاسل التي تحتوي على بيانات في الفترة المحددة',
+              'توزيع إيرادات مبيعات التجزئة وحجم الاستهلاك للسلاسل التي تحتوي على بيانات في الفترة المحددة',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -170,6 +227,12 @@ class ChainSharePie extends StatelessWidget {
               itemBuilder: (context, index) {
                 final item = chainShares[index];
                 final color = colorForChain(item.retailerChain, index);
+                final rawLabel = (item.displayName.trim().isNotEmpty &&
+                        item.displayName.trim().toLowerCase() !=
+                            item.retailerChain.trim().toLowerCase())
+                    ? item.displayName
+                    : labelForChain(item.retailerChain);
+                final parts = splitBilingualLabel(rawLabel);
 
                 return Row(
                   children: [
@@ -187,11 +250,23 @@ class ChainSharePie extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            item.displayName,
+                            parts.ar,
                             style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
+                          if (parts.en != null) ...[
+                            const SizedBox(height: 1.0),
+                            Text(
+                              parts.en!,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 11.0,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 2.0),
                           Text(
                             '${CurrencyFormatter.formatUnits(item.totalUnits)} عبوة مباعة',
                             style: theme.textTheme.bodySmall?.copyWith(

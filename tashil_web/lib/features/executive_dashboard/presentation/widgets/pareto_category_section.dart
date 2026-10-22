@@ -3,6 +3,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import 'chain_share_pie.dart';
 
 /// ParetoCategorySection renders Competing Suppliers Market Share, Category Contribution bars,
 /// and Pareto 80/20 Power SKUs with interactive category drilldown.
@@ -250,11 +251,20 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Market Share vs. Competitors',
+                            'الحصة السوقية مقارنة بالمنافسين',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+                          const SizedBox(height: 1.0),
+                          Text(
+                            'Market Share vs. Competitors',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2.0),
                           Text(
                             'الحصة السوقية لشركة أديكو مقارنة بالموردين المنافسين عبر كافة المجموعات',
                             style: theme.textTheme.bodySmall?.copyWith(
@@ -427,6 +437,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                   sup.supplierName.contains('ادكو') ||
                   sup.supplierName.contains('الإسكندرية للمنظفات');
               final supplierDisplayName = _cleanSupplierName(sup.supplierName, isTenant);
+              final supplierParts = ChainSharePie.splitBilingualLabel(supplierDisplayName);
               final ratio = (sup.marketSharePct / 25.0).clamp(0.02, 1.0);
               final barColor = isTenant
                   ? colorScheme.primary
@@ -481,15 +492,30 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 ),
                               ),
                             ),
-                            // 2. Company Name
-                            Text(
-                              supplierDisplayName,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: isTenant ? colorScheme.primary : colorScheme.onSurface,
-                                fontSize: isTenant ? 15.0 : 14.0,
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                            // 2. Company Name (Arabic on Line 1, English on Line 2)
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  supplierParts.ar,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: isTenant ? colorScheme.primary : colorScheme.onSurface,
+                                    fontSize: isTenant ? 15.0 : 14.0,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (supplierParts.en != null)
+                                  Text(
+                                    supplierParts.en!,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
                             ),
                             // 3. Barcode Count Chip
                             Container(
@@ -542,17 +568,34 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                     ),
                                     const SizedBox(width: 5.0),
                                     Flexible(
-                                      child: Text(
-                                        rank == 1
-                                            ? 'الشركة الرائدة (#1 Market Leader)'
-                                            : 'المركز التنافسي (#$rank)',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: colorScheme.onPrimaryContainer,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 11.0,
-                                        ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            rank == 1
+                                                ? 'الشركة الرائدة (#1)'
+                                                : 'المركز التنافسي (#$rank)',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: theme.textTheme.labelSmall?.copyWith(
+                                              color: colorScheme.onPrimaryContainer,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 11.0,
+                                            ),
+                                          ),
+                                          if (rank == 1)
+                                            Text(
+                                              'Market Leader',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: theme.textTheme.labelSmall?.copyWith(
+                                                color: colorScheme.onPrimaryContainer.withOpacity(0.85),
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 10.0,
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
                                   ],
@@ -965,11 +1008,20 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Category Contribution',
+                        'مساهمة الفئات والمجموعات السلعية',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      const SizedBox(height: 1.0),
+                      Text(
+                        'Category Contribution',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2.0),
                       Text(
                         'توزيع الإيرادات والحصة السوقية داخل كل مجموعة رئيسية',
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -1550,11 +1602,20 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Pareto 80/20 Power SKUs',
+                        'الأصناف القائدة للمبيعات (باريتو 80/20)',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      const SizedBox(height: 1.0),
+                      Text(
+                        'Pareto 80/20 Power SKUs',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2.0),
                       Text(
                         isFiltered
                             ? 'الأصناف المحركة لـ 80% من مبيعات ($selectedCategory) سهم تراكمي'

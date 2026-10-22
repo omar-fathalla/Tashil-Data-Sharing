@@ -56,6 +56,21 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
     'ديسمبر',
   ];
 
+  static const _englishMonthNames = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
   static String _formatYAxisLabel(double amount) {
     if (amount <= 0) return '0 ج.م';
     if (amount >= 1000000) {
@@ -86,6 +101,22 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
       if (parts.isNotEmpty) return parts[0];
     }
     return item.date.trim();
+  }
+
+  String? _formatAxisLabelEn(DailyTrendItem item) {
+    if (item.monthKey.trim().isNotEmpty) {
+      final parts = item.monthKey.trim().split('-');
+      if (parts.length >= 2) {
+        final m = int.tryParse(parts[1]);
+        if (m != null && m >= 1 && m <= 12) {
+          return _englishMonthNames[m - 1];
+        }
+      }
+    }
+    final arLabel = _formatAxisLabel(item);
+    final idx = _arabicMonthNames.indexOf(arLabel);
+    if (idx != -1) return _englishMonthNames[idx];
+    return null;
   }
 
   List<DailyTrendItem> _getEffectiveTrends() {
@@ -131,7 +162,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
       return [
         _ChainSeriesData(
           chainCode: 'total',
-          displayName: 'إجمالي المبيعات (ج.م)',
+          displayName: 'إجمالي المبيعات (Total Sell-Out)',
           color: colorScheme.primary,
           values: effectiveTrends.map((e) => e.revenue).toList(),
           growthPcts: List<double>.filled(effectiveTrends.length, 0.0),
@@ -199,6 +230,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
     if (widget.trends.isEmpty) {
       return Card(
         child: Container(
+          width: double.infinity,
           height: 320.0,
           alignment: Alignment.center,
           child: Text('لا توجد بيانات متاحة للمخطط الزمني في هذه الفترة', style: theme.textTheme.bodyMedium),
@@ -224,7 +256,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
       child: Padding(
         padding: M3Spacing.pMd,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Wrap(
               alignment: WrapAlignment.spaceBetween,
@@ -236,9 +268,20 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'منحنى نمو المبيعات الشهري حسب السلاسل (Sell-Out Trend)',
+                      'منحنى نمو المبيعات الشهري حسب السلاسل',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2.0),
+                    Text(
+                      'Sell-Out Trend',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -254,13 +297,14 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                     ),
                   ],
                 ),
-                // Multi-chain legend pills
+                // Multi-chain legend pills with Arabic on line 1 and English on line 2
                 Wrap(
                   spacing: 6.0,
                   runSpacing: 6.0,
                   children: seriesList.map((series) {
+                    final parts = ChainSharePie.splitBilingualLabel(series.displayName);
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
                       decoration: BoxDecoration(
                         color: series.color.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(16.0),
@@ -279,14 +323,31 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                           ),
                           const SizedBox(width: 6.0),
                           Flexible(
-                            child: Text(
-                              series.displayName,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: colorScheme.onSurface,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  parts.ar,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: colorScheme.onSurface,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                                if (parts.en != null)
+                                  Text(
+                                    parts.en!,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 9.5,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                              ],
                             ),
                           ),
                         ],
@@ -390,6 +451,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                       children: List.generate(effectiveTrends.length, (index) {
                         final item = effectiveTrends[index];
                         final label = _formatAxisLabel(item);
+                        final labelEn = _formatAxisLabelEn(item);
                         final isHovered = hoveredIndex == index;
 
                         return Expanded(
@@ -398,14 +460,30 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                               fit: BoxFit.scaleDown,
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 1.0),
-                                child: Text(
-                                  label,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: isHovered ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                                    fontWeight: isHovered ? FontWeight.bold : FontWeight.w600,
-                                    fontSize: 10.5,
-                                    fontFamily: 'Cairo',
-                                  ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      label,
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: isHovered ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                                        fontWeight: isHovered ? FontWeight.bold : FontWeight.w600,
+                                        fontSize: 10.5,
+                                        fontFamily: 'Cairo',
+                                      ),
+                                    ),
+                                    if (labelEn != null)
+                                      Text(
+                                        labelEn,
+                                        style: theme.textTheme.labelSmall?.copyWith(
+                                          color: isHovered
+                                              ? colorScheme.primary
+                                              : colorScheme.onSurfaceVariant.withOpacity(0.75),
+                                          fontWeight: isHovered ? FontWeight.bold : FontWeight.w500,
+                                          fontSize: 9.0,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -492,14 +570,17 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                 final valueLabel = val > 0
                     ? '${CurrencyFormatter.formatEGP(val)}$growthStr'
                     : 'لا توجد بيانات مرفوعة';
+                final parts = ChainSharePie.splitBilingualLabel(s.displayName);
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 2.0),
+                  padding: const EdgeInsets.only(bottom: 3.0),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
                         width: 7.0,
                         height: 7.0,
+                        margin: const EdgeInsets.only(top: 4.0),
                         decoration: BoxDecoration(
                           color: val > 0 ? s.color : s.color.withOpacity(0.45),
                           shape: BoxShape.circle,
@@ -507,16 +588,31 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                       ),
                       const SizedBox(width: 5.0),
                       Flexible(
-                        child: Text(
-                          '${s.displayName}: $valueLabel',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: val > 0
-                                ? colorScheme.onInverseSurface
-                                : colorScheme.onInverseSurface.withOpacity(0.65),
-                            fontWeight: val > 0 ? FontWeight.w600 : FontWeight.normal,
-                            fontSize: 10.0,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${parts.ar}: $valueLabel',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: val > 0
+                                    ? colorScheme.onInverseSurface
+                                    : colorScheme.onInverseSurface.withOpacity(0.65),
+                                fontWeight: val > 0 ? FontWeight.w600 : FontWeight.normal,
+                                fontSize: 10.0,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (parts.en != null)
+                              Text(
+                                parts.en!,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onInverseSurface.withOpacity(0.7),
+                                  fontSize: 9.0,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
                         ),
                       ),
                     ],

@@ -93,12 +93,16 @@ void main() {
         ),
       );
 
-      expect(find.text('+14.8% شهري MoM'), findsOneWidget);
-      expect(find.text('+24.5% سنوي YoY'), findsOneWidget);
-      expect(find.text('+9.2% شهري MoM'), findsOneWidget);
-      expect(find.text('+16.4% سنوي YoY'), findsOneWidget);
-      expect(find.text('توافر الرفوف OSA: 96.8%'), findsOneWidget);
-      expect(find.textContaining('نسبة النواقص (OOS Rate): 3.2%'), findsOneWidget);
+      expect(find.text('+14.8% شهري'), findsOneWidget);
+      expect(find.text('MoM'), findsNWidgets(2));
+      expect(find.text('+24.5% سنوي'), findsOneWidget);
+      expect(find.text('YoY'), findsNWidgets(2));
+      expect(find.text('+9.2% شهري'), findsOneWidget);
+      expect(find.text('+16.4% سنوي'), findsOneWidget);
+      expect(find.text('توافر الرفوف: 96.8%'), findsOneWidget);
+      expect(find.text('On-Shelf Availability (OSA)'), findsOneWidget);
+      expect(find.textContaining('نسبة النواقص: 3.2%'), findsOneWidget);
+      expect(find.textContaining('OOS Rate •'), findsOneWidget);
     });
 
     testWidgets('ParetoCategorySection renders Category Contribution and Pareto 80/20 cards and handles empty lists', (WidgetTester tester) async {
