@@ -130,9 +130,18 @@ void main() {
       expect(find.text('متوسط مبيعات الفرع'), findsOneWidget);
       expect(find.text('Average Store Velocity'), findsOneWidget);
 
-      // Verify Tables
+      // Verify Tab 1 Year (2026 Default) and Month Filter Dropdowns
+      expect(find.byKey(const ValueKey('perf_year_dropdown')), findsOneWidget);
+      expect(find.byKey(const ValueKey('perf_month_dropdown')), findsOneWidget);
+      expect(find.text('2026 (Default)'), findsOneWidget);
+      expect(find.text('كل الشهور'), findsOneWidget);
+
+      // Verify Tables (SKU Pareto Breakdown table was removed and replaced with Branch YoY & MoM Growth Matrix)
       expect(find.textContaining('Branch Sales Velocity'), findsOneWidget);
-      expect(find.textContaining('SKU Pareto Breakdown'), findsOneWidget);
+      expect(find.textContaining('SKU Pareto Breakdown'), findsNothing);
+      expect(find.byKey(const ValueKey('branch_growth_matrix_section')), findsOneWidget);
+      expect(find.textContaining('مقارنة نمو وتراجع الفروع سنوياً وشهرياً'), findsOneWidget);
+      expect(find.textContaining('Branch YoY & MoM Growth Matrix'), findsOneWidget);
     });
 
     testWidgets('switches to Tab 2 (Target Management) and renders TargetManagementPanel',

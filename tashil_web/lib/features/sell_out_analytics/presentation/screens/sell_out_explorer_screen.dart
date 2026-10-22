@@ -46,6 +46,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
   String? selectedCategory;
   DateTimeRange? selectedDateRange;
   int _selectedYear = 2026; // Default to 2026 as requested
+  int _selectedMonth = 0; // 0 = All Months (كل الشهور), 1..12 = Jan..Dec
   String searchQuery = '';
   bool isLoading = true;
   bool _isUploading = false;
@@ -67,10 +68,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
   String _perfChain = 'all';
   String _perfBrand = 'all';
   String _perfSearch = '';
-  int _perfSortColumnIndex = 3; // 3: Net Revenue (EGP)
-  bool _perfSortAscending = false; // Descending by default for highest value
-  int _perfCurrentPage = 0;
-  final int _perfPageSize = 25; // 25 items per page
+  String _perfGrowthStatusFilter = 'all'; // 'all', 'growing', 'declining', 'new_branch'
   late final TextEditingController _perfSearchController;
 
   // Tab 3: Uploaded Sell-Out Excel Sheets Archive State
@@ -122,6 +120,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       selectedCategory = null;
       selectedDateRange = null;
       _selectedYear = 2026;
+      _selectedMonth = 0;
       _chartChain = 'fathalla';
       searchQuery = '';
       _availableCategories = [];
@@ -156,6 +155,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
   Future<void> _loadRecords() async {
     if (mounted) setState(() => isLoading = true);
     final effectiveYear = (selectedDateRange == null && _selectedYear > 0) ? _selectedYear : null;
+    final effectiveMonth = (selectedDateRange == null && _selectedMonth > 0) ? _selectedMonth : null;
     final res = await widget.apiClient.getRecords(
       chain: selectedChain,
       storeId: selectedStoreId,
@@ -164,7 +164,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       startDate: selectedDateRange != null ? _formatDate(selectedDateRange!.start) : null,
       endDate: selectedDateRange != null ? _formatDate(selectedDateRange!.end) : null,
       year: effectiveYear,
-      limit: 250,
+      month: effectiveMonth,
+      limit: 1000,
     );
     final summary = widget.apiClient.lastSellOutSummary ??
         SellOutRecordsSummaryModel(
@@ -185,12 +186,14 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       widget.apiClient.getStoreBenchmarkMatrix(
         chain: activeChartChain == 'all' ? null : activeChartChain,
         year: _selectedYear > 0 ? _selectedYear : null,
+        month: effectiveMonth,
         startDate: selectedDateRange != null ? _formatDate(selectedDateRange!.start) : null,
         endDate: selectedDateRange != null ? _formatDate(selectedDateRange!.end) : null,
       ),
       widget.apiClient.getStoreBenchmarkMatrix(
         chain: activeChartChain == 'all' ? null : activeChartChain,
         year: compYear,
+        month: effectiveMonth,
       ),
     ]);
 
@@ -1757,34 +1760,49 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
         : records.where((r) => r.retailerChain.toLowerCase() == _perfChain.toLowerCase()).toList();
 
     // 1. Group records by Branch (use full backend StoreBenchmarkItem list if available for the selected chain)
-    final branchMap = <String, ({String storeName, String chain, int units, double revenue})>{};
+    final branchMap = <String, ({
+      String storeId,
+      String storeName,
+      String chain,
+      String region,
+      int units,
+      double revenue,
+    })>{};
     if (_branchChartItems.isNotEmpty &&
         (_perfChain == 'all' || _perfChain.toLowerCase() == _chartChain.toLowerCase())) {
       for (final item in _branchChartItems) {
         final chainName = item.retailerChain.isNotEmpty ? item.retailerChain : _chartChain;
-        final key = '${chainName}_${item.storeId.isNotEmpty ? item.storeId : item.storeName}';
+        final sId = item.storeId.isNotEmpty ? item.storeId : item.storeName;
+        final key = '${chainName}_$sId';
         branchMap[key] = (
+          storeId: sId,
           storeName: item.storeName.isNotEmpty ? item.storeName : item.storeId,
           chain: chainName,
+          region: item.region.isNotEmpty ? item.region : '—',
           units: item.totalUnits,
           revenue: item.totalRevenue,
         );
       }
     } else {
       for (final r in effectiveRecords) {
-        final key = '${r.retailerChain}_${r.storeId.isNotEmpty ? r.storeId : r.storeName}';
+        final sId = r.storeId.isNotEmpty ? r.storeId : r.storeName;
+        final key = '${r.retailerChain}_$sId';
         final existing = branchMap[key];
         if (existing == null) {
           branchMap[key] = (
+            storeId: sId,
             storeName: r.storeName.isNotEmpty ? r.storeName : r.storeId,
             chain: r.retailerChain,
+            region: '—',
             units: r.quantitySold,
             revenue: r.netRevenue,
           );
         } else {
           branchMap[key] = (
+            storeId: existing.storeId,
             storeName: existing.storeName,
             chain: existing.chain,
+            region: existing.region,
             units: existing.units + r.quantitySold,
             revenue: existing.revenue + r.netRevenue,
           );
@@ -1793,6 +1811,77 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     }
     final branchList = branchMap.values.toList()
       ..sort((a, b) => b.revenue.compareTo(a.revenue));
+
+    final int compYear = (_selectedYear == 2026) ? 2025 : (_selectedYear == 2025 ? 2024 : 2025);
+    final int currYearLabel = _selectedYear > 0 ? _selectedYear : 2026;
+
+    // Build Branch YoY & MoM Growth Matrix
+    final branchGrowthMatrix = branchList.map((b) {
+      StoreBenchmarkItem? prevItem = _prevYearBranchMap[b.storeId];
+      if (prevItem == null) {
+        for (final entry in _prevYearBranchMap.values) {
+          if (entry.storeName == b.storeName) {
+            prevItem = entry;
+            break;
+          }
+        }
+      }
+      final prevRev = prevItem?.totalRevenue ?? 0.0;
+      final prevUnits = prevItem?.totalUnits ?? 0;
+      final varianceEgp = b.revenue - prevRev;
+      final double? yoyGrowthPct = prevRev > 0
+          ? ((b.revenue - prevRev) / prevRev) * 100.0
+          : null;
+      final String status = prevRev <= 0
+          ? (b.revenue > 0 ? 'new_branch' : 'declining')
+          : ((yoyGrowthPct ?? 0.0) >= 0 ? 'growing' : 'declining');
+      final double monthlyRunRate = _selectedMonth > 0 ? b.revenue : (b.revenue / 12.0);
+      return (
+        storeId: b.storeId,
+        storeName: b.storeName,
+        chain: b.chain,
+        region: b.region != '—' ? b.region : (prevItem?.region ?? '—'),
+        currentRevenue: b.revenue,
+        prevRevenue: prevRev,
+        varianceEgp: varianceEgp,
+        yoyGrowthPct: yoyGrowthPct,
+        monthlyRunRate: monthlyRunRate,
+        currentUnits: b.units,
+        prevUnits: prevUnits,
+        status: status,
+      );
+    }).toList();
+
+    final filteredGrowthBranches = branchGrowthMatrix.where((item) {
+      if (_perfGrowthStatusFilter != 'all' && item.status != _perfGrowthStatusFilter) {
+        return false;
+      }
+      if (_perfSearch.isNotEmpty) {
+        final q = _perfSearch.toLowerCase();
+        if (!item.storeName.toLowerCase().contains(q) &&
+            !item.region.toLowerCase().contains(q) &&
+            !item.chain.toLowerCase().contains(q)) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
+
+    final growingBranchesCount = branchGrowthMatrix.where((b) => b.status == 'growing').length;
+    final decliningBranchesCount = branchGrowthMatrix.where((b) => b.status == 'declining').length;
+    final newBranchesCount = branchGrowthMatrix.where((b) => b.status == 'new_branch').length;
+    final totalCurrMatrixRev = branchGrowthMatrix.fold<double>(0.0, (s, b) => s + b.currentRevenue);
+    final totalPrevMatrixRev = branchGrowthMatrix.fold<double>(0.0, (s, b) => s + b.prevRevenue);
+    final totalMatrixVarianceEgp = totalCurrMatrixRev - totalPrevMatrixRev;
+    final double? totalMatrixYoYPct = totalPrevMatrixRev > 0
+        ? ((totalCurrMatrixRev - totalPrevMatrixRev) / totalPrevMatrixRev) * 100.0
+        : null;
+
+    final growingSorted = branchGrowthMatrix
+        .where((b) => b.yoyGrowthPct != null)
+        .toList()
+      ..sort((a, b) => (b.yoyGrowthPct ?? -999).compareTo(a.yoyGrowthPct ?? -999));
+    final fastestGrowingBranch = growingSorted.isNotEmpty ? growingSorted.first : null;
 
     // 2. Group records by SKU & infer Brand
     final skuMap = <String, ({String skuName, String brand, String category, int units, double revenue})>{};
@@ -1830,9 +1919,29 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
 
     final topSku = sortedByRev.isNotEmpty ? sortedByRev.first : null;
     final topBranch = branchList.isNotEmpty ? branchList.first : null;
-    final avgBranchRevenue = branchList.isNotEmpty ? (totalRevenueAll / branchList.length) : 0.0;
+    final branchTotalRevenueAll = branchList.fold<double>(0.0, (sum, b) => sum + b.revenue);
+    final effectiveChainTotalRev = branchTotalRevenueAll > 0 ? branchTotalRevenueAll : totalRevenueAll;
+    final avgBranchRevenue = branchList.isNotEmpty ? (effectiveChainTotalRev / branchList.length) : 0.0;
 
-    // Filter SKUs for display table
+    const monthLabelsAr = <int, String>{
+      0: 'كل الشهور',
+      1: 'يناير (01)',
+      2: 'فبراير (02)',
+      3: 'مارس (03)',
+      4: 'أبريل (04)',
+      5: 'مايو (05)',
+      6: 'يونيو (06)',
+      7: 'يوليو (07)',
+      8: 'أغسطس (08)',
+      9: 'سبتمبر (09)',
+      10: 'أكتوبر (10)',
+      11: 'نوفمبر (11)',
+      12: 'ديسمبر (12)',
+    };
+    final String perfPeriodBadgeAr =
+        '${_selectedYear > 0 ? "سنة $_selectedYear" : "كل السنوات"} • ${monthLabelsAr[_selectedMonth] ?? "كل الشهور"}';
+
+    // Filter SKUs for Excel export if needed
     final availableBrands = skuMap.values.map((s) => s.brand).toSet().toList()..sort();
     final filteredSkus = sortedByRev.where((sku) {
       if (_perfBrand != 'all' && sku.brand != _perfBrand) return false;
@@ -1847,33 +1956,6 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       return true;
     }).toList();
 
-    // Sort filtered SKUs
-    filteredSkus.sort((a, b) {
-      int cmp = 0;
-      switch (_perfSortColumnIndex) {
-        case 0:
-          cmp = a.skuName.compareTo(b.skuName);
-          break;
-        case 1:
-          cmp = a.brand.compareTo(b.brand);
-          break;
-        case 2:
-          cmp = a.units.compareTo(b.units);
-          break;
-        case 3:
-        default:
-          cmp = a.revenue.compareTo(b.revenue);
-          break;
-      }
-      return _perfSortAscending ? cmp : -cmp;
-    });
-
-    // Pagination for SKU table
-    final totalSkuPages = (filteredSkus.length / _perfPageSize).ceil().clamp(1, 9999);
-    final pageIndex = _perfCurrentPage.clamp(0, totalSkuPages - 1);
-    final startOffset = pageIndex * _perfPageSize;
-    final pagedSkus = filteredSkus.skip(startOffset).take(_perfPageSize).toList();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1886,8 +1968,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               titleEn: 'Top Performing SKU',
               value: topSku != null ? topSku.skuName : '—',
               subtitle: topSku != null
-                  ? '${CurrencyFormatter.formatCompactEGP(topSku.revenue)} (${topSku.units} قطعة)'
-                  : 'لا توجد مبيعات',
+                  ? '${CurrencyFormatter.formatCompactEGP(topSku.revenue)} (${CurrencyFormatter.formatNumber(topSku.units)} قطعة) • $perfPeriodBadgeAr'
+                  : 'لا توجد مبيعات • $perfPeriodBadgeAr',
               icon: Icons.star_rounded,
               color: colorScheme.primary,
             );
@@ -1896,7 +1978,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               titleAr: 'مؤشر باريتو (Pareto 80/20)',
               titleEn: 'Top 20% SKU Revenue Share',
               value: '${paretoSharePct.toStringAsFixed(1)}%',
-              subtitle: '$top20PctCount صنف تمثل القوة الدافعة للمبيعات',
+              subtitle: '$top20PctCount صنف تمثل القوة الدافعة للمبيعات • $perfPeriodBadgeAr',
               icon: Icons.pie_chart_rounded,
               color: Color.lerp(colorScheme.primary, colorScheme.secondary, 0.30) ?? colorScheme.primary,
             );
@@ -1906,7 +1988,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               titleEn: 'Top Revenue Branch',
               value: topBranch != null ? topBranch.storeName : '—',
               subtitle: topBranch != null
-                  ? '${topBranch.chain.toUpperCase()} • ${CurrencyFormatter.formatCompactEGP(topBranch.revenue)}'
+                  ? '${topBranch.chain.toUpperCase()} • ${CurrencyFormatter.formatCompactEGP(topBranch.revenue)} • $perfPeriodBadgeAr'
                   : 'لا توجد فروع',
               icon: Icons.leaderboard_rounded,
               color: Color.lerp(colorScheme.primary, colorScheme.tertiary, 0.40) ?? colorScheme.primary,
@@ -1916,7 +1998,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               titleAr: 'متوسط مبيعات الفرع',
               titleEn: 'Average Store Velocity',
               value: CurrencyFormatter.formatCompactEGP(avgBranchRevenue),
-              subtitle: '${branchList.length} فرع محقق مبيعات فعلية',
+              subtitle: '${branchList.length} فرع نشط • $perfPeriodBadgeAr',
               icon: Icons.speed_rounded,
               color: colorScheme.secondary,
             );
@@ -1954,42 +2036,116 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                 runSpacing: 8.0,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
+                  // 1. Year Filter (Default: 2026)
                   SizedBox(
-                    width: 180.0,
+                    width: 170.0,
+                    child: DropdownButtonFormField<int>(
+                      key: const ValueKey('perf_year_dropdown'),
+                      isExpanded: true,
+                      value: const [2026, 2025, 2024, 0].contains(_selectedYear)
+                          ? _selectedYear
+                          : 2026,
+                      decoration: InputDecoration(
+                        labelText: 'السنة (Year)',
+                        isDense: true,
+                        prefixIcon: const Icon(Icons.calendar_today_rounded, size: 17.0),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 2026, child: Text('2026 (Default)')),
+                        DropdownMenuItem(value: 2025, child: Text('2025')),
+                        DropdownMenuItem(value: 2024, child: Text('2024')),
+                        DropdownMenuItem(value: 0, child: Text('كل السنوات (All)')),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) {
+                          setState(() {
+                            _selectedYear = v;
+                            selectedDateRange = null;
+                          });
+                          _loadRecords();
+                        }
+                      },
+                    ),
+                  ),
+
+                  // 2. Month Filter (Default: All Months / 0)
+                  SizedBox(
+                    width: 175.0,
+                    child: DropdownButtonFormField<int>(
+                      key: const ValueKey('perf_month_dropdown'),
+                      isExpanded: true,
+                      value: _selectedMonth,
+                      decoration: InputDecoration(
+                        labelText: 'الشهر (Month)',
+                        isDense: true,
+                        prefixIcon: const Icon(Icons.date_range_rounded, size: 17.0),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                      ),
+                      items: monthLabelsAr.entries
+                          .map(
+                            (e) => DropdownMenuItem<int>(
+                              value: e.key,
+                              child: Text(
+                                e.value,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) {
+                          setState(() {
+                            _selectedMonth = v;
+                            selectedDateRange = null;
+                          });
+                          _loadRecords();
+                        }
+                      },
+                    ),
+                  ),
+
+                  // 3. Chain Filter
+                  SizedBox(
+                    width: 175.0,
                     child: DropdownButtonFormField<String>(
                       isExpanded: true,
                       value: _perfChain,
                       decoration: InputDecoration(
-                        labelText: 'Chain',
+                        labelText: 'السلسلة (Chain)',
                         isDense: true,
                         prefixIcon: const Icon(Icons.storefront_rounded, size: 18.0),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'all', child: Text('All Chains')),
-                        DropdownMenuItem(value: 'fathalla', child: Text('Fathalla')),
-                        DropdownMenuItem(value: 'gomla', child: Text('Gomla')),
-                        DropdownMenuItem(value: 'beet-elgomla', child: Text('Beet El Gomla')),
-                        DropdownMenuItem(value: 'chain-1080314', child: Text('El Wakala')),
+                        DropdownMenuItem(value: 'all', child: Text('All Chains (الكل)')),
+                        DropdownMenuItem(value: 'fathalla', child: Text('أسواق فتح الله (Fathalla)')),
+                        DropdownMenuItem(value: 'gomla', child: Text('جملة ماركت (Gomla)')),
+                        DropdownMenuItem(value: 'beet-elgomla', child: Text('بيت الجملة (Beet El Gomla)')),
+                        DropdownMenuItem(value: 'chain-1080314', child: Text('الوكالة (El Wakala)')),
                       ],
                       onChanged: (v) {
                         if (v != null) {
                           setState(() {
                             _perfChain = v;
-                            _perfCurrentPage = 0;
+                            selectedChain = v == 'all' ? null : v;
+                            if (v != 'all') _chartChain = v;
                           });
+                          _loadRecords();
                         }
                       },
                     ),
                   ),
                   SizedBox(
-                    width: 220.0,
+                    width: 210.0,
                     child: DropdownButtonFormField<String>(
                       isExpanded: true,
                       value: availableBrands.contains(_perfBrand) ? _perfBrand : 'all',
                       decoration: InputDecoration(
-                        labelText: 'Brand Filter (AI Inferred)',
+                        labelText: 'Brand Filter (الماركة)',
                         isDense: true,
                         prefixIcon: const Icon(Icons.branding_watermark_rounded, size: 18.0),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
@@ -2003,18 +2159,17 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                         if (v != null) {
                           setState(() {
                             _perfBrand = v;
-                            _perfCurrentPage = 0;
                           });
                         }
                       },
                     ),
                   ),
                   SizedBox(
-                    width: 240.0,
+                    width: 220.0,
                     child: TextField(
                       controller: _perfSearchController,
                       decoration: InputDecoration(
-                        hintText: 'بحث باسم الصنف أو الماركة',
+                        hintText: 'بحث باسم الفرع أو المنطقة أو الصنف',
                         isDense: true,
                         prefixIcon: const Icon(Icons.search_rounded, size: 18.0),
                         suffixIcon: _perfSearch.isNotEmpty
@@ -2024,7 +2179,6 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                                   _perfSearchController.clear();
                                   setState(() {
                                     _perfSearch = '';
-                                    _perfCurrentPage = 0;
                                   });
                                 },
                               )
@@ -2035,7 +2189,6 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                       onChanged: (val) {
                         setState(() {
                           _perfSearch = val;
-                          _perfCurrentPage = 0;
                         });
                       },
                     ),
@@ -2233,8 +2386,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
 
         M3Spacing.gapMD,
 
-        // 4. Section B: SKU & Brand Pareto Analysis Table (With Pagination & Sorting)
+        // 4. Section B: Branch YoY & MoM Growth Matrix (مقارنة نمو وتراجع الفروع سنوياً وشهرياً)
         Container(
+          key: const ValueKey('branch_growth_matrix_section'),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(18.0),
@@ -2245,113 +2399,269 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Header + Period Badge
               Padding(
-                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
-                child: Row(
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 10.0),
+                child: Wrap(
+                  spacing: 12.0,
+                  runSpacing: 8.0,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Icon(Icons.inventory_2_rounded, color: colorScheme.primary, size: 22.0),
-                    const SizedBox(width: 8.0),
-                    Text(
-                      'تحليل الأصناف ومساهمة الماركات (SKU Pareto Breakdown)',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8.0),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer.withOpacity(0.55),
+                            borderRadius: BorderRadius.circular(10.0),
+                          ),
+                          child: Icon(
+                            Icons.trending_up_rounded,
+                            color: colorScheme.primary,
+                            size: 20.0,
+                          ),
+                        ),
+                        const SizedBox(width: 10.0),
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'مقارنة نمو وتراجع الفروع سنوياً وشهرياً ($currYearLabel vs $compYear)',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 2.0),
+                              Text(
+                                'Branch YoY & MoM Growth Matrix • متابعة الفروع الصاعدة والمتراجعة ($perfPeriodBadgeAr)',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const Spacer(),
-                    Text(
-                      'صفحة ${pageIndex + 1} من $totalSkuPages (${filteredSkus.length} صنف)',
-                      style: TextStyle(
-                        fontSize: 12.0,
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                    // Status Filter Chips
+                    Wrap(
+                      spacing: 6.0,
+                      runSpacing: 6.0,
+                      children: [
+                        ChoiceChip(
+                          label: Text('الكل (${branchGrowthMatrix.length})'),
+                          selected: _perfGrowthStatusFilter == 'all',
+                          onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'all'),
+                        ),
+                        ChoiceChip(
+                          label: Text('فروع صاعدة 📈 ($growingBranchesCount)'),
+                          selected: _perfGrowthStatusFilter == 'growing',
+                          onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'growing'),
+                        ),
+                        ChoiceChip(
+                          label: Text('تحتاج تنشيط 📉 ($decliningBranchesCount)'),
+                          selected: _perfGrowthStatusFilter == 'declining',
+                          onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'declining'),
+                        ),
+                        if (newBranchesCount > 0)
+                          ChoiceChip(
+                            label: Text('فروع جديدة ✨ ($newBranchesCount)'),
+                            selected: _perfGrowthStatusFilter == 'new_branch',
+                            onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'new_branch'),
+                          ),
+                      ],
                     ),
                   ],
                 ),
               ),
+
+              // 4 Single-Row Summary Strips inside the Growth Matrix
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+                child: LayoutBuilder(
+                  builder: (context, box) {
+                    final tone1 = colorScheme.primary;
+                    final tone2 = Color.lerp(colorScheme.primary, colorScheme.secondary, 0.30) ?? colorScheme.primary;
+                    final tone3 = Color.lerp(colorScheme.primary, colorScheme.tertiary, 0.45) ?? colorScheme.primary;
+                    final tone4 = Color.lerp(colorScheme.primary, colorScheme.outline, 0.35) ?? colorScheme.primary;
+
+                    final isPosTotal = totalMatrixVarianceEgp >= 0;
+                    final totalSign = isPosTotal ? '+' : '';
+                    final totalYoYBadge = totalMatrixYoYPct != null
+                        ? '$totalSign${totalMatrixYoYPct.toStringAsFixed(1)}% (${CurrencyFormatter.formatCompactEGP(totalMatrixVarianceEgp)})'
+                        : CurrencyFormatter.formatCompactEGP(totalCurrMatrixRev);
+
+                    final fastestBadge = fastestGrowingBranch != null
+                        ? '${fastestGrowingBranch.storeName} (${(fastestGrowingBranch.yoyGrowthPct ?? 0) >= 0 ? "+" : ""}${(fastestGrowingBranch.yoyGrowthPct ?? 0).toStringAsFixed(1)}%)'
+                        : '—';
+
+                    final stripCards = [
+                      _buildBranchInsightBadge(
+                        context,
+                        label: 'نمو السلسلة ($currYearLabel vs $compYear)',
+                        branchName: totalYoYBadge,
+                        valueText: CurrencyFormatter.formatCompactEGP(totalCurrMatrixRev),
+                        color: tone1,
+                        icon: isPosTotal ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                        isHighlighted: true,
+                      ),
+                      _buildBranchInsightBadge(
+                        context,
+                        label: 'أسرع فرع نمواً',
+                        branchName: fastestGrowingBranch?.storeName ?? '—',
+                        valueText: fastestGrowingBranch != null
+                            ? '${(fastestGrowingBranch.yoyGrowthPct ?? 0) >= 0 ? "+" : ""}${(fastestGrowingBranch.yoyGrowthPct ?? 0).toStringAsFixed(1)}%'
+                            : '—',
+                        color: tone2,
+                        icon: Icons.rocket_launch_rounded,
+                      ),
+                      _buildBranchInsightBadge(
+                        context,
+                        label: 'الفروع الصاعدة',
+                        branchName: '$growingBranchesCount فرع صاعد',
+                        valueText: 'من ${branchGrowthMatrix.length}',
+                        color: tone3,
+                        icon: Icons.auto_graph_rounded,
+                      ),
+                      _buildBranchInsightBadge(
+                        context,
+                        label: 'تحتاج تنشيط',
+                        branchName: '$decliningBranchesCount فرع',
+                        valueText: 'مقارنة بـ $compYear',
+                        color: tone4,
+                        icon: Icons.campaign_rounded,
+                      ),
+                    ];
+
+                    if (box.maxWidth >= 900) {
+                      return Row(
+                        children: [
+                          Expanded(child: stripCards[0]),
+                          const SizedBox(width: 8.0),
+                          Expanded(child: stripCards[1]),
+                          const SizedBox(width: 8.0),
+                          Expanded(child: stripCards[2]),
+                          const SizedBox(width: 8.0),
+                          Expanded(child: stripCards[3]),
+                        ],
+                      );
+                    }
+                    return Wrap(
+                      spacing: 8.0,
+                      runSpacing: 8.0,
+                      children: stripCards
+                          .map((c) => SizedBox(width: (box.maxWidth - 8.0) / 2, child: c))
+                          .toList(),
+                    );
+                  },
+                ),
+              ),
+
+              // Matrix DataTable
               TableScrollContainer(
                 controller: _skuPerfTableScrollController,
                 showSwipeHint: true,
                 padding: const EdgeInsets.all(12.0),
                 child: DataTable(
-                  sortColumnIndex: _perfSortColumnIndex,
-                  sortAscending: _perfSortAscending,
                   headingRowColor: WidgetStatePropertyAll(
                     colorScheme.surfaceContainerHigh.withOpacity(0.5),
                   ),
                   columns: [
+                    const DataColumn(label: Text('#')),
+                    const DataColumn(label: Text('الفرع والمنطقة')),
                     DataColumn(
-                      label: const Text('اسم الصنف (SKU Name)'),
-                      onSort: (col, asc) {
-                        setState(() {
-                          _perfSortColumnIndex = col;
-                          _perfSortAscending = asc;
-                        });
-                      },
+                      label: Text('مبيعات $currYearLabel (ج.م)'),
+                      numeric: true,
                     ),
                     DataColumn(
-                      label: const Text('الماركة (Brand)'),
-                      onSort: (col, asc) {
-                        setState(() {
-                          _perfSortColumnIndex = col;
-                          _perfSortAscending = asc;
-                        });
-                      },
+                      label: Text('مبيعات $compYear (ج.م)'),
+                      numeric: true,
                     ),
                     const DataColumn(
-                      label: Text('الفئة (Category)'),
-                    ),
-                    DataColumn(
-                      label: const Text('القطع المباعة (Units)'),
+                      label: Text('صافي التغير (Variance)'),
                       numeric: true,
-                      onSort: (col, asc) {
-                        setState(() {
-                          _perfSortColumnIndex = col;
-                          _perfSortAscending = asc;
-                        });
-                      },
-                    ),
-                    DataColumn(
-                      label: const Text('صافي المبيعات (EGP)'),
-                      numeric: true,
-                      onSort: (col, asc) {
-                        setState(() {
-                          _perfSortColumnIndex = col;
-                          _perfSortAscending = asc;
-                        });
-                      },
                     ),
                     const DataColumn(
-                      label: Text('تصنيف باريتو (Pareto Class)'),
+                      label: Text('نسبة النمو السنوي (YoY %)'),
+                      numeric: true,
                     ),
+                    DataColumn(
+                      label: Text(_selectedMonth > 0 ? 'مبيعات الشهر الحالي' : 'المتوسط الشهري (MoM Run-Rate)'),
+                      numeric: true,
+                    ),
+                    const DataColumn(label: Text('حالة أداء الفرع')),
                   ],
-                  rows: pagedSkus.map((sku) {
-                    final sharePct = totalRevenueAll > 0 ? (sku.revenue / totalRevenueAll) * 100 : 0.0;
-                    final isClassA = sharePct >= 2.0;
-                    final isClassB = sharePct >= 0.5 && sharePct < 2.0;
-                    final tagLabel = isClassA ? 'Class A (قائد)' : (isClassB ? 'Class B (متوسط)' : 'Class C (عادي)');
-                    final tagColor = isClassA
-                        ? Colors.green.shade700
-                        : (isClassB ? Colors.amber.shade800 : Colors.blueGrey.shade600);
+                  rows: filteredGrowthBranches.asMap().entries.map((entry) {
+                    final rank = entry.key + 1;
+                    final item = entry.value;
+                    final isPositive = item.varianceEgp >= 0;
+                    final yoyPct = item.yoyGrowthPct;
+
+                    Color statusBg;
+                    Color statusFg;
+                    String statusLabel;
+                    IconData statusIcon;
+
+                    if (item.status == 'new_branch') {
+                      statusBg = colorScheme.tertiaryContainer.withOpacity(0.7);
+                      statusFg = colorScheme.onTertiaryContainer;
+                      statusLabel = 'فرع جديد ✨';
+                      statusIcon = Icons.fiber_new_rounded;
+                    } else if (item.status == 'growing') {
+                      statusBg = colorScheme.primaryContainer.withOpacity(0.75);
+                      statusFg = colorScheme.onPrimaryContainer;
+                      statusLabel = (yoyPct ?? 0) >= 15.0 ? 'نمو قوي 🚀' : 'نمو إيجابي 📈';
+                      statusIcon = Icons.trending_up_rounded;
+                    } else {
+                      statusBg = colorScheme.errorContainer.withOpacity(0.65);
+                      statusFg = colorScheme.onErrorContainer;
+                      statusLabel = 'يحتاج تنشيط 📉';
+                      statusIcon = Icons.trending_down_rounded;
+                    }
 
                     return DataRow(
                       cells: [
                         DataCell(
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 240.0),
-                            child: Text(
-                              sku.skuName,
-                              style: const TextStyle(fontWeight: FontWeight.w700),
-                              overflow: TextOverflow.ellipsis,
+                          Text(
+                            '$rank',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
-                        DataCell(Text(sku.brand, style: const TextStyle(fontWeight: FontWeight.w600))),
-                        DataCell(Text(sku.category)),
-                        DataCell(Text(CurrencyFormatter.formatNumber(sku.units))),
+                        DataCell(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                item.storeName,
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.0),
+                              ),
+                              Text(
+                                '${item.chain.toUpperCase()} • ${item.region}',
+                                style: TextStyle(
+                                  fontSize: 11.0,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         DataCell(
                           Text(
-                            CurrencyFormatter.formatEGP(sku.revenue),
+                            CurrencyFormatter.formatEGP(item.currentRevenue),
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               color: colorScheme.primary,
@@ -2359,62 +2669,89 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                           ),
                         ),
                         DataCell(
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
-                            decoration: BoxDecoration(
-                              color: tagColor.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(8.0),
-                              border: Border.all(color: tagColor.withOpacity(0.3)),
+                          Text(
+                            item.prevRevenue > 0
+                                ? CurrencyFormatter.formatEGP(item.prevRevenue)
+                                : '—',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.onSurfaceVariant,
                             ),
-                            child: Text(
-                              tagLabel,
-                              style: TextStyle(
-                                fontSize: 11.0,
-                                fontWeight: FontWeight.w700,
-                                color: tagColor,
-                              ),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            '${isPositive ? "+" : ""}${CurrencyFormatter.formatCompactEGP(item.varianceEgp)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: isPositive ? colorScheme.primary : colorScheme.error,
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          yoyPct != null
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      yoyPct >= 0
+                                          ? Icons.arrow_upward_rounded
+                                          : Icons.arrow_downward_rounded,
+                                      size: 14.0,
+                                      color: yoyPct >= 0 ? colorScheme.primary : colorScheme.error,
+                                    ),
+                                    const SizedBox(width: 4.0),
+                                    Text(
+                                      '${yoyPct >= 0 ? "+" : ""}${yoyPct.toStringAsFixed(1)}%',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        color: yoyPct >= 0 ? colorScheme.primary : colorScheme.error,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text(
+                                  'جديد ($currYearLabel)',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: colorScheme.tertiary,
+                                  ),
+                                ),
+                        ),
+                        DataCell(
+                          Text(
+                            CurrencyFormatter.formatCompactEGP(item.monthlyRunRate),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        DataCell(
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                            decoration: BoxDecoration(
+                              color: statusBg,
+                              borderRadius: BorderRadius.circular(999.0),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(statusIcon, size: 14.0, color: statusFg),
+                                const SizedBox(width: 4.0),
+                                Text(
+                                  statusLabel,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: statusFg,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       ],
                     );
                   }).toList(),
-                ),
-              ),
-
-              // Pagination Controller Bar (25 items per page)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'عرض ${startOffset + 1} - ${math.min(startOffset + _perfPageSize, filteredSkus.length)} من أصل ${filteredSkus.length} صنف',
-                      style: TextStyle(fontSize: 12.5, color: colorScheme.onSurfaceVariant),
-                    ),
-                    Row(
-                      children: [
-                        IconButton.outlined(
-                          icon: const Icon(Icons.chevron_left_rounded),
-                          onPressed: pageIndex > 0
-                              ? () => setState(() => _perfCurrentPage = pageIndex - 1)
-                              : null,
-                        ),
-                        const SizedBox(width: 8.0),
-                        Text(
-                          '${pageIndex + 1} / $totalSkuPages',
-                          style: const TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(width: 8.0),
-                        IconButton.outlined(
-                          icon: const Icon(Icons.chevron_right_rounded),
-                          onPressed: pageIndex < totalSkuPages - 1
-                              ? () => setState(() => _perfCurrentPage = pageIndex + 1)
-                              : null,
-                        ),
-                      ],
-                    ),
-                  ],
                 ),
               ),
             ],
