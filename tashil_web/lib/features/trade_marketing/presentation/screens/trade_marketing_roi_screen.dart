@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
+import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_responsive_tab_bar.dart';
@@ -69,6 +72,124 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
   void initState() {
     super.initState();
     _reload();
+  }
+
+  bool _uploading = false;
+
+  /// Roles the backend allows to write trade marketing expenses.
+  static const Set<String> _writeRoles = {
+    'super_admin', 'vendor_admin', 'admin', 'national_sales_manager', 'chain_kam', 'executive',
+  };
+
+  bool get _canWrite {
+    final role = widget.apiClient.currentUser?.role ?? '';
+    return role.isEmpty || _writeRoles.contains(role);
+  }
+
+  static const String _templateCsvHeader =
+      'year,month,chain_name,category,amount_egp,brand_name,campaign_title,vendor_or_agency,notes\n';
+
+  void _downloadTemplate() {
+    WebFileHelper.downloadFile(
+      filename: 'trade_marketing_expenses_template.csv',
+      bytes: [0xEF, 0xBB, 0xBF, ...utf8.encode(_templateCsvHeader)],
+      mimeType: 'text/csv;charset=utf-8',
+    );
+  }
+
+  Future<void> _pickAndUploadExpenses() async {
+    if (_uploading || !_canWrite) return;
+    final picked = await WebFileHelper.pickFile(accept: '.xlsx,.csv');
+    if (picked == null || !mounted) return;
+    final lower = picked.name.toLowerCase();
+    if (!(lower.endsWith('.xlsx') || lower.endsWith('.csv'))) {
+      M3Feedback.showError(context, 'نوع الملف غير مدعوم. يرجى اختيار ملف ‎.xlsx أو ‎.csv');
+      return;
+    }
+    setState(() => _uploading = true);
+    try {
+      final result = await _repo.uploadExpenses(picked.bytes, picked.name);
+      if (!mounted) return;
+      setState(() => _uploading = false);
+      await _showUploadResultDialog(picked.name, result);
+      if (mounted) await _reload();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _uploading = false);
+      M3Feedback.showError(context, 'تعذر رفع الملف: $e');
+    }
+  }
+
+  Future<void> _showUploadResultDialog(String filename, ExpenseUploadResult r) {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            key: const ValueKey('dlg_expense_upload_result'),
+            icon: Icon(
+              r.rejectedCount == 0 ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
+              color: r.rejectedCount == 0 ? cs.primary : cs.error,
+            ),
+            title: const Text('نتيجة رفع المصروفات'),
+            content: SizedBox(
+              width: 480,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(filename, style: Theme.of(ctx).textTheme.bodySmall),
+                  const SizedBox(height: 12),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    Chip(
+                      key: const ValueKey('chip_upload_saved'),
+                      avatar: Icon(Icons.check_rounded, size: 18, color: cs.primary),
+                      label: Text('تم الحفظ: ${r.savedCount}'),
+                    ),
+                    Chip(
+                      key: const ValueKey('chip_upload_rejected'),
+                      avatar: Icon(Icons.block_rounded, size: 18, color: cs.error),
+                      label: Text('مرفوض: ${r.rejectedCount}'),
+                    ),
+                  ]),
+                  if (r.rejectedReasons.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Text('الصفوف المرفوضة وأسبابها:', style: TextStyle(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 260),
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: [
+                          for (final reason in r.rejectedReasons)
+                            ListTile(
+                              dense: true,
+                              leading: Icon(Icons.error_outline_rounded, size: 18, color: cs.error),
+                              title: Directionality(
+                                textDirection: TextDirection.ltr,
+                                child: Text(reason, textAlign: TextAlign.right),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              FilledButton(
+                key: const ValueKey('btn_close_upload_result'),
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('تم'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   /// Loads expenses and ROI sales baselines from the server.
@@ -1139,7 +1260,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // 1. Header & MD3 Large Responsive Tab Bar (Identical padding/margin to Sell-In & Sell-Out)
-              if (_loading) const LinearProgressIndicator(),
+              if (_loading || _uploading) const LinearProgressIndicator(),
               if (_loadError != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -1618,6 +1739,29 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                       icon: const Icon(Icons.add_circle_outline_rounded, size: 20.0),
                       label: const Text('Add Expense'),
                     ),
+                    if (_canWrite)
+                      FilledButton.tonalIcon(
+                        key: const ValueKey('btn_upload_marketing_expenses'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 44.0),
+                          padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 10.0),
+                          textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                        ),
+                        onPressed: _uploading ? null : _pickAndUploadExpenses,
+                        icon: _uploading
+                            ? const SizedBox(
+                                width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.upload_file_rounded, size: 20.0),
+                        label: Text(_uploading ? 'Uploading…' : 'Upload Excel/CSV'),
+                      ),
+                    if (_canWrite)
+                      TextButton.icon(
+                        key: const ValueKey('btn_download_expense_template'),
+                        style: TextButton.styleFrom(minimumSize: const Size(0, 44.0)),
+                        onPressed: _downloadTemplate,
+                        icon: const Icon(Icons.download_rounded, size: 20.0),
+                        label: const Text('CSV Template'),
+                      ),
                     FilledButton.tonalIcon(
                       key: const ValueKey('btn_roi_simulator'),
                       style: FilledButton.styleFrom(
