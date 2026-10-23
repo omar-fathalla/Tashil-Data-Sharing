@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../core/data/result.dart';
 import '../../../../core/network/api_client.dart';
+import '../../data/target_repository.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
@@ -21,10 +23,14 @@ class TargetManagementPanel extends StatefulWidget {
   final ApiClient apiClient;
   final String targetType; // 'sell_out' or 'sell_in'
 
+  /// Optional injected repository (tests); defaults to one wrapping [apiClient].
+  final TargetRepository? repository;
+
   const TargetManagementPanel({
     super.key,
     required this.apiClient,
     required this.targetType,
+    this.repository,
   });
 
   @override
@@ -101,26 +107,37 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
   @override
   void initState() {
     super.initState();
+    _repo = widget.repository ?? TargetRepository(widget.apiClient);
     _initAndLoad();
   }
 
+  late TargetRepository _repo;
+
   Future<void> _initAndLoad() async {
-    try {
-      final chains = await widget.apiClient.getRetailChains();
+    final chains = await _repo.loadChains();
+    if (chains case Success(:final value)) {
       if (mounted) {
-        setState(() => _companyChains = chains);
+        setState(() => _companyChains = value);
       }
-    } catch (_) {}
+    }
     await _loadTargets();
   }
 
   Future<void> _loadTargets() async {
     setState(() => _isLoading = true);
-    final res = await widget.apiClient.getTargetsSummary(
+    final loaded = await _repo.loadSummary(
       targetType: widget.targetType,
       chain: _selectedChain == 'all' ? null : _selectedChain,
       year: _selectedYear > 0 ? _selectedYear : null,
     );
+    if (loaded case Failure(:final error)) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        M3Feedback.showError(context, 'تعذر تحميل المستهدفات: $error');
+      }
+      return;
+    }
+    final res = loaded.valueOrNull!;
     if (mounted) {
       setState(() {
         _summary = res;
@@ -642,6 +659,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                               ? 'تم حفظ الـ Target الشامل وتوزيعه تلقائياً على الفروع والأصناف والمناديب بنجاح'
                               : 'تم حفظ الـ Target وتحديث نسبة التحقيق بنجاح',
                         );
+                        _repo.invalidateAll();
                         await _loadTargets();
                       } catch (e) {
                         if (!mounted) return;
@@ -657,6 +675,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
       },
     );
     if (saved == true) {
+      _repo.invalidateAll();
       await _loadTargets();
     }
   }
@@ -679,6 +698,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
         context,
         'تم استيراد ${res.rowsImported} مستهدف من الملف (${picked.name}) بنجاح',
       );
+      _repo.invalidateAll();
       await _loadTargets();
     } catch (e) {
       if (!mounted) return;
@@ -1605,6 +1625,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                                 context,
                                                 'تم حذف المستهدف بنجاح',
                                               );
+                                              _repo.invalidateAll();
                                               await _loadTargets();
                                             } catch (e) {
                                               if (!context.mounted) return;
@@ -2845,7 +2866,10 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
         context,
         apiClient: widget.apiClient,
         item: matched,
-        onUpdated: (_) => _loadTargets(),
+        onUpdated: (_) {
+          _repo.invalidateAll();
+          _loadTargets();
+        },
       );
     } catch (e) {
       if (!mounted) return;
