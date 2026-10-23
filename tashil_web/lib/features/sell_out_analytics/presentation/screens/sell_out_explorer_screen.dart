@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../../core/data/result.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
+import '../../data/sell_out_explorer_repository.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
@@ -24,9 +26,13 @@ import '../widgets/virtualized_sku_table.dart';
 class SellOutExplorerScreen extends StatefulWidget {
   final ApiClient apiClient;
 
+  /// Optional injected repository (tests); defaults to one wrapping [apiClient].
+  final SellOutExplorerRepository? repository;
+
   const SellOutExplorerScreen({
     super.key,
     required this.apiClient,
+    this.repository,
   });
 
   @override
@@ -82,6 +88,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
   String? _deletingFileId;
 
   late String _lastTenantId;
+  late SellOutExplorerRepository _repo;
 
   // Scroll Controllers for Responsive Data Tables & Branch Chart
   late final ScrollController _branchChartScrollController;
@@ -97,6 +104,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     _branchTableScrollController = ScrollController();
     _skuPerfTableScrollController = ScrollController();
     _archiveSheetsScrollController = ScrollController();
+    _repo = widget.repository ?? SellOutExplorerRepository(widget.apiClient);
     _lastTenantId = widget.apiClient.tenantId;
     _loadAllData();
   }
@@ -117,6 +125,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     if (oldWidget.apiClient != widget.apiClient ||
         _lastTenantId != widget.apiClient.tenantId) {
       _lastTenantId = widget.apiClient.tenantId;
+      _repo = widget.repository ?? SellOutExplorerRepository(widget.apiClient);
       selectedChain = null;
       selectedStoreId = null;
       selectedCategory = null;
@@ -158,7 +167,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     if (mounted) setState(() => isLoading = true);
     final effectiveYear = (selectedDateRange == null && _selectedYear > 0) ? _selectedYear : null;
     final effectiveMonth = (selectedDateRange == null && _selectedMonth > 0) ? _selectedMonth : null;
-    final res = await widget.apiClient.getRecords(
+    final activeChartChain = (selectedChain != null && selectedChain!.isNotEmpty)
+        ? selectedChain!
+        : _chartChain;
+    final compYear = (_selectedYear == 2026) ? 2025 : (_selectedYear == 2025 ? 2024 : 2025);
+
+    final loaded = await _repo.load(SellOutExplorerQuery(
       chain: selectedChain,
       storeId: selectedStoreId,
       category: selectedCategory,
@@ -168,8 +182,20 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       year: effectiveYear,
       month: effectiveMonth,
       limit: 1000,
-    );
-    final summary = widget.apiClient.lastSellOutSummary ??
+      matrixChain: activeChartChain == 'all' ? null : activeChartChain,
+      matrixYear: _selectedYear > 0 ? _selectedYear : null,
+      compYear: compYear,
+    ));
+    if (loaded case Failure(:final error)) {
+      if (mounted) {
+        setState(() => isLoading = false);
+        M3Feedback.showError(context, 'تعذر تحميل بيانات الـ Sell-Out: $error');
+      }
+      return;
+    }
+    final data = loaded.valueOrNull!;
+    final res = data.records;
+    final summary = data.summary ??
         SellOutRecordsSummaryModel(
           totalCount: res.length,
           totalNetRevenue: res.fold<double>(0.0, (acc, r) => acc + r.netRevenue),
@@ -178,30 +204,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
           activeSkusCount: res.map((r) => r.barcode.isNotEmpty ? r.barcode : r.skuName).toSet().length,
         );
 
-    final activeChartChain = (selectedChain != null && selectedChain!.isNotEmpty)
-        ? selectedChain!
-        : _chartChain;
-    final compYear = (_selectedYear == 2026) ? 2025 : (_selectedYear == 2025 ? 2024 : 2025);
-
-    final results = await Future.wait([
-      widget.apiClient.getStores(),
-      widget.apiClient.getStoreBenchmarkMatrix(
-        chain: activeChartChain == 'all' ? null : activeChartChain,
-        year: _selectedYear > 0 ? _selectedYear : null,
-        month: effectiveMonth,
-        startDate: selectedDateRange != null ? _formatDate(selectedDateRange!.start) : null,
-        endDate: selectedDateRange != null ? _formatDate(selectedDateRange!.end) : null,
-      ),
-      widget.apiClient.getStoreBenchmarkMatrix(
-        chain: activeChartChain == 'all' ? null : activeChartChain,
-        year: compYear,
-        month: effectiveMonth,
-      ),
-    ]);
-
-    final dynamicStores = results[0] as List<Map<String, dynamic>>;
-    final currentBranchMatrix = results[1] as List<StoreBenchmarkItem>;
-    final prevBranchMatrix = results[2] as List<StoreBenchmarkItem>;
+    final dynamicStores = data.stores;
+    final currentBranchMatrix = data.currentBranchMatrix;
+    final prevBranchMatrix = data.prevBranchMatrix;
 
     final prevMap = <String, StoreBenchmarkItem>{};
     double prevTotalRev = 0.0;
@@ -346,6 +351,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
         context,
         '$actionLabel (${picked.name}): ${res.validRows} حركة مبيعات بإجمالي ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)}',
       );
+      _repo.invalidateAll();
       await _loadAllData();
     } catch (e) {
       if (!mounted) return;
@@ -460,6 +466,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
         context,
         'تم حذف شيت (${file.fileName}) وتحديث حركات الـ Sell-Out بنجاح',
       );
+      _repo.invalidateAll();
       await _loadAllData();
     } catch (e) {
       if (!mounted) return;
@@ -934,7 +941,10 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
         context,
         apiClient: widget.apiClient,
         item: matched,
-        onUpdated: (_) => _loadRecords(),
+        onUpdated: (_) {
+          _repo.invalidateAll();
+          _loadRecords();
+        },
       );
     } catch (_) {}
   }
@@ -962,7 +972,10 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
         context,
         apiClient: widget.apiClient,
         item: matched,
-        onUpdated: (_) => _loadRecords(),
+        onUpdated: (_) {
+          _repo.invalidateAll();
+          _loadRecords();
+        },
       );
     } catch (_) {}
   }
