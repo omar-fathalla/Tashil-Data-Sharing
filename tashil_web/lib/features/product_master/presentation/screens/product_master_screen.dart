@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../../../core/network/api_client.dart';
+import '../../data/product_master_repository.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
 
@@ -21,7 +22,11 @@ class ProductMasterScreen extends StatefulWidget {
     super.key,
     required this.apiClient,
     this.initialSearchQuery,
+    this.repository,
   });
+
+  /// Optional injected repository (tests); defaults to one wrapping [apiClient].
+  final ProductMasterRepository? repository;
 
   /// Opens the Canonical Product ID Card Modal (`بطاقة تعريف الصنف`) from any screen.
   static Future<ProductMasterItemModel?> showProductIdCardModal(
@@ -52,6 +57,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   final NumberFormat _intFmt = NumberFormat('#,###', 'en_US');
 
   bool _isLoading = true;
+  late final ProductMasterRepository _repo =
+      widget.repository ?? ProductMasterRepository(widget.apiClient);
   bool _isUploading = false;
   String? _errorMessage;
 
@@ -103,21 +110,19 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     });
 
     try {
-      final summary = await widget.apiClient.getProductMaster();
-      List<ArchivedExcelFileModel> pmArchives = const [];
-      try {
-        final archiveResp = await widget.apiClient.getUploadedFilesArchive(
-          fileType: 'product_master',
-        );
-        pmArchives = archiveResp.files
-            .where((f) =>
-                f.fileType == 'product_master' ||
-                f.retailChain == 'product-master' ||
-                f.fileName.toLowerCase().contains('product_master') ||
-                f.fileName.contains('اسعار') ||
-                f.fileName.contains('أصناف'))
-            .toList();
-      } catch (_) {}
+      final loaded = await _repo.loadSummary();
+      final loadError = loaded.errorOrNull;
+      if (loadError != null) throw loadError.cause ?? loadError;
+      final summary = loaded.valueOrNull!;
+      final archiveFiles = (await _repo.loadArchive()).valueOrNull ?? const <ArchivedExcelFileModel>[];
+      List<ArchivedExcelFileModel> pmArchives = archiveFiles
+          .where((f) =>
+              f.fileType == 'product_master' ||
+              f.retailChain == 'product-master' ||
+              f.fileName.toLowerCase().contains('product_master') ||
+              f.fileName.contains('اسعار') ||
+              f.fileName.contains('أصناف'))
+          .toList();
 
       if (pmArchives.isEmpty &&
           summary.sourceFilename.isNotEmpty &&
@@ -252,6 +257,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         _isUploading = false;
         _currentPage = 0;
       });
+      _repo.invalidateAll();
       await _loadData();
       if (!mounted) return;
       final latestSummary = _summary ?? res.summary;
@@ -322,6 +328,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           .where((f) => f.id != file.id)
           .toList();
     });
+    _repo.invalidateAll();
     await _loadData();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1259,6 +1266,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                     apiClient: widget.apiClient,
                     item: newItem,
                     onUpdated: (updatedSummary) {
+                      _repo.prime(updatedSummary);
                       if (mounted) {
                         setState(() => _summary = updatedSummary);
                       }
@@ -1856,6 +1864,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                             apiClient: widget.apiClient,
                             item: item,
                             onUpdated: (updatedSummary) {
+                              _repo.prime(updatedSummary);
                               if (mounted) {
                                 setState(() => _summary = updatedSummary);
                               }
@@ -2109,6 +2118,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                       apiClient: widget.apiClient,
                                       item: item,
                                       onUpdated: (updatedSummary) {
+                                        _repo.prime(updatedSummary);
                                         if (mounted) {
                                           setState(
                                               () => _summary = updatedSummary);
