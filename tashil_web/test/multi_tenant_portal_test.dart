@@ -42,9 +42,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('لوحة الإدارة المركزية (Super Admin)'), findsOneWidget);
-      expect(find.text('إجمالي الشركات المسجلة'), findsOneWidget);
-      expect(find.text('إضافة شركة جديدة وتوليد الرابط'), findsOneWidget);
+      // Redesigned M3 header: English title + Arabic subtitle + action group.
+      expect(find.text('Super Admin Executive Portal'), findsOneWidget);
+      expect(find.text('إجمالي الشركات المفعلة'), findsOneWidget);
+      expect(find.text('New Company'), findsWidgets);
       expect(find.text('شركة أديكو للصناعات الغذائية (Adeco)'), findsOneWidget);
       expect(find.text('شركة يونيليفر مشرق (Unilever)'), findsOneWidget);
       expect(find.text('شركة بيبسي كولا مصر (PepsiCo)'), findsOneWidget);
@@ -61,8 +62,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Click "إضافة شركة جديدة وتوليد الرابط"
-      await tester.tap(find.text('إضافة شركة جديدة وتوليد الرابط'));
+      // Click the "New Company" header action
+      await tester.tap(find.text('New Company').first);
       await tester.pumpAndSettle();
 
       expect(find.text('معالج إضافة شركة جديدة وتوليد الرابط'), findsOneWidget);
@@ -75,18 +76,18 @@ void main() {
       await tester.pumpAndSettle();
 
       // Submit wizard form
-      await tester.ensureVisible(find.text('حفظ وتوليد الرابط'));
-      await tester.tap(find.text('حفظ وتوليد الرابط'));
+      await tester.ensureVisible(find.text('Create Portal'));
+      await tester.tap(find.text('Create Portal'));
       await tester.pumpAndSettle();
 
       // Expect success credential card
       expect(find.text('تم تجهيز بوابة شركة جهينة بنجاح!'), findsOneWidget);
       expect(find.text(ApiClient.buildPortalUrl('juhayna')), findsWidgets);
-      expect(find.text('admin@juhayna.com'), findsOneWidget);
+      expect(find.text('admin@juhayna.com'), findsWidgets);
 
       // Close wizard
-      await tester.ensureVisible(find.text('تم والعودة للوحة الإدارة'));
-      await tester.tap(find.text('تم والعودة للوحة الإدارة'));
+      await tester.ensureVisible(find.text('Done'));
+      await tester.tap(find.text('Done'));
       await tester.pumpAndSettle();
     });
 
@@ -101,16 +102,19 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Find first "إعادة تعيين كلمة المرور" button
-      final resetButtons = find.text('إعادة تعيين كلمة المرور');
+      // Find first per-company "Reset Key" action
+      final resetButtons = find.text('Reset Key');
       expect(resetButtons, findsWidgets);
 
+      await tester.ensureVisible(resetButtons.first);
+      await tester.pumpAndSettle();
       await tester.tap(resetButtons.first);
       await tester.pumpAndSettle();
 
-      expect(find.text('توليد كلمة مرور مؤقتة الآن'), findsOneWidget);
+      expect(find.textContaining('إعادة تعيين كلمة المرور:'), findsOneWidget);
+      expect(find.text('Generate Key'), findsOneWidget);
 
-      await tester.tap(find.text('توليد كلمة مرور مؤقتة الآن'));
+      await tester.tap(find.text('Generate Key'));
       await tester.pumpAndSettle();
 
       expect(find.text('كلمة المرور الجديدة:'), findsOneWidget);

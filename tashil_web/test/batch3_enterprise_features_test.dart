@@ -464,6 +464,19 @@ void main() {
         role: 'super_admin',
       );
 
+      // Seed two distinct audit events (served from the in-memory audit log
+      // when the backend is unreachable in tests).
+      await superClient.recordAuditLog(
+        action: 'INGEST_UPLOAD',
+        resource: 'batch3_upload_probe.xlsx',
+        details: 'رفع ملف مبيعات batch3 probe',
+      );
+      await superClient.recordAuditLog(
+        action: 'AUTH_LOGIN',
+        resource: 'batch3_login_probe',
+        details: 'تسجيل دخول batch3 probe',
+      );
+
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light(),
@@ -472,16 +485,20 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const ValueKey('audit_logs_panel_card')), findsOneWidget);
-      expect(find.text('سجل التدقيق الأمني والعمليات (Enterprise Security Audit Logs)'), findsOneWidget);
+      expect(find.byType(AuditLogsPanel), findsOneWidget);
+      expect(find.text('Enterprise Security Audit Logs'), findsOneWidget);
+      expect(find.text('batch3_upload_probe.xlsx'), findsWidgets);
+      expect(find.text('batch3_login_probe'), findsWidgets);
 
-      // Filter by 'رفع الملفات'
-      final uploadChip = find.widgetWithText(FilterChip, 'رفع الملفات');
-      await tester.ensureVisible(uploadChip);
-      await tester.tap(uploadChip);
+      // Filter by the 'Uploads' segment
+      final uploadsSegment = find.text('Uploads');
+      await tester.ensureVisible(uploadsSegment);
+      await tester.pumpAndSettle();
+      await tester.tap(uploadsSegment);
       await tester.pumpAndSettle();
 
-      expect(find.text('رفع ملف مبيعات'), findsWidgets);
+      expect(find.text('batch3_upload_probe.xlsx'), findsWidgets);
+      expect(find.text('batch3_login_probe'), findsNothing);
     });
   });
 }
