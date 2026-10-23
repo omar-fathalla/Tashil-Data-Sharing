@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
+import '../../../../core/data/result.dart';
 import '../../../../core/network/api_client.dart';
+import '../../data/competitor_comparison_repository.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
@@ -16,9 +18,13 @@ import '../../../../core/widgets/m3_button.dart';
 class CompetitorComparisonScreen extends StatefulWidget {
   final ApiClient apiClient;
 
+  /// Optional injected repository (tests); defaults to one wrapping [apiClient].
+  final CompetitorComparisonRepository? repository;
+
   const CompetitorComparisonScreen({
     super.key,
     required this.apiClient,
+    this.repository,
   });
 
   @override
@@ -29,6 +35,7 @@ class CompetitorComparisonScreen extends StatefulWidget {
 class _CompetitorComparisonScreenState
     extends State<CompetitorComparisonScreen> {
   bool _isLoading = true;
+  late CompetitorComparisonRepository _repo;
   List<OwnSkuCompetitiveGroupModel> _allGroups = [];
   List<OwnSkuCompetitiveGroupModel> _filteredGroups = [];
   String? _selectedOwnBarcode;
@@ -68,6 +75,7 @@ class _CompetitorComparisonScreenState
   @override
   void initState() {
     super.initState();
+    _repo = widget.repository ?? CompetitorComparisonRepository(widget.apiClient);
     _lastTenantId = widget.apiClient.tenantId;
     _loadCompetitiveData();
   }
@@ -84,6 +92,7 @@ class _CompetitorComparisonScreenState
     if (oldWidget.apiClient != widget.apiClient ||
         _lastTenantId != widget.apiClient.tenantId) {
       _lastTenantId = widget.apiClient.tenantId;
+      _repo = widget.repository ?? CompetitorComparisonRepository(widget.apiClient);
       _selectedYear = 2026;
       _selectedMonth = 0;
       _selectedChain = 'fathalla';
@@ -96,31 +105,40 @@ class _CompetitorComparisonScreenState
     }
   }
 
-  Future<void> _loadCompetitiveData() async {
+  Future<void> _loadCompetitiveData({bool forceRefresh = false}) async {
     setState(() => _isLoading = true);
-    final groups = await widget.apiClient.getCompetitiveComparisonGroups(
+    final result = await _repo.loadGroups(
       chain: _selectedChain,
       year: _selectedYear,
       month: _selectedMonth,
+      forceRefresh: forceRefresh,
     );
 
     if (!mounted) return;
-    setState(() {
-      _allGroups = groups;
-      _applyLocalFilters();
-      _isLoading = false;
-    });
+    result.when(
+      success: (groups) => setState(() {
+        _allGroups = groups;
+        _applyLocalFilters();
+        _isLoading = false;
+      }),
+      failure: (error) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text('تعذر تحميل بيانات المقارنة: $error')),
+        );
+      },
+    );
   }
 
   /// Re-renders from the ApiClient's in-memory custom SKUs without a server round-trip.
   Future<void> _rebuildFromLocalCache() async {
-    final groups = await widget.apiClient.getCompetitiveComparisonGroups(
+    final result = await _repo.rebuildLocal(
       chain: _selectedChain,
       year: _selectedYear,
       month: _selectedMonth,
-      syncCustomSkus: false,
     );
-    if (!mounted) return;
+    final groups = result.valueOrNull;
+    if (!mounted || groups == null) return;
     setState(() {
       _allGroups = groups;
       _applyLocalFilters();
@@ -146,16 +164,15 @@ class _CompetitorComparisonScreenState
     );
     if (ok != true || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    final deleting = widget.apiClient.deleteCustomCompetitorSku(competitor.barcode);
+    final deleting = _repo.deleteCustomSku(competitor.barcode);
     if (_selectedCompetitorBarcode == competitor.barcode) {
       _selectedCompetitorBarcode = null;
     }
     await _rebuildFromLocalCache();
-    try {
-      await deleting;
-    } catch (e) {
+    final res = await deleting;
+    if (res case Failure(:final error)) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text('تعذر حذف منتج المنافس: $e')));
+      messenger.showSnackBar(SnackBar(content: Text('تعذر حذف منتج المنافس: $error')));
       await _rebuildFromLocalCache();
     }
   }
@@ -399,7 +416,7 @@ class _CompetitorComparisonScreenState
 
                       final messenger = ScaffoldMessenger.of(context);
                       Navigator.pop(ctx);
-                      final saving = widget.apiClient.addCustomCompetitorSku(
+                      final saving = _repo.addCustomSku(
                         ownBarcode: currentGroup.ownBarcode,
                         ownSkuName: currentGroup.ownSkuName,
                         ownUnitPrice: currentGroup.ownUnitPrice,
@@ -422,12 +439,11 @@ class _CompetitorComparisonScreenState
                       );
                       // Local list already updated: refresh instantly, then confirm with the server.
                       _rebuildFromLocalCache();
-                      try {
-                        await saving;
-                      } catch (e) {
+                      final res = await saving;
+                      if (res case Failure(:final error)) {
                         if (!mounted) return;
                         messenger.showSnackBar(SnackBar(
-                          content: Text('تعذر حفظ منتج المنافس على الخادم: $e'),
+                          content: Text('تعذر حفظ منتج المنافس على الخادم: $error'),
                         ));
                         _rebuildFromLocalCache();
                       }
@@ -516,7 +532,7 @@ class _CompetitorComparisonScreenState
                   M3ActionItem(
                     label: 'تحديث',
                     icon: Icons.refresh_rounded,
-                    onPressed: _isLoading ? null : _loadCompetitiveData,
+                    onPressed: _isLoading ? null : () => _loadCompetitiveData(forceRefresh: true),
                   ),
                 ],
               ),
@@ -1590,7 +1606,7 @@ class _CompetitorComparisonScreenState
                           ),
                         ),
                       ),
-                      if (widget.apiClient.isCustomCompetitorSku(competitor.barcode))
+                      if (_repo.isCustomSku(competitor.barcode))
                         IconButton(
                           tooltip: 'حذف منتج المنافس',
                           visualDensity: VisualDensity.compact,
