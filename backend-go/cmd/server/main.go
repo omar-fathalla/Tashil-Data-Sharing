@@ -50,7 +50,10 @@ func main() {
 	}
 
 	// 4. Initialize Handlers and Auth Middleware
-	authMiddleware := middleware.NewAuthMiddleware(cfg.JWTSecret, true) // allow demo tokens for smooth executive portal preview
+	// Demo bypass tokens (demo-*-token) are OFF unless ALLOW_DEMO_TOKENS=true.
+	allowDemoTokens := os.Getenv("ALLOW_DEMO_TOKENS") == "true"
+	log.Printf("[Tashil Cloud Run] Demo tokens allowed: %v", allowDemoTokens)
+	authMiddleware := middleware.NewAuthMiddleware(cfg.JWTSecret, allowDemoTokens)
 	uploadHandler := handlers.NewUploadHandler(ingestProcessor)
 	analyticsHandler := handlers.NewAnalyticsHandler(bqRepo)
 	oosHandler := handlers.NewOOSHandler(fsRepo).WithBigQueryRepo(bqRepo)
