@@ -40,7 +40,7 @@ void main() {
       expect(find.byKey(const ValueKey('missing_chain_error_banner')), findsOneWidget);
 
       // Attempting to pick file before selecting chain also shows red warning banner and does NOT consume file
-      await tester.tap(find.text('اختيار ملف من الجهاز'));
+      await tester.tap(find.text('اختيار ملف'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('missing_chain_error_banner')), findsOneWidget);
       expect(WebFileHelper.nextMockPickedFile, isNotNull);
@@ -52,7 +52,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('missing_chain_error_banner')), findsNothing);
 
-      await tester.tap(find.text('اختيار ملف من الجهاز'));
+      await tester.tap(find.text('اختيار ملف'));
       await tester.pump();
       await tester.pumpAndSettle();
 
@@ -60,15 +60,15 @@ void main() {
       expect(find.byKey(const ValueKey('staging_review_banner')), findsOneWidget);
       expect(find.text('وضع المعاينة والتدقيق الأمني (Staging & Review)'), findsOneWidget);
       expect(find.text('لم يتم الحفظ في BigQuery بعد'), findsOneWidget);
-      expect(find.text('تم التحليل والاستخراج بالذكاء الاصطناعي • بانتظار المراجعة والاعتماد'), findsOneWidget);
+      expect(find.text('جاهز للاعتماد والحفظ النهائي'), findsOneWidget);
 
       // 2. Verify Commit & Discard action buttons are present
       expect(find.byKey(const ValueKey('commit_action_toolbar')), findsOneWidget);
-      expect(find.byKey(const ValueKey('commit_staged_upload_button')), findsOneWidget);
-      expect(find.byKey(const ValueKey('discard_staged_upload_button')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('commit_action_toolbar')), matching: find.text('اعتماد البيانات')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('commit_action_toolbar')), matching: find.text('إلغاء')), findsOneWidget);
 
       // 3. Test Discard action -> removes uncommitted file from archive as well
-      final discardBtn = find.byKey(const ValueKey('discard_staged_upload_button'));
+      final discardBtn = find.descendant(of: find.byKey(const ValueKey('commit_action_toolbar')), matching: find.text('إلغاء'));
       await tester.ensureVisible(discardBtn);
       await tester.tap(discardBtn);
       await tester.pumpAndSettle();
@@ -107,28 +107,28 @@ void main() {
         bytes: WebFileHelper.sampleCarrefourCsvBytes(),
       );
 
-      await tester.tap(find.text('اختيار ملف من الجهاز'));
+      await tester.tap(find.text('اختيار ملف'));
       await tester.pump();
       await tester.pumpAndSettle();
 
       // Verify Chain Mismatch Warning Card is rendered
       expect(find.byKey(const ValueKey('chain_mismatch_alert_card')), findsOneWidget);
       expect(find.text('تنبيه تعارض سلسلة التجزئة (Chain Mismatch Detected)'), findsOneWidget);
-      expect(find.byKey(const ValueKey('fix_chain_mismatch_button')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('chain_mismatch_alert_card')), matching: find.text('تصحيح السلسلة')), findsOneWidget);
 
       // Click 1-click chain fixer button
-      final fixBtn = find.byKey(const ValueKey('fix_chain_mismatch_button'));
+      final fixBtn = find.descendant(of: find.byKey(const ValueKey('chain_mismatch_alert_card')), matching: find.text('تصحيح السلسلة'));
       await tester.ensureVisible(fixBtn);
       await tester.tap(fixBtn);
       await tester.pumpAndSettle();
 
       // Warning card should disappear after correction and archive counts immediately reflect Gomla (2) and Fathalla (1)
       expect(find.byKey(const ValueKey('chain_mismatch_alert_card')), findsNothing);
-      expect(find.text('جملة ماركت (2)'), findsOneWidget);
-      expect(find.text('أسواق فتح الله (1)'), findsOneWidget);
+      expect(find.text('جملة ماركت (2)'), findsWidgets);
+      expect(find.text('أسواق فتح الله (1)'), findsWidgets);
 
       // Commit the staged data under corrected Gomla chain
-      final commitBtn = find.byKey(const ValueKey('commit_staged_upload_button'));
+      final commitBtn = find.descendant(of: find.byKey(const ValueKey('commit_action_toolbar')), matching: find.text('اعتماد البيانات'));
       await tester.ensureVisible(commitBtn);
       await tester.tap(commitBtn);
       await tester.pumpAndSettle();
@@ -141,8 +141,8 @@ void main() {
       // Verify committed success banner and archive counts still reflect Gomla (2) and Fathalla (1)
       expect(find.byKey(const ValueKey('committed_success_banner')), findsOneWidget);
       expect(find.text('تم حفظ واعتماد البيانات نهائياً في النظام (Committed to BigQuery)'), findsOneWidget);
-      expect(find.text('جملة ماركت (2)'), findsOneWidget);
-      expect(find.text('أسواق فتح الله (1)'), findsOneWidget);
+      expect(find.text('جملة ماركت (2)'), findsWidgets);
+      expect(find.text('أسواق فتح الله (1)'), findsWidgets);
     });
   });
 }

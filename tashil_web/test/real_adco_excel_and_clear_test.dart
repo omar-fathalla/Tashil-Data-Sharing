@@ -79,8 +79,10 @@ void main() {
       expect(find.byKey(const ValueKey('clear_fake_data_button')), findsNothing);
       expect(find.byKey(const ValueKey('load_real_adco_excel_button')), findsNothing);
       expect(find.byKey(const ValueKey('ingestion_ai_tier_dropdown')), findsNothing);
-      expect(find.text('بوابة استيعاب البيانات الذكية'), findsOneWidget);
-      expect(find.text('استيعاب التابات المتعددة (Multi-Tab Ingestion)'), findsOneWidget);
+      // Redesigned M3 page header (English title + Arabic subtitle + Multi-Tab chip).
+      expect(find.text('Smart Data Ingestion Portal'), findsOneWidget);
+      expect(find.text('مبيعات الفروع وأرشفة شيتات الإكسيل حسب السلاسل'), findsOneWidget);
+      expect(find.text('Multi-Tab Ingestion'), findsOneWidget);
     });
 
     testWidgets('ParetoCategorySection renders Competing Suppliers Market Share card', (tester) async {

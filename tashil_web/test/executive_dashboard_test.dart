@@ -249,23 +249,26 @@ void main() {
     await tester.pumpAndSettle();
 
     WebFileHelper.nextMockPickedFile = PickedFileData(
-      name: 'Carrefour_Daily_Sales.csv',
+      name: 'Fathalla_Daily_Sales.csv',
       bytes: WebFileHelper.sampleCarrefourCsvBytes(),
     );
 
-    // Select target retail chain first
+    // Select target retail chain first (chains are now per-company; Adeco's list
+    // no longer includes Carrefour, so target Fathalla).
     await tester.tap(find.byKey(const ValueKey('ingestion_retail_chain_dropdown')));
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('كارفور').last);
+    await tester.tap(find.textContaining('فتح الله').last);
     await tester.pumpAndSettle();
 
     // Tap device file picker button (has 3 valid rows + 1 short barcode = 4 total)
-    await tester.tap(find.text('اختيار ملف من الجهاز'));
+    await tester.ensureVisible(find.text('اختيار ملف'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('اختيار ملف'));
     await tester.pump();
     await tester.pumpAndSettle();
 
     expect(find.text('تم التحليل والاستخراج بالذكاء الاصطناعي • بانتظار المراجعة والاعتماد'), findsOneWidget);
-    expect(find.text('حفظ واعتماد البيانات في النظام (Commit Data)'), findsOneWidget);
+    expect(find.text('اعتماد البيانات'), findsOneWidget);
     expect(find.text('4 صف'), findsOneWidget);
     expect(find.text('3 صف'), findsOneWidget);
     expect(find.text('1 ملاحظة'), findsOneWidget);
@@ -279,6 +282,7 @@ void main() {
     ExcelExportService.resetLastDownloaded();
 
     await tester.binding.setSurfaceSize(const Size(1280, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final apiClient = ApiClient(tenantId: 'tenant_adeco');
     await tester.pumpWidget(
       MaterialApp(
@@ -345,25 +349,37 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Select target retail chain first
+    // Select target retail chain first (chains are now per-company; Adeco's list
+    // no longer includes Carrefour, so target Fathalla).
     await tester.tap(find.byKey(const ValueKey('ingestion_retail_chain_dropdown')));
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('كارفور').last);
+    await tester.tap(find.textContaining('فتح الله').last);
     await tester.pumpAndSettle();
 
-    // Tap 'اختيار ملف من الجهاز' (uses VM fallback sample Carrefour CSV: 3 valid + 1 anomaly)
-    await tester.tap(find.text('اختيار ملف من الجهاز'));
+    // The VM stub picker no longer fabricates a sample file, so provide the
+    // sample CSV explicitly (3 valid rows + 1 short-barcode anomaly).
+    WebFileHelper.nextMockPickedFile = PickedFileData(
+      name: 'Fathalla_Daily_Sales.csv',
+      bytes: WebFileHelper.sampleCarrefourCsvBytes(),
+    );
+    // Tap 'اختيار ملف'
+    await tester.ensureVisible(find.text('اختيار ملف'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('اختيار ملف'));
     await tester.pump();
     await tester.pumpAndSettle();
 
     expect(find.text('تم التحليل والاستخراج بالذكاء الاصطناعي • بانتظار المراجعة والاعتماد'), findsOneWidget);
-    expect(find.text('حفظ واعتماد البيانات في النظام (Commit Data)'), findsOneWidget);
+    expect(find.text('اعتماد البيانات'), findsOneWidget);
     expect(find.text('4 صف'), findsOneWidget);
     expect(find.text('3 صف'), findsOneWidget);
     expect(find.text('1 ملاحظة'), findsOneWidget);
 
     // Commit staged data
-    final commitBtn = find.byKey(const ValueKey('commit_staged_upload_button'));
+    final commitBtn = find.descendant(
+      of: find.byKey(const ValueKey('commit_action_toolbar')),
+      matching: find.text('اعتماد البيانات'),
+    );
     await tester.ensureVisible(commitBtn);
     await tester.tap(commitBtn);
     await tester.pumpAndSettle();
