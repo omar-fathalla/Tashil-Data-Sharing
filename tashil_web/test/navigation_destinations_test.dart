@@ -68,13 +68,26 @@ void main() {
       await tester.tap(find.text('Pricing & Promos'));
       expect(selectedDestination, 5);
 
-      // Tap on destination 6 ('Trade Marketing & ROI')
-      await tester.tap(find.text('Trade Marketing & ROI'));
+      // Tap on destination 6 ('Compare', added with Competitor Intelligence)
+      await tester.tap(find.text('Compare'));
       expect(selectedDestination, 6);
 
-      // Tap on destination 8 ('Upload' at the very bottom)
-      await tester.tap(find.text('Upload'));
+      // Tap on destination 7 ('Trade Marketing & ROI')
+      await tester.tap(find.text('Trade Marketing & ROI'));
+      expect(selectedDestination, 7);
+
+      // Tap on destination 8 ('CPFR Replenishment')
+      await tester.tap(find.text('CPFR Replenishment'));
       expect(selectedDestination, 8);
+
+      // Tap on destination 9 ('Upload')
+      await tester.tap(find.text('Upload'));
+      expect(selectedDestination, 9);
+
+      // Tap on destination 10 ('Product Master' at the very bottom)
+      await tester.ensureVisible(find.text('Product Master'));
+      await tester.tap(find.text('Product Master'));
+      expect(selectedDestination, 10);
     });
 
     testWidgets('AppShell switches screens when destinations 4 and 5 are selected', (WidgetTester tester) async {
