@@ -413,11 +413,32 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                             ),
                             const SizedBox(height: 8.0),
 
-                            // Metadata Wrap: Barcode, Store Name, Category
+                            // Metadata Wrap: Item Code, Barcode, Store Name, Category
                             Wrap(
                               spacing: 8.0,
                               runSpacing: 6.0,
                               children: [
+                                if (r.itemCode.isNotEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7.0,
+                                      vertical: 3.0,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primaryContainer
+                                          .withOpacity(0.55),
+                                      borderRadius: BorderRadius.circular(6.0),
+                                    ),
+                                    child: SelectableText(
+                                      r.itemCode,
+                                      style: TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: colorScheme.primary,
+                                      ),
+                                    ),
+                                  ),
                                 // Barcode Chip
                                 Container(
                                   padding: const EdgeInsets.symmetric(
@@ -843,16 +864,34 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                 children: [
                                   SizedBox(
                                     width: barcodeColWidth,
-                                    child: Row(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Icon(Icons.qr_code_2, size: 16.0, color: colorScheme.onSurfaceVariant),
-                                        const SizedBox(width: 4.0),
-                                        Expanded(
-                                          child: SelectableText(
-                                            r.barcode,
-                                            style: const TextStyle(fontFamily: 'monospace', fontSize: 11.0),
+                                        if (r.itemCode.isNotEmpty)
+                                          Text(
+                                            r.itemCode,
+                                            style: TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 10.0,
+                                              fontWeight: FontWeight.w800,
+                                              color: colorScheme.primary,
+                                            ),
                                             maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
+                                        Row(
+                                          children: [
+                                            Icon(Icons.qr_code_2, size: 13.0, color: colorScheme.onSurfaceVariant),
+                                            const SizedBox(width: 3.0),
+                                            Expanded(
+                                              child: SelectableText(
+                                                r.barcode,
+                                                style: const TextStyle(fontFamily: 'monospace', fontSize: 10.5),
+                                                maxLines: 1,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
@@ -860,7 +899,9 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   const SizedBox(width: 8.0),
                                   Expanded(
                                     child: Tooltip(
-                                      message: r.skuName,
+                                      message: r.itemCode.isNotEmpty
+                                          ? '${r.skuName}\nكود الصنف: ${r.itemCode} • الباركود: ${r.barcode}'
+                                          : r.skuName,
                                       child: Text(
                                         r.skuName,
                                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.0),

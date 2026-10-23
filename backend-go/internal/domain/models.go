@@ -101,25 +101,221 @@ type SKU struct {
 	BasePrice float64 `json:"base_price"`
 }
 
+// ProductMasterItem represents an authoritative factory SKU and pricing definition from the company's Product Master sheet (كارتة الأصناف والأسعار).
+type ProductMasterItem struct {
+	SerialNo              int      `json:"serial_no"`
+	TenantID              string   `json:"tenant_id,omitempty"`
+	ItemCode              string   `json:"item_code"`                         // كود الصنف (e.g., FGCL-0550-0001)
+	ItemCodePrefix        string   `json:"item_code_prefix"`                  // FGCL, FGDG, FGDW, FGGC, FGHC, FGLC, FGPC, PRGC, PRHC, PRLC, PRPC
+	ERPPrefix             string   `json:"erp_prefix,omitempty"`              // Alias for ItemCodePrefix
+	DepartmentAr          string   `json:"department_ar,omitempty"`           // القسم بالعربية حسب البادئة
+	Barcode               string   `json:"barcode"`                           // الباركود الدولي EAN-13
+	OfficialName          string   `json:"official_name"`                     // اسم الصنف الرسمي المعتمد
+	Brand                 string   `json:"brand"`                             // العلامة التجارية المستنتجة
+	Category              string   `json:"category"`                          // الفئة المستنتجة من البادئة والاسم
+	ItemType              string   `json:"item_type"`                         // "عادي" | "عرض"
+	PackagingType         string   `json:"packaging_type"`                    // "زجاجة" | "جركن" | "عبوة" | "مجموعة" | "كرتونة"
+	UnitsPerCarton        int      `json:"units_per_carton"`                  // عدد الوحدات بالكرتونة
+	VATRate               float64  `json:"vat_rate"`                          // 0.14 (14%)
+	UnitPriceExclVAT      float64  `json:"unit_price_excl_vat"`               // سعر العبوة غير شامل الضريبة
+	UnitPriceInclVAT      float64  `json:"unit_price_incl_vat"`               // سعر العبوة شامل الضريبة
+	CartonPriceExclVAT    float64  `json:"carton_price_excl_vat"`             // سعر الكرتونة غير شامل الضريبة
+	CartonPriceInclVAT    float64  `json:"carton_price_incl_vat"`             // سعر الكرتونة شامل الضريبة
+	InvoiceDiscountPct    float64  `json:"invoice_discount_pct"`              // نسبة خصم الفاتورة (default 0.10)
+	ExtraDiscountPct      float64  `json:"extra_discount_pct"`                // نسبة الخصم الإضافية
+	NetUnitInvoiceCost    float64  `json:"net_unit_invoice_cost"`             // سعر القطعة بعد خصم الفاتورة
+	NetCartonInvoiceCost  float64  `json:"net_carton_invoice_cost"`           // سعر الكرتونة بعد خصم الفاتورة
+	IsPrimaryForBarcode   bool     `json:"is_primary_for_barcode"`            // True for the primary regular pack of a shared barcode
+	IsActiveInChains      bool     `json:"is_active_in_chains"`               // True if pulled/sold in any retail chain
+	TotalPOSUnitsSold     int      `json:"total_pos_units_sold"`              // إجمالي القطع المباعة فعلياً بالسلاسل
+	TotalPOSCartonsSold   float64  `json:"total_pos_cartons_sold"`            // إجمالي الكراتين المباعة فعلياً بالسلاسل
+	TotalPOSRevenue       float64  `json:"total_pos_revenue"`                 // إجمالي مبيعات الكاشير بالسلاسل بالجنيه
+	AvgRetailSellingPrice float64  `json:"avg_retail_selling_price,omitempty"` // متوسط سعر بيع المستهلك الفعلي بالسلاسل
+	ActiveChains          []string `json:"active_chains"`                     // السلاسل النشطة التي تسحب الصنف
+	SourceFilename        string   `json:"source_filename,omitempty"`
+	SheetName             string   `json:"sheet_name,omitempty"`
+	UpdatedAt             string   `json:"updated_at"`
+}
+
+// ProductMasterSummaryResponse returns the full product master catalog and summary KPIs.
+type ProductMasterSummaryResponse struct {
+	TenantID            string              `json:"tenant_id"`
+	CompanyName         string              `json:"company_name"`
+	SheetDateLabel      string              `json:"sheet_date_label"`
+	SourceFilename      string              `json:"source_filename"`
+	DefaultDiscountPct  float64             `json:"default_discount_pct"`
+	DefaultVATRate      float64             `json:"default_vat_rate"`
+	TotalSKUs           int                 `json:"total_skus"`
+	RegularSKUsCount    int                 `json:"regular_skus_count"`
+	PromoSKUsCount      int                 `json:"promo_skus_count"`
+	UniqueBarcodesCount int                 `json:"unique_barcodes_count"`
+	ActiveInChainsCount int                 `json:"active_in_chains_count"`
+	UnpulledSKUsCount   int                 `json:"unpulled_skus_count"`
+	AvgUnitsPerCarton   float64             `json:"avg_units_per_carton"`
+	AvailablePrefixes   []string            `json:"available_prefixes"`
+	AvailableBrands     []string            `json:"available_brands"`
+	AvailablePackaging  []string            `json:"available_packaging"`
+	Items               []ProductMasterItem `json:"items"`
+}
+
+// NormalizeItemCode canonicalizes an item code to uppercase trimmed format (e.g., "FGLc-0730-0019" -> "FGLC-0730-0019").
+func NormalizeItemCode(code string) string {
+	return strings.ToUpper(strings.TrimSpace(code))
+}
+
+// ExtractItemCodePrefix returns the alphabetic prefix before the first '-' in an item code (e.g. "FGCL-0550-0001" -> "FGCL").
+func ExtractItemCodePrefix(code string) string {
+	norm := NormalizeItemCode(code)
+	if idx := strings.IndexByte(norm, '-'); idx > 0 {
+		return norm[:idx]
+	}
+	return norm
+}
+
+// InferDepartmentArFromPrefix maps an Adeco ERP item code prefix to its canonical Arabic department label.
+func InferDepartmentArFromPrefix(prefix string) string {
+	p := strings.ToUpper(strings.TrimSpace(prefix))
+	switch p {
+	case "FGCL":
+		return "كلور ومبيضات"
+	case "FGDG":
+		return "منظفات الأطباق السائلة"
+	case "FGDW", "FGLW":
+		return "منظفات غسالات الأطباق الأوتوماتيك"
+	case "FGLC":
+		return "العناية بالملابس والمنسوجات"
+	case "FGGC":
+		return "منظفات وملمعات الزجاج والأسطح"
+	case "FGHC":
+		return "العناية المنزلية والمطهرات"
+	case "FGPC":
+		return "العناية الشخصية"
+	default:
+		if strings.HasPrefix(p, "PR") {
+			return "عروض ترويجية مجمعة"
+		}
+		return "أصناف أدكو"
+	}
+}
+
+// InferCategoryFromItemCodeAndName maps Adeco item code prefixes and Arabic product names to canonical categories.
+func InferCategoryFromItemCodeAndName(prefix, name string) string {
+	p := strings.ToUpper(strings.TrimSpace(prefix))
+	n := strings.ToLower(strings.TrimSpace(name))
+	switch {
+	case strings.Contains(n, "كلور ألوان") || strings.Contains(n, "كلور الوان"):
+		return "كلور ألوان"
+	case strings.Contains(n, "كلور") || p == "FGCL":
+		return "كلور عادى"
+	case strings.Contains(n, "غسالات اطباق") || strings.Contains(n, "غسالات أطباق") || p == "FGDW" || p == "FGLW":
+		return "مسحوق غسالات اطباق"
+	case strings.Contains(n, "أطباق") || strings.Contains(n, "اطباق") || p == "FGDG":
+		return "صابون سائل اطباق"
+	case strings.Contains(n, "منعم") || strings.Contains(n, "معطر ملابس") || strings.Contains(n, "داوني"):
+		return "منعمات ملابس"
+	case strings.Contains(n, "زجاج") || strings.Contains(n, "ملمع زجاج") || strings.Contains(n, "جلاسي") || strings.Contains(n, "جلاسى") || p == "FGGC" || p == "PRGC":
+		return "ملمع زجاج وكريستال"
+	case strings.Contains(n, "بقع"):
+		return "مزيلات بقع ملابس"
+	case strings.Contains(n, "عباية") || strings.Contains(n, "عبايه") || strings.Contains(n, "جينز") || strings.Contains(n, "ملابس") || strings.Contains(n, "جل غسيل") || strings.Contains(n, "مسحوق") || p == "FGLC" || p == "PRLC":
+		return "مساحيق جيل اتوماتيك"
+	case strings.Contains(n, "تواليت") || strings.Contains(n, "حمام"):
+		return "منظفات تواليت"
+	case strings.Contains(n, "مطبخ") || strings.Contains(n, "مطابخ") || strings.Contains(n, "دهون") || strings.Contains(n, "بوتاجاز") || strings.Contains(n, "افران") || strings.Contains(n, "أفران"):
+		return "منظفات مطبخ"
+	case strings.Contains(n, "أخشاب") || strings.Contains(n, "اخشاب") || strings.Contains(n, "باركيه") || strings.Contains(n, "أثاث") || strings.Contains(n, "اثاث"):
+		return "ملمع اخشاب وباركيه"
+	case strings.Contains(n, "سجاد") || strings.Contains(n, "مفروشات"):
+		return "منظفات سجاد ومفروشات"
+	case strings.Contains(n, "مسلك") || strings.Contains(n, "بالوعات") || strings.Contains(n, "احواض") || strings.Contains(n, "أحواض"):
+		return "مسلك احواض وبالوعات"
+	case strings.Contains(n, "معطر جو") || strings.Contains(n, "معطرات جو"):
+		return "معطر جو"
+	case strings.Contains(n, "مطهر") || strings.Contains(n, "ديفاتول") || strings.Contains(n, "ديفاسول") || strings.Contains(n, "ديتول") || strings.Contains(n, "فينيك"):
+		return "مطهر عام"
+	case strings.Contains(n, "أرضيات") || strings.Contains(n, "ارضيات") || strings.Contains(n, "جنرال"):
+		return "منظف ارضيات"
+	case strings.Contains(n, "شاور") || strings.Contains(n, "استحمام"):
+		return "شاور جيل"
+	case strings.Contains(n, "هاند") || strings.Contains(n, "غسول يد") || strings.Contains(n, "صابون يد") || strings.Contains(n, "فوم"):
+		return "هاند وواش"
+	case strings.Contains(n, "شامبو") || strings.Contains(n, "بلسم") || strings.Contains(n, "شعر") || strings.Contains(n, "كريم") || strings.Contains(n, "لوشن") || strings.Contains(n, "بشرة") || strings.Contains(n, "وجه") || p == "FGPC" || p == "PRPC":
+		return "عناية شخصية"
+	case strings.Contains(n, "سيارات") || strings.Contains(n, "ردياتير") || strings.Contains(n, "تابلوه") || strings.Contains(n, "إطارات") || strings.Contains(n, "اطارات") || strings.Contains(n, "موتور") || strings.Contains(n, "رابيدو"):
+		return "عناية بالسيارات"
+	case p == "FGHC" || p == "PRHC":
+		return "منظف ارضيات"
+	default:
+		return "منظفات منزلية"
+	}
+}
+
+// MatchesProductSearchQuery checks if a user search query matches an item by ItemCode (including prefixes and FGSL phonetic alias),
+// Barcode, SKUName, OfficialName, Category, or Brand.
+func MatchesProductSearchQuery(rawQuery, itemCode, barcode, skuName, officialName, category, brand string) bool {
+	q := strings.ToLower(strings.TrimSpace(rawQuery))
+	if q == "" {
+		return true
+	}
+	codeLower := strings.ToLower(strings.TrimSpace(itemCode))
+	codeCompact := strings.ReplaceAll(codeLower, "-", "")
+	qCompact := strings.ReplaceAll(q, "-", "")
+
+	if codeLower != "" {
+		if strings.Contains(codeLower, q) || strings.Contains(codeCompact, qCompact) {
+			return true
+		}
+		// Phonetic alias: users typing "fgsl" (إف جي إس إل) should match "fgcl" (Clorel) and "fglc" (Laundry Care)
+		if strings.HasPrefix(qCompact, "fgsl") {
+			alt1 := "fgcl" + strings.TrimPrefix(qCompact, "fgsl")
+			alt2 := "fglc" + strings.TrimPrefix(qCompact, "fgsl")
+			if strings.Contains(codeCompact, alt1) || strings.Contains(codeCompact, alt2) {
+				return true
+			}
+		}
+	}
+	if barcode != "" && strings.Contains(strings.ToLower(barcode), q) {
+		return true
+	}
+	if skuName != "" && strings.Contains(strings.ToLower(skuName), q) {
+		return true
+	}
+	if officialName != "" && strings.Contains(strings.ToLower(officialName), q) {
+		return true
+	}
+	if category != "" && strings.Contains(strings.ToLower(category), q) {
+		return true
+	}
+	if brand != "" && strings.Contains(strings.ToLower(brand), q) {
+		return true
+	}
+	return false
+}
+
 // SellOutFact represents an atomic sell-out transaction loaded into Google BigQuery.
 type SellOutFact struct {
-	RecordID         string    `json:"record_id" bigquery:"record_id"`
-	TenantID         string    `json:"tenant_id" bigquery:"tenant_id"`
-	RetailerChain    string    `json:"retailer_chain" bigquery:"retailer_chain"`
-	StoreID          string    `json:"store_id" bigquery:"store_id"`
-	StoreName        string    `json:"store_name" bigquery:"store_name"`
-	Barcode          string    `json:"barcode" bigquery:"barcode"`
-	SKUName          string    `json:"sku_name" bigquery:"sku_name"`
-	Category         string    `json:"category" bigquery:"category"`
-	Supplier         string    `json:"supplier,omitempty" bigquery:"supplier"`
-	IsOwnBrand       bool      `json:"is_own_brand" bigquery:"is_own_brand"`
-	QuantitySold     int       `json:"quantity_sold" bigquery:"quantity_sold"`
-	NetRevenue       float64   `json:"net_revenue" bigquery:"net_revenue"`
-	UnitPrice        float64   `json:"unit_price" bigquery:"unit_price"`
-	RecommendedPrice float64   `json:"recommended_price,omitempty" bigquery:"recommended_price"`
-	TransactionDate  string    `json:"transaction_date" bigquery:"transaction_date"` // YYYY-MM-DD
-	IngestionBatchID string    `json:"ingestion_batch_id" bigquery:"ingestion_batch_id"`
-	IngestedAt       time.Time `json:"ingested_at" bigquery:"ingested_at"`
+	RecordID           string    `json:"record_id" bigquery:"record_id"`
+	TenantID           string    `json:"tenant_id" bigquery:"tenant_id"`
+	RetailerChain      string    `json:"retailer_chain" bigquery:"retailer_chain"`
+	StoreID            string    `json:"store_id" bigquery:"store_id"`
+	StoreName          string    `json:"store_name" bigquery:"store_name"`
+	ItemCode           string    `json:"item_code,omitempty" bigquery:"item_code"`
+	Barcode            string    `json:"barcode" bigquery:"barcode"`
+	SKUName            string    `json:"sku_name" bigquery:"sku_name"`
+	RetailerRawSKUName string    `json:"retailer_raw_sku_name,omitempty" bigquery:"retailer_raw_sku_name"`
+	Category           string    `json:"category" bigquery:"category"`
+	Supplier           string    `json:"supplier,omitempty" bigquery:"supplier"`
+	IsOwnBrand         bool      `json:"is_own_brand" bigquery:"is_own_brand"`
+	UnitsPerCarton     int       `json:"units_per_carton,omitempty" bigquery:"units_per_carton"`
+	ItemType           string    `json:"item_type,omitempty" bigquery:"item_type"`
+	FactoryUnitCost    float64   `json:"factory_unit_cost,omitempty" bigquery:"factory_unit_cost"`
+	QuantitySold       int       `json:"quantity_sold" bigquery:"quantity_sold"`
+	NetRevenue         float64   `json:"net_revenue" bigquery:"net_revenue"`
+	UnitPrice          float64   `json:"unit_price" bigquery:"unit_price"`
+	RecommendedPrice   float64   `json:"recommended_price,omitempty" bigquery:"recommended_price"`
+	TransactionDate    string    `json:"transaction_date" bigquery:"transaction_date"` // YYYY-MM-DD
+	IngestionBatchID   string    `json:"ingestion_batch_id" bigquery:"ingestion_batch_id"`
+	IngestedAt         time.Time `json:"ingested_at" bigquery:"ingested_at"`
 }
 
 // IngestionBatch records metadata for an uploaded Excel or CSV file.
@@ -145,10 +341,13 @@ type OOSAlert struct {
 	RetailerChain          string    `json:"retailer_chain"`
 	StoreID                string    `json:"store_id"`
 	StoreName              string    `json:"store_name"`
+	ItemCode               string    `json:"item_code,omitempty"`
 	Barcode                string    `json:"barcode"`
 	SKUName                string    `json:"sku_name"`
 	Brand                  string    `json:"brand,omitempty"`
 	Category               string    `json:"category"`
+	UnitsPerCarton         int       `json:"units_per_carton,omitempty"`
+	ItemType               string    `json:"item_type,omitempty"`
 	EstimatedLostDailyCost float64   `json:"estimated_lost_daily_cost"`
 	ConsecutiveDaysOOS     int       `json:"consecutive_days_oos"`
 	Severity               string    `json:"severity"` // critical, high, medium
@@ -242,9 +441,12 @@ type CategoryContribution struct {
 
 // ParetoSKUItem represents a SKU in the 80/20 Pareto revenue analysis.
 type ParetoSKUItem struct {
+	ItemCode           string  `json:"item_code,omitempty"`
 	Barcode            string  `json:"barcode"`
 	SKUName            string  `json:"sku_name"`
 	Category           string  `json:"category"`
+	UnitsPerCarton     int     `json:"units_per_carton,omitempty"`
+	ItemType           string  `json:"item_type,omitempty"`
 	TotalRevenue       float64 `json:"total_revenue"`
 	TotalUnits         int     `json:"total_units"`
 	UnitPrice          float64 `json:"unit_price,omitempty"`

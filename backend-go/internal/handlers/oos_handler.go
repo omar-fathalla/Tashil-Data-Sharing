@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
+	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 )
 
@@ -25,11 +27,18 @@ type OOSResponse struct {
 // OOSHandler exposes out-of-stock operational intelligence.
 type OOSHandler struct {
 	fsRepo firestore.Repository
+	bqRepo bigquery.Repository
 }
 
 // NewOOSHandler creates a new OOSHandler.
 func NewOOSHandler(fsRepo firestore.Repository) *OOSHandler {
 	return &OOSHandler{fsRepo: fsRepo}
+}
+
+// WithBigQueryRepo attaches the BigQuery repository for canonical Product Master enrichment.
+func (h *OOSHandler) WithBigQueryRepo(bqRepo bigquery.Repository) *OOSHandler {
+	h.bqRepo = bqRepo
+	return h
 }
 
 // HandleOOSMonitor serves GET /api/v1/analytics/oos-monitor.
@@ -40,10 +49,46 @@ func (h *OOSHandler) HandleOOSMonitor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	alerts, err := h.fsRepo.GetOOSAlerts(r.Context(), tenantID)
+	rawAlerts, err := h.fsRepo.GetOOSAlerts(r.Context(), tenantID)
 	if err != nil {
 		http.Error(w, `{"error":"failed to retrieve OOS alerts"}`, http.StatusInternalServerError)
 		return
+	}
+
+	searchQuery := strings.TrimSpace(r.URL.Query().Get("q"))
+	if searchQuery == "" {
+		searchQuery = strings.TrimSpace(r.URL.Query().Get("search"))
+	}
+
+	alerts := make([]domain.OOSAlert, 0, len(rawAlerts))
+	for i := range rawAlerts {
+		a := rawAlerts[i]
+		if h.bqRepo != nil {
+			if pm, ok := h.bqRepo.LookupProductMaster(tenantID, a.ItemCode, a.Barcode, a.SKUName); ok {
+				a.ItemCode = pm.ItemCode
+				if pm.Barcode != "" && a.Barcode == "" {
+					a.Barcode = pm.Barcode
+				}
+				if pm.OfficialName != "" {
+					a.SKUName = pm.OfficialName
+				}
+				if pm.UnitsPerCarton > 0 {
+					a.UnitsPerCarton = pm.UnitsPerCarton
+				}
+				if pm.ItemType != "" {
+					a.ItemType = pm.ItemType
+				}
+			}
+		}
+		if a.Brand == "" {
+			a.Brand = domain.InferBrandFromItemName(a.SKUName, a.Category)
+		}
+		if searchQuery != "" {
+			if !domain.MatchesProductSearchQuery(searchQuery, a.ItemCode, a.Barcode, a.SKUName, a.StoreName, a.Category, a.Brand) {
+				continue
+			}
+		}
+		alerts = append(alerts, a)
 	}
 
 	var totalCost float64
@@ -55,9 +100,6 @@ func (h *OOSHandler) HandleOOSMonitor(w http.ResponseWriter, r *http.Request) {
 	branchBrandSeen := make(map[string]map[string]bool)
 
 	for i := range alerts {
-		if alerts[i].Brand == "" {
-			alerts[i].Brand = domain.InferBrandFromItemName(alerts[i].SKUName, alerts[i].Category)
-		}
 		totalCost += alerts[i].EstimatedLostDailyCost
 		if alerts[i].Severity == "critical" {
 			criticalCount++

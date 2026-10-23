@@ -198,6 +198,100 @@ func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Requ
 	_ = json.NewEncoder(w).Encode(result)
 }
 
+// HandleUploadProductMaster handles POST /api/v1/product-master/upload to ingest or update an Adeco Product Master & Price List workbook (.xlsx or .csv).
+func (h *UploadHandler) HandleUploadProductMaster(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	tenantID, err := middleware.EnforceTenantRLS(r)
+	if err != nil {
+		http.Error(w, `{"error":"unauthorized tenant context"}`, http.StatusUnauthorized)
+		return
+	}
+	if qTenant := strings.TrimSpace(r.URL.Query().Get("tenant_id")); qTenant != "" {
+		tenantID = qTenant
+	}
+
+	filename := strings.TrimSpace(r.URL.Query().Get("filename"))
+	replaceArchiveID := strings.TrimSpace(r.URL.Query().Get("replace_archive_id"))
+	dryRun := r.URL.Query().Get("dry_run") == "true"
+	var fileBytes []byte
+
+	contentType := strings.ToLower(r.Header.Get("Content-Type"))
+	if strings.Contains(contentType, "multipart/form-data") {
+		if err := r.ParseMultipartForm(64 << 20); err == nil {
+			if formTenant := strings.TrimSpace(r.FormValue("tenant_id")); formTenant != "" {
+				tenantID = formTenant
+			}
+			if formReplace := strings.TrimSpace(r.FormValue("replace_archive_id")); formReplace != "" {
+				replaceArchiveID = formReplace
+			}
+			if strings.TrimSpace(r.FormValue("dry_run")) == "true" {
+				dryRun = true
+			}
+			file, header, fErr := r.FormFile("file")
+			if fErr == nil && file != nil {
+				defer file.Close()
+				fileBytes, _ = io.ReadAll(file)
+				if header != nil && header.Filename != "" {
+					filename = header.Filename
+				}
+			}
+		}
+	} else if r.ContentLength > 0 {
+		fileBytes, _ = io.ReadAll(r.Body)
+	}
+
+	if len(fileBytes) == 0 {
+		candidatePaths := []string{
+			"data/product_master/adeco_product_master_2026_08_01.xlsx",
+			"/app/data/product_master/adeco_product_master_2026_08_01.xlsx",
+		}
+		for _, p := range candidatePaths {
+			if b, readErr := os.ReadFile(p); readErr == nil && len(b) > 0 {
+				fileBytes = b
+				filename = filepath.Base(p)
+				break
+			}
+		}
+	}
+
+	if len(fileBytes) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"error":   "file_not_found",
+			"message": "يرجى اختيار ملف كارتة الأصناف والأسعار (Product Master Excel أو CSV) لرفعه",
+		})
+		return
+	}
+
+	if filename == "" {
+		filename = "adeco_product_master_2026_08_01.xlsx"
+	}
+
+	if replaceArchiveID != "" {
+		_, _ = h.processor.DeleteArchivedFile(r.Context(), tenantID, replaceArchiveID)
+	}
+
+	result, err := h.processor.ProcessProductMaster(r.Context(), tenantID, filename, fileBytes, dryRun)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"error":   "product_master_ingestion_failed",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(result)
+}
+
 // HandleLoadLocalExcel handles POST /api/v1/ingest/load-default-excel to ingest the local Adco (Fathalla + Gomla) Excel workbooks.
 func (h *UploadHandler) HandleLoadLocalExcel(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

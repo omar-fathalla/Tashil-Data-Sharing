@@ -50,6 +50,10 @@ type Repository interface {
 	GetTargetsSummary(ctx context.Context, tenantID, targetType, chain string, year int) (*domain.TargetsSummaryResponse, error)
 	UpsertTarget(ctx context.Context, tenantID string, target domain.TargetRecord) (*domain.TargetRecord, error)
 	DeleteTarget(ctx context.Context, tenantID, targetID string) error
+	GetProductMaster(ctx context.Context, tenantID string, filter ProductMasterFilter) (*domain.ProductMasterSummaryResponse, error)
+	SetProductMaster(ctx context.Context, tenantID string, summary *domain.ProductMasterSummaryResponse) (*domain.ProductMasterSummaryResponse, error)
+	UpsertProductMasterItem(ctx context.Context, tenantID string, item domain.ProductMasterItem) (*domain.ProductMasterItem, error)
+	LookupProductMaster(tenantID, itemCode, barcode, skuName string) (domain.ProductMasterItem, bool)
 }
 
 // SellInRecordFilter allows filtering Supplier Sell-In records by chain, year, month, region, sector, brand, and search query.
@@ -74,6 +78,7 @@ type CPFRFilter struct {
 	Brand           string
 	SalesRep        string
 	StockStatus     string // all, urgent_replenishment, optimal, overstock
+	SearchQuery     string
 	LeadTimeDays    int
 	SafetyStockDays int
 }
@@ -102,12 +107,13 @@ type StoreMatrixFilter struct {
 	EndDate       string
 }
 
-// PricingComplianceFilter allows filtering pricing compliance items by chain, category, violation/promo status, period, and pagination.
+// PricingComplianceFilter allows filtering pricing compliance items by chain, category, violation/promo status, search query, period, and pagination.
 type PricingComplianceFilter struct {
 	RetailerChain string
 	Category      string
 	ViolationOnly bool
 	PromoOnly     bool
+	SearchQuery   string
 	Year          int
 	Month         int
 	StartDate     string
@@ -122,14 +128,18 @@ type Client struct {
 	dataset   string
 	useMock   bool
 
-	mu             sync.RWMutex
-	records        []domain.SellOutFact
-	pricingItems   []domain.PricingComplianceItem
-	workbookMeta   map[string]TenantWorkbookAnalytics
-	sellInRecords  map[string][]domain.SellInRecord
-	sellInFilename map[string]string
-	targets        map[string][]domain.TargetRecord
-	cleanedTenants map[string]bool
+	mu                     sync.RWMutex
+	records                []domain.SellOutFact
+	pricingItems           []domain.PricingComplianceItem
+	workbookMeta           map[string]TenantWorkbookAnalytics
+	sellInRecords          map[string][]domain.SellInRecord
+	sellInFilename         map[string]string
+	targets                map[string][]domain.TargetRecord
+	productMaster          map[string]*domain.ProductMasterSummaryResponse
+	productMasterByCode    map[string]map[string]domain.ProductMasterItem
+	productMasterByBarcode map[string]map[string]domain.ProductMasterItem
+	productMasterByName    map[string]map[string]domain.ProductMasterItem
+	cleanedTenants         map[string]bool
 
 	kpiCacheMu sync.RWMutex
 	kpiCache   map[string]*domain.ExecutiveKPIs
@@ -144,18 +154,23 @@ func (c *Client) invalidateKPICache() {
 // NewClient initializes the BigQuery repository.
 func NewClient(projectID, dataset string, useMock bool) *Client {
 	c := &Client{
-		projectID:      projectID,
-		dataset:        dataset,
-		useMock:        useMock,
-		records:        make([]domain.SellOutFact, 0),
-		pricingItems:   make([]domain.PricingComplianceItem, 0),
-		workbookMeta:   make(map[string]TenantWorkbookAnalytics),
-		sellInRecords:  make(map[string][]domain.SellInRecord),
-		sellInFilename: make(map[string]string),
-		targets:        make(map[string][]domain.TargetRecord),
-		cleanedTenants: make(map[string]bool),
-		kpiCache:       make(map[string]*domain.ExecutiveKPIs),
+		projectID:              projectID,
+		dataset:                dataset,
+		useMock:                useMock,
+		records:                make([]domain.SellOutFact, 0),
+		pricingItems:           make([]domain.PricingComplianceItem, 0),
+		workbookMeta:           make(map[string]TenantWorkbookAnalytics),
+		sellInRecords:          make(map[string][]domain.SellInRecord),
+		sellInFilename:         make(map[string]string),
+		targets:                make(map[string][]domain.TargetRecord),
+		productMaster:          make(map[string]*domain.ProductMasterSummaryResponse),
+		productMasterByCode:    make(map[string]map[string]domain.ProductMasterItem),
+		productMasterByBarcode: make(map[string]map[string]domain.ProductMasterItem),
+		productMasterByName:    make(map[string]map[string]domain.ProductMasterItem),
+		cleanedTenants:         make(map[string]bool),
+		kpiCache:               make(map[string]*domain.ExecutiveKPIs),
 	}
+	c.loadPersistedProductMaster()
 	c.seedInitialData()
 	c.loadPersistedTargets()
 	return c
@@ -1068,6 +1083,7 @@ func (c *Client) InsertSellOutFacts(ctx context.Context, facts []domain.SellOutF
 	}
 
 	for _, f := range facts {
+		c.enrichSellOutFactLocked(&f)
 		if idx, found := existingIndex[f.RecordID]; found {
 			c.records[idx] = f // update existing instead of duplicating
 		} else {
@@ -1090,7 +1106,9 @@ func (c *Client) ReplaceTenantFacts(ctx context.Context, tenantID string, facts 
 	chainsInFacts := make(map[string]bool)
 	chainMonthsInFacts := make(map[string]bool)
 	monthsCountPerChain := make(map[string]map[string]bool)
-	for _, f := range facts {
+	for i := range facts {
+		c.enrichSellOutFactLocked(&facts[i])
+		f := facts[i]
 		ch := strings.ToLower(strings.TrimSpace(f.RetailerChain))
 		if ch != "" {
 			chainsInFacts[ch] = true
@@ -1167,12 +1185,14 @@ func (c *Client) SetTenantWorkbookAnalytics(ctx context.Context, tenantID string
 			itemChain := strings.ToLower(strings.TrimSpace(item.RetailerChain))
 			if !isSeed && len(chainsInPricing) > 0 && itemChain != "" && !chainsInPricing[itemChain] {
 				item.Category = domain.NormalizeProductCategory(item.Category)
+				c.enrichPricingItemLocked(&item)
 				keptPricing = append(keptPricing, item)
 			}
 		}
 		for _, item := range meta.PricingItems {
 			item.TenantID = fullTenant
 			item.Category = domain.NormalizeProductCategory(item.Category)
+			c.enrichPricingItemLocked(&item)
 			keptPricing = append(keptPricing, item)
 		}
 		c.pricingItems = keptPricing
@@ -1543,14 +1563,23 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 		if acc.units > 0 {
 			uPrice = math.Round((acc.revenue/float64(acc.units))*100) / 100
 		}
-		paretoSKUs = append(paretoSKUs, domain.ParetoSKUItem{
+		pItem := domain.ParetoSKUItem{
 			Barcode:      acc.barcode,
 			SKUName:      acc.skuName,
 			Category:     acc.category,
 			TotalRevenue: math.Round(acc.revenue*100) / 100,
 			TotalUnits:   acc.units,
 			UnitPrice:    uPrice,
-		})
+		}
+		if pm, ok := c.lookupProductMasterLocked(tenantID, "", acc.barcode, acc.skuName); ok {
+			pItem.ItemCode = pm.ItemCode
+			pItem.UnitsPerCarton = pm.UnitsPerCarton
+			pItem.ItemType = pm.ItemType
+			if pm.OfficialName != "" {
+				pItem.SKUName = pm.OfficialName
+			}
+		}
+		paretoSKUs = append(paretoSKUs, pItem)
 	}
 	sort.Slice(paretoSKUs, func(i, j int) bool {
 		if paretoSKUs[i].TotalRevenue == paretoSKUs[j].TotalRevenue {
@@ -1864,6 +1893,9 @@ func (c *Client) GetSellOutRecords(ctx context.Context, tenantID string, filter 
 		if !matchTenant(r.TenantID, tenantID) {
 			continue // Row-Level Security
 		}
+		if r.ItemCode == "" {
+			c.enrichSellOutFactLocked(&r)
+		}
 		// Default to tenant's own SKUs unless user explicitly requests "all_market" or a specific competing supplier,
 		// or searches by barcode/name across the market
 		if supFilter == "" || strings.EqualFold(supFilter, "own") || supFilter == "أصناف الشركة فقط" {
@@ -1901,11 +1933,8 @@ func (c *Client) GetSellOutRecords(ctx context.Context, tenantID string, filter 
 			continue
 		}
 		if qLower != "" {
-			if !strings.Contains(strings.ToLower(r.SKUName), qLower) &&
-				!strings.Contains(strings.ToLower(r.Barcode), qLower) &&
-				!strings.Contains(strings.ToLower(r.StoreName), qLower) &&
-				!strings.Contains(strings.ToLower(r.Supplier), qLower) &&
-				!strings.Contains(strings.ToLower(r.Category), qLower) {
+			if !domain.MatchesProductSearchQuery(filter.SearchQuery, r.ItemCode, r.Barcode, r.SKUName, r.RetailerRawSKUName, r.Category, r.Supplier) &&
+				!strings.Contains(strings.ToLower(r.StoreName), qLower) {
 				continue
 			}
 		}
@@ -2445,7 +2474,7 @@ func (c *Client) GetStoreBenchmarkMatrix(ctx context.Context, tenantID string, f
 	return filtered, nil
 }
 
-// GetPricingCompliance returns SKU compliance items filtered by tenant, chain, category, violation/promo status, and optional pagination.
+// GetPricingCompliance returns SKU compliance items filtered by tenant, chain, category, violation/promo status, search query, and optional pagination.
 func (c *Client) GetPricingCompliance(ctx context.Context, tenantID string, filter PricingComplianceFilter) ([]domain.PricingComplianceItem, error) {
 	c.ensureTenantSeeded(tenantID)
 
@@ -2453,6 +2482,7 @@ func (c *Client) GetPricingCompliance(ctx context.Context, tenantID string, filt
 	defer c.mu.RUnlock()
 
 	targetCat := domain.NormalizeProductCategory(filter.Category)
+	searchQ := strings.TrimSpace(filter.SearchQuery)
 	var result []domain.PricingComplianceItem
 	for _, item := range c.pricingItems {
 		itemTenant := item.TenantID
@@ -2461,6 +2491,9 @@ func (c *Client) GetPricingCompliance(ctx context.Context, tenantID string, filt
 		}
 		if !matchTenant(itemTenant, tenantID) {
 			continue // Row-Level Security
+		}
+		if item.ItemCode == "" || item.FactoryUnitCost == 0 {
+			c.enrichPricingItemLocked(&item)
 		}
 		if filter.RetailerChain != "" && filter.RetailerChain != "all" && filter.RetailerChain != "الكل" {
 			if !strings.EqualFold(item.RetailerChain, filter.RetailerChain) {
@@ -2480,6 +2513,11 @@ func (c *Client) GetPricingCompliance(ctx context.Context, tenantID string, filt
 		}
 		if filter.PromoOnly {
 			if !item.IsPromoActive {
+				continue
+			}
+		}
+		if searchQ != "" {
+			if !domain.MatchesProductSearchQuery(searchQ, item.ItemCode, item.Barcode, item.SKUName, item.SKUName, item.Category, item.StoreName) {
 				continue
 			}
 		}

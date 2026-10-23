@@ -7,6 +7,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
+import '../../../product_master/presentation/screens/product_master_screen.dart';
 
 /// PricingComplianceScreen monitors SKU-level price compliance against Recommended Retail Price (RRP)
 /// and measures promotional uplift percentages across retail chains.
@@ -30,6 +31,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
   int _selectedMonth = 0;
   String _selectedChain = 'all';
   bool _showPriceImpact = false;
+  final TextEditingController _searchController = TextEditingController();
   List<MonthlyPriceElasticityPoint> _elasticityPoints = [];
   PriceElasticitySummaryModel? _elasticitySummary;
   int? _selectedMonthIndex;
@@ -63,6 +65,12 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   void didUpdateWidget(covariant PricingComplianceScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.apiClient != widget.apiClient ||
@@ -74,6 +82,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
       _selectedMonth = 0;
       _selectedChain = 'all';
       _showPriceImpact = false;
+      _searchController.clear();
       _selectedMonthIndex = null;
       _currentPage = 0;
       _availableCategories = const [];
@@ -86,10 +95,12 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
     final isUnfilteredCategory = _selectedCategory == 'الكل';
     final isViolationOnly = _selectedFilter == 'مخالفات سعرية فقط';
     final isPromoOnly = _selectedFilter == 'عروض نشطة فقط';
+    final searchQuery = _searchController.text.trim();
 
     final results = await widget.apiClient.getPricingCompliance(
       chain: _selectedChain == 'all' ? null : _selectedChain,
       category: isUnfilteredCategory ? null : _selectedCategory,
+      search: searchQuery.isEmpty ? null : searchQuery,
       violationOnly: isViolationOnly ? true : null,
       promoOnly: isPromoOnly ? true : null,
       year: _selectedYear > 0 ? _selectedYear : null,
@@ -172,6 +183,30 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
     }
   }
 
+  void _openProductMasterDialog({String? initialQuery}) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog.fullscreen(
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('كارتة الأصناف والأسعار المعتمدة (Product Master)'),
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ),
+            body: ProductMasterScreen(
+              apiClient: widget.apiClient,
+              initialSearchQuery: initialQuery,
+            ),
+          ),
+        ),
+      ),
+    ).then((_) => _loadPricingCompliance());
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -204,7 +239,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
             M3PageHeader(
               titleEn: 'Pricing & Promo Compliance',
               subtitleAr:
-                  'كشف الفروق السعرية عن السعر الاسترشادي (RRP) وتتبع الأثر البيعي للحملات الترويجية',
+                  'كشف الفروق السعرية عن السعر الاسترشادي (RRP) وكارتة أسعار المصنع وتتبع الأثر البيعي للعروض',
               actions: M3ActionButtonGroup(
                 actions: [
                   M3ActionItem(
@@ -389,10 +424,72 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                             }
                           },
                         ),
+                        OutlinedButton.icon(
+                          key: const ValueKey('open_product_master_from_pricing_btn'),
+                          onPressed: _openProductMasterDialog,
+                          icon: const Icon(Icons.qr_code_2_rounded, size: 18.0),
+                          label: const Text('كارتة الأصناف والأسعار'),
+                        ),
                       ],
                     ),
 
                     const Divider(height: 20.0),
+
+                    // Search Bar by Item Code (كود الصنف), Barcode (الباركود), SKU Name, or Branch
+                    TextField(
+                      key: const ValueKey('pricing_compliance_search_input'),
+                      controller: _searchController,
+                      onSubmitted: (_) {
+                        setState(() => _currentPage = 0);
+                        _loadPricingCompliance();
+                      },
+                      onChanged: (val) {
+                        if (val.isEmpty) {
+                          setState(() => _currentPage = 0);
+                          _loadPricingCompliance();
+                        } else {
+                          setState(() {});
+                        }
+                      },
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search_rounded, size: 20.0),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_searchController.text.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.clear_rounded, size: 18.0),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _currentPage = 0);
+                                  _loadPricingCompliance();
+                                },
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back_rounded, size: 18.0),
+                              tooltip: 'بحث',
+                              onPressed: () {
+                                setState(() => _currentPage = 0);
+                                _loadPricingCompliance();
+                              },
+                            ),
+                          ],
+                        ),
+                        hintText:
+                            'ابحث بكود الصنف (FGCL-0550-0001 / FGSL) أو الباركود (6221133...) أو اسم الصنف أو الفرع...',
+                        isDense: true,
+                        filled: true,
+                        fillColor: colorScheme.surface,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14.0,
+                          vertical: 10.0,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: M3Spacing.sm),
 
                     // Row 2: Status & Category Selectors
                     Text(
@@ -583,7 +680,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                                           ),
                                                           const SizedBox(height: 2.0),
                                                           Text(
-                                                            'GTIN: ${item.barcode} | ${item.category}',
+                                                            '${item.itemCode.isNotEmpty ? '[${item.itemCode}] • ' : ''}GTIN: ${item.barcode} | ${item.category}',
                                                             style: theme.textTheme.bodySmall?.copyWith(
                                                               color: colorScheme.onSurfaceVariant,
                                                               fontSize: 11.0,
@@ -728,7 +825,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                             rows: displayedItems.map((item) {
                                               return DataRow(
                                                 cells: [
-                                                  // SKU Name & Barcode
+                                                  // SKU Name, Item Code & Barcode
                                                   DataCell(
                                                     Column(
                                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -741,7 +838,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                                           ),
                                                         ),
                                                         Text(
-                                                          'GTIN: ${item.barcode} | ${item.category}',
+                                                          '${item.itemCode.isNotEmpty ? 'كود: ${item.itemCode} | ' : ''}GTIN: ${item.barcode} | ${item.category}${item.unitsPerCarton > 0 ? ' (${item.unitsPerCarton} ش)' : ''}',
                                                           style: theme.textTheme.bodySmall?.copyWith(
                                                             color: colorScheme.onSurfaceVariant,
                                                             fontSize: 11.0,
@@ -783,23 +880,51 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                                     ),
                                                   ),
 
-                                                  // Actual Price
+                                                  // Actual Price & Margin
                                                   DataCell(
-                                                    Text(
-                                                      CurrencyFormatter.formatEGP(item.actualPrice, showDecimals: true),
-                                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
+                                                    Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      children: [
+                                                        Text(
+                                                          CurrencyFormatter.formatEGP(item.actualPrice, showDecimals: true),
+                                                          style: theme.textTheme.bodyMedium?.copyWith(
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                        if (item.retailerMarginPct != 0)
+                                                          Text(
+                                                            'هامش السلسلة: ${item.retailerMarginPct.toStringAsFixed(1)}%',
+                                                            style: theme.textTheme.labelSmall?.copyWith(
+                                                              fontSize: 10.0,
+                                                              color: colorScheme.primary,
+                                                            ),
+                                                          ),
+                                                      ],
                                                     ),
                                                   ),
 
-                                                  // Recommended Price (RRP)
+                                                  // Recommended Price (RRP) & Factory Cost
                                                   DataCell(
-                                                    Text(
-                                                      CurrencyFormatter.formatEGP(item.recommendedPrice, showDecimals: true),
-                                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                                        color: colorScheme.onSurfaceVariant,
-                                                      ),
+                                                    Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      children: [
+                                                        Text(
+                                                          CurrencyFormatter.formatEGP(item.recommendedPrice, showDecimals: true),
+                                                          style: theme.textTheme.bodyMedium?.copyWith(
+                                                            color: colorScheme.onSurfaceVariant,
+                                                          ),
+                                                        ),
+                                                        if (item.factoryUnitCost > 0)
+                                                          Text(
+                                                            'صافي المصنع: ${item.factoryUnitCost.toStringAsFixed(2)} ج.م',
+                                                            style: theme.textTheme.labelSmall?.copyWith(
+                                                              fontSize: 10.0,
+                                                              color: colorScheme.onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                      ],
                                                     ),
                                                   ),
 

@@ -685,7 +685,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     // Use full-dataset summary metrics from backend (not just the 250 paginated rows)
     final bool hasSubFilters = (selectedStoreId != null && selectedStoreId!.isNotEmpty) ||
         (selectedCategory != null && selectedCategory!.isNotEmpty) ||
-        (searchQuery != null && searchQuery!.trim().isNotEmpty);
+        searchQuery.trim().isNotEmpty;
     final double branchMatrixTotalRev = _branchChartItems.fold<double>(0.0, (acc, b) => acc + b.totalRevenue);
     final int branchMatrixTotalUnits = _branchChartItems.fold<int>(0, (acc, b) => acc + b.totalUnits);
 
@@ -1416,7 +1416,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                 final List<StoreBenchmarkItem> row2Branches =
                     useTwoRows ? rawBranches.skip(firstRowCount).toList() : const [];
 
-                final double minColWidth = 54.0;
+                const double minColWidth = 54.0;
                 final double neededWidth = firstRowCount * minColWidth;
                 final double canvasWidth = math.max(chartConstraints.maxWidth, neededWidth);
                 final double colWidth = canvasWidth / firstRowCount;
@@ -1884,14 +1884,20 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     final fastestGrowingBranch = growingSorted.isNotEmpty ? growingSorted.first : null;
 
     // 2. Group records by SKU & infer Brand
-    final skuMap = <String, ({String skuName, String brand, String category, int units, double revenue})>{};
+    final skuMap = <String, ({String skuName, String itemCode, String barcode, String brand, String category, int units, double revenue})>{};
     for (final r in effectiveRecords) {
       final key = r.barcode.isNotEmpty ? r.barcode : r.skuName;
-      final inferredBrand = SmartBrandExtractor.inferBrand(r.skuName, subCategory: r.category);
+      final inferredBrand = SmartBrandExtractor.inferBrand(
+        r.skuName,
+        subCategory: r.category,
+        itemCode: r.itemCode,
+      );
       final existing = skuMap[key];
       if (existing == null) {
         skuMap[key] = (
           skuName: r.skuName,
+          itemCode: r.itemCode,
+          barcode: r.barcode,
           brand: inferredBrand,
           category: r.category,
           units: r.quantitySold,
@@ -1900,6 +1906,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       } else {
         skuMap[key] = (
           skuName: existing.skuName,
+          itemCode: existing.itemCode.isNotEmpty ? existing.itemCode : r.itemCode,
+          barcode: existing.barcode.isNotEmpty ? existing.barcode : r.barcode,
           brand: existing.brand,
           category: existing.category,
           units: existing.units + r.quantitySold,
@@ -1946,10 +1954,14 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     final filteredSkus = sortedByRev.where((sku) {
       if (_perfBrand != 'all' && sku.brand != _perfBrand) return false;
       if (_perfSearch.isNotEmpty) {
-        final q = _perfSearch.toLowerCase();
-        if (!sku.skuName.toLowerCase().contains(q) &&
-            !sku.brand.toLowerCase().contains(q) &&
-            !sku.category.toLowerCase().contains(q)) {
+        if (!ApiClient.matchesProductSearch(
+          _perfSearch,
+          itemCode: sku.itemCode,
+          barcode: sku.barcode,
+          skuName: sku.skuName,
+          category: sku.category,
+          brand: sku.brand,
+        )) {
           return false;
         }
       }
@@ -2500,10 +2512,6 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                     final totalYoYBadge = totalMatrixYoYPct != null
                         ? '$totalSign${totalMatrixYoYPct.toStringAsFixed(1)}% (${CurrencyFormatter.formatCompactEGP(totalMatrixVarianceEgp)})'
                         : CurrencyFormatter.formatCompactEGP(totalCurrMatrixRev);
-
-                    final fastestBadge = fastestGrowingBranch != null
-                        ? '${fastestGrowingBranch.storeName} (${(fastestGrowingBranch.yoyGrowthPct ?? 0) >= 0 ? "+" : ""}${(fastestGrowingBranch.yoyGrowthPct ?? 0).toStringAsFixed(1)}%)'
-                        : '—';
 
                     final stripCards = [
                       _buildBranchInsightBadge(

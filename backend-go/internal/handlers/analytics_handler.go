@@ -299,12 +299,17 @@ func (h *AnalyticsHandler) HandlePricingCompliance(w http.ResponseWriter, r *htt
 
 	limitStr := q.Get("limit")
 	offsetStr := q.Get("offset")
+	searchQuery := strings.TrimSpace(q.Get("q"))
+	if searchQuery == "" {
+		searchQuery = strings.TrimSpace(q.Get("search"))
+	}
 	isPaginatedRequest := limitStr != "" || offsetStr != ""
 
 	if !isPaginatedRequest {
 		filter := bigquery.PricingComplianceFilter{
 			RetailerChain: effectiveChain,
 			Category:      q.Get("category"),
+			SearchQuery:   searchQuery,
 			ViolationOnly: violationOnly,
 			PromoOnly:     promoOnly,
 			Year:          year,
@@ -398,6 +403,11 @@ func (h *AnalyticsHandler) HandlePricingCompliance(w http.ResponseWriter, r *htt
 		if promoOnly && !item.IsPromoActive {
 			continue
 		}
+		if searchQuery != "" {
+			if !domain.MatchesProductSearchQuery(searchQuery, item.ItemCode, item.Barcode, item.SKUName, "", item.Category, "") {
+				continue
+			}
+		}
 		filteredItems = append(filteredItems, item)
 	}
 
@@ -439,6 +449,89 @@ func (h *AnalyticsHandler) HandlePricingCompliance(w http.ResponseWriter, r *htt
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
+// HandleGetProductMaster serves GET /api/v1/product-master to return the canonical Adeco Product Master & Price List.
+func (h *AnalyticsHandler) HandleGetProductMaster(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := middleware.EnforceTenantRLS(r)
+	if err != nil {
+		http.Error(w, `{"error":"unauthorized tenant context"}`, http.StatusUnauthorized)
+		return
+	}
+
+	q := r.URL.Query()
+	prefix := strings.TrimSpace(q.Get("prefix"))
+	if prefix == "" {
+		prefix = strings.TrimSpace(q.Get("category"))
+	}
+	itemType := strings.TrimSpace(q.Get("item_type"))
+	if itemType == "" {
+		itemType = strings.TrimSpace(q.Get("type"))
+	}
+	searchQuery := strings.TrimSpace(q.Get("q"))
+	if searchQuery == "" {
+		searchQuery = strings.TrimSpace(q.Get("search"))
+	}
+
+	pullStatus := strings.TrimSpace(q.Get("pull_status"))
+	if pullStatus == "" {
+		pullStatus = strings.TrimSpace(q.Get("status"))
+	}
+
+	summary, err := h.bqRepo.GetProductMaster(r.Context(), tenantID, bigquery.ProductMasterFilter{
+		Prefix:        prefix,
+		Brand:         strings.TrimSpace(q.Get("brand")),
+		ItemType:      itemType,
+		PackagingType: strings.TrimSpace(q.Get("packaging")),
+		PullStatus:    pullStatus,
+		SearchQuery:   searchQuery,
+	})
+	if err != nil {
+		http.Error(w, `{"error":"failed to query product master"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(summary)
+}
+
+// HandleUpdateProductMasterItem serves PUT /api/v1/product-master/item to upsert a single SKU in the Product Master.
+func (h *AnalyticsHandler) HandleUpdateProductMasterItem(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut && r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	tenantID, err := middleware.EnforceTenantRLS(r)
+	if err != nil {
+		http.Error(w, `{"error":"unauthorized tenant context"}`, http.StatusUnauthorized)
+		return
+	}
+
+	var item domain.ProductMasterItem
+	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
+		http.Error(w, `{"error":"invalid json payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	if _, err := h.bqRepo.UpsertProductMasterItem(r.Context(), tenantID, item); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"error":   "upsert_failed",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	summary, err := h.bqRepo.GetProductMaster(r.Context(), tenantID, bigquery.ProductMasterFilter{})
+	if err != nil {
+		http.Error(w, `{"error":"failed to reload product master"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(summary)
+}
+
 // HandleCPFRDashboard serves GET /api/v1/analytics/cpfr for Sell-In vs. Sell-Out reconciliation,
 // estimated inventory balances, smart replenishment PO generation, W1+W2 -> EXP forecasting,
 // promotions & returns analytics, and field sales rep scorecards.
@@ -457,6 +550,10 @@ func (h *AnalyticsHandler) HandleCPFRDashboard(w http.ResponseWriter, r *http.Re
 	if chainParam == "" {
 		chainParam = strings.TrimSpace(q.Get("retailer_chain"))
 	}
+	searchQ := strings.TrimSpace(q.Get("q"))
+	if searchQ == "" {
+		searchQ = strings.TrimSpace(q.Get("search"))
+	}
 
 	filter := bigquery.CPFRFilter{
 		RetailerChain:   chainParam,
@@ -466,6 +563,7 @@ func (h *AnalyticsHandler) HandleCPFRDashboard(w http.ResponseWriter, r *http.Re
 		Brand:           q.Get("brand"),
 		SalesRep:        q.Get("rep"),
 		StockStatus:     q.Get("stock_status"),
+		SearchQuery:     searchQ,
 		LeadTimeDays:    leadTime,
 		SafetyStockDays: safetyDays,
 	}

@@ -364,9 +364,13 @@ class CategoryContributionModel {
 
 /// Pareto 80/20 Power SKU Model
 class ParetoSkuItemModel {
+  final String itemCode;
   final String barcode;
   final String skuName;
   final String category;
+  final int unitsPerCarton;
+  final String itemType;
+  final double factoryUnitCost;
   final double totalRevenue;
   final int totalUnits;
   final double unitPrice;
@@ -375,9 +379,13 @@ class ParetoSkuItemModel {
   final bool isTop80Contributor;
 
   ParetoSkuItemModel({
+    this.itemCode = '',
     required this.barcode,
     required this.skuName,
     required this.category,
+    this.unitsPerCarton = 12,
+    this.itemType = 'عادي',
+    this.factoryUnitCost = 0.0,
     required this.totalRevenue,
     required this.totalUnits,
     this.unitPrice = 0.0,
@@ -388,9 +396,13 @@ class ParetoSkuItemModel {
 
   factory ParetoSkuItemModel.fromJson(Map<String, dynamic> json) {
     return ParetoSkuItemModel(
+      itemCode: json['item_code'] as String? ?? '',
       barcode: json['barcode'] as String? ?? '',
       skuName: json['sku_name'] as String? ?? '',
       category: json['category'] as String? ?? '',
+      unitsPerCarton: (json['units_per_carton'] as num?)?.toInt() ?? 12,
+      itemType: json['item_type'] as String? ?? 'عادي',
+      factoryUnitCost: (json['factory_unit_cost'] as num?)?.toDouble() ?? 0.0,
       totalRevenue: (json['total_revenue'] as num?)?.toDouble() ?? 0.0,
       totalUnits: (json['total_units'] as num?)?.toInt() ?? 0,
       unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0.0,
@@ -404,9 +416,13 @@ class ParetoSkuItemModel {
   }
 
   Map<String, dynamic> toJson() => {
+        'item_code': itemCode,
         'barcode': barcode,
         'sku_name': skuName,
         'category': category,
+        'units_per_carton': unitsPerCarton,
+        'item_type': itemType,
+        'factory_unit_cost': factoryUnitCost,
         'total_revenue': totalRevenue,
         'total_units': totalUnits,
         'unit_price': unitPrice,
@@ -812,11 +828,16 @@ class SellOutRecordModel {
   final String retailerChain;
   final String storeId;
   final String storeName;
+  final String itemCode;
   final String barcode;
   final String skuName;
+  final String retailerRawSkuName;
   final String category;
   final String supplier;
   final bool isOwnBrand;
+  final int unitsPerCarton;
+  final String itemType;
+  final double factoryUnitCost;
   final int quantitySold;
   final double netRevenue;
   final double unitPrice;
@@ -828,11 +849,16 @@ class SellOutRecordModel {
     required this.retailerChain,
     required this.storeId,
     required this.storeName,
+    this.itemCode = '',
     required this.barcode,
     required this.skuName,
+    this.retailerRawSkuName = '',
     required this.category,
     this.supplier = '',
     this.isOwnBrand = true,
+    this.unitsPerCarton = 12,
+    this.itemType = 'عادي',
+    this.factoryUnitCost = 0.0,
     required this.quantitySold,
     required this.netRevenue,
     required this.unitPrice,
@@ -847,11 +873,16 @@ class SellOutRecordModel {
       retailerChain: json['retailer_chain'] as String? ?? '',
       storeId: json['store_id'] as String? ?? '',
       storeName: json['store_name'] as String? ?? '',
+      itemCode: json['item_code'] as String? ?? '',
       barcode: json['barcode'] as String? ?? '',
       skuName: json['sku_name'] as String? ?? '',
+      retailerRawSkuName: json['retailer_raw_sku_name'] as String? ?? '',
       category: json['category'] as String? ?? '',
       supplier: json['supplier'] as String? ?? '',
       isOwnBrand: json['is_own_brand'] as bool? ?? true,
+      unitsPerCarton: (json['units_per_carton'] as num?)?.toInt() ?? 12,
+      itemType: json['item_type'] as String? ?? 'عادي',
+      factoryUnitCost: (json['factory_unit_cost'] as num?)?.toDouble() ?? 0.0,
       quantitySold: json['quantity_sold'] as int? ?? 0,
       netRevenue: (json['net_revenue'] as num?)?.toDouble() ?? 0.0,
       unitPrice: uPrice,
@@ -867,10 +898,13 @@ class OOSAlertModel {
   final String retailerChain;
   final String storeId;
   final String storeName;
+  final String itemCode;
   final String barcode;
   final String skuName;
   final String brand;
   final String category;
+  final int unitsPerCarton;
+  final String itemType;
   final double estimatedLostDailyCost;
   final int consecutiveDaysOOS;
   final String severity; // critical, high, medium
@@ -880,10 +914,13 @@ class OOSAlertModel {
     required this.retailerChain,
     required this.storeId,
     required this.storeName,
+    this.itemCode = '',
     required this.barcode,
     required this.skuName,
     String brand = '',
     required this.category,
+    this.unitsPerCarton = 12,
+    this.itemType = 'عادي',
     required this.estimatedLostDailyCost,
     required this.consecutiveDaysOOS,
     required this.severity,
@@ -906,10 +943,13 @@ class OOSAlertModel {
       retailerChain: json['retailer_chain'] as String? ?? '',
       storeId: json['store_id'] as String? ?? '',
       storeName: json['store_name'] as String? ?? '',
+      itemCode: json['item_code'] as String? ?? '',
       barcode: json['barcode'] as String? ?? '',
       skuName: skuName,
       brand: inferredBrand,
       category: category,
+      unitsPerCarton: (json['units_per_carton'] as num?)?.toInt() ?? 12,
+      itemType: json['item_type'] as String? ?? 'عادي',
       estimatedLostDailyCost: (json['estimated_lost_daily_cost'] as num?)?.toDouble() ?? 0.0,
       consecutiveDaysOOS: json['consecutive_days_oos'] as int? ?? 0,
       severity: json['severity'] as String? ?? 'medium',
@@ -1128,6 +1168,7 @@ class StoreBenchmarkItem {
 
 /// Pricing Compliance Item Model
 class PricingComplianceItem {
+  final String itemCode;
   final String skuName;
   final String barcode;
   final String category;
@@ -1135,6 +1176,10 @@ class PricingComplianceItem {
   final String storeName;
   final double actualPrice;
   final double recommendedPrice;
+  final double factoryUnitCost;
+  final double retailerMarginPct;
+  final int unitsPerCarton;
+  final String itemType;
   final double priceDeltaPct;
   final String violationType; // 'compliant', 'under_cutting', 'price_gouging'
   final bool isPromoActive;
@@ -1142,6 +1187,7 @@ class PricingComplianceItem {
   final String transactionDate;
 
   PricingComplianceItem({
+    this.itemCode = '',
     required this.skuName,
     required this.barcode,
     required this.category,
@@ -1149,6 +1195,10 @@ class PricingComplianceItem {
     required this.storeName,
     required this.actualPrice,
     required this.recommendedPrice,
+    this.factoryUnitCost = 0.0,
+    this.retailerMarginPct = 0.0,
+    this.unitsPerCarton = 12,
+    this.itemType = 'عادي',
     required this.priceDeltaPct,
     required this.violationType,
     required this.isPromoActive,
@@ -1157,14 +1207,23 @@ class PricingComplianceItem {
   });
 
   factory PricingComplianceItem.fromJson(Map<String, dynamic> json) {
+    final actual = (json['actual_price'] as num?)?.toDouble() ?? 0.0;
+    final cost = (json['factory_unit_cost'] as num?)?.toDouble() ?? 0.0;
+    final margin = (json['retailer_margin_pct'] as num?)?.toDouble() ??
+        (actual > 0 && cost > 0 ? double.parse((((actual - cost) / actual) * 100.0).toStringAsFixed(1)) : 0.0);
     return PricingComplianceItem(
+      itemCode: json['item_code'] as String? ?? '',
       skuName: json['sku_name'] as String? ?? '',
       barcode: json['barcode'] as String? ?? '',
       category: ApiClient.normalizeCategoryName(json['category'] as String? ?? ''),
       retailerChain: json['retailer_chain'] as String? ?? '',
       storeName: json['store_name'] as String? ?? '',
-      actualPrice: (json['actual_price'] as num?)?.toDouble() ?? 0.0,
+      actualPrice: actual,
       recommendedPrice: (json['recommended_price'] as num?)?.toDouble() ?? 0.0,
+      factoryUnitCost: cost,
+      retailerMarginPct: margin,
+      unitsPerCarton: (json['units_per_carton'] as num?)?.toInt() ?? 12,
+      itemType: json['item_type'] as String? ?? 'عادي',
       priceDeltaPct: (json['price_delta_pct'] as num?)?.toDouble() ?? 0.0,
       violationType: json['violation_type'] as String? ?? 'compliant',
       isPromoActive: json['is_promo_active'] as bool? ?? false,
@@ -1174,6 +1233,7 @@ class PricingComplianceItem {
   }
 
   Map<String, dynamic> toJson() => {
+        'item_code': itemCode,
         'sku_name': skuName,
         'barcode': barcode,
         'category': category,
@@ -1181,6 +1241,10 @@ class PricingComplianceItem {
         'store_name': storeName,
         'actual_price': actualPrice,
         'recommended_price': recommendedPrice,
+        'factory_unit_cost': factoryUnitCost,
+        'retailer_margin_pct': retailerMarginPct,
+        'units_per_carton': unitsPerCarton,
+        'item_type': itemType,
         'price_delta_pct': priceDeltaPct,
         'violation_type': violationType,
         'is_promo_active': isPromoActive,
@@ -1570,7 +1634,9 @@ class ArchivedExcelFileModel {
     final rawType = json['file_type'] as String? ?? '';
     final fType = rawType.isNotEmpty
         ? rawType
-        : (batch.startsWith('batch_sellin_') ? 'sell_in' : 'sell_out');
+        : (batch.startsWith('batch_pm_') || chain == 'product-master'
+            ? 'product_master'
+            : (batch.startsWith('batch_sellin_') ? 'sell_in' : 'sell_out'));
     return ArchivedExcelFileModel(
       id: json['id'] as String? ?? '',
       batchId: batch,
@@ -3047,6 +3113,7 @@ class ApiClient {
   Future<List<PricingComplianceItem>> getPricingCompliance({
     String? chain,
     String? category,
+    String? search,
     bool? violationOnly,
     bool? promoOnly,
     int? year,
@@ -3069,6 +3136,9 @@ class ApiClient {
       }
       if (month != null && month > 0) {
         params['month'] = month.toString();
+      }
+      if (search != null && search.trim().isNotEmpty) {
+        params['search'] = search.trim();
       }
       if (!_legacyListComplianceServer) {
         if (category != null && category.isNotEmpty && category != 'الكل' && category != 'all') {
@@ -3104,6 +3174,7 @@ class ApiClient {
           lastPricingComplianceMeta = _buildCompliancePageMetaFromList(
             allChainItems: items,
             category: category,
+            search: search,
             violationOnly: violationOnly,
             promoOnly: promoOnly,
             limit: limit,
@@ -3181,6 +3252,7 @@ class ApiClient {
             return _fallbackMockPricingComplianceWithMeta(
               chain: effectiveChain,
               category: category,
+              search: search,
               violationOnly: violationOnly,
               promoOnly: promoOnly,
               limit: limit,
@@ -3219,6 +3291,7 @@ class ApiClient {
     return _fallbackMockPricingComplianceWithMeta(
       chain: effectiveChain,
       category: category,
+      search: search,
       violationOnly: violationOnly,
       promoOnly: promoOnly,
       limit: limit,
@@ -3229,6 +3302,7 @@ class ApiClient {
   List<PricingComplianceItem> _fallbackMockPricingComplianceWithMeta({
     String? chain,
     String? category,
+    String? search,
     bool? violationOnly,
     bool? promoOnly,
     int? limit,
@@ -3238,6 +3312,7 @@ class ApiClient {
     lastPricingComplianceMeta = _buildCompliancePageMetaFromList(
       allChainItems: allChainItems,
       category: category,
+      search: search,
       violationOnly: violationOnly,
       promoOnly: promoOnly,
       limit: limit,
@@ -3249,6 +3324,7 @@ class ApiClient {
   PricingCompliancePageResult _buildCompliancePageMetaFromList({
     required List<PricingComplianceItem> allChainItems,
     String? category,
+    String? search,
     bool? violationOnly,
     bool? promoOnly,
     int? limit,
@@ -3270,9 +3346,22 @@ class ApiClient {
 
     final targetCat = category != null ? normalizeCategoryName(category) : '';
     final hasCatFilter = targetCat.isNotEmpty && targetCat != 'الكل' && targetCat != 'all';
-    final categoryItems = hasCatFilter
+    var categoryItems = hasCatFilter
         ? effectiveChainItems.where((i) => normalizeCategoryName(i.category) == targetCat).toList()
         : effectiveChainItems;
+
+    if (search != null && search.trim().isNotEmpty) {
+      categoryItems = categoryItems
+          .where((i) => matchesProductSearch(
+                search,
+                itemCode: i.itemCode,
+                barcode: i.barcode,
+                skuName: i.skuName,
+                category: i.category,
+                storeName: i.storeName,
+              ))
+          .toList();
+    }
 
     final summaryTotal = categoryItems.length;
     final compliantCount = categoryItems.where((i) => i.violationType == 'compliant').length;
@@ -8661,6 +8750,388 @@ class ApiClient {
     throw Exception('تعذر استيراد ملف المستهدفات (HTTP ${response.statusCode})');
   }
 
+  /// Canonical product search helper supporting Item Code (كود الصنف), prefixes (FGCL, FGDW, FGSL alias),
+  /// Barcode (الباركود), SKU name, brand, category, and branch/customer name.
+  static bool matchesProductSearch(
+    String rawQuery, {
+    String itemCode = '',
+    String barcode = '',
+    String skuName = '',
+    String rawSkuName = '',
+    String brand = '',
+    String category = '',
+    String packagingType = '',
+    String storeName = '',
+  }) {
+    final q = rawQuery.trim().toLowerCase();
+    if (q.isEmpty) return true;
+
+    final qCompact = q.replaceAll(' ', '').replaceAll('-', '').replaceAll('_', '');
+    final codeLower = itemCode.trim().toLowerCase();
+    final codeCompact = codeLower.replaceAll(' ', '').replaceAll('-', '').replaceAll('_', '');
+    final bcLower = barcode.trim().toLowerCase();
+
+    if (codeLower.isNotEmpty) {
+      if (codeLower.contains(q) || codeCompact.contains(qCompact)) return true;
+      if (qCompact.startsWith('fgsl')) {
+        final altCl = 'fgcl${qCompact.substring(4)}';
+        final altLc = 'fglc${qCompact.substring(4)}';
+        if (codeCompact.contains(altCl) || codeCompact.contains(altLc)) {
+          return true;
+        }
+      }
+    }
+    if (bcLower.isNotEmpty && (bcLower.contains(q) || bcLower.contains(qCompact))) {
+      return true;
+    }
+    if (skuName.toLowerCase().contains(q)) return true;
+    if (rawSkuName.toLowerCase().contains(q)) return true;
+    if (brand.toLowerCase().contains(q)) return true;
+    if (category.toLowerCase().contains(q)) return true;
+    if (packagingType.toLowerCase().contains(q)) return true;
+    if (storeName.toLowerCase().contains(q)) return true;
+    return false;
+  }
+
+  /// Fetches the Adeco Product Master & Official Price List (`كارتة الأصناف والأسعار`).
+  Future<ProductMasterSummaryModel> getProductMaster({
+    String? search,
+    String? brand,
+    String? category,
+    String? prefix,
+    String? itemType,
+    String? packaging,
+    String? pullStatus,
+  }) async {
+    try {
+      final params = <String, String>{};
+      if (search != null && search.trim().isNotEmpty) {
+        params['search'] = search.trim();
+      }
+      if (brand != null && brand.isNotEmpty && brand != 'all' && brand != 'الكل') {
+        params['brand'] = brand;
+      }
+      if (category != null && category.isNotEmpty && category != 'all' && category != 'الكل') {
+        params['category'] = category;
+      }
+      if (prefix != null && prefix.isNotEmpty && prefix != 'all' && prefix != 'الكل') {
+        params['prefix'] = prefix;
+      }
+      if (itemType != null && itemType.isNotEmpty && itemType != 'all' && itemType != 'الكل') {
+        params['item_type'] = itemType;
+      }
+      if (packaging != null && packaging.isNotEmpty && packaging != 'all' && packaging != 'الكل') {
+        params['packaging'] = packaging;
+      }
+      if (pullStatus != null && pullStatus.isNotEmpty && pullStatus != 'all' && pullStatus != 'الكل') {
+        params['pull_status'] = pullStatus;
+      }
+
+      final uri = Uri.parse(ApiEndpoints.productMaster).replace(
+        queryParameters: params.isEmpty ? null : params,
+      );
+      final response = await http
+          .get(uri, headers: _headers)
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        isServerOnline.value = true;
+        lastConnectionError = null;
+        final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        return ProductMasterSummaryModel.fromJson(data);
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] Fallback getProductMaster: $e');
+      if (!allowMockFallback) {
+        isServerOnline.value = false;
+        lastConnectionError = e.toString();
+        throw ServerConnectionException(
+          'تعذر الاتصال بخادم كارتة الأصناف والأسعار (Port 8080).',
+          e,
+        );
+      }
+    }
+    return _fallbackMockProductMaster(
+      search: search,
+      brand: brand,
+      category: category,
+      prefix: prefix,
+      itemType: itemType,
+      packaging: packaging,
+      pullStatus: pullStatus,
+    );
+  }
+
+  /// Updates or inserts a single Product Master SKU item (`PUT /api/v1/product-master/item`).
+  Future<ProductMasterSummaryModel> updateProductMasterItem(
+    ProductMasterItemModel item,
+  ) async {
+    final uri = Uri.parse(ApiEndpoints.productMasterItem);
+    final response = await http
+        .put(
+          uri,
+          headers: _headers,
+          body: jsonEncode(item.toJson()),
+        )
+        .timeout(const Duration(seconds: 12));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      final summaryJson = data['summary'] as Map<String, dynamic>? ?? data;
+      return ProductMasterSummaryModel.fromJson(summaryJson);
+    }
+    throw Exception('تعذر تحديث بيانات الصنف في كارتة الأصناف (HTTP ${response.statusCode})');
+  }
+
+  /// Uploads an Excel (.xlsx) or CSV file containing the Product Master & Price List (`POST /api/v1/product-master/upload`).
+  Future<({IngestionResultModel result, ProductMasterSummaryModel summary})> uploadProductMasterFile({
+    required String filename,
+    required Uint8List fileBytes,
+  }) async {
+    final uri = Uri.parse(ApiEndpoints.productMasterUpload).replace(
+      queryParameters: {'filename': filename},
+    );
+
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(_headers);
+    request.headers.remove('Content-Type');
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        fileBytes,
+        filename: filename,
+      ),
+    );
+
+    final streamed = await request.send().timeout(const Duration(seconds: 30));
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      final resultJson = data['result'] as Map<String, dynamic>? ?? data;
+      final summaryJson = data['summary'] as Map<String, dynamic>? ?? const {};
+      return (
+        result: IngestionResultModel.fromJson(resultJson),
+        summary: ProductMasterSummaryModel.fromJson(summaryJson),
+      );
+    }
+    throw Exception('تعذر رفع وتحديث شيت كارتة الأصناف والأسعار (HTTP ${response.statusCode})');
+  }
+
+  ProductMasterSummaryModel _fallbackMockProductMaster({
+    String? search,
+    String? brand,
+    String? category,
+    String? prefix,
+    String? itemType,
+    String? packaging,
+    String? pullStatus,
+  }) {
+    const seedItems = <ProductMasterItemModel>[
+      ProductMasterItemModel(
+        serialNo: 1,
+        itemCode: 'FGCL-0550-0001',
+        itemCodePrefix: 'FGCL',
+        erpPrefix: 'FGCL',
+        departmentAr: 'قسم الكلور والمبيضات (Chlorine & Bleach)',
+        officialName: 'كلوريل أبيض 1050 جم عبوة',
+        barcode: '6221133000181',
+        category: 'الكلور والمطهرات (Chlorine & Disinfectants)',
+        brand: 'كلوريل (Clorel)',
+        packagingType: 'عبوة',
+        unitsPerCarton: 12,
+        unitPriceExclVat: 15.79,
+        vatRate: 0.14,
+        unitPriceInclVat: 18.00,
+        cartonPriceExclVat: 189.47,
+        cartonPriceInclVat: 216.00,
+        invoiceDiscountPct: 10.0,
+        extraDiscountPct: 0.0,
+        netUnitInvoiceCost: 16.20,
+        netCartonInvoiceCost: 194.40,
+        itemType: 'عادي',
+        isActiveInChains: true,
+        totalPosUnitsSold: 420,
+        totalPosCartonsSold: 35.0,
+        totalPosRevenue: 7560.0,
+        avgRetailSellingPrice: 18.0,
+        activeChains: ['fathalla', 'carrefour'],
+      ),
+      ProductMasterItemModel(
+        serialNo: 42,
+        itemCode: 'FGDW-0251-0002',
+        itemCodePrefix: 'FGDW',
+        erpPrefix: 'FGDW',
+        departmentAr: 'قسم غسالات الأطباق الأوتوماتيك (Auto Dishwashing)',
+        officialName: 'فيبا سائل أطباق ليمون 4 لتر جركن توفير',
+        barcode: '6221133992356',
+        category: 'منظفات الأطباق (Dishwashing)',
+        brand: 'فيبا (Feba)',
+        packagingType: 'جركن',
+        unitsPerCarton: 4,
+        unitPriceExclVat: 122.81,
+        vatRate: 0.14,
+        unitPriceInclVat: 140.00,
+        cartonPriceExclVat: 491.23,
+        cartonPriceInclVat: 560.00,
+        invoiceDiscountPct: 10.0,
+        extraDiscountPct: 0.0,
+        netUnitInvoiceCost: 126.00,
+        netCartonInvoiceCost: 504.00,
+        itemType: 'عادي',
+        isActiveInChains: true,
+        totalPosUnitsSold: 120,
+        totalPosCartonsSold: 30.0,
+        totalPosRevenue: 16800.0,
+        avgRetailSellingPrice: 140.0,
+        activeChains: ['fathalla'],
+      ),
+      ProductMasterItemModel(
+        serialNo: 88,
+        itemCode: 'FGDG-0400-0012',
+        itemCodePrefix: 'FGDG',
+        erpPrefix: 'FGDG',
+        departmentAr: 'قسم سائل غسيل الأطباق اليدوي (Hand Dishwashing)',
+        officialName: 'ديفاتول مطهر عام برائحة الصنوبر 750 مل عبوة',
+        barcode: '6221133010142',
+        category: 'الكلور والمطهرات (Chlorine & Disinfectants)',
+        brand: 'ديفاتول (Divatol)',
+        packagingType: 'عبوة',
+        unitsPerCarton: 12,
+        unitPriceExclVat: 48.25,
+        vatRate: 0.14,
+        unitPriceInclVat: 55.00,
+        cartonPriceExclVat: 578.95,
+        cartonPriceInclVat: 660.00,
+        invoiceDiscountPct: 10.0,
+        extraDiscountPct: 0.0,
+        netUnitInvoiceCost: 49.50,
+        netCartonInvoiceCost: 594.00,
+        itemType: 'عادي',
+        isActiveInChains: false,
+      ),
+      ProductMasterItemModel(
+        serialNo: 145,
+        itemCode: 'FGHC-0310-0005',
+        itemCodePrefix: 'FGHC',
+        erpPrefix: 'FGHC',
+        departmentAr: 'قسم العناية المنزلية والمطهرات (Home Care & Disinfectants)',
+        officialName: 'فلفيتا منعم أقمشة مركز لافندر 1 لتر عبوة',
+        barcode: '6221133011903',
+        category: 'منعم ومعطر الأقمشة (Fabric Softeners)',
+        brand: 'فلفيتا (Velveta)',
+        packagingType: 'عبوة',
+        unitsPerCarton: 12,
+        unitPriceExclVat: 42.11,
+        vatRate: 0.14,
+        unitPriceInclVat: 48.00,
+        cartonPriceExclVat: 505.26,
+        cartonPriceInclVat: 576.00,
+        invoiceDiscountPct: 10.0,
+        extraDiscountPct: 0.0,
+        netUnitInvoiceCost: 43.20,
+        netCartonInvoiceCost: 518.40,
+        itemType: 'عادي',
+        isActiveInChains: true,
+        totalPosUnitsSold: 84,
+        totalPosCartonsSold: 7.0,
+        totalPosRevenue: 4032.0,
+        avgRetailSellingPrice: 48.0,
+        activeChains: ['fathalla'],
+      ),
+      ProductMasterItemModel(
+        serialNo: 210,
+        itemCode: 'PRHC-0102-0015',
+        itemCodePrefix: 'PRHC',
+        erpPrefix: 'PRHC',
+        departmentAr: 'قسم العروض الترويجية والباكتات (Promotional Bundles)',
+        officialName: 'عرض فيبا توفير 3 لتر + 600 مل هدية شرنك',
+        barcode: '6221133994121',
+        category: 'منظفات الأطباق (Dishwashing)',
+        brand: 'فيبا (Feba)',
+        packagingType: 'شرنك',
+        unitsPerCarton: 6,
+        unitPriceExclVat: 96.49,
+        vatRate: 0.14,
+        unitPriceInclVat: 110.00,
+        cartonPriceExclVat: 578.95,
+        cartonPriceInclVat: 660.00,
+        invoiceDiscountPct: 10.0,
+        extraDiscountPct: 0.0,
+        netUnitInvoiceCost: 99.00,
+        netCartonInvoiceCost: 594.00,
+        itemType: 'عرض',
+        isActiveInChains: false,
+      ),
+    ];
+
+    final filtered = seedItems.where((item) {
+      if (brand != null && brand.isNotEmpty && brand != 'all' && brand != 'الكل' && item.brand != brand) {
+        return false;
+      }
+      if (category != null && category.isNotEmpty && category != 'all' && category != 'الكل' && item.category != category) {
+        return false;
+      }
+      if (prefix != null && prefix.isNotEmpty && prefix != 'all' && prefix != 'الكل') {
+        if (prefix.toUpperCase() == 'PR') {
+          if (!item.itemCodePrefix.toUpperCase().startsWith('PR')) return false;
+        } else if (item.itemCodePrefix.toUpperCase() != prefix.toUpperCase()) {
+          return false;
+        }
+      }
+      if (itemType != null && itemType.isNotEmpty && itemType != 'all' && itemType != 'الكل' && item.itemType != itemType) {
+        return false;
+      }
+      if (packaging != null && packaging.isNotEmpty && packaging != 'all' && packaging != 'الكل' && item.packagingType != packaging) {
+        return false;
+      }
+      if (pullStatus != null && pullStatus.isNotEmpty && pullStatus != 'all' && pullStatus != 'الكل') {
+        if (pullStatus == 'active' && !item.isActiveInChains) return false;
+        if (pullStatus == 'unpulled' && item.isActiveInChains) return false;
+      }
+      if (search != null && search.trim().isNotEmpty) {
+        return matchesProductSearch(
+          search,
+          itemCode: item.itemCode,
+          barcode: item.barcode,
+          skuName: item.officialName,
+          brand: item.brand,
+          category: item.category,
+          packagingType: item.packagingType,
+        );
+      }
+      return true;
+    }).toList();
+
+    return ProductMasterSummaryModel(
+      tenantId: tenantId,
+      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+      sheetDateLabel: 'تحديث 01-08-2026',
+      sourceFilename: 'adeco_product_master_2026_08_01.xlsx',
+      defaultDiscountPct: 10.0,
+      defaultVatRate: 0.14,
+      totalSkus: seedItems.length,
+      regularSkusCount: seedItems.where((e) => e.itemType != 'عرض').length,
+      promoSkusCount: seedItems.where((e) => e.itemType == 'عرض').length,
+      uniqueBarcodesCount: seedItems.map((e) => e.barcode).toSet().length,
+      avgUnitsPerCarton: 9.2,
+      activeInChainsCount: seedItems.where((e) => e.isActiveInChains).length,
+      unpulledSkusCount: seedItems.where((e) => !e.isActiveInChains).length,
+      availablePrefixes: const ['FGCL', 'FGDG', 'FGDW', 'FGGC', 'FGHC', 'FGLC', 'FGPC', 'PR'],
+      availableBrands: const [
+        'فيبا (Feba)',
+        'كلوريل (Clorel)',
+        'فلفيتا (Velveta)',
+        'ديفا (Diva)',
+        'ديفاتول (Divatol)',
+        'ماكسيل (Maxell)',
+        'جلاسي (Glassy)',
+        'سبيد (Speed)',
+      ],
+      availablePackaging: const ['عبوة', 'جركن', 'شرنك', 'باكت', 'بكته'],
+      items: filtered,
+    );
+  }
+
   /// Custom field competitor entries added or pinned by the user during the session.
   final Map<String, List<CompetitorSkuComparisonModel>> _customPinnedCompetitors = {};
 
@@ -10303,9 +10774,12 @@ class SellInRecordItem {
   final String governorate;
   final String sector;
   final String customerName;
+  final String itemCode;
+  final String barcode;
   final String brand;
   final String subCategory;
   final String itemName;
+  final int unitsPerCarton;
   final String promotionType;
   final String salesManager;
   final String kaOfficer;
@@ -10332,9 +10806,12 @@ class SellInRecordItem {
     required this.governorate,
     required this.sector,
     required this.customerName,
+    this.itemCode = '',
+    this.barcode = '',
     required this.brand,
     required this.subCategory,
     required this.itemName,
+    this.unitsPerCarton = 12,
     required this.promotionType,
     required this.salesManager,
     required this.kaOfficer,
@@ -10363,9 +10840,12 @@ class SellInRecordItem {
       governorate: json['governorate'] as String? ?? '',
       sector: json['sector'] as String? ?? 'MT',
       customerName: json['customer_name'] as String? ?? '',
+      itemCode: json['item_code'] as String? ?? '',
+      barcode: json['barcode'] as String? ?? '',
       brand: json['brand'] as String? ?? '',
       subCategory: json['sub_category'] as String? ?? '',
       itemName: json['item_name'] as String? ?? '',
+      unitsPerCarton: (json['units_per_carton'] as num?)?.toInt() ?? 12,
       promotionType: json['promotion_type'] as String? ?? 'عادي',
       salesManager: json['sales_manager'] as String? ?? '',
       kaOfficer: json['ka_officer'] as String? ?? '',
@@ -10414,10 +10894,13 @@ class SellInExplorerResponse {
 }
 
 class TargetSKUBreakdownModel {
+  final String itemCode;
+  final String barcode;
   final String skuName;
   final String brand;
   final String sector;
   final String subCategory;
+  final int unitsPerCarton;
   final double sharePct;
   final double casePriceEgp;
   final double targetRevenueEgp;
@@ -10437,10 +10920,13 @@ class TargetSKUBreakdownModel {
   final double promoSharePct;
 
   const TargetSKUBreakdownModel({
+    this.itemCode = '',
+    this.barcode = '',
     required this.skuName,
     required this.brand,
     required this.sector,
     required this.subCategory,
+    this.unitsPerCarton = 12,
     required this.sharePct,
     required this.casePriceEgp,
     required this.targetRevenueEgp,
@@ -10462,10 +10948,13 @@ class TargetSKUBreakdownModel {
 
   factory TargetSKUBreakdownModel.fromJson(Map<String, dynamic> json) {
     return TargetSKUBreakdownModel(
+      itemCode: json['item_code'] as String? ?? '',
+      barcode: json['barcode'] as String? ?? '',
       skuName: json['sku_name'] as String? ?? '',
       brand: json['brand'] as String? ?? '',
       sector: json['sector'] as String? ?? 'MT',
       subCategory: json['sub_category'] as String? ?? '',
+      unitsPerCarton: (json['units_per_carton'] as num?)?.toInt() ?? 12,
       sharePct: (json['share_pct'] as num?)?.toDouble() ?? 0.0,
       casePriceEgp: (json['case_price_egp'] as num?)?.toDouble() ?? 0.0,
       targetRevenueEgp: (json['target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
@@ -10983,6 +11472,301 @@ class TargetsSummaryModel {
     );
   }
 }
+
+/// Canonical SKU definition from the Adeco Product Master & Price List (`كارتة الأصناف والأسعار`).
+class ProductMasterItemModel {
+  final int serialNo;
+  final String itemCode;
+  final String itemCodePrefix;
+  final String erpPrefix;
+  final String departmentAr;
+  final String officialName;
+  final String barcode;
+  final String category;
+  final String brand;
+  final String packagingType;
+  final int unitsPerCarton;
+  final double unitPriceExclVat;
+  final double vatRate;
+  final double unitPriceInclVat;
+  final double cartonPriceExclVat;
+  final double cartonPriceInclVat;
+  final double invoiceDiscountPct;
+  final double extraDiscountPct;
+  final double netUnitInvoiceCost;
+  final double netCartonInvoiceCost;
+  final String itemType;
+  final bool isPrimaryForBarcode;
+  final bool isActiveInChains;
+  final int totalPosUnitsSold;
+  final double totalPosCartonsSold;
+  final double totalPosRevenue;
+  final double avgRetailSellingPrice;
+  final List<String> activeChains;
+  final String updatedAt;
+
+  const ProductMasterItemModel({
+    this.serialNo = 0,
+    required this.itemCode,
+    this.itemCodePrefix = '',
+    this.erpPrefix = '',
+    this.departmentAr = '',
+    required this.officialName,
+    required this.barcode,
+    this.category = '',
+    this.brand = '',
+    this.packagingType = 'عبوة',
+    this.unitsPerCarton = 12,
+    this.unitPriceExclVat = 0.0,
+    this.vatRate = 0.14,
+    this.unitPriceInclVat = 0.0,
+    this.cartonPriceExclVat = 0.0,
+    this.cartonPriceInclVat = 0.0,
+    this.invoiceDiscountPct = 10.0,
+    this.extraDiscountPct = 0.0,
+    this.netUnitInvoiceCost = 0.0,
+    this.netCartonInvoiceCost = 0.0,
+    this.itemType = 'عادي',
+    this.isPrimaryForBarcode = true,
+    this.isActiveInChains = false,
+    this.totalPosUnitsSold = 0,
+    this.totalPosCartonsSold = 0.0,
+    this.totalPosRevenue = 0.0,
+    this.avgRetailSellingPrice = 0.0,
+    this.activeChains = const [],
+    this.updatedAt = '',
+  });
+
+  static double normalizeDiscountPct(num? raw, double defaultPct) {
+    if (raw == null) return defaultPct;
+    final d = raw.toDouble();
+    if (d > 0.0 && d <= 1.0) {
+      return double.parse((d * 100.0).toStringAsFixed(2));
+    }
+    return d;
+  }
+
+  factory ProductMasterItemModel.fromJson(Map<String, dynamic> json) {
+    final code = (json['item_code'] as String? ?? '').trim();
+    var pfx = (json['item_code_prefix'] as String? ?? '').trim();
+    if (pfx.isEmpty && code.contains('-')) {
+      pfx = code.split('-').first.toUpperCase();
+    }
+    final erpPfx = (json['erp_prefix'] as String? ?? '').trim();
+    return ProductMasterItemModel(
+      serialNo: (json['serial_no'] as num?)?.toInt() ?? 0,
+      itemCode: code,
+      itemCodePrefix: pfx,
+      erpPrefix: erpPfx.isNotEmpty ? erpPfx : pfx,
+      departmentAr: json['department_ar'] as String? ?? '',
+      officialName: json['official_name'] as String? ?? '',
+      barcode: json['barcode'] as String? ?? '',
+      category: json['category'] as String? ?? '',
+      brand: json['brand'] as String? ?? '',
+      packagingType: json['packaging_type'] as String? ?? 'عبوة',
+      unitsPerCarton: (json['units_per_carton'] as num?)?.toInt() ?? 12,
+      unitPriceExclVat: (json['unit_price_excl_vat'] as num?)?.toDouble() ?? 0.0,
+      vatRate: (json['vat_rate'] as num?)?.toDouble() ?? 0.14,
+      unitPriceInclVat: (json['unit_price_incl_vat'] as num?)?.toDouble() ?? 0.0,
+      cartonPriceExclVat: (json['carton_price_excl_vat'] as num?)?.toDouble() ?? 0.0,
+      cartonPriceInclVat: (json['carton_price_incl_vat'] as num?)?.toDouble() ?? 0.0,
+      invoiceDiscountPct: normalizeDiscountPct(json['invoice_discount_pct'] as num?, 10.0),
+      extraDiscountPct: normalizeDiscountPct(json['extra_discount_pct'] as num?, 0.0),
+      netUnitInvoiceCost: (json['net_unit_invoice_cost'] as num?)?.toDouble() ?? 0.0,
+      netCartonInvoiceCost: (json['net_carton_invoice_cost'] as num?)?.toDouble() ?? 0.0,
+      itemType: json['item_type'] as String? ?? 'عادي',
+      isPrimaryForBarcode: json['is_primary_for_barcode'] as bool? ?? true,
+      isActiveInChains: json['is_active_in_chains'] as bool? ?? false,
+      totalPosUnitsSold: (json['total_pos_units_sold'] as num?)?.toInt() ?? 0,
+      totalPosCartonsSold: (json['total_pos_cartons_sold'] as num?)?.toDouble() ?? 0.0,
+      totalPosRevenue: (json['total_pos_revenue'] as num?)?.toDouble() ?? 0.0,
+      avgRetailSellingPrice: (json['avg_retail_selling_price'] as num?)?.toDouble() ?? 0.0,
+      activeChains: (json['active_chains'] as List<dynamic>? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
+      updatedAt: json['updated_at'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'serial_no': serialNo,
+        'item_code': itemCode,
+        'item_code_prefix': itemCodePrefix,
+        'erp_prefix': erpPrefix.isNotEmpty ? erpPrefix : itemCodePrefix,
+        'department_ar': departmentAr,
+        'official_name': officialName,
+        'barcode': barcode,
+        'category': category,
+        'brand': brand,
+        'packaging_type': packagingType,
+        'units_per_carton': unitsPerCarton,
+        'unit_price_excl_vat': unitPriceExclVat,
+        'vat_rate': vatRate,
+        'unit_price_incl_vat': unitPriceInclVat,
+        'carton_price_excl_vat': cartonPriceExclVat,
+        'carton_price_incl_vat': cartonPriceInclVat,
+        'invoice_discount_pct': invoiceDiscountPct > 1.0 ? invoiceDiscountPct / 100.0 : invoiceDiscountPct,
+        'extra_discount_pct': extraDiscountPct > 1.0 ? extraDiscountPct / 100.0 : extraDiscountPct,
+        'net_unit_invoice_cost': netUnitInvoiceCost,
+        'net_carton_invoice_cost': netCartonInvoiceCost,
+        'item_type': itemType,
+        'is_primary_for_barcode': isPrimaryForBarcode,
+        'is_active_in_chains': isActiveInChains,
+        'total_pos_units_sold': totalPosUnitsSold,
+        'total_pos_cartons_sold': totalPosCartonsSold,
+        'total_pos_revenue': totalPosRevenue,
+        'avg_retail_selling_price': avgRetailSellingPrice,
+        'active_chains': activeChains,
+        'updated_at': updatedAt,
+      };
+
+  ProductMasterItemModel copyWith({
+    int? serialNo,
+    String? itemCode,
+    String? itemCodePrefix,
+    String? erpPrefix,
+    String? departmentAr,
+    String? officialName,
+    String? barcode,
+    String? category,
+    String? brand,
+    String? packagingType,
+    int? unitsPerCarton,
+    double? unitPriceExclVat,
+    double? vatRate,
+    double? unitPriceInclVat,
+    double? cartonPriceExclVat,
+    double? cartonPriceInclVat,
+    double? invoiceDiscountPct,
+    double? extraDiscountPct,
+    double? netUnitInvoiceCost,
+    double? netCartonInvoiceCost,
+    String? itemType,
+    bool? isPrimaryForBarcode,
+    bool? isActiveInChains,
+    int? totalPosUnitsSold,
+    double? totalPosCartonsSold,
+    double? totalPosRevenue,
+    double? avgRetailSellingPrice,
+    List<String>? activeChains,
+    String? updatedAt,
+  }) {
+    return ProductMasterItemModel(
+      serialNo: serialNo ?? this.serialNo,
+      itemCode: itemCode ?? this.itemCode,
+      itemCodePrefix: itemCodePrefix ?? this.itemCodePrefix,
+      erpPrefix: erpPrefix ?? this.erpPrefix,
+      departmentAr: departmentAr ?? this.departmentAr,
+      officialName: officialName ?? this.officialName,
+      barcode: barcode ?? this.barcode,
+      category: category ?? this.category,
+      brand: brand ?? this.brand,
+      packagingType: packagingType ?? this.packagingType,
+      unitsPerCarton: unitsPerCarton ?? this.unitsPerCarton,
+      unitPriceExclVat: unitPriceExclVat ?? this.unitPriceExclVat,
+      vatRate: vatRate ?? this.vatRate,
+      unitPriceInclVat: unitPriceInclVat ?? this.unitPriceInclVat,
+      cartonPriceExclVat: cartonPriceExclVat ?? this.cartonPriceExclVat,
+      cartonPriceInclVat: cartonPriceInclVat ?? this.cartonPriceInclVat,
+      invoiceDiscountPct: invoiceDiscountPct ?? this.invoiceDiscountPct,
+      extraDiscountPct: extraDiscountPct ?? this.extraDiscountPct,
+      netUnitInvoiceCost: netUnitInvoiceCost ?? this.netUnitInvoiceCost,
+      netCartonInvoiceCost: netCartonInvoiceCost ?? this.netCartonInvoiceCost,
+      itemType: itemType ?? this.itemType,
+      isPrimaryForBarcode: isPrimaryForBarcode ?? this.isPrimaryForBarcode,
+      isActiveInChains: isActiveInChains ?? this.isActiveInChains,
+      totalPosUnitsSold: totalPosUnitsSold ?? this.totalPosUnitsSold,
+      totalPosCartonsSold: totalPosCartonsSold ?? this.totalPosCartonsSold,
+      totalPosRevenue: totalPosRevenue ?? this.totalPosRevenue,
+      avgRetailSellingPrice: avgRetailSellingPrice ?? this.avgRetailSellingPrice,
+      activeChains: activeChains ?? this.activeChains,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}
+
+/// Summary & items response for `GET /api/v1/product-master`.
+class ProductMasterSummaryModel {
+  final String tenantId;
+  final String companyName;
+  final String sheetDateLabel;
+  final String sourceFilename;
+  final double defaultDiscountPct;
+  final double defaultVatRate;
+  final int totalSkus;
+  final int regularSkusCount;
+  final int promoSkusCount;
+  final int uniqueBarcodesCount;
+  final double avgUnitsPerCarton;
+  final int activeInChainsCount;
+  final int unpulledSkusCount;
+  final List<String> availablePrefixes;
+  final List<String> availableBrands;
+  final List<String> availablePackaging;
+  final List<ProductMasterItemModel> items;
+
+  const ProductMasterSummaryModel({
+    required this.tenantId,
+    required this.companyName,
+    required this.sheetDateLabel,
+    required this.sourceFilename,
+    this.defaultDiscountPct = 10.0,
+    this.defaultVatRate = 0.14,
+    required this.totalSkus,
+    required this.regularSkusCount,
+    required this.promoSkusCount,
+    required this.uniqueBarcodesCount,
+    required this.avgUnitsPerCarton,
+    this.activeInChainsCount = 0,
+    this.unpulledSkusCount = 0,
+    this.availablePrefixes = const [],
+    this.availableBrands = const [],
+    this.availablePackaging = const [],
+    required this.items,
+  });
+
+  factory ProductMasterSummaryModel.fromJson(Map<String, dynamic> json) {
+    final itemsList = (json['items'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(ProductMasterItemModel.fromJson)
+        .toList();
+    return ProductMasterSummaryModel(
+      tenantId: json['tenant_id'] as String? ?? 'tenant-adeco',
+      companyName: json['company_name'] as String? ??
+          'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+      sheetDateLabel: json['sheet_date_label'] as String? ?? 'تحديث 01-08-2026',
+      sourceFilename: json['source_filename'] as String? ?? 'adeco_product_master_2026_08_01.xlsx',
+      defaultDiscountPct: ProductMasterItemModel.normalizeDiscountPct(
+        json['default_discount_pct'] as num?,
+        10.0,
+      ),
+      defaultVatRate: (json['default_vat_rate'] as num?)?.toDouble() ?? 0.14,
+      totalSkus: (json['total_skus'] as num?)?.toInt() ?? itemsList.length,
+      regularSkusCount: (json['regular_skus_count'] as num?)?.toInt() ??
+          itemsList.where((e) => e.itemType != 'عرض').length,
+      promoSkusCount: (json['promo_skus_count'] as num?)?.toInt() ??
+          itemsList.where((e) => e.itemType == 'عرض').length,
+      uniqueBarcodesCount: (json['unique_barcodes_count'] as num?)?.toInt() ??
+          itemsList.map((e) => e.barcode).toSet().length,
+      avgUnitsPerCarton: (json['avg_units_per_carton'] as num?)?.toDouble() ?? 12.0,
+      activeInChainsCount: (json['active_in_chains_count'] as num?)?.toInt() ??
+          itemsList.where((e) => e.isActiveInChains).length,
+      unpulledSkusCount: (json['unpulled_skus_count'] as num?)?.toInt() ??
+          itemsList.where((e) => !e.isActiveInChains).length,
+      availablePrefixes: (json['available_prefixes'] as List<dynamic>? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
+      availableBrands: (json['available_brands'] as List<dynamic>? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
+      availablePackaging: (json['available_packaging'] as List<dynamic>? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
+      items: itemsList,
+    );
+  }
+}
+
 
 
 

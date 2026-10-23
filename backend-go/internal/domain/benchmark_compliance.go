@@ -17,19 +17,24 @@ type StoreBenchmarkItem struct {
 
 // PricingComplianceItem represents SKU-level price monitoring and promotional uplift.
 type PricingComplianceItem struct {
-	TenantID         string  `json:"tenant_id,omitempty"`
-	SKUName          string  `json:"sku_name"`
-	Barcode          string  `json:"barcode"`
-	Category         string  `json:"category"`
-	RetailerChain    string  `json:"retailer_chain"`
-	StoreName        string  `json:"store_name"`
-	ActualPrice      float64 `json:"actual_price"`
-	RecommendedPrice float64 `json:"recommended_price"` // RRP
-	PriceDeltaPct    float64 `json:"price_delta_pct"`
-	ViolationType    string  `json:"violation_type"` // 'compliant', 'under_cutting', 'price_gouging'
-	IsPromoActive    bool    `json:"is_promo_active"`
-	PromoUpliftPct   float64 `json:"promo_uplift_pct"`
-	TransactionDate  string  `json:"transaction_date,omitempty"`
+	TenantID          string  `json:"tenant_id,omitempty"`
+	ItemCode          string  `json:"item_code,omitempty"`
+	SKUName           string  `json:"sku_name"`
+	Barcode           string  `json:"barcode"`
+	Category          string  `json:"category"`
+	RetailerChain     string  `json:"retailer_chain"`
+	StoreName         string  `json:"store_name"`
+	ActualPrice       float64 `json:"actual_price"`
+	RecommendedPrice  float64 `json:"recommended_price"` // RRP
+	FactoryUnitCost   float64 `json:"factory_unit_cost,omitempty"`
+	RetailerMarginPct float64 `json:"retailer_margin_pct,omitempty"`
+	UnitsPerCarton    int     `json:"units_per_carton,omitempty"`
+	ItemType          string  `json:"item_type,omitempty"`
+	PriceDeltaPct     float64 `json:"price_delta_pct"`
+	ViolationType     string  `json:"violation_type"` // 'compliant', 'under_cutting', 'price_gouging'
+	IsPromoActive     bool    `json:"is_promo_active"`
+	PromoUpliftPct    float64 `json:"promo_uplift_pct"`
+	TransactionDate   string  `json:"transaction_date,omitempty"`
 }
 
 // MonthlyPriceElasticityPoint represents monthly average price vs. revenue and volume performance.

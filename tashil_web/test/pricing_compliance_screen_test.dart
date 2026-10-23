@@ -289,6 +289,7 @@ class _FakePaginatedComplianceApiClient extends ApiClient {
     int? month,
     int? limit,
     int? offset,
+    String? search,
   }) async {
     lastRequestedLimit = limit;
     lastRequestedOffset = offset;
@@ -299,6 +300,17 @@ class _FakePaginatedComplianceApiClient extends ApiClient {
       if (category != null && category.isNotEmpty && item.category != category) return false;
       if (violationOnly == true && item.violationType == 'compliant') return false;
       if (promoOnly == true && !item.isPromoActive) return false;
+      if (search != null && search.trim().isNotEmpty) {
+        if (!ApiClient.matchesProductSearch(
+          search,
+          itemCode: item.itemCode,
+          barcode: item.barcode,
+          skuName: item.skuName,
+          category: item.category,
+        )) {
+          return false;
+        }
+      }
       return true;
     }).toList();
 

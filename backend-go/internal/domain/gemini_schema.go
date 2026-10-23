@@ -162,6 +162,7 @@ type IngestionAnomaly struct {
 type NormalizedRecord struct {
 	RawStoreName     string  `json:"raw_store_name"`
 	ResolvedStoreID  string  `json:"resolved_store_id"`
+	ItemCode         string  `json:"item_code,omitempty"`
 	Barcode          string  `json:"barcode"`
 	SKUName          string  `json:"sku_name"`
 	Category         string  `json:"category,omitempty"`

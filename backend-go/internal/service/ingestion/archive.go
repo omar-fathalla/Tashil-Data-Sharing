@@ -18,7 +18,7 @@ import (
 type ArchivedFile struct {
 	ID              string  `json:"id"`
 	BatchID         string  `json:"batch_id,omitempty"`
-	FileType        string  `json:"file_type,omitempty"` // "sell_out" | "sell_in"
+	FileType        string  `json:"file_type,omitempty"` // "sell_out" | "sell_in" | "product_master"
 	TenantID        string  `json:"tenant_id"`
 	FileName        string  `json:"file_name"`
 	ContentType     string  `json:"content_type"`
@@ -37,8 +37,29 @@ type ArchivedFile struct {
 	StoragePath     string  `json:"storage_path,omitempty"`
 }
 
+func isProductMasterArchiveEntry(entry *ArchivedFile) bool {
+	if entry == nil {
+		return false
+	}
+	if strings.EqualFold(entry.FileType, "product_master") {
+		return true
+	}
+	if strings.HasPrefix(entry.BatchID, "batch_pm_") {
+		return true
+	}
+	if strings.EqualFold(entry.RetailChain, "product-master") || strings.EqualFold(entry.RetailChain, "product_master") {
+		return true
+	}
+	fn := strings.ToLower(entry.FileName)
+	return strings.Contains(fn, "product_master") ||
+		strings.Contains(entry.FileName, "كارتة الأصناف")
+}
+
 func isSellInArchiveEntry(entry *ArchivedFile) bool {
 	if entry == nil {
+		return false
+	}
+	if isProductMasterArchiveEntry(entry) {
 		return false
 	}
 	if strings.EqualFold(entry.FileType, "sell_in") {
@@ -76,6 +97,8 @@ func normalizeArchiveTenantID(tenantID string) string {
 
 func getChainNamesArEn(chainCode string) (string, string) {
 	switch strings.ToLower(strings.TrimSpace(chainCode)) {
+	case "product-master", "product_master":
+		return "كارتة الأصناف والأسعار", "Product Master & Price List"
 	case "fathalla":
 		return "أسواق فتح الله", "Fathalla Market"
 	case "gomla":
@@ -325,7 +348,9 @@ func (p *Processor) SaveArchivedFile(
 	}
 
 	fileType := "sell_out"
-	if strings.HasPrefix(batchID, "batch_sellin_") {
+	if strings.HasPrefix(batchID, "batch_pm_") || strings.EqualFold(normChain, "product-master") || strings.EqualFold(normChain, "product_master") {
+		fileType = "product_master"
+	} else if strings.HasPrefix(batchID, "batch_sellin_") {
 		fileType = "sell_in"
 	}
 
@@ -341,7 +366,9 @@ func (p *Processor) SaveArchivedFile(
 	var existingID string
 	for id, entry := range p.archivedFiles {
 		entryType := "sell_out"
-		if isSellInArchiveEntry(entry) {
+		if isProductMasterArchiveEntry(entry) {
+			entryType = "product_master"
+		} else if isSellInArchiveEntry(entry) {
 			entryType = "sell_in"
 		}
 		if entry.TenantID == normTenant &&
@@ -357,7 +384,9 @@ func (p *Processor) SaveArchivedFile(
 	if archiveID == "" {
 		slug := strings.TrimPrefix(normTenant, "tenant-")
 		prefix := "arch"
-		if fileType == "sell_in" {
+		if fileType == "product_master" {
+			prefix = "arch_pm"
+		} else if fileType == "sell_in" {
 			prefix = "arch_sellin"
 		}
 		archiveID = fmt.Sprintf("%s_%s_%s_%d", prefix, slug, normChain, time.Now().UnixNano())
@@ -426,6 +455,7 @@ func (p *Processor) UpdateArchivedFileByBatch(batchID, retailChain, targetYear, 
 				for otherID, other := range p.archivedFiles {
 					if otherID != entry.ID &&
 						other.TenantID == entry.TenantID &&
+						isProductMasterArchiveEntry(other) == isProductMasterArchiveEntry(entry) &&
 						isSellInArchiveEntry(other) == isSellInArchiveEntry(entry) &&
 						strings.EqualFold(other.RetailChain, normChain) &&
 						strings.EqualFold(other.FileName, entry.FileName) {
@@ -487,7 +517,7 @@ func (p *Processor) RemoveArchivedFileByBatch(batchID string, prevEntry *Archive
 	}
 }
 
-// ListArchivedFiles returns archived files for the tenant, optionally filtered by retail chain, year, search query, and file type ("sell_out" | "sell_in" | "all").
+// ListArchivedFiles returns archived files for the tenant, optionally filtered by retail chain, year, search query, and file type ("sell_out" | "sell_in" | "product_master" | "all").
 func (p *Processor) ListArchivedFiles(ctx context.Context, tenantID, chainFilter, yearFilter, searchQuery string, fileTypeFilters ...string) *ArchiveListResponse {
 	p.archiveMu.RLock()
 	defer p.archiveMu.RUnlock()
@@ -508,6 +538,8 @@ func (p *Processor) ListArchivedFiles(ctx context.Context, tenantID, chainFilter
 		tf := strings.ToLower(strings.TrimSpace(fileTypeFilters[0]))
 		if tf == "sell_in" || tf == "sellin" {
 			typeFilter = "sell_in"
+		} else if tf == "product_master" || tf == "product-master" || tf == "master" {
+			typeFilter = "product_master"
 		} else if tf == "all" || tf == "*" {
 			typeFilter = "all"
 		}
@@ -524,11 +556,15 @@ func (p *Processor) ListArchivedFiles(ctx context.Context, tenantID, chainFilter
 			continue
 		}
 
+		isProductMaster := isProductMasterArchiveEntry(entry)
 		isSellIn := isSellInArchiveEntry(entry)
+		if typeFilter == "product_master" && !isProductMaster {
+			continue
+		}
 		if typeFilter == "sell_in" && !isSellIn {
 			continue
 		}
-		if typeFilter == "sell_out" && isSellIn {
+		if typeFilter == "sell_out" && (isSellIn || isProductMaster) {
 			continue
 		}
 
@@ -550,7 +586,9 @@ func (p *Processor) ListArchivedFiles(ctx context.Context, tenantID, chainFilter
 		}
 		copyEntry := *entry
 		if copyEntry.FileType == "" {
-			if isSellIn {
+			if isProductMaster {
+				copyEntry.FileType = "product_master"
+			} else if isSellIn {
 				copyEntry.FileType = "sell_in"
 			} else {
 				copyEntry.FileType = "sell_out"
@@ -675,6 +713,9 @@ func (p *Processor) DeleteArchivedFile(ctx context.Context, tenantID, archiveID 
 	}
 
 	// 4. Purge facts / analytics from BigQuery and Firestore:
+	if isProductMasterArchiveEntry(&deletedEntry) {
+		return &deletedEntry, nil
+	}
 	isSellInFile := isSellInArchiveEntry(&deletedEntry)
 	if isSellInFile {
 		// Only remove Sell-In records belonging to this deleted Sell-In file; never touch Sell-Out or other Sell-In files!
@@ -685,7 +726,7 @@ func (p *Processor) DeleteArchivedFile(ctx context.Context, tenantID, archiveID 
 	remainingSellOutTenantFiles := 0
 	remainingSellOutChainFiles := 0
 	for _, f := range p.archivedFiles {
-		if f.TenantID == normTenant && !isSellInArchiveEntry(f) {
+		if f.TenantID == normTenant && !isSellInArchiveEntry(f) && !isProductMasterArchiveEntry(f) {
 			remainingSellOutTenantFiles++
 			if strings.EqualFold(f.RetailChain, deletedEntry.RetailChain) {
 				remainingSellOutChainFiles++
@@ -743,13 +784,32 @@ func (p *Processor) ReplayArchivedFilesToDatabase(ctx context.Context) error {
 	p.loadDiskArchiveLocked()
 	files := make([]*ArchivedFile, 0, len(p.archivedFiles))
 	hasSeedSellIn := false
+	hasSeedProductMaster := false
 	for _, f := range p.archivedFiles {
 		files = append(files, f)
 		if strings.EqualFold(f.FileName, "Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx") {
 			hasSeedSellIn = true
 		}
+		if isProductMasterArchiveEntry(f) || strings.EqualFold(f.FileName, "adeco_product_master_2026_08_01.xlsx") {
+			hasSeedProductMaster = true
+		}
 	}
 	p.archiveMu.Unlock()
+
+	// Ensure Adeco Product Master & Price List seed dataset is archived on startup if not already present
+	pmSeedDeleted := p.fsRepo != nil && p.fsRepo.IsArchiveDeleted("tenant-adeco", "", "adeco_product_master_2026_08_01.xlsx")
+	if !hasSeedProductMaster && !pmSeedDeleted {
+		pmSeedPaths := []string{
+			"data/product_master/adeco_product_master_2026_08_01.xlsx",
+			"/app/data/product_master/adeco_product_master_2026_08_01.xlsx",
+		}
+		for _, sp := range pmSeedPaths {
+			if seedBytes, err := os.ReadFile(sp); err == nil && len(seedBytes) > 0 {
+				_, _ = p.ProcessProductMaster(ctx, "tenant-adeco", filepath.Base(sp), seedBytes, false)
+				break
+			}
+		}
+	}
 
 	// Ensure CPFR Sell-In seed dataset is loaded on startup if not already archived and not deleted by the user
 	seedDeleted := p.fsRepo != nil && p.fsRepo.IsArchiveDeleted("tenant-adeco", "", "Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx")
@@ -796,7 +856,9 @@ func (p *Processor) ReplayArchivedFilesToDatabase(ctx context.Context) error {
 			continue
 		}
 
-		if isSellInArchiveEntry(f) {
+		if isProductMasterArchiveEntry(f) {
+			_, _ = p.ProcessProductMaster(ctx, f.TenantID, f.FileName, raw, false)
+		} else if isSellInArchiveEntry(f) {
 			_, _ = p.ProcessSellInPlan(ctx, f.TenantID, f.FileName, raw, false, f.RetailChain)
 		} else {
 			_, _ = p.ProcessUpload(ctx, f.TenantID, f.FileName, raw, f.RetailChain)

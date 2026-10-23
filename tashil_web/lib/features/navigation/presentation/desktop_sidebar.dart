@@ -86,6 +86,11 @@ class DesktopSidebar extends StatelessWidget {
         selectedIcon: Icons.auto_awesome_rounded,
         label: 'Upload',
       ),
+      _NavDestination(
+        icon: Icons.qr_code_2_outlined,
+        selectedIcon: Icons.qr_code_2_rounded,
+        label: 'كارتة الأصناف (Product Master)',
+      ),
     ];
 
     return Container(

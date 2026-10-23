@@ -69,6 +69,8 @@ type StagedUpload struct {
 	ValidNormalizedRecords []domain.NormalizedRecord
 	SellInRecords          []domain.SellInRecord
 	IsSellInPlan           bool
+	ProductMasterSummary   *domain.ProductMasterSummaryResponse
+	IsProductMaster        bool
 	WBMeta                 bigquery.TenantWorkbookAnalytics
 	DiscoveredStores       []domain.Store
 	DiscoveredStoreMap     map[string]domain.Store
@@ -147,6 +149,8 @@ func (p *Processor) ClearTenantData(ctx context.Context, tenantID string) error 
 
 func getChainDisplayName(chainCode string) string {
 	switch strings.ToLower(strings.TrimSpace(chainCode)) {
+	case "product-master", "product_master":
+		return "كارتة الأصناف والأسعار (Product Master)"
 	case "fathalla":
 		return "أسواق فتح الله (Fathalla Market)"
 	case "gomla":
@@ -208,6 +212,11 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 	targetChain := ""
 	if len(targetChains) > 0 {
 		targetChain = strings.TrimSpace(targetChains[0])
+	}
+
+	// Auto-detect Adeco Product Master & Price List workbook (كارتة الأصناف والأسعار)
+	if gemini.IsProductMasterWorkbook(fileBytes) || strings.EqualFold(targetChain, "product-master") || strings.EqualFold(targetChain, "product_master") {
+		return p.ProcessProductMaster(ctx, tenantID, filename, fileBytes, dryRun)
 	}
 
 	// Auto-detect Supplier Sell-In & Forecasting Plan workbook (plan 10 aswak.xlsx / Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx)
@@ -424,6 +433,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			RetailerChain:    payload.RetailerDetected,
 			StoreID:          rec.ResolvedStoreID,
 			StoreName:        rec.RawStoreName,
+			ItemCode:         rec.ItemCode,
 			Barcode:          cleanedBarcode,
 			SKUName:          rec.SKUName,
 			Category:         category,
@@ -436,6 +446,42 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			TransactionDate:  rec.TransactionDate,
 			IngestionBatchID: batchID,
 			IngestedAt:       now,
+		}
+
+		if p.bqRepo != nil && (rec.IsOwnBrand || strings.TrimSpace(rec.Supplier) == "") {
+			if pm, ok := p.bqRepo.LookupProductMaster(tenantID, rec.ItemCode, cleanedBarcode, rec.SKUName); ok {
+				fact.ItemCode = pm.ItemCode
+				cleanRec.ItemCode = pm.ItemCode
+				if pm.Barcode != "" && cleanedBarcode == "" {
+					fact.Barcode = pm.Barcode
+					cleanRec.Barcode = pm.Barcode
+				}
+				if pm.OfficialName != "" {
+					if fact.SKUName != "" && fact.SKUName != pm.OfficialName {
+						fact.RetailerRawSKUName = fact.SKUName
+					}
+					fact.SKUName = pm.OfficialName
+					cleanRec.SKUName = pm.OfficialName
+				}
+				if pm.Category != "" {
+					fact.Category = pm.Category
+					cleanRec.Category = pm.Category
+					discoveredCatSet[pm.Category] = true
+				}
+				if pm.UnitsPerCarton > 0 {
+					fact.UnitsPerCarton = pm.UnitsPerCarton
+				}
+				if pm.ItemType != "" {
+					fact.ItemType = pm.ItemType
+				}
+				if pm.NetUnitInvoiceCost > 0 {
+					fact.FactoryUnitCost = pm.NetUnitInvoiceCost
+				}
+				if pm.UnitPriceInclVAT > 0 {
+					fact.RecommendedPrice = pm.UnitPriceInclVAT
+					cleanRec.RecommendedPrice = pm.UnitPriceInclVAT
+				}
+			}
 		}
 
 		if existingIdx, exists := factIndexByID[deterministicID]; exists {
@@ -473,6 +519,28 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 	if len(discoveredCategories) == 0 {
 		for cat := range discoveredCatSet {
 			discoveredCategories = append(discoveredCategories, cat)
+		}
+	}
+
+	// Enrich OOS alerts with Product Master identity
+	if p.bqRepo != nil {
+		for i := range payload.ComputedOOSAlerts {
+			a := &payload.ComputedOOSAlerts[i]
+			if pm, ok := p.bqRepo.LookupProductMaster(tenantID, a.ItemCode, a.Barcode, a.SKUName); ok {
+				a.ItemCode = pm.ItemCode
+				if pm.Barcode != "" && a.Barcode == "" {
+					a.Barcode = pm.Barcode
+				}
+				if pm.OfficialName != "" {
+					a.SKUName = pm.OfficialName
+				}
+				if pm.UnitsPerCarton > 0 {
+					a.UnitsPerCarton = pm.UnitsPerCarton
+				}
+				if pm.ItemType != "" {
+					a.ItemType = pm.ItemType
+				}
+			}
 		}
 	}
 
@@ -767,8 +835,11 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 	p.stagedMu.Unlock()
 
 	chainToUse := strings.ToLower(strings.TrimSpace(staged.TargetChain))
+	if staged.IsProductMaster && chainToUse == "" {
+		chainToUse = "product-master"
+	}
 	overrideNorm := strings.ToLower(strings.TrimSpace(targetChainOverride))
-	if overrideNorm != "" && !strings.EqualFold(overrideNorm, chainToUse) {
+	if !staged.IsProductMaster && overrideNorm != "" && !strings.EqualFold(overrideNorm, chainToUse) {
 		chainToUse = overrideNorm
 		overrideStoreCache := make(map[string]domain.Store, 64)
 		for i := range staged.ValidFacts {
@@ -830,7 +901,11 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 	}
 
 	// Persist facts and analytics to BigQuery
-	if staged.IsSellInPlan {
+	if staged.IsProductMaster {
+		if _, err := p.bqRepo.SetProductMaster(ctx, tenantID, staged.ProductMasterSummary); err != nil {
+			return nil, fmt.Errorf("failed to persist product master items: %w", err)
+		}
+	} else if staged.IsSellInPlan {
 		if err := p.bqRepo.SetSellInRecords(ctx, tenantID, staged.Filename, staged.SellInRecords); err != nil {
 			return nil, fmt.Errorf("failed to persist sell-in records: %w", err)
 		}
@@ -903,6 +978,150 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		staged.Result.ArchiveID = updatedArchived.ID
 	}
 	return staged.Result, nil
+}
+
+// ProcessProductMaster parses and ingests an Adeco Product Master & Price List workbook (.xlsx or .csv).
+func (p *Processor) ProcessProductMaster(ctx context.Context, tenantID, filename string, fileBytes []byte, dryRun bool) (*IngestionResult, error) {
+	if p.fsRepo != nil {
+		_ = p.fsRepo.UnmarkArchiveDeleted(ctx, tenantID, "", filename)
+	}
+
+	summary, err := gemini.ParseProductMasterWorkbook(tenantID, filename, fileBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse product master workbook: %w", err)
+	}
+	if summary == nil || len(summary.Items) == 0 {
+		return nil, fmt.Errorf("no valid product master SKU rows found in %s", filename)
+	}
+
+	items := summary.Items
+	sheetName := summary.SheetDateLabel
+
+	batchID := fmt.Sprintf("batch_pm_%s_%s", time.Now().Format("20060102150405"), uuid.New().String()[:8])
+	effectiveChain := "product-master"
+
+	catSet := make(map[string]bool)
+	var totalCartonValue float64
+	var totalUnitsPerCarton int
+	samples := make([]domain.NormalizedRecord, 0, 20)
+
+	for _, item := range items {
+		if item.Category != "" {
+			catSet[item.Category] = true
+		}
+		totalCartonValue += item.NetCartonInvoiceCost
+		totalUnitsPerCarton += item.UnitsPerCarton
+		if len(samples) < 20 {
+			samples = append(samples, domain.NormalizedRecord{
+				RawStoreName:     fmt.Sprintf("%s (%s)", item.ItemCode, item.ItemType),
+				ResolvedStoreID:  item.ItemCodePrefix,
+				ItemCode:         item.ItemCode,
+				Barcode:          item.Barcode,
+				SKUName:          item.OfficialName,
+				Category:         item.Category,
+				Supplier:         "شركة أديكو (Adeco)",
+				IsOwnBrand:       true,
+				QuantitySold:     item.UnitsPerCarton,
+				NetRevenue:       math.Round(item.NetCartonInvoiceCost*100) / 100,
+				UnitPrice:        item.NetUnitInvoiceCost,
+				RecommendedPrice: item.UnitPriceInclVAT,
+				TransactionDate:  "2026-08-01",
+			})
+		}
+	}
+
+	discoveredCats := make([]string, 0, len(catSet))
+	for cat := range catSet {
+		discoveredCats = append(discoveredCats, cat)
+	}
+
+	var prevArch *ArchivedFile
+	var prevBytes []byte
+	if dryRun {
+		prevArch, prevBytes = p.SnapshotExistingArchivedFile(tenantID, effectiveChain, filename)
+	}
+	archivedEntry := p.SaveArchivedFile(
+		tenantID,
+		batchID,
+		filename,
+		fileBytes,
+		effectiveChain,
+		"2026",
+		"08",
+		len(items),
+		len(discoveredCats),
+		math.Round(totalCartonValue*100)/100,
+		float64(len(items)),
+		0,
+	)
+
+	if sheetName == "" {
+		sheetName = "تحديث 01-08-2026"
+	}
+
+	result := &IngestionResult{
+		BatchID:                batchID,
+		ArchiveID:              archivedEntry.ID,
+		ArchivedFile:           archivedEntry,
+		Filename:               filename,
+		RetailerDetected:       effectiveChain,
+		DiscoveredRetailer:     effectiveChain,
+		TargetRetailer:         effectiveChain,
+		TotalRows:              len(items),
+		ValidRows:              len(items),
+		AnomalyRows:            0,
+		TotalRevenue:           math.Round(totalCartonValue*100) / 100,
+		TotalQuantity:          totalUnitsPerCarton,
+		ConfidenceScore:        1.0,
+		AutoCreatedStoresCount: 0,
+		DiscoveredCategories:   discoveredCats,
+		TenantMarketSharePct:   100.0,
+		SheetsProcessed:        []string{sheetName},
+		SheetsDetectedCount:    1,
+		ColumnMapping: domain.ColumnMapping{
+			StoreNameColumn:    "كود الصنف (Item Code) + نوع الصنف (عادي / عرض)",
+			BarcodeColumn:      "الباركود الدولي (GTIN / EAN-13 Barcode)",
+			SKUNameColumn:      "اسم الصنف بالعربي والإنجليزي (Official SKU Name)",
+			QuantitySoldColumn: "عدد الوحدات بالكرتونة (Units / Carton)",
+			NetRevenueColumn:   "سعر الكرتونة بعد الخصم شامل الضريبة (Net Carton Cost) + سعر المستهلك",
+			CategoryColumn:     "البادئة والفئة السلعية (FGCL / FGDG / FGDW / FGGC / FGHC / FGLC / FGPC / PR)",
+		},
+		Anomalies:     []domain.IngestionAnomaly{},
+		SampleRecords: samples,
+		AiModelUsed:   "Adeco Product Master & Price List Engine",
+		AiTierUsed:    "Tier 1 - Canonical SKU & Pricing Registry",
+		IsStaged:      dryRun,
+		IsCommitted:   !dryRun,
+	}
+
+	if dryRun {
+		p.stagedMu.Lock()
+		p.staged[batchID] = &StagedUpload{
+			BatchID:              batchID,
+			TenantID:             tenantID,
+			Filename:             filename,
+			TargetChain:          effectiveChain,
+			DiscoveredChain:      effectiveChain,
+			ProductMasterSummary: summary,
+			IsProductMaster:      true,
+			Result:               result,
+			PrevArchivedFile:     prevArch,
+			PrevArchivedBytes:    prevBytes,
+			CreatedAt:            time.Now(),
+		}
+		p.stagedMu.Unlock()
+		if p.bqRepo != nil {
+			_, _ = p.bqRepo.SetProductMaster(ctx, tenantID, summary)
+		}
+		return result, nil
+	}
+
+	if p.bqRepo != nil {
+		if _, err := p.bqRepo.SetProductMaster(ctx, tenantID, summary); err != nil {
+			return nil, fmt.Errorf("failed to store product master items: %w", err)
+		}
+	}
+	return result, nil
 }
 
 // ProcessSellInPlan parses and ingests a Supplier Sell-In & Forecasting Plan workbook (.xlsx or .csv).

@@ -129,6 +129,12 @@ func (c *Client) GetSellInRecords(ctx context.Context, tenantID string, filter S
 
 	var matched []domain.SellInRecord
 	for _, r := range rawRecords {
+		if r.TenantID == "" {
+			r.TenantID = normTenant
+		}
+		if r.ItemCode == "" {
+			c.enrichSellInRecordLocked(&r)
+		}
 		rChain := strings.ToLower(strings.TrimSpace(r.RetailerChain))
 		if rChain == "" {
 			rChain = "fathalla"
@@ -153,13 +159,11 @@ func (c *Client) GetSellInRecords(ctx context.Context, tenantID string, filter S
 			continue
 		}
 		if qLower != "" {
-			matchItem := strings.Contains(strings.ToLower(r.ItemName), qLower)
-			matchBrand := strings.Contains(strings.ToLower(r.Brand), qLower)
+			matchProd := domain.MatchesProductSearchQuery(filter.SearchQuery, r.ItemCode, r.Barcode, r.ItemName, r.ItemName, r.SubCategory, r.Brand)
 			matchCustomer := strings.Contains(strings.ToLower(r.CustomerName), qLower)
 			matchRep := strings.Contains(strings.ToLower(r.SalesRep), qLower)
 			matchGov := strings.Contains(strings.ToLower(r.Governorate), qLower)
-			matchCat := strings.Contains(strings.ToLower(r.SubCategory), qLower)
-			if !matchItem && !matchBrand && !matchCustomer && !matchRep && !matchGov && !matchCat {
+			if !matchProd && !matchCustomer && !matchRep && !matchGov {
 				continue
 			}
 		}

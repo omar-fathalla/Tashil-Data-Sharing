@@ -1558,11 +1558,15 @@ class _ParetoPowerSkusCard extends StatelessWidget {
 
           return ParetoSkuItemModel(
             barcode: s.barcode,
+            itemCode: s.itemCode,
             skuName: s.skuName,
             category: s.category,
+            unitsPerCarton: s.unitsPerCarton,
+            itemType: s.itemType,
             totalRevenue: s.totalRevenue,
             totalUnits: s.totalUnits,
             unitPrice: s.unitPrice,
+            factoryUnitCost: s.factoryUnitCost,
             revenueSharePct: double.parse(share.toStringAsFixed(1)),
             cumulativeSharePct: double.parse(cum.toStringAsFixed(1)),
             isTop80Contributor: isTop80,
@@ -1767,7 +1771,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4.0),
                                 Text(
-                                  '${sku.category} • باركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
+                                  '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود: ${sku.itemCode} • " : ""}باركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                     fontSize: 11.0,
@@ -1807,7 +1811,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 3.0),
                                       Text(
-                                        '${sku.category} • باركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
+                                        '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود: ${sku.itemCode} • " : ""}باركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
                                         style: theme.textTheme.bodySmall?.copyWith(
                                           color: colorScheme.onSurfaceVariant,
                                           fontSize: 11.0,

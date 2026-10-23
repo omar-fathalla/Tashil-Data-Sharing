@@ -1600,14 +1600,17 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
               if (_skuStockStatusFilter != 'all' && item.stockStatus != _skuStockStatusFilter) {
                 return false;
               }
-              // 3. Search query (SKU Name, Brand, SubCategory, Governorate)
+              // 3. Search query (Item Code, Barcode, SKU Name, Brand, SubCategory, Governorate)
               if (_skuSearchQuery.trim().isNotEmpty) {
-                final q = _skuSearchQuery.trim().toLowerCase();
-                final matchName = item.skuName.toLowerCase().contains(q);
-                final matchBrand = brandName.toLowerCase().contains(q);
-                final matchSubCat = item.subCategory.toLowerCase().contains(q);
-                final matchGov = item.governorate.toLowerCase().contains(q);
-                if (!matchName && !matchBrand && !matchSubCat && !matchGov) {
+                if (!ApiClient.matchesProductSearch(
+                  _skuSearchQuery,
+                  itemCode: item.itemCode,
+                  barcode: item.barcode,
+                  skuName: item.skuName,
+                  brand: brandName,
+                  category: item.subCategory,
+                  storeName: item.governorate,
+                )) {
                   return false;
                 }
               }
@@ -2048,9 +2051,25 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                         return DataRow(
                           cells: [
                             DataCell(
-                              Text(
-                                item.skuName,
-                                style: const TextStyle(fontWeight: FontWeight.w700),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    item.skuName,
+                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                  if (item.itemCode.isNotEmpty || item.barcode.isNotEmpty)
+                                    Text(
+                                      '${item.itemCode.isNotEmpty ? item.itemCode : ""}${item.itemCode.isNotEmpty && item.barcode.isNotEmpty ? " • " : ""}${item.barcode}',
+                                      style: TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 10.5,
+                                        color: colorScheme.primary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             DataCell(

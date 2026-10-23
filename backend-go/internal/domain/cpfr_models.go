@@ -31,6 +31,9 @@ type SellInRecord struct {
 	ProductFamily      string    `json:"product_family"`       // عائلة المنتج
 	SubCategory        string    `json:"sub_category"`         // الفئة الفرعية
 	ItemGroup          string    `json:"item_group"`           // مجموعة الصنف
+	ItemCode           string    `json:"item_code,omitempty"`  // كود الصنف المعتمد (e.g. FGCL-0550-0001)
+	Barcode            string    `json:"barcode,omitempty"`    // الباركود الدولي EAN-13
+	UnitsPerCarton     int       `json:"units_per_carton,omitempty"`
 	ItemName           string    `json:"item_name"`            // اسم الصنف
 	PromotionType      string    `json:"promotion_type"`       // عادي | عرض
 	SalesManager       string    `json:"sales_manager"`        // مدير القطاع (officer mgr)
@@ -76,6 +79,11 @@ type ReconciliationMonthItem struct {
 
 // SKUBranchInventoryItem represents the estimated stock balance and smart replenishment PO per SKU/Brand/Region.
 type SKUBranchInventoryItem struct {
+	ItemCode               string  `json:"item_code,omitempty"`
+	Barcode                string  `json:"barcode,omitempty"`
+	UnitsPerCarton         int     `json:"units_per_carton,omitempty"`
+	ItemType               string  `json:"item_type,omitempty"`
+	FactoryCartonCost      float64 `json:"factory_carton_cost,omitempty"`
 	SKUName                string  `json:"sku_name"`
 	Brand                  string  `json:"brand"`
 	Sector                 string  `json:"sector"`      // MT | CC
@@ -234,6 +242,9 @@ type CPFRDashboardPayload struct {
 
 // TargetSKUBreakdown represents the SKU-level target allocation inside a specific branch or rolled up across an entire chain.
 type TargetSKUBreakdown struct {
+	ItemCode            string  `json:"item_code,omitempty"`
+	Barcode             string  `json:"barcode,omitempty"`
+	UnitsPerCarton      int     `json:"units_per_carton,omitempty"`
 	SKUName             string  `json:"sku_name"`
 	Brand               string  `json:"brand"`
 	Sector              string  `json:"sector"` // "MT" | "CC"
@@ -448,8 +459,14 @@ func InferBrandFromItemName(itemName, subCategory string) string {
 		return "نيفيا (Nivea)"
 	case strings.Contains(s, "دوف") || strings.Contains(s, "dove"):
 		return "دوف (Dove)"
-	case strings.Contains(s, "رابيدو") || strings.Contains(s, "rapido") || strings.Contains(s, "جلاسي") || strings.Contains(s, "سبيد"):
+	case strings.Contains(s, "جلاسي") || strings.Contains(s, "جلاسى") || strings.Contains(s, "glassy"):
+		return "جلاسي (Glassy)"
+	case strings.Contains(s, "سبيد") || strings.Contains(s, "speed"):
+		return "سبيد (Speed)"
+	case strings.Contains(s, "رابيدو") || strings.Contains(s, "rapido"):
 		return "رابيدو (Rapido)"
+	case strings.Contains(s, "فما") || strings.Contains(s, "فيما") || strings.Contains(s, "fema"):
+		return "فيما (Fema)"
 	case strings.Contains(s, "كلوريل") || strings.Contains(s, "clorel"):
 		return "كلوريل (Clorel)"
 	case strings.Contains(s, "جنرال") || strings.Contains(s, "general"):
@@ -483,7 +500,7 @@ func InferBrandFromItemName(itemName, subCategory string) string {
 	case strings.Contains(s, "كوكاكولا") || strings.Contains(s, "coca"):
 		return "كوكاكولا (Coca-Cola)"
 	default:
-		clean := strings.TrimSpace(itemName)
+		clean := strings.TrimSpace(strings.TrimLeft(itemName, "* "))
 		if clean == "" {
 			if subCategory != "" {
 				return subCategory
@@ -491,6 +508,9 @@ func InferBrandFromItemName(itemName, subCategory string) string {
 			return "أصناف عامة"
 		}
 		parts := strings.Fields(clean)
+		if len(parts) > 0 && parts[0] == "عرض" && len(parts) > 1 {
+			parts = parts[1:]
+		}
 		if len(parts) > 0 {
 			first := parts[0]
 			if len([]rune(first)) >= 2 {
@@ -503,5 +523,6 @@ func InferBrandFromItemName(itemName, subCategory string) string {
 		return "أصناف عامة"
 	}
 }
+
 
 

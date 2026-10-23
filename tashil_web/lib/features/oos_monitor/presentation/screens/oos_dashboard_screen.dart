@@ -138,11 +138,14 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
         if (_selectedSeverity == 'أولوية مرتفعة' && a.severity != 'high' && a.severity != 'critical') return false;
       }
       if (_searchQuery.trim().isNotEmpty) {
-        final q = _searchQuery.trim().toLowerCase();
-        final match = a.skuName.toLowerCase().contains(q) ||
-            a.barcode.toLowerCase().contains(q) ||
-            a.storeName.toLowerCase().contains(q) ||
-            a.brand.toLowerCase().contains(q);
+        final match = ApiClient.matchesProductSearch(
+          _searchQuery,
+          itemCode: a.itemCode,
+          barcode: a.barcode,
+          skuName: a.skuName,
+          brand: a.brand,
+          storeName: a.storeName,
+        );
         if (!match) return false;
       }
       return true;
@@ -1267,7 +1270,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                       ),
                       const SizedBox(height: 8.0),
                       Text(
-                        'المنفذ: ${alert.storeName} (${alert.retailerChain.toUpperCase()}) • الباركود: ${alert.barcode}',
+                        'المنفذ: ${alert.storeName} (${alert.retailerChain.toUpperCase()}) • ${alert.itemCode.isNotEmpty ? "كود: ${alert.itemCode} • " : ""}الباركود: ${alert.barcode}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -1337,7 +1340,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                           ),
                           const SizedBox(height: 4.0),
                           Text(
-                            'المنفذ: ${alert.storeName} (${alert.retailerChain.toUpperCase()}) • الباركود: ${alert.barcode}',
+                            'المنفذ: ${alert.storeName} (${alert.retailerChain.toUpperCase()}) • ${alert.itemCode.isNotEmpty ? "كود: ${alert.itemCode} • " : ""}الباركود: ${alert.barcode}',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),

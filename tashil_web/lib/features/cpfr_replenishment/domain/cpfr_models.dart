@@ -103,6 +103,8 @@ class ReconciliationMonthModel {
 }
 
 class SKUBranchInventoryModel {
+  final String itemCode;
+  final String barcode;
   final String skuName;
   final String brand;
   final String sector;
@@ -110,6 +112,7 @@ class SKUBranchInventoryModel {
   final String regionCode;
   final String governorate;
   final String salesRep;
+  final int unitsPerCarton;
   final double sellInCases;
   final double sellInValueEgp;
   final double sellOutEstCases;
@@ -129,6 +132,8 @@ class SKUBranchInventoryModel {
   final double suggestedPoTons;
 
   const SKUBranchInventoryModel({
+    this.itemCode = '',
+    this.barcode = '',
     required this.skuName,
     required this.brand,
     required this.sector,
@@ -136,6 +141,7 @@ class SKUBranchInventoryModel {
     required this.regionCode,
     required this.governorate,
     required this.salesRep,
+    this.unitsPerCarton = 12,
     required this.sellInCases,
     required this.sellInValueEgp,
     required this.sellOutEstCases,
@@ -157,6 +163,8 @@ class SKUBranchInventoryModel {
 
   factory SKUBranchInventoryModel.fromJson(Map<String, dynamic> json) {
     return SKUBranchInventoryModel(
+      itemCode: json['item_code'] as String? ?? '',
+      barcode: json['barcode'] as String? ?? '',
       skuName: json['sku_name'] as String? ?? '',
       brand: SmartBrandExtractor.inferBrand(
         json['sku_name'] as String? ?? '',
@@ -168,6 +176,7 @@ class SKUBranchInventoryModel {
       regionCode: json['region_code'] as String? ?? '',
       governorate: json['governorate'] as String? ?? '',
       salesRep: json['sales_rep'] as String? ?? '',
+      unitsPerCarton: (json['units_per_carton'] as num?)?.toInt() ?? 12,
       sellInCases: (json['sell_in_cases'] as num?)?.toDouble() ?? 0.0,
       sellInValueEgp: (json['sell_in_value_egp'] as num?)?.toDouble() ?? 0.0,
       sellOutEstCases: (json['sell_out_est_cases'] as num?)?.toDouble() ?? 0.0,
@@ -660,7 +669,12 @@ class SmartBrandExtractor {
     'رابيدو': 'رابيدو (Rapido)',
     'rapido': 'رابيدو (Rapido)',
     'جلاسي': 'رابيدو (Rapido)',
+    'جلاسى': 'رابيدو (Rapido)',
     'سبيد': 'رابيدو (Rapido)',
+    'فما': 'فيما (Fema)',
+    'فيما': 'فيما (Fema)',
+    'fema': 'فيما (Fema)',
+    'ديفاتول': 'ديفاتول (Divatol)',
     'كلوريل': 'كلوريل (Clorel)',
     'clorel': 'كلوريل (Clorel)',
     'جنرال': 'جنرال (General)',
@@ -696,11 +710,12 @@ class SmartBrandExtractor {
     'coca': 'كوكاكولا (Coca-Cola)',
   };
 
-  /// Dynamically infers and extracts the Brand name from SKU name, category, or existing brand.
+  /// Dynamically infers and extracts the Brand name from SKU name, category, itemCode, or existing brand.
   static String inferBrand(
     String skuName, {
     String? existingBrand,
     String? subCategory,
+    String? itemCode,
   }) {
     final eb = existingBrand?.trim() ?? '';
     if (eb.isNotEmpty &&
@@ -719,8 +734,17 @@ class SmartBrandExtractor {
       }
     }
 
+    final codeUpper = (itemCode ?? '').trim().toUpperCase();
+    if (codeUpper.startsWith('FGCL')) return 'كلوريل (Clorel)';
+    if (codeUpper.startsWith('FGDW')) return 'فيبا (Feba)';
+    if (codeUpper.startsWith('FGDG')) return 'ديفاتول (Divatol)';
+    if (codeUpper.startsWith('FGHC')) return 'فلفيتا (Velveta)';
+
     // Dynamic AI token inference for any novel company
-    final cleaned = skuName.replaceAll(RegExp(r'^[0-9\-_./\s]+'), '').trim();
+    final cleaned = skuName
+        .replaceAll(RegExp(r'^[*0-9\-_./\s]+'), '')
+        .replaceFirst(RegExp(r'^(عرض\s+\d*\s*)'), '')
+        .trim();
     if (cleaned.isEmpty) {
       if (subCategory != null && subCategory.trim().isNotEmpty) {
         return subCategory.trim();

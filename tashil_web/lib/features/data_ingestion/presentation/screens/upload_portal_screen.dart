@@ -2234,6 +2234,21 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                             ),
                           ),
                         ),
+                        if (file.fileType == 'product_master')
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
+                            decoration: BoxDecoration(
+                              color: colorScheme.tertiaryContainer.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(8.0),
+                            ),
+                            child: Text(
+                              'كارتة الأصناف والأسعار (Product Master)',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onTertiaryContainer,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 6.0),

@@ -1940,10 +1940,27 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                         cells: [
                           DataCell(SizedBox(
                             width: 210,
-                            child: Text(
-                              item.skuName,
-                              style: const TextStyle(fontWeight: FontWeight.w700),
-                              overflow: TextOverflow.ellipsis,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  item.skuName,
+                                  style: const TextStyle(fontWeight: FontWeight.w700),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (item.itemCode.isNotEmpty || item.barcode.isNotEmpty)
+                                  Text(
+                                    '${item.itemCode.isNotEmpty ? item.itemCode : ""}${item.itemCode.isNotEmpty && item.barcode.isNotEmpty ? " • " : ""}${item.barcode}',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 10.0,
+                                      color: colorScheme.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
                             ),
                           )),
                           DataCell(Text('${item.brand} (${item.sector})')),

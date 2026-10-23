@@ -14,6 +14,7 @@ import '../../competitor_comparison/presentation/screens/competitor_comparison_s
 import '../../pricing_compliance/presentation/screens/pricing_compliance_screen.dart';
 import '../../store_benchmark/presentation/screens/store_matrix_screen.dart';
 import '../../cpfr_replenishment/presentation/screens/cpfr_dashboard_screen.dart';
+import '../../product_master/presentation/screens/product_master_screen.dart';
 import '../../trade_marketing/presentation/screens/trade_marketing_roi_screen.dart';
 import 'desktop_sidebar.dart';
 
@@ -140,6 +141,14 @@ class _AppShellState extends State<AppShell> {
       shortLabel: 'Upload',
       icon: Icons.auto_awesome_outlined,
       selectedIcon: Icons.auto_awesome_rounded,
+    ),
+    _NavDestinationSpec(
+      index: 10,
+      labelEn: 'Product Master & Price List',
+      labelAr: 'كارتة الأصناف والأسعار',
+      shortLabel: 'Master',
+      icon: Icons.qr_code_2_outlined,
+      selectedIcon: Icons.qr_code_2_rounded,
     ),
   ];
 
@@ -319,6 +328,10 @@ class _AppShellState extends State<AppShell> {
       ),
       UploadPortalScreen(
         key: ValueKey('upload_$stateKey'),
+        apiClient: widget.apiClient,
+      ),
+      ProductMasterScreen(
+        key: ValueKey('product_master_$stateKey'),
         apiClient: widget.apiClient,
       ),
     ];

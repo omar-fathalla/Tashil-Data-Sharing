@@ -34,6 +34,10 @@ func (c *Client) SetSellInRecords(ctx context.Context, tenantID, filename string
 	incomingPeriods := make(map[chainYearMonth]bool)
 	incomingChains := make(map[string]bool)
 	for i := range records {
+		if records[i].TenantID == "" {
+			records[i].TenantID = normTenant
+		}
+		c.enrichSellInRecordLocked(&records[i])
 		ch := strings.ToLower(strings.TrimSpace(records[i].RetailerChain))
 		if ch == "" {
 			ch = "fathalla"
@@ -181,6 +185,7 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	if statusFilter == "all" || statusFilter == "الكل" {
 		statusFilter = ""
 	}
+	searchQ := strings.TrimSpace(filter.SearchQuery)
 
 	// Track which chains already have explicit Sell-In records uploaded
 	chainsWithExplicitSellIn := make(map[string]bool)
@@ -200,6 +205,7 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	}
 	sellOutByYMRev := make(map[ymKey]float64)
 	sellOutByYMUnits := make(map[ymKey]int)
+	sellOutByYMCases := make(map[ymKey]float64)
 	sellOutByMonthRev := make(map[int]float64)
 	sellOutByMonthUnits := make(map[int]int)
 	sellOutByChainMonthRev := make(map[string]map[int]float64)
@@ -244,19 +250,22 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			continue
 		}
 
-		// Apply optional sector, region, or brand filter to Sell-Out records as well
-		if sectorFilter != "" || brandFilter != "" {
-			bName, sCode := inferBrandAndSectorFromSKU(r.SKUName, r.Category)
-			if sectorFilter != "" && !strings.EqualFold(sCode, sectorFilter) {
-				continue
-			}
-			if brandFilter != "" && !strings.EqualFold(bName, brandFilter) && !strings.Contains(strings.ToLower(bName), strings.ToLower(brandFilter)) {
-				continue
-			}
+		// Apply optional sector, region, brand, or search filter to Sell-Out records as well
+		bName, sCode := inferBrandAndSectorFromSKU(r.SKUName, r.Category)
+		if sectorFilter != "" && !strings.EqualFold(sCode, sectorFilter) {
+			continue
+		}
+		if brandFilter != "" && !strings.EqualFold(bName, brandFilter) && !strings.Contains(strings.ToLower(bName), strings.ToLower(brandFilter)) {
+			continue
 		}
 		if regionFilter != "" {
 			rCode, _ := inferRegionFromBranch(r.StoreName, recChain)
 			if !strings.EqualFold(rCode, regionFilter) {
+				continue
+			}
+		}
+		if searchQ != "" {
+			if !domain.MatchesProductSearchQuery(searchQ, r.ItemCode, r.Barcode, r.SKUName, r.RetailerRawSKUName, r.Category, bName) {
 				continue
 			}
 		}
@@ -271,6 +280,15 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			ym := ymKey{year: yr, month: m}
 			sellOutByYMRev[ym] += r.NetRevenue
 			sellOutByYMUnits[ym] += r.QuantitySold
+			upc := r.UnitsPerCarton
+			if upc <= 0 {
+				if pm, ok := c.lookupProductMasterLocked(normTenant, r.ItemCode, r.Barcode, r.SKUName); ok && pm.UnitsPerCarton > 0 {
+					upc = pm.UnitsPerCarton
+				} else {
+					upc = 12
+				}
+			}
+			sellOutByYMCases[ym] += float64(r.QuantitySold) / float64(upc)
 			sellOutByMonthRev[m] += r.NetRevenue
 			sellOutByMonthUnits[m] += r.QuantitySold
 			totalMatchedSellOutRev += r.NetRevenue
@@ -526,6 +544,11 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		}
 		if repFilter != "" && !strings.EqualFold(rec.SalesRep, repFilter) {
 			continue
+		}
+		if searchQ != "" {
+			if !domain.MatchesProductSearchQuery(searchQ, rec.ItemCode, rec.Barcode, rec.ItemName, "", rec.SubCategory, rec.Brand) {
+				continue
+			}
 		}
 
 		filteredSellIn = append(filteredSellIn, rec)
@@ -848,6 +871,8 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			if avgCasePrice > 0 {
 				sellOutEstCases = round2(sellOutVal / avgCasePrice)
 			}
+		} else if useRealSellOutReconciliation && sellOutByYMCases[ym] > 0 {
+			sellOutEstCases = round2(sellOutByYMCases[ym])
 		} else if sellOutUnits > 0 {
 			sellOutEstCases = round2(float64(sellOutUnits) / 12.0)
 		}
@@ -1179,7 +1204,7 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		totalSuggestedPOEGP += suggestedVal
 		totalSuggestedPOTons += suggestedTons
 
-		invItems = append(invItems, domain.SKUBranchInventoryItem{
+		invItem := domain.SKUBranchInventoryItem{
 			SKUName:                sia.skuName,
 			Brand:                  sia.brand,
 			Sector:                 sia.sector,
@@ -1204,7 +1229,15 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			SuggestedPOCases:       suggestedCases,
 			SuggestedPOValueEGP:    suggestedVal,
 			SuggestedPOTons:        suggestedTons,
-		})
+		}
+		if pm, ok := c.lookupProductMasterLocked(normTenant, "", "", sia.skuName); ok {
+			invItem.ItemCode = pm.ItemCode
+			invItem.Barcode = pm.Barcode
+			invItem.UnitsPerCarton = pm.UnitsPerCarton
+			invItem.ItemType = pm.ItemType
+			invItem.FactoryCartonCost = pm.NetCartonInvoiceCost
+		}
+		invItems = append(invItems, invItem)
 	}
 
 	sort.Slice(invItems, func(i, j int) bool {

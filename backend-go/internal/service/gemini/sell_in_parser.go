@@ -676,7 +676,11 @@ func InferBrandFromItemName(itemName, subCategory string) string {
 		return "فيبا (Feba)"
 	case strings.Contains(s, "دوف") || strings.Contains(s, "dove"):
 		return "دوف (Dove)"
-	case strings.Contains(s, "رابيدو") || strings.Contains(s, "rapido") || strings.Contains(s, "جلاسي") || strings.Contains(s, "سبيد"):
+	case strings.Contains(s, "جلاسي") || strings.Contains(s, "جلاسى") || strings.Contains(s, "glassy"):
+		return "جلاسي (Glassy)"
+	case strings.Contains(s, "سبيد") || strings.Contains(s, "speed"):
+		return "سبيد (Speed)"
+	case strings.Contains(s, "رابيدو") || strings.Contains(s, "rapido"):
 		return "رابيدو (Rapido)"
 	case strings.Contains(s, "كلوريل") || strings.Contains(s, "clorel"):
 		return "كلوريل (Clorel)"
