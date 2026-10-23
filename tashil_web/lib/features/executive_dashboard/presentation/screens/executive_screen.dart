@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
+import '../../data/executive_dashboard_repository.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
@@ -13,9 +14,13 @@ import '../widgets/sellout_trend_chart.dart';
 class ExecutiveScreen extends StatefulWidget {
   final ApiClient apiClient;
 
+  /// Optional injected repository (tests); defaults to one wrapping [apiClient].
+  final ExecutiveDashboardRepository? repository;
+
   const ExecutiveScreen({
     super.key,
     required this.apiClient,
+    this.repository,
   });
 
   @override
@@ -33,6 +38,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
   String? _lastRole;
   String? _lastAssignedChain;
   int _loadRequestId = 0;
+  late ExecutiveDashboardRepository _repo;
 
   static const List<({int number, String shortName, String fullName})> _months = [
     (number: 0, shortName: 'All', fullName: 'All Months'),
@@ -106,6 +112,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
   @override
   void initState() {
     super.initState();
+    _repo = widget.repository ?? ExecutiveDashboardRepository(widget.apiClient);
     _lastTenantId = widget.apiClient.tenantId;
     _lastRole = widget.apiClient.currentUser?.role;
     _lastAssignedChain = widget.apiClient.currentUser?.assignedChain;
@@ -126,6 +133,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
       _lastTenantId = widget.apiClient.tenantId;
       _lastRole = widget.apiClient.currentUser?.role;
       _lastAssignedChain = widget.apiClient.currentUser?.assignedChain;
+      _repo = widget.repository ?? ExecutiveDashboardRepository(widget.apiClient);
       _loadData();
     }
   }
@@ -147,12 +155,18 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
     }
 
     final effectiveChain = selectedChain == 'all' ? null : selectedChain;
-    final cached = widget.apiClient.getCachedExecutiveKPIs(
-      period: selectedPeriod,
-      startDate: startDate,
-      endDate: endDate,
-      chain: effectiveChain,
-    );
+    final cached = _repo.peekFresh(
+          period: selectedPeriod,
+          startDate: startDate,
+          endDate: endDate,
+          chain: effectiveChain,
+        ) ??
+        _repo.peekStale(
+          period: selectedPeriod,
+          startDate: startDate,
+          endDate: endDate,
+          chain: effectiveChain,
+        );
     if (cached != null) {
       setState(() {
         kpis = cached;
@@ -162,24 +176,32 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
       setState(() => isLoading = true);
     }
 
-    final result = await widget.apiClient.getExecutiveKPIs(
+    final loaded = await _repo.loadKpis(
       period: selectedPeriod,
       startDate: startDate,
       endDate: endDate,
       chain: effectiveChain,
     );
-    if (mounted && requestId == _loadRequestId) {
-      setState(() {
-        kpis = result;
-        isLoading = false;
-        if (selectedChain != 'all') {
-          final chains = _availableChains;
-          if (chains.every((c) => c.code.toLowerCase() != selectedChain.toLowerCase())) {
-            selectedChain = 'all';
-          }
-        }
-      });
+    if (!mounted || requestId != _loadRequestId) return;
+    final error = loaded.errorOrNull;
+    if (error != null) {
+      setState(() => isLoading = false);
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text('تعذر تحميل مؤشرات الأداء: $error')),
+      );
+      return;
     }
+    final result = loaded.valueOrNull!;
+    setState(() {
+      kpis = result;
+      isLoading = false;
+      if (selectedChain != 'all') {
+        final chains = _availableChains;
+        if (chains.every((c) => c.code.toLowerCase() != selectedChain.toLowerCase())) {
+          selectedChain = 'all';
+        }
+      }
+    });
   }
 
   Widget _buildChainDropdown(BuildContext context, {bool isCompact = false}) {
