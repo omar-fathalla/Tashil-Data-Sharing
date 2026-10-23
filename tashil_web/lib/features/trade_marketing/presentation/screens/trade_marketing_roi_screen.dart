@@ -11,6 +11,7 @@ import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_responsive_tab_bar.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
+import '../../data/cached_trade_marketing_repository.dart';
 import '../../data/trade_marketing_repository.dart';
 import '../../domain/trade_marketing_models.dart';
 
@@ -57,7 +58,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
   bool _loading = false;
   String? _loadError;
   late final TradeMarketingRepository _repo =
-      widget.repository ?? ApiTradeMarketingRepository(widget.apiClient);
+      widget.repository ??
+          CachedTradeMarketingRepository(ApiTradeMarketingRepository(widget.apiClient), widget.apiClient);
 
   static const List<String> _availableChains = [
     'Fathalla',
