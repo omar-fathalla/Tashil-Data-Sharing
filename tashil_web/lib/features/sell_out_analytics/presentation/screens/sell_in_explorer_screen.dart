@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/data/result.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
@@ -12,6 +13,7 @@ import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../cpfr_replenishment/domain/cpfr_models.dart';
 import '../../../product_master/presentation/screens/product_master_screen.dart';
 import '../widgets/target_management_panel.dart';
+import '../../data/sell_in_explorer_repository.dart';
 
 /// SellInExplorerScreen provides dedicated Supplier Sell-In (توريدات السلاسل):
 /// - Tab 0: بيانات وحركات الـ Sell-In (Sell-In Explorer Table, KPIs, Filters, Upload/Export)
@@ -21,9 +23,13 @@ import '../widgets/target_management_panel.dart';
 class SellInExplorerScreen extends StatefulWidget {
   final ApiClient apiClient;
 
+  /// Optional injected repository (tests); defaults to one wrapping [apiClient].
+  final SellInExplorerRepository? repository;
+
   const SellInExplorerScreen({
     super.key,
     required this.apiClient,
+    this.repository,
   });
 
   @override
@@ -73,6 +79,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
   String? _replacingFileId;
 
   late String _lastTenantId;
+  late SellInExplorerRepository _repo;
 
   late final ScrollController _recordsTableScrollController;
   late final ScrollController _monthlyLedgerScrollController;
@@ -87,6 +94,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     _monthlyLedgerScrollController = ScrollController();
     _skuStockScrollController = ScrollController();
     _archiveSheetsScrollController = ScrollController();
+    _repo = widget.repository ?? SellInExplorerRepository(widget.apiClient);
     _lastTenantId = widget.apiClient.tenantId;
     _loadAllData();
   }
@@ -119,6 +127,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     if (oldWidget.apiClient != widget.apiClient ||
         _lastTenantId != widget.apiClient.tenantId) {
       _lastTenantId = widget.apiClient.tenantId;
+      _repo = widget.repository ?? SellInExplorerRepository(widget.apiClient);
       _selectedChain = 'all';
       _selectedYear = 2026;
       _selectedMonth = 0;
@@ -137,13 +146,21 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
 
   Future<void> _loadSellInRecords() async {
     if (mounted) setState(() => _isLoading = true);
-    final res = await widget.apiClient.getSellInRecords(
+    final loaded = await _repo.load(SellInExplorerQuery(
       chain: _selectedChain == 'all' ? null : _selectedChain,
       year: _selectedYear > 0 ? _selectedYear : null,
       month: _selectedMonth > 0 ? _selectedMonth : null,
       query: _searchQuery,
       limit: 250,
-    );
+    ));
+    if (loaded case Failure(:final error)) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        M3Feedback.showError(context, 'تعذر تحميل بيانات الـ Sell-In: $error');
+      }
+      return;
+    }
+    final res = loaded.valueOrNull!;
     if (mounted) {
       setState(() {
         _data = res;
@@ -258,6 +275,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
         context,
         '$actionLabel (${picked.name}): ${res.validRows} حركة بإجمالي ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)}',
       );
+      _repo.invalidateAll();
       await _loadAllData();
     } catch (e) {
       if (!mounted) return;
@@ -357,6 +375,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
         context,
         'تم حذف شيت (${file.fileName}) وتحديث حركات الـ Sell-In والأرصدة المتبقية بنجاح',
       );
+      _repo.invalidateAll();
       await _loadAllData();
     } catch (e) {
       if (!mounted) return;
@@ -410,7 +429,10 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
         context,
         apiClient: widget.apiClient,
         item: matched,
-        onUpdated: (_) => _loadAllData(),
+        onUpdated: (_) {
+          _repo.invalidateAll();
+          _loadAllData();
+        },
       );
     } catch (e) {
       if (!mounted) return;
