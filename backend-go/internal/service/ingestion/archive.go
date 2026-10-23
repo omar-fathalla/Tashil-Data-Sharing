@@ -219,14 +219,11 @@ func (p *Processor) loadDiskArchiveLocked() {
 			continue
 		}
 		indexFile := filepath.Join(p.archiveDir, entry.Name(), "index.json")
-		raw, err := os.ReadFile(indexFile)
-		if err != nil {
-			continue
-		}
 		var list []*ArchivedFile
-		if err := json.Unmarshal(raw, &list); err != nil {
-			continue
+		if raw, err := os.ReadFile(indexFile); err == nil {
+			_ = json.Unmarshal(raw, &list)
 		}
+		list = mergeArchiveSidecars(list, filepath.Join(p.archiveDir, entry.Name()))
 		for _, item := range list {
 			if item == nil || item.ID == "" {
 				continue
@@ -451,6 +448,7 @@ func (p *Processor) SaveArchivedFile(
 		_ = p.fsRepo.UnmarkArchiveDeleted(context.Background(), normTenant, archiveID, filename)
 	}
 
+	p.writeArchiveSidecarLocked(entry)
 	p.persistTenantArchiveIndexLocked(normTenant)
 	copyEntry := *entry
 	return &copyEntry
@@ -481,6 +479,7 @@ func (p *Processor) UpdateArchivedFileByBatch(batchID, retailChain, targetYear, 
 						if other.StoragePath != "" && other.StoragePath != entry.StoragePath {
 							_ = os.Remove(other.StoragePath)
 						}
+						p.removeArchiveSidecarLocked(other)
 						delete(p.archivedFiles, otherID)
 						delete(p.archivedBytes, otherID)
 					}
@@ -493,6 +492,7 @@ func (p *Processor) UpdateArchivedFileByBatch(batchID, retailChain, targetYear, 
 				entry.TargetMonth = targetMonth
 			}
 			entry.UploadedAt = time.Now().UTC().Format(time.RFC3339Nano)
+			p.writeArchiveSidecarLocked(entry)
 			p.persistTenantArchiveIndexLocked(entry.TenantID)
 			copyEntry := *entry
 			return &copyEntry
@@ -515,6 +515,7 @@ func (p *Processor) RemoveArchivedFileByBatch(batchID string, prevEntry *Archive
 			if prevEntry != nil && prevEntry.ID == id {
 				restored := *prevEntry
 				p.archivedFiles[id] = &restored
+				p.writeArchiveSidecarLocked(&restored)
 				if len(prevBytes) > 0 {
 					bCopy := make([]byte, len(prevBytes))
 					copy(bCopy, prevBytes)
@@ -527,6 +528,7 @@ func (p *Processor) RemoveArchivedFileByBatch(batchID string, prevEntry *Archive
 				if entry.StoragePath != "" {
 					_ = os.Remove(entry.StoragePath)
 				}
+				p.removeArchiveSidecarLocked(entry)
 				delete(p.archivedFiles, id)
 				delete(p.archivedBytes, id)
 			}
@@ -722,6 +724,8 @@ func (p *Processor) DeleteArchivedFile(ctx context.Context, tenantID, archiveID 
 	}
 
 	deletedEntry := *entry
+	p.removeArchiveSidecarLocked(entry)
+	defer p.sinkDeleteArchived(ctx, &deletedEntry)
 
 	// 1. Remove from in-memory maps first
 	delete(p.archivedFiles, archiveID)
@@ -864,12 +868,27 @@ func (p *Processor) ClearTenantArchives(ctx context.Context, tenantID string) {
 	if p.archiveDir != "" {
 		tenantDir := filepath.Join(p.archiveDir, normTenant)
 		_ = os.Remove(filepath.Join(tenantDir, "index.json"))
+		_ = os.RemoveAll(filepath.Join(tenantDir, archiveSidecarDir))
 	}
 }
 
 // ReplayArchivedFilesToDatabase replays all existing archived files on disk into BigQuery and Firestore on server startup.
 // It ensures ONLY real user-uploaded files on disk exist in the system, and never re-reads external directories.
 func (p *Processor) ReplayArchivedFilesToDatabase(ctx context.Context) error {
+	return p.replayArchivedFiles(ctx, false)
+}
+
+// BackfillArchiveToSink replays every archived file like startup does, but WITH durable BigQuery writes enabled.
+// Writes are idempotent (dedupe by period / file), so running it twice does not duplicate rows.
+func (p *Processor) BackfillArchiveToSink(ctx context.Context) error {
+	return p.replayArchivedFiles(ctx, true)
+}
+
+func (p *Processor) replayArchivedFiles(ctx context.Context, writeSink bool) error {
+	if !writeSink {
+		p.replaying.Store(true)
+		defer p.replaying.Store(false)
+	}
 	p.archiveMu.Lock()
 	p.loadDiskArchiveLocked()
 	files := make([]*ArchivedFile, 0, len(p.archivedFiles))

@@ -14,6 +14,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/handlers"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
+	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
@@ -36,6 +37,9 @@ func main() {
 		archDir = "data/archive"
 	}
 	ingestProcessor := ingestion.NewProcessor(geminiAgent, bqRepo, fsRepo).WithArchiveDir(archDir)
+
+	// Durable BigQuery persistence of uploaded sheets (off unless BIGQUERY_SINK_ENABLED=true)
+	ingestProcessor.WithSink(bqsink.New(context.Background(), bqsink.ConfigFromEnv(cfg.ProjectID, cfg.BigQueryDataset)))
 
 	// Wipe all fake/synthetic seed data on server startup and replay ONLY real user-uploaded archived files
 	_ = ingestProcessor.ClearTenantData(context.Background(), "all")

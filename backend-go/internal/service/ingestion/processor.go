@@ -1,6 +1,7 @@
 package ingestion
 
 import (
+	"sync/atomic"
 	"context"
 	"fmt"
 	"math"
@@ -14,6 +15,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
+	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 )
@@ -56,6 +58,9 @@ type IngestionResult struct {
 	AiModelUsed           string `json:"ai_model_used"`
 	AiTierUsed            string `json:"ai_tier_used"`
 	Tier2Escalated        bool   `json:"tier2_escalated"`
+
+	// BigQuerySync reports the durable BigQuery write for committed uploads (nil for previews / when not attempted).
+	BigQuerySync *bqsink.Result `json:"bigquery_sync,omitempty"`
 }
 
 
@@ -94,6 +99,8 @@ type Processor struct {
 	archiveDir    string
 	archivedFiles map[string]*ArchivedFile
 	archivedBytes map[string][]byte
+	sink          bqsink.Sink
+	replaying     atomic.Bool
 }
 
 // NewProcessor constructs a new ingestion processor.
@@ -107,6 +114,7 @@ func NewProcessor(agent gemini.Agent, bqRepo bigquery.Repository, fsRepo firesto
 		archiveDir:    archDir,
 		archivedFiles: make(map[string]*ArchivedFile),
 		archivedBytes: make(map[string][]byte),
+		sink:          bqsink.Noop{},
 	}
 	if archDir != "" {
 		p.archiveMu.Lock()
@@ -209,6 +217,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 	if len(fileBytes) == 0 {
 		return nil, fmt.Errorf("empty file uploaded")
 	}
+	var directSync *bqsink.Result
 
 	targetChain := ""
 	if len(targetChains) > 0 {
@@ -630,6 +639,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			if err := p.bqRepo.ReplaceTenantFacts(ctx, tenantID, validFacts); err != nil {
 				return nil, fmt.Errorf("failed to replace tenant facts in bigquery: %w", err)
 			}
+			directSync = p.sinkSellOut(ctx, bqsink.Meta{TenantID: tenantID, BatchID: batchID, SourceFile: filename}, validFacts, bqsink.ModeReplacePeriods)
 			if err := p.bqRepo.SetTenantWorkbookAnalytics(ctx, tenantID, wbMeta); err != nil {
 				return nil, fmt.Errorf("failed to store workbook analytics in bigquery: %w", err)
 			}
@@ -661,6 +671,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			if err := p.bqRepo.InsertSellOutFacts(ctx, validFacts); err != nil {
 				return nil, fmt.Errorf("failed to stream facts to bigquery: %w", err)
 			}
+			directSync = p.sinkSellOut(ctx, bqsink.Meta{TenantID: tenantID, BatchID: batchID, SourceFile: filename}, validFacts, bqsink.ModeUpsertRecords)
 			if len(wbMeta.PricingItems) > 0 || len(wbMeta.SupplierShares) > 0 {
 				_ = p.bqRepo.SetTenantWorkbookAnalytics(ctx, tenantID, wbMeta)
 			}
@@ -817,6 +828,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 		AiModelUsed:            payload.AiModelUsed,
 		AiTierUsed:             payload.AiTierUsed,
 		Tier2Escalated:         payload.Tier2Escalated,
+		BigQuerySync:           directSync,
 	}
 
 
@@ -924,18 +936,26 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 	}
 
 	// Persist facts and analytics to BigQuery
+	sinkMeta := bqsink.Meta{TenantID: tenantID, BatchID: batchID, SourceFile: staged.Filename}
+	if updatedArchived != nil {
+		sinkMeta.ArchiveID = updatedArchived.ID
+	}
+	var commitSync *bqsink.Result
 	if staged.IsProductMaster {
 		if _, err := p.bqRepo.SetProductMaster(ctx, tenantID, staged.ProductMasterSummary); err != nil {
 			return nil, fmt.Errorf("failed to persist product master items: %w", err)
 		}
+		commitSync = p.sinkProductMaster(ctx, sinkMeta, staged.ProductMasterSummary)
 	} else if staged.IsSellInPlan {
 		if err := p.bqRepo.SetSellInRecords(ctx, tenantID, staged.Filename, staged.SellInRecords); err != nil {
 			return nil, fmt.Errorf("failed to persist sell-in records: %w", err)
 		}
+		commitSync = p.sinkSellIn(ctx, sinkMeta, staged.SellInRecords)
 	} else if staged.IsWideMatrix {
 		if err := p.bqRepo.ReplaceTenantFacts(ctx, tenantID, staged.ValidFacts); err != nil {
 			return nil, fmt.Errorf("failed to replace tenant facts in bigquery: %w", err)
 		}
+		commitSync = p.sinkSellOut(ctx, sinkMeta, staged.ValidFacts, bqsink.ModeReplacePeriods)
 		if err := p.bqRepo.SetTenantWorkbookAnalytics(ctx, tenantID, staged.WBMeta); err != nil {
 			return nil, fmt.Errorf("failed to store workbook analytics in bigquery: %w", err)
 		}
@@ -946,6 +966,7 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		if err := p.bqRepo.InsertSellOutFacts(ctx, staged.ValidFacts); err != nil {
 			return nil, fmt.Errorf("failed to stream facts to bigquery: %w", err)
 		}
+		commitSync = p.sinkSellOut(ctx, sinkMeta, staged.ValidFacts, bqsink.ModeUpsertRecords)
 		if len(staged.WBMeta.PricingItems) > 0 || len(staged.WBMeta.SupplierShares) > 0 {
 			_ = p.bqRepo.SetTenantWorkbookAnalytics(ctx, tenantID, staged.WBMeta)
 		}
@@ -990,6 +1011,7 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 
 	staged.Result.IsStaged = false
 	staged.Result.IsCommitted = true
+	staged.Result.BigQuerySync = commitSync
 	staged.Result.RetailerDetected = chainToUse
 	staged.Result.TargetRetailer = chainToUse
 	staged.Result.DiscoveredBranches = staged.DiscoveredStores
@@ -1151,6 +1173,7 @@ func (p *Processor) ProcessProductMaster(ctx context.Context, tenantID, filename
 			return nil, fmt.Errorf("failed to store product master items: %w", err)
 		}
 		result.ProductMasterSummary = stored
+		result.BigQuerySync = p.sinkProductMaster(ctx, bqsink.Meta{TenantID: tenantID, BatchID: batchID, ArchiveID: result.ArchiveID, SourceFile: filename}, summary)
 	} else {
 		result.ProductMasterSummary = summary
 	}
@@ -1455,6 +1478,7 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	if err := p.bqRepo.SetSellInRecords(ctx, tenantID, filename, records); err != nil {
 		return nil, fmt.Errorf("failed to store sell-in records: %w", err)
 	}
+	result.BigQuerySync = p.sinkSellIn(ctx, bqsink.Meta{TenantID: tenantID, BatchID: batchID, ArchiveID: result.ArchiveID, SourceFile: filename}, records)
 	return result, nil
 }
 
