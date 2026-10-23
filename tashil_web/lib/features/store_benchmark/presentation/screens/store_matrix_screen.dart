@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
+import '../../data/store_benchmark_repository.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -13,9 +14,13 @@ import '../../../../core/widgets/table_scroll_container.dart';
 class StoreMatrixScreen extends StatefulWidget {
   final ApiClient apiClient;
 
+  /// Optional injected repository (tests); defaults to one wrapping [apiClient].
+  final StoreBenchmarkRepository? repository;
+
   const StoreMatrixScreen({
     super.key,
     required this.apiClient,
+    this.repository,
   });
 
   @override
@@ -24,6 +29,7 @@ class StoreMatrixScreen extends StatefulWidget {
 
 class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
   bool _isLoading = true;
+  late StoreBenchmarkRepository _repo;
   String _selectedRegion = 'الكل';
   String _selectedTier = 'الكل';
   int _selectedYear = 2026;
@@ -42,6 +48,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
   @override
   void initState() {
     super.initState();
+    _repo = widget.repository ?? StoreBenchmarkRepository(widget.apiClient);
     _lastTenantId = widget.apiClient.tenantId;
     _loadStoreMatrix();
   }
@@ -54,6 +61,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
     if (oldWidget.apiClient != widget.apiClient ||
         _lastTenantId != widget.apiClient.tenantId) {
       _lastTenantId = widget.apiClient.tenantId;
+      _repo = widget.repository ?? StoreBenchmarkRepository(widget.apiClient);
       _selectedRegion = 'الكل';
       _selectedTier = 'الكل';
       _selectedYear = 2026;
@@ -63,21 +71,29 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
     }
   }
 
-  Future<void> _loadStoreMatrix() async {
+  Future<void> _loadStoreMatrix({bool forceRefresh = false}) async {
     setState(() => _isLoading = true);
-    final results = await widget.apiClient.getStoreBenchmarkMatrix(
+    final result = await _repo.loadMatrix(
       region: _selectedRegion == 'الكل' ? null : _selectedRegion,
       tier: _selectedTier == 'الكل' ? null : _selectedTier,
       chain: _selectedChain == 'all' ? null : _selectedChain,
       year: _selectedYear == 0 ? null : _selectedYear,
       month: _selectedMonth == 0 ? null : _selectedMonth,
+      forceRefresh: forceRefresh,
     );
-    if (mounted) {
-      setState(() {
+    if (!mounted) return;
+    result.when(
+      success: (results) => setState(() {
         _stores = results;
         _isLoading = false;
-      });
-    }
+      }),
+      failure: (error) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text('تعذر تحميل بيانات مقارنة الفروع: $error')),
+        );
+      },
+    );
   }
 
   void _onRegionChanged(String newRegion) {
@@ -150,7 +166,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
               actions: M3Button.tonal(
                 label: 'تحديث',
                 icon: Icons.refresh_rounded,
-                onPressed: _isLoading ? null : _loadStoreMatrix,
+                onPressed: _isLoading ? null : () => _loadStoreMatrix(forceRefresh: true),
               ),
             ),
 
