@@ -60,17 +60,9 @@ class ZeroTrustDigest {
     final clean = token.trim();
     // Reject unauthenticated demo tokens on the Super Admin gate
     if (clean == 'demo-superadmin-token') return false;
-    if (clean.startsWith('zt-sa-')) {
-      final parts = clean.split('-');
-      if (parts.length == 4) {
-        final ts = parts[2];
-        final providedSig = parts[3];
-        final expectedSig =
-            saltedSha256Hex('$_superAdminComboDigest:$ts').substring(0, 32);
-        return _constantTimeEquals(providedSig, expectedSig);
-      }
-      return false;
-    }
+    // Locally-minted zt-sa-* tokens are not accepted by the backend; only
+    // real backend JWTs count as an authenticated Super Admin session.
+    if (clean.startsWith('zt-sa-')) return false;
     // Standard 3-part signed JWT from Go backend
     final jwtParts = clean.split('.');
     return jwtParts.length == 3 &&

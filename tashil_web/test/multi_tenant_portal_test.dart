@@ -287,14 +287,15 @@ void main() {
   });
 
   group('Batch 1: Multi-Tenant Data Switching, Dynamic Dropdown, Super Admin Auth Gate & Session Persistence', () {
-    test('ApiClient derives tenant-specific demo token and isolated FMCG datasets per tenant', () async {
+    test('ApiClient starts without a demo token and keeps isolated FMCG datasets per tenant', () async {
       final adecoClient = ApiClient(tenantId: 'tenant-adeco');
       final unileverClient = ApiClient(tenantId: 'tenant-unilever');
       final pepsiClient = ApiClient(tenantId: 'tenant-pepsi');
 
-      expect(adecoClient.authToken, 'demo-adeco-token');
-      expect(unileverClient.authToken, 'demo-unilever-token');
-      expect(pepsiClient.authToken, 'demo-pepsi-token');
+      // No implicit demo-*-token: a real backend JWT must come from login.
+      expect(adecoClient.authToken, isEmpty);
+      expect(unileverClient.authToken, isEmpty);
+      expect(pepsiClient.authToken, isEmpty);
 
       final adecoRecs = await adecoClient.getRecords();
       final unileverRecs = await unileverClient.getRecords();
@@ -403,14 +404,15 @@ void main() {
       expect(authResult, isNull);
       expect(find.textContaining('رفض الوصول'), findsWidgets);
 
-      // 2. Valid credentials via zero-trust digest succeed
+      // 2. Without a reachable backend there is no offline/demo session:
+      // even valid-looking credentials must not authenticate locally.
       await tester.enterText(find.byKey(const ValueKey('super_admin_email_field')), 'support@sw-point.com');
-      await tester.enterText(find.byKey(const ValueKey('super_admin_password_field')), '481636100Aa!');
+      await tester.enterText(find.byKey(const ValueKey('super_admin_password_field')), 'AnyPassword123!');
       await tester.tap(find.text('Sign In'));
       await tester.pumpAndSettle();
 
-      expect(authResult, isNotNull);
-      expect(authResult!.user.isSuperAdmin, isTrue);
+      expect(authResult, isNull);
+      expect(client.authToken, isEmpty);
     });
 
     testWidgets('SessionStorage persists and restores authenticated session across app restarts', (WidgetTester tester) async {

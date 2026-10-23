@@ -1946,7 +1946,7 @@ class ApiClient {
     this.tenantId = 'tenant-adeco',
     String? authToken,
     bool? allowMockFallback,
-  })  : authToken = authToken ?? defaultDemoTokenForTenant(tenantId),
+  })  : authToken = authToken ?? '',
         allowMockFallback = allowMockFallback ?? defaultAllowMockFallback;
 
   static String normalizeTenantSlug(String raw) {
@@ -1980,14 +1980,6 @@ class ApiClient {
         .where((w) => w.isNotEmpty)
         .map((w) => w[0].toUpperCase() + w.substring(1))
         .join(' ');
-  }
-
-  static String defaultDemoTokenForTenant(String rawTenantId) {
-    final clean = normalizeTenantSlug(rawTenantId);
-    if (clean == 'system' || clean == 'admin' || clean == 'superadmin') {
-      return 'demo-superadmin-token';
-    }
-    return 'demo-$clean-token';
   }
 
   /// 34 Fathalla branches extracted from the real 40-Adco -2026.xlsx workbook
@@ -7159,7 +7151,7 @@ class ApiClient {
             ? findTenantSlugForEmail(normalizedEmail)
             : rawSlug);
 
-    http.Response? resp;
+    http.Response resp;
     try {
       final uri = Uri.parse(ApiEndpoints.authLogin);
       resp = await http.post(
@@ -7172,10 +7164,11 @@ class ApiClient {
         }),
       ).timeout(const Duration(seconds: 4));
     } catch (e) {
-      debugPrint('[ApiClient] Fallback to mock login: $e');
+      debugPrint('[ApiClient] Login request failed: $e');
+      throw Exception('تعذر الاتصال بالخادم لتسجيل الدخول. تحقق من الاتصال وحاول مرة أخرى.');
     }
 
-    if (resp != null && resp.statusCode == 200) {
+    if (resp.statusCode == 200) {
       final res = LoginResultModel.fromJson(jsonDecode(resp.body) as Map<String, dynamic>);
       authToken = res.token;
       final respSlug = normalizeTenantSlug(res.tenant.tenantId);
@@ -7190,76 +7183,13 @@ class ApiClient {
         registerTenantProfile(res.tenant);
       }
       return res;
-    } else if (resp != null && resp.statusCode >= 400 && resp.body.trim().isNotEmpty) {
-      throw Exception(_extractBackendError(
-        resp,
-        'فشل تسجيل الدخول: بيانات الاعتماد غير صالحة',
-      ));
     }
 
-    // High fidelity offline fallback with strict Zero-Trust Super Admin digest verification
-    final cleanSlug = effectiveTenant;
-
-    if (isSuperTarget) {
-      final isVerified = ZeroTrustDigest.verifySuperAdminCredentials(
-        email: normalizedEmail,
-        password: password,
-      );
-      if (!isVerified) {
-        throw Exception('فشل تسجيل الدخول: البريد الإلكتروني أو كلمة مرور مدير النظام غير صحيحة');
-      }
-    } else {
-      if (password.trim().length < 6 ||
-          password.toLowerCase().contains('wrong') ||
-          password.toLowerCase().contains('invalid')) {
-        throw Exception('فشل تسجيل الدخول: بيانات الاعتماد غير صالحة');
-      }
-    }
-
-    final profile = isSuperTarget
-        ? TenantProfileModel(
-            tenantId: 'system',
-            displayName: 'Tashil Platform Executive Control (Super Admin)',
-            slug: 'system',
-            portalUrl: 'http://localhost:3000/admin',
-            brandSeedColor: '#0B57D0',
-            adminEmail: normalizedEmail,
-          )
-        : getTenantProfileBySlug(cleanSlug);
-
-    final user = TenantUserModel(
-      userId: isSuperTarget ? 'user-super-admin' : 'user-$cleanSlug-admin',
-      tenantId: isSuperTarget ? 'system' : cleanSlug,
-      email: normalizedEmail,
-      fullName: isSuperTarget ? 'Super Admin' : 'مدير ${profile.displayName}',
-      role: isSuperTarget ? 'super_admin' : 'vendor_admin',
-    );
-
-    final res = LoginResultModel(
-      token: isSuperTarget
-          ? ZeroTrustDigest.generateVerifiedAdminSessionToken()
-          : 'demo-$cleanSlug-token',
-      user: user,
-      tenant: profile,
-    );
-
-    authToken = res.token;
-    if (isSuperTarget) {
-      this.tenantId = 'tenant-${normalizeDataTenantSlug(this.tenantId)}';
-    } else {
-      this.tenantId = 'tenant-$cleanSlug';
-    }
-    currentUser = res.user;
-    currentTenantProfile = res.tenant;
-    _appendLocalAuditLog(
-      tenantId: isSuperTarget ? 'system' : cleanSlug,
-      actorEmail: normalizedEmail,
-      actorRole: user.role,
-      action: 'AUTH_LOGIN',
-      resource: isSuperTarget ? '/admin' : '/portal/$cleanSlug',
-      details: 'تسجيل دخول ناجح إلى البوابة (${user.roleDisplayAr})',
-    );
-    return res;
+    // No offline/demo fallback: only a backend-issued JWT may authenticate.
+    throw Exception(_extractBackendError(
+      resp,
+      'فشل تسجيل الدخول: بيانات الاعتماد غير صالحة',
+    ));
   }
 
   /// Request forgot password reset token
@@ -7406,8 +7336,9 @@ class ApiClient {
       );
       final headers = Map<String, String>.from(_headers);
       headers['X-Tenant-ID'] = 'tenant-$cleanTenant';
-      if (currentUser?.isSuperAdmin == true || authToken.isEmpty || authToken.contains('demo-')) {
-        headers['Authorization'] = 'Bearer demo-$cleanTenant-token';
+      // Super Admin keeps its real backend JWT; the backend switches tenant
+      // context via X-Tenant-ID and scopes the role via X-Simulated-Role.
+      if (currentUser?.isSuperAdmin == true) {
         headers['X-Simulated-Role'] = 'vendor_admin';
       }
       final resp = await http.get(uri, headers: headers).timeout(const Duration(seconds: 4));
@@ -7456,8 +7387,9 @@ class ApiClient {
       );
       final headers = Map<String, String>.from(_headers);
       headers['X-Tenant-ID'] = 'tenant-$cleanTenant';
-      if (currentUser?.isSuperAdmin == true || authToken.isEmpty || authToken.contains('demo-')) {
-        headers['Authorization'] = 'Bearer demo-$cleanTenant-token';
+      // Super Admin keeps its real backend JWT; the backend switches tenant
+      // context via X-Tenant-ID and scopes the role via X-Simulated-Role.
+      if (currentUser?.isSuperAdmin == true) {
         headers['X-Simulated-Role'] = 'vendor_admin';
       }
       resp = await http.post(
@@ -7525,8 +7457,9 @@ class ApiClient {
       );
       final headers = Map<String, String>.from(_headers);
       headers['X-Tenant-ID'] = 'tenant-$cleanTenant';
-      if (currentUser?.isSuperAdmin == true || authToken.isEmpty || authToken.contains('demo-')) {
-        headers['Authorization'] = 'Bearer demo-$cleanTenant-token';
+      // Super Admin keeps its real backend JWT; the backend switches tenant
+      // context via X-Tenant-ID and scopes the role via X-Simulated-Role.
+      if (currentUser?.isSuperAdmin == true) {
         headers['X-Simulated-Role'] = 'vendor_admin';
       }
       resp = await http.put(
@@ -7590,8 +7523,9 @@ class ApiClient {
       );
       final headers = Map<String, String>.from(_headers);
       headers['X-Tenant-ID'] = 'tenant-$cleanTenant';
-      if (currentUser?.isSuperAdmin == true || authToken.isEmpty || authToken.contains('demo-')) {
-        headers['Authorization'] = 'Bearer demo-$cleanTenant-token';
+      // Super Admin keeps its real backend JWT; the backend switches tenant
+      // context via X-Tenant-ID and scopes the role via X-Simulated-Role.
+      if (currentUser?.isSuperAdmin == true) {
         headers['X-Simulated-Role'] = 'vendor_admin';
       }
       resp = await http.delete(uri, headers: headers).timeout(const Duration(seconds: 4));

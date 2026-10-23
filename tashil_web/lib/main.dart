@@ -206,7 +206,11 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
       _isGenericCompanyPortal = false;
       final profile = ApiClient.getTenantProfileBySlug(_activeTenant);
       final brandEn = ApiClient.getEnglishDisplayNameForTenant(_activeTenant);
-      _apiClient = ApiClient(tenantId: 'tenant-$_activeTenant');
+      // Preserve the real backend JWT (e.g. Super Admin) when switching portals.
+      _apiClient = ApiClient(
+        tenantId: 'tenant-$_activeTenant',
+        authToken: _apiClient.authToken,
+      );
       _apiClient.currentUser = TenantUserModel(
         userId: 'user-$_activeTenant-admin-01',
         tenantId: _activeTenant,
@@ -463,7 +467,9 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
           );
         }
       }
-      _apiClient.authToken = ApiClient.defaultDemoTokenForTenant(slug);
+      if (_apiClient.authToken.isEmpty) {
+        _apiClient.authToken = SessionStorage.loadSession()?.authToken ?? '';
+      }
 
       return MaterialPageRoute(
         settings: settings,
