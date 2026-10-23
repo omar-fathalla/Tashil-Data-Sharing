@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/utils/excel_export_service.dart';
@@ -256,8 +260,29 @@ void main() {
       expect(compliance, isNotEmpty);
       expect(compliance.every((c) => c.retailerChain == 'carrefour'), isTrue);
 
-      final alerts = await apiClient.getOOSAlerts();
+      // OOS alerts: serve a mixed-chain server response and verify the
+      // client strips competitor chains for the chain_kam persona.
+      final alerts = await http.runWithClient(
+        () => apiClient.getOOSAlerts(),
+        () => MockClient((req) async {
+          if (req.url.path.endsWith('/api/v1/analytics/oos-monitor')) {
+            return http.Response(
+              jsonEncode({
+                'alerts': [
+                  {'alert_id': 'a1', 'retailer_chain': 'carrefour', 'store_name': 'كارفور المعادي', 'sku_name': 'Adeco Oil 1L'},
+                  {'alert_id': 'a2', 'retailer_chain': 'spinneys', 'store_name': 'سبينيس الرحاب', 'sku_name': 'Adeco Oil 1L'},
+                  {'alert_id': 'a3', 'retailer_chain': 'fathalla', 'store_name': 'فتح الله سموحة', 'sku_name': 'Adeco Ghee 1kg'},
+                ],
+              }),
+              200,
+              headers: {'content-type': 'application/json; charset=utf-8'},
+            );
+          }
+          throw http.ClientException('down');
+        }),
+      );
       expect(alerts, isNotEmpty);
+      expect(alerts.length, 1, reason: 'competitor chain alerts must be filtered out');
       expect(alerts.every((a) => a.retailerChain == 'carrefour'), isTrue);
 
       // 3. Field supervisor region scoping
@@ -269,7 +294,8 @@ void main() {
         role: 'field_supervisor',
         assignedRegion: 'شرق الإسكندرية',
       );
-      expect(apiClient.requestHeaders['X-Assigned-Region'], equals('شرق الإسكندرية'));
+      // Non-ASCII header values are percent-encoded so they are valid HTTP headers.
+      expect(apiClient.requestHeaders['X-Assigned-Region'], equals(Uri.encodeComponent('شرق الإسكندرية')));
       final regionalStores = await apiClient.getStoreBenchmarkMatrix();
       expect(regionalStores, isNotEmpty);
       expect(regionalStores.every((s) => s.region == 'شرق الإسكندرية'), isTrue);

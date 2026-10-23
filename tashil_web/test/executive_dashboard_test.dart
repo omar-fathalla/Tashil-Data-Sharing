@@ -293,7 +293,9 @@ void main() {
     expect(find.byKey(const ValueKey('sellout_date_range_chip')), findsOneWidget);
     expect(find.text('Date Range'), findsOneWidget);
 
-    // Trigger Excel export
+    // Trigger Excel export (the toolbar sits below the fold after the redesign).
+    await tester.ensureVisible(find.text('Export Excel'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Export Excel'));
     await tester.pumpAndSettle();
 
@@ -302,6 +304,8 @@ void main() {
     expect(ExcelExportService.lastDownloadedMimeType, equals('text/csv;charset=utf-8'));
 
     // Trigger PDF/HTML export
+    await tester.ensureVisible(find.byKey(const ValueKey('export_pdf_button')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('export_pdf_button')));
     await tester.pumpAndSettle();
 

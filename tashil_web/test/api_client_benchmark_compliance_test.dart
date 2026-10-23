@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 
 void main() {
@@ -107,32 +111,61 @@ void main() {
     });
 
     test('getPricingCompliance returns diverse items and filters correctly', () async {
-      final allItems = await apiClient.getPricingCompliance();
-      expect(allItems.isNotEmpty, true);
+      Map<String, dynamic> row(String sku, String chain, String type, bool promo, double uplift) => {
+            'sku_name': sku,
+            'barcode': '622115500${sku.length}',
+            'category': 'زيوت طعام',
+            'retailer_chain': chain,
+            'store_name': '$chain store',
+            'actual_price': 100.0,
+            'recommended_price': 100.0,
+            'price_delta_pct': 0.0,
+            'violation_type': type,
+            'is_promo_active': promo,
+            'promo_uplift_pct': uplift,
+          };
+      final serverRows = [
+        row('Adeco Oil 1L', 'carrefour', 'under_cutting', true, 34.5),
+        row('Adeco Ghee 1kg', 'carrefour', 'compliant', false, 0),
+        row('Adeco Oil 2L', 'spinneys', 'price_gouging', false, 0),
+        row('Adeco Corn Oil 1L', 'fathalla', 'compliant', false, 0),
+      ];
+      final server = MockClient((req) async {
+        if (req.url.path.endsWith('/api/v1/analytics/pricing-compliance')) {
+          return http.Response(jsonEncode(serverRows), 200,
+              headers: {'content-type': 'application/json; charset=utf-8'});
+        }
+        throw http.ClientException('down');
+      });
 
-      // Check violation types presence
-      expect(allItems.any((i) => i.violationType == 'compliant'), true);
-      expect(allItems.any((i) => i.violationType == 'under_cutting'), true);
-      expect(allItems.any((i) => i.violationType == 'price_gouging'), true);
+      await http.runWithClient(() async {
+        final allItems = await apiClient.getPricingCompliance();
+        expect(allItems.isNotEmpty, true);
 
-      // Check active promo presence with uplift
-      final promoItems = allItems.where((i) => i.isPromoActive).toList();
-      expect(promoItems.isNotEmpty, true);
-      expect(promoItems.any((i) => i.promoUpliftPct > 0), true);
+        // Check violation types presence
+        expect(allItems.any((i) => i.violationType == 'compliant'), true);
+        expect(allItems.any((i) => i.violationType == 'under_cutting'), true);
+        expect(allItems.any((i) => i.violationType == 'price_gouging'), true);
 
-      // Filter by violationOnly: true
-      final violations = await apiClient.getPricingCompliance(violationOnly: true);
-      expect(violations.isNotEmpty, true);
-      for (final v in violations) {
-        expect(v.violationType, isNot('compliant'));
-      }
+        // Check active promo presence with uplift
+        final promoItems = allItems.where((i) => i.isPromoActive).toList();
+        expect(promoItems.isNotEmpty, true);
+        expect(promoItems.any((i) => i.promoUpliftPct > 0), true);
 
-      // Filter by chain: carrefour
-      final carrefourItems = await apiClient.getPricingCompliance(chain: 'carrefour');
-      expect(carrefourItems.isNotEmpty, true);
-      for (final c in carrefourItems) {
-        expect(c.retailerChain, 'carrefour');
-      }
+        // Filter by violationOnly: true
+        final violations = await apiClient.getPricingCompliance(violationOnly: true);
+        expect(violations.isNotEmpty, true);
+        for (final v in violations) {
+          expect(v.violationType, isNot('compliant'));
+        }
+
+        // Filter by chain: carrefour
+        final carrefourItems = await apiClient.getPricingCompliance(chain: 'carrefour');
+        expect(carrefourItems.isNotEmpty, true);
+        for (final c in carrefourItems) {
+          expect(c.retailerChain, 'carrefour');
+        }
+      }, () => server);
     });
   });
 }

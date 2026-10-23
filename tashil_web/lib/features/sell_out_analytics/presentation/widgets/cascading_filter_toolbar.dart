@@ -985,7 +985,9 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                         buildYearSelectorPill(),
                         const SizedBox(width: 8.0),
                       ],
-                      buildDateRangeButton(expand: false),
+                      // Flexible so a long active date-range label ellipsizes
+                      // instead of overflowing the actions row.
+                      Flexible(child: buildDateRangeButton(expand: false)),
                       const Spacer(),
                       if (widget.onUpload != null) ...[
                         buildUploadSellOutButton(expand: false),
