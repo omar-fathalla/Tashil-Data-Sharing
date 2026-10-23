@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../features/cpfr_replenishment/domain/cpfr_models.dart';
 import '../security/zero_trust_digest.dart';
+import '../utils/date_range.dart';
 import '../storage/session_storage.dart';
 import '../theme/m3_color_roles.dart';
 import '../utils/web_file_helper.dart';
@@ -2895,9 +2896,8 @@ class ApiClient {
         year != null &&
         year > 0) {
       if (month != null && month > 0 && month <= 12) {
-        final mStr = month.toString().padLeft(2, '0');
-        effectiveStartDate = '$year-$mStr-01';
-        effectiveEndDate = '$year-$mStr-31';
+        effectiveStartDate = DateRangeUtils.monthStart(year, month);
+        effectiveEndDate = DateRangeUtils.monthEnd(year, month);
       } else {
         effectiveStartDate = '$year-01-01';
         effectiveEndDate = '$year-12-31';
@@ -10139,9 +10139,8 @@ class ApiClient {
       String? endDate;
       if (year > 0) {
         if (month > 0) {
-          final mStr = month.toString().padLeft(2, '0');
-          startDate = '$year-$mStr-01';
-          endDate = '$year-$mStr-31';
+          startDate = DateRangeUtils.monthStart(year, month);
+          endDate = DateRangeUtils.monthEnd(year, month);
         } else {
           startDate = '$year-01-01';
           endDate = '$year-12-31';
