@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -65,18 +66,24 @@ func (h *AnalyticsHandler) HandleExecutiveSummary(w http.ResponseWriter, r *http
 
 // PaginatedRecordsResponse formats data table payload along with full-dataset KPI aggregations.
 type PaginatedRecordsResponse struct {
-	Records           interface{} `json:"records"`
-	TotalCount        int         `json:"total_count"`
-	Limit             int         `json:"limit"`
-	Offset            int         `json:"offset"`
-	TotalNetRevenue   float64     `json:"total_net_revenue"`
-	TotalUnitsSold    int         `json:"total_units_sold"`
-	ActiveStoresCount int         `json:"active_stores_count"`
-	ActiveSKUsCount   int         `json:"active_skus_count"`
-	MinDate           string      `json:"min_date"`
-	MaxDate           string      `json:"max_date"`
-	TopBranchName     string      `json:"top_branch_name"`
-	TopBranchRevenue  float64     `json:"top_branch_revenue"`
+	Records                  interface{}                `json:"records"`
+	TotalCount               int                        `json:"total_count"`
+	Limit                    int                        `json:"limit"`
+	Offset                   int                        `json:"offset"`
+	TotalNetRevenue          float64                    `json:"total_net_revenue"`
+	TotalUnitsSold           int                        `json:"total_units_sold"`
+	TotalCartonsSold         float64                    `json:"total_cartons_sold"`
+	TotalFactoryCost         float64                    `json:"total_factory_cost"`
+	TotalRetailerGrossProfit float64                    `json:"total_retailer_gross_profit"`
+	AvgRetailerMarginPct     float64                    `json:"avg_retailer_margin_pct"`
+	ActiveStoresCount        int                        `json:"active_stores_count"`
+	ActiveSKUsCount          int                        `json:"active_skus_count"`
+	MatchedSKUsCount         int                        `json:"matched_skus_count"`
+	MinDate                  string                     `json:"min_date"`
+	MaxDate                  string                     `json:"max_date"`
+	TopBranchName            string                     `json:"top_branch_name"`
+	TopBranchRevenue         float64                    `json:"top_branch_revenue"`
+	SKUSummaries             []domain.SellOutSKUSummary `json:"sku_summaries"`
 }
 
 // HandleRecords serves GET /api/v1/analytics/records.
@@ -135,18 +142,36 @@ func (h *AnalyticsHandler) HandleRecords(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	type skuAggBucket struct {
+		summary domain.SellOutSKUSummary
+		stores  map[string]bool
+	}
+
 	var totalRev float64
 	var totalUnits int
+	var totalCartons float64
+	var totalFactoryCost float64
+	var totalGrossProfit float64
+	var matchedRevForMargin float64
 	storesSet := make(map[string]bool)
 	skusSet := make(map[string]bool)
+	matchedSKUsSet := make(map[string]bool)
 	branchRev := make(map[string]float64)
 	branchNames := make(map[string]string)
+	skuBuckets := make(map[string]*skuAggBucket)
 	minDate := ""
 	maxDate := ""
 
 	for _, rec := range allMatched {
 		totalRev += rec.NetRevenue
 		totalUnits += rec.QuantitySold
+		totalCartons += rec.CartonsSold
+		if rec.TotalFactoryCost > 0 {
+			totalFactoryCost += rec.TotalFactoryCost
+			totalGrossProfit += rec.RetailerGrossProfit
+			matchedRevForMargin += rec.NetRevenue
+		}
+
 		storeKey := rec.StoreID
 		if storeKey == "" {
 			storeKey = rec.StoreName
@@ -162,10 +187,16 @@ func (h *AnalyticsHandler) HandleRecords(w http.ResponseWriter, r *http.Request)
 		}
 		skuKey := rec.Barcode
 		if skuKey == "" {
+			skuKey = rec.ItemCode
+		}
+		if skuKey == "" {
 			skuKey = rec.SKUName
 		}
 		if skuKey != "" {
 			skusSet[skuKey] = true
+			if rec.ItemCode != "" {
+				matchedSKUsSet[skuKey] = true
+			}
 		}
 		if rec.TransactionDate != "" {
 			if minDate == "" || rec.TransactionDate < minDate {
@@ -175,6 +206,123 @@ func (h *AnalyticsHandler) HandleRecords(w http.ResponseWriter, r *http.Request)
 				maxDate = rec.TransactionDate
 			}
 		}
+
+		groupKey := rec.ItemCode
+		if groupKey == "" {
+			groupKey = rec.Barcode
+		}
+		if groupKey == "" {
+			groupKey = rec.SKUName
+		}
+		if groupKey != "" {
+			b, exists := skuBuckets[groupKey]
+			if !exists {
+				rawName := rec.RetailerRawSKUName
+				if rawName == "" {
+					rawName = rec.SKUName
+				}
+				b = &skuAggBucket{
+					summary: domain.SellOutSKUSummary{
+						ItemCode:             rec.ItemCode,
+						Barcode:              rec.Barcode,
+						SKUName:              rec.SKUName,
+						RetailerRawSKUName:   rawName,
+						Brand:                domain.InferBrandFromItemName(rec.SKUName, rec.Category),
+						Category:             rec.Category,
+						ItemType:             rec.ItemType,
+						UnitsPerCarton:       rec.UnitsPerCarton,
+						OfficialConsumerRSP:  rec.RecommendedPrice,
+						CartonPriceInclVAT:   rec.CartonPriceInclVAT,
+						FactoryUnitCost:      rec.FactoryUnitCost,
+						NetCartonInvoiceCost: rec.NetCartonInvoiceCost,
+						InvoiceDiscountPct:   rec.InvoiceDiscountPct,
+					},
+					stores: make(map[string]bool),
+				}
+				skuBuckets[groupKey] = b
+			} else {
+				if b.summary.ItemCode == "" && rec.ItemCode != "" {
+					b.summary.ItemCode = rec.ItemCode
+				}
+				if b.summary.Barcode == "" && rec.Barcode != "" {
+					b.summary.Barcode = rec.Barcode
+				}
+				if b.summary.OfficialConsumerRSP <= 0 && rec.RecommendedPrice > 0 {
+					b.summary.OfficialConsumerRSP = rec.RecommendedPrice
+				}
+				if b.summary.FactoryUnitCost <= 0 && rec.FactoryUnitCost > 0 {
+					b.summary.FactoryUnitCost = rec.FactoryUnitCost
+				}
+				if b.summary.CartonPriceInclVAT <= 0 && rec.CartonPriceInclVAT > 0 {
+					b.summary.CartonPriceInclVAT = rec.CartonPriceInclVAT
+				}
+				if b.summary.NetCartonInvoiceCost <= 0 && rec.NetCartonInvoiceCost > 0 {
+					b.summary.NetCartonInvoiceCost = rec.NetCartonInvoiceCost
+				}
+				if b.summary.UnitsPerCarton <= 0 && rec.UnitsPerCarton > 0 {
+					b.summary.UnitsPerCarton = rec.UnitsPerCarton
+				}
+			}
+			b.summary.TotalUnitsSold += rec.QuantitySold
+			b.summary.TotalCartonsSold += rec.CartonsSold
+			b.summary.TotalNetRevenue += rec.NetRevenue
+			b.summary.TotalFactoryCost += rec.TotalFactoryCost
+			b.summary.RetailerGrossProfit += rec.RetailerGrossProfit
+			if storeKey != "" {
+				b.stores[storeKey] = true
+			}
+		}
+	}
+
+	skuSummaries := make([]domain.SellOutSKUSummary, 0, len(skuBuckets))
+	for _, b := range skuBuckets {
+		s := b.summary
+		s.ActiveStoresCount = len(b.stores)
+		if s.TotalUnitsSold > 0 {
+			s.AvgSellingPrice = math.Round((s.TotalNetRevenue/float64(s.TotalUnitsSold))*100) / 100
+		}
+		if s.UnitsPerCarton > 0 && s.TotalUnitsSold > 0 {
+			s.TotalCartonsSold = math.Round((float64(s.TotalUnitsSold)/float64(s.UnitsPerCarton))*100) / 100
+		} else {
+			s.TotalCartonsSold = math.Round(s.TotalCartonsSold*100) / 100
+		}
+		s.TotalNetRevenue = math.Round(s.TotalNetRevenue*100) / 100
+		if s.FactoryUnitCost > 0 && s.TotalUnitsSold > 0 {
+			s.TotalFactoryCost = math.Round((float64(s.TotalUnitsSold)*s.FactoryUnitCost)*100) / 100
+			s.RetailerGrossProfit = math.Round((s.TotalNetRevenue-s.TotalFactoryCost)*100) / 100
+			if s.TotalNetRevenue > 0 {
+				s.RetailerMarginPct = math.Round(((s.RetailerGrossProfit/s.TotalNetRevenue)*100)*100) / 100
+			}
+		} else {
+			s.TotalFactoryCost = math.Round(s.TotalFactoryCost*100) / 100
+			s.RetailerGrossProfit = math.Round(s.RetailerGrossProfit*100) / 100
+		}
+		if s.OfficialConsumerRSP > 0 && s.AvgSellingPrice > 0 {
+			s.PriceDeltaPct = math.Round((((s.AvgSellingPrice-s.OfficialConsumerRSP)/s.OfficialConsumerRSP)*100)*100) / 100
+		}
+		switch {
+		case s.FactoryUnitCost > 0 && s.AvgSellingPrice > 0 && s.AvgSellingPrice < s.FactoryUnitCost:
+			s.PriceStatus = "below_cost"
+		case s.PriceDeltaPct <= -5.0:
+			s.PriceStatus = "promo_discount"
+		case s.PriceDeltaPct >= 5.0:
+			s.PriceStatus = "above_rsp"
+		default:
+			s.PriceStatus = "compliant"
+		}
+		skuSummaries = append(skuSummaries, s)
+	}
+
+	sort.Slice(skuSummaries, func(i, j int) bool {
+		if skuSummaries[i].TotalNetRevenue != skuSummaries[j].TotalNetRevenue {
+			return skuSummaries[i].TotalNetRevenue > skuSummaries[j].TotalNetRevenue
+		}
+		return skuSummaries[i].SKUName < skuSummaries[j].SKUName
+	})
+
+	avgMarginPct := 0.0
+	if matchedRevForMargin > 0 {
+		avgMarginPct = math.Round(((totalGrossProfit/matchedRevForMargin)*100)*100) / 100
 	}
 
 	topBranchName := ""
@@ -196,18 +344,24 @@ func (h *AnalyticsHandler) HandleRecords(w http.ResponseWriter, r *http.Request)
 	}
 
 	resp := PaginatedRecordsResponse{
-		Records:           pageRecords,
-		TotalCount:        total,
-		Limit:             limit,
-		Offset:            offset,
-		TotalNetRevenue:   math.Round(totalRev*100) / 100,
-		TotalUnitsSold:    totalUnits,
-		ActiveStoresCount: len(storesSet),
-		ActiveSKUsCount:   len(skusSet),
-		MinDate:           minDate,
-		MaxDate:           maxDate,
-		TopBranchName:     topBranchName,
-		TopBranchRevenue:  math.Round(topBranchRev*100) / 100,
+		Records:                  pageRecords,
+		TotalCount:               total,
+		Limit:                    limit,
+		Offset:                   offset,
+		TotalNetRevenue:          math.Round(totalRev*100) / 100,
+		TotalUnitsSold:           totalUnits,
+		TotalCartonsSold:         math.Round(totalCartons*100) / 100,
+		TotalFactoryCost:         math.Round(totalFactoryCost*100) / 100,
+		TotalRetailerGrossProfit: math.Round(totalGrossProfit*100) / 100,
+		AvgRetailerMarginPct:     avgMarginPct,
+		ActiveStoresCount:        len(storesSet),
+		ActiveSKUsCount:          len(skusSet),
+		MatchedSKUsCount:         len(matchedSKUsSet),
+		MinDate:                  minDate,
+		MaxDate:                  maxDate,
+		TopBranchName:            topBranchName,
+		TopBranchRevenue:         math.Round(topBranchRev*100) / 100,
+		SKUSummaries:             skuSummaries,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -475,6 +629,7 @@ func (h *AnalyticsHandler) HandleGetProductMaster(w http.ResponseWriter, r *http
 	if pullStatus == "" {
 		pullStatus = strings.TrimSpace(q.Get("status"))
 	}
+	priceChange := strings.TrimSpace(q.Get("price_change"))
 
 	summary, err := h.bqRepo.GetProductMaster(r.Context(), tenantID, bigquery.ProductMasterFilter{
 		Prefix:        prefix,
@@ -482,6 +637,7 @@ func (h *AnalyticsHandler) HandleGetProductMaster(w http.ResponseWriter, r *http
 		ItemType:      itemType,
 		PackagingType: strings.TrimSpace(q.Get("packaging")),
 		PullStatus:    pullStatus,
+		PriceChange:   priceChange,
 		SearchQuery:   searchQuery,
 	})
 	if err != nil {

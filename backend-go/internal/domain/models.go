@@ -132,30 +132,73 @@ type ProductMasterItem struct {
 	TotalPOSRevenue       float64  `json:"total_pos_revenue"`                 // إجمالي مبيعات الكاشير بالسلاسل بالجنيه
 	AvgRetailSellingPrice float64  `json:"avg_retail_selling_price,omitempty"` // متوسط سعر بيع المستهلك الفعلي بالسلاسل
 	ActiveChains          []string `json:"active_chains"`                     // السلاسل النشطة التي تسحب الصنف
-	SourceFilename        string   `json:"source_filename,omitempty"`
-	SheetName             string   `json:"sheet_name,omitempty"`
-	UpdatedAt             string   `json:"updated_at"`
+	SourceFilename             string   `json:"source_filename,omitempty"`
+	SheetName                  string   `json:"sheet_name,omitempty"`
+	UpdatedAt                  string   `json:"updated_at"`
+	PrevUnitPriceExclVAT       float64  `json:"prev_unit_price_excl_vat,omitempty"`
+	PrevUnitPriceInclVAT       float64  `json:"prev_unit_price_incl_vat,omitempty"`
+	PrevCartonPriceInclVAT     float64  `json:"prev_carton_price_incl_vat,omitempty"`
+	PrevNetUnitInvoiceCost     float64  `json:"prev_net_unit_invoice_cost,omitempty"`
+	PrevNetCartonInvoiceCost   float64  `json:"prev_net_carton_invoice_cost,omitempty"`
+	PriceChangeDirection       string   `json:"price_change_direction,omitempty"` // "up" | "down" | "new" | "same"
+	PriceChangeDiffEGP         float64  `json:"price_change_diff_egp,omitempty"`
+	PriceChangePct             float64  `json:"price_change_pct,omitempty"`
+}
+
+// ProductMasterDiffItem summarizes a single SKU price change or newly added SKU in a sheet comparison.
+type ProductMasterDiffItem struct {
+	ItemCode           string  `json:"item_code"`
+	OfficialName       string  `json:"official_name"`
+	Brand              string  `json:"brand,omitempty"`
+	OldUnitPriceIncl   float64 `json:"old_unit_price_incl"`
+	NewUnitPriceIncl   float64 `json:"new_unit_price_incl"`
+	OldCartonPriceIncl float64 `json:"old_carton_price_incl,omitempty"`
+	NewCartonPriceIncl float64 `json:"new_carton_price_incl,omitempty"`
+	DiffEGP            float64 `json:"diff_egp"`
+	DiffPct            float64 `json:"diff_pct"`
+	Direction          string  `json:"direction"` // "up" | "down" | "new" | "same"
+}
+
+// ProductMasterDiffSummary provides an automated AI/diff report between a newly uploaded Product Master sheet and the previous version.
+type ProductMasterDiffSummary struct {
+	ComparedAgainstFile string                  `json:"compared_against_file"`
+	NewFileName         string                  `json:"new_file_name"`
+	ComparedAt          string                  `json:"compared_at"`
+	TotalSKUsCompared   int                     `json:"total_skus_compared"`
+	PriceIncreasedCount int                     `json:"price_increased_count"`
+	PriceDecreasedCount int                     `json:"price_decreased_count"`
+	PriceUnchangedCount int                     `json:"price_unchanged_count"`
+	NewSKUsCount        int                     `json:"new_skus_count"`
+	AvgPriceIncreasePct float64                 `json:"avg_price_increase_pct"`
+	AvgPriceDecreasePct float64                 `json:"avg_price_decrease_pct"`
+	TopChangedItems     []ProductMasterDiffItem `json:"top_changed_items,omitempty"`
 }
 
 // ProductMasterSummaryResponse returns the full product master catalog and summary KPIs.
 type ProductMasterSummaryResponse struct {
-	TenantID            string              `json:"tenant_id"`
-	CompanyName         string              `json:"company_name"`
-	SheetDateLabel      string              `json:"sheet_date_label"`
-	SourceFilename      string              `json:"source_filename"`
-	DefaultDiscountPct  float64             `json:"default_discount_pct"`
-	DefaultVATRate      float64             `json:"default_vat_rate"`
-	TotalSKUs           int                 `json:"total_skus"`
-	RegularSKUsCount    int                 `json:"regular_skus_count"`
-	PromoSKUsCount      int                 `json:"promo_skus_count"`
-	UniqueBarcodesCount int                 `json:"unique_barcodes_count"`
-	ActiveInChainsCount int                 `json:"active_in_chains_count"`
-	UnpulledSKUsCount   int                 `json:"unpulled_skus_count"`
-	AvgUnitsPerCarton   float64             `json:"avg_units_per_carton"`
-	AvailablePrefixes   []string            `json:"available_prefixes"`
-	AvailableBrands     []string            `json:"available_brands"`
-	AvailablePackaging  []string            `json:"available_packaging"`
-	Items               []ProductMasterItem `json:"items"`
+	TenantID            string                    `json:"tenant_id"`
+	CompanyName         string                    `json:"company_name"`
+	SheetDateLabel      string                    `json:"sheet_date_label"`
+	SourceFilename      string                    `json:"source_filename"`
+	DefaultDiscountPct  float64                   `json:"default_discount_pct"`
+	DefaultVATRate      float64                   `json:"default_vat_rate"`
+	TotalSKUs           int                       `json:"total_skus"`
+	RegularSKUsCount    int                       `json:"regular_skus_count"`
+	PromoSKUsCount      int                       `json:"promo_skus_count"`
+	UniqueBarcodesCount int                       `json:"unique_barcodes_count"`
+	ActiveInChainsCount int                       `json:"active_in_chains_count"`
+	UnpulledSKUsCount   int                       `json:"unpulled_skus_count"`
+	PriceIncreasedCount int                       `json:"price_increased_count"`
+	PriceDecreasedCount int                       `json:"price_decreased_count"`
+	PriceUnchangedCount int                       `json:"price_unchanged_count"`
+	NewSKUsCount        int                       `json:"new_skus_count"`
+	AvgUnitsPerCarton   float64                   `json:"avg_units_per_carton"`
+	AvailablePrefixes   []string                  `json:"available_prefixes"`
+	AvailableBrands     []string                  `json:"available_brands"`
+	AvailablePackaging  []string                  `json:"available_packaging"`
+	DiffSummary          *ProductMasterDiffSummary `json:"diff_summary,omitempty"`
+	Items                []ProductMasterItem       `json:"items"`
+	SupplementalPOSItems []ProductMasterItem       `json:"supplemental_pos_items,omitempty"`
 }
 
 // NormalizeItemCode canonicalizes an item code to uppercase trimmed format (e.g., "FGLc-0730-0019" -> "FGLC-0730-0019").
@@ -294,28 +337,64 @@ func MatchesProductSearchQuery(rawQuery, itemCode, barcode, skuName, officialNam
 
 // SellOutFact represents an atomic sell-out transaction loaded into Google BigQuery.
 type SellOutFact struct {
-	RecordID           string    `json:"record_id" bigquery:"record_id"`
-	TenantID           string    `json:"tenant_id" bigquery:"tenant_id"`
-	RetailerChain      string    `json:"retailer_chain" bigquery:"retailer_chain"`
-	StoreID            string    `json:"store_id" bigquery:"store_id"`
-	StoreName          string    `json:"store_name" bigquery:"store_name"`
-	ItemCode           string    `json:"item_code,omitempty" bigquery:"item_code"`
-	Barcode            string    `json:"barcode" bigquery:"barcode"`
-	SKUName            string    `json:"sku_name" bigquery:"sku_name"`
-	RetailerRawSKUName string    `json:"retailer_raw_sku_name,omitempty" bigquery:"retailer_raw_sku_name"`
-	Category           string    `json:"category" bigquery:"category"`
-	Supplier           string    `json:"supplier,omitempty" bigquery:"supplier"`
-	IsOwnBrand         bool      `json:"is_own_brand" bigquery:"is_own_brand"`
-	UnitsPerCarton     int       `json:"units_per_carton,omitempty" bigquery:"units_per_carton"`
-	ItemType           string    `json:"item_type,omitempty" bigquery:"item_type"`
-	FactoryUnitCost    float64   `json:"factory_unit_cost,omitempty" bigquery:"factory_unit_cost"`
-	QuantitySold       int       `json:"quantity_sold" bigquery:"quantity_sold"`
-	NetRevenue         float64   `json:"net_revenue" bigquery:"net_revenue"`
-	UnitPrice          float64   `json:"unit_price" bigquery:"unit_price"`
-	RecommendedPrice   float64   `json:"recommended_price,omitempty" bigquery:"recommended_price"`
-	TransactionDate    string    `json:"transaction_date" bigquery:"transaction_date"` // YYYY-MM-DD
-	IngestionBatchID   string    `json:"ingestion_batch_id" bigquery:"ingestion_batch_id"`
-	IngestedAt         time.Time `json:"ingested_at" bigquery:"ingested_at"`
+	RecordID             string    `json:"record_id" bigquery:"record_id"`
+	TenantID             string    `json:"tenant_id" bigquery:"tenant_id"`
+	RetailerChain        string    `json:"retailer_chain" bigquery:"retailer_chain"`
+	StoreID              string    `json:"store_id" bigquery:"store_id"`
+	StoreName            string    `json:"store_name" bigquery:"store_name"`
+	ItemCode             string    `json:"item_code,omitempty" bigquery:"item_code"`
+	Barcode              string    `json:"barcode" bigquery:"barcode"`
+	SKUName              string    `json:"sku_name" bigquery:"sku_name"`
+	RetailerRawSKUName   string    `json:"retailer_raw_sku_name,omitempty" bigquery:"retailer_raw_sku_name"`
+	Category             string    `json:"category" bigquery:"category"`
+	Supplier             string    `json:"supplier,omitempty" bigquery:"supplier"`
+	IsOwnBrand           bool      `json:"is_own_brand" bigquery:"is_own_brand"`
+	UnitsPerCarton       int       `json:"units_per_carton,omitempty" bigquery:"units_per_carton"`
+	ItemType             string    `json:"item_type,omitempty" bigquery:"item_type"`
+	FactoryUnitCost      float64   `json:"factory_unit_cost,omitempty" bigquery:"factory_unit_cost"`
+	CartonPriceInclVAT   float64   `json:"carton_price_incl_vat,omitempty" bigquery:"carton_price_incl_vat"`
+	NetCartonInvoiceCost float64   `json:"net_carton_invoice_cost,omitempty" bigquery:"net_carton_invoice_cost"`
+	InvoiceDiscountPct   float64   `json:"invoice_discount_pct,omitempty" bigquery:"invoice_discount_pct"`
+	QuantitySold         int       `json:"quantity_sold" bigquery:"quantity_sold"`
+	CartonsSold          float64   `json:"cartons_sold,omitempty" bigquery:"cartons_sold"`
+	NetRevenue           float64   `json:"net_revenue" bigquery:"net_revenue"`
+	UnitPrice            float64   `json:"unit_price" bigquery:"unit_price"`
+	RecommendedPrice     float64   `json:"recommended_price,omitempty" bigquery:"recommended_price"`
+	TotalFactoryCost     float64   `json:"total_factory_cost,omitempty" bigquery:"total_factory_cost"`
+	RetailerGrossProfit  float64   `json:"retailer_gross_profit,omitempty" bigquery:"retailer_gross_profit"`
+	RetailerMarginPct    float64   `json:"retailer_margin_pct,omitempty" bigquery:"retailer_margin_pct"`
+	PriceDeltaPct        float64   `json:"price_delta_pct,omitempty" bigquery:"price_delta_pct"`
+	TransactionDate      string    `json:"transaction_date" bigquery:"transaction_date"` // YYYY-MM-DD
+	IngestionBatchID     string    `json:"ingestion_batch_id" bigquery:"ingestion_batch_id"`
+	IngestedAt           time.Time `json:"ingested_at" bigquery:"ingested_at"`
+}
+
+// SellOutSKUSummary aggregates full-dataset sell-out performance, official factory pricing, and chain margin for a single SKU across the selected filter scope.
+type SellOutSKUSummary struct {
+	ItemCode             string   `json:"item_code"`
+	Barcode              string   `json:"barcode"`
+	SKUName              string   `json:"sku_name"`
+	RetailerRawSKUName   string   `json:"retailer_raw_sku_name,omitempty"`
+	Brand                string   `json:"brand"`
+	Category             string   `json:"category"`
+	ItemType             string   `json:"item_type"`
+	UnitsPerCarton       int      `json:"units_per_carton"`
+	TotalUnitsSold       int      `json:"total_units_sold"`
+	TotalCartonsSold     float64  `json:"total_cartons_sold"`
+	TotalNetRevenue      float64  `json:"total_net_revenue"`
+	AvgSellingPrice      float64  `json:"avg_selling_price"`
+	OfficialConsumerRSP  float64  `json:"official_consumer_rsp"`
+	FactoryUnitCost      float64  `json:"factory_unit_cost"`
+	CartonPriceInclVAT   float64  `json:"carton_price_incl_vat"`
+	NetCartonInvoiceCost float64  `json:"net_carton_invoice_cost"`
+	InvoiceDiscountPct   float64  `json:"invoice_discount_pct"`
+	TotalFactoryCost     float64  `json:"total_factory_cost"`
+	RetailerGrossProfit  float64  `json:"retailer_gross_profit"`
+	RetailerMarginPct    float64  `json:"retailer_margin_pct"`
+	PriceDeltaPct        float64  `json:"price_delta_pct"`
+	PriceStatus          string   `json:"price_status"`
+	ActiveStoresCount    int      `json:"active_stores_count"`
+	ActiveChains         []string `json:"active_chains"`
 }
 
 // IngestionBatch records metadata for an uploaded Excel or CSV file.

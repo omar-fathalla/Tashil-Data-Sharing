@@ -148,4 +148,34 @@ func TestComprehensiveSellInTargetBreakdown(t *testing.T) {
 	if diff := sumBranchUnits - item.TargetUnits; diff > 1.0 || diff < -1.0 {
 		t.Errorf("expected sum of branch target units (%.2f) to equal chain target units (%.2f)", sumBranchUnits, item.TargetUnits)
 	}
+
+	// Verify Product Master 3-way linkage on ChainSKUTotals and Sell-In Explorer Waterfall
+	matchedTargetSkus := 0
+	for _, s := range item.ChainSKUTotals {
+		if s.ItemCode != "" {
+			matchedTargetSkus++
+		}
+		if s.UnitsPerCarton <= 0 {
+			t.Errorf("expected UnitsPerCarton > 0 for SKU %s", s.SKUName)
+		}
+	}
+	if len(item.ChainSKUTotals) > 0 && matchedTargetSkus < 130 {
+		t.Errorf("expected >= 130 Sell-In SKUs matched to Product Master ItemCode, got %d / %d", matchedTargetSkus, len(item.ChainSKUTotals))
+	}
+
+	analyticsHandler := NewAnalyticsHandler(bqRepo)
+	reqRecs := authenticatedRequest(http.MethodGet, "/api/v1/analytics/sell-in-records?chain=fathalla&year=2026&limit=50", "tenant-adeco")
+	wRecs := httptest.NewRecorder()
+	analyticsHandler.HandleSellInRecords(wRecs, reqRecs)
+	if wRecs.Code != http.StatusOK {
+		t.Fatalf("expected 200 from /api/v1/analytics/sell-in-records, got %d", wRecs.Code)
+	}
+	var recResp PaginatedSellInRecordsResponse
+	if err := json.Unmarshal(wRecs.Body.Bytes(), &recResp); err != nil {
+		t.Fatalf("failed to decode PaginatedSellInRecordsResponse: %v", err)
+	}
+	if recResp.TotalGrossInclVATEGP <= recResp.TotalValueEGP || recResp.TotalVAT14EGP <= 0 || recResp.TotalUnitsPieces <= 0 {
+		t.Errorf("expected populated Tax & Discount Waterfall in Sell-In records response, got Net=%.2f VAT=%.2f Gross=%.2f Pieces=%d MatchedSKUs=%d",
+			recResp.TotalValueEGP, recResp.TotalVAT14EGP, recResp.TotalGrossInclVATEGP, recResp.TotalUnitsPieces, recResp.MatchedCatalogSKUsCount)
+	}
 }

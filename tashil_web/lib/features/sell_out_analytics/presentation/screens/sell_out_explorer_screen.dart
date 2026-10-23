@@ -11,6 +11,7 @@ import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_responsive_tab_bar.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../cpfr_replenishment/domain/cpfr_models.dart';
+import '../../../product_master/presentation/screens/product_master_screen.dart';
 import '../widgets/cascading_filter_toolbar.dart';
 import '../widgets/target_management_panel.dart';
 import '../widgets/virtualized_sku_table.dart';
@@ -69,6 +70,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
   String _perfBrand = 'all';
   String _perfSearch = '';
   String _perfGrowthStatusFilter = 'all'; // 'all', 'growing', 'declining', 'new_branch'
+  String _priceMatrixFilter = 'all'; // 'all', 'healthy', 'low_margin', 'negative_margin', 'promo'
   late final TextEditingController _perfSearchController;
 
   // Tab 3: Uploaded Sell-Out Excel Sheets Archive State
@@ -700,6 +702,18 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
 
     final double totalNetRevenue = _recordsSummary.totalNetRevenue > 0 ? _recordsSummary.totalNetRevenue : fallbackRev;
     final int totalUnitsSold = _recordsSummary.totalUnitsSold > 0 ? _recordsSummary.totalUnitsSold : fallbackUnits;
+    final double totalCartonsSold = _recordsSummary.totalCartonsSold > 0
+        ? _recordsSummary.totalCartonsSold
+        : records.fold<double>(0.0, (acc, r) => acc + r.cartonsSold);
+    final double totalFactoryCost = _recordsSummary.totalFactoryCost > 0
+        ? _recordsSummary.totalFactoryCost
+        : records.fold<double>(0.0, (acc, r) => acc + r.totalFactoryCost);
+    final double totalGrossProfit = _recordsSummary.totalRetailerGrossProfit != 0
+        ? _recordsSummary.totalRetailerGrossProfit
+        : records.fold<double>(0.0, (acc, r) => acc + r.retailerGrossProfit);
+    final double avgMarginPct = _recordsSummary.avgRetailerMarginPct != 0
+        ? _recordsSummary.avgRetailerMarginPct
+        : (totalNetRevenue > 0 && totalGrossProfit != 0 ? (totalGrossProfit / totalNetRevenue) * 100.0 : 0.0);
     final int totalTransactionsCount = _recordsSummary.totalCount > 0 ? _recordsSummary.totalCount : records.length;
     final int activeStoresCount = _recordsSummary.activeStoresCount > 0
         ? _recordsSummary.activeStoresCount
@@ -731,6 +745,13 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       yoySubtitleSuffix = ' • نمو $sign${yoyPct.toStringAsFixed(1)}% عن 2025';
     }
 
+    final String cartonsSubtitle = totalCartonsSold > 0
+        ? ' (${CurrencyFormatter.formatNumber(totalCartonsSold.round())} كرتونة بالشد الفعلي)'
+        : '';
+    final String marginSubtitle = totalFactoryCost > 0
+        ? ' • صافي المصنع: ${CurrencyFormatter.formatCompactEGP(totalFactoryCost)} • ربح السلسلة: ${CurrencyFormatter.formatCompactEGP(totalGrossProfit)} (${avgMarginPct.toStringAsFixed(1)}%)'
+        : '';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -743,7 +764,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               titleEn: 'Total Net Revenue (EGP)',
               value: CurrencyFormatter.formatCompactEGP(totalNetRevenue),
               subtitle:
-                  '$yearBadgeAr • ${CurrencyFormatter.formatNumber(totalTransactionsCount)} حركة بيع فعلية$dateSpanAr$yoySubtitleSuffix',
+                  '$yearBadgeAr • ${CurrencyFormatter.formatNumber(totalTransactionsCount)} حركة بيع فعلية$dateSpanAr$yoySubtitleSuffix$marginSubtitle',
               icon: Icons.payments_rounded,
               color: colorScheme.primary,
             );
@@ -752,7 +773,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               titleAr: 'إجمالي الكمية المباعة',
               titleEn: 'Total Units Sold',
               value: CurrencyFormatter.formatNumber(totalUnitsSold),
-              subtitle: 'قطعة / وحدة مباعة للمستهلك • $yearBadgeAr',
+              subtitle: 'قطعة / وحدة مباعة للمستهلك$cartonsSubtitle • $yearBadgeAr',
               icon: Icons.shopping_bag_rounded,
               color: Color.lerp(colorScheme.primary, colorScheme.secondary, 0.30) ?? colorScheme.primary,
             );
@@ -873,14 +894,298 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
           onExportPdf: _handleExportPdf,
         ),
 
+        if (_recordsSummary.skuSummaries.isNotEmpty) ...[
+          M3Spacing.gapMD,
+          _buildAdecoPriceAndMarginMatrixSection(context, theme, colorScheme),
+        ],
+
         M3Spacing.gapMD,
 
         // 4. Virtualized SKU Table
         VirtualizedSkuTable(
           records: records,
           isLoading: isLoading,
+          onRecordTap: _openProductIdCardForRecord,
         ),
       ],
+    );
+  }
+
+  Future<void> _openProductIdCardForRecord(SellOutRecordModel r) async {
+    try {
+      final q = r.itemCode.trim().isNotEmpty
+          ? r.itemCode.trim()
+          : (r.barcode.trim().isNotEmpty ? r.barcode.trim() : r.skuName.trim());
+      if (q.isEmpty) return;
+      final res = await widget.apiClient.getProductMaster(search: q);
+      if (!mounted || res.items.isEmpty) return;
+      ProductMasterItemModel matched = res.items.first;
+      for (final it in res.items) {
+        if (r.itemCode.isNotEmpty && it.itemCode == r.itemCode) {
+          matched = it;
+          break;
+        }
+        if (r.barcode.isNotEmpty && it.barcode == r.barcode) {
+          matched = it;
+          break;
+        }
+      }
+      await ProductMasterScreen.showProductIdCardModal(
+        context,
+        apiClient: widget.apiClient,
+        item: matched,
+        onUpdated: (_) => _loadRecords(),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _openProductIdCardForSummary(SellOutSkuSummaryModel s) async {
+    try {
+      final q = s.itemCode.trim().isNotEmpty
+          ? s.itemCode.trim()
+          : (s.barcode.trim().isNotEmpty ? s.barcode.trim() : s.skuName.trim());
+      if (q.isEmpty) return;
+      final res = await widget.apiClient.getProductMaster(search: q);
+      if (!mounted || res.items.isEmpty) return;
+      ProductMasterItemModel matched = res.items.first;
+      for (final it in res.items) {
+        if (s.itemCode.isNotEmpty && it.itemCode == s.itemCode) {
+          matched = it;
+          break;
+        }
+        if (s.barcode.isNotEmpty && it.barcode == s.barcode) {
+          matched = it;
+          break;
+        }
+      }
+      await ProductMasterScreen.showProductIdCardModal(
+        context,
+        apiClient: widget.apiClient,
+        item: matched,
+        onUpdated: (_) => _loadRecords(),
+      );
+    } catch (_) {}
+  }
+
+  static bool _matchesPriceMatrixFilter(SellOutSkuSummaryModel s, String filter) {
+    switch (filter) {
+      case 'healthy':
+        return s.retailerMarginPct >= 10.0;
+      case 'low_margin':
+        return s.retailerMarginPct >= 0.0 && s.retailerMarginPct < 10.0 && s.factoryUnitCost > 0;
+      case 'negative_margin':
+        return s.retailerMarginPct < 0.0 || s.priceStatus == 'below_cost';
+      case 'promo':
+        return s.priceStatus == 'promo_discount' || s.priceDeltaPct <= -5.0;
+      case 'all':
+      default:
+        return true;
+    }
+  }
+
+  Widget _buildAdecoPriceAndMarginMatrixSection(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    final allItems = _recordsSummary.skuSummaries;
+    final filteredItems = allItems
+        .where((s) => _matchesPriceMatrixFilter(s, _priceMatrixFilter))
+        .take(25)
+        .toList();
+
+    final healthyCount = allItems.where((s) => _matchesPriceMatrixFilter(s, 'healthy')).length;
+    final lowMarginCount = allItems.where((s) => _matchesPriceMatrixFilter(s, 'low_margin')).length;
+    final negMarginCount = allItems.where((s) => _matchesPriceMatrixFilter(s, 'negative_margin')).length;
+    final promoCount = allItems.where((s) => _matchesPriceMatrixFilter(s, 'promo')).length;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18.0),
+        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.55)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12.0,
+              runSpacing: 8.0,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.price_check_rounded, color: colorScheme.primary, size: 22.0),
+                    const SizedBox(width: 8.0),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'مصفوفة مقارنة أسعار كارتة أدكو وهوامش ربح السلسلة (Adeco Official Price & Chain Margin Matrix)',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          'ربط مباشر بين شيت الكاشير وكارتة الأصناف الرسمية (${_recordsSummary.matchedSkusCount} صنف مطابق بالكود والباركود وشد الكرتونة)',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer.withOpacity(0.55),
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                  child: Text(
+                    'إجمالي الكراتين المباعة: ${CurrencyFormatter.formatNumber(_recordsSummary.totalCartonsSold.round())} كرتونة • صافي المصنع: ${CurrencyFormatter.formatCompactEGP(_recordsSummary.totalFactoryCost)} • ربح السلسلة: ${CurrencyFormatter.formatCompactEGP(_recordsSummary.totalRetailerGrossProfit)} (${_recordsSummary.avgRetailerMarginPct.toStringAsFixed(1)}%)',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10.0),
+            // Filter Chips: الكل, هامش صحي 📈, هامش منخفض ⚠️, بيع بأقل من التكلفة / حرق سعر 🚨, عروض ترويجية 🎁
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 8.0,
+              children: [
+                ChoiceChip(
+                  label: Text('الكل (${allItems.length})'),
+                  selected: _priceMatrixFilter == 'all',
+                  onSelected: (_) => setState(() => _priceMatrixFilter = 'all'),
+                ),
+                ChoiceChip(
+                  label: Text('هامش صحي 📈 ($healthyCount)'),
+                  selected: _priceMatrixFilter == 'healthy',
+                  onSelected: (_) => setState(() => _priceMatrixFilter = 'healthy'),
+                ),
+                ChoiceChip(
+                  label: Text('هامش منخفض ⚠️ ($lowMarginCount)'),
+                  selected: _priceMatrixFilter == 'low_margin',
+                  onSelected: (_) => setState(() => _priceMatrixFilter = 'low_margin'),
+                ),
+                ChoiceChip(
+                  label: Text('بيع بأقل من التكلفة / حرق سعر 🚨 ($negMarginCount)'),
+                  selected: _priceMatrixFilter == 'negative_margin',
+                  onSelected: (_) => setState(() => _priceMatrixFilter = 'negative_margin'),
+                ),
+                ChoiceChip(
+                  label: Text('عروض ترويجية 🎁 ($promoCount)'),
+                  selected: _priceMatrixFilter == 'promo',
+                  onSelected: (_) => setState(() => _priceMatrixFilter = 'promo'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12.0),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowHeight: 42.0,
+                dataRowMinHeight: 42.0,
+                dataRowMaxHeight: 48.0,
+                columnSpacing: 18.0,
+                columns: const [
+                  DataColumn(label: Text('كود الكارتة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                  DataColumn(label: Text('الصنف الرسمي', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                  DataColumn(numeric: true, label: Text('الشد', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                  DataColumn(numeric: true, label: Text('الوحدات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                  DataColumn(numeric: true, label: Text('الكراتين', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                  DataColumn(numeric: true, label: Text('سعر الكارتة (شامل)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                  DataColumn(numeric: true, label: Text('سعر الكاشير الفعلي', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                  DataColumn(numeric: true, label: Text('انحراف السعر', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                  DataColumn(numeric: true, label: Text('تكلفة المصنع للقطعة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                  DataColumn(numeric: true, label: Text('صافي الكرتونة للفاتورة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                  DataColumn(numeric: true, label: Text('صافي المبيعات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                  DataColumn(numeric: true, label: Text('هامش السلسلة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                ],
+                rows: filteredItems.map((s) {
+                  final isNegMargin = s.retailerMarginPct < 0;
+                  final marginColor = isNegMargin ? colorScheme.error : colorScheme.secondary;
+                  final deltaSign = s.priceDeltaPct >= 0 ? '+' : '';
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        InkWell(
+                          onTap: () => _openProductIdCardForSummary(s),
+                          child: Text(
+                            s.itemCode.isNotEmpty ? s.itemCode : s.barcode,
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11.0,
+                              fontWeight: FontWeight.w800,
+                              color: colorScheme.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ),
+                      DataCell(
+                        InkWell(
+                          onTap: () => _openProductIdCardForSummary(s),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 230.0),
+                            child: Text(
+                              s.skuName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.0),
+                            ),
+                          ),
+                        ),
+                      ),
+                      DataCell(Text('${s.unitsPerCarton}', style: const TextStyle(fontSize: 11.5))),
+                      DataCell(Text(CurrencyFormatter.formatNumber(s.totalUnitsSold), style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700))),
+                      DataCell(Text(s.totalCartonsSold.toStringAsFixed(1), style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700))),
+                      DataCell(Text(s.officialConsumerRsp > 0 ? '${s.officialConsumerRsp.toStringAsFixed(2)} ج.م' : '—', style: const TextStyle(fontSize: 11.5))),
+                      DataCell(Text('${s.avgSellingPrice.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700))),
+                      DataCell(
+                        Text(
+                          s.officialConsumerRsp > 0 ? '$deltaSign${s.priceDeltaPct.toStringAsFixed(1)}%' : '—',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: s.priceDeltaPct < -5.0
+                                ? colorScheme.tertiary
+                                : (s.priceDeltaPct > 5.0 ? colorScheme.error : colorScheme.onSurfaceVariant),
+                          ),
+                        ),
+                      ),
+                      DataCell(Text(s.factoryUnitCost > 0 ? '${s.factoryUnitCost.toStringAsFixed(2)} ج.م' : '—', style: const TextStyle(fontSize: 11.5))),
+                      DataCell(Text(s.netCartonInvoiceCost > 0 ? '${s.netCartonInvoiceCost.toStringAsFixed(2)} ج.م' : '—', style: const TextStyle(fontSize: 11.5))),
+                      DataCell(Text(CurrencyFormatter.formatCompactEGP(s.totalNetRevenue), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: colorScheme.primary))),
+                      DataCell(
+                        Text(
+                          s.retailerMarginPct != 0
+                              ? '${s.retailerMarginPct.toStringAsFixed(1)}% (${CurrencyFormatter.formatCompactEGP(s.retailerGrossProfit)})'
+                              : '—',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: marginColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -2765,6 +3070,10 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
             ],
           ),
         ),
+        if (_recordsSummary.skuSummaries.isNotEmpty) ...[
+          M3Spacing.gapMD,
+          _buildAdecoPriceAndMarginMatrixSection(context, theme, colorScheme),
+        ],
       ],
     );
   }

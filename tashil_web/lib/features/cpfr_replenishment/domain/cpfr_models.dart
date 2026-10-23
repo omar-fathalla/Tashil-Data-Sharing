@@ -11,20 +11,31 @@ class ReconciliationMonthModel {
   final String monthEn;
   final String monthAr;
   final String periodStatus;
+  final bool hasActualSellOut;
   final int activeSkusCount;
   final double openingStockCases;
   final double openingStockValueEgp;
   final double sellInCases;
+  final int sellInUnits;
   final double sellInValueEgp;
+  final double sellInGrossInclVatEgp;
+  final double sellInVatAmountEgp;
   final int sellOutUnits;
   final double sellOutEstCases;
   final double sellOutValueEgp;
+  final double sellOutFactoryCostExclVatEgp;
+  final double sellOutFactoryCostInclVatEgp;
+  final double chainGrossMarginEgp;
+  final double chainGrossMarginPct;
   final double monthlyNetCases;
   final double monthlyNetValueEgp;
   final double closingStockCases;
   final double closingStockValueEgp;
   final double inventoryGapEgp;
   final double sellThroughRatePct;
+  final int prevYearSellOutUnits;
+  final double prevYearSellOutValueEgp;
+  final double yoySellOutGrowthPct;
   final String stockHealthStatus;
   final String stockHealthLabelAr;
   final double weightTons;
@@ -37,20 +48,31 @@ class ReconciliationMonthModel {
     required this.monthEn,
     required this.monthAr,
     required this.periodStatus,
+    this.hasActualSellOut = false,
     required this.activeSkusCount,
     this.openingStockCases = 0.0,
     this.openingStockValueEgp = 0.0,
     required this.sellInCases,
+    this.sellInUnits = 0,
     required this.sellInValueEgp,
+    this.sellInGrossInclVatEgp = 0.0,
+    this.sellInVatAmountEgp = 0.0,
     required this.sellOutUnits,
     this.sellOutEstCases = 0.0,
     required this.sellOutValueEgp,
+    this.sellOutFactoryCostExclVatEgp = 0.0,
+    this.sellOutFactoryCostInclVatEgp = 0.0,
+    this.chainGrossMarginEgp = 0.0,
+    this.chainGrossMarginPct = 0.0,
     this.monthlyNetCases = 0.0,
     this.monthlyNetValueEgp = 0.0,
     this.closingStockCases = 0.0,
     this.closingStockValueEgp = 0.0,
     required this.inventoryGapEgp,
     required this.sellThroughRatePct,
+    this.prevYearSellOutUnits = 0,
+    this.prevYearSellOutValueEgp = 0.0,
+    this.yoySellOutGrowthPct = 0.0,
     this.stockHealthStatus = 'optimal',
     this.stockHealthLabelAr = 'رصيد آمن ومتوازن',
     required this.weightTons,
@@ -61,6 +83,7 @@ class ReconciliationMonthModel {
   factory ReconciliationMonthModel.fromJson(Map<String, dynamic> json) {
     final sellInVal = (json['sell_in_value_egp'] as num?)?.toDouble() ?? 0.0;
     final sellOutVal = (json['sell_out_value_egp'] as num?)?.toDouble() ?? 0.0;
+    final sellOutUnits = (json['sell_out_units'] as num?)?.toInt() ?? 0;
     final gapVal =
         (json['inventory_gap_egp'] as num?)?.toDouble() ?? (sellInVal - sellOutVal);
     return ReconciliationMonthModel(
@@ -69,17 +92,34 @@ class ReconciliationMonthModel {
       monthEn: json['month_en'] as String? ?? '',
       monthAr: json['month_ar'] as String? ?? '',
       periodStatus: json['period_status'] as String? ?? '',
+      hasActualSellOut: json['has_actual_sell_out'] as bool? ??
+          (sellOutVal > 0 || sellOutUnits > 0),
       activeSkusCount: (json['active_skus_count'] as num?)?.toInt() ?? 0,
       openingStockCases:
           (json['opening_stock_cases'] as num?)?.toDouble() ?? 0.0,
       openingStockValueEgp:
           (json['opening_stock_value_egp'] as num?)?.toDouble() ?? 0.0,
       sellInCases: (json['sell_in_cases'] as num?)?.toDouble() ?? 0.0,
+      sellInUnits: (json['sell_in_units'] as num?)?.toInt() ?? 0,
       sellInValueEgp: sellInVal,
-      sellOutUnits: (json['sell_out_units'] as num?)?.toInt() ?? 0,
+      sellInGrossInclVatEgp:
+          (json['sell_in_gross_incl_vat_egp'] as num?)?.toDouble() ??
+              double.parse((sellInVal * 1.14).toStringAsFixed(2)),
+      sellInVatAmountEgp:
+          (json['sell_in_vat_amount_egp'] as num?)?.toDouble() ??
+              double.parse((sellInVal * 0.14).toStringAsFixed(2)),
+      sellOutUnits: sellOutUnits,
       sellOutEstCases:
           (json['sell_out_est_cases'] as num?)?.toDouble() ?? 0.0,
       sellOutValueEgp: sellOutVal,
+      sellOutFactoryCostExclVatEgp:
+          (json['sell_out_factory_cost_excl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      sellOutFactoryCostInclVatEgp:
+          (json['sell_out_factory_cost_incl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      chainGrossMarginEgp:
+          (json['chain_gross_margin_egp'] as num?)?.toDouble() ?? 0.0,
+      chainGrossMarginPct:
+          (json['chain_gross_margin_pct'] as num?)?.toDouble() ?? 0.0,
       monthlyNetCases:
           (json['monthly_net_cases'] as num?)?.toDouble() ?? 0.0,
       monthlyNetValueEgp:
@@ -91,6 +131,12 @@ class ReconciliationMonthModel {
       inventoryGapEgp: gapVal,
       sellThroughRatePct:
           (json['sell_through_rate_pct'] as num?)?.toDouble() ?? 0.0,
+      prevYearSellOutUnits:
+          (json['prev_year_sell_out_units'] as num?)?.toInt() ?? 0,
+      prevYearSellOutValueEgp:
+          (json['prev_year_sell_out_value_egp'] as num?)?.toDouble() ?? 0.0,
+      yoySellOutGrowthPct:
+          (json['yoy_sell_out_growth_pct'] as num?)?.toDouble() ?? 0.0,
       stockHealthStatus: json['stock_health_status'] as String? ?? 'optimal',
       stockHealthLabelAr:
           json['stock_health_label_ar'] as String? ?? 'رصيد آمن ومتوازن',
@@ -105,6 +151,14 @@ class ReconciliationMonthModel {
 class SKUBranchInventoryModel {
   final String itemCode;
   final String barcode;
+  final String itemType;
+  final String departmentAr;
+  final double factoryCartonCost;
+  final double officialCartonExclVatEgp;
+  final double officialCartonInclVatEgp;
+  final double officialUnitInclVatEgp;
+  final double avgRetailPosPriceEgp;
+  final double retailerMarginPct;
   final String skuName;
   final String brand;
   final String sector;
@@ -114,13 +168,26 @@ class SKUBranchInventoryModel {
   final String salesRep;
   final int unitsPerCarton;
   final double sellInCases;
+  final int sellInUnits;
   final double sellInValueEgp;
+  final double sellInGrossInclVatEgp;
+  final double matchedSellInCases;
+  final double matchedSellInValueEgp;
+  final double pendingSellInCases;
+  final double pendingSellInValueEgp;
+  final int sellOutUnits;
   final double sellOutEstCases;
   final double sellOutValueEgp;
+  final double sellOutFactoryCostEgp;
+  final double chainGrossMarginEgp;
   final double returnCases;
   final double returnValueEgp;
   final double estimatedStockCases;
+  final int estimatedStockUnits;
   final double estimatedStockValueEgp;
+  final double matchedRemainingCases;
+  final double matchedRemainingValueEgp;
+  final double sellThroughPct;
   final double dailyRunRateCases;
   final double daysOfInventory;
   final String stockStatus;
@@ -129,11 +196,20 @@ class SKUBranchInventoryModel {
   final double weightTons;
   final int suggestedPoCases;
   final double suggestedPoValueEgp;
+  final double suggestedPoGrossInclVatEgp;
   final double suggestedPoTons;
 
   const SKUBranchInventoryModel({
     this.itemCode = '',
     this.barcode = '',
+    this.itemType = 'عادي',
+    this.departmentAr = '',
+    this.factoryCartonCost = 0.0,
+    this.officialCartonExclVatEgp = 0.0,
+    this.officialCartonInclVatEgp = 0.0,
+    this.officialUnitInclVatEgp = 0.0,
+    this.avgRetailPosPriceEgp = 0.0,
+    this.retailerMarginPct = 0.0,
     required this.skuName,
     required this.brand,
     required this.sector,
@@ -143,13 +219,26 @@ class SKUBranchInventoryModel {
     required this.salesRep,
     this.unitsPerCarton = 12,
     required this.sellInCases,
+    this.sellInUnits = 0,
     required this.sellInValueEgp,
+    this.sellInGrossInclVatEgp = 0.0,
+    this.matchedSellInCases = 0.0,
+    this.matchedSellInValueEgp = 0.0,
+    this.pendingSellInCases = 0.0,
+    this.pendingSellInValueEgp = 0.0,
+    this.sellOutUnits = 0,
     required this.sellOutEstCases,
     required this.sellOutValueEgp,
+    this.sellOutFactoryCostEgp = 0.0,
+    this.chainGrossMarginEgp = 0.0,
     required this.returnCases,
     required this.returnValueEgp,
     required this.estimatedStockCases,
+    this.estimatedStockUnits = 0,
     required this.estimatedStockValueEgp,
+    this.matchedRemainingCases = 0.0,
+    this.matchedRemainingValueEgp = 0.0,
+    this.sellThroughPct = 0.0,
     required this.dailyRunRateCases,
     required this.daysOfInventory,
     required this.stockStatus,
@@ -158,13 +247,33 @@ class SKUBranchInventoryModel {
     required this.weightTons,
     required this.suggestedPoCases,
     required this.suggestedPoValueEgp,
+    this.suggestedPoGrossInclVatEgp = 0.0,
     required this.suggestedPoTons,
   });
 
   factory SKUBranchInventoryModel.fromJson(Map<String, dynamic> json) {
+    final upc = (json['units_per_carton'] as num?)?.toInt() ?? 12;
+    final sellInC = (json['sell_in_cases'] as num?)?.toDouble() ?? 0.0;
+    final sellInV = (json['sell_in_value_egp'] as num?)?.toDouble() ?? 0.0;
+    final estStockC = (json['estimated_stock_cases'] as num?)?.toDouble() ?? 0.0;
+    final estStockV = (json['estimated_stock_value_egp'] as num?)?.toDouble() ?? 0.0;
+    final poValExcl = (json['suggested_po_value_egp'] as num?)?.toDouble() ?? 0.0;
     return SKUBranchInventoryModel(
       itemCode: json['item_code'] as String? ?? '',
       barcode: json['barcode'] as String? ?? '',
+      itemType: json['item_type'] as String? ?? 'عادي',
+      departmentAr: json['department_ar'] as String? ?? '',
+      factoryCartonCost: (json['factory_carton_cost'] as num?)?.toDouble() ?? 0.0,
+      officialCartonExclVatEgp:
+          (json['official_carton_excl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      officialCartonInclVatEgp:
+          (json['official_carton_incl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      officialUnitInclVatEgp:
+          (json['official_unit_incl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      avgRetailPosPriceEgp:
+          (json['avg_retail_pos_price_egp'] as num?)?.toDouble() ?? 0.0,
+      retailerMarginPct:
+          (json['retailer_margin_pct'] as num?)?.toDouble() ?? 0.0,
       skuName: json['sku_name'] as String? ?? '',
       brand: SmartBrandExtractor.inferBrand(
         json['sku_name'] as String? ?? '',
@@ -176,17 +285,39 @@ class SKUBranchInventoryModel {
       regionCode: json['region_code'] as String? ?? '',
       governorate: json['governorate'] as String? ?? '',
       salesRep: json['sales_rep'] as String? ?? '',
-      unitsPerCarton: (json['units_per_carton'] as num?)?.toInt() ?? 12,
-      sellInCases: (json['sell_in_cases'] as num?)?.toDouble() ?? 0.0,
-      sellInValueEgp: (json['sell_in_value_egp'] as num?)?.toDouble() ?? 0.0,
+      unitsPerCarton: upc,
+      sellInCases: sellInC,
+      sellInUnits: (json['sell_in_units'] as num?)?.toInt() ?? (sellInC * upc).round(),
+      sellInValueEgp: sellInV,
+      sellInGrossInclVatEgp:
+          (json['sell_in_gross_incl_vat_egp'] as num?)?.toDouble() ??
+              double.parse((sellInV * 1.14).toStringAsFixed(2)),
+      matchedSellInCases:
+          (json['matched_sell_in_cases'] as num?)?.toDouble() ?? sellInC,
+      matchedSellInValueEgp:
+          (json['matched_sell_in_value_egp'] as num?)?.toDouble() ?? sellInV,
+      pendingSellInCases:
+          (json['pending_sell_in_cases'] as num?)?.toDouble() ?? 0.0,
+      pendingSellInValueEgp:
+          (json['pending_sell_in_value_egp'] as num?)?.toDouble() ?? 0.0,
+      sellOutUnits: (json['sell_out_units'] as num?)?.toInt() ?? 0,
       sellOutEstCases: (json['sell_out_est_cases'] as num?)?.toDouble() ?? 0.0,
       sellOutValueEgp: (json['sell_out_value_egp'] as num?)?.toDouble() ?? 0.0,
+      sellOutFactoryCostEgp:
+          (json['sell_out_factory_cost_egp'] as num?)?.toDouble() ?? 0.0,
+      chainGrossMarginEgp:
+          (json['chain_gross_margin_egp'] as num?)?.toDouble() ?? 0.0,
       returnCases: (json['return_cases'] as num?)?.toDouble() ?? 0.0,
       returnValueEgp: (json['return_value_egp'] as num?)?.toDouble() ?? 0.0,
-      estimatedStockCases:
-          (json['estimated_stock_cases'] as num?)?.toDouble() ?? 0.0,
-      estimatedStockValueEgp:
-          (json['estimated_stock_value_egp'] as num?)?.toDouble() ?? 0.0,
+      estimatedStockCases: estStockC,
+      estimatedStockUnits: (json['estimated_stock_units'] as num?)?.toInt() ??
+          (estStockC * upc).round(),
+      estimatedStockValueEgp: estStockV,
+      matchedRemainingCases:
+          (json['matched_remaining_cases'] as num?)?.toDouble() ?? estStockC,
+      matchedRemainingValueEgp:
+          (json['matched_remaining_value_egp'] as num?)?.toDouble() ?? estStockV,
+      sellThroughPct: (json['sell_through_pct'] as num?)?.toDouble() ?? 0.0,
       dailyRunRateCases:
           (json['daily_run_rate_cases'] as num?)?.toDouble() ?? 0.0,
       daysOfInventory: (json['days_of_inventory'] as num?)?.toDouble() ?? 0.0,
@@ -195,8 +326,10 @@ class SKUBranchInventoryModel {
       casePriceEgp: (json['case_price_egp'] as num?)?.toDouble() ?? 0.0,
       weightTons: (json['weight_tons'] as num?)?.toDouble() ?? 0.0,
       suggestedPoCases: (json['suggested_po_cases'] as num?)?.toInt() ?? 0,
-      suggestedPoValueEgp:
-          (json['suggested_po_value_egp'] as num?)?.toDouble() ?? 0.0,
+      suggestedPoValueEgp: poValExcl,
+      suggestedPoGrossInclVatEgp:
+          (json['suggested_po_gross_incl_vat_egp'] as num?)?.toDouble() ??
+              double.parse((poValExcl * 1.14).toStringAsFixed(2)),
       suggestedPoTons: (json['suggested_po_tons'] as num?)?.toDouble() ?? 0.0,
     );
   }
@@ -490,6 +623,9 @@ class CPFRDashboardModel {
   final double ytd2026SellInCases;
   final double ytd2026WeightTons;
   final double ytd2026ExpectedEgp;
+  final double ytd2026GrossInclVatEgp;
+  final double ytd2026VatAmountEgp;
+  final int ytd2026TotalUnits;
   final double octW1W2ActualEgp;
   final double octW1W2ActualCases;
   final double octProjectedMonthEndEgp;
@@ -507,6 +643,26 @@ class CPFRDashboardModel {
   final int overstockAlertCount;
   final int leadTimeDays;
   final int safetyStockDays;
+  final int matchedMonthsCount;
+  final String matchedPeriodLabel;
+  final double matchedSellInCases;
+  final double matchedSellInValueExclVatEgp;
+  final double matchedSellInGrossInclVatEgp;
+  final int matchedSellOutUnits;
+  final double matchedSellOutCases;
+  final double matchedSellOutPosValueEgp;
+  final double matchedSellOutFactoryCostEgp;
+  final double matchedRemainingCases;
+  final double matchedRemainingFactoryValueEgp;
+  final double matchedSellThroughPct;
+  final double matchedChainGrossMarginEgp;
+  final double matchedChainGrossMarginPct;
+  final double matchedYoyUnitsGrowthPct;
+  final double matchedYoyValueGrowthPct;
+  final int pendingSellOutMonthsCount;
+  final String pendingSellOutPeriodLabel;
+  final double pendingSellOutCases;
+  final double pendingSellOutValueEgp;
   final List<ReconciliationMonthModel> monthlyReconciliation;
   final List<SKUBranchInventoryModel> inventoryAndPoItems;
   final List<BrandForecastModel> brandForecasts;
@@ -531,6 +687,9 @@ class CPFRDashboardModel {
     required this.ytd2026SellInCases,
     required this.ytd2026WeightTons,
     required this.ytd2026ExpectedEgp,
+    this.ytd2026GrossInclVatEgp = 0.0,
+    this.ytd2026VatAmountEgp = 0.0,
+    this.ytd2026TotalUnits = 0,
     required this.octW1W2ActualEgp,
     required this.octW1W2ActualCases,
     required this.octProjectedMonthEndEgp,
@@ -548,6 +707,26 @@ class CPFRDashboardModel {
     required this.overstockAlertCount,
     required this.leadTimeDays,
     required this.safetyStockDays,
+    this.matchedMonthsCount = 0,
+    this.matchedPeriodLabel = '',
+    this.matchedSellInCases = 0.0,
+    this.matchedSellInValueExclVatEgp = 0.0,
+    this.matchedSellInGrossInclVatEgp = 0.0,
+    this.matchedSellOutUnits = 0,
+    this.matchedSellOutCases = 0.0,
+    this.matchedSellOutPosValueEgp = 0.0,
+    this.matchedSellOutFactoryCostEgp = 0.0,
+    this.matchedRemainingCases = 0.0,
+    this.matchedRemainingFactoryValueEgp = 0.0,
+    this.matchedSellThroughPct = 0.0,
+    this.matchedChainGrossMarginEgp = 0.0,
+    this.matchedChainGrossMarginPct = 0.0,
+    this.matchedYoyUnitsGrowthPct = 0.0,
+    this.matchedYoyValueGrowthPct = 0.0,
+    this.pendingSellOutMonthsCount = 0,
+    this.pendingSellOutPeriodLabel = '',
+    this.pendingSellOutCases = 0.0,
+    this.pendingSellOutValueEgp = 0.0,
     required this.monthlyReconciliation,
     required this.inventoryAndPoItems,
     required this.brandForecasts,
@@ -564,6 +743,8 @@ class CPFRDashboardModel {
     final repsRaw = json['sales_rep_scorecards'] as List<dynamic>? ?? [];
     final promoRaw =
         json['promo_and_returns'] as Map<String, dynamic>? ?? const {};
+    final ytdSellIn = (json['ytd_2026_sell_in_egp'] as num?)?.toDouble() ?? 0.0;
+    final ytdCases = (json['ytd_2026_sell_in_cases'] as num?)?.toDouble() ?? 0.0;
 
     return CPFRDashboardModel(
       tenantId: json['tenant_id'] as String? ?? 'tenant-default',
@@ -585,14 +766,21 @@ class CPFRDashboardModel {
           (json['jan_2026_gap_egp'] as num?)?.toDouble() ?? 674973.06,
       jan2026SellThroughPct:
           (json['jan_2026_sell_through_pct'] as num?)?.toDouble() ?? 93.39,
-      ytd2026SellInEgp:
-          (json['ytd_2026_sell_in_egp'] as num?)?.toDouble() ?? 0.0,
-      ytd2026SellInCases:
-          (json['ytd_2026_sell_in_cases'] as num?)?.toDouble() ?? 0.0,
+      ytd2026SellInEgp: ytdSellIn,
+      ytd2026SellInCases: ytdCases,
       ytd2026WeightTons:
           (json['ytd_2026_weight_tons'] as num?)?.toDouble() ?? 0.0,
       ytd2026ExpectedEgp:
           (json['ytd_2026_expected_egp'] as num?)?.toDouble() ?? 0.0,
+      ytd2026GrossInclVatEgp:
+          (json['ytd_2026_gross_incl_vat_egp'] as num?)?.toDouble() ??
+              double.parse((ytdSellIn * 1.14).toStringAsFixed(2)),
+      ytd2026VatAmountEgp:
+          (json['ytd_2026_vat_amount_egp'] as num?)?.toDouble() ??
+              double.parse((ytdSellIn * 0.14).toStringAsFixed(2)),
+      ytd2026TotalUnits:
+          (json['ytd_2026_total_units'] as num?)?.toInt() ??
+              (ytdCases * 12).round(),
       octW1W2ActualEgp:
           (json['oct_w1w2_actual_egp'] as num?)?.toDouble() ?? 0.0,
       octW1W2ActualCases:
@@ -621,6 +809,46 @@ class CPFRDashboardModel {
           (json['overstock_alert_count'] as num?)?.toInt() ?? 0,
       leadTimeDays: (json['lead_time_days'] as num?)?.toInt() ?? 4,
       safetyStockDays: (json['safety_stock_days'] as num?)?.toInt() ?? 7,
+      matchedMonthsCount:
+          (json['matched_months_count'] as num?)?.toInt() ?? 0,
+      matchedPeriodLabel:
+          json['matched_period_label'] as String? ?? '',
+      matchedSellInCases:
+          (json['matched_sell_in_cases'] as num?)?.toDouble() ?? 0.0,
+      matchedSellInValueExclVatEgp:
+          (json['matched_sell_in_value_excl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      matchedSellInGrossInclVatEgp:
+          (json['matched_sell_in_gross_incl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      matchedSellOutUnits:
+          (json['matched_sell_out_units'] as num?)?.toInt() ?? 0,
+      matchedSellOutCases:
+          (json['matched_sell_out_cases'] as num?)?.toDouble() ?? 0.0,
+      matchedSellOutPosValueEgp:
+          (json['matched_sell_out_pos_value_egp'] as num?)?.toDouble() ?? 0.0,
+      matchedSellOutFactoryCostEgp:
+          (json['matched_sell_out_factory_cost_egp'] as num?)?.toDouble() ?? 0.0,
+      matchedRemainingCases:
+          (json['matched_remaining_cases'] as num?)?.toDouble() ?? 0.0,
+      matchedRemainingFactoryValueEgp:
+          (json['matched_remaining_factory_value_egp'] as num?)?.toDouble() ?? 0.0,
+      matchedSellThroughPct:
+          (json['matched_sell_through_pct'] as num?)?.toDouble() ?? 0.0,
+      matchedChainGrossMarginEgp:
+          (json['matched_chain_gross_margin_egp'] as num?)?.toDouble() ?? 0.0,
+      matchedChainGrossMarginPct:
+          (json['matched_chain_gross_margin_pct'] as num?)?.toDouble() ?? 0.0,
+      matchedYoyUnitsGrowthPct:
+          (json['matched_yoy_units_growth_pct'] as num?)?.toDouble() ?? 0.0,
+      matchedYoyValueGrowthPct:
+          (json['matched_yoy_value_growth_pct'] as num?)?.toDouble() ?? 0.0,
+      pendingSellOutMonthsCount:
+          (json['pending_sell_out_months_count'] as num?)?.toInt() ?? 0,
+      pendingSellOutPeriodLabel:
+          json['pending_sell_out_period_label'] as String? ?? '',
+      pendingSellOutCases:
+          (json['pending_sell_out_cases'] as num?)?.toDouble() ?? 0.0,
+      pendingSellOutValueEgp:
+          (json['pending_sell_out_value_egp'] as num?)?.toDouble() ?? 0.0,
       monthlyReconciliation: monthsRaw
           .whereType<Map<String, dynamic>>()
           .map(ReconciliationMonthModel.fromJson)

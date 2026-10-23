@@ -8,29 +8,153 @@ import '../theme/m3_color_roles.dart';
 import '../utils/web_file_helper.dart';
 import 'api_endpoints.dart';
 
+/// Aggregated Sell-Out SKU summary with official Product Master factory pricing and chain margin
+class SellOutSkuSummaryModel {
+  final String itemCode;
+  final String barcode;
+  final String skuName;
+  final String retailerRawSkuName;
+  final String brand;
+  final String category;
+  final String itemType;
+  final int unitsPerCarton;
+  final int totalUnitsSold;
+  final double totalCartonsSold;
+  final double totalNetRevenue;
+  final double avgSellingPrice;
+  final double officialConsumerRsp;
+  final double factoryUnitCost;
+  final double cartonPriceInclVat;
+  final double netCartonInvoiceCost;
+  final double invoiceDiscountPct;
+  final double totalFactoryCost;
+  final double retailerGrossProfit;
+  final double retailerMarginPct;
+  final double priceDeltaPct;
+  final String priceStatus;
+  final int activeStoresCount;
+
+  const SellOutSkuSummaryModel({
+    this.itemCode = '',
+    this.barcode = '',
+    this.skuName = '',
+    this.retailerRawSkuName = '',
+    this.brand = '',
+    this.category = '',
+    this.itemType = 'عادي',
+    this.unitsPerCarton = 12,
+    this.totalUnitsSold = 0,
+    this.totalCartonsSold = 0.0,
+    this.totalNetRevenue = 0.0,
+    this.avgSellingPrice = 0.0,
+    this.officialConsumerRsp = 0.0,
+    this.factoryUnitCost = 0.0,
+    this.cartonPriceInclVat = 0.0,
+    this.netCartonInvoiceCost = 0.0,
+    this.invoiceDiscountPct = 0.10,
+    this.totalFactoryCost = 0.0,
+    this.retailerGrossProfit = 0.0,
+    this.retailerMarginPct = 0.0,
+    this.priceDeltaPct = 0.0,
+    this.priceStatus = 'compliant',
+    this.activeStoresCount = 0,
+  });
+
+  factory SellOutSkuSummaryModel.fromJson(Map<String, dynamic> json) {
+    return SellOutSkuSummaryModel(
+      itemCode: json['item_code'] as String? ?? '',
+      barcode: json['barcode'] as String? ?? '',
+      skuName: json['sku_name'] as String? ?? '',
+      retailerRawSkuName: json['retailer_raw_sku_name'] as String? ?? '',
+      brand: json['brand'] as String? ?? '',
+      category: json['category'] as String? ?? '',
+      itemType: json['item_type'] as String? ?? 'عادي',
+      unitsPerCarton: (json['units_per_carton'] as num?)?.toInt() ?? 12,
+      totalUnitsSold: (json['total_units_sold'] as num?)?.toInt() ?? 0,
+      totalCartonsSold: (json['total_cartons_sold'] as num?)?.toDouble() ?? 0.0,
+      totalNetRevenue: (json['total_net_revenue'] as num?)?.toDouble() ?? 0.0,
+      avgSellingPrice: (json['avg_selling_price'] as num?)?.toDouble() ?? 0.0,
+      officialConsumerRsp:
+          (json['official_consumer_rsp'] as num?)?.toDouble() ?? 0.0,
+      factoryUnitCost: (json['factory_unit_cost'] as num?)?.toDouble() ?? 0.0,
+      cartonPriceInclVat:
+          (json['carton_price_incl_vat'] as num?)?.toDouble() ?? 0.0,
+      netCartonInvoiceCost:
+          (json['net_carton_invoice_cost'] as num?)?.toDouble() ?? 0.0,
+      invoiceDiscountPct:
+          (json['invoice_discount_pct'] as num?)?.toDouble() ?? 0.10,
+      totalFactoryCost: (json['total_factory_cost'] as num?)?.toDouble() ?? 0.0,
+      retailerGrossProfit:
+          (json['retailer_gross_profit'] as num?)?.toDouble() ?? 0.0,
+      retailerMarginPct:
+          (json['retailer_margin_pct'] as num?)?.toDouble() ?? 0.0,
+      priceDeltaPct: (json['price_delta_pct'] as num?)?.toDouble() ?? 0.0,
+      priceStatus: json['price_status'] as String? ?? 'compliant',
+      activeStoresCount: (json['active_stores_count'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 /// Full-dataset Sell-Out summary metrics returned alongside paginated records
 class SellOutRecordsSummaryModel {
   final int totalCount;
   final double totalNetRevenue;
   final int totalUnitsSold;
+  final double totalCartonsSold;
+  final double totalFactoryCost;
+  final double totalRetailerGrossProfit;
+  final double avgRetailerMarginPct;
   final int activeStoresCount;
   final int activeSkusCount;
+  final int matchedSkusCount;
   final String minDate;
   final String maxDate;
   final String topBranchName;
   final double topBranchRevenue;
+  final List<SellOutSkuSummaryModel> skuSummaries;
 
   const SellOutRecordsSummaryModel({
     this.totalCount = 0,
     this.totalNetRevenue = 0.0,
     this.totalUnitsSold = 0,
+    this.totalCartonsSold = 0.0,
+    this.totalFactoryCost = 0.0,
+    this.totalRetailerGrossProfit = 0.0,
+    this.avgRetailerMarginPct = 0.0,
     this.activeStoresCount = 0,
     this.activeSkusCount = 0,
+    this.matchedSkusCount = 0,
     this.minDate = '',
     this.maxDate = '',
     this.topBranchName = '',
     this.topBranchRevenue = 0.0,
+    this.skuSummaries = const [],
   });
+
+  factory SellOutRecordsSummaryModel.fromJson(Map<String, dynamic> json) {
+    final rawSummaries = json['sku_summaries'] as List<dynamic>? ?? const [];
+    return SellOutRecordsSummaryModel(
+      totalCount: (json['total_count'] as num?)?.toInt() ?? 0,
+      totalNetRevenue: (json['total_net_revenue'] as num?)?.toDouble() ?? 0.0,
+      totalUnitsSold: (json['total_units_sold'] as num?)?.toInt() ?? 0,
+      totalCartonsSold: (json['total_cartons_sold'] as num?)?.toDouble() ?? 0.0,
+      totalFactoryCost: (json['total_factory_cost'] as num?)?.toDouble() ?? 0.0,
+      totalRetailerGrossProfit:
+          (json['total_retailer_gross_profit'] as num?)?.toDouble() ?? 0.0,
+      avgRetailerMarginPct:
+          (json['avg_retailer_margin_pct'] as num?)?.toDouble() ?? 0.0,
+      activeStoresCount: (json['active_stores_count'] as num?)?.toInt() ?? 0,
+      activeSkusCount: (json['active_skus_count'] as num?)?.toInt() ?? 0,
+      matchedSkusCount: (json['matched_skus_count'] as num?)?.toInt() ?? 0,
+      minDate: json['min_date'] as String? ?? '',
+      maxDate: json['max_date'] as String? ?? '',
+      topBranchName: json['top_branch_name'] as String? ?? '',
+      topBranchRevenue: (json['top_branch_revenue'] as num?)?.toDouble() ?? 0.0,
+      skuSummaries: rawSummaries
+          .map((e) => SellOutSkuSummaryModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 }
 
 /// Enterprise Tenant Profile Model
@@ -838,10 +962,18 @@ class SellOutRecordModel {
   final int unitsPerCarton;
   final String itemType;
   final double factoryUnitCost;
+  final double cartonPriceInclVat;
+  final double netCartonInvoiceCost;
+  final double invoiceDiscountPct;
   final int quantitySold;
+  final double cartonsSold;
   final double netRevenue;
   final double unitPrice;
   final double recommendedPrice;
+  final double totalFactoryCost;
+  final double retailerGrossProfit;
+  final double retailerMarginPct;
+  final double priceDeltaPct;
   final String transactionDate;
 
   SellOutRecordModel({
@@ -859,15 +991,27 @@ class SellOutRecordModel {
     this.unitsPerCarton = 12,
     this.itemType = 'عادي',
     this.factoryUnitCost = 0.0,
+    this.cartonPriceInclVat = 0.0,
+    this.netCartonInvoiceCost = 0.0,
+    this.invoiceDiscountPct = 0.10,
     required this.quantitySold,
+    this.cartonsSold = 0.0,
     required this.netRevenue,
     required this.unitPrice,
     this.recommendedPrice = 0.0,
+    this.totalFactoryCost = 0.0,
+    this.retailerGrossProfit = 0.0,
+    this.retailerMarginPct = 0.0,
+    this.priceDeltaPct = 0.0,
     required this.transactionDate,
   });
 
   factory SellOutRecordModel.fromJson(Map<String, dynamic> json) {
     final uPrice = (json['unit_price'] as num?)?.toDouble() ?? 0.0;
+    final qty = (json['quantity_sold'] as num?)?.toInt() ?? 0;
+    final upc = (json['units_per_carton'] as num?)?.toInt() ?? 12;
+    final cSold = (json['cartons_sold'] as num?)?.toDouble() ??
+        (upc > 0 && qty > 0 ? qty / upc : 0.0);
     return SellOutRecordModel(
       recordId: json['record_id'] as String? ?? '',
       retailerChain: json['retailer_chain'] as String? ?? '',
@@ -880,14 +1024,27 @@ class SellOutRecordModel {
       category: json['category'] as String? ?? '',
       supplier: json['supplier'] as String? ?? '',
       isOwnBrand: json['is_own_brand'] as bool? ?? true,
-      unitsPerCarton: (json['units_per_carton'] as num?)?.toInt() ?? 12,
+      unitsPerCarton: upc,
       itemType: json['item_type'] as String? ?? 'عادي',
       factoryUnitCost: (json['factory_unit_cost'] as num?)?.toDouble() ?? 0.0,
-      quantitySold: json['quantity_sold'] as int? ?? 0,
+      cartonPriceInclVat:
+          (json['carton_price_incl_vat'] as num?)?.toDouble() ?? 0.0,
+      netCartonInvoiceCost:
+          (json['net_carton_invoice_cost'] as num?)?.toDouble() ?? 0.0,
+      invoiceDiscountPct:
+          (json['invoice_discount_pct'] as num?)?.toDouble() ?? 0.10,
+      quantitySold: qty,
+      cartonsSold: cSold,
       netRevenue: (json['net_revenue'] as num?)?.toDouble() ?? 0.0,
       unitPrice: uPrice,
       recommendedPrice:
           (json['recommended_price'] as num?)?.toDouble() ?? uPrice,
+      totalFactoryCost: (json['total_factory_cost'] as num?)?.toDouble() ?? 0.0,
+      retailerGrossProfit:
+          (json['retailer_gross_profit'] as num?)?.toDouble() ?? 0.0,
+      retailerMarginPct:
+          (json['retailer_margin_pct'] as num?)?.toDouble() ?? 0.0,
+      priceDeltaPct: (json['price_delta_pct'] as num?)?.toDouble() ?? 0.0,
       transactionDate: json['transaction_date'] as String? ?? '',
     );
   }
@@ -2775,18 +2932,31 @@ class ApiClient {
         }
         final fallbackRev = list.fold<double>(0.0, (acc, r) => acc + r.netRevenue);
         final fallbackUnits = list.fold<int>(0, (acc, r) => acc + r.quantitySold);
+        final fallbackCartons = list.fold<double>(0.0, (acc, r) => acc + r.cartonsSold);
+        final fallbackFactoryCost = list.fold<double>(0.0, (acc, r) => acc + r.totalFactoryCost);
+        final fallbackProfit = list.fold<double>(0.0, (acc, r) => acc + r.retailerGrossProfit);
         final fallbackStores = list.map((r) => r.storeId.isNotEmpty ? r.storeId : r.storeName).toSet().length;
         final fallbackSkus = list.map((r) => r.barcode.isNotEmpty ? r.barcode : r.skuName).toSet().length;
+        final rawSkuSummaries = body['sku_summaries'] as List<dynamic>? ?? const [];
+        final parsedSkuSummaries = rawSkuSummaries
+            .map((e) => SellOutSkuSummaryModel.fromJson(e as Map<String, dynamic>))
+            .toList();
         lastSellOutSummary = SellOutRecordsSummaryModel(
           totalCount: (body['total_count'] as num?)?.toInt() ?? list.length,
           totalNetRevenue: (body['total_net_revenue'] as num?)?.toDouble() ?? fallbackRev,
           totalUnitsSold: (body['total_units_sold'] as num?)?.toInt() ?? fallbackUnits,
+          totalCartonsSold: (body['total_cartons_sold'] as num?)?.toDouble() ?? fallbackCartons,
+          totalFactoryCost: (body['total_factory_cost'] as num?)?.toDouble() ?? fallbackFactoryCost,
+          totalRetailerGrossProfit: (body['total_retailer_gross_profit'] as num?)?.toDouble() ?? fallbackProfit,
+          avgRetailerMarginPct: (body['avg_retailer_margin_pct'] as num?)?.toDouble() ?? 0.0,
           activeStoresCount: (body['active_stores_count'] as num?)?.toInt() ?? fallbackStores,
           activeSkusCount: (body['active_skus_count'] as num?)?.toInt() ?? fallbackSkus,
+          matchedSkusCount: (body['matched_skus_count'] as num?)?.toInt() ?? fallbackSkus,
           minDate: body['min_date'] as String? ?? (list.isNotEmpty ? list.last.transactionDate : ''),
           maxDate: body['max_date'] as String? ?? (list.isNotEmpty ? list.first.transactionDate : ''),
           topBranchName: body['top_branch_name'] as String? ?? (list.isNotEmpty ? list.first.storeName : ''),
           topBranchRevenue: (body['top_branch_revenue'] as num?)?.toDouble() ?? 0.0,
+          skuSummaries: parsedSkuSummaries,
         );
         return list;
       } else {
@@ -3514,6 +3684,7 @@ class ApiClient {
     required int branchesCount,
     required double totalRevenue,
     bool isStaged = false,
+    String fileType = 'sell_out',
   }) {
     _ensureLocalArchiveSeeded(cleanSlug);
     final normChain = (retailChain.trim().isEmpty ? 'fathalla' : retailChain.trim().toLowerCase());
@@ -3536,9 +3707,13 @@ class ApiClient {
             : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
     final list = _localArchiveByTenant[cleanSlug]!;
-    final existingIdx = list.indexWhere(
-      (e) => e.retailChain.toLowerCase() == normChain && e.fileName.toLowerCase() == lowerFile,
-    );
+    final existingIdx = fileType == 'product_master'
+        ? (archiveId != null && archiveId.trim().isNotEmpty
+            ? list.indexWhere((e) => e.id == archiveId.trim())
+            : -1)
+        : list.indexWhere(
+            (e) => e.retailChain.toLowerCase() == normChain && e.fileName.toLowerCase() == lowerFile,
+          );
     final prevEntry = existingIdx >= 0 ? list[existingIdx] : null;
     final prevBytes = prevEntry != null && _localArchiveBytesById.containsKey(prevEntry.id)
         ? _localArchiveBytesById[prevEntry.id]
@@ -3555,7 +3730,7 @@ class ApiClient {
         ? archiveId.trim()
         : (existingIdx >= 0
             ? list[existingIdx].id
-            : 'arch_${cleanSlug}_${normChain}_${DateTime.now().microsecondsSinceEpoch}');
+            : 'arch_${fileType == 'product_master' ? 'pm_' : ''}${cleanSlug}_${normChain}_${DateTime.now().microsecondsSinceEpoch}');
 
     if (_deletedArchiveIds.remove(resolvedArchiveId) && kIsWeb) {
       SessionStorage.saveDeletedArchiveIds(_deletedArchiveIds);
@@ -3567,13 +3742,14 @@ class ApiClient {
     final entry = ArchivedExcelFileModel(
       id: resolvedArchiveId,
       batchId: batchId,
+      fileType: fileType,
       tenantId: 'tenant-$cleanSlug',
       fileName: filename,
       contentType: contentType,
       fileSizeBytes: bytes.length,
       retailChain: normChain,
-      chainNameAr: getRetailChainShortAr(normChain),
-      chainNameEn: getRetailChainNameEn(normChain),
+      chainNameAr: fileType == 'product_master' ? 'كارتة الأصناف والأسعار' : getRetailChainShortAr(normChain),
+      chainNameEn: fileType == 'product_master' ? 'Product Master & Price List' : getRetailChainNameEn(normChain),
       targetYear: year,
       targetMonth: month,
       rowsIngested: validRows,
@@ -4103,26 +4279,55 @@ class ApiClient {
     String? targetTenant,
     String? fileName,
     bool isSellIn = false,
+    bool isProductMaster = false,
   }) async {
     final effectiveTenant = (targetTenant != null && targetTenant.isNotEmpty)
         ? targetTenant
         : tenantId;
     final cleanSlug = normalizeDataTenantSlug(effectiveTenant);
     invalidateExecutiveKpisCache();
+    _ensureLocalArchiveSeeded(cleanSlug);
+    final localList = _localArchiveByTenant[cleanSlug];
+    final effectiveIsPm = isProductMaster ||
+        archiveId.contains('_pm_') ||
+        archiveId == 'pm_default_seed' ||
+        (localList != null && localList.any((f) => f.id == archiveId && f.fileType == 'product_master'));
+
     _deletedArchiveIds.add(archiveId);
     if (kIsWeb) {
       SessionStorage.saveDeletedArchiveIds(_deletedArchiveIds);
     }
-    if (fileName != null && fileName.trim().isNotEmpty) {
+
+    if (localList != null) {
+      _localArchiveByTenant[cleanSlug] = localList.where((f) {
+        if (f.id == archiveId) return false;
+        if (!effectiveIsPm && fileName != null && f.fileName.toLowerCase() == fileName.trim().toLowerCase()) {
+          return false;
+        }
+        return true;
+      }).toList();
+    }
+
+    final hasRemainingWithSameFileName = fileName != null &&
+        fileName.trim().isNotEmpty &&
+        (_localArchiveByTenant[cleanSlug] ?? const [])
+            .any((f) => f.fileName.toLowerCase() == fileName.trim().toLowerCase());
+
+    if (fileName != null && fileName.trim().isNotEmpty && !hasRemainingWithSameFileName) {
       _deletedArchiveFileNames.add(fileName.trim().toLowerCase());
       if (kIsWeb) {
         SessionStorage.saveDeletedArchiveFileNames(_deletedArchiveFileNames);
       }
     }
+
+    if (effectiveIsPm) {
+      _rollbackLocalProductMasterSheet(cleanSlug, archiveId: archiveId, fileName: fileName);
+    }
+
     bool backendSuccess = false;
     try {
       var uri = Uri.parse(ApiEndpoints.ingestArchiveItem(archiveId));
-      if (fileName != null && fileName.trim().isNotEmpty) {
+      if (fileName != null && fileName.trim().isNotEmpty && !hasRemainingWithSameFileName) {
         uri = uri.replace(queryParameters: {'file_name': fileName.trim()});
       }
       final resp = await http.delete(
@@ -4141,19 +4346,11 @@ class ApiClient {
       debugPrint('[ApiClient] deleteArchivedFile network call error: $e');
     }
 
-    _ensureLocalArchiveSeeded(cleanSlug);
-    final localList = _localArchiveByTenant[cleanSlug];
-    if (localList != null) {
-      _localArchiveByTenant[cleanSlug] = localList.where((f) {
-        if (f.id == archiveId) return false;
-        if (fileName != null && f.fileName.toLowerCase() == fileName.trim().toLowerCase()) return false;
-        return true;
-      }).toList();
-    }
     _localArchiveBytesById.remove(archiveId);
     if (!isSellIn &&
+        !effectiveIsPm &&
         (_localArchiveByTenant[cleanSlug] ?? [])
-            .where((f) => f.fileType != 'sell_in')
+            .where((f) => f.fileType != 'sell_in' && f.fileType != 'product_master')
             .isEmpty) {
       _clearedTenants.add(cleanSlug);
       if (kIsWeb) {
@@ -8802,6 +8999,7 @@ class ApiClient {
     String? itemType,
     String? packaging,
     String? pullStatus,
+    String? priceChange,
   }) async {
     try {
       final params = <String, String>{};
@@ -8825,6 +9023,9 @@ class ApiClient {
       }
       if (pullStatus != null && pullStatus.isNotEmpty && pullStatus != 'all' && pullStatus != 'الكل') {
         params['pull_status'] = pullStatus;
+      }
+      if (priceChange != null && priceChange.isNotEmpty && priceChange != 'all' && priceChange != 'الكل') {
+        params['price_change'] = priceChange;
       }
 
       final uri = Uri.parse(ApiEndpoints.productMaster).replace(
@@ -8859,28 +9060,151 @@ class ApiClient {
       itemType: itemType,
       packaging: packaging,
       pullStatus: pullStatus,
+      priceChange: priceChange,
     );
+  }
+
+  final Map<String, List<({String archiveId, ProductMasterSummaryModel summary})>>
+      _localProductMasterStackByTenant = {};
+  final Set<String> _deletedProductMasterBaselineTenants = <String>{};
+
+  void _rollbackLocalProductMasterSheet(
+    String cleanSlug, {
+    required String archiveId,
+    String? fileName,
+  }) {
+    final stack = _localProductMasterStackByTenant[cleanSlug];
+    if (stack != null && stack.isNotEmpty) {
+      final idx = stack.lastIndexWhere(
+        (e) =>
+            e.archiveId == archiveId ||
+            (fileName != null &&
+                fileName.trim().isNotEmpty &&
+                e.summary.sourceFilename.toLowerCase() == fileName.trim().toLowerCase()),
+      );
+      if (idx >= 0) {
+        stack.removeAt(idx);
+      } else {
+        stack.removeLast();
+      }
+      // Recompute diffs along the remaining stack
+      final base = _deletedProductMasterBaselineTenants.contains(cleanSlug)
+          ? null
+          : _buildDefaultSeedProductMasterSummary();
+      ProductMasterSummaryModel? prev = base;
+      for (int i = 0; i < stack.length; i++) {
+        final recomputed = _computeLocalProductMasterDiff(
+          prev,
+          stack[i].summary,
+          isFirstWithoutBaseline: prev == null,
+        );
+        stack[i] = (archiveId: stack[i].archiveId, summary: recomputed);
+        prev = recomputed;
+      }
+    }
+    if (archiveId == 'pm_default_seed' ||
+        (fileName != null &&
+            fileName.trim().toLowerCase() == 'adeco_product_master_2026_08_01.xlsx' &&
+            (stack == null || stack.isEmpty))) {
+      _deletedProductMasterBaselineTenants.add(cleanSlug);
+    }
   }
 
   /// Updates or inserts a single Product Master SKU item (`PUT /api/v1/product-master/item`).
   Future<ProductMasterSummaryModel> updateProductMasterItem(
     ProductMasterItemModel item,
   ) async {
-    final uri = Uri.parse(ApiEndpoints.productMasterItem);
-    final response = await http
-        .put(
-          uri,
-          headers: _headers,
-          body: jsonEncode(item.toJson()),
-        )
-        .timeout(const Duration(seconds: 12));
+    final cleanSlug = normalizeDataTenantSlug(tenantId);
+    try {
+      final uri = Uri.parse(ApiEndpoints.productMasterItem);
+      final response = await http
+          .put(
+            uri,
+            headers: _headers,
+            body: jsonEncode(item.toJson()),
+          )
+          .timeout(const Duration(seconds: 12));
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
-      final summaryJson = data['summary'] as Map<String, dynamic>? ?? data;
-      return ProductMasterSummaryModel.fromJson(summaryJson);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        final summaryJson = data['summary'] as Map<String, dynamic>? ?? data;
+        return ProductMasterSummaryModel.fromJson(summaryJson);
+      }
+      if (!allowMockFallback) {
+        throw Exception('تعذر تحديث بيانات الصنف في كارتة الأصناف (HTTP ${response.statusCode})');
+      }
+    } catch (e) {
+      if (!allowMockFallback) rethrow;
+      debugPrint('[ApiClient] Fallback updateProductMasterItem: $e');
     }
-    throw Exception('تعذر تحديث بيانات الصنف في كارتة الأصناف (HTTP ${response.statusCode})');
+
+    final current = _fallbackMockProductMaster();
+    final updatedItems = List<ProductMasterItemModel>.from(current.items);
+    final idx = updatedItems.indexWhere(
+      (e) => e.itemCode.toLowerCase() == item.itemCode.trim().toLowerCase(),
+    );
+    final vatRate = item.vatRate > 1.0 ? item.vatRate / 100.0 : (item.vatRate > 0 ? item.vatRate : 0.14);
+    final discPct = item.invoiceDiscountPct > 1.0 ? item.invoiceDiscountPct : item.invoiceDiscountPct * 100.0;
+    final extraPct = item.extraDiscountPct > 1.0 ? item.extraDiscountPct : item.extraDiscountPct * 100.0;
+    final upc = item.unitsPerCarton > 0 ? item.unitsPerCarton : 12;
+    final unitExcl = item.unitPriceExclVat > 0
+        ? item.unitPriceExclVat
+        : (item.unitPriceInclVat / (1.0 + vatRate));
+    final unitIncl = item.unitPriceExclVat > 0
+        ? (item.unitPriceExclVat * (1.0 + vatRate))
+        : item.unitPriceInclVat;
+    final netUnit = unitIncl * (1.0 - discPct / 100.0) * (1.0 - extraPct / 100.0);
+
+    ProductMasterItemModel resolved = item.copyWith(
+      unitsPerCarton: upc,
+      vatRate: vatRate,
+      invoiceDiscountPct: discPct,
+      extraDiscountPct: extraPct,
+      unitPriceExclVat: double.parse(unitExcl.toStringAsFixed(3)),
+      unitPriceInclVat: double.parse(unitIncl.toStringAsFixed(3)),
+      cartonPriceExclVat: double.parse((unitExcl * upc).toStringAsFixed(2)),
+      cartonPriceInclVat: double.parse((unitIncl * upc).toStringAsFixed(2)),
+      netUnitInvoiceCost: double.parse(netUnit.toStringAsFixed(3)),
+      netCartonInvoiceCost: double.parse((netUnit * upc).toStringAsFixed(2)),
+    );
+
+    if (idx >= 0) {
+      final old = updatedItems[idx];
+      final diffEgp = double.parse((resolved.unitPriceInclVat - old.unitPriceInclVat).toStringAsFixed(2));
+      if (diffEgp.abs() >= 0.01 && old.unitPriceInclVat > 0) {
+        resolved = resolved.copyWith(
+          prevUnitPriceExclVat: old.unitPriceExclVat,
+          prevUnitPriceInclVat: old.unitPriceInclVat,
+          prevCartonPriceInclVat: old.cartonPriceInclVat,
+          prevNetUnitInvoiceCost: old.netUnitInvoiceCost,
+          prevNetCartonInvoiceCost: old.netCartonInvoiceCost,
+          priceChangeDiffEgp: diffEgp,
+          priceChangePct: double.parse(((diffEgp / old.unitPriceInclVat) * 100.0).toStringAsFixed(1)),
+          priceChangeDirection: diffEgp > 0 ? 'up' : 'down',
+        );
+      }
+      updatedItems[idx] = resolved;
+    } else {
+      resolved = resolved.copyWith(
+        serialNo: updatedItems.length + 1,
+        priceChangeDirection: 'new',
+      );
+      updatedItems.add(resolved);
+    }
+
+    final rebuilt = _buildSummaryFromItems(
+      sourceFilename: current.sourceFilename.isNotEmpty ? current.sourceFilename : 'adeco_product_master_2026_08_01.xlsx',
+      sheetDateLabel: current.sheetDateLabel,
+      items: updatedItems,
+      diffSummary: current.diffSummary,
+    );
+    final stack = _localProductMasterStackByTenant.putIfAbsent(cleanSlug, () => []);
+    if (stack.isNotEmpty) {
+      stack[stack.length - 1] = (archiveId: stack.last.archiveId, summary: rebuilt);
+    } else {
+      stack.add((archiveId: 'pm_default_seed', summary: rebuilt));
+    }
+    return rebuilt;
   }
 
   /// Uploads an Excel (.xlsx) or CSV file containing the Product Master & Price List (`POST /api/v1/product-master/upload`).
@@ -8888,44 +9212,370 @@ class ApiClient {
     required String filename,
     required Uint8List fileBytes,
   }) async {
-    final uri = Uri.parse(ApiEndpoints.productMasterUpload).replace(
-      queryParameters: {'filename': filename},
-    );
-
-    final request = http.MultipartRequest('POST', uri);
-    request.headers.addAll(_headers);
-    request.headers.remove('Content-Type');
-    request.files.add(
-      http.MultipartFile.fromBytes(
-        'file',
-        fileBytes,
-        filename: filename,
-      ),
-    );
-
-    final streamed = await request.send().timeout(const Duration(seconds: 30));
-    final response = await http.Response.fromStream(streamed);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
-      final resultJson = data['result'] as Map<String, dynamic>? ?? data;
-      final summaryJson = data['summary'] as Map<String, dynamic>? ?? const {};
-      return (
-        result: IngestionResultModel.fromJson(resultJson),
-        summary: ProductMasterSummaryModel.fromJson(summaryJson),
-      );
+    final cleanSlug = normalizeDataTenantSlug(tenantId);
+    final lowerFile = filename.trim().toLowerCase();
+    if (_deletedArchiveFileNames.remove(lowerFile) && kIsWeb) {
+      SessionStorage.saveDeletedArchiveFileNames(_deletedArchiveFileNames);
     }
-    throw Exception('تعذر رفع وتحديث شيت كارتة الأصناف والأسعار (HTTP ${response.statusCode})');
+    if (lowerFile == 'adeco_product_master_2026_08_01.xlsx') {
+      _deletedArchiveIds.remove('pm_default_seed');
+      _deletedProductMasterBaselineTenants.remove(cleanSlug);
+    }
+
+    try {
+      final uri = Uri.parse(ApiEndpoints.productMasterUpload).replace(
+        queryParameters: {'filename': filename},
+      );
+
+      final request = http.MultipartRequest('POST', uri);
+      request.headers.addAll(_headers);
+      request.headers.remove('Content-Type');
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          fileBytes,
+          filename: filename,
+        ),
+      );
+
+      final streamed = await request.send().timeout(const Duration(seconds: 30));
+      final response = await http.Response.fromStream(streamed);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        final resultJson = data['result'] as Map<String, dynamic>? ?? data;
+        final summaryJson = data['summary'] as Map<String, dynamic>? ??
+            (resultJson['product_master_summary'] as Map<String, dynamic>? ?? const {});
+        final resModel = IngestionResultModel.fromJson(resultJson);
+        final sumModel = ProductMasterSummaryModel.fromJson(summaryJson);
+        final archId = resModel.archiveId.isNotEmpty
+            ? resModel.archiveId
+            : 'arch_pm_${cleanSlug}_${DateTime.now().microsecondsSinceEpoch}';
+        _recordLocalArchivedUpload(
+          cleanSlug: cleanSlug,
+          batchId: resModel.batchId,
+          archiveId: archId,
+          filename: filename,
+          bytes: fileBytes,
+          retailChain: 'product-master',
+          validRows: sumModel.totalSkus,
+          branchesCount: 1,
+          totalRevenue: 0,
+          fileType: 'product_master',
+        );
+        _localProductMasterStackByTenant
+            .putIfAbsent(cleanSlug, () => [])
+            .add((archiveId: archId, summary: sumModel));
+        return (
+          result: resModel,
+          summary: sumModel,
+        );
+      }
+      if (!allowMockFallback) {
+        throw Exception('تعذر رفع وتحديث شيت كارتة الأصناف والأسعار (HTTP ${response.statusCode})');
+      }
+    } catch (e) {
+      if (!allowMockFallback) rethrow;
+      debugPrint('[ApiClient] Fallback uploadProductMasterFile: $e');
+    }
+
+    final prevSummary = _fallbackMockProductMaster();
+    final parsedItems = _parseLocalProductMasterCsvBytes(fileBytes, fallbackItems: prevSummary.items);
+    final rawSummary = _buildSummaryFromItems(
+      sourceFilename: filename,
+      sheetDateLabel: 'تحديث ${DateTime.now().toIso8601String().substring(0, 10)}',
+      items: parsedItems,
+    );
+    final diffedSummary = _computeLocalProductMasterDiff(
+      prevSummary.totalSkus > 0 ? prevSummary : null,
+      rawSummary,
+      isFirstWithoutBaseline: prevSummary.totalSkus == 0,
+    );
+    final batchId = 'batch_pm_${DateTime.now().microsecondsSinceEpoch}';
+    final archId = 'arch_pm_${cleanSlug}_product-master_${DateTime.now().microsecondsSinceEpoch}';
+    _recordLocalArchivedUpload(
+      cleanSlug: cleanSlug,
+      batchId: batchId,
+      archiveId: archId,
+      filename: filename,
+      bytes: fileBytes,
+      retailChain: 'product-master',
+      validRows: diffedSummary.totalSkus,
+      branchesCount: 1,
+      totalRevenue: 0,
+      fileType: 'product_master',
+    );
+    _localProductMasterStackByTenant
+        .putIfAbsent(cleanSlug, () => [])
+        .add((archiveId: archId, summary: diffedSummary));
+
+    final fallbackResult = IngestionResultModel(
+      batchId: batchId,
+      archiveId: archId,
+      filename: filename,
+      retailerDetected: 'product-master',
+      totalRows: diffedSummary.totalSkus,
+      validRows: diffedSummary.totalSkus,
+      anomalyRows: 0,
+      totalRevenue: 0,
+      totalQuantity: diffedSummary.totalSkus,
+      confidenceScore: 1.0,
+      isStaged: false,
+      isCommitted: true,
+      anomalies: const [],
+    );
+    return (result: fallbackResult, summary: diffedSummary);
   }
 
-  ProductMasterSummaryModel _fallbackMockProductMaster({
-    String? search,
-    String? brand,
-    String? category,
-    String? prefix,
-    String? itemType,
-    String? packaging,
-    String? pullStatus,
+  List<ProductMasterItemModel> _parseLocalProductMasterCsvBytes(
+    Uint8List fileBytes, {
+    required List<ProductMasterItemModel> fallbackItems,
   }) {
+    try {
+      final content = utf8.decode(fileBytes, allowMalformed: true).replaceFirst('\uFEFF', '');
+      final lines = const LineSplitter()
+          .convert(content)
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
+      if (lines.length >= 2) {
+        final headers = lines.first.split(',').map((h) => h.trim().replaceAll('"', '')).toList();
+        int codeCol = -1, nameCol = -1, bcCol = -1, packCol = -1, upcCol = -1, exclCol = -1, inclCol = -1;
+        for (int c = 0; c < headers.length; c++) {
+          final h = headers[c].toLowerCase();
+          if (codeCol < 0 && (h.contains('كود الصنف') || h == 'item_code' || h == 'كود')) codeCol = c;
+          if (nameCol < 0 && (h.contains('اسم الصنف') || h.contains('الاسم الرسمي') || h == 'official_name')) nameCol = c;
+          if (bcCol < 0 && (h.contains('باركود') || h.contains('الباركود') || h == 'barcode')) bcCol = c;
+          if (packCol < 0 && (h.contains('التعبئة') || h.contains('نوع العبوة') || h == 'packaging_type')) packCol = c;
+          if (upcCol < 0 && (h.contains('الوحدات بالكرتونة') || h.contains('الشدة') || h == 'units_per_carton')) upcCol = c;
+          if (exclCol < 0 && (h.contains('قبل الضريبة') || h.contains('ق.ض') || h == 'unit_price_excl_vat')) exclCol = c;
+          if (inclCol < 0 && (h.contains('شامل الضريبة') || h.contains('ش.ض') || h == 'unit_price_incl_vat')) {
+            if (!h.contains('كرتون')) inclCol = c;
+          }
+        }
+        if (codeCol >= 0 || nameCol >= 0) {
+          final parsed = <ProductMasterItemModel>[];
+          for (int r = 1; r < lines.length; r++) {
+            final cols = lines[r].split(',').map((v) => v.trim().replaceAll('"', '')).toList();
+            final code = (codeCol >= 0 && codeCol < cols.length) ? cols[codeCol] : 'SKU-$r';
+            final name = (nameCol >= 0 && nameCol < cols.length) ? cols[nameCol] : code;
+            if (code.isEmpty && name.isEmpty) continue;
+            final bc = (bcCol >= 0 && bcCol < cols.length) ? cols[bcCol] : '';
+            final pack = (packCol >= 0 && packCol < cols.length && cols[packCol].isNotEmpty) ? cols[packCol] : 'عبوة';
+            final upc = (upcCol >= 0 && upcCol < cols.length) ? (int.tryParse(cols[upcCol]) ?? 12) : 12;
+            double excl = (exclCol >= 0 && exclCol < cols.length) ? (double.tryParse(cols[exclCol]) ?? 0.0) : 0.0;
+            double incl = (inclCol >= 0 && inclCol < cols.length) ? (double.tryParse(cols[inclCol]) ?? 0.0) : 0.0;
+            if (incl <= 0 && excl > 0) incl = double.parse((excl * 1.14).toStringAsFixed(2));
+            if (excl <= 0 && incl > 0) excl = double.parse((incl / 1.14).toStringAsFixed(2));
+            final prefix = code.contains('-') ? code.split('-').first.toUpperCase() : 'FGCL';
+            final isPromo = prefix.startsWith('PR') || name.contains('عرض');
+            parsed.add(ProductMasterItemModel(
+              serialNo: parsed.length + 1,
+              itemCode: code,
+              itemCodePrefix: prefix,
+              erpPrefix: prefix,
+              departmentAr: prefix,
+              officialName: name,
+              barcode: bc,
+              category: 'منظفات وعناية منزلية',
+              brand: inferBrandFromSkuOrSupplier(name, '', isOwn: true),
+              packagingType: pack,
+              unitsPerCarton: upc,
+              unitPriceExclVat: excl,
+              vatRate: 0.14,
+              unitPriceInclVat: incl,
+              cartonPriceExclVat: double.parse((excl * upc).toStringAsFixed(2)),
+              cartonPriceInclVat: double.parse((incl * upc).toStringAsFixed(2)),
+              invoiceDiscountPct: 10.0,
+              extraDiscountPct: 0.0,
+              netUnitInvoiceCost: double.parse((incl * 0.90).toStringAsFixed(3)),
+              netCartonInvoiceCost: double.parse((incl * 0.90 * upc).toStringAsFixed(2)),
+              itemType: isPromo ? 'عرض' : 'عادي',
+              priceChangeDirection: 'same',
+            ));
+          }
+          if (parsed.isNotEmpty) return parsed;
+        }
+      }
+    } catch (_) {}
+    return fallbackItems;
+  }
+
+  ProductMasterSummaryModel _buildSummaryFromItems({
+    required String sourceFilename,
+    required String sheetDateLabel,
+    required List<ProductMasterItemModel> items,
+    ProductMasterDiffSummaryModel? diffSummary,
+  }) {
+    final prefixes = items.map((e) => e.itemCodePrefix).where((e) => e.isNotEmpty).toSet().toList()..sort();
+    final brands = items.map((e) => e.brand).where((e) => e.isNotEmpty).toSet().toList()..sort();
+    final packs = items.map((e) => e.packagingType).where((e) => e.isNotEmpty).toSet().toList()..sort();
+    final avgUpc = items.isEmpty
+        ? 0.0
+        : double.parse((items.fold<int>(0, (s, e) => s + e.unitsPerCarton) / items.length).toStringAsFixed(1));
+    return ProductMasterSummaryModel(
+      tenantId: tenantId,
+      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+      sheetDateLabel: sheetDateLabel,
+      sourceFilename: items.isEmpty ? '' : sourceFilename,
+      defaultDiscountPct: 10.0,
+      defaultVatRate: 0.14,
+      totalSkus: items.length,
+      regularSkusCount: items.where((e) => e.itemType != 'عرض').length,
+      promoSkusCount: items.where((e) => e.itemType == 'عرض').length,
+      uniqueBarcodesCount: items.map((e) => e.barcode).where((b) => b.isNotEmpty).toSet().length,
+      avgUnitsPerCarton: avgUpc,
+      activeInChainsCount: items.where((e) => e.isActiveInChains).length,
+      unpulledSkusCount: items.where((e) => !e.isActiveInChains).length,
+      priceIncreasedCount: items.where((e) => e.priceChangeDirection == 'up').length,
+      priceDecreasedCount: items.where((e) => e.priceChangeDirection == 'down').length,
+      priceUnchangedCount: items.where((e) => e.priceChangeDirection == 'same' || e.priceChangeDirection.isEmpty).length,
+      newSkusCount: items.where((e) => e.priceChangeDirection == 'new').length,
+      availablePrefixes: prefixes,
+      availableBrands: brands,
+      availablePackaging: packs,
+      diffSummary: diffSummary,
+      items: items,
+    );
+  }
+
+  ProductMasterSummaryModel _computeLocalProductMasterDiff(
+    ProductMasterSummaryModel? prev,
+    ProductMasterSummaryModel next, {
+    bool isFirstWithoutBaseline = false,
+  }) {
+    if (prev == null || prev.items.isEmpty || isFirstWithoutBaseline) {
+      final cleanItems = next.items
+          .map((it) => it.copyWith(
+                prevUnitPriceExclVat: 0,
+                prevUnitPriceInclVat: 0,
+                prevCartonPriceInclVat: 0,
+                prevNetUnitInvoiceCost: 0,
+                prevNetCartonInvoiceCost: 0,
+                priceChangeDirection: 'same',
+                priceChangeDiffEgp: 0,
+                priceChangePct: 0,
+              ))
+          .toList();
+      return _buildSummaryFromItems(
+        sourceFilename: next.sourceFilename,
+        sheetDateLabel: next.sheetDateLabel,
+        items: cleanItems,
+        diffSummary: null,
+      );
+    }
+
+    final prevByCode = <String, ProductMasterItemModel>{};
+    for (final it in prev.items) {
+      prevByCode[it.itemCode.trim().toUpperCase()] = it;
+    }
+
+    int upCount = 0, downCount = 0, sameCount = 0, newCount = 0;
+    double upPctSum = 0.0, downPctSum = 0.0;
+    final topChanges = <ProductMasterDiffItemModel>[];
+    final updatedItems = <ProductMasterItemModel>[];
+
+    for (final it in next.items) {
+      final old = prevByCode[it.itemCode.trim().toUpperCase()];
+      if (old == null) {
+        newCount++;
+        updatedItems.add(it.copyWith(
+          prevUnitPriceExclVat: 0,
+          prevUnitPriceInclVat: 0,
+          prevCartonPriceInclVat: 0,
+          prevNetUnitInvoiceCost: 0,
+          prevNetCartonInvoiceCost: 0,
+          priceChangeDirection: 'new',
+          priceChangeDiffEgp: 0,
+          priceChangePct: 0,
+        ));
+        topChanges.add(ProductMasterDiffItemModel(
+          itemCode: it.itemCode,
+          officialName: it.officialName,
+          brand: it.brand,
+          oldUnitPriceIncl: 0,
+          newUnitPriceIncl: it.unitPriceInclVat,
+          oldCartonPriceIncl: 0,
+          newCartonPriceIncl: it.cartonPriceInclVat,
+          diffEgp: 0,
+          diffPct: 0,
+          direction: 'new',
+        ));
+        continue;
+      }
+
+      final diffEgp = double.parse((it.unitPriceInclVat - old.unitPriceInclVat).toStringAsFixed(2));
+      final diffPct = old.unitPriceInclVat > 0
+          ? double.parse(((diffEgp / old.unitPriceInclVat) * 100.0).toStringAsFixed(1))
+          : 0.0;
+      if (diffEgp.abs() >= 0.01) {
+        final dir = diffEgp > 0 ? 'up' : 'down';
+        if (dir == 'up') {
+          upCount++;
+          upPctSum += diffPct;
+        } else {
+          downCount++;
+          downPctSum += diffPct.abs();
+        }
+        updatedItems.add(it.copyWith(
+          prevUnitPriceExclVat: old.unitPriceExclVat,
+          prevUnitPriceInclVat: old.unitPriceInclVat,
+          prevCartonPriceInclVat: old.cartonPriceInclVat,
+          prevNetUnitInvoiceCost: old.netUnitInvoiceCost,
+          prevNetCartonInvoiceCost: old.netCartonInvoiceCost,
+          priceChangeDirection: dir,
+          priceChangeDiffEgp: diffEgp,
+          priceChangePct: diffPct,
+        ));
+        topChanges.add(ProductMasterDiffItemModel(
+          itemCode: it.itemCode,
+          officialName: it.officialName,
+          brand: it.brand,
+          oldUnitPriceIncl: old.unitPriceInclVat,
+          newUnitPriceIncl: it.unitPriceInclVat,
+          oldCartonPriceIncl: old.cartonPriceInclVat,
+          newCartonPriceIncl: it.cartonPriceInclVat,
+          diffEgp: diffEgp,
+          diffPct: diffPct,
+          direction: dir,
+        ));
+      } else {
+        sameCount++;
+        updatedItems.add(it.copyWith(
+          prevUnitPriceExclVat: 0,
+          prevUnitPriceInclVat: 0,
+          prevCartonPriceInclVat: 0,
+          prevNetUnitInvoiceCost: 0,
+          prevNetCartonInvoiceCost: 0,
+          priceChangeDirection: 'same',
+          priceChangeDiffEgp: 0,
+          priceChangePct: 0,
+        ));
+      }
+    }
+
+    final diffSummary = ProductMasterDiffSummaryModel(
+      comparedAgainstFile: prev.sourceFilename,
+      newFileName: next.sourceFilename,
+      comparedAt: DateTime.now().toIso8601String().substring(0, 16).replaceAll('T', ' '),
+      totalSkusCompared: updatedItems.length,
+      priceIncreasedCount: upCount,
+      priceDecreasedCount: downCount,
+      priceUnchangedCount: sameCount,
+      newSkusCount: newCount,
+      avgPriceIncreasePct: upCount > 0 ? double.parse((upPctSum / upCount).toStringAsFixed(1)) : 0.0,
+      avgPriceDecreasePct: downCount > 0 ? double.parse((downPctSum / downCount).toStringAsFixed(1)) : 0.0,
+      topChangedItems: topChanges,
+    );
+
+    return _buildSummaryFromItems(
+      sourceFilename: next.sourceFilename,
+      sheetDateLabel: next.sheetDateLabel,
+      items: updatedItems,
+      diffSummary: diffSummary,
+    );
+  }
+
+  ProductMasterSummaryModel _buildDefaultSeedProductMasterSummary() {
     const seedItems = <ProductMasterItemModel>[
       ProductMasterItemModel(
         serialNo: 1,
@@ -8955,6 +9605,10 @@ class ApiClient {
         totalPosRevenue: 7560.0,
         avgRetailSellingPrice: 18.0,
         activeChains: ['fathalla', 'carrefour'],
+        prevUnitPriceInclVat: 16.50,
+        priceChangeDirection: 'up',
+        priceChangeDiffEgp: 1.50,
+        priceChangePct: 9.1,
       ),
       ProductMasterItemModel(
         serialNo: 42,
@@ -8984,6 +9638,10 @@ class ApiClient {
         totalPosRevenue: 16800.0,
         avgRetailSellingPrice: 140.0,
         activeChains: ['fathalla'],
+        prevUnitPriceInclVat: 150.00,
+        priceChangeDirection: 'down',
+        priceChangeDiffEgp: -10.00,
+        priceChangePct: -6.7,
       ),
       ProductMasterItemModel(
         serialNo: 88,
@@ -9008,6 +9666,7 @@ class ApiClient {
         netCartonInvoiceCost: 594.00,
         itemType: 'عادي',
         isActiveInChains: false,
+        priceChangeDirection: 'same',
       ),
       ProductMasterItemModel(
         serialNo: 145,
@@ -9037,6 +9696,7 @@ class ApiClient {
         totalPosRevenue: 4032.0,
         avgRetailSellingPrice: 48.0,
         activeChains: ['fathalla'],
+        priceChangeDirection: 'same',
       ),
       ProductMasterItemModel(
         serialNo: 210,
@@ -9061,8 +9721,69 @@ class ApiClient {
         netCartonInvoiceCost: 594.00,
         itemType: 'عرض',
         isActiveInChains: false,
+        priceChangeDirection: 'new',
       ),
     ];
+    return ProductMasterSummaryModel(
+      tenantId: tenantId,
+      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+      sheetDateLabel: 'تحديث 01-08-2026',
+      sourceFilename: 'adeco_product_master_2026_08_01.xlsx',
+      defaultDiscountPct: 10.0,
+      defaultVatRate: 0.14,
+      totalSkus: seedItems.length,
+      regularSkusCount: seedItems.where((e) => e.itemType != 'عرض').length,
+      promoSkusCount: seedItems.where((e) => e.itemType == 'عرض').length,
+      uniqueBarcodesCount: seedItems.map((e) => e.barcode).toSet().length,
+      avgUnitsPerCarton: 9.2,
+      activeInChainsCount: seedItems.where((e) => e.isActiveInChains).length,
+      unpulledSkusCount: seedItems.where((e) => !e.isActiveInChains).length,
+      priceIncreasedCount: seedItems.where((e) => e.priceChangeDirection == 'up').length,
+      priceDecreasedCount: seedItems.where((e) => e.priceChangeDirection == 'down').length,
+      priceUnchangedCount: seedItems.where((e) => e.priceChangeDirection == 'same').length,
+      newSkusCount: seedItems.where((e) => e.priceChangeDirection == 'new').length,
+      availablePrefixes: const ['FGCL', 'FGDG', 'FGDW', 'FGGC', 'FGHC', 'FGLC', 'FGPC', 'PR'],
+      availableBrands: const [
+        'فيبا (Feba)',
+        'كلوريل (Clorel)',
+        'فلفيتا (Velveta)',
+        'ديفا (Diva)',
+        'ديفاتول (Divatol)',
+        'ماكسيل (Maxell)',
+        'جلاسي (Glassy)',
+        'سبيد (Speed)',
+      ],
+      availablePackaging: const ['عبوة', 'جركن', 'شرنك', 'باكت', 'بكته'],
+      items: seedItems,
+    );
+  }
+
+  ProductMasterSummaryModel _fallbackMockProductMaster({
+    String? search,
+    String? brand,
+    String? category,
+    String? prefix,
+    String? itemType,
+    String? packaging,
+    String? pullStatus,
+    String? priceChange,
+  }) {
+    final cleanSlug = normalizeDataTenantSlug(tenantId);
+    final stack = _localProductMasterStackByTenant[cleanSlug];
+    final ProductMasterSummaryModel baseSummary;
+    if (stack != null && stack.isNotEmpty) {
+      baseSummary = stack.last.summary;
+    } else if (_deletedProductMasterBaselineTenants.contains(cleanSlug)) {
+      baseSummary = _buildSummaryFromItems(
+        sourceFilename: '',
+        sheetDateLabel: '',
+        items: const [],
+      );
+    } else {
+      baseSummary = _buildDefaultSeedProductMasterSummary();
+    }
+
+    final seedItems = baseSummary.items;
 
     final filtered = seedItems.where((item) {
       if (brand != null && brand.isNotEmpty && brand != 'all' && brand != 'الكل' && item.brand != brand) {
@@ -9088,6 +9809,17 @@ class ApiClient {
         if (pullStatus == 'active' && !item.isActiveInChains) return false;
         if (pullStatus == 'unpulled' && item.isActiveInChains) return false;
       }
+      if (priceChange != null && priceChange.isNotEmpty && priceChange != 'all' && priceChange != 'الكل') {
+        final pc = priceChange.toLowerCase();
+        final dir = item.priceChangeDirection.toLowerCase();
+        if (pc == 'changed' && dir != 'up' && dir != 'down' && dir != 'new') {
+          return false;
+        }
+        if (pc == 'up' && dir != 'up') return false;
+        if (pc == 'down' && dir != 'down') return false;
+        if (pc == 'new' && dir != 'new') return false;
+        if (pc == 'same' && dir != 'same' && dir.isNotEmpty) return false;
+      }
       if (search != null && search.trim().isNotEmpty) {
         return matchesProductSearch(
           search,
@@ -9103,31 +9835,27 @@ class ApiClient {
     }).toList();
 
     return ProductMasterSummaryModel(
-      tenantId: tenantId,
-      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
-      sheetDateLabel: 'تحديث 01-08-2026',
-      sourceFilename: 'adeco_product_master_2026_08_01.xlsx',
-      defaultDiscountPct: 10.0,
-      defaultVatRate: 0.14,
-      totalSkus: seedItems.length,
-      regularSkusCount: seedItems.where((e) => e.itemType != 'عرض').length,
-      promoSkusCount: seedItems.where((e) => e.itemType == 'عرض').length,
-      uniqueBarcodesCount: seedItems.map((e) => e.barcode).toSet().length,
-      avgUnitsPerCarton: 9.2,
-      activeInChainsCount: seedItems.where((e) => e.isActiveInChains).length,
-      unpulledSkusCount: seedItems.where((e) => !e.isActiveInChains).length,
-      availablePrefixes: const ['FGCL', 'FGDG', 'FGDW', 'FGGC', 'FGHC', 'FGLC', 'FGPC', 'PR'],
-      availableBrands: const [
-        'فيبا (Feba)',
-        'كلوريل (Clorel)',
-        'فلفيتا (Velveta)',
-        'ديفا (Diva)',
-        'ديفاتول (Divatol)',
-        'ماكسيل (Maxell)',
-        'جلاسي (Glassy)',
-        'سبيد (Speed)',
-      ],
-      availablePackaging: const ['عبوة', 'جركن', 'شرنك', 'باكت', 'بكته'],
+      tenantId: baseSummary.tenantId,
+      companyName: baseSummary.companyName,
+      sheetDateLabel: baseSummary.sheetDateLabel,
+      sourceFilename: baseSummary.sourceFilename,
+      defaultDiscountPct: baseSummary.defaultDiscountPct,
+      defaultVatRate: baseSummary.defaultVatRate,
+      totalSkus: baseSummary.totalSkus,
+      regularSkusCount: baseSummary.regularSkusCount,
+      promoSkusCount: baseSummary.promoSkusCount,
+      uniqueBarcodesCount: baseSummary.uniqueBarcodesCount,
+      avgUnitsPerCarton: baseSummary.avgUnitsPerCarton,
+      activeInChainsCount: baseSummary.activeInChainsCount,
+      unpulledSkusCount: baseSummary.unpulledSkusCount,
+      priceIncreasedCount: baseSummary.priceIncreasedCount,
+      priceDecreasedCount: baseSummary.priceDecreasedCount,
+      priceUnchangedCount: baseSummary.priceUnchangedCount,
+      newSkusCount: baseSummary.newSkusCount,
+      availablePrefixes: baseSummary.availablePrefixes,
+      availableBrands: baseSummary.availableBrands,
+      availablePackaging: baseSummary.availablePackaging,
+      diffSummary: baseSummary.diffSummary,
       items: filtered,
     );
   }
@@ -10790,6 +11518,24 @@ class SellInRecordItem {
   final double expectedQtyCases;
   final double expectedValueEgp;
   final String transactionType;
+  final int totalUnitsSupplied;
+  final double officialUnitExclVatEgp;
+  final double officialUnitInclVatEgp;
+  final double officialCartonExclVatEgp;
+  final double officialCartonInclVatEgp;
+  final double netCartonInvoiceCostEgp;
+  final double invoiceDiscountPct;
+  final double extraDiscountPct;
+  final double vatRate;
+  final double grossValueInclVatEgp;
+  final double vatAmountEgp;
+  final double officialListValueExclEgp;
+  final double discountGrantedEgp;
+  final double effectiveDiscountPct;
+  final double actualCasePriceExclEgp;
+  final double priceVariancePct;
+  final String pricingWaveStatus;
+  final String departmentAr;
 
   const SellInRecordItem({
     required this.recordId,
@@ -10822,9 +11568,35 @@ class SellInRecordItem {
     required this.expectedQtyCases,
     required this.expectedValueEgp,
     required this.transactionType,
+    this.totalUnitsSupplied = 0,
+    this.officialUnitExclVatEgp = 0.0,
+    this.officialUnitInclVatEgp = 0.0,
+    this.officialCartonExclVatEgp = 0.0,
+    this.officialCartonInclVatEgp = 0.0,
+    this.netCartonInvoiceCostEgp = 0.0,
+    this.invoiceDiscountPct = 10.0,
+    this.extraDiscountPct = 0.0,
+    this.vatRate = 0.14,
+    this.grossValueInclVatEgp = 0.0,
+    this.vatAmountEgp = 0.0,
+    this.officialListValueExclEgp = 0.0,
+    this.discountGrantedEgp = 0.0,
+    this.effectiveDiscountPct = 0.0,
+    this.actualCasePriceExclEgp = 0.0,
+    this.priceVariancePct = 0.0,
+    this.pricingWaveStatus = 'current_list',
+    this.departmentAr = '',
   });
 
   factory SellInRecordItem.fromJson(Map<String, dynamic> json) {
+    final upc = (json['units_per_carton'] as num?)?.toInt() ?? 12;
+    final cases = (json['net_qty_cases'] as num?)?.toDouble() ?? 0.0;
+    final netVal = (json['net_value_egp'] as num?)?.toDouble() ?? 0.0;
+    final vatR = (json['vat_rate'] as num?)?.toDouble() ?? 0.14;
+    final grossVal = (json['gross_value_incl_vat_egp'] as num?)?.toDouble() ??
+        double.parse((netVal * (1.0 + vatR)).toStringAsFixed(2));
+    final vatAmt = (json['vat_amount_egp'] as num?)?.toDouble() ??
+        double.parse((grossVal - netVal).toStringAsFixed(2));
     return SellInRecordItem(
       recordId: json['record_id'] as String? ?? '',
       batchId: json['batch_id'] as String? ?? '',
@@ -10845,17 +11617,37 @@ class SellInRecordItem {
       brand: json['brand'] as String? ?? '',
       subCategory: json['sub_category'] as String? ?? '',
       itemName: json['item_name'] as String? ?? '',
-      unitsPerCarton: (json['units_per_carton'] as num?)?.toInt() ?? 12,
+      unitsPerCarton: upc,
       promotionType: json['promotion_type'] as String? ?? 'عادي',
       salesManager: json['sales_manager'] as String? ?? '',
       kaOfficer: json['ka_officer'] as String? ?? '',
       salesRep: json['sales_rep'] as String? ?? '',
-      netQtyCases: (json['net_qty_cases'] as num?)?.toDouble() ?? 0.0,
-      netValueEgp: (json['net_value_egp'] as num?)?.toDouble() ?? 0.0,
+      netQtyCases: cases,
+      netValueEgp: netVal,
       weightTons: (json['weight_tons'] as num?)?.toDouble() ?? 0.0,
       expectedQtyCases: (json['expected_qty_cases'] as num?)?.toDouble() ?? 0.0,
       expectedValueEgp: (json['expected_value_egp'] as num?)?.toDouble() ?? 0.0,
       transactionType: json['transaction_type'] as String? ?? '',
+      totalUnitsSupplied: (json['total_units_supplied'] as num?)?.toInt() ??
+          (cases * upc).round(),
+      officialUnitExclVatEgp: (json['official_unit_excl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      officialUnitInclVatEgp: (json['official_unit_incl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      officialCartonExclVatEgp: (json['official_carton_excl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      officialCartonInclVatEgp: (json['official_carton_incl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      netCartonInvoiceCostEgp: (json['net_carton_invoice_cost_egp'] as num?)?.toDouble() ?? 0.0,
+      invoiceDiscountPct: (json['invoice_discount_pct'] as num?)?.toDouble() ?? 10.0,
+      extraDiscountPct: (json['extra_discount_pct'] as num?)?.toDouble() ?? 0.0,
+      vatRate: vatR,
+      grossValueInclVatEgp: grossVal,
+      vatAmountEgp: vatAmt,
+      officialListValueExclEgp: (json['official_list_value_excl_egp'] as num?)?.toDouble() ?? 0.0,
+      discountGrantedEgp: (json['discount_granted_egp'] as num?)?.toDouble() ?? 0.0,
+      effectiveDiscountPct: (json['effective_discount_pct'] as num?)?.toDouble() ?? 0.0,
+      actualCasePriceExclEgp: (json['actual_case_price_excl_egp'] as num?)?.toDouble() ??
+          (cases.abs() > 0.001 ? double.parse((netVal.abs() / cases.abs()).toStringAsFixed(2)) : 0.0),
+      priceVariancePct: (json['price_variance_pct'] as num?)?.toDouble() ?? 0.0,
+      pricingWaveStatus: json['pricing_wave_status'] as String? ?? 'current_list',
+      departmentAr: json['department_ar'] as String? ?? '',
     );
   }
 }
@@ -10865,16 +11657,34 @@ class SellInExplorerResponse {
   final int totalCount;
   final double totalValueEgp;
   final double totalCases;
+  final int totalUnitsPieces;
   final double totalWeightTons;
   final double totalExpectedEgp;
+  final double totalOfficialListExclVatEgp;
+  final double totalOfficialListInclVatEgp;
+  final double totalDiscountGrantedEgp;
+  final double effectiveDiscountPct;
+  final double totalNetExclVatEgp;
+  final double totalVat14Egp;
+  final double totalGrossInclVatEgp;
+  final int matchedCatalogSkusCount;
 
   const SellInExplorerResponse({
     required this.records,
     required this.totalCount,
     required this.totalValueEgp,
     required this.totalCases,
+    this.totalUnitsPieces = 0,
     required this.totalWeightTons,
     required this.totalExpectedEgp,
+    this.totalOfficialListExclVatEgp = 0.0,
+    this.totalOfficialListInclVatEgp = 0.0,
+    this.totalDiscountGrantedEgp = 0.0,
+    this.effectiveDiscountPct = 10.0,
+    this.totalNetExclVatEgp = 0.0,
+    this.totalVat14Egp = 0.0,
+    this.totalGrossInclVatEgp = 0.0,
+    this.matchedCatalogSkusCount = 0,
   });
 
   factory SellInExplorerResponse.fromJson(Map<String, dynamic> json) {
@@ -10882,13 +11692,33 @@ class SellInExplorerResponse {
         .whereType<Map<String, dynamic>>()
         .map(SellInRecordItem.fromJson)
         .toList();
+    final totVal = (json['total_value_egp'] as num?)?.toDouble() ?? 0.0;
+    final totCases = (json['total_cases'] as num?)?.toDouble() ?? 0.0;
+    final totListExcl = (json['total_official_list_excl_vat_egp'] as num?)?.toDouble() ??
+        (totVal > 0 ? double.parse((totVal / 0.90).toStringAsFixed(2)) : 0.0);
+    final totGrossIncl = (json['total_gross_incl_vat_egp'] as num?)?.toDouble() ??
+        double.parse((totVal * 1.14).toStringAsFixed(2));
+    final totVat = (json['total_vat_14_egp'] as num?)?.toDouble() ??
+        double.parse((totGrossIncl - totVal).toStringAsFixed(2));
     return SellInExplorerResponse(
       records: list,
       totalCount: (json['total_count'] as num?)?.toInt() ?? list.length,
-      totalValueEgp: (json['total_value_egp'] as num?)?.toDouble() ?? 0.0,
-      totalCases: (json['total_cases'] as num?)?.toDouble() ?? 0.0,
+      totalValueEgp: totVal,
+      totalCases: totCases,
+      totalUnitsPieces: (json['total_units_pieces'] as num?)?.toInt() ??
+          (totCases * 12).round(),
       totalWeightTons: (json['total_weight_tons'] as num?)?.toDouble() ?? 0.0,
       totalExpectedEgp: (json['total_expected_egp'] as num?)?.toDouble() ?? 0.0,
+      totalOfficialListExclVatEgp: totListExcl,
+      totalOfficialListInclVatEgp: (json['total_official_list_incl_vat_egp'] as num?)?.toDouble() ??
+          double.parse((totListExcl * 1.14).toStringAsFixed(2)),
+      totalDiscountGrantedEgp: (json['total_discount_granted_egp'] as num?)?.toDouble() ??
+          double.parse((totListExcl - totVal).clamp(0.0, double.infinity).toStringAsFixed(2)),
+      effectiveDiscountPct: (json['effective_discount_pct'] as num?)?.toDouble() ?? 10.0,
+      totalNetExclVatEgp: (json['total_net_excl_vat_egp'] as num?)?.toDouble() ?? totVal,
+      totalVat14Egp: totVat,
+      totalGrossInclVatEgp: totGrossIncl,
+      matchedCatalogSkusCount: (json['matched_catalog_skus_count'] as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -10896,6 +11726,11 @@ class SellInExplorerResponse {
 class TargetSKUBreakdownModel {
   final String itemCode;
   final String barcode;
+  final String departmentAr;
+  final double officialCartonExclVatEgp;
+  final double officialCartonInclVatEgp;
+  final int targetPieces;
+  final int actualPieces;
   final String skuName;
   final String brand;
   final String sector;
@@ -10922,6 +11757,11 @@ class TargetSKUBreakdownModel {
   const TargetSKUBreakdownModel({
     this.itemCode = '',
     this.barcode = '',
+    this.departmentAr = '',
+    this.officialCartonExclVatEgp = 0.0,
+    this.officialCartonInclVatEgp = 0.0,
+    this.targetPieces = 0,
+    this.actualPieces = 0,
     required this.skuName,
     required this.brand,
     required this.sector,
@@ -10947,21 +11787,29 @@ class TargetSKUBreakdownModel {
   });
 
   factory TargetSKUBreakdownModel.fromJson(Map<String, dynamic> json) {
+    final upc = (json['units_per_carton'] as num?)?.toInt() ?? 12;
+    final tCases = (json['target_units'] as num?)?.toDouble() ?? 0.0;
+    final aCases = (json['actual_units'] as num?)?.toDouble() ?? 0.0;
     return TargetSKUBreakdownModel(
       itemCode: json['item_code'] as String? ?? '',
       barcode: json['barcode'] as String? ?? '',
+      departmentAr: json['department_ar'] as String? ?? '',
+      officialCartonExclVatEgp: (json['official_carton_excl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      officialCartonInclVatEgp: (json['official_carton_incl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      targetPieces: (json['target_pieces'] as num?)?.toInt() ?? (tCases * upc).round(),
+      actualPieces: (json['actual_pieces'] as num?)?.toInt() ?? (aCases * upc).round(),
       skuName: json['sku_name'] as String? ?? '',
       brand: json['brand'] as String? ?? '',
       sector: json['sector'] as String? ?? 'MT',
       subCategory: json['sub_category'] as String? ?? '',
-      unitsPerCarton: (json['units_per_carton'] as num?)?.toInt() ?? 12,
+      unitsPerCarton: upc,
       sharePct: (json['share_pct'] as num?)?.toDouble() ?? 0.0,
       casePriceEgp: (json['case_price_egp'] as num?)?.toDouble() ?? 0.0,
       targetRevenueEgp: (json['target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
-      targetUnits: (json['target_units'] as num?)?.toDouble() ?? 0.0,
+      targetUnits: tCases,
       targetWeightTons: (json['target_weight_tons'] as num?)?.toDouble() ?? 0.0,
       actualRevenueEgp: (json['actual_revenue_egp'] as num?)?.toDouble() ?? 0.0,
-      actualUnits: (json['actual_units'] as num?)?.toDouble() ?? 0.0,
+      actualUnits: aCases,
       actualWeightTons: (json['actual_weight_tons'] as num?)?.toDouble() ?? 0.0,
       expectedRevenueEgp: (json['expected_revenue_egp'] as num?)?.toDouble() ?? 0.0,
       expectedUnits: (json['expected_units'] as num?)?.toDouble() ?? 0.0,
@@ -11504,6 +12352,14 @@ class ProductMasterItemModel {
   final double avgRetailSellingPrice;
   final List<String> activeChains;
   final String updatedAt;
+  final double prevUnitPriceExclVat;
+  final double prevUnitPriceInclVat;
+  final double prevCartonPriceInclVat;
+  final double prevNetUnitInvoiceCost;
+  final double prevNetCartonInvoiceCost;
+  final String priceChangeDirection; // "up" | "down" | "new" | "same"
+  final double priceChangeDiffEgp;
+  final double priceChangePct;
 
   const ProductMasterItemModel({
     this.serialNo = 0,
@@ -11535,6 +12391,14 @@ class ProductMasterItemModel {
     this.avgRetailSellingPrice = 0.0,
     this.activeChains = const [],
     this.updatedAt = '',
+    this.prevUnitPriceExclVat = 0.0,
+    this.prevUnitPriceInclVat = 0.0,
+    this.prevCartonPriceInclVat = 0.0,
+    this.prevNetUnitInvoiceCost = 0.0,
+    this.prevNetCartonInvoiceCost = 0.0,
+    this.priceChangeDirection = 'same',
+    this.priceChangeDiffEgp = 0.0,
+    this.priceChangePct = 0.0,
   });
 
   static double normalizeDiscountPct(num? raw, double defaultPct) {
@@ -11553,6 +12417,7 @@ class ProductMasterItemModel {
       pfx = code.split('-').first.toUpperCase();
     }
     final erpPfx = (json['erp_prefix'] as String? ?? '').trim();
+    final rawDir = (json['price_change_direction'] as String? ?? '').trim().toLowerCase();
     return ProductMasterItemModel(
       serialNo: (json['serial_no'] as num?)?.toInt() ?? 0,
       itemCode: code,
@@ -11585,6 +12450,14 @@ class ProductMasterItemModel {
           .map((e) => e.toString())
           .toList(),
       updatedAt: json['updated_at'] as String? ?? '',
+      prevUnitPriceExclVat: (json['prev_unit_price_excl_vat'] as num?)?.toDouble() ?? 0.0,
+      prevUnitPriceInclVat: (json['prev_unit_price_incl_vat'] as num?)?.toDouble() ?? 0.0,
+      prevCartonPriceInclVat: (json['prev_carton_price_incl_vat'] as num?)?.toDouble() ?? 0.0,
+      prevNetUnitInvoiceCost: (json['prev_net_unit_invoice_cost'] as num?)?.toDouble() ?? 0.0,
+      prevNetCartonInvoiceCost: (json['prev_net_carton_invoice_cost'] as num?)?.toDouble() ?? 0.0,
+      priceChangeDirection: rawDir.isEmpty ? 'same' : rawDir,
+      priceChangeDiffEgp: (json['price_change_diff_egp'] as num?)?.toDouble() ?? 0.0,
+      priceChangePct: (json['price_change_pct'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
@@ -11618,6 +12491,14 @@ class ProductMasterItemModel {
         'avg_retail_selling_price': avgRetailSellingPrice,
         'active_chains': activeChains,
         'updated_at': updatedAt,
+        if (prevUnitPriceExclVat > 0) 'prev_unit_price_excl_vat': prevUnitPriceExclVat,
+        if (prevUnitPriceInclVat > 0) 'prev_unit_price_incl_vat': prevUnitPriceInclVat,
+        if (prevCartonPriceInclVat > 0) 'prev_carton_price_incl_vat': prevCartonPriceInclVat,
+        if (prevNetUnitInvoiceCost > 0) 'prev_net_unit_invoice_cost': prevNetUnitInvoiceCost,
+        if (prevNetCartonInvoiceCost > 0) 'prev_net_carton_invoice_cost': prevNetCartonInvoiceCost,
+        if (priceChangeDirection.isNotEmpty) 'price_change_direction': priceChangeDirection,
+        if (priceChangeDiffEgp != 0) 'price_change_diff_egp': priceChangeDiffEgp,
+        if (priceChangePct != 0) 'price_change_pct': priceChangePct,
       };
 
   ProductMasterItemModel copyWith({
@@ -11650,6 +12531,14 @@ class ProductMasterItemModel {
     double? avgRetailSellingPrice,
     List<String>? activeChains,
     String? updatedAt,
+    double? prevUnitPriceExclVat,
+    double? prevUnitPriceInclVat,
+    double? prevCartonPriceInclVat,
+    double? prevNetUnitInvoiceCost,
+    double? prevNetCartonInvoiceCost,
+    String? priceChangeDirection,
+    double? priceChangeDiffEgp,
+    double? priceChangePct,
   }) {
     return ProductMasterItemModel(
       serialNo: serialNo ?? this.serialNo,
@@ -11681,6 +12570,105 @@ class ProductMasterItemModel {
       avgRetailSellingPrice: avgRetailSellingPrice ?? this.avgRetailSellingPrice,
       activeChains: activeChains ?? this.activeChains,
       updatedAt: updatedAt ?? this.updatedAt,
+      prevUnitPriceExclVat: prevUnitPriceExclVat ?? this.prevUnitPriceExclVat,
+      prevUnitPriceInclVat: prevUnitPriceInclVat ?? this.prevUnitPriceInclVat,
+      prevCartonPriceInclVat: prevCartonPriceInclVat ?? this.prevCartonPriceInclVat,
+      prevNetUnitInvoiceCost: prevNetUnitInvoiceCost ?? this.prevNetUnitInvoiceCost,
+      prevNetCartonInvoiceCost: prevNetCartonInvoiceCost ?? this.prevNetCartonInvoiceCost,
+      priceChangeDirection: priceChangeDirection ?? this.priceChangeDirection,
+      priceChangeDiffEgp: priceChangeDiffEgp ?? this.priceChangeDiffEgp,
+      priceChangePct: priceChangePct ?? this.priceChangePct,
+    );
+  }
+}
+
+/// Single SKU price change item in a Product Master sheet diff.
+class ProductMasterDiffItemModel {
+  final String itemCode;
+  final String officialName;
+  final String brand;
+  final double oldUnitPriceIncl;
+  final double newUnitPriceIncl;
+  final double oldCartonPriceIncl;
+  final double newCartonPriceIncl;
+  final double diffEgp;
+  final double diffPct;
+  final String direction; // "up" | "down" | "new" | "same"
+
+  const ProductMasterDiffItemModel({
+    required this.itemCode,
+    required this.officialName,
+    this.brand = '',
+    this.oldUnitPriceIncl = 0.0,
+    this.newUnitPriceIncl = 0.0,
+    this.oldCartonPriceIncl = 0.0,
+    this.newCartonPriceIncl = 0.0,
+    this.diffEgp = 0.0,
+    this.diffPct = 0.0,
+    this.direction = 'same',
+  });
+
+  factory ProductMasterDiffItemModel.fromJson(Map<String, dynamic> json) {
+    return ProductMasterDiffItemModel(
+      itemCode: json['item_code'] as String? ?? '',
+      officialName: json['official_name'] as String? ?? '',
+      brand: json['brand'] as String? ?? '',
+      oldUnitPriceIncl: (json['old_unit_price_incl'] as num?)?.toDouble() ?? 0.0,
+      newUnitPriceIncl: (json['new_unit_price_incl'] as num?)?.toDouble() ?? 0.0,
+      oldCartonPriceIncl: (json['old_carton_price_incl'] as num?)?.toDouble() ?? 0.0,
+      newCartonPriceIncl: (json['new_carton_price_incl'] as num?)?.toDouble() ?? 0.0,
+      diffEgp: (json['diff_egp'] as num?)?.toDouble() ?? 0.0,
+      diffPct: (json['diff_pct'] as num?)?.toDouble() ?? 0.0,
+      direction: json['direction'] as String? ?? 'same',
+    );
+  }
+}
+
+/// Smart diff comparison summary between a newly uploaded Product Master sheet and the previous version.
+class ProductMasterDiffSummaryModel {
+  final String comparedAgainstFile;
+  final String newFileName;
+  final String comparedAt;
+  final int totalSkusCompared;
+  final int priceIncreasedCount;
+  final int priceDecreasedCount;
+  final int priceUnchangedCount;
+  final int newSkusCount;
+  final double avgPriceIncreasePct;
+  final double avgPriceDecreasePct;
+  final List<ProductMasterDiffItemModel> topChangedItems;
+
+  const ProductMasterDiffSummaryModel({
+    this.comparedAgainstFile = '',
+    this.newFileName = '',
+    this.comparedAt = '',
+    this.totalSkusCompared = 0,
+    this.priceIncreasedCount = 0,
+    this.priceDecreasedCount = 0,
+    this.priceUnchangedCount = 0,
+    this.newSkusCount = 0,
+    this.avgPriceIncreasePct = 0.0,
+    this.avgPriceDecreasePct = 0.0,
+    this.topChangedItems = const [],
+  });
+
+  factory ProductMasterDiffSummaryModel.fromJson(Map<String, dynamic> json) {
+    final topList = (json['top_changed_items'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(ProductMasterDiffItemModel.fromJson)
+        .toList();
+    return ProductMasterDiffSummaryModel(
+      comparedAgainstFile: json['compared_against_file'] as String? ?? '',
+      newFileName: json['new_file_name'] as String? ?? '',
+      comparedAt: json['compared_at'] as String? ?? '',
+      totalSkusCompared: (json['total_skus_compared'] as num?)?.toInt() ?? 0,
+      priceIncreasedCount: (json['price_increased_count'] as num?)?.toInt() ?? 0,
+      priceDecreasedCount: (json['price_decreased_count'] as num?)?.toInt() ?? 0,
+      priceUnchangedCount: (json['price_unchanged_count'] as num?)?.toInt() ?? 0,
+      newSkusCount: (json['new_skus_count'] as num?)?.toInt() ?? 0,
+      avgPriceIncreasePct: (json['avg_price_increase_pct'] as num?)?.toDouble() ?? 0.0,
+      avgPriceDecreasePct: (json['avg_price_decrease_pct'] as num?)?.toDouble() ?? 0.0,
+      topChangedItems: topList,
     );
   }
 }
@@ -11700,9 +12688,14 @@ class ProductMasterSummaryModel {
   final double avgUnitsPerCarton;
   final int activeInChainsCount;
   final int unpulledSkusCount;
+  final int priceIncreasedCount;
+  final int priceDecreasedCount;
+  final int priceUnchangedCount;
+  final int newSkusCount;
   final List<String> availablePrefixes;
   final List<String> availableBrands;
   final List<String> availablePackaging;
+  final ProductMasterDiffSummaryModel? diffSummary;
   final List<ProductMasterItemModel> items;
 
   const ProductMasterSummaryModel({
@@ -11719,9 +12712,14 @@ class ProductMasterSummaryModel {
     required this.avgUnitsPerCarton,
     this.activeInChainsCount = 0,
     this.unpulledSkusCount = 0,
+    this.priceIncreasedCount = 0,
+    this.priceDecreasedCount = 0,
+    this.priceUnchangedCount = 0,
+    this.newSkusCount = 0,
     this.availablePrefixes = const [],
     this.availableBrands = const [],
     this.availablePackaging = const [],
+    this.diffSummary,
     required this.items,
   });
 
@@ -11730,18 +12728,23 @@ class ProductMasterSummaryModel {
         .whereType<Map<String, dynamic>>()
         .map(ProductMasterItemModel.fromJson)
         .toList();
+    final diffRaw = json['diff_summary'] as Map<String, dynamic>?;
+    final parsedTotalSkus = (json['total_skus'] as num?)?.toInt() ?? itemsList.length;
+    final defaultSourceFilename = (parsedTotalSkus > 0 || itemsList.isNotEmpty)
+        ? 'adeco_product_master_2026_08_01.xlsx'
+        : '';
     return ProductMasterSummaryModel(
       tenantId: json['tenant_id'] as String? ?? 'tenant-adeco',
       companyName: json['company_name'] as String? ??
           'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
       sheetDateLabel: json['sheet_date_label'] as String? ?? 'تحديث 01-08-2026',
-      sourceFilename: json['source_filename'] as String? ?? 'adeco_product_master_2026_08_01.xlsx',
+      sourceFilename: json['source_filename'] as String? ?? defaultSourceFilename,
       defaultDiscountPct: ProductMasterItemModel.normalizeDiscountPct(
         json['default_discount_pct'] as num?,
         10.0,
       ),
       defaultVatRate: (json['default_vat_rate'] as num?)?.toDouble() ?? 0.14,
-      totalSkus: (json['total_skus'] as num?)?.toInt() ?? itemsList.length,
+      totalSkus: parsedTotalSkus,
       regularSkusCount: (json['regular_skus_count'] as num?)?.toInt() ??
           itemsList.where((e) => e.itemType != 'عرض').length,
       promoSkusCount: (json['promo_skus_count'] as num?)?.toInt() ??
@@ -11753,6 +12756,14 @@ class ProductMasterSummaryModel {
           itemsList.where((e) => e.isActiveInChains).length,
       unpulledSkusCount: (json['unpulled_skus_count'] as num?)?.toInt() ??
           itemsList.where((e) => !e.isActiveInChains).length,
+      priceIncreasedCount: (json['price_increased_count'] as num?)?.toInt() ??
+          itemsList.where((e) => e.priceChangeDirection == 'up').length,
+      priceDecreasedCount: (json['price_decreased_count'] as num?)?.toInt() ??
+          itemsList.where((e) => e.priceChangeDirection == 'down').length,
+      priceUnchangedCount: (json['price_unchanged_count'] as num?)?.toInt() ??
+          itemsList.where((e) => e.priceChangeDirection == 'same' || e.priceChangeDirection.isEmpty).length,
+      newSkusCount: (json['new_skus_count'] as num?)?.toInt() ??
+          itemsList.where((e) => e.priceChangeDirection == 'new').length,
       availablePrefixes: (json['available_prefixes'] as List<dynamic>? ?? const [])
           .map((e) => e.toString())
           .toList(),
@@ -11762,6 +12773,7 @@ class ProductMasterSummaryModel {
       availablePackaging: (json['available_packaging'] as List<dynamic>? ?? const [])
           .map((e) => e.toString())
           .toList(),
+      diffSummary: diffRaw != null ? ProductMasterDiffSummaryModel.fromJson(diffRaw) : null,
       items: itemsList,
     );
   }

@@ -638,6 +638,9 @@ func (h *UploadHandler) HandleListArchive(w http.ResponseWriter, r *http.Request
 	chainFilter := r.URL.Query().Get("chain")
 	yearFilter := r.URL.Query().Get("year")
 	fileType := strings.TrimSpace(r.URL.Query().Get("file_type"))
+	if fileType == "" {
+		fileType = strings.TrimSpace(r.URL.Query().Get("type"))
+	}
 	searchQuery := r.URL.Query().Get("q")
 	if searchQuery == "" {
 		searchQuery = r.URL.Query().Get("search")

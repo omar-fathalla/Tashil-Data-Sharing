@@ -89,7 +89,7 @@ class DesktopSidebar extends StatelessWidget {
       _NavDestination(
         icon: Icons.qr_code_2_outlined,
         selectedIcon: Icons.qr_code_2_rounded,
-        label: 'كارتة الأصناف (Product Master)',
+        label: 'Product Master',
       ),
     ];
 

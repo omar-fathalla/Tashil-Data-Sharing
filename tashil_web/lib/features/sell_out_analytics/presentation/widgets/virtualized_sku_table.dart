@@ -11,11 +11,13 @@ import '../../../../core/utils/currency_formatter.dart';
 class VirtualizedSkuTable extends StatefulWidget {
   final List<SellOutRecordModel> records;
   final bool isLoading;
+  final ValueChanged<SellOutRecordModel>? onRecordTap;
 
   const VirtualizedSkuTable({
     super.key,
     required this.records,
     this.isLoading = false,
+    this.onRecordTap,
   });
 
   @override
@@ -419,23 +421,32 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                               runSpacing: 6.0,
                               children: [
                                 if (r.itemCode.isNotEmpty)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 7.0,
-                                      vertical: 3.0,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.primaryContainer
-                                          .withOpacity(0.55),
-                                      borderRadius: BorderRadius.circular(6.0),
-                                    ),
-                                    child: SelectableText(
-                                      r.itemCode,
-                                      style: TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w800,
-                                        color: colorScheme.primary,
+                                  InkWell(
+                                    onTap: widget.onRecordTap != null
+                                        ? () => widget.onRecordTap!(r)
+                                        : null,
+                                    borderRadius: BorderRadius.circular(6.0),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 7.0,
+                                        vertical: 3.0,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primaryContainer
+                                            .withOpacity(0.55),
+                                        borderRadius: BorderRadius.circular(6.0),
+                                      ),
+                                      child: Text(
+                                        r.itemCode,
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: colorScheme.primary,
+                                          decoration: widget.onRecordTap != null
+                                              ? TextDecoration.underline
+                                              : TextDecoration.none,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -554,7 +565,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                               ),
                               child: Row(
                                 children: [
-                                  // Column 1: Quantity & Unit Price
+                                  // Column 1: Quantity, Cartons & Unit Price
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -568,14 +579,16 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                         ),
                                         const SizedBox(height: 3.0),
                                         Text(
-                                          '${CurrencyFormatter.formatUnits(r.quantitySold)} وحدة',
+                                          '${CurrencyFormatter.formatUnits(r.quantitySold)} وحدة (${r.cartonsSold.toStringAsFixed(1)} كرتونة)',
                                           style: theme.textTheme.bodyMedium?.copyWith(
                                             fontWeight: FontWeight.w800,
                                             color: colorScheme.onSurface,
                                           ),
                                         ),
                                         Text(
-                                          '× ${r.unitPrice.toStringAsFixed(2)} ج.م',
+                                          (r.recommendedPrice > 0 || r.factoryUnitCost > 0)
+                                              ? 'كاشير ${r.unitPrice.toStringAsFixed(2)} • كارتة ${r.recommendedPrice.toStringAsFixed(2)} • مصنع ${r.factoryUnitCost.toStringAsFixed(2)} ج.م'
+                                              : '× ${r.unitPrice.toStringAsFixed(2)} ج.م',
                                           style: theme.textTheme.labelSmall?.copyWith(
                                             color: colorScheme.onSurfaceVariant,
                                             fontSize: 10.5,
@@ -591,13 +604,13 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                         .withOpacity(0.4),
                                   ),
                                   const SizedBox(width: 12.0),
-                                  // Column 2: Net Revenue
+                                  // Column 2: Net Revenue & Chain Margin
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'صافي المبيعات',
+                                          'صافي المبيعات وهامش السلسلة',
                                           style: theme.textTheme.labelSmall?.copyWith(
                                             color: colorScheme.onSurfaceVariant,
                                             fontSize: 11.0,
@@ -613,10 +626,13 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           ),
                                         ),
                                         Text(
-                                          'EGP ${r.netRevenue.toStringAsFixed(2)}',
+                                          (r.retailerMarginPct != 0 || r.retailerGrossProfit != 0)
+                                              ? 'هامش ${r.retailerMarginPct.toStringAsFixed(1)}% (${CurrencyFormatter.formatUnits(r.retailerGrossProfit.round())} ج.م)'
+                                              : 'EGP ${r.netRevenue.toStringAsFixed(2)}',
                                           style: theme.textTheme.labelSmall?.copyWith(
-                                            color: colorScheme.primary
-                                                .withOpacity(0.75),
+                                            color: r.retailerMarginPct < 0
+                                                ? colorScheme.error
+                                                : colorScheme.primary.withOpacity(0.75),
                                             fontSize: 10.5,
                                             fontFamily: 'monospace',
                                           ),
@@ -869,16 +885,24 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         if (r.itemCode.isNotEmpty)
-                                          Text(
-                                            r.itemCode,
-                                            style: TextStyle(
-                                              fontFamily: 'monospace',
-                                              fontSize: 10.0,
-                                              fontWeight: FontWeight.w800,
-                                              color: colorScheme.primary,
+                                          InkWell(
+                                            onTap: widget.onRecordTap != null
+                                                ? () => widget.onRecordTap!(r)
+                                                : null,
+                                            child: Text(
+                                              r.itemCode,
+                                              style: TextStyle(
+                                                fontFamily: 'monospace',
+                                                fontSize: 10.0,
+                                                fontWeight: FontWeight.w800,
+                                                color: colorScheme.primary,
+                                                decoration: widget.onRecordTap != null
+                                                    ? TextDecoration.underline
+                                                    : TextDecoration.none,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         Row(
                                           children: [
@@ -898,15 +922,20 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   ),
                                   const SizedBox(width: 8.0),
                                   Expanded(
-                                    child: Tooltip(
-                                      message: r.itemCode.isNotEmpty
-                                          ? '${r.skuName}\nكود الصنف: ${r.itemCode} • الباركود: ${r.barcode}'
-                                          : r.skuName,
-                                      child: Text(
-                                        r.skuName,
-                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.0),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                    child: InkWell(
+                                      onTap: widget.onRecordTap != null
+                                          ? () => widget.onRecordTap!(r)
+                                          : null,
+                                      child: Tooltip(
+                                        message: r.itemCode.isNotEmpty
+                                            ? '${r.skuName}\nكود الصنف: ${r.itemCode} • الباركود: ${r.barcode} • شد الكرتونة: ${r.unitsPerCarton}'
+                                            : r.skuName,
+                                        child: Text(
+                                          r.skuName,
+                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.0),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -1042,29 +1071,93 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     ),
                                     SizedBox(
                                       width: colQtyWidth,
-                                      child: Text(
-                                        '${CurrencyFormatter.formatUnits(r.quantitySold)} units',
-                                        textAlign: TextAlign.end,
-                                        style: const TextStyle(fontSize: 12.0),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            '${CurrencyFormatter.formatUnits(r.quantitySold)} units',
+                                            textAlign: TextAlign.end,
+                                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                          ),
+                                          if (r.cartonsSold > 0)
+                                            Text(
+                                              '${r.cartonsSold.toStringAsFixed(1)} كرتونة (${r.unitsPerCarton}/ك)',
+                                              textAlign: TextAlign.end,
+                                              style: TextStyle(
+                                                fontSize: 9.5,
+                                                color: colorScheme.onSurfaceVariant,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                        ],
                                       ),
                                     ),
                                     SizedBox(
                                       width: colUnitPriceWidth,
-                                      child: Text(
-                                        '${r.unitPrice.toStringAsFixed(2)} EGP',
-                                        textAlign: TextAlign.end,
-                                        style: const TextStyle(fontSize: 12.0),
+                                      child: Tooltip(
+                                        message: (r.recommendedPrice > 0 || r.factoryUnitCost > 0)
+                                            ? 'سعر الكارتة: ${r.recommendedPrice.toStringAsFixed(2)} ج.م • تكلفة المصنع للقطعة: ${r.factoryUnitCost.toStringAsFixed(2)} ج.م • صافي الكرتونة: ${r.netCartonInvoiceCost.toStringAsFixed(2)} ج.م • انحراف السعر: ${r.priceDeltaPct >= 0 ? "+" : ""}${r.priceDeltaPct.toStringAsFixed(1)}%'
+                                            : '${r.unitPrice.toStringAsFixed(2)} EGP',
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: [
+                                            Text(
+                                              '${r.unitPrice.toStringAsFixed(2)} EGP',
+                                              textAlign: TextAlign.end,
+                                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                            ),
+                                            if (r.recommendedPrice > 0 || r.factoryUnitCost > 0)
+                                              Text(
+                                                'كارتة ${r.recommendedPrice.toStringAsFixed(2)} • مصنع ${r.factoryUnitCost.toStringAsFixed(2)}',
+                                                textAlign: TextAlign.end,
+                                                style: TextStyle(
+                                                  fontSize: 9.0,
+                                                  color: colorScheme.onSurfaceVariant,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                     SizedBox(
                                       width: colNetRevenueWidth,
-                                      child: Text(
-                                        '${CurrencyFormatter.formatUnits(r.netRevenue.round())} EGP',
-                                        textAlign: TextAlign.end,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12.0,
-                                          color: colorScheme.primary,
+                                      child: Tooltip(
+                                        message: (r.retailerMarginPct != 0 || r.retailerGrossProfit != 0)
+                                            ? 'مجمل ربح السلسلة: ${CurrencyFormatter.formatUnits(r.retailerGrossProfit.round())} ج.م (${r.retailerMarginPct.toStringAsFixed(1)}%) • انحراف السعر: ${r.priceDeltaPct >= 0 ? "+" : ""}${r.priceDeltaPct.toStringAsFixed(1)}%'
+                                            : '${CurrencyFormatter.formatUnits(r.netRevenue.round())} EGP',
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: [
+                                            Text(
+                                              '${CurrencyFormatter.formatUnits(r.netRevenue.round())} EGP',
+                                              textAlign: TextAlign.end,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 11.5,
+                                                color: colorScheme.primary,
+                                              ),
+                                            ),
+                                            if (r.retailerMarginPct != 0 || r.retailerGrossProfit != 0)
+                                              Text(
+                                                'هامش ${r.retailerMarginPct.toStringAsFixed(1)}% (${CurrencyFormatter.formatUnits(r.retailerGrossProfit.round())} ج)',
+                                                textAlign: TextAlign.end,
+                                                style: TextStyle(
+                                                  fontSize: 9.0,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: r.retailerMarginPct < 0
+                                                      ? colorScheme.error
+                                                      : colorScheme.secondary,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                          ],
                                         ),
                                       ),
                                     ),

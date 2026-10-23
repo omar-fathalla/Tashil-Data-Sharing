@@ -1,6 +1,7 @@
 package ingestion
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
+	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 )
 
 // ArchivedFile represents a stored Excel or CSV file in the retail chain upload archive.
@@ -364,6 +367,7 @@ func (p *Processor) SaveArchivedFile(
 
 	safeFile := sanitizeArchiveFilename(filename)
 	var existingID string
+	var existingUploadedAt string
 	for id, entry := range p.archivedFiles {
 		entryType := "sell_out"
 		if isProductMasterArchiveEntry(entry) {
@@ -375,6 +379,16 @@ func (p *Processor) SaveArchivedFile(
 			entryType == fileType &&
 			strings.EqualFold(entry.RetailChain, normChain) &&
 			strings.EqualFold(entry.FileName, filename) {
+			if fileType == "product_master" {
+				// Only reuse existing entry for Product Master if raw bytes are identical (e.g., startup replay);
+				// otherwise create a new versioned entry so deleting it rolls back to the prior sheet version.
+				if bytes.Equal(p.archivedBytes[id], fileBytes) {
+					existingID = id
+					existingUploadedAt = entry.UploadedAt
+					break
+				}
+				continue
+			}
 			existingID = id
 			break
 		}
@@ -401,6 +415,11 @@ func (p *Processor) SaveArchivedFile(
 		}
 	}
 
+	uploadedAt := time.Now().UTC().Format(time.RFC3339Nano)
+	if existingUploadedAt != "" {
+		uploadedAt = existingUploadedAt
+	}
+
 	entry := &ArchivedFile{
 		ID:              archiveID,
 		BatchID:         batchID,
@@ -419,7 +438,7 @@ func (p *Processor) SaveArchivedFile(
 		TotalRevenue:    totalRevenue,
 		TotalCases:      totalCases,
 		TotalWeightTons: totalTons,
-		UploadedAt:      time.Now().UTC().Format(time.RFC3339),
+		UploadedAt:      uploadedAt,
 		StoragePath:     storagePath,
 	}
 
@@ -473,7 +492,7 @@ func (p *Processor) UpdateArchivedFileByBatch(batchID, retailChain, targetYear, 
 			if targetMonth != "" && targetMonth != "auto" {
 				entry.TargetMonth = targetMonth
 			}
-			entry.UploadedAt = time.Now().UTC().Format(time.RFC3339)
+			entry.UploadedAt = time.Now().UTC().Format(time.RFC3339Nano)
 			p.persistTenantArchiveIndexLocked(entry.TenantID)
 			copyEntry := *entry
 			return &copyEntry
@@ -599,7 +618,7 @@ func (p *Processor) ListArchivedFiles(ctx context.Context, tenantID, chainFilter
 
 	sort.Slice(filtered, func(i, j int) bool {
 		if filtered[i].UploadedAt == filtered[j].UploadedAt {
-			return filtered[i].FileName < filtered[j].FileName
+			return filtered[i].ID > filtered[j].ID
 		}
 		return filtered[i].UploadedAt > filtered[j].UploadedAt
 	})
@@ -658,14 +677,40 @@ func (p *Processor) DeleteArchivedFile(ctx context.Context, tenantID, archiveID 
 	normTenant := normalizeArchiveTenantID(tenantID)
 	entry, ok := p.archivedFiles[archiveID]
 	if !ok || entry == nil {
-		// Fallback match by BatchID or FileName for resilience across client/server IDs
+		// Fallback match by BatchID or FileName (preferring the newest entry when multiple versions share a FileName)
 		for _, candidate := range p.archivedFiles {
 			if candidate.TenantID == normTenant &&
 				(candidate.BatchID == archiveID || strings.EqualFold(candidate.FileName, archiveID)) {
-				entry = candidate
-				archiveID = candidate.ID
-				ok = true
-				break
+				if entry == nil || candidate.UploadedAt > entry.UploadedAt || (candidate.UploadedAt == entry.UploadedAt && candidate.ID > entry.ID) {
+					entry = candidate
+					archiveID = candidate.ID
+					ok = true
+				}
+			}
+		}
+	}
+	if (!ok || entry == nil) && p.bqRepo != nil {
+		// Handle deletion of synthesized default seed Product Master bubble when not in p.archivedFiles
+		if pm, err := p.bqRepo.GetProductMaster(ctx, normTenant, bigquery.ProductMasterFilter{}); err == nil && pm != nil && pm.TotalSKUs > 0 {
+			srcName := pm.SourceFilename
+			if srcName == "" {
+				srcName = "adeco_product_master_2026_08_01.xlsx"
+			}
+			if strings.EqualFold(archiveID, "pm_default_seed") || strings.EqualFold(archiveID, srcName) {
+				_ = p.bqRepo.RestoreBaselineProductMaster(ctx, normTenant, srcName)
+				_ = p.bqRepo.ClearProductMaster(ctx, normTenant)
+				if p.fsRepo != nil {
+					_ = p.fsRepo.MarkArchiveDeleted(ctx, normTenant, archiveID, srcName)
+				}
+				p.appendDiskTombstoneLocked(normTenant, archiveID, srcName)
+				return &ArchivedFile{
+					ID:           archiveID,
+					FileType:     "product_master",
+					TenantID:     normTenant,
+					FileName:     srcName,
+					RetailChain:  "product-master",
+					RowsIngested: pm.TotalSKUs,
+				}, nil
 			}
 		}
 	}
@@ -678,22 +723,35 @@ func (p *Processor) DeleteArchivedFile(ctx context.Context, tenantID, archiveID 
 
 	deletedEntry := *entry
 
-	// 0. Record permanent deletion tombstone in Cloud Firestore and disk so it never resurrects on refresh or restart
-	if p.fsRepo != nil {
-		_ = p.fsRepo.MarkArchiveDeleted(ctx, normTenant, deletedEntry.ID, deletedEntry.FileName)
-	}
-	p.appendDiskTombstoneLocked(normTenant, deletedEntry.ID, deletedEntry.FileName)
-
-	// 1. Remove from in-memory maps
+	// 1. Remove from in-memory maps first
 	delete(p.archivedFiles, archiveID)
 	delete(p.archivedBytes, archiveID)
 
-	// 2. Remove physical file from disk if exists
+	// Check if another version with the same filename still exists for this tenant
+	hasSameNameRemaining := false
+	for _, f := range p.archivedFiles {
+		if f.TenantID == normTenant && strings.EqualFold(f.FileName, deletedEntry.FileName) {
+			hasSameNameRemaining = true
+			break
+		}
+	}
+	tombstoneFileName := deletedEntry.FileName
+	if hasSameNameRemaining {
+		tombstoneFileName = ""
+	}
+
+	// 2. Record permanent deletion tombstone in Cloud Firestore and disk
+	if p.fsRepo != nil {
+		_ = p.fsRepo.MarkArchiveDeleted(ctx, normTenant, deletedEntry.ID, tombstoneFileName)
+	}
+	p.appendDiskTombstoneLocked(normTenant, deletedEntry.ID, tombstoneFileName)
+
+	// 3. Remove physical file from disk if exists
 	if entry.StoragePath != "" {
 		_ = os.Remove(entry.StoragePath)
 	}
 
-	// 3. Remove entry from index.json on disk
+	// 4. Remove entry from index.json on disk
 	if p.archiveDir != "" {
 		tenantDir := filepath.Join(p.archiveDir, normTenant)
 		indexPath := filepath.Join(tenantDir, "index.json")
@@ -712,8 +770,40 @@ func (p *Processor) DeleteArchivedFile(ctx context.Context, tenantID, archiveID 
 		}
 	}
 
-	// 4. Purge facts / analytics from BigQuery and Firestore:
+	// 5. Purge facts / analytics from BigQuery and Firestore:
 	if isProductMasterArchiveEntry(&deletedEntry) {
+		var remainingPM []*ArchivedFile
+		for _, f := range p.archivedFiles {
+			if f.TenantID == normTenant && isProductMasterArchiveEntry(f) {
+				remainingPM = append(remainingPM, f)
+			}
+		}
+		sort.Slice(remainingPM, func(i, j int) bool {
+			if remainingPM[i].UploadedAt == remainingPM[j].UploadedAt {
+				return remainingPM[i].ID < remainingPM[j].ID
+			}
+			return remainingPM[i].UploadedAt < remainingPM[j].UploadedAt
+		})
+		if p.bqRepo != nil {
+			_ = p.bqRepo.ClearProductMaster(ctx, normTenant)
+			if len(remainingPM) == 0 {
+				_ = p.bqRepo.RestoreBaselineProductMaster(ctx, normTenant, deletedEntry.FileName)
+			} else {
+				for _, f := range remainingPM {
+					raw := p.archivedBytes[f.ID]
+					if len(raw) == 0 && f.StoragePath != "" {
+						if b, err := os.ReadFile(f.StoragePath); err == nil {
+							raw = b
+						}
+					}
+					if len(raw) > 0 {
+						if summary, err := gemini.ParseProductMasterWorkbook(normTenant, f.FileName, raw); err == nil && summary != nil {
+							_, _ = p.bqRepo.SetProductMaster(ctx, normTenant, summary)
+						}
+					}
+				}
+			}
+		}
 		return &deletedEntry, nil
 	}
 	isSellInFile := isSellInArchiveEntry(&deletedEntry)
@@ -805,7 +895,12 @@ func (p *Processor) ReplayArchivedFilesToDatabase(ctx context.Context) error {
 		}
 		for _, sp := range pmSeedPaths {
 			if seedBytes, err := os.ReadFile(sp); err == nil && len(seedBytes) > 0 {
-				_, _ = p.ProcessProductMaster(ctx, "tenant-adeco", filepath.Base(sp), seedBytes, false)
+				if p.bqRepo != nil && len(p.bqRepo.GetProductMasterItems("tenant-adeco")) > 0 {
+					pmItems := p.bqRepo.GetProductMasterItems("tenant-adeco")
+					p.SaveArchivedFile("tenant-adeco", "batch_pm_seed_2026_08_01", filepath.Base(sp), seedBytes, "product-master", "2026", "08", len(pmItems), 0, 0)
+				} else {
+					_, _ = p.ProcessProductMaster(ctx, "tenant-adeco", filepath.Base(sp), seedBytes, false)
+				}
 				break
 			}
 		}
@@ -827,8 +922,24 @@ func (p *Processor) ReplayArchivedFilesToDatabase(ctx context.Context) error {
 		}
 	}
 
-	// Sort files chronologically so earlier files are processed first
+	// Sort files so Product Master catalogs are replayed first, then Sell-Out workbooks, then Sell-In plans, and chronologically within each type
+	typePriority := func(f *ArchivedFile) int {
+		if isProductMasterArchiveEntry(f) {
+			return 0
+		}
+		if isSellInArchiveEntry(f) {
+			return 2
+		}
+		return 1
+	}
 	sort.Slice(files, func(i, j int) bool {
+		pi, pj := typePriority(files[i]), typePriority(files[j])
+		if pi != pj {
+			return pi < pj
+		}
+		if files[i].UploadedAt == files[j].UploadedAt {
+			return files[i].ID < files[j].ID
+		}
 		return files[i].UploadedAt < files[j].UploadedAt
 	})
 
@@ -857,7 +968,9 @@ func (p *Processor) ReplayArchivedFilesToDatabase(ctx context.Context) error {
 		}
 
 		if isProductMasterArchiveEntry(f) {
-			_, _ = p.ProcessProductMaster(ctx, f.TenantID, f.FileName, raw, false)
+			if p.bqRepo == nil || len(p.bqRepo.GetProductMasterItems(f.TenantID)) == 0 {
+				_, _ = p.ProcessProductMaster(ctx, f.TenantID, f.FileName, raw, false)
+			}
 		} else if isSellInArchiveEntry(f) {
 			_, _ = p.ProcessSellInPlan(ctx, f.TenantID, f.FileName, raw, false, f.RetailChain)
 		} else {

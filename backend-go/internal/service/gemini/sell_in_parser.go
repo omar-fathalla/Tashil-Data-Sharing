@@ -305,13 +305,18 @@ func ParseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, targe
 				rec.Governorate = inferGovernorateFromRegion(rec.RegionCode)
 			}
 			rec.CustomerName = strings.TrimSpace(getColByMap(r, colMap, "branch_name"))
-			rec.CustomerBranchCode = rec.CustomerName
+			rec.CustomerBranchCode = strings.TrimSpace(getColByMap(r, colMap, "customer_branch_code"))
+			if rec.CustomerBranchCode == "" {
+				rec.CustomerBranchCode = rec.CustomerName
+			}
 			rec.Sector = strings.TrimSpace(getColByMap(r, colMap, "sector"))
 			if rec.Sector == "" {
 				rec.Sector = "عام"
 			}
+			rec.SubSector = strings.TrimSpace(getColByMap(r, colMap, "sub_sector"))
 			rec.Brand = strings.TrimSpace(getColByMap(r, colMap, "brand"))
 			rec.SubCategory = strings.TrimSpace(getColByMap(r, colMap, "sub_category"))
+			rec.ProductFamily = strings.TrimSpace(getColByMap(r, colMap, "product_family"))
 			rec.ItemGroup = strings.TrimSpace(getColByMap(r, colMap, "barcode"))
 			rec.ItemName = strings.TrimSpace(getColByMap(r, colMap, "item_name"))
 			rec.PromotionType = strings.TrimSpace(getColByMap(r, colMap, "promo_type"))
@@ -350,10 +355,15 @@ func ParseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, targe
 			rec.ExpectedQtyCases = expCases
 			rec.ExpectedValueEGP = expVal
 
-			if rec.NetQtyCases < 0 || rec.NetValueEGP < 0 || strings.Contains(rec.PromotionType, "مرتجع") {
-				rec.TransactionType = "مرتجع (Return)"
-			} else {
-				rec.TransactionType = "مسحوبات بيع (Sale)"
+			rec.TransactionType = strings.TrimSpace(getColByMap(r, colMap, "transaction_type"))
+			if rec.TransactionType == "" {
+				if rec.NetQtyCases < 0 || rec.NetValueEGP < 0 || strings.Contains(rec.PromotionType, "مرتجع") {
+					rec.TransactionType = "مرتجع (Return)"
+				} else if rec.NetQtyCases == 0 && rec.NetValueEGP == 0 {
+					rec.TransactionType = "صفري (Zero)"
+				} else {
+					rec.TransactionType = "مسحوبات بيع (Sale)"
+				}
 			}
 		} else {
 			// Raw plan 10 aswak.xlsx format
@@ -443,28 +453,32 @@ func ParseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, targe
 
 func buildSellInHeaderMap(headers []string) map[string]int {
 	m := map[string]int{
-		"year":           -1,
-		"month_num":      -1,
-		"month_name":     -1,
-		"period_week":    -1,
-		"retail_chain":   -1,
-		"region_code":    -1,
-		"governorate":    -1,
-		"branch_name":    -1,
-		"sector":         -1,
-		"brand":          -1,
-		"sub_category":   -1,
-		"barcode":        -1,
-		"item_name":      -1,
-		"promo_type":     -1,
-		"sales_manager":  -1,
-		"ka_officer":     -1,
-		"sales_rep":      -1,
-		"sell_in_cases":  -1,
-		"sell_in_value":  -1,
-		"weight_tons":    -1,
-		"expected_cases": -1,
-		"expected_value": -1,
+		"year":                 -1,
+		"month_num":            -1,
+		"month_name":           -1,
+		"period_week":          -1,
+		"retail_chain":         -1,
+		"region_code":          -1,
+		"governorate":          -1,
+		"branch_name":          -1,
+		"customer_branch_code": -1,
+		"sector":               -1,
+		"sub_sector":           -1,
+		"brand":                -1,
+		"sub_category":         -1,
+		"product_family":       -1,
+		"barcode":              -1,
+		"item_name":            -1,
+		"promo_type":           -1,
+		"transaction_type":     -1,
+		"sales_manager":        -1,
+		"ka_officer":           -1,
+		"sales_rep":            -1,
+		"sell_in_cases":        -1,
+		"sell_in_value":        -1,
+		"weight_tons":          -1,
+		"expected_cases":       -1,
+		"expected_value":       -1,
 	}
 	for idx, raw := range headers {
 		h := strings.ToLower(strings.TrimSpace(raw))
@@ -487,24 +501,32 @@ func buildSellInHeaderMap(headers []string) map[string]int {
 			m["region_code"] = idx
 		case strings.Contains(h, "governorate") || strings.Contains(h, "المحافظة"):
 			m["governorate"] = idx
-		case strings.Contains(h, "branch") || strings.Contains(h, "customer_name") || strings.Contains(h, "اسم الفرع") || strings.Contains(h, "الفرع") || strings.Contains(h, "العميل"):
-			m["branch_name"] = idx
-		case strings.Contains(h, "sector") || strings.Contains(h, "القطاع"):
-			m["sector"] = idx
-		case strings.Contains(h, "brand") || strings.Contains(h, "العلامة التجارية") || h == "العلامة":
-			m["brand"] = idx
 		case strings.Contains(h, "sub_category") || strings.Contains(h, "الفئة الفرعية") || h == "الفئة":
 			m["sub_category"] = idx
-		case strings.Contains(h, "barcode") || strings.Contains(h, "باركود") || strings.Contains(h, "كود الصنف"):
+		case strings.Contains(h, "product_family") || strings.Contains(h, "عائلة المنتج"):
+			m["product_family"] = idx
+		case strings.Contains(h, "customer_branch_code") || strings.Contains(h, "كود الفرع") || strings.Contains(h, "كود فرع العميل"):
+			m["customer_branch_code"] = idx
+		case strings.Contains(h, "sales_manager") || strings.Contains(h, "مدير المبيعات") || strings.Contains(h, "مدير القطاع"):
+			m["sales_manager"] = idx
+		case strings.Contains(h, "sub_sector") || strings.Contains(h, "القطاع الفرعي") || strings.Contains(h, "قطاع فرعي"):
+			m["sub_sector"] = idx
+		case strings.Contains(h, "sector") || strings.Contains(h, "القطاع"):
+			m["sector"] = idx
+		case strings.Contains(h, "ka_officer") || strings.Contains(h, "مسؤول كبار العملاء"):
+			m["ka_officer"] = idx
+		case strings.Contains(h, "branch") || strings.Contains(h, "customer_name") || strings.Contains(h, "اسم الفرع") || strings.Contains(h, "الفرع") || strings.Contains(h, "العميل"):
+			m["branch_name"] = idx
+		case strings.Contains(h, "brand") || strings.Contains(h, "العلامة التجارية") || h == "العلامة":
+			m["brand"] = idx
+		case strings.Contains(h, "barcode") || strings.Contains(h, "باركود") || strings.Contains(h, "كود الصنف") || strings.Contains(h, "مجموعة الصنف"):
 			m["barcode"] = idx
 		case strings.Contains(h, "item_name") || strings.Contains(h, "sku_name") || strings.Contains(h, "اسم الصنف") || h == "الصنف" || strings.Contains(h, "المنتج"):
 			m["item_name"] = idx
-		case strings.Contains(h, "promo") || strings.Contains(h, "نوع الحركة") || strings.Contains(h, "نوع العرض"):
+		case strings.Contains(h, "transaction_type") || strings.Contains(h, "نوع الحركة"):
+			m["transaction_type"] = idx
+		case strings.Contains(h, "promo") || strings.Contains(h, "نوع العرض"):
 			m["promo_type"] = idx
-		case strings.Contains(h, "sales_manager") || strings.Contains(h, "مدير المبيعات") || strings.Contains(h, "مدير القطاع"):
-			m["sales_manager"] = idx
-		case strings.Contains(h, "ka_officer") || strings.Contains(h, "مسؤول كبار العملاء"):
-			m["ka_officer"] = idx
 		case strings.Contains(h, "sales_rep") || strings.Contains(h, "مندوب المبيعات") || h == "المندوب":
 			m["sales_rep"] = idx
 		case strings.Contains(h, "sell_in_cases") || strings.Contains(h, "net_qty_cases") || strings.Contains(h, "كمية التوريد") || strings.Contains(h, "الكمية بالكرتون") || strings.Contains(h, "cases") || strings.Contains(h, "كرتون") || strings.Contains(h, "الكمية") || h == "qty" || h == "quantity":

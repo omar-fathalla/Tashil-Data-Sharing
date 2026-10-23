@@ -215,5 +215,63 @@ void main() {
       expect(find.text('تحديث القائمة'), findsOneWidget);
       expect(find.text('Target Chain'), findsOneWidget);
     });
+
+    test('parses enriched SellOutRecordModel, SellOutSkuSummaryModel, and SellOutRecordsSummaryModel accurately', () {
+      final summaryJson = {
+        'total_net_revenue': 125000.0,
+        'total_units_sold': 1200,
+        'total_cartons_sold': 100.0,
+        'total_factory_cost': 108000.0,
+        'total_retailer_gross_profit': 17000.0,
+        'avg_retailer_margin_pct': 13.6,
+        'matched_skus_count': 214,
+        'active_skus_count': 214,
+        'active_stores_count': 34,
+        'sku_summaries': [
+          {
+            'item_code': 'FGCL-1050-0001',
+            'barcode': '6223000230015',
+            'sku_name': 'كلوريل أبيض 1050 جم',
+            'retailer_raw_sku_name': 'كلوريل ابيض 1050ج',
+            'brand': 'كلوريل (Clorel)',
+            'category': 'منظفات ومطهرات',
+            'item_type': 'عادي',
+            'packaging_type': 'زجاجة',
+            'units_per_carton': 12,
+            'total_units_sold': 120,
+            'total_cartons_sold': 10.0,
+            'total_net_revenue': 3000.0,
+            'avg_selling_price': 25.0,
+            'official_consumer_rsp': 25.0,
+            'carton_price_incl_vat': 300.0,
+            'factory_unit_cost': 22.5,
+            'net_carton_invoice_cost': 270.0,
+            'total_factory_cost': 2700.0,
+            'retailer_gross_profit': 300.0,
+            'retailer_margin_pct': 10.0,
+            'price_delta_pct': 0.0,
+            'active_stores_count': 12,
+          }
+        ],
+      };
+
+      final summary = SellOutRecordsSummaryModel.fromJson(summaryJson);
+      expect(summary.totalCartonsSold, 100.0);
+      expect(summary.totalFactoryCost, 108000.0);
+      expect(summary.totalRetailerGrossProfit, 17000.0);
+      expect(summary.avgRetailerMarginPct, 13.6);
+      expect(summary.matchedSkusCount, 214);
+      expect(summary.skuSummaries, hasLength(1));
+
+      final sku = summary.skuSummaries.first;
+      expect(sku.itemCode, 'FGCL-1050-0001');
+      expect(sku.retailerRawSkuName, 'كلوريل ابيض 1050ج');
+      expect(sku.unitsPerCarton, 12);
+      expect(sku.totalCartonsSold, 10.0);
+      expect(sku.factoryUnitCost, 22.5);
+      expect(sku.netCartonInvoiceCost, 270.0);
+      expect(sku.retailerMarginPct, 10.0);
+    });
   });
 }
+

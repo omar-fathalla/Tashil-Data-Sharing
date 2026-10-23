@@ -10,6 +10,7 @@ import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_responsive_tab_bar.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../cpfr_replenishment/domain/cpfr_models.dart';
+import '../../../product_master/presentation/screens/product_master_screen.dart';
 import '../widgets/target_management_panel.dart';
 
 /// SellInExplorerScreen provides dedicated Supplier Sell-In (توريدات السلاسل):
@@ -32,7 +33,7 @@ class SellInExplorerScreen extends StatefulWidget {
 class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
   int _activeTab = 0; // 0: Sell-In Explorer, 1: Remaining Stock & Reports, 2: Sell-In Targets, 3: Uploaded Sell-In Sheets Archive
   String _selectedChain = 'all';
-  int _selectedYear = 0; // 0 = All Years
+  int _selectedYear = 2026; // Default to 2026
   int _selectedMonth = 0; // 0 = All Months
   String _searchQuery = '';
   bool _isLoading = true;
@@ -50,6 +51,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
   bool _isLoadingStockReport = false;
   CPFRDashboardModel? _stockDashboard;
   String _stockStatusFilter = 'all'; // all, urgent_replenishment, optimal, overstock
+  bool _showFullYtdReconciliation = false; // false = Matched Window (Jan-Apr), true = Full YTD (Jan-Oct)
 
   // Tab 1 SKU-Level Remaining Stock: Pagination, Sorting & AI Brand Filtering
   String _skuSearchQuery = '';
@@ -118,7 +120,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
         _lastTenantId != widget.apiClient.tenantId) {
       _lastTenantId = widget.apiClient.tenantId;
       _selectedChain = 'all';
-      _selectedYear = 0;
+      _selectedYear = 2026;
       _selectedMonth = 0;
       _searchQuery = '';
       _loadAllData();
@@ -366,6 +368,56 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     }
   }
 
+  Future<void> _openProductIdCard({
+    required String itemCode,
+    required String barcode,
+    required String skuName,
+  }) async {
+    try {
+      final query = itemCode.trim().isNotEmpty
+          ? itemCode.trim()
+          : (barcode.trim().isNotEmpty ? barcode.trim() : skuName.trim());
+      if (query.isEmpty) return;
+
+      final res = await widget.apiClient.getProductMaster(search: query);
+      if (!mounted) return;
+      if (res.items.isEmpty) {
+        M3Feedback.showError(
+          context,
+          'لم يتم العثور على بطاقة تعريفية لهذا الصنف في كارتة الأصناف',
+        );
+        return;
+      }
+
+      ProductMasterItemModel matched = res.items.first;
+      if (itemCode.trim().isNotEmpty) {
+        for (final it in res.items) {
+          if (it.itemCode == itemCode.trim()) {
+            matched = it;
+            break;
+          }
+        }
+      } else if (barcode.trim().isNotEmpty) {
+        for (final it in res.items) {
+          if (it.barcode == barcode.trim()) {
+            matched = it;
+            break;
+          }
+        }
+      }
+
+      await ProductMasterScreen.showProductIdCardModal(
+        context,
+        apiClient: widget.apiClient,
+        item: matched,
+        onUpdated: (_) => _loadAllData(),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      M3Feedback.showError(context, 'تعذر فتح بطاقة هوية الصنف: $e');
+    }
+  }
+
   void _handleExportExcel() {
     if (widget.apiClient.currentUser?.canExportFinancials == false) {
       M3Feedback.showError(
@@ -384,12 +436,21 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
       'القطاع',
       'العلامة التجارية',
       'الفئة الفرعية',
+      'كود الصنف (Item Code)',
+      'الباركود (Barcode)',
       'اسم الصنف',
       'مندوب المبيعات',
+      'شد الكرتونة (Units/Carton)',
       'الكمية بالكرتونة (Cases)',
-      'صافي قيمة التوريد (ج.م)',
+      'إجمالي الكمية بالقطعة (Units)',
+      'سعر الكرتونة الرسمي (Official Carton Excl VAT)',
+      'سعر الكرتونة الفعلي (Actual Case Price Excl VAT)',
+      'نسبة الخصم الفعلي %',
+      'صافي قيمة التوريد غير شامل الضريبة (Net EGP)',
+      'ضريبة القيمة المضافة 14% (VAT EGP)',
+      'إجمالي قيمة الفاتورة شامل الضريبة (Gross Incl VAT EGP)',
       'الوزن بالطن (Tons)',
-      'القيمة المتوقعة بنهاية الشهر (EXP EGP)',
+      'حالة التسعير (Pricing Wave)',
       'الشيت المصدري (Source Sheet)',
     ];
     final rows = records
@@ -403,12 +464,21 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
             r.sector,
             r.brand,
             r.subCategory,
+            r.itemCode,
+            r.barcode,
             r.itemName,
             r.salesRep,
+            r.unitsPerCarton,
             r.netQtyCases,
-            r.netValueEgp,
+            r.totalUnitsSupplied,
+            r.officialCartonExclVatEgp.toStringAsFixed(2),
+            r.actualCasePriceExclEgp.toStringAsFixed(2),
+            r.effectiveDiscountPct.toStringAsFixed(1),
+            r.netValueEgp.toStringAsFixed(2),
+            r.vatAmountEgp.toStringAsFixed(2),
+            r.grossValueInclVatEgp.toStringAsFixed(2),
             r.weightTons,
-            r.expectedValueEgp,
+            r.pricingWaveStatus,
             r.sourceFilename,
           ],
         )
@@ -419,7 +489,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     ExcelExportService.downloadCsv(filename, csvData);
     M3Feedback.showSuccess(
       context,
-      'تم تصدير ${records.length} صف توريد (Sell-In) إلى ملف Excel/CSV بنجاح',
+      'تم تصدير ${records.length} صف توريد (Sell-In) شامل بيانات كارتة الأصناف والضريبة إلى ملف Excel/CSV بنجاح',
     );
   }
 
@@ -435,12 +505,12 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     final headers = [
       'الفترة',
       'السلسلة',
-      'المحافظة',
-      'العلامة',
+      'كود / باركود',
       'اسم الصنف',
-      'مندوب المبيعات',
-      'الكراتين',
-      'قيمة التوريد (ج.م)',
+      'الشد',
+      'الكراتين (القطع)',
+      'صافي التوريد (ج.م)',
+      'شامل 14% ضريبة (ج.م)',
       'الوزن (طن)',
     ];
     final rows = records
@@ -448,24 +518,25 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
           (r) => [
             '${r.monthAr} ${r.year}',
             r.retailerChain,
-            r.governorate,
-            r.brand,
+            r.itemCode.isNotEmpty ? '${r.itemCode}\n${r.barcode}' : '-',
             r.itemName,
-            r.salesRep,
-            r.netQtyCases.toStringAsFixed(1),
+            '${r.unitsPerCarton}',
+            '${r.netQtyCases.toStringAsFixed(1)} (${r.totalUnitsSupplied})',
             CurrencyFormatter.formatEGP(r.netValueEgp),
+            CurrencyFormatter.formatEGP(r.grossValueInclVatEgp),
             r.weightTons.toStringAsFixed(3),
           ],
         )
         .toList();
     final htmlData = ExcelExportService.generatePrintableReport(
-      title: 'تقرير حركة التوريد للسلاسل التجارية (Sell-In Analytics)',
+      title: 'تقرير حركة التوريد للسلاسل التجارية وكارتة الأصناف (Sell-In & Tax Waterfall)',
       headers: headers,
       rows: rows,
       metadata: {
-        'إجمالي قيمة التوريد': CurrencyFormatter.formatEGP(_data.totalValueEgp),
-        'إجمالي الكراتين': CurrencyFormatter.formatNumber(_data.totalCases.round()),
-        'إجمالي الصفوف': '${records.length}',
+        'إجمالي صافي التوريد (غير شامل الضريبة)': CurrencyFormatter.formatEGP(_data.totalValueEgp),
+        'إجمالي التوريد شامل 14% ضريبة': CurrencyFormatter.formatEGP(_data.totalGrossInclVatEgp),
+        'إجمالي الكراتين والقطع': '${CurrencyFormatter.formatNumber(_data.totalCases.round())} كرتونة (${CurrencyFormatter.formatNumber(_data.totalUnitsPieces)} قطعة)',
+        'متوسط الخصم الفعلي عن الكارتة': '${_data.effectiveDiscountPct.toStringAsFixed(1)}%',
       },
     );
     final filename =
@@ -659,6 +730,70 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     );
   }
 
+  Widget _buildWaterfallMetricPill(
+    BuildContext context, {
+    required String labelAr,
+    required String valueText,
+    required String subText,
+    required Color accentColor,
+    required IconData icon,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(14.0),
+        border: Border.all(color: accentColor.withOpacity(0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8.0),
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10.0),
+            ),
+            child: Icon(icon, size: 18.0, color: accentColor),
+          ),
+          const SizedBox(width: 10.0),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                labelAr,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 2.0),
+              Text(
+                valueText,
+                style: TextStyle(
+                  fontSize: 15.0,
+                  fontWeight: FontWeight.w900,
+                  color: accentColor,
+                ),
+              ),
+              Text(
+                subText,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   // ===========================================================================
   // TAB 0: SELL-IN DATA & TRANSACTIONS EXPLORER
   // ===========================================================================
@@ -667,6 +802,21 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
+    final netExclVat = _data.totalNetExclVatEgp > 0
+        ? _data.totalNetExclVatEgp
+        : _data.totalValueEgp;
+    final vat14 = _data.totalVat14Egp > 0
+        ? _data.totalVat14Egp
+        : netExclVat * 0.14;
+    final grossInclVat = _data.totalGrossInclVatEgp > 0
+        ? _data.totalGrossInclVatEgp
+        : netExclVat + vat14;
+    final officialListExcl = _data.totalOfficialListExclVatEgp > 0
+        ? _data.totalOfficialListExclVatEgp
+        : netExclVat;
+    final discountGranted = _data.totalDiscountGrantedEgp;
+    final discountPct = _data.effectiveDiscountPct;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -675,39 +825,44 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
           builder: (context, constraints) {
             final card1 = _buildSummaryCard(
               context,
-              titleAr: 'إجمالي صافي التوريد',
-              titleEn: 'Total Net Sell-In (EGP)',
-              value: CurrencyFormatter.formatCompactEGP(_data.totalValueEgp),
+              titleAr: 'إجمالي صافي التوريد (غير شامل الضريبة)',
+              titleEn: 'Total Net Sell-In (Excl. VAT)',
+              value: CurrencyFormatter.formatCompactEGP(netExclVat),
               subtitle:
-                  '${_data.totalCount} حركة توريد مسجلة (${_archivedSellInFiles.length} شيت مرفوع)',
+                  'شامل 14% ضريبة: ${CurrencyFormatter.formatCompactEGP(grossInclVat)} • ${_data.totalCount} حركة',
               icon: Icons.payments_rounded,
               color: colorScheme.primary,
             );
             final card2 = _buildSummaryCard(
               context,
-              titleAr: 'إجمالي الكمية بالكرتونة',
-              titleEn: 'Total Cases',
-              value: CurrencyFormatter.formatNumber(_data.totalCases.round()),
-              subtitle: 'كرتونة موردة للسلاسل',
+              titleAr: 'إجمالي الكمية بالكرتونة والقطعة',
+              titleEn: 'Total Cases & Pieces',
+              value:
+                  '${CurrencyFormatter.formatNumber(_data.totalCases.round())} كرتونة',
+              subtitle: _data.totalUnitsPieces > 0
+                  ? 'توازي ${CurrencyFormatter.formatNumber(_data.totalUnitsPieces)} قطعة (بشد الكارتة الحقيقي)'
+                  : 'كرتونة موردة للسلاسل',
               icon: Icons.inventory_2_rounded,
               color: Colors.teal.shade700,
             );
             final card3 = _buildSummaryCard(
               context,
-              titleAr: 'إجمالي الوزن',
+              titleAr: 'إجمالي الوزن الفعلي',
               titleEn: 'Total Weight (Tons)',
               value: '${_data.totalWeightTons.toStringAsFixed(1)} طن',
-              subtitle: 'إجمالي الحمولة الموردة بالطن',
+              subtitle:
+                  'خصم تجاري فعلي عن الكارتة: ${discountPct.toStringAsFixed(1)}%',
               icon: Icons.scale_rounded,
               color: Colors.indigo.shade700,
             );
             final card4 = _buildSummaryCard(
               context,
-              titleAr: 'المتوقع لنهاية الشهر',
-              titleEn: 'Month-End Projection (EXP)',
-              value: CurrencyFormatter.formatCompactEGP(_data.totalExpectedEgp),
-              subtitle: 'توقعات إغلاق الفترة',
-              icon: Icons.trending_up_rounded,
+              titleAr: 'إجمالي الفواتير شامل ضريبة 14%',
+              titleEn: 'Gross Sell-In (Incl. 14% VAT)',
+              value: CurrencyFormatter.formatCompactEGP(grossInclVat),
+              subtitle:
+                  'ضريبة القيمة المضافة: ${CurrencyFormatter.formatCompactEGP(vat14)} • المتوقع: ${CurrencyFormatter.formatCompactEGP(_data.totalExpectedEgp)}',
+              icon: Icons.receipt_long_rounded,
               color: Colors.orange.shade800,
             );
 
@@ -719,6 +874,137 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
               card4,
             );
           },
+        ),
+
+        M3Spacing.gapMD,
+
+        // 1.B Tax & Discount Waterfall Banner (Product Master Official Price vs Net Invoice vs 14% VAT)
+        Container(
+          padding: const EdgeInsets.all(14.0),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                colorScheme.primaryContainer.withOpacity(0.32),
+                colorScheme.secondaryContainer.withOpacity(0.24),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(18.0),
+            border: Border.all(
+              color: colorScheme.primary.withOpacity(0.28),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.account_tree_rounded,
+                    size: 20.0,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8.0),
+                  Expanded(
+                    child: Text(
+                      'شريط التدفق المالي والضريبي (Tax & Discount Waterfall — ربط مباشر مع كارتة الأصناف Product Master 2026)',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10.0,
+                      vertical: 4.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(999.0),
+                    ),
+                    child: Text(
+                      'اضغط على أي صنف بالجدول لفتح بطاقة الهوية (Product ID Card)',
+                      style: TextStyle(
+                        fontSize: 11.0,
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10.0),
+              Wrap(
+                spacing: 10.0,
+                runSpacing: 10.0,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _buildWaterfallMetricPill(
+                    context,
+                    labelAr: '1. التوريد بالسعر الرسمي (قبل الخصم)',
+                    valueText: CurrencyFormatter.formatCompactEGP(officialListExcl),
+                    subText: 'وفق سعر الكرتونة بكارتة الأصناف',
+                    accentColor: Colors.blueGrey.shade700,
+                    icon: Icons.price_check_rounded,
+                  ),
+                  Icon(
+                    Icons.remove_circle_outline_rounded,
+                    size: 18.0,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  _buildWaterfallMetricPill(
+                    context,
+                    labelAr: '2. إجمالي الخصم التجاري الممنوح للسلسلة',
+                    valueText:
+                        '${CurrencyFormatter.formatCompactEGP(discountGranted)} (${discountPct.toStringAsFixed(1)}%)',
+                    subText: 'خصم فاتورة + خصم إضافي (10% + 5%)',
+                    accentColor: Colors.deepOrange.shade700,
+                    icon: Icons.discount_outlined,
+                  ),
+                  Icon(
+                    Icons.drag_handle_rounded,
+                    size: 18.0,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  _buildWaterfallMetricPill(
+                    context,
+                    labelAr: '3. صافي التوريد الفعلي (غير شامل الضريبة)',
+                    valueText: CurrencyFormatter.formatCompactEGP(netExclVat),
+                    subText:
+                        '${CurrencyFormatter.formatNumber(_data.totalCases.round())} كرتونة • ${CurrencyFormatter.formatNumber(_data.totalUnitsPieces)} قطعة',
+                    accentColor: colorScheme.primary,
+                    icon: Icons.local_shipping_outlined,
+                  ),
+                  Icon(
+                    Icons.add_circle_outline_rounded,
+                    size: 18.0,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  _buildWaterfallMetricPill(
+                    context,
+                    labelAr: '4. ضريبة القيمة المضافة (14% VAT)',
+                    valueText: CurrencyFormatter.formatCompactEGP(vat14),
+                    subText: 'ضريبة مبيعات 14% قانونية',
+                    accentColor: Colors.purple.shade700,
+                    icon: Icons.percent_rounded,
+                  ),
+                  Icon(
+                    Icons.arrow_back_rounded,
+                    size: 18.0,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  _buildWaterfallMetricPill(
+                    context,
+                    labelAr: '5. إجمالي الفواتير (شامل ضريبة 14%)',
+                    valueText: CurrencyFormatter.formatCompactEGP(grossInclVat),
+                    subText: 'إجمالي المطالبة المالية على السلسلة',
+                    accentColor: Colors.teal.shade800,
+                    icon: Icons.account_balance_wallet_rounded,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
 
         M3Spacing.gapMD,
@@ -987,78 +1273,210 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                         ),
                         columns: const [
                           DataColumn(label: Text('الفترة (Period)')),
-                          DataColumn(label: Text('السلسلة (Chain)')),
-                          DataColumn(label: Text('المحافظة / الفرع')),
-                          DataColumn(label: Text('العلامة / الفئة')),
-                          DataColumn(label: Text('اسم الصنف (SKU / Item)')),
+                          DataColumn(label: Text('السلسلة / الفرع')),
+                          DataColumn(label: Text('اسم الصنف وهوية الكارتة (SKU / ID Card)')),
+                          DataColumn(label: Text('العلامة / القسم')),
                           DataColumn(label: Text('مندوب المبيعات')),
                           DataColumn(
                             numeric: true,
-                            label: Text('الكمية بالكرتونة (Cases)'),
+                            label: Text('الشد والكمية (كرتونة / قطعة)'),
                           ),
                           DataColumn(
                             numeric: true,
-                            label: Text('صافي التوريد (Net Sell-In EGP)'),
+                            label: Text('سعر الكرتونة (فعلي vs كارتة)'),
+                          ),
+                          DataColumn(
+                            numeric: true,
+                            label: Text('صافي التوريد (غير شامل الضريبة)'),
+                          ),
+                          DataColumn(
+                            numeric: true,
+                            label: Text('الإجمالي شامل 14% ضريبة'),
                           ),
                           DataColumn(
                             numeric: true,
                             label: Text('الوزن (Tons)'),
                           ),
                           DataColumn(
-                            numeric: true,
-                            label: Text('المتوقع (EXP EGP)'),
-                          ),
-                          DataColumn(
                             label: Text('الشيت المصدري (Sheet)'),
                           ),
                         ],
                         rows: _data.records.map((r) {
+                          final hasIdCard = r.itemCode.isNotEmpty || r.barcode.isNotEmpty;
+                          final unitsSupplied = r.totalUnitsSupplied > 0
+                              ? r.totalUnitsSupplied
+                              : (r.netQtyCases * (r.unitsPerCarton > 0 ? r.unitsPerCarton : 12)).round();
+                          final grossInclVat = r.grossValueInclVatEgp > 0
+                              ? r.grossValueInclVatEgp
+                              : r.netValueEgp * 1.14;
+                          final vatAmount = r.vatAmountEgp > 0
+                              ? r.vatAmountEgp
+                              : r.netValueEgp * 0.14;
+                          final actualCasePrice = r.actualCasePriceExclEgp > 0
+                              ? r.actualCasePriceExclEgp
+                              : (r.netQtyCases > 0 ? r.netValueEgp / r.netQtyCases : 0.0);
+
                           return DataRow(
                             cells: [
                               DataCell(
                                 Text(
                                   '${r.monthAr.isNotEmpty ? r.monthAr : r.monthNum} ${r.year}',
+                                  style: const TextStyle(fontWeight: FontWeight.w700),
                                 ),
                               ),
                               DataCell(
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8.0,
-                                    vertical: 3.0,
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8.0,
+                                        vertical: 2.0,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primaryContainer.withOpacity(0.6),
+                                        borderRadius: BorderRadius.circular(999.0),
+                                      ),
+                                      child: Text(
+                                        r.retailerChain.toUpperCase(),
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: colorScheme.onPrimaryContainer,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2.0),
+                                    Text(
+                                      r.customerName.isNotEmpty
+                                          ? '${r.governorate} • ${r.customerName}'
+                                          : r.governorate,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              DataCell(
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(8.0),
+                                  onTap: () => _openProductIdCard(
+                                    itemCode: r.itemCode,
+                                    barcode: r.barcode,
+                                    skuName: r.itemName,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.primaryContainer.withOpacity(0.6),
-                                    borderRadius: BorderRadius.circular(999.0),
-                                  ),
-                                  child: Text(
-                                    r.retailerChain.toUpperCase(),
-                                    style: TextStyle(
-                                      fontSize: 11.0,
-                                      fontWeight: FontWeight.w800,
-                                      color: colorScheme.onPrimaryContainer,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                r.itemName,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 12.5,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4.0),
+                                            Icon(
+                                              Icons.badge_outlined,
+                                              size: 15.0,
+                                              color: colorScheme.primary,
+                                            ),
+                                          ],
+                                        ),
+                                        if (hasIdCard)
+                                          Text(
+                                            'كود: ${r.itemCode.isNotEmpty ? r.itemCode : "-"} • باركود: ${r.barcode.isNotEmpty ? r.barcode : "-"}',
+                                            style: TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: colorScheme.primary,
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                 ),
                               ),
                               DataCell(
-                                Text(
-                                  r.customerName.isNotEmpty
-                                      ? '${r.governorate} • ${r.customerName}'
-                                      : r.governorate,
-                                ),
-                              ),
-                              DataCell(Text('${r.brand} • ${r.subCategory}')),
-                              DataCell(
-                                Text(
-                                  r.itemName,
-                                  style: const TextStyle(fontWeight: FontWeight.w700),
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${r.brand} • ${r.subCategory}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 12.0,
+                                      ),
+                                    ),
+                                    if (r.departmentAr.isNotEmpty)
+                                      Text(
+                                        r.departmentAr,
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                               DataCell(Text(r.salesRep)),
                               DataCell(
-                                Text(
-                                  CurrencyFormatter.formatNumber(r.netQtyCases.round()),
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      '${CurrencyFormatter.formatNumber(r.netQtyCases.round())} كرتونة',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12.5,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${CurrencyFormatter.formatNumber(unitsSupplied)} قطعة (شد ${r.unitsPerCarton > 0 ? r.unitsPerCarton : 12})',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.teal.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              DataCell(
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      'فعلي: ${CurrencyFormatter.formatEGP(actualCasePrice)}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12.0,
+                                      ),
+                                    ),
+                                    if (r.officialCartonExclVatEgp > 0)
+                                      Text(
+                                        'كارتة: ${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp)} (${r.effectiveDiscountPct > 0 ? "خصم ${r.effectiveDiscountPct.toStringAsFixed(1)}%" : r.pricingWaveStatus})',
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                               DataCell(
@@ -1070,10 +1488,30 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                                   ),
                                 ),
                               ),
-                              DataCell(Text(r.weightTons.toStringAsFixed(2))),
                               DataCell(
-                                Text(CurrencyFormatter.formatEGP(r.expectedValueEgp)),
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      CurrencyFormatter.formatEGP(grossInclVat),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.teal.shade800,
+                                        fontSize: 12.5,
+                                      ),
+                                    ),
+                                    Text(
+                                      'ضريبة 14%: ${CurrencyFormatter.formatEGP(vatAmount)}',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              DataCell(Text('${r.weightTons.toStringAsFixed(2)} طن')),
                               DataCell(
                                 Text(
                                   r.sourceFilename.isNotEmpty
@@ -1129,56 +1567,219 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
       totalSellOutEgp += m.sellOutValueEgp;
       totalSellOutEstCases += m.sellOutEstCases;
     }
-    final remainingStockEgp = d.monthlyReconciliation.isNotEmpty
-        ? d.monthlyReconciliation.last.closingStockValueEgp
-        : d.totalEstimatedStockEgp;
-    final remainingStockCases = d.monthlyReconciliation.isNotEmpty
-        ? d.monthlyReconciliation.last.closingStockCases
-        : d.totalEstimatedStockCases;
-    final overallStrPct = d.ytd2026SellInEgp > 0
-        ? (totalSellOutEgp / d.ytd2026SellInEgp) * 100.0
-        : d.jan2026SellThroughPct;
+
+    // Use Matched Window (Jan-Aug) by default so Sell-In vs Sell-Out is 100% apples-to-apples
+    final useMatchedWindow = !_showFullYtdReconciliation && d.matchedMonthsCount > 0;
+    final displaySellInEgp = useMatchedWindow
+        ? d.matchedSellInValueExclVatEgp
+        : d.ytd2026SellInEgp;
+    final displaySellInGrossEgp = useMatchedWindow
+        ? d.matchedSellInGrossInclVatEgp
+        : d.ytd2026GrossInclVatEgp;
+    final displaySellInCases = useMatchedWindow
+        ? d.matchedSellInCases
+        : d.ytd2026SellInCases;
+    final displaySellOutPosEgp = useMatchedWindow && d.matchedSellOutPosValueEgp > 0
+        ? d.matchedSellOutPosValueEgp
+        : totalSellOutEgp;
+    final displaySellOutFactoryCostEgp = useMatchedWindow && d.matchedSellOutFactoryCostEgp > 0
+        ? d.matchedSellOutFactoryCostEgp
+        : totalSellOutEgp;
+    final displaySellOutCases = useMatchedWindow && d.matchedSellOutCases > 0
+        ? d.matchedSellOutCases
+        : totalSellOutEstCases;
+    final remainingStockEgp = useMatchedWindow
+        ? d.matchedRemainingFactoryValueEgp
+        : (d.monthlyReconciliation.isNotEmpty
+            ? d.monthlyReconciliation.last.closingStockValueEgp
+            : d.totalEstimatedStockEgp);
+    final remainingStockCases = useMatchedWindow
+        ? d.matchedRemainingCases
+        : (d.monthlyReconciliation.isNotEmpty
+            ? d.monthlyReconciliation.last.closingStockCases
+            : d.totalEstimatedStockCases);
+    final overallStrPct = useMatchedWindow && d.matchedSellThroughPct > 0
+        ? d.matchedSellThroughPct
+        : (displaySellInEgp > 0
+            ? (displaySellOutFactoryCostEgp / displaySellInEgp) * 100.0
+            : d.jan2026SellThroughPct);
+
+    final matchedLabel = d.matchedPeriodLabel.isNotEmpty
+        ? d.matchedPeriodLabel
+        : 'يناير - أبريل 2026';
+    final pendingLabel = d.pendingSellOutPeriodLabel.isNotEmpty
+        ? d.pendingSellOutPeriodLabel
+        : 'مايو - أكتوبر 2026';
+
+    final visibleMonthlyRows = _showFullYtdReconciliation
+        ? d.monthlyReconciliation
+        : d.monthlyReconciliation
+            .where((m) => m.hasActualSellOut || m.sellOutValueEgp > 0)
+            .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 0. Matched Period vs Full YTD Toggle Banner + Pending Sell-Out Notice
+        Container(
+          padding: const EdgeInsets.all(14.0),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                colorScheme.primaryContainer.withOpacity(0.35),
+                colorScheme.tertiaryContainer.withOpacity(0.25),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(18.0),
+            border: Border.all(
+              color: colorScheme.primary.withOpacity(0.3),
+            ),
+          ),
+          child: Wrap(
+            spacing: 14.0,
+            runSpacing: 10.0,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.sync_alt_rounded,
+                    color: colorScheme.primary,
+                    size: 22.0,
+                  ),
+                  const SizedBox(width: 10.0),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'الربط الثلاثي الذكي (Sell-In × Sell-Out × كارتة الأصناف Product Master)',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        'يتم تحويل مبيعات الكاشير بالقطعة إلى كراتين بشد الكارتة الحقيقي لكل صنف وحساب ربح السلسلة الفعلي بعد خصم تكلفة المصنع',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 8.0,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  ChoiceChip(
+                    selected: !_showFullYtdReconciliation,
+                    label: Text(
+                      'الفترة المتطابقة ($matchedLabel — ${d.matchedMonthsCount > 0 ? d.matchedMonthsCount : 4} أشهر)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12.5,
+                        color: !_showFullYtdReconciliation
+                            ? colorScheme.onPrimaryContainer
+                            : colorScheme.onSurface,
+                      ),
+                    ),
+                    onSelected: (_) => setState(() => _showFullYtdReconciliation = false),
+                  ),
+                  ChoiceChip(
+                    selected: _showFullYtdReconciliation,
+                    label: Text(
+                      'إجمالي العام شامل التوريدات تحت التصريف (يناير - أكتوبر)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12.5,
+                        color: _showFullYtdReconciliation
+                            ? colorScheme.onPrimaryContainer
+                            : colorScheme.onSurface,
+                      ),
+                    ),
+                    onSelected: (_) => setState(() => _showFullYtdReconciliation = true),
+                  ),
+                  if (d.pendingSellOutCases > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0,
+                        vertical: 6.0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade100.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(10.0),
+                        border: Border.all(color: Colors.amber.shade700.withOpacity(0.5)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.hourglass_top_rounded,
+                            size: 15.0,
+                            color: Colors.amber.shade900,
+                          ),
+                          const SizedBox(width: 6.0),
+                          Text(
+                            'توريدات تحت التصريف ($pendingLabel): ${CurrencyFormatter.formatNumber(d.pendingSellOutCases.round())} كرتونة (${CurrencyFormatter.formatCompactEGP(d.pendingSellOutValueEgp)}) بانتظار رفع شيت الكاشير',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.amber.shade900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        M3Spacing.gapMD,
+
         // 1. 4 Prominent Full-Width KPI Cards for Sell-In vs Sell-Out & Remaining Stock
         LayoutBuilder(
           builder: (context, constraints) {
             final card1 = _buildSummaryCard(
               context,
-              titleAr: 'إجمالي التوريد التراكمي (Sell-In)',
-              titleEn: 'Cumulative Supplied Stock',
-              value: CurrencyFormatter.formatCompactEGP(d.ytd2026SellInEgp),
+              titleAr: useMatchedWindow
+                  ? 'التوريد للفترة المتطابقة ($matchedLabel)'
+                  : 'إجمالي التوريد التراكمي (Sell-In YTD)',
+              titleEn: 'Supplied Stock (Excl. & Incl. VAT)',
+              value: CurrencyFormatter.formatCompactEGP(displaySellInEgp),
               subtitle:
-                  '${CurrencyFormatter.formatNumber(d.ytd2026SellInCases.round())} كرتونة موردة للسلاسل',
+                  '${CurrencyFormatter.formatNumber(displaySellInCases.round())} كرتونة • شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(displaySellInGrossEgp)}',
               icon: Icons.local_shipping_rounded,
               color: colorScheme.primary,
             );
             final card2 = _buildSummaryCard(
               context,
-              titleAr: 'إجمالي المبيعات الفعلية (Sell-Out)',
-              titleEn: 'Actual Cashier Sell-Out',
-              value: CurrencyFormatter.formatCompactEGP(totalSellOutEgp),
+              titleAr: 'المبيعات الفعلية للكاشير (Sell-Out)',
+              titleEn: 'Actual Cashier POS & Factory Cost',
+              value: CurrencyFormatter.formatCompactEGP(displaySellOutPosEgp),
               subtitle:
-                  '${CurrencyFormatter.formatNumber(totalSellOutEstCases.round())} كرتونة مباعة فعلياً من الكاشير',
+                  '${CurrencyFormatter.formatNumber(displaySellOutCases.round())} كرتونة حقيقية (${CurrencyFormatter.formatNumber(d.matchedSellOutUnits)} قطعة) • بتكلفة مصنع ${CurrencyFormatter.formatCompactEGP(displaySellOutFactoryCostEgp)}',
               icon: Icons.point_of_sale_rounded,
               color: Colors.teal.shade700,
             );
             final card3 = _buildSummaryCard(
               context,
-              titleAr: 'الرصيد المتبقي لدى السلاسل',
+              titleAr: 'الرصيد المتبقي الفعلي لدى السلسلة',
               titleEn: 'Remaining Stock (Sell-In − Sell-Out)',
               value: CurrencyFormatter.formatCompactEGP(remainingStockEgp),
               subtitle:
-                  '${CurrencyFormatter.formatNumber(remainingStockCases.round())} كرتونة متبقية بالمخازن والأرفف',
+                  '${CurrencyFormatter.formatNumber(remainingStockCases.round())} كرتونة متبقية فعلياً بعد خصم السحب الحقيقي',
               icon: Icons.warehouse_rounded,
               color: Colors.deepOrange.shade700,
             );
             final card4 = _buildSummaryCard(
               context,
-              titleAr: 'نسبة التصريف وأوامر التوريد',
-              titleEn: 'Sell-Through % & Suggested PO',
+              titleAr: 'نسبة التصريف وأوامر التوريد (STR %)',
+              titleEn: 'Real Sell-Through % & Suggested PO',
               value: '${overallStrPct.toStringAsFixed(1)}%',
               subtitle:
                   '${d.urgentReplenishmentCount} صنف يحتاج توريد فوري (${d.totalSuggestedPoCases} كرتونة مقترحة)',
@@ -1192,6 +1793,54 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
               card2,
               card3,
               card4,
+            );
+          },
+        ),
+
+        M3Spacing.gapSM,
+
+        // 1.B Strategic 3-Way Linkage KPIs: Retailer Gross Margin & YoY 2026 vs 2025 Growth
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final marginCard = _buildSummaryCard(
+              context,
+              titleAr: 'ربح السلسلة المحقق وهامش الربح الفعلي (Retailer Gross Margin)',
+              titleEn: 'Chain POS Revenue − Factory Cost Excl. VAT',
+              value:
+                  '${CurrencyFormatter.formatCompactEGP(d.matchedChainGrossMarginEgp)} (هامش ${d.matchedChainGrossMarginPct.toStringAsFixed(1)}%)',
+              subtitle:
+                  'الفرق الفعلي بين سعر بيع الكاشير للمستهلك وتكلفة التوريد الصافية من كارتة الأصناف',
+              icon: Icons.paid_rounded,
+              color: Colors.green.shade800,
+            );
+            final yoySign = d.matchedYoyValueGrowthPct >= 0 ? '+' : '';
+            final yoyUnitsSign = d.matchedYoyUnitsGrowthPct >= 0 ? '+' : '';
+            final yoyCard = _buildSummaryCard(
+              context,
+              titleAr: 'النمو السنوي لمبيعات الكاشير (2026 مقابل 2025 YoY)',
+              titleEn: 'Matched Period YoY Sell-Out Growth',
+              value: '$yoySign${d.matchedYoyValueGrowthPct.toStringAsFixed(1)}% نمو قيمة',
+              subtitle:
+                  'نمو الكميات المباعة بالقطعة: $yoyUnitsSign${d.matchedYoyUnitsGrowthPct.toStringAsFixed(1)}% مقارنة بنفس الشهور في عام 2025',
+              icon: Icons.trending_up_rounded,
+              color: Colors.purple.shade800,
+            );
+
+            if (constraints.maxWidth < 760) {
+              return Column(
+                children: [
+                  marginCard,
+                  const SizedBox(height: 10.0),
+                  yoyCard,
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: marginCard),
+                const SizedBox(width: 12.0),
+                Expanded(child: yoyCard),
+              ],
             );
           },
         ),
@@ -1418,9 +2067,10 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                   columns: const [
                     DataColumn(label: Text('الشهر / السنة')),
                     DataColumn(label: Text('رصيد أول الشهر (Opening)'), numeric: true),
-                    DataColumn(label: Text('+ التوريد الشهري (Sell-In)'), numeric: true),
-                    DataColumn(label: Text('− المبيعات الفعلية (Sell-Out)'), numeric: true),
-                    DataColumn(label: Text('= صافي حركة الشهر'), numeric: true),
+                    DataColumn(label: Text('+ التوريد الشهري (صافي وشامل 14%)'), numeric: true),
+                    DataColumn(label: Text('− مبيعات الكاشير (بشد الكارتة الحقيقي)'), numeric: true),
+                    DataColumn(label: Text('ربح السلسلة المحقق (هامش %)'), numeric: true),
+                    DataColumn(label: Text('النمو السنوي (2026 vs 2025)'), numeric: true),
                     DataColumn(
                       label: Text('الرصيد المتبقي آخر الشهر (Closing Stock)'),
                       numeric: true,
@@ -1428,14 +2078,30 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     DataColumn(label: Text('نسبة التصريف (STR %)'), numeric: true),
                     DataColumn(label: Text('تشخيص حالة الرصيد')),
                   ],
-                  rows: d.monthlyReconciliation.map((m) {
+                  rows: visibleMonthlyRows.map((m) {
                     final isPositiveClosing = m.closingStockValueEgp >= 0;
+                    final yoySign = m.yoySellOutGrowthPct >= 0 ? '+' : '';
                     return DataRow(
                       cells: [
                         DataCell(
-                          Text(
-                            '${m.monthNum} - ${m.monthAr} ${m.year}',
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${m.monthNum} - ${m.monthAr} ${m.year}',
+                                style: const TextStyle(fontWeight: FontWeight.w800),
+                              ),
+                              if (!m.hasActualSellOut)
+                                Text(
+                                  'بانتظار شيت كاشير السلسلة',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.amber.shade900,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                         DataCell(
@@ -1462,47 +2128,119 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                               Text(
                                 CurrencyFormatter.formatEGP(m.sellInValueEgp),
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w800,
                                   color: colorScheme.primary,
                                 ),
                               ),
                               Text(
-                                '+${CurrencyFormatter.formatNumber(m.sellInCases.round())} كرتونة',
+                                '+${CurrencyFormatter.formatNumber(m.sellInCases.round())} كرتونة (${CurrencyFormatter.formatNumber(m.sellInUnits)} قطعة)',
                                 style: TextStyle(
-                                  fontSize: 11.0,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        DataCell(
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                CurrencyFormatter.formatEGP(m.sellOutValueEgp),
-                                style: TextStyle(
+                                  fontSize: 10.5,
                                   fontWeight: FontWeight.w700,
-                                  color: Colors.teal.shade700,
-                                ),
-                              ),
-                              Text(
-                                '−${CurrencyFormatter.formatNumber(m.sellOutEstCases.round())} كرتونة',
-                                style: TextStyle(
-                                  fontSize: 11.0,
                                   color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
+                              if (m.sellInGrossInclVatEgp > 0)
+                                Text(
+                                  'شامل 14%: ${CurrencyFormatter.formatCompactEGP(m.sellInGrossInclVatEgp)}',
+                                  style: TextStyle(
+                                    fontSize: 10.0,
+                                    color: Colors.teal.shade800,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
                         DataCell(
-                          Text(
-                            CurrencyFormatter.formatEGP(m.monthlyNetValueEgp),
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
+                          m.hasActualSellOut
+                              ? Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      CurrencyFormatter.formatEGP(m.sellOutValueEgp),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.teal.shade700,
+                                      ),
+                                    ),
+                                    Text(
+                                      '−${CurrencyFormatter.formatNumber(m.sellOutEstCases.round())} كرتونة (${CurrencyFormatter.formatNumber(m.sellOutUnits)} قطعة)',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    if (m.sellOutFactoryCostExclVatEgp > 0)
+                                      Text(
+                                        'بتكلفة مصنع: ${CurrencyFormatter.formatCompactEGP(m.sellOutFactoryCostExclVatEgp)}',
+                                        style: TextStyle(
+                                          fontSize: 10.0,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                  ],
+                                )
+                              : Text(
+                                  'تحت التصريف (Pending POS)',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.amber.shade900,
+                                  ),
+                                ),
+                        ),
+                        DataCell(
+                          m.hasActualSellOut
+                              ? Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      CurrencyFormatter.formatEGP(m.chainGrossMarginEgp),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.green.shade800,
+                                      ),
+                                    ),
+                                    Text(
+                                      'هامش السلسلة: ${m.chainGrossMarginPct.toStringAsFixed(1)}%',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.green.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : const Text('-'),
+                        ),
+                        DataCell(
+                          m.hasActualSellOut && m.prevYearSellOutValueEgp > 0
+                              ? Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      '$yoySign${m.yoySellOutGrowthPct.toStringAsFixed(1)}%',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        color: m.yoySellOutGrowthPct >= 0
+                                            ? Colors.purple.shade800
+                                            : colorScheme.error,
+                                      ),
+                                    ),
+                                    Text(
+                                      '2025: ${CurrencyFormatter.formatCompactEGP(m.prevYearSellOutValueEgp)}',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : const Text('-'),
                         ),
                         DataCell(
                           Container(
@@ -1545,7 +2283,9 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                         ),
                         DataCell(
                           Text(
-                            '${m.sellThroughRatePct.toStringAsFixed(1)}%',
+                            m.hasActualSellOut
+                                ? '${m.sellThroughRatePct.toStringAsFixed(1)}%'
+                                : 'تحت التصريف',
                             style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ),
@@ -2048,50 +2788,154 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                       rows: currentSkuPageItems.map((item) {
                         final isUrgent = item.stockStatus == 'urgent_replenishment';
                         final isOverstock = item.stockStatus == 'overstock';
+                        final packUnits = item.unitsPerCarton > 0 ? item.unitsPerCarton : 12;
+                        final sellInUnits = item.sellInUnits > 0
+                            ? item.sellInUnits
+                            : (item.sellInCases * packUnits).round();
+                        final sellOutUnits = item.sellOutUnits > 0
+                            ? item.sellOutUnits
+                            : (item.sellOutEstCases * packUnits).round();
+                        final stockCases = useMatchedWindow && item.matchedRemainingCases > 0
+                            ? item.matchedRemainingCases
+                            : item.estimatedStockCases;
+                        final stockVal = useMatchedWindow && item.matchedRemainingValueEgp > 0
+                            ? item.matchedRemainingValueEgp
+                            : item.estimatedStockValueEgp;
+                        final stockUnits = item.estimatedStockUnits > 0
+                            ? item.estimatedStockUnits
+                            : (stockCases * packUnits).round();
+                        final poGrossInclVat = item.suggestedPoGrossInclVatEgp > 0
+                            ? item.suggestedPoGrossInclVatEgp
+                            : item.suggestedPoValueEgp * 1.14;
+
                         return DataRow(
                           cells: [
                             DataCell(
+                              InkWell(
+                                borderRadius: BorderRadius.circular(8.0),
+                                onTap: () => _openProductIdCard(
+                                  itemCode: item.itemCode,
+                                  barcode: item.barcode,
+                                  skuName: item.skuName,
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              item.skuName,
+                                              style: const TextStyle(fontWeight: FontWeight.w800),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4.0),
+                                          Icon(
+                                            Icons.badge_outlined,
+                                            size: 15.0,
+                                            color: colorScheme.primary,
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        'كود: ${item.itemCode.isNotEmpty ? item.itemCode : "-"} • باركود: ${item.barcode.isNotEmpty ? item.barcode : "-"} • شد $packUnits',
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 10.5,
+                                          color: colorScheme.primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            DataCell(
                               Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    item.skuName,
+                                    '${item.brand} • ${item.governorate}',
                                     style: const TextStyle(fontWeight: FontWeight.w700),
                                   ),
-                                  if (item.itemCode.isNotEmpty || item.barcode.isNotEmpty)
+                                  if (item.officialCartonExclVatEgp > 0)
                                     Text(
-                                      '${item.itemCode.isNotEmpty ? item.itemCode : ""}${item.itemCode.isNotEmpty && item.barcode.isNotEmpty ? " • " : ""}${item.barcode}',
+                                      'كرتونة الكارتة: ${CurrencyFormatter.formatEGP(item.officialCartonExclVatEgp)}',
                                       style: TextStyle(
-                                        fontFamily: 'monospace',
                                         fontSize: 10.5,
-                                        color: colorScheme.primary,
-                                        fontWeight: FontWeight.w700,
+                                        color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                 ],
                               ),
                             ),
                             DataCell(
-                              Text('${item.brand} • ${item.governorate}'),
-                            ),
-                            DataCell(
-                              Text(
-                                '${CurrencyFormatter.formatNumber(item.sellInCases.round())} كرتونة\n(${CurrencyFormatter.formatCompactEGP(item.sellInValueEgp)})',
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${CurrencyFormatter.formatNumber(item.sellInCases.round())} كرتونة (${CurrencyFormatter.formatNumber(sellInUnits)} ق)',
+                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                  Text(
+                                    'صافي: ${CurrencyFormatter.formatCompactEGP(item.sellInValueEgp)}',
+                                    style: TextStyle(
+                                      fontSize: 11.0,
+                                      color: colorScheme.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             DataCell(
-                              Text(
-                                '${CurrencyFormatter.formatNumber(item.sellOutEstCases.round())} كرتونة\n(${CurrencyFormatter.formatCompactEGP(item.sellOutValueEgp)})',
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${CurrencyFormatter.formatNumber(item.sellOutEstCases.round())} كرتونة (${CurrencyFormatter.formatNumber(sellOutUnits)} ق)',
+                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                  Text(
+                                    'POS: ${CurrencyFormatter.formatCompactEGP(item.sellOutValueEgp)}${item.retailerMarginPct != 0 ? " (هامش ${item.retailerMarginPct.toStringAsFixed(0)}%)" : ""}',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: Colors.teal.shade700,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             DataCell(
-                              Text(
-                                '${CurrencyFormatter.formatNumber(item.estimatedStockCases.round())} كرتونة\n(${CurrencyFormatter.formatEGP(item.estimatedStockValueEgp)})',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: colorScheme.primary,
-                                ),
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${CurrencyFormatter.formatNumber(stockCases.round())} كرتونة (${CurrencyFormatter.formatNumber(stockUnits)} ق)',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                  Text(
+                                    CurrencyFormatter.formatEGP(stockVal),
+                                    style: TextStyle(
+                                      fontSize: 11.0,
+                                      fontWeight: FontWeight.w700,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             DataCell(
@@ -2136,19 +2980,35 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                               ),
                             ),
                             DataCell(
-                              Text(
-                                item.suggestedPoCases > 0
-                                    ? '${item.suggestedPoCases} كرتونة (${CurrencyFormatter.formatCompactEGP(item.suggestedPoValueEgp)})'
-                                    : 'لا يحتاج توريد حالياً',
-                                style: TextStyle(
-                                  fontWeight: item.suggestedPoCases > 0
-                                      ? FontWeight.w800
-                                      : FontWeight.normal,
-                                  color: item.suggestedPoCases > 0
-                                      ? Colors.deepOrange.shade800
-                                      : colorScheme.onSurfaceVariant,
-                                ),
-                              ),
+                              item.suggestedPoCases > 0
+                                  ? Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          '${item.suggestedPoCases} كرتونة (${CurrencyFormatter.formatCompactEGP(item.suggestedPoValueEgp)})',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.deepOrange.shade800,
+                                            fontSize: 12.0,
+                                          ),
+                                        ),
+                                        Text(
+                                          'شامل 14%: ${CurrencyFormatter.formatCompactEGP(poGrossInclVat)}',
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.teal.shade800,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : Text(
+                                      'لا يحتاج توريد حالياً',
+                                      style: TextStyle(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
                             ),
                           ],
                         );

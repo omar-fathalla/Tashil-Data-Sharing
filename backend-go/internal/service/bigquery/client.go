@@ -52,8 +52,11 @@ type Repository interface {
 	DeleteTarget(ctx context.Context, tenantID, targetID string) error
 	GetProductMaster(ctx context.Context, tenantID string, filter ProductMasterFilter) (*domain.ProductMasterSummaryResponse, error)
 	SetProductMaster(ctx context.Context, tenantID string, summary *domain.ProductMasterSummaryResponse) (*domain.ProductMasterSummaryResponse, error)
+	ClearProductMaster(ctx context.Context, tenantID string) error
+	RestoreBaselineProductMaster(ctx context.Context, tenantID, deletedFilename string) bool
 	UpsertProductMasterItem(ctx context.Context, tenantID string, item domain.ProductMasterItem) (*domain.ProductMasterItem, error)
 	LookupProductMaster(tenantID, itemCode, barcode, skuName string) (domain.ProductMasterItem, bool)
+	GetProductMasterItems(tenantID string) []domain.ProductMasterItem
 }
 
 // SellInRecordFilter allows filtering Supplier Sell-In records by chain, year, month, region, sector, brand, and search query.
@@ -135,11 +138,13 @@ type Client struct {
 	sellInRecords          map[string][]domain.SellInRecord
 	sellInFilename         map[string]string
 	targets                map[string][]domain.TargetRecord
-	productMaster          map[string]*domain.ProductMasterSummaryResponse
-	productMasterByCode    map[string]map[string]domain.ProductMasterItem
-	productMasterByBarcode map[string]map[string]domain.ProductMasterItem
-	productMasterByName    map[string]map[string]domain.ProductMasterItem
-	cleanedTenants         map[string]bool
+	productMaster                    map[string]*domain.ProductMasterSummaryResponse
+	baselineProductMaster            map[string]*domain.ProductMasterSummaryResponse
+	productMasterByCode              map[string]map[string]domain.ProductMasterItem
+	productMasterByBarcode           map[string]map[string]domain.ProductMasterItem
+	productMasterByBarcodeCandidates map[string]map[string][]domain.ProductMasterItem
+	productMasterByName              map[string]map[string]domain.ProductMasterItem
+	cleanedTenants                   map[string]bool
 
 	kpiCacheMu sync.RWMutex
 	kpiCache   map[string]*domain.ExecutiveKPIs
@@ -154,21 +159,23 @@ func (c *Client) invalidateKPICache() {
 // NewClient initializes the BigQuery repository.
 func NewClient(projectID, dataset string, useMock bool) *Client {
 	c := &Client{
-		projectID:              projectID,
-		dataset:                dataset,
-		useMock:                useMock,
-		records:                make([]domain.SellOutFact, 0),
-		pricingItems:           make([]domain.PricingComplianceItem, 0),
-		workbookMeta:           make(map[string]TenantWorkbookAnalytics),
-		sellInRecords:          make(map[string][]domain.SellInRecord),
-		sellInFilename:         make(map[string]string),
-		targets:                make(map[string][]domain.TargetRecord),
-		productMaster:          make(map[string]*domain.ProductMasterSummaryResponse),
-		productMasterByCode:    make(map[string]map[string]domain.ProductMasterItem),
-		productMasterByBarcode: make(map[string]map[string]domain.ProductMasterItem),
-		productMasterByName:    make(map[string]map[string]domain.ProductMasterItem),
-		cleanedTenants:         make(map[string]bool),
-		kpiCache:               make(map[string]*domain.ExecutiveKPIs),
+		projectID:                        projectID,
+		dataset:                          dataset,
+		useMock:                          useMock,
+		records:                          make([]domain.SellOutFact, 0),
+		pricingItems:                     make([]domain.PricingComplianceItem, 0),
+		workbookMeta:                     make(map[string]TenantWorkbookAnalytics),
+		sellInRecords:                    make(map[string][]domain.SellInRecord),
+		sellInFilename:                   make(map[string]string),
+		targets:                          make(map[string][]domain.TargetRecord),
+		productMaster:                    make(map[string]*domain.ProductMasterSummaryResponse),
+		baselineProductMaster:            make(map[string]*domain.ProductMasterSummaryResponse),
+		productMasterByCode:              make(map[string]map[string]domain.ProductMasterItem),
+		productMasterByBarcode:           make(map[string]map[string]domain.ProductMasterItem),
+		productMasterByBarcodeCandidates: make(map[string]map[string][]domain.ProductMasterItem),
+		productMasterByName:              make(map[string]map[string]domain.ProductMasterItem),
+		cleanedTenants:                   make(map[string]bool),
+		kpiCache:                         make(map[string]*domain.ExecutiveKPIs),
 	}
 	c.loadPersistedProductMaster()
 	c.seedInitialData()
@@ -1152,7 +1159,7 @@ func (c *Client) ReplaceTenantFacts(ctx context.Context, tenantID string, facts 
 	return nil
 }
 
-// SetTenantWorkbookAnalytics stores rich multi-sheet market share, competitor, pricing, and trend analytics for a tenant.
+// SetTenantWorkbookAnalytics stores and merges rich multi-sheet market share, competitor, pricing, and trend analytics for a tenant.
 func (c *Client) SetTenantWorkbookAnalytics(ctx context.Context, tenantID string, meta TenantWorkbookAnalytics) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -1160,17 +1167,131 @@ func (c *Client) SetTenantWorkbookAnalytics(ctx context.Context, tenantID string
 
 	slug := normalizeBQTenantSlug(tenantID)
 	c.cleanedTenants[slug] = true
-	if len(meta.SupplierShares) > 0 || len(meta.MonthlyTrends) > 0 {
+	if len(meta.SupplierShares) > 0 || len(meta.MonthlyTrends) > 0 || len(meta.CategoryMarketTotals) > 0 {
+		if prev, hasPrev := c.workbookMeta[slug]; hasPrev {
+			prevMonthKeys := make(map[string]bool, len(prev.MonthlyTrends))
+			trendMap := make(map[string]domain.DailyTrendPoint, len(prev.MonthlyTrends)+len(meta.MonthlyTrends))
+			for _, pt := range prev.MonthlyTrends {
+				key := pt.MonthKey
+				if key == "" {
+					key = pt.Date
+				}
+				if key != "" {
+					prevMonthKeys[key] = true
+					trendMap[key] = pt
+				}
+			}
+			overlappingMonths := false
+			for _, pt := range meta.MonthlyTrends {
+				key := pt.MonthKey
+				if key == "" {
+					key = pt.Date
+				}
+				if key != "" {
+					if prevMonthKeys[key] {
+						overlappingMonths = true
+					}
+					trendMap[key] = pt
+				}
+			}
+			nonOverlappingMultiPeriod := len(prev.MonthlyTrends) > 0 && len(meta.MonthlyTrends) > 0 && !overlappingMonths
+
+			mergedTrends := make([]domain.DailyTrendPoint, 0, len(trendMap))
+			for _, pt := range trendMap {
+				mergedTrends = append(mergedTrends, pt)
+			}
+			sort.Slice(mergedTrends, func(i, j int) bool {
+				return mergedTrends[i].Date < mergedTrends[j].Date
+			})
+			meta.MonthlyTrends = mergedTrends
+
+			// Merge CategoryMarketTotals
+			if len(prev.CategoryMarketTotals) > 0 {
+				if meta.CategoryMarketTotals == nil {
+					meta.CategoryMarketTotals = make(map[string]float64)
+				}
+				for cat, val := range prev.CategoryMarketTotals {
+					if nonOverlappingMultiPeriod {
+						meta.CategoryMarketTotals[cat] = math.Round((meta.CategoryMarketTotals[cat]+val)*100) / 100
+					} else if val > meta.CategoryMarketTotals[cat] {
+						meta.CategoryMarketTotals[cat] = val
+					}
+				}
+			}
+
+			// Merge or preserve SupplierShares
+			if len(meta.SupplierShares) == 0 && len(prev.SupplierShares) > 0 {
+				meta.SupplierShares = prev.SupplierShares
+			} else if nonOverlappingMultiPeriod && len(prev.SupplierShares) > 0 && len(meta.SupplierShares) > 0 {
+				supMap := make(map[string]*domain.SupplierShareSummary, len(prev.SupplierShares)+len(meta.SupplierShares))
+				var supOrder []string
+				for _, s := range prev.SupplierShares {
+					cp := s
+					supMap[s.SupplierName] = &cp
+					supOrder = append(supOrder, s.SupplierName)
+				}
+				for _, s := range meta.SupplierShares {
+					if existing, ok := supMap[s.SupplierName]; ok {
+						existing.TotalRevenue = math.Round((existing.TotalRevenue+s.TotalRevenue)*100) / 100
+						existing.TotalUnits += s.TotalUnits
+						if s.SKUCount > existing.SKUCount {
+							existing.SKUCount = s.SKUCount
+						}
+						if s.IsTenant {
+							existing.IsTenant = true
+						}
+					} else {
+						cp := s
+						supMap[s.SupplierName] = &cp
+						supOrder = append(supOrder, s.SupplierName)
+					}
+				}
+				totalMktRev := 0.0
+				mergedSups := make([]domain.SupplierShareSummary, 0, len(supOrder))
+				for _, name := range supOrder {
+					totalMktRev += supMap[name].TotalRevenue
+				}
+				for _, name := range supOrder {
+					it := *supMap[name]
+					if totalMktRev > 0 {
+						it.MarketShare = math.Round((it.TotalRevenue/totalMktRev)*10000) / 100
+					}
+					mergedSups = append(mergedSups, it)
+				}
+				sort.Slice(mergedSups, func(i, j int) bool {
+					return mergedSups[i].TotalRevenue > mergedSups[j].TotalRevenue
+				})
+				meta.SupplierShares = mergedSups
+			}
+
+			// Merge or preserve OOS metrics
+			if meta.OOSIncidents == 0 && prev.OOSIncidents > 0 {
+				meta.OOSIncidents = prev.OOSIncidents
+				meta.EstimatedLostRevenue = prev.EstimatedLostRevenue
+				meta.OOSRatePct = prev.OOSRatePct
+			} else if nonOverlappingMultiPeriod && prev.OOSIncidents > 0 && meta.OOSIncidents > 0 {
+				meta.OOSIncidents += prev.OOSIncidents
+				meta.EstimatedLostRevenue = math.Round((meta.EstimatedLostRevenue+prev.EstimatedLostRevenue)*100) / 100
+				if prev.OOSRatePct > 0 && meta.OOSRatePct > 0 {
+					meta.OOSRatePct = math.Round(((meta.OOSRatePct+prev.OOSRatePct)/2.0)*10) / 10
+				}
+			}
+		}
 		c.workbookMeta[slug] = meta
 	}
 
 	if len(meta.PricingItems) > 0 {
 		fullTenant := "tenant-" + slug
-		chainsInPricing := make(map[string]bool)
+		chainMonthsInPricing := make(map[string]bool)
+		chainsWithoutMonthInPricing := make(map[string]bool)
 		for _, item := range meta.PricingItems {
 			ch := strings.ToLower(strings.TrimSpace(item.RetailerChain))
 			if ch != "" {
-				chainsInPricing[ch] = true
+				if len(item.TransactionDate) >= 7 {
+					chainMonthsInPricing[ch+"|"+item.TransactionDate[:7]] = true
+				} else {
+					chainsWithoutMonthInPricing[ch] = true
+				}
 			}
 		}
 
@@ -1180,10 +1301,18 @@ func (c *Client) SetTenantWorkbookAnalytics(ctx context.Context, tenantID string
 				keptPricing = append(keptPricing, item)
 				continue
 			}
-			// Keep pricing items from other chains if they are not initial synthetic seed items
+			// Keep pricing items from other chains or non-overlapping months if they are not initial synthetic seed items
 			isSeed := strings.HasPrefix(item.Barcode, "622115500")
+			if isSeed {
+				continue
+			}
 			itemChain := strings.ToLower(strings.TrimSpace(item.RetailerChain))
-			if !isSeed && len(chainsInPricing) > 0 && itemChain != "" && !chainsInPricing[itemChain] {
+			itemMonth := ""
+			if len(item.TransactionDate) >= 7 {
+				itemMonth = item.TransactionDate[:7]
+			}
+			overwritten := chainsWithoutMonthInPricing[itemChain] || (itemMonth != "" && chainMonthsInPricing[itemChain+"|"+itemMonth])
+			if !overwritten {
 				item.Category = domain.NormalizeProductCategory(item.Category)
 				c.enrichPricingItemLocked(&item)
 				keptPricing = append(keptPricing, item)
@@ -1893,13 +2022,12 @@ func (c *Client) GetSellOutRecords(ctx context.Context, tenantID string, filter 
 		if !matchTenant(r.TenantID, tenantID) {
 			continue // Row-Level Security
 		}
-		if r.ItemCode == "" {
+		if r.ItemCode == "" || r.RecommendedPrice == 0 || r.FactoryUnitCost == 0 || r.CartonsSold == 0 {
 			c.enrichSellOutFactLocked(&r)
 		}
-		// Default to tenant's own SKUs unless user explicitly requests "all_market" or a specific competing supplier,
-		// or searches by barcode/name across the market
+		// Default to tenant's own SKUs unless user explicitly requests "all_market" or a specific competing supplier
 		if supFilter == "" || strings.EqualFold(supFilter, "own") || supFilter == "أصناف الشركة فقط" {
-			if qLower == "" && !isOwnRecord(r) {
+			if !isOwnRecord(r) {
 				continue
 			}
 		} else if !strings.EqualFold(supFilter, "all") && !strings.EqualFold(supFilter, "all_market") && supFilter != "الكل" && supFilter != "السوق الكامل (شامل المنافسين)" {

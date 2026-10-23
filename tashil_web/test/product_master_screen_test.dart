@@ -6,6 +6,45 @@ import 'package:tashil_web/features/product_master/presentation/screens/product_
 class _FakeProductMasterApiClient extends ApiClient {
   _FakeProductMasterApiClient() : super();
 
+  final List<ArchivedExcelFileModel> archivedSheets = [
+    const ArchivedExcelFileModel(
+      id: 'pm-seed-2',
+      tenantId: 'tenant-adeco',
+      fileType: 'product_master',
+      fileName: 'adeco_product_master_2026_09_01.xlsx',
+      contentType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      fileSizeBytes: 54200,
+      retailChain: 'product-master',
+      chainNameAr: 'كارتة الأصناف والأسعار (Product Master)',
+      chainNameEn: 'Product Master',
+      targetYear: '2026',
+      rowsIngested: 390,
+      branchesCount: 0,
+      totalRevenue: 0.0,
+      uploadedAt: '2026-09-01T10:00:00Z',
+    ),
+    const ArchivedExcelFileModel(
+      id: 'pm-seed-1',
+      tenantId: 'tenant-adeco',
+      fileType: 'product_master',
+      fileName: 'adeco_product_master_2026_08_01.xlsx',
+      contentType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      fileSizeBytes: 51200,
+      retailChain: 'product-master',
+      chainNameAr: 'كارتة الأصناف والأسعار (Product Master)',
+      chainNameEn: 'Product Master',
+      targetYear: '2026',
+      rowsIngested: 389,
+      branchesCount: 0,
+      totalRevenue: 0.0,
+      uploadedAt: '2026-08-01T10:00:00Z',
+    ),
+  ];
+
+  bool sheet2Deleted = false;
+
   @override
   Future<ProductMasterSummaryModel> getProductMaster({
     String? search,
@@ -15,23 +54,70 @@ class _FakeProductMasterApiClient extends ApiClient {
     String? itemType,
     String? packaging,
     String? pullStatus,
+    String? priceChange,
   }) async {
-    return const ProductMasterSummaryModel(
+    return ProductMasterSummaryModel(
       tenantId: 'tenant-adeco',
       companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
-      sheetDateLabel: 'تحديث 01-08-2026',
-      sourceFilename: 'adeco_product_master_2026_08_01.xlsx',
+      sheetDateLabel: sheet2Deleted ? 'تحديث 01-08-2026' : 'تحديث 01-09-2026',
+      sourceFilename: sheet2Deleted
+          ? 'adeco_product_master_2026_08_01.xlsx'
+          : 'adeco_product_master_2026_09_01.xlsx',
       totalSkus: 389,
       regularSkusCount: 280,
       promoSkusCount: 109,
       uniqueBarcodesCount: 363,
       activeInChainsCount: 185,
       unpulledSkusCount: 204,
+      priceIncreasedCount: sheet2Deleted ? 0 : 1,
+      priceDecreasedCount: sheet2Deleted ? 0 : 1,
+      priceUnchangedCount: sheet2Deleted ? 2 : 0,
+      newSkusCount: sheet2Deleted ? 0 : 1,
+      diffSummary: sheet2Deleted
+          ? null
+          : const ProductMasterDiffSummaryModel(
+              comparedAgainstFile: 'adeco_product_master_2026_08_01.xlsx',
+              newFileName: 'adeco_product_master_2026_09_01.xlsx',
+              comparedAt: '2026-09-01T10:00:00Z',
+              totalSkusCompared: 390,
+              priceIncreasedCount: 1,
+              priceDecreasedCount: 1,
+              priceUnchangedCount: 387,
+              newSkusCount: 1,
+              avgPriceIncreasePct: 12.5,
+              avgPriceDecreasePct: -8.3,
+              topChangedItems: [
+                ProductMasterDiffItemModel(
+                  itemCode: 'FGCL-0550-0001',
+                  officialName: 'كلوريل أبيض 1050 جم عبوة',
+                  brand: 'كلوريل (Clorel)',
+                  direction: 'up',
+                  oldUnitPriceIncl: 16.00,
+                  newUnitPriceIncl: 18.00,
+                  oldCartonPriceIncl: 192.00,
+                  newCartonPriceIncl: 216.00,
+                  diffEgp: 2.00,
+                  diffPct: 12.5,
+                ),
+                ProductMasterDiffItemModel(
+                  itemCode: 'PRCL-0102-0015',
+                  officialName: 'عرض فيبا توفير 3 لتر + 600 مل هدية شرنك',
+                  brand: 'فيبا (Feba)',
+                  direction: 'down',
+                  oldUnitPriceIncl: 120.00,
+                  newUnitPriceIncl: 110.00,
+                  oldCartonPriceIncl: 720.00,
+                  newCartonPriceIncl: 660.00,
+                  diffEgp: -10.00,
+                  diffPct: -8.3,
+                ),
+              ],
+            ),
       avgUnitsPerCarton: 12.0,
       defaultDiscountPct: 10.0,
-      availablePrefixes: ['FGCL', 'FGDW', 'PRCL'],
-      availableBrands: ['كلوريل (Clorel)', 'فيبا (Feba)'],
-      availablePackaging: ['عبوة', 'جركن', 'شرنك'],
+      availablePrefixes: const ['FGCL', 'FGDW', 'PRCL'],
+      availableBrands: const ['كلوريل (Clorel)', 'فيبا (Feba)'],
+      availablePackaging: const ['عبوة', 'جركن', 'شرنك'],
       items: [
         ProductMasterItemModel(
           serialNo: 1,
@@ -47,20 +133,24 @@ class _FakeProductMasterApiClient extends ApiClient {
           unitsPerCarton: 12,
           unitPriceExclVat: 15.79,
           vatRate: 0.14,
-          unitPriceInclVat: 18.00,
+          unitPriceInclVat: sheet2Deleted ? 16.00 : 18.00,
           cartonPriceExclVat: 189.47,
-          cartonPriceInclVat: 216.00,
+          cartonPriceInclVat: sheet2Deleted ? 192.00 : 216.00,
           invoiceDiscountPct: 10.0,
           extraDiscountPct: 0.0,
-          netUnitInvoiceCost: 16.20,
-          netCartonInvoiceCost: 194.40,
+          netUnitInvoiceCost: sheet2Deleted ? 14.40 : 16.20,
+          netCartonInvoiceCost: sheet2Deleted ? 172.80 : 194.40,
+          prevUnitPriceInclVat: sheet2Deleted ? 0.0 : 16.00,
+          priceChangeDirection: sheet2Deleted ? 'same' : 'up',
+          priceChangeDiffEgp: sheet2Deleted ? 0.0 : 2.00,
+          priceChangePct: sheet2Deleted ? 0.0 : 12.5,
           itemType: 'عادي',
           isActiveInChains: true,
           totalPosUnitsSold: 4200,
           totalPosCartonsSold: 350,
           totalPosRevenue: 81900,
           avgRetailSellingPrice: 19.50,
-          activeChains: ['carrefour', 'fathalla'],
+          activeChains: const ['carrefour', 'fathalla'],
         ),
         ProductMasterItemModel(
           serialNo: 210,
@@ -76,16 +166,46 @@ class _FakeProductMasterApiClient extends ApiClient {
           unitsPerCarton: 6,
           unitPriceExclVat: 96.49,
           vatRate: 0.14,
-          unitPriceInclVat: 110.00,
+          unitPriceInclVat: sheet2Deleted ? 120.00 : 110.00,
           cartonPriceExclVat: 578.95,
-          cartonPriceInclVat: 660.00,
+          cartonPriceInclVat: sheet2Deleted ? 720.00 : 660.00,
           invoiceDiscountPct: 10.0,
           extraDiscountPct: 0.0,
-          netUnitInvoiceCost: 99.00,
-          netCartonInvoiceCost: 594.00,
+          netUnitInvoiceCost: sheet2Deleted ? 108.00 : 99.00,
+          netCartonInvoiceCost: sheet2Deleted ? 648.00 : 594.00,
+          prevUnitPriceInclVat: sheet2Deleted ? 0.0 : 120.00,
+          priceChangeDirection: sheet2Deleted ? 'same' : 'down',
+          priceChangeDiffEgp: sheet2Deleted ? 0.0 : -10.00,
+          priceChangePct: sheet2Deleted ? 0.0 : -8.3,
           itemType: 'عرض',
           isActiveInChains: false,
         ),
+        if (!sheet2Deleted)
+          const ProductMasterItemModel(
+            serialNo: 390,
+            itemCode: 'FGDW-0200-0099',
+            itemCodePrefix: 'FGDW',
+            erpPrefix: 'FGDW',
+            departmentAr: 'قسم غسالات الأطباق',
+            officialName: 'أقراص فيبا غسالات أطباق 30 قرص جديد',
+            barcode: '6221133009999',
+            category: 'منظفات الأطباق',
+            brand: 'فيبا (Feba)',
+            packagingType: 'عبوة',
+            unitsPerCarton: 12,
+            unitPriceExclVat: 131.58,
+            vatRate: 0.14,
+            unitPriceInclVat: 150.00,
+            cartonPriceExclVat: 1578.95,
+            cartonPriceInclVat: 1800.00,
+            invoiceDiscountPct: 10.0,
+            extraDiscountPct: 0.0,
+            netUnitInvoiceCost: 135.00,
+            netCartonInvoiceCost: 1620.00,
+            priceChangeDirection: 'new',
+            itemType: 'عادي',
+            isActiveInChains: false,
+          ),
       ],
     );
   }
@@ -98,41 +218,61 @@ class _FakeProductMasterApiClient extends ApiClient {
     String? targetTenant,
     String? fileType,
   }) async {
-    return const UploadedFilesArchiveResponse(
+    return UploadedFilesArchiveResponse(
       tenantId: 'tenant-adeco',
-      totalCount: 1,
-      chainCounts: {'product-master': 1},
-      files: [
-        ArchivedExcelFileModel(
-          id: 'pm-seed-1',
-          tenantId: 'tenant-adeco',
-          fileType: 'product_master',
-          fileName: 'adeco_product_master_2026_08_01.xlsx',
-          contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          fileSizeBytes: 51200,
-          retailChain: 'product-master',
-          chainNameAr: 'كارتة الأصناف والأسعار (Product Master)',
-          chainNameEn: 'Product Master',
-          targetYear: '2026',
-          rowsIngested: 389,
-          branchesCount: 0,
-          totalRevenue: 0.0,
-          uploadedAt: '2026-08-01T10:00:00Z',
-        ),
-      ],
+      totalCount: archivedSheets.length,
+      chainCounts: {'product-master': archivedSheets.length},
+      files: List.unmodifiable(archivedSheets),
     );
+  }
+
+  @override
+  Future<bool> deleteArchivedFile(
+    String archiveId, {
+    String? targetTenant,
+    String? fileName,
+    bool isSellIn = false,
+    bool isProductMaster = false,
+  }) async {
+    archivedSheets.removeWhere((f) => f.id == archiveId);
+    if (archiveId == 'pm-seed-2') {
+      sheet2Deleted = true;
+    }
+    return true;
   }
 }
 
 void main() {
   group('ProductMasterItemModel & ProductMasterSummaryModel JSON normalization', () {
-    test('normalizes backend decimal discount ratios (0.10 -> 10.0%) and preserves >1 percentages', () {
+    test('normalizes backend decimal discount ratios (0.10 -> 10.0%), price diffs, and preserves >1 percentages', () {
       final summary = ProductMasterSummaryModel.fromJson({
         'tenant_id': 'tenant-adeco',
         'total_skus': 389,
         'active_in_chains_count': 185,
         'unpulled_skus_count': 204,
+        'price_increased_count': 12,
+        'price_decreased_count': 3,
+        'new_skus_count': 2,
         'default_discount_pct': 0.10,
+        'diff_summary': {
+          'compared_against_file': 'old.xlsx',
+          'new_file_name': 'new.xlsx',
+          'price_increased_count': 12,
+          'price_decreased_count': 3,
+          'new_skus_count': 2,
+          'avg_price_increase_pct': 5.4,
+          'top_changed_items': [
+            {
+              'item_code': 'FGGC-0600-0007',
+              'official_name': 'ملمع زجاج جلاسى أزرق 600 مل بمسدس',
+              'direction': 'up',
+              'old_unit_price_incl': 25.0,
+              'new_unit_price_incl': 28.0,
+              'diff_egp': 3.0,
+              'diff_pct': 12.0,
+            }
+          ],
+        },
         'items': [
           {
             'serial_no': 1,
@@ -145,6 +285,10 @@ void main() {
             'brand': 'جلاسي (Glassy)',
             'invoice_discount_pct': 0.10,
             'extra_discount_pct': 0.05,
+            'prev_unit_price_incl_vat': 25.0,
+            'price_change_direction': 'up',
+            'price_change_diff_egp': 3.0,
+            'price_change_pct': 12.0,
             'is_active_in_chains': true,
             'total_pos_units_sold': 1200,
           }
@@ -154,11 +298,29 @@ void main() {
       expect(summary.defaultDiscountPct, closeTo(10.0, 0.001));
       expect(summary.activeInChainsCount, equals(185));
       expect(summary.unpulledSkusCount, equals(204));
+      expect(summary.priceIncreasedCount, equals(12));
+      expect(summary.priceDecreasedCount, equals(3));
+      expect(summary.newSkusCount, equals(2));
+      expect(summary.diffSummary, isNotNull);
+      expect(summary.diffSummary!.topChangedItems.first.direction, equals('up'));
       expect(summary.items.first.invoiceDiscountPct, closeTo(10.0, 0.001));
       expect(summary.items.first.extraDiscountPct, closeTo(5.0, 0.001));
+      expect(summary.items.first.priceChangeDirection, equals('up'));
+      expect(summary.items.first.prevUnitPriceInclVat, closeTo(25.0, 0.001));
+      expect(summary.items.first.priceChangePct, closeTo(12.0, 0.001));
       expect(summary.items.first.erpPrefix, equals('FGGC'));
       expect(summary.items.first.departmentAr, equals('قسم منظفات الزجاج والأسطح'));
       expect(summary.items.first.isActiveInChains, isTrue);
+    });
+
+    test('sets empty sourceFilename when total_skus is 0 and items is empty so no zombie seed bubble is synthesized', () {
+      final emptySummary = ProductMasterSummaryModel.fromJson({
+        'tenant_id': 'tenant-adeco',
+        'total_skus': 0,
+        'items': const [],
+      });
+      expect(emptySummary.totalSkus, equals(0));
+      expect(emptySummary.sourceFilename, isEmpty);
     });
   });
 
@@ -239,7 +401,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify header, 5th KPI card, and both SKUs are rendered
+    // Verify header, 5th KPI card, and SKUs are rendered
     expect(find.textContaining('كارتة الأصناف والأسعار المعتمدة'), findsOneWidget);
     expect(find.textContaining('التغطية والسحب بالسلاسل'), findsOneWidget);
     expect(find.text('FGCL-0550-0001'), findsWidgets);
@@ -265,5 +427,97 @@ void main() {
     await tester.tap(find.textContaining('حاسبة الطلبيات والخصومات والهامش'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('product_master_export_order_csv_btn')), findsOneWidget);
+  });
+
+  testWidgets(
+      'ProductMasterScreen displays price change indicators, filters by price changes, opens Diff Summary modal, and manages File Sheets with rollback on delete',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final client = _FakeProductMasterApiClient();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProductMasterScreen(apiClient: client),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. Verify inline price change indicators next to product prices
+    expect(
+      find.byKey(const ValueKey('price_indicator_FGCL-0550-0001_up')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('price_indicator_PRCL-0102-0015_down')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('price_indicator_FGDW-0200-0099_new')),
+      findsOneWidget,
+    );
+
+    // 2. Test Quick Price-Change Filter Chips (زاد السعر / انخفض السعر / أصناف جديدة)
+    await tester.tap(find.byKey(const ValueKey('price_filter_up')));
+    await tester.pumpAndSettle();
+    expect(find.text('FGCL-0550-0001'), findsWidgets);
+    expect(find.text('PRCL-0102-0015'), findsNothing);
+    expect(find.text('FGDW-0200-0099'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('price_filter_down')));
+    await tester.pumpAndSettle();
+    expect(find.text('PRCL-0102-0015'), findsWidgets);
+    expect(find.text('FGCL-0550-0001'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('price_filter_new')));
+    await tester.pumpAndSettle();
+    expect(find.text('FGDW-0200-0099'), findsWidgets);
+    expect(find.text('FGCL-0550-0001'), findsNothing);
+
+    // Reset back to all
+    await tester.tap(find.byKey(const ValueKey('price_filter_all')));
+    await tester.pumpAndSettle();
+    expect(find.text('FGCL-0550-0001'), findsWidgets);
+    expect(find.text('PRCL-0102-0015'), findsWidgets);
+
+    // 3. Open Diff Summary Modal and click "عرض الأصناف المتغيرة فقط في الجدول"
+    final diffBtn = find.byKey(const ValueKey('product_master_open_diff_summary_btn'));
+    expect(diffBtn, findsOneWidget);
+    await tester.tap(diffBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('ملخص مقارنة الشيت الجديد'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('diff_dialog_filter_changed_btn')));
+    await tester.pumpAndSettle();
+
+    // 4. Open File Sheets modal, verify sheet bubbles, and delete the latest sheet to trigger rollback
+    final fileSheetsBtn = find.byKey(const ValueKey('product_master_file_sheets_btn'));
+    expect(fileSheetsBtn, findsOneWidget);
+    await tester.tap(fileSheetsBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('شيتات الأسعار المرفوعة (File Sheets)'), findsOneWidget);
+    expect(find.text('adeco_product_master_2026_09_01.xlsx'), findsWidgets);
+    expect(find.text('adeco_product_master_2026_08_01.xlsx'), findsWidgets);
+
+    // Delete the 2026-09-01 sheet bubble
+    await tester.tap(find.byKey(const ValueKey('delete_file_sheet_btn_pm-seed-2')));
+    await tester.pumpAndSettle();
+
+    // Confirm deletion in confirmation dialog
+    expect(find.textContaining('حذف شيت الأسعار وإلغاء تأثيراته'), findsOneWidget);
+    await tester.tap(find.text('تأكيد الحذف واسترجاع الأسعار'));
+    await tester.pumpAndSettle();
+
+    // Verify rollback occurred: sheet2Deleted is true, new SKU FGDW-0200-0099 is gone, and active sheet is 2026_08_01
+    expect(client.sheet2Deleted, isTrue);
+    expect(find.text('FGDW-0200-0099'), findsNothing);
+    expect(find.textContaining('تحديث 01-08-2026'), findsWidgets);
   });
 }

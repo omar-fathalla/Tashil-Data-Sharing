@@ -40,13 +40,34 @@ type SellInRecord struct {
 	KAOfficer          string    `json:"ka_officer"`           // مسؤول الحسابات (officer)
 	SalesRep           string    `json:"sales_rep"`            // مندوب المبيعات (عمود 10)
 	NetQtyCases        float64   `json:"net_qty_cases"`        // صافي الكمية الفعلية بالكرتونة
-	NetValueEGP        float64   `json:"net_value_egp"`        // صافي القيمة الفعلية بالجنيه
+	NetValueEGP        float64   `json:"net_value_egp"`        // صافي القيمة الفعلية بالجنيه (بدون ضريبة القيمة المضافة)
 	TurnoverEGP        float64   `json:"turnover_egp"`         // إجمالي المسحوبات (t.o)
 	WeightTons         float64   `json:"weight_tons"`          // الوزن بالطن
 	ExpectedQtyCases   float64   `json:"expected_qty_cases"`   // الكمية المتوقعة بنهاية الشهر (Q EXP.)
 	ExpectedValueEGP   float64   `json:"expected_value_egp"`   // القيمة المتوقعة بنهاية الشهر (V EXP.)
 	TransactionType    string    `json:"transaction_type"`     // مسحوبات بيع (Sale) | مرتجع (Return) | صفري (Zero)
 	IngestedAt         time.Time `json:"ingested_at"`
+
+	// Canonical Product Master & Tax/Discount Enrichment (3-Way Linkage)
+	TotalUnitsSupplied       int     `json:"total_units_supplied"`         // NetQtyCases * UnitsPerCarton (الكمية بالقطعة)
+	OfficialUnitExclVATEGP   float64 `json:"official_unit_excl_vat_egp"`   // سعر القطعة الرسمي غير شامل الضريبة
+	OfficialUnitInclVATEGP   float64 `json:"official_unit_incl_vat_egp"`   // سعر القطعة الرسمي شامل 14% ضريبة
+	OfficialCartonExclVATEGP float64 `json:"official_carton_excl_vat_egp"` // سعر الكرتونة الرسمي غير شامل الضريبة
+	OfficialCartonInclVATEGP float64 `json:"official_carton_incl_vat_egp"` // سعر الكرتونة الرسمي شامل 14% ضريبة
+	NetCartonInvoiceCostEGP  float64 `json:"net_carton_invoice_cost_egp"`  // صافي تكلفة الكرتونة بعد الخصم وشامل الضريبة
+	InvoiceDiscountPct       float64 `json:"invoice_discount_pct"`         // نسبة خصم الفاتورة الرسمي (e.g. 10%)
+	ExtraDiscountPct         float64 `json:"extra_discount_pct"`           // نسبة الخصم الإضافي/التعاقدي
+	VATRate                  float64 `json:"vat_rate"`                     // 0.14 (14% ضريبة القيمة المضافة)
+	GrossValueInclVATEGP     float64 `json:"gross_value_incl_vat_egp"`     // NetValueEGP * 1.14 (الإجمالي شامل الضريبة)
+	VATAmountEGP             float64 `json:"vat_amount_egp"`               // GrossValueInclVATEGP - NetValueEGP (قيمة الضريبة 14%)
+	OfficialListValueExclEGP float64 `json:"official_list_value_excl_egp"` // NetQtyCases * OfficialCartonExclVATEGP (القيمة بالسعر الرسمي قبل الخصم)
+	DiscountGrantedEGP       float64 `json:"discount_granted_egp"`         // OfficialListValueExclEGP - NetValueEGP (قيمة الخصم الممنوح)
+	EffectiveDiscountPct     float64 `json:"effective_discount_pct"`       // نسبة الخصم الفعلي المحققة %
+	ActualCasePriceExclEGP   float64 `json:"actual_case_price_excl_egp"`   // NetValueEGP / NetQtyCases (سعر الكرتونة الفعلي بالبيان)
+	PriceVariancePct         float64 `json:"price_variance_pct"`           // نسبة انحراف السعر الفعلي عن الكارتة %
+	PricingWaveStatus        string  `json:"pricing_wave_status"`          // "current_list" | "historical_pre_aug" | "promo_discounted" | "unmatched"
+	DepartmentAr             string  `json:"department_ar,omitempty"`      // القسم الإنتاجي (منظفات سائلة / بودر / معطر / رابيدو)
+	CanonicalFamilyKey       string  `json:"canonical_family_key,omitempty"`
 }
 
 // ReconciliationMonthItem compares Supplier Sell-In vs Retailer Cashier Sell-Out for a given month.
@@ -56,23 +77,34 @@ type ReconciliationMonthItem struct {
 	MonthEN              string  `json:"month_en"`
 	MonthAR              string  `json:"month_ar"`
 	PeriodStatus         string  `json:"period_status"`           // مغلق (Full Month) | قيد الإغلاق (W1+W2 Run-Rate)
+	HasActualSellOut     bool    `json:"has_actual_sell_out"`     // true فقط للأشهر التي يتوفر لها شيت كاشير فعلي (Jan..Aug)
 	ActiveSKUsCount      int     `json:"active_skus_count"`
 	OpeningStockCases    float64 `json:"opening_stock_cases"`     // رصيد أول المدة بالكرتونة
 	OpeningStockValueEGP float64 `json:"opening_stock_value_egp"` // رصيد أول المدة بالجنيه
 	SellInCases          float64 `json:"sell_in_cases"`           // التوريد بالكرتونة
-	SellInValueEGP       float64 `json:"sell_in_value_egp"`       // قيمة التوريد الفعلي (Sell-In)
+	SellInUnits          int     `json:"sell_in_units"`           // التوريد بالقطعة
+	SellInValueEGP       float64 `json:"sell_in_value_egp"`       // قيمة التوريد الفعلي صافي بدون ضريبة (Sell-In Excl. VAT)
+	SellInGrossInclVATEGP float64 `json:"sell_in_gross_incl_vat_egp"` // قيمة التوريد الفعلي شامل 14% ضريبة
+	SellInVATAmountEGP   float64 `json:"sell_in_vat_amount_egp"`  // ضريبة القيمة المضافة على التوريد (14%)
 	SellOutUnits         int     `json:"sell_out_units"`          // مبيعات الكاشير بالقطعة
-	SellOutEstCases      float64 `json:"sell_out_est_cases"`      // مبيعات الكاشير المعادلة بالكرتونة
-	SellOutValueEGP      float64 `json:"sell_out_value_egp"`      // مبيعات الكاشير بالجنيه (Sell-Out)
+	SellOutEstCases      float64 `json:"sell_out_est_cases"`      // مبيعات الكاشير المعادلة بالكرتونة (باستخدام شد الكارتة الفعلي)
+	SellOutValueEGP      float64 `json:"sell_out_value_egp"`      // مبيعات الكاشير بسعر المستهلك بالجنيه (POS Sell-Out)
+	SellOutFactoryCostExclVATEGP float64 `json:"sell_out_factory_cost_excl_vat_egp"` // تكلفة مبيعات الكاشير بسعر المصنع صافي بدون ضريبة
+	SellOutFactoryCostInclVATEGP float64 `json:"sell_out_factory_cost_incl_vat_egp"` // تكلفة مبيعات الكاشير بسعر المصنع شامل الضريبة والخصم
+	ChainGrossMarginEGP  float64 `json:"chain_gross_margin_egp"`  // ربح السلسلة المحقق (SellOutValueEGP - SellOutFactoryCostInclVATEGP)
+	ChainGrossMarginPct  float64 `json:"chain_gross_margin_pct"`  // هامش ربح السلسلة %
 	MonthlyNetCases      float64 `json:"monthly_net_cases"`       // صافي حركة الشهر بالكرتونة (Sell-In - Sell-Out)
 	MonthlyNetValueEGP   float64 `json:"monthly_net_value_egp"`   // صافي حركة الشهر بالجنيه (Sell-In - Sell-Out)
 	ClosingStockCases    float64 `json:"closing_stock_cases"`     // الرصيد المتبقي التراكمي آخر الشهر بالكرتونة
 	ClosingStockValueEGP float64 `json:"closing_stock_value_egp"` // الرصيد المتبقي التراكمي آخر الشهر بالجنيه
 	InventoryGapEGP      float64 `json:"inventory_gap_egp"`       // الفجوة المخزنية (Sell-In - Sell-Out)
-	SellThroughRatePct   float64 `json:"sell_through_rate_pct"`   // معدل تصريف المخزون (Sell-Out / Sell-In %)
+	SellThroughRatePct   float64 `json:"sell_through_rate_pct"`   // معدل تصريف المخزون بالكرتونة (Sell-Out Cases / Sell-In Cases %)
 	WeightTons           float64 `json:"weight_tons"`             // الوزن بالطن
 	ExpectedCases        float64 `json:"expected_cases"`          // الكمية المتوقعة بنهاية الشهر (EXP)
 	ExpectedValueEGP     float64 `json:"expected_value_egp"`      // القيمة المتوقعة بنهاية الشهر (EXP)
+	PrevYearSellOutUnits int     `json:"prev_year_sell_out_units"`// مبيعات الكاشير لنفس الشهر من العام السابق 2025 (قطعة)
+	PrevYearSellOutValueEGP float64 `json:"prev_year_sell_out_value_egp"` // مبيعات الكاشير لنفس الشهر من العام السابق 2025 (ج.م)
+	YoYSellOutGrowthPct  float64 `json:"yoy_sell_out_growth_pct"` // نسبة النمو السنوي في السحب الفعلي (2026 مقابل 2025)
 	StockHealthStatus    string  `json:"stock_health_status"`     // accumulation | balanced | drawdown | awaiting_sell_out | awaiting_sell_in
 	StockHealthLabelAr   string  `json:"stock_health_label_ar"`   // توصية الشهر بالعربية
 }
@@ -83,7 +115,13 @@ type SKUBranchInventoryItem struct {
 	Barcode                string  `json:"barcode,omitempty"`
 	UnitsPerCarton         int     `json:"units_per_carton,omitempty"`
 	ItemType               string  `json:"item_type,omitempty"`
+	DepartmentAr           string  `json:"department_ar,omitempty"`
 	FactoryCartonCost      float64 `json:"factory_carton_cost,omitempty"`
+	OfficialCartonExclVATEGP float64 `json:"official_carton_excl_vat_egp,omitempty"`
+	OfficialCartonInclVATEGP float64 `json:"official_carton_incl_vat_egp,omitempty"`
+	OfficialUnitInclVATEGP float64 `json:"official_unit_incl_vat_egp,omitempty"`
+	AvgRetailPOSPriceEGP   float64 `json:"avg_retail_pos_price_egp,omitempty"`
+	RetailerMarginPct      float64 `json:"retailer_margin_pct,omitempty"`
 	SKUName                string  `json:"sku_name"`
 	Brand                  string  `json:"brand"`
 	Sector                 string  `json:"sector"`      // MT | CC
@@ -91,22 +129,36 @@ type SKUBranchInventoryItem struct {
 	RegionCode             string  `json:"region_code"` // ALX, CIR, TNT, BHR, MNS
 	Governorate            string  `json:"governorate"`
 	SalesRep               string  `json:"sales_rep"`
-	SellInCases            float64 `json:"sell_in_cases"`             // إجمالي التوريد بالكرتونة
-	SellInValueEGP         float64 `json:"sell_in_value_egp"`         // إجمالي قيمة التوريد
-	SellOutEstCases        float64 `json:"sell_out_est_cases"`        // المبيعات الفعلية المعادلة بالكرتونة
-	SellOutValueEGP        float64 `json:"sell_out_value_egp"`        // قيمة المبيعات الفعلية للكاشير
+	SellInCases            float64 `json:"sell_in_cases"`             // إجمالي التوريد بالكرتونة (Full YTD)
+	SellInUnits            int     `json:"sell_in_units"`             // إجمالي التوريد بالقطعة
+	SellInValueEGP         float64 `json:"sell_in_value_egp"`         // إجمالي قيمة التوريد (صافي بدون ضريبة)
+	SellInGrossInclVATEGP  float64 `json:"sell_in_gross_incl_vat_egp"`// إجمالي قيمة التوريد شامل 14% ضريبة
+	MatchedSellInCases     float64 `json:"matched_sell_in_cases"`     // التوريد خلال الفترة المتطابقة (يناير-أغسطس) بالكرتونة
+	MatchedSellInValueEGP  float64 `json:"matched_sell_in_value_egp"` // قيمة التوريد خلال الفترة المتطابقة (يناير-أغسطس)
+	PendingSellInCases     float64 `json:"pending_sell_in_cases"`     // توريد بانتظار شيتات الكاشير (سبتمبر-أكتوبر) بالكرتونة
+	PendingSellInValueEGP  float64 `json:"pending_sell_in_value_egp"` // قيمة توريد بانتظار شيتات الكاشير (سبتمبر-أكتوبر)
+	SellOutUnits           int     `json:"sell_out_units"`            // المبيعات الفعلية للكاشير بالقطعة
+	SellOutEstCases        float64 `json:"sell_out_est_cases"`        // المبيعات الفعلية المعادلة بالكرتونة (SellOutUnits / UnitsPerCarton)
+	SellOutValueEGP        float64 `json:"sell_out_value_egp"`        // قيمة المبيعات الفعلية للكاشير بسعر المستهلك
+	SellOutFactoryCostEGP  float64 `json:"sell_out_factory_cost_egp"` // تكلفة المبيعات الفعلية بسعر المصنع
+	ChainGrossMarginEGP    float64 `json:"chain_gross_margin_egp"`    // ربح السلسلة على الصنف بالجنيه
 	ReturnCases            float64 `json:"return_cases"`              // المرتجعات بالكرتونة
 	ReturnValueEGP         float64 `json:"return_value_egp"`          // قيمة المرتجعات
-	EstimatedStockCases    float64 `json:"estimated_stock_cases"`     // الرصيد التقديري الحالي بالكرتونة
-	EstimatedStockValueEGP float64 `json:"estimated_stock_value_egp"` // قيمة الرصيد التقديري الحالي بالجنيه
-	DailyRunRateCases      float64 `json:"daily_run_rate_cases"`      // معدل السحب اليومي بالكرتونة (ADR)
+	EstimatedStockCases    float64 `json:"estimated_stock_cases"`     // الرصيد الدفتري الحقيقي بالكرتونة
+	EstimatedStockUnits    int     `json:"estimated_stock_units"`     // الرصيد الدفتري الحقيقي بالقطعة
+	EstimatedStockValueEGP float64 `json:"estimated_stock_value_egp"` // قيمة الرصيد الدفتري الحقيقي بالجنيه (بسعر كارتة الأصناف)
+	MatchedRemainingCases  float64 `json:"matched_remaining_cases"`   // الرصيد الدفتري بنهاية الفترة المتطابقة (أغسطس) بالكرتونة
+	MatchedRemainingValueEGP float64 `json:"matched_remaining_value_egp"` // قيمة الرصيد بنهاية الفترة المتطابقة (أغسطس)
+	SellThroughPct         float64 `json:"sell_through_pct"`          // نسبة التصريف الحقيقية للصنف %
+	DailyRunRateCases      float64 `json:"daily_run_rate_cases"`      // معدل السحب اليومي الحقيقي بالكرتونة (ADR)
 	DaysOfInventory        float64 `json:"days_of_inventory"`         // أيام تغطية المخزون (DOI)
 	StockStatus            string  `json:"stock_status"`              // urgent_replenishment | optimal | overstock
 	StockStatusAr          string  `json:"stock_status_ar"`           // خطر نفاد عاجل | رصيد آمن | تكدس مخزني
-	CasePriceEGP           float64 `json:"case_price_egp"`            // متوسط سعر الكرتونة
+	CasePriceEGP           float64 `json:"case_price_egp"`            // سعر الكرتونة المعتمد لحساب أوامر التوريد
 	WeightTons             float64 `json:"weight_tons"`
 	SuggestedPOCases       int     `json:"suggested_po_cases"`        // أمر التوريد المقترح (مقرب لكرتونة كاملة)
-	SuggestedPOValueEGP    float64 `json:"suggested_po_value_egp"`    // قيمة أمر التوريد المقترح بالجنيه
+	SuggestedPOValueEGP    float64 `json:"suggested_po_value_egp"`    // قيمة أمر التوريد المقترح بالجنيه (صافي الفاتورة)
+	SuggestedPOGrossInclVATEGP float64 `json:"suggested_po_gross_incl_vat_egp"` // قيمة أمر التوريد المقترح شامل 14% ضريبة
 	SuggestedPOTons        float64 `json:"suggested_po_tons"`         // وزن أمر التوريد المقترح بالطن
 }
 
@@ -232,6 +284,32 @@ type CPFRDashboardPayload struct {
 	OverstockAlertCount      int                       `json:"overstock_alert_count"`
 	LeadTimeDays             int                       `json:"lead_time_days"`
 	SafetyStockDays          int                       `json:"safety_stock_days"`
+
+	// Dynamic Matched Period (Sell-In × Sell-Out × Product Master) KPIs
+	MatchedMonthsCount              int     `json:"matched_months_count"`                 // عدد الأشهر المتطابقة فعلياً (e.g. 8: Jan-Aug)
+	MatchedPeriodLabel              string  `json:"matched_period_label"`                 // "يناير - أغسطس 2026 (8 أشهر متطابقة)"
+	MatchedSellInCases              float64 `json:"matched_sell_in_cases"`                // إجمالي التوريد في الأشهر المتطابقة بالكرتونة
+	MatchedSellInValueExclVATEGP    float64 `json:"matched_sell_in_value_excl_vat_egp"`   // إجمالي التوريد صافي بدون ضريبة في الأشهر المتطابقة
+	MatchedSellInGrossInclVATEGP    float64 `json:"matched_sell_in_gross_incl_vat_egp"`   // إجمالي التوريد شامل الضريبة 14% في الأشهر المتطابقة
+	MatchedSellOutUnits             int     `json:"matched_sell_out_units"`               // إجمالي مبيعات الكاشير بالقطعة في الأشهر المتطابقة
+	MatchedSellOutCases             float64 `json:"matched_sell_out_cases"`               // إجمالي مبيعات الكاشير بالكرتونة (بشد الكارتة الحقيقي)
+	MatchedSellOutPOSValueEGP       float64 `json:"matched_sell_out_pos_value_egp"`       // إجمالي مبيعات الكاشير بسعر المستهلك بالجنيه
+	MatchedSellOutFactoryCostEGP    float64 `json:"matched_sell_out_factory_cost_egp"`    // تكلفة مبيعات الكاشير بسعر فاتورة المصنع
+	MatchedRemainingCases           float64 `json:"matched_remaining_cases"`              // الرصيد الدفتري الفعلي المتبقي بنهاية الفترة المتطابقة (كرتونة)
+	MatchedRemainingFactoryValueEGP float64 `json:"matched_remaining_factory_value_egp"`  // قيمة الرصيد الدفتري المتبقي بسعر المصنع (ج.م)
+	MatchedSellThroughPct           float64 `json:"matched_sell_through_pct"`             // نسبة التصريف الحقيقية بالكرتونة %
+	MatchedChainGrossMarginEGP      float64 `json:"matched_chain_gross_margin_egp"`       // إجمالي ربح السلسلة المحقق (POS - Factory Cost)
+	MatchedChainGrossMarginPct      float64 `json:"matched_chain_gross_margin_pct"`       // متوسط هامش ربح السلسلة المحقق %
+	MatchedYoYUnitsGrowthPct        float64 `json:"matched_yoy_units_growth_pct"`         // نمو مبيعات القطع 2026 مقابل 2025 لنفس الأشهر %
+	MatchedYoYValueGrowthPct        float64 `json:"matched_yoy_value_growth_pct"`         // نمو مبيعات القيمة 2026 مقابل 2025 لنفس الأشهر %
+	PendingSellOutMonthsCount       int     `json:"pending_sell_out_months_count"`        // عدد أشهر التوريد بانتظار شيت الكاشير (e.g. 2: Sep-Oct)
+	PendingSellOutPeriodLabel       string  `json:"pending_sell_out_period_label"`        // "سبتمبر - أكتوبر 2026"
+	PendingSellOutCases             float64 `json:"pending_sell_out_cases"`               // كراتين موردة في سبتمبر وأكتوبر بانتظار شيت الكاشير
+	PendingSellOutValueEGP          float64 `json:"pending_sell_out_value_egp"`            // قيمة التوريد في سبتمبر وأكتوبر بانتظار شيت الكاشير
+	YTD2026GrossInclVATEGP          float64 `json:"ytd_2026_gross_incl_vat_egp"`          // إجمالي التوريد السنوي شامل الضريبة 14%
+	YTD2026VATAmountEGP             float64 `json:"ytd_2026_vat_amount_egp"`              // إجمالي ضريبة القيمة المضافة 14% السنوية
+	YTD2026TotalUnits               int     `json:"ytd_2026_total_units"`                 // إجمالي الوحدات (القطع) الموردة سنوياً
+
 	MonthlyReconciliation    []ReconciliationMonthItem `json:"monthly_reconciliation"`
 	InventoryAndPOItems      []SKUBranchInventoryItem  `json:"inventory_and_po_items"`
 	BrandForecasts           []BrandForecastItem       `json:"brand_forecasts"`
@@ -242,30 +320,35 @@ type CPFRDashboardPayload struct {
 
 // TargetSKUBreakdown represents the SKU-level target allocation inside a specific branch or rolled up across an entire chain.
 type TargetSKUBreakdown struct {
-	ItemCode            string  `json:"item_code,omitempty"`
-	Barcode             string  `json:"barcode,omitempty"`
-	UnitsPerCarton      int     `json:"units_per_carton,omitempty"`
-	SKUName             string  `json:"sku_name"`
-	Brand               string  `json:"brand"`
-	Sector              string  `json:"sector"` // "MT" | "CC"
-	SubCategory         string  `json:"sub_category"`
-	SharePct            float64 `json:"share_pct"`
-	CasePriceEGP        float64 `json:"case_price_egp"`
-	TargetRevenueEGP    float64 `json:"target_revenue_egp"`
-	TargetUnits         float64 `json:"target_units"` // Cases for Sell-In
-	TargetWeightTons    float64 `json:"target_weight_tons"`
-	ActualRevenueEGP    float64 `json:"actual_revenue_egp"`
-	ActualUnits         float64 `json:"actual_units"`
-	ActualWeightTons    float64 `json:"actual_weight_tons"`
-	ExpectedRevenueEGP  float64 `json:"expected_revenue_egp"`
-	ExpectedUnits       float64 `json:"expected_units"`
-	VarianceRevenueEGP  float64 `json:"variance_revenue_egp"`
-	VarianceUnits       float64 `json:"variance_units"`
-	AchievementPct      float64 `json:"achievement_pct"`
-	RemainingStockCases float64 `json:"remaining_stock_cases"`
-	StockStatus         string  `json:"stock_status"`    // "urgent_replenishment" | "optimal" | "overstock"
-	StockStatusAr       string  `json:"stock_status_ar"` // "سحب عالي / أولوية توريد" | "رصيد آمن ومتوازن" | "تكدس مخزني - تهدئة توريد"
-	PromoSharePct       float64 `json:"promo_share_pct"`
+	ItemCode                 string  `json:"item_code,omitempty"`
+	Barcode                  string  `json:"barcode,omitempty"`
+	UnitsPerCarton           int     `json:"units_per_carton,omitempty"`
+	DepartmentAr             string  `json:"department_ar,omitempty"`
+	OfficialCartonExclVATEGP float64 `json:"official_carton_excl_vat_egp,omitempty"`
+	OfficialCartonInclVATEGP float64 `json:"official_carton_incl_vat_egp,omitempty"`
+	TargetPieces             int     `json:"target_pieces,omitempty"`
+	ActualPieces             int     `json:"actual_pieces,omitempty"`
+	SKUName                  string  `json:"sku_name"`
+	Brand                    string  `json:"brand"`
+	Sector                   string  `json:"sector"` // "MT" | "CC"
+	SubCategory              string  `json:"sub_category"`
+	SharePct                 float64 `json:"share_pct"`
+	CasePriceEGP             float64 `json:"case_price_egp"`
+	TargetRevenueEGP         float64 `json:"target_revenue_egp"`
+	TargetUnits              float64 `json:"target_units"` // Cases for Sell-In
+	TargetWeightTons         float64 `json:"target_weight_tons"`
+	ActualRevenueEGP         float64 `json:"actual_revenue_egp"`
+	ActualUnits              float64 `json:"actual_units"`
+	ActualWeightTons         float64 `json:"actual_weight_tons"`
+	ExpectedRevenueEGP       float64 `json:"expected_revenue_egp"`
+	ExpectedUnits            float64 `json:"expected_units"`
+	VarianceRevenueEGP       float64 `json:"variance_revenue_egp"`
+	VarianceUnits            float64 `json:"variance_units"`
+	AchievementPct           float64 `json:"achievement_pct"`
+	RemainingStockCases      float64 `json:"remaining_stock_cases"`
+	StockStatus              string  `json:"stock_status"`    // "urgent_replenishment" | "optimal" | "overstock"
+	StockStatusAr            string  `json:"stock_status_ar"` // "سحب عالي / أولوية توريد" | "رصيد آمن ومتوازن" | "تكدس مخزني - تهدئة توريد"
+	PromoSharePct            float64 `json:"promo_share_pct"`
 }
 
 // TargetBranchBreakdown represents the Branch-level target allocation inside a chain, along with all SKUs allocated to that branch.

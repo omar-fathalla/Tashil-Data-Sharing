@@ -43,6 +43,7 @@ type IngestionResult struct {
 	Anomalies              []domain.IngestionAnomaly                `json:"anomalies"`
 	SampleRecords          []domain.NormalizedRecord                `json:"sample_records"`
 	Payload                *domain.NormalizedRetailIngestionPayload `json:"payload,omitempty"`
+	ProductMasterSummary   *domain.ProductMasterSummaryResponse     `json:"summary,omitempty"`
 
 	// Staging & Review Fields
 	IsStaged              bool   `json:"is_staged"`
@@ -470,16 +471,38 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 				}
 				if pm.UnitsPerCarton > 0 {
 					fact.UnitsPerCarton = pm.UnitsPerCarton
+					if fact.QuantitySold > 0 {
+						fact.CartonsSold = math.Round((float64(fact.QuantitySold)/float64(pm.UnitsPerCarton))*100) / 100
+					}
 				}
 				if pm.ItemType != "" {
 					fact.ItemType = pm.ItemType
 				}
+				if pm.CartonPriceInclVAT > 0 {
+					fact.CartonPriceInclVAT = math.Round(pm.CartonPriceInclVAT*1000) / 1000
+				}
+				if pm.NetCartonInvoiceCost > 0 {
+					fact.NetCartonInvoiceCost = math.Round(pm.NetCartonInvoiceCost*1000) / 1000
+				}
+				if pm.InvoiceDiscountPct > 0 {
+					fact.InvoiceDiscountPct = math.Round(pm.InvoiceDiscountPct*10000) / 10000
+				}
 				if pm.NetUnitInvoiceCost > 0 {
-					fact.FactoryUnitCost = pm.NetUnitInvoiceCost
+					fact.FactoryUnitCost = math.Round(pm.NetUnitInvoiceCost*1000) / 1000
+					if fact.QuantitySold > 0 {
+						fact.TotalFactoryCost = math.Round((float64(fact.QuantitySold)*fact.FactoryUnitCost)*100) / 100
+						fact.RetailerGrossProfit = math.Round((fact.NetRevenue-fact.TotalFactoryCost)*100) / 100
+						if fact.NetRevenue > 0 {
+							fact.RetailerMarginPct = math.Round(((fact.RetailerGrossProfit/fact.NetRevenue)*100)*100) / 100
+						}
+					}
 				}
 				if pm.UnitPriceInclVAT > 0 {
-					fact.RecommendedPrice = pm.UnitPriceInclVAT
-					cleanRec.RecommendedPrice = pm.UnitPriceInclVAT
+					fact.RecommendedPrice = math.Round(pm.UnitPriceInclVAT*1000) / 1000
+					cleanRec.RecommendedPrice = fact.RecommendedPrice
+					if fact.UnitPrice > 0 {
+						fact.PriceDeltaPct = math.Round((((fact.UnitPrice-fact.RecommendedPrice)/fact.RecommendedPrice)*100)*100) / 100
+					}
 				}
 			}
 		}
@@ -1111,15 +1134,25 @@ func (p *Processor) ProcessProductMaster(ctx context.Context, tenantID, filename
 		}
 		p.stagedMu.Unlock()
 		if p.bqRepo != nil {
-			_, _ = p.bqRepo.SetProductMaster(ctx, tenantID, summary)
+			if stored, err := p.bqRepo.SetProductMaster(ctx, tenantID, summary); err == nil && stored != nil {
+				result.ProductMasterSummary = stored
+			} else {
+				result.ProductMasterSummary = summary
+			}
+		} else {
+			result.ProductMasterSummary = summary
 		}
 		return result, nil
 	}
 
 	if p.bqRepo != nil {
-		if _, err := p.bqRepo.SetProductMaster(ctx, tenantID, summary); err != nil {
+		stored, err := p.bqRepo.SetProductMaster(ctx, tenantID, summary)
+		if err != nil {
 			return nil, fmt.Errorf("failed to store product master items: %w", err)
 		}
+		result.ProductMasterSummary = stored
+	} else {
+		result.ProductMasterSummary = summary
 	}
 	return result, nil
 }

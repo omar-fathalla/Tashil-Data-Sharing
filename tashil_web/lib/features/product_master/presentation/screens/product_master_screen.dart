@@ -63,6 +63,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   String _selectedItemType = 'all';
   String _selectedPackaging = 'all';
   String _selectedPullStatus = 'all';
+  String _selectedPriceChange = 'all';
   int _currentPage = 0;
   static const int _pageSize = 50;
 
@@ -117,6 +118,30 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                 f.fileName.contains('أصناف'))
             .toList();
       } catch (_) {}
+
+      if (pmArchives.isEmpty &&
+          summary.sourceFilename.isNotEmpty &&
+          summary.totalSkus > 0) {
+        pmArchives = [
+          ArchivedExcelFileModel(
+            id: 'pm_default_seed',
+            tenantId: summary.tenantId,
+            fileType: 'product_master',
+            fileName: summary.sourceFilename,
+            contentType:
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            fileSizeBytes: 51200,
+            retailChain: 'product-master',
+            chainNameAr: 'كارتة الأصناف والأسعار (Product Master)',
+            chainNameEn: 'Product Master',
+            targetYear: '2026',
+            rowsIngested: summary.totalSkus,
+            branchesCount: 0,
+            totalRevenue: 0.0,
+            uploadedAt: summary.sheetDateLabel,
+          ),
+        ];
+      }
 
       if (!mounted) return;
       setState(() {
@@ -176,6 +201,26 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       if (_selectedPullStatus == 'unpulled' && item.isActiveInChains) {
         return false;
       }
+      if (_selectedPriceChange != 'all') {
+        final dir = item.priceChangeDirection.toLowerCase();
+        switch (_selectedPriceChange) {
+          case 'changed':
+            if (dir != 'up' && dir != 'down' && dir != 'new') return false;
+            break;
+          case 'up':
+            if (dir != 'up') return false;
+            break;
+          case 'down':
+            if (dir != 'down') return false;
+            break;
+          case 'new':
+            if (dir != 'new') return false;
+            break;
+          case 'same':
+            if (dir == 'up' || dir == 'down' || dir == 'new') return false;
+            break;
+        }
+      }
       if (q.isNotEmpty) {
         return ApiClient.matchesProductSearch(
           q,
@@ -209,13 +254,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       });
       await _loadData();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: const Color(0xFF0F766E),
-          content: Text(
-            'تم رفع وتحديث كارتة الأصناف بنجاح (${res.summary.totalSkus} صنف من ${picked.name})',
-          ),
-        ),
+      final latestSummary = _summary ?? res.summary;
+      await _showUploadDiffSummaryDialog(
+        latestSummary,
+        uploadedFilename: picked.name,
       );
     } catch (e) {
       if (!mounted) return;
@@ -227,6 +269,570 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         ),
       );
     }
+  }
+
+  Future<void> _handleDeleteProductMasterSheet(ArchivedExcelFileModel file) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          icon: Icon(
+            Icons.delete_forever_rounded,
+            color: Theme.of(ctx).colorScheme.error,
+            size: 36,
+          ),
+          title: const Text(
+            'حذف شيت الأسعار وإلغاء تأثيراته',
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
+          content: Text(
+            'هل أنت متأكد من حذف الملف "${file.fileName}"؟\nسيتم إزالة جميع تحديثات الأسعار والأصناف التي تمت من خلال هذا الشيت والرجوع تلقائياً إلى النسخة السابقة.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              icon: const Icon(Icons.delete_outline_rounded, size: 18),
+              label: const Text('تأكيد الحذف واسترجاع الأسعار'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final hasOtherSameName = _archivedMasterFiles.any(
+      (f) => f.id != file.id && f.fileName.toLowerCase() == file.fileName.toLowerCase(),
+    );
+    await widget.apiClient.deleteArchivedFile(
+      file.id,
+      fileName: hasOtherSameName ? null : file.fileName,
+      isProductMaster: true,
+    );
+    if (!mounted) return;
+    setState(() {
+      _archivedMasterFiles = _archivedMasterFiles
+          .where((f) => f.id != file.id)
+          .toList();
+    });
+    await _loadData();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF0F766E),
+        content: Text(
+          'تم حذف الشيت "${file.fileName}" وإلغاء تأثيراته واسترجاع الأسعار السابقة بنجاح.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showFileSheetsModal() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final theme = Theme.of(ctx);
+            final cs = theme.colorScheme;
+            final files = _archivedMasterFiles;
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: AlertDialog(
+                titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8.0),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer,
+                        borderRadius: BorderRadius.circular(10.0),
+                      ),
+                      child: Icon(
+                        Icons.folder_copy_rounded,
+                        color: cs.primary,
+                        size: 22.0,
+                      ),
+                    ),
+                    const SizedBox(width: 10.0),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'شيتات الأسعار المرفوعة (File Sheets)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16.0,
+                            ),
+                          ),
+                          Text(
+                            'سجل ملفات الإكسيل المرفوعة بالتاريخ مع إمكانية حذف أي شيت وإلغاء تأثيراته فوراً',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                content: SizedBox(
+                  width: 620,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (files.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(24.0),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(14.0),
+                          ),
+                          child: const Center(
+                            child: Text('لا توجد شيتات مرفوعة حالياً'),
+                          ),
+                        )
+                      else
+                        Flexible(
+                          child: SingleChildScrollView(
+                            child: Wrap(
+                              spacing: 10.0,
+                              runSpacing: 10.0,
+                              children: files.asMap().entries.map((entry) {
+                                final idx = entry.key;
+                                final file = entry.value;
+                                final isLatest = idx == 0;
+                                return Container(
+                                  key: ValueKey('file_sheet_bubble_${file.id}'),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14.0,
+                                    vertical: 12.0,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isLatest
+                                        ? cs.primaryContainer.withValues(alpha: 0.45)
+                                        : cs.surfaceContainerLow,
+                                    borderRadius: BorderRadius.circular(16.0),
+                                    border: Border.all(
+                                      color: isLatest
+                                          ? cs.primary.withValues(alpha: 0.5)
+                                          : cs.outlineVariant.withValues(alpha: 0.6),
+                                      width: isLatest ? 1.5 : 1.0,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 18,
+                                        backgroundColor: isLatest
+                                            ? cs.primary
+                                            : cs.surfaceContainerHighest,
+                                        child: Icon(
+                                          Icons.table_chart_rounded,
+                                          size: 18,
+                                          color: isLatest
+                                              ? cs.onPrimary
+                                              : cs.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12.0),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    file.fileName,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                      fontSize: 13.0,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (isLatest) ...[
+                                                  const SizedBox(width: 8.0),
+                                                  Container(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                      horizontal: 8.0,
+                                                      vertical: 2.0,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(
+                                                              0xFF0F766E)
+                                                          .withValues(
+                                                              alpha: 0.15),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              999.0),
+                                                    ),
+                                                    child: const Text(
+                                                      'مفعل حالياً',
+                                                      style: TextStyle(
+                                                        fontSize: 10.0,
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                        color:
+                                                            Color(0xFF0F766E),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4.0),
+                                            Wrap(
+                                              spacing: 10.0,
+                                              runSpacing: 4.0,
+                                              children: [
+                                                Text(
+                                                  'تاريخ الرفع: ${_formatUploadDate(file.uploadedAt)}',
+                                                  style: theme
+                                                      .textTheme.labelSmall
+                                                      ?.copyWith(
+                                                    color: cs.onSurfaceVariant,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  '• عدد الأصناف: ${file.rowsIngested} صنف',
+                                                  style: theme
+                                                      .textTheme.labelSmall
+                                                      ?.copyWith(
+                                                    color: cs.primary,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      IconButton(
+                                        key: ValueKey(
+                                            'delete_file_sheet_btn_${file.id}'),
+                                        tooltip:
+                                            'حذف هذا الشيت وإلغاء تأثيراته من الكارتة',
+                                        icon: Icon(
+                                          Icons.delete_outline_rounded,
+                                          color: cs.error,
+                                        ),
+                                        onPressed: () async {
+                                          Navigator.of(ctx).pop();
+                                          await _handleDeleteProductMasterSheet(
+                                              file);
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('إغلاق'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _handleUploadMasterWorkbook();
+                    },
+                    icon: const Icon(Icons.upload_file_rounded, size: 18),
+                    label: const Text('رفع شيت أسعار جديد'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showUploadDiffSummaryDialog(
+    ProductMasterSummaryModel summary, {
+    String? uploadedFilename,
+  }) async {
+    final diff = summary.diffSummary;
+    final upCount = diff?.priceIncreasedCount ?? summary.priceIncreasedCount;
+    final downCount = diff?.priceDecreasedCount ?? summary.priceDecreasedCount;
+    final newCount = diff?.newSkusCount ?? summary.newSkusCount;
+    final sameCount = diff?.priceUnchangedCount ?? summary.priceUnchangedCount;
+    final fileName = uploadedFilename ?? diff?.newFileName ?? summary.sourceFilename;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final cs = theme.colorScheme;
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            key: const ValueKey('product_master_diff_summary_dialog'),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8.0),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F766E).withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Color(0xFF0F766E),
+                    size: 22.0,
+                  ),
+                ),
+                const SizedBox(width: 10.0),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'ملخص مقارنة الشيت الجديد (AI Price Diff Summary)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15.5,
+                        ),
+                      ),
+                      Text(
+                        'تم فحص ومطابقة أسعار "$fileName" تلقائياً مع النسخة السابقة',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 560,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Wrap(
+                    spacing: 10.0,
+                    runSpacing: 10.0,
+                    children: [
+                      _buildDiffStatCard(
+                        cs: cs,
+                        icon: Icons.trending_up_rounded,
+                        labelAr: 'أصناف زاد سعرها',
+                        count: upCount,
+                        color: const Color(0xFFDC2626),
+                      ),
+                      _buildDiffStatCard(
+                        cs: cs,
+                        icon: Icons.trending_down_rounded,
+                        labelAr: 'أصناف انخفض سعرها',
+                        count: downCount,
+                        color: const Color(0xFF0F766E),
+                      ),
+                      _buildDiffStatCard(
+                        cs: cs,
+                        icon: Icons.fiber_new_rounded,
+                        labelAr: 'أصناف جديدة مضافة',
+                        count: newCount,
+                        color: const Color(0xFF0284C7),
+                      ),
+                      _buildDiffStatCard(
+                        cs: cs,
+                        icon: Icons.horizontal_rule_rounded,
+                        labelAr: 'أصناف لم يتغير سعرها',
+                        count: sameCount,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                  if (diff != null && diff.topChangedItems.isNotEmpty) ...[
+                    const SizedBox(height: 16.0),
+                    Text(
+                      'أبرز التغيرات السعرية المكتشفة:',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8.0),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 210),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: diff.topChangedItems.take(8).map((item) {
+                            final isUp = item.direction == 'up';
+                            final isDown = item.direction == 'down';
+                            final badgeColor = isUp
+                                ? const Color(0xFFDC2626)
+                                : isDown
+                                    ? const Color(0xFF0F766E)
+                                    : const Color(0xFF0284C7);
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 6.0),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10.0,
+                                  vertical: 8.0,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: cs.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(10.0),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      isUp
+                                          ? Icons.arrow_upward_rounded
+                                          : isDown
+                                              ? Icons.arrow_downward_rounded
+                                              : Icons.fiber_new_rounded,
+                                      size: 16,
+                                      color: badgeColor,
+                                    ),
+                                    const SizedBox(width: 8.0),
+                                    Expanded(
+                                      child: Text(
+                                        '[${item.itemCode}] ${item.officialName}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 12.0,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8.0),
+                                    if (item.direction == 'new')
+                                      Text(
+                                        'صنف جديد (${_currFmt.format(item.newUnitPriceIncl)} ج.م)',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 11.5,
+                                          color: badgeColor,
+                                        ),
+                                      )
+                                    else
+                                      Text(
+                                        '${_currFmt.format(item.oldUnitPriceIncl)} ← ${_currFmt.format(item.newUnitPriceIncl)} ج.م (${item.diffPct > 0 ? '+' : ''}${item.diffPct.toStringAsFixed(1)}%)',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 11.5,
+                                          color: badgeColor,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('إغلاق'),
+              ),
+              if (upCount + downCount + newCount > 0)
+                FilledButton.icon(
+                  key: const ValueKey('diff_dialog_filter_changed_btn'),
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    setState(() {
+                      _selectedPriceChange = 'changed';
+                      _currentPage = 0;
+                      _tabController.animateTo(0);
+                    });
+                  },
+                  icon: const Icon(Icons.filter_alt_rounded, size: 18),
+                  label: const Text('عرض الأصناف المتغيرة فقط في الجدول'),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDiffStatCard({
+    required ColorScheme cs,
+    required IconData icon,
+    required String labelAr,
+    required int count,
+    required Color color,
+  }) {
+    return Container(
+      width: 125,
+      padding: const EdgeInsets.all(12.0),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20.0),
+          const SizedBox(height: 6.0),
+          Text(
+            _intFmt.format(count),
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 18.0,
+              color: color,
+            ),
+          ),
+          Text(
+            labelAr,
+            style: TextStyle(
+              fontSize: 11.0,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatUploadDate(String raw) {
+    if (raw.isEmpty) return 'غير محدد';
+    final dt = DateTime.tryParse(raw);
+    if (dt != null) {
+      return DateFormat('yyyy-MM-dd HH:mm').format(dt.toLocal());
+    }
+    return raw;
   }
 
   void _exportFilteredCatalogToCsv() {
@@ -438,6 +1044,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     ColorScheme cs,
     ProductMasterSummaryModel summary,
   ) {
+    final totalChanged = summary.priceIncreasedCount +
+        summary.priceDecreasedCount +
+        summary.newSkusCount;
     return Container(
       padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
@@ -513,11 +1122,91 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           Icons.receipt_long_outlined,
                           'ضريبة القيمة المضافة: ${(summary.defaultVatRate * 100).toStringAsFixed(0)}%',
                         ),
-                        _buildMetaChip(
-                          cs,
-                          Icons.description_outlined,
-                          summary.sourceFilename,
+                        // Compact interactive File Sheets bubble button replacing cluttered file list
+                        InkWell(
+                          key: const ValueKey('product_master_file_sheets_btn'),
+                          onTap: _showFileSheetsModal,
+                          borderRadius: BorderRadius.circular(999.0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0,
+                              vertical: 4.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999.0),
+                              border: Border.all(
+                                color: cs.primary.withValues(alpha: 0.45),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.folder_special_rounded,
+                                  size: 15.0,
+                                  color: cs.primary,
+                                ),
+                                const SizedBox(width: 6.0),
+                                Text(
+                                  'File Sheets • شيتات الأسعار (${_archivedMasterFiles.length})',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: cs.primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 4.0),
+                                Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  size: 16.0,
+                                  color: cs.primary,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
+                        if (totalChanged > 0)
+                          InkWell(
+                            key: const ValueKey(
+                                'product_master_diff_summary_chip'),
+                            onTap: () => _showUploadDiffSummaryDialog(summary),
+                            borderRadius: BorderRadius.circular(999.0),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10.0,
+                                vertical: 4.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD97706)
+                                    .withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(999.0),
+                                border: Border.all(
+                                  color: const Color(0xFFD97706)
+                                      .withValues(alpha: 0.45),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.price_change_rounded,
+                                    size: 14.0,
+                                    color: Color(0xFFB45309),
+                                  ),
+                                  const SizedBox(width: 5.0),
+                                  Text(
+                                    'ملخص فروق الأسعار: ↑${summary.priceIncreasedCount} ↓${summary.priceDecreasedCount} +${summary.newSkusCount}',
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFB45309),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ],
@@ -529,6 +1218,12 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             spacing: 10.0,
             runSpacing: 8.0,
             children: [
+              OutlinedButton.icon(
+                key: const ValueKey('product_master_header_sheets_btn'),
+                onPressed: _showFileSheetsModal,
+                icon: const Icon(Icons.layers_outlined, size: 18.0),
+                label: Text('File Sheets (${_archivedMasterFiles.length})'),
+              ),
               OutlinedButton.icon(
                 key: const ValueKey('product_master_export_csv_btn'),
                 onPressed: _exportFilteredCatalogToCsv,
@@ -645,8 +1340,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           _buildKpiCard(
             theme: theme,
             cs: cs,
-            titleAr: 'أصناف البيع العادي (Regular)',
-            titleEn: 'Standard Catalog SKUs',
+            titleAr: 'أصناف البيع العادي',
+            titleEn: 'Regular • Standard Catalog SKUs',
             value: '${_intFmt.format(summary.regularSkusCount)} صنف عادي',
             subtitle:
                 'تمثل ${summary.totalSkus > 0 ? ((summary.regularSkusCount / summary.totalSkus) * 100).toStringAsFixed(1) : 0}% من إجمالي الكارتة',
@@ -656,21 +1351,21 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           _buildKpiCard(
             theme: theme,
             cs: cs,
-            titleAr: 'أصناف العروض الترويجية (Promos)',
-            titleEn: 'Promotional & Bundle SKUs (PR)',
+            titleAr: 'أصناف العروض الترويجية',
+            titleEn: 'Promos • Promotional & Bundle SKUs (PR)',
             value: '${_intFmt.format(summary.promoSkusCount)} عرض ترويجي',
-            subtitle: 'أكواد العروض الخاصة والشرنك والـ Bundles',
+            subtitle: 'أكواد العروض الخاصة والشرنك والباقات الترويجية',
             icon: Icons.local_offer_outlined,
             accentColor: const Color(0xFFD97706),
           ),
           _buildKpiCard(
             theme: theme,
             cs: cs,
-            titleAr: 'الباركودات الفريدة والشدود',
+            titleAr: 'الباركودات الفريدة وسعة الكرتونة',
             titleEn: 'Unique Barcodes & Avg Pack Size',
             value: '${_intFmt.format(summary.uniqueBarcodesCount)} باركود',
             subtitle:
-                'متوسط الشدة: ${summary.avgUnitsPerCarton.toStringAsFixed(1)} وحدة/كرتونة',
+                'متوسط سعة الكرتونة: ${summary.avgUnitsPerCarton.toStringAsFixed(1)} وحدة/كرتونة',
             icon: Icons.view_in_ar_rounded,
             accentColor: const Color(0xFF4F46E5),
           ),
@@ -688,15 +1383,18 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         ];
 
         if (isWide) {
-          return Row(
-            children: cards
-                .map((c) => Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 5.0),
-                        child: c,
-                      ),
-                    ))
-                .toList(),
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: cards
+                  .map((c) => Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 5.0),
+                          child: c,
+                        ),
+                      ))
+                  .toList(),
+            ),
           );
         }
         return Wrap(
@@ -705,6 +1403,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           children: cards
               .map((c) => SizedBox(
                     width: (constraints.maxWidth - 12.0) / 2,
+                    height: 132.0,
                     child: c,
                   ))
               .toList(),
@@ -732,8 +1431,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.all(8.0),
@@ -747,6 +1448,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       titleAr,
@@ -756,13 +1458,20 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    Text(
-                      titleEn,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                        fontSize: 10.5,
+                    const SizedBox(height: 2.0),
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(
+                          titleEn,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            fontSize: 10.5,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -771,22 +1480,30 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             ],
           ),
           const SizedBox(height: 12.0),
-          Text(
-            value,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: cs.onSurface,
-            ),
-          ),
-          const SizedBox(height: 4.0),
-          Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant,
-              fontSize: 11.5,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: cs.onSurface,
+                ),
+              ),
+              const SizedBox(height: 4.0),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontSize: 11.5,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -852,8 +1569,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 },
                               )
                             : null,
-                        hintText:
-                            'ابحث بكود الصنف (مثل FGCL-0550-0001 أو FGSL) أو الباركود (6221133...) أو اسم الصنف أو البراند...',
+                        hintText: 'بحث بكود الصنف',
                         filled: true,
                         fillColor: cs.surface,
                         contentPadding: const EdgeInsets.symmetric(
@@ -872,8 +1588,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                       _selectedItemType != 'all' ||
                       _selectedPackaging != 'all' ||
                       _selectedPullStatus != 'all' ||
+                      _selectedPriceChange != 'all' ||
                       _searchController.text.isNotEmpty)
                     TextButton.icon(
+                      key: const ValueKey('product_master_reset_filters_btn'),
                       onPressed: () {
                         _searchController.clear();
                         setState(() {
@@ -882,6 +1600,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           _selectedItemType = 'all';
                           _selectedPackaging = 'all';
                           _selectedPullStatus = 'all';
+                          _selectedPriceChange = 'all';
                           _currentPage = 0;
                         });
                       },
@@ -891,49 +1610,28 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                 ],
               ),
               const SizedBox(height: 12.0),
-              // Prefix quick chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    Text(
-                      'بادئة كود الصنف (Item Code Prefix):',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(width: 8.0),
-                    _buildFilterChip(
-                      label: 'الكل (All)',
-                      selected: _selectedPrefix == 'all',
-                      onSelected: () => setState(() {
-                        _selectedPrefix = 'all';
-                        _currentPage = 0;
-                      }),
-                    ),
-                    ..._buildEffectivePrefixChips(summary).map(
-                      (pfx) => Padding(
-                        padding: const EdgeInsetsDirectional.only(start: 6.0),
-                        child: _buildFilterChip(
-                          label: '$pfx (${_prefixDescriptionAr(pfx)})',
-                          selected: _selectedPrefix == pfx,
-                          onSelected: () => setState(() {
-                            _selectedPrefix = pfx;
-                            _currentPage = 0;
-                          }),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10.0),
+              // Quick Price-Change Filter Bar (فلتر سريع لتغيرات الأسعار)
+              _buildQuickPriceChangeFilterBar(theme, cs, summary),
+              const SizedBox(height: 12.0),
               Wrap(
                 spacing: 12.0,
                 runSpacing: 10.0,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
+                  // Item Code Prefix dropdown filter
+                  _buildDropdownFilter(
+                    labelAr: 'بادئة كود الصنف (Item Code Prefix)',
+                    value: _selectedPrefix,
+                    items: {
+                      'all': 'الكل (All)',
+                      for (final pfx in _buildEffectivePrefixChips(summary))
+                        pfx: '$pfx (${_prefixDescriptionAr(pfx)})',
+                    },
+                    onChanged: (v) => setState(() {
+                      _selectedPrefix = v ?? 'all';
+                      _currentPage = 0;
+                    }),
+                  ),
                   // Brand filter
                   _buildDropdownFilter(
                     labelAr: 'العلامة التجارية (Brand)',
@@ -1311,15 +2009,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                               ),
                             ),
                           ),
-                          // Unit Price Incl VAT
+                          // Unit Price Incl VAT + Price Change Indicator Badge
                           DataCell(
-                            Text(
-                              '${_currFmt.format(item.unitPriceInclVat)} ج.م',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: cs.primary,
-                              ),
-                            ),
+                            _buildPriceWithChangeIndicator(theme, cs, item),
                           ),
                           // Carton Price Incl VAT
                           DataCell(
@@ -1453,6 +2145,237 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     );
   }
 
+  Widget _buildQuickPriceChangeFilterBar(
+    ThemeData theme,
+    ColorScheme cs,
+    ProductMasterSummaryModel summary,
+  ) {
+    final allItems = summary.items;
+    final upCount = summary.priceIncreasedCount > 0
+        ? summary.priceIncreasedCount
+        : allItems.where((e) => e.priceChangeDirection == 'up').length;
+    final downCount = summary.priceDecreasedCount > 0
+        ? summary.priceDecreasedCount
+        : allItems.where((e) => e.priceChangeDirection == 'down').length;
+    final newCount = summary.newSkusCount > 0
+        ? summary.newSkusCount
+        : allItems.where((e) => e.priceChangeDirection == 'new').length;
+    final changedCount = upCount + downCount + newCount;
+
+    Widget buildChip({
+      required String keyId,
+      required String value,
+      required String label,
+      required IconData icon,
+      required Color color,
+    }) {
+      final isSelected = _selectedPriceChange == value;
+      return FilterChip(
+        key: ValueKey(keyId),
+        selected: isSelected,
+        showCheckmark: false,
+        avatar: Icon(
+          icon,
+          size: 15.0,
+          color: isSelected ? Colors.white : color,
+        ),
+        label: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+            color: isSelected ? Colors.white : cs.onSurface,
+          ),
+        ),
+        selectedColor: color,
+        backgroundColor: cs.surface,
+        side: BorderSide(
+          color: isSelected ? color : color.withValues(alpha: 0.35),
+        ),
+        onSelected: (_) {
+          setState(() {
+            _selectedPriceChange =
+                (_selectedPriceChange == value && value != 'all')
+                    ? 'all'
+                    : value;
+            _currentPage = 0;
+          });
+        },
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Wrap(
+        spacing: 8.0,
+        runSpacing: 8.0,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.price_change_outlined, size: 17.0, color: cs.primary),
+              const SizedBox(width: 6.0),
+              const Text(
+                'فلتر سريع لتغيرات الأسعار:',
+                style: TextStyle(fontSize: 12.0, fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+          buildChip(
+            keyId: 'price_filter_all',
+            value: 'all',
+            label: 'كل الأصناف (${summary.totalSkus})',
+            icon: Icons.apps_rounded,
+            color: cs.primary,
+          ),
+          buildChip(
+            keyId: 'price_filter_changed',
+            value: 'changed',
+            label: 'الأصناف التي تغير سعرها فقط ($changedCount)',
+            icon: Icons.published_with_changes_rounded,
+            color: const Color(0xFFD97706),
+          ),
+          buildChip(
+            keyId: 'price_filter_up',
+            value: 'up',
+            label: 'زاد السعر ↑ ($upCount)',
+            icon: Icons.trending_up_rounded,
+            color: const Color(0xFFDC2626),
+          ),
+          buildChip(
+            keyId: 'price_filter_down',
+            value: 'down',
+            label: 'انخفض السعر ↓ ($downCount)',
+            icon: Icons.trending_down_rounded,
+            color: const Color(0xFF0F766E),
+          ),
+          buildChip(
+            keyId: 'price_filter_new',
+            value: 'new',
+            label: 'أصناف جديدة ($newCount)',
+            icon: Icons.fiber_new_rounded,
+            color: const Color(0xFF0284C7),
+          ),
+          if (summary.diffSummary != null)
+            ActionChip(
+              key: const ValueKey('product_master_open_diff_summary_btn'),
+              avatar: Icon(
+                Icons.summarize_rounded,
+                size: 15.0,
+                color: cs.primary,
+              ),
+              label: const Text(
+                'تقرير مقارنة الشيت الجديد',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+              ),
+              onPressed: () => _showUploadDiffSummaryDialog(
+                summary,
+                uploadedFilename: summary.sourceFilename,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceWithChangeIndicator(
+    ThemeData theme,
+    ColorScheme cs,
+    ProductMasterItemModel item,
+  ) {
+    final dir = item.priceChangeDirection.toLowerCase();
+    final isUp = dir == 'up';
+    final isDown = dir == 'down';
+    final isNew = dir == 'new';
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${_currFmt.format(item.unitPriceInclVat)} ج.م',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: cs.primary,
+              ),
+            ),
+            if (isUp || isDown || isNew) ...[
+              const SizedBox(width: 5.0),
+              Container(
+                key: ValueKey('price_indicator_${item.itemCode}_$dir'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6.0,
+                  vertical: 2.0,
+                ),
+                decoration: BoxDecoration(
+                  color: isUp
+                      ? const Color(0xFFDC2626).withValues(alpha: 0.14)
+                      : isDown
+                          ? const Color(0xFF0F766E).withValues(alpha: 0.14)
+                          : const Color(0xFF0284C7).withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(999.0),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isUp
+                          ? Icons.arrow_upward_rounded
+                          : isDown
+                              ? Icons.arrow_downward_rounded
+                              : Icons.fiber_new_rounded,
+                      size: 11.0,
+                      color: isUp
+                          ? const Color(0xFFDC2626)
+                          : isDown
+                              ? const Color(0xFF0F766E)
+                              : const Color(0xFF0284C7),
+                    ),
+                    const SizedBox(width: 2.0),
+                    Text(
+                      isNew
+                          ? 'جديد'
+                          : isUp
+                              ? 'زاد ${item.priceChangePct > 0 ? '+${item.priceChangePct.toStringAsFixed(1)}%' : ''}'
+                              : 'قل ${item.priceChangePct != 0 ? '${item.priceChangePct.toStringAsFixed(1)}%' : ''}',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: isUp
+                            ? const Color(0xFFDC2626)
+                            : isDown
+                                ? const Color(0xFF0F766E)
+                                : const Color(0xFF0284C7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        if ((isUp || isDown) && item.prevUnitPriceInclVat > 0)
+          Text(
+            'كان: ${_currFmt.format(item.prevUnitPriceInclVat)} ج.م',
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontSize: 9.5,
+              color: cs.onSurfaceVariant,
+              decoration: TextDecoration.lineThrough,
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildColHeader(String ar, String en) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -1467,25 +2390,6 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 10.0),
         ),
       ],
-    );
-  }
-
-  Widget _buildFilterChip({
-    required String label,
-    required bool selected,
-    required VoidCallback onSelected,
-  }) {
-    return ChoiceChip(
-      label: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-        ),
-      ),
-      selected: selected,
-      onSelected: (_) => onSelected(),
-      visualDensity: VisualDensity.compact,
     );
   }
 
@@ -1931,7 +2835,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               ),
               const SizedBox(height: 4.0),
               Text(
-                'يقوم النظام تلقائياً بقراءة أكواد الأصناف (FGCL, FGDW, PR...) والباركودات والشدود والأسعار وتحديث جميع شاشات المبيعات والنواقص والتسعير فوراً',
+                'يقوم النظام تلقائياً بقراءة أكواد الأصناف (FGCL, FGDW, PR...) والباركودات وسعة الكرتونة والأسعار وتحديث جميع شاشات المبيعات والنواقص والتسعير فوراً',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: cs.onSurfaceVariant,
@@ -1992,9 +2896,24 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                 subtitle: Text(
                   'عدد الأصناف: ${file.rowsIngested} صنف • تاريخ الرفع: ${file.uploadedAt}',
                 ),
-                trailing: Text(
-                  '${(file.fileSizeBytes / 1024).toStringAsFixed(1)} KB',
-                  style: theme.textTheme.labelMedium,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${(file.fileSizeBytes / 1024).toStringAsFixed(1)} KB',
+                      style: theme.textTheme.labelMedium,
+                    ),
+                    const SizedBox(width: 8.0),
+                    IconButton(
+                      key: ValueKey('archive_tab_delete_sheet_${file.id}'),
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: Color(0xFFDC2626),
+                      ),
+                      tooltip: 'حذف الشيت والتراجع عن تحديثاته',
+                      onPressed: () => _handleDeleteProductMasterSheet(file),
+                    ),
+                  ],
                 ),
               ),
             ),

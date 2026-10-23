@@ -187,14 +187,18 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	}
 	searchQ := strings.TrimSpace(filter.SearchQuery)
 
-	// Track which chains already have explicit Sell-In records uploaded
+	// Track which chains and years already have explicit Sell-In records uploaded
 	chainsWithExplicitSellIn := make(map[string]bool)
+	explicitSellInYears := make(map[int]bool)
 	for _, sr := range explicitSellIn {
 		ch := strings.ToLower(strings.TrimSpace(sr.RetailerChain))
 		if ch == "" {
 			ch = "fathalla"
 		}
 		chainsWithExplicitSellIn[ch] = true
+		if matchChainFilter(ch, chainFilter) && sr.Year > 0 {
+			explicitSellInYears[sr.Year] = true
+		}
 	}
 
 	// 1. Aggregate actual Cashier Sell-Out by (Year, Month) & Chain from c.records,
@@ -206,6 +210,10 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	sellOutByYMRev := make(map[ymKey]float64)
 	sellOutByYMUnits := make(map[ymKey]int)
 	sellOutByYMCases := make(map[ymKey]float64)
+	sellOutByYMFactoryCostExcl := make(map[ymKey]float64)
+	sellOutByYMFactoryCostIncl := make(map[ymKey]float64)
+	allYearsSellOutByYMRev := make(map[ymKey]float64)
+	allYearsSellOutByYMUnits := make(map[ymKey]int)
 	sellOutByMonthRev := make(map[int]float64)
 	sellOutByMonthUnits := make(map[int]int)
 	sellOutByChainMonthRev := make(map[string]map[int]float64)
@@ -213,6 +221,16 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	totalMatchedSellOutRev := 0.0
 	totalMatchedSellOutUnits := 0
 	hasRealUploadedSellOut := false
+
+	type realSellOutSKUAcc struct {
+		units           int
+		cases           float64
+		posRev          float64
+		factoryCostExcl float64
+		factoryCostIncl float64
+	}
+	realSellOutByFam := make(map[string]*realSellOutSKUAcc)
+	realSellOutByFamRegion := make(map[string]*realSellOutSKUAcc)
 
 	type derivedKey struct {
 		chain string
@@ -246,9 +264,6 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		if m <= 0 {
 			m = 1
 		}
-		if filter.Year > 0 && yr != filter.Year {
-			continue
-		}
 
 		// Apply optional sector, region, brand, or search filter to Sell-Out records as well
 		bName, sCode := inferBrandAndSectorFromSKU(r.SKUName, r.Category)
@@ -258,16 +273,27 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		if brandFilter != "" && !strings.EqualFold(bName, brandFilter) && !strings.Contains(strings.ToLower(bName), strings.ToLower(brandFilter)) {
 			continue
 		}
-		if regionFilter != "" {
-			rCode, _ := inferRegionFromBranch(r.StoreName, recChain)
-			if !strings.EqualFold(rCode, regionFilter) {
-				continue
-			}
+		rCode, _ := inferRegionFromBranch(r.StoreName, recChain)
+		if regionFilter != "" && !strings.EqualFold(rCode, regionFilter) {
+			continue
 		}
 		if searchQ != "" {
 			if !domain.MatchesProductSearchQuery(searchQ, r.ItemCode, r.Barcode, r.SKUName, r.RetailerRawSKUName, r.Category, bName) {
 				continue
 			}
+		}
+
+		if matchChainFilter(recChain, chainFilter) {
+			allYM := ymKey{year: yr, month: m}
+			allYearsSellOutByYMRev[allYM] += r.NetRevenue
+			allYearsSellOutByYMUnits[allYM] += r.QuantitySold
+		}
+
+		if filter.Year > 0 && yr != filter.Year {
+			continue
+		}
+		if filter.Year == 0 && len(explicitSellInYears) > 0 && !explicitSellInYears[yr] {
+			continue
 		}
 
 		if sellOutByChainMonthRev[recChain] == nil {
@@ -280,15 +306,70 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			ym := ymKey{year: yr, month: m}
 			sellOutByYMRev[ym] += r.NetRevenue
 			sellOutByYMUnits[ym] += r.QuantitySold
+
+			pm, pmOk := c.lookupProductMasterLocked(normTenant, r.ItemCode, r.Barcode, r.SKUName)
 			upc := r.UnitsPerCarton
 			if upc <= 0 {
-				if pm, ok := c.lookupProductMasterLocked(normTenant, r.ItemCode, r.Barcode, r.SKUName); ok && pm.UnitsPerCarton > 0 {
+				if pmOk && pm.UnitsPerCarton > 0 {
 					upc = pm.UnitsPerCarton
 				} else {
 					upc = 12
 				}
 			}
-			sellOutByYMCases[ym] += float64(r.QuantitySold) / float64(upc)
+			eqCases := float64(r.QuantitySold) / float64(upc)
+			sellOutByYMCases[ym] += eqCases
+
+			unitCostIncl := r.FactoryUnitCost
+			if unitCostIncl <= 0 && pmOk {
+				if pm.NetUnitInvoiceCost > 0 {
+					unitCostIncl = pm.NetUnitInvoiceCost
+				} else if pm.UnitPriceInclVAT > 0 {
+					unitCostIncl = pm.UnitPriceInclVAT * 0.90
+				}
+			}
+			if unitCostIncl <= 0 && r.QuantitySold > 0 && r.NetRevenue > 0 {
+				unitCostIncl = (r.NetRevenue / float64(r.QuantitySold)) * 0.78
+			}
+			vatRate := 0.14
+			if pmOk && pm.VATRate > 0 {
+				vatRate = pm.VATRate
+			}
+			unitCostExcl := unitCostIncl / (1.0 + vatRate)
+			costIncl := float64(r.QuantitySold) * unitCostIncl
+			costExcl := float64(r.QuantitySold) * unitCostExcl
+
+			sellOutByYMFactoryCostIncl[ym] += costIncl
+			sellOutByYMFactoryCostExcl[ym] += costExcl
+
+			var famKey string
+			if pmOk {
+				famKey = CanonicalSellInFamilyKey(&pm, r.SKUName)
+			} else {
+				famKey = CanonicalSellInFamilyKey(nil, r.SKUName)
+			}
+			famAcc, exists := realSellOutByFam[famKey]
+			if !exists {
+				famAcc = &realSellOutSKUAcc{}
+				realSellOutByFam[famKey] = famAcc
+			}
+			famAcc.units += r.QuantitySold
+			famAcc.cases += eqCases
+			famAcc.posRev += r.NetRevenue
+			famAcc.factoryCostExcl += costExcl
+			famAcc.factoryCostIncl += costIncl
+
+			regFamKey := famKey + "|" + rCode
+			regAcc, exists := realSellOutByFamRegion[regFamKey]
+			if !exists {
+				regAcc = &realSellOutSKUAcc{}
+				realSellOutByFamRegion[regFamKey] = regAcc
+			}
+			regAcc.units += r.QuantitySold
+			regAcc.cases += eqCases
+			regAcc.posRev += r.NetRevenue
+			regAcc.factoryCostExcl += costExcl
+			regAcc.factoryCostIncl += costIncl
+
 			sellOutByMonthRev[m] += r.NetRevenue
 			sellOutByMonthUnits[m] += r.QuantitySold
 			totalMatchedSellOutRev += r.NetRevenue
@@ -415,21 +496,26 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 
 	var mtRevTotal, ccRevTotal float64
 	var ytdSellInEGP, ytdSellInCases, ytdWeightTons, ytdExpectedEGP float64
+	var ytdGrossInclVATEGP, ytdVATAmountEGP float64
+	var ytdTotalUnits int
 	var octActualEGP, octActualCases, octProjEGP, octProjCases float64
 	var latestYM ymKey
 
 	type monthAgg struct {
-		year        int
-		monthNum    int
-		monthEN     string
-		monthAR     string
-		skus        map[string]bool
-		sellInCases float64
-		sellInEGP   float64
-		tons        float64
-		expCases    float64
-		expEGP      float64
-		hasWeekly   bool
+		year               int
+		monthNum           int
+		monthEN            string
+		monthAR            string
+		skus               map[string]bool
+		sellInCases        float64
+		sellInUnits        int
+		sellInEGP          float64
+		sellInGrossInclVAT float64
+		sellInVAT          float64
+		tons               float64
+		expCases           float64
+		expEGP             float64
+		hasWeekly          bool
 	}
 	monthMap := make(map[ymKey]*monthAgg)
 
@@ -494,24 +580,47 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	returnItemMap := make(map[string]*returnAgg)
 
 	type skuInvAgg struct {
-		skuName     string
-		brand       string
-		sector      string
-		subCat      string
-		region      string
-		gov         string
-		rep         string
-		sellInCases float64
-		sellInEGP   float64
-		retCases    float64
-		retEGP      float64
-		tons        float64
-		octCases    float64
-		sepCases    float64
+		itemCode              string
+		barcode               string
+		unitsPerCarton        int
+		itemType              string
+		departmentAr          string
+		famKey                string
+		officialCartonExclVAT float64
+		officialCartonInclVAT float64
+		officialUnitInclVAT   float64
+		netCartonInvoiceCost  float64
+		skuName               string
+		brand                 string
+		sector                string
+		subCat                string
+		region                string
+		gov                   string
+		rep                   string
+		sellInCases           float64
+		sellInUnits           int
+		sellInEGP             float64
+		sellInGrossInclVAT    float64
+		matchedSellInCases    float64
+		matchedSellInEGP      float64
+		pendingSellInCases    float64
+		pendingSellInEGP      float64
+		retCases              float64
+		retEGP                float64
+		tons                  float64
+		octCases              float64
+		sepCases              float64
 	}
 	skuInvMap := make(map[string]*skuInvAgg)
+	famTotalSellInCases := make(map[string]float64)
+	famRegionSellInCases := make(map[string]float64)
+	famMatchedSellInCases := make(map[string]float64)
+	famRegionMatchedSellInCases := make(map[string]float64)
 
 	for _, rec := range combinedSellIn {
+		if rec.TotalUnitsSupplied == 0 || rec.CanonicalFamilyKey == "" {
+			c.enrichSellInRecordLocked(&rec)
+		}
 		if rec.SalesManager != "" && salesMgrName == "إدارة المبيعات وتطوير السلاسل" {
 			salesMgrName = rec.SalesManager
 		}
@@ -546,7 +655,7 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			continue
 		}
 		if searchQ != "" {
-			if !domain.MatchesProductSearchQuery(searchQ, rec.ItemCode, rec.Barcode, rec.ItemName, "", rec.SubCategory, rec.Brand) {
+			if !domain.MatchesProductSearchQuery(searchQ, rec.ItemCode, rec.Barcode, rec.ItemName, rec.DepartmentAr, rec.SubCategory, rec.Brand) {
 				continue
 			}
 		}
@@ -563,6 +672,9 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		ytdSellInCases += rec.NetQtyCases
 		ytdWeightTons += rec.WeightTons
 		ytdExpectedEGP += rec.ExpectedValueEGP
+		ytdGrossInclVATEGP += rec.GrossValueInclVATEGP
+		ytdVATAmountEGP += rec.VATAmountEGP
+		ytdTotalUnits += rec.TotalUnitsSupplied
 
 		yr := rec.Year
 		if yr <= 0 {
@@ -576,6 +688,7 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		if curYM.year > latestYM.year || (curYM.year == latestYM.year && curYM.month > latestYM.month) {
 			latestYM = curYM
 		}
+		monthHasSellOut := sellOutByYMRev[curYM] > 0 || sellOutByYMUnits[curYM] > 0
 
 		if m == 10 {
 			octActualEGP += rec.NetValueEGP
@@ -608,7 +721,10 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			ma.skus[rec.ItemName] = true
 		}
 		ma.sellInCases += rec.NetQtyCases
+		ma.sellInUnits += rec.TotalUnitsSupplied
 		ma.sellInEGP += rec.NetValueEGP
+		ma.sellInGrossInclVAT += rec.GrossValueInclVATEGP
+		ma.sellInVAT += rec.VATAmountEGP
 		ma.tons += rec.WeightTons
 		ma.expCases += rec.ExpectedQtyCases
 		ma.expEGP += rec.ExpectedValueEGP
@@ -745,22 +861,60 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			sia, ok := skuInvMap[invKey]
 			if !ok {
 				sia = &skuInvAgg{
-					skuName: rec.ItemName,
-					brand:   rec.Brand,
-					sector:  rec.Sector,
-					subCat:  rec.SubCategory,
-					region:  rec.RegionCode,
-					gov:     rec.Governorate,
-					rep:     rec.SalesRep,
+					itemCode:              rec.ItemCode,
+					barcode:               rec.Barcode,
+					unitsPerCarton:        rec.UnitsPerCarton,
+					itemType:              rec.PromotionType,
+					departmentAr:          rec.DepartmentAr,
+					famKey:                rec.CanonicalFamilyKey,
+					officialCartonExclVAT: rec.OfficialCartonExclVATEGP,
+					officialCartonInclVAT: rec.OfficialCartonInclVATEGP,
+					officialUnitInclVAT:   rec.OfficialUnitInclVATEGP,
+					netCartonInvoiceCost:  rec.NetCartonInvoiceCostEGP,
+					skuName:               rec.ItemName,
+					brand:                 rec.Brand,
+					sector:                rec.Sector,
+					subCat:                rec.SubCategory,
+					region:                rec.RegionCode,
+					gov:                   rec.Governorate,
+					rep:                   rec.SalesRep,
 				}
 				skuInvMap[invKey] = sia
+			}
+			if sia.itemCode == "" && rec.ItemCode != "" {
+				sia.itemCode = rec.ItemCode
+				sia.barcode = rec.Barcode
+				sia.unitsPerCarton = rec.UnitsPerCarton
+				sia.departmentAr = rec.DepartmentAr
+				sia.famKey = rec.CanonicalFamilyKey
+				sia.officialCartonExclVAT = rec.OfficialCartonExclVATEGP
+				sia.officialCartonInclVAT = rec.OfficialCartonInclVATEGP
+				sia.officialUnitInclVAT = rec.OfficialUnitInclVATEGP
+				sia.netCartonInvoiceCost = rec.NetCartonInvoiceCostEGP
 			}
 			if rec.SalesRep != "" && !strings.Contains(rec.SalesRep, "توزيع مركزي") {
 				sia.rep = rec.SalesRep
 			}
 			if rec.NetQtyCases >= 0 {
 				sia.sellInCases += rec.NetQtyCases
+				sia.sellInUnits += rec.TotalUnitsSupplied
 				sia.sellInEGP += rec.NetValueEGP
+				sia.sellInGrossInclVAT += rec.GrossValueInclVATEGP
+				if monthHasSellOut {
+					sia.matchedSellInCases += rec.NetQtyCases
+					sia.matchedSellInEGP += rec.NetValueEGP
+				} else {
+					sia.pendingSellInCases += rec.NetQtyCases
+					sia.pendingSellInEGP += rec.NetValueEGP
+				}
+				if sia.famKey != "" {
+					famTotalSellInCases[sia.famKey] += rec.NetQtyCases
+					famRegionSellInCases[sia.famKey+"|"+rec.RegionCode] += rec.NetQtyCases
+					if monthHasSellOut {
+						famMatchedSellInCases[sia.famKey] += rec.NetQtyCases
+						famRegionMatchedSellInCases[sia.famKey+"|"+rec.RegionCode] += rec.NetQtyCases
+					}
+				}
 			} else {
 				sia.retCases += math.Abs(rec.NetQtyCases)
 				sia.retEGP += math.Abs(rec.NetValueEGP)
@@ -838,17 +992,41 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	runningStockValByYear := make(map[int]float64)
 	useRealSellOutReconciliation := hasRealUploadedSellOut || normTenant == "tenant-adeco"
 
+	var matchedMonthsCount int
+	var matchedFirstMonthAR, matchedLastMonthAR string
+	var matchedYear int
+	var matchedSellInCases, matchedSellInExclVAT, matchedSellInGrossInclVAT float64
+	var matchedSellOutUnits int
+	var matchedSellOutCases, matchedSellOutPOSVal, matchedSellOutFactoryCostIncl, matchedSellOutFactoryCostExcl float64
+	var matchedPrevYearUnits int
+	var matchedPrevYearVal float64
+
+	var pendingMonthsCount int
+	var pendingFirstMonthAR, pendingLastMonthAR string
+	var pendingSellOutCases, pendingSellOutVal float64
+
 	for _, ym := range sortedYMKeys {
 		ma := monthMap[ym]
 		m := ym.month
 		yr := ym.year
+		matchedYear = yr
 
 		var sellOutVal float64
 		var sellOutUnits int
+		var sellOutEstCases float64
+		var sellOutFactoryCostExcl, sellOutFactoryCostIncl float64
+		hasActualSellOut := false
+
 		if useRealSellOutReconciliation {
-			// Use 100% real uploaded Sell-Out for this exact (Year, Month)
 			sellOutVal = round2(sellOutByYMRev[ym])
 			sellOutUnits = sellOutByYMUnits[ym]
+			sellOutEstCases = round2(sellOutByYMCases[ym])
+			sellOutFactoryCostExcl = round2(sellOutByYMFactoryCostExcl[ym])
+			sellOutFactoryCostIncl = round2(sellOutByYMFactoryCostIncl[ym])
+			hasActualSellOut = sellOutVal > 0 || sellOutUnits > 0
+			if sellOutEstCases <= 0 && sellOutUnits > 0 {
+				sellOutEstCases = round2(float64(sellOutUnits) / 12.0)
+			}
 		} else {
 			ratio := monthlySellThroughRatios[m]
 			if ratio <= 0 {
@@ -856,6 +1034,10 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			}
 			sellOutVal = round2(ma.sellInEGP * ratio)
 			sellOutUnits = int(math.Round(ma.sellInCases * 12.0 * ratio))
+			sellOutEstCases = round2(ma.sellInCases * ratio)
+			sellOutFactoryCostExcl = round2(sellOutVal * 0.78)
+			sellOutFactoryCostIncl = round2(sellOutFactoryCostExcl * 1.14)
+			hasActualSellOut = sellOutVal > 0
 		}
 
 		totalReconciledSellOutEGP += sellOutVal
@@ -864,33 +1046,75 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		openingVal := round2(runningStockValByYear[yr])
 		sellInCases := round2(ma.sellInCases)
 		sellInVal := round2(ma.sellInEGP)
-
-		var sellOutEstCases float64
-		if sellInCases > 0 && sellInVal > 0 {
-			avgCasePrice := sellInVal / sellInCases
-			if avgCasePrice > 0 {
-				sellOutEstCases = round2(sellOutVal / avgCasePrice)
-			}
-		} else if useRealSellOutReconciliation && sellOutByYMCases[ym] > 0 {
-			sellOutEstCases = round2(sellOutByYMCases[ym])
-		} else if sellOutUnits > 0 {
-			sellOutEstCases = round2(float64(sellOutUnits) / 12.0)
-		}
+		sellInGross := round2(ma.sellInGrossInclVAT)
+		sellInVAT := round2(ma.sellInVAT)
 
 		monthlyNetCases := round2(sellInCases - sellOutEstCases)
-		monthlyNetVal := round2(sellInVal - sellOutVal)
+		// Factory value of remaining cases uses actual factory cost of Sell-Out when available
+		costBasisForNet := sellOutFactoryCostExcl
+		if costBasisForNet <= 0 {
+			costBasisForNet = sellOutVal
+		}
+		monthlyNetVal := round2(sellInVal - costBasisForNet)
 
-		closingCases := round2(math.Max(0, openingCases+monthlyNetCases))
-		closingVal := round2(math.Max(0, openingVal+monthlyNetVal))
-		runningStockCasesByYear[yr] = closingCases
-		runningStockValByYear[yr] = closingVal
+		closingCases := openingCases
+		closingVal := openingVal
+		if hasActualSellOut || !useRealSellOutReconciliation {
+			closingCases = round2(math.Max(0, openingCases+monthlyNetCases))
+			closingVal = round2(math.Max(0, openingVal+monthlyNetVal))
+			runningStockCasesByYear[yr] = closingCases
+			runningStockValByYear[yr] = closingVal
+		}
 
 		gap := monthlyNetVal
 		strPct := 0.0
-		if sellInVal > 0 {
+		if sellInCases > 0 && sellOutEstCases > 0 {
+			strPct = round2((sellOutEstCases / sellInCases) * 100.0)
+		} else if sellInVal > 0 && sellOutVal > 0 {
 			strPct = round2((sellOutVal / sellInVal) * 100.0)
 		} else if sellOutVal > 0 {
 			strPct = 100.0
+		}
+
+		chainMarginEGP := 0.0
+		chainMarginPct := 0.0
+		if sellOutVal > 0 && sellOutFactoryCostIncl > 0 {
+			chainMarginEGP = round2(math.Max(0, sellOutVal-sellOutFactoryCostIncl))
+			chainMarginPct = round2((chainMarginEGP / sellOutVal) * 100.0)
+		}
+
+		prevYM := ymKey{year: yr - 1, month: m}
+		prevUnits := allYearsSellOutByYMUnits[prevYM]
+		prevVal := round2(allYearsSellOutByYMRev[prevYM])
+		yoyGrowthPct := 0.0
+		if prevVal > 0 && sellOutVal > 0 {
+			yoyGrowthPct = round2(((sellOutVal - prevVal) / prevVal) * 100.0)
+		}
+
+		if hasActualSellOut && (sellInCases > 0 || sellInVal > 0 || len(explicitSellIn) == 0) {
+			matchedMonthsCount++
+			if matchedFirstMonthAR == "" {
+				matchedFirstMonthAR = ma.monthAR
+			}
+			matchedLastMonthAR = ma.monthAR
+			matchedSellInCases += sellInCases
+			matchedSellInExclVAT += sellInVal
+			matchedSellInGrossInclVAT += sellInGross
+			matchedSellOutUnits += sellOutUnits
+			matchedSellOutCases += sellOutEstCases
+			matchedSellOutPOSVal += sellOutVal
+			matchedSellOutFactoryCostIncl += sellOutFactoryCostIncl
+			matchedSellOutFactoryCostExcl += sellOutFactoryCostExcl
+			matchedPrevYearUnits += prevUnits
+			matchedPrevYearVal += prevVal
+		} else if sellInCases > 0 || sellInVal > 0 {
+			pendingMonthsCount++
+			if pendingFirstMonthAR == "" {
+				pendingFirstMonthAR = ma.monthAR
+			}
+			pendingLastMonthAR = ma.monthAR
+			pendingSellOutCases += sellInCases
+			pendingSellOutVal += sellInVal
 		}
 
 		status := "مغلق (Full Month)"
@@ -900,13 +1124,13 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 
 		var healthStatus, healthLabelAr string
 		switch {
-		case sellInVal > 0 && sellOutVal == 0:
+		case sellInVal > 0 && !hasActualSellOut:
 			healthStatus = "awaiting_sell_out"
-			healthLabelAr = "رصيد مضاف للمخزن (بانتظار رفع شيت السحب Sell-Out للشهر)"
-		case sellInVal == 0 && sellOutVal > 0:
+			healthLabelAr = "توريد مضاف للمخزن (بانتظار رفع شيت كاشير السلسلة Sell-Out للشهر)"
+		case sellInVal == 0 && hasActualSellOut:
 			healthStatus = "awaiting_sell_in"
 			healthLabelAr = "سحب فعلي مسجل (بانتظار رفع شيت التوريد Sell-In للشهر)"
-		case sellOutVal > sellInVal:
+		case sellOutEstCases > sellInCases:
 			healthStatus = "drawdown"
 			healthLabelAr = "سحب عالٍ يفوق توريد الشهر (تصريف من الرصيد السابق - يحتاج تعويض)"
 		case strPct >= 75.0:
@@ -918,39 +1142,99 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		}
 
 		reconciliationList = append(reconciliationList, domain.ReconciliationMonthItem{
-			Year:                 yr,
-			MonthNum:             m,
-			MonthEN:              ma.monthEN,
-			MonthAR:              ma.monthAR,
-			PeriodStatus:         status,
-			ActiveSKUsCount:      len(ma.skus),
-			OpeningStockCases:    openingCases,
-			OpeningStockValueEGP: openingVal,
-			SellInCases:          sellInCases,
-			SellInValueEGP:       sellInVal,
-			SellOutUnits:         sellOutUnits,
-			SellOutEstCases:      sellOutEstCases,
-			SellOutValueEGP:      sellOutVal,
-			MonthlyNetCases:      monthlyNetCases,
-			MonthlyNetValueEGP:   monthlyNetVal,
-			ClosingStockCases:    closingCases,
-			ClosingStockValueEGP: closingVal,
-			InventoryGapEGP:      gap,
-			SellThroughRatePct:   strPct,
-			WeightTons:           round2(ma.tons),
-			ExpectedCases:        round2(ma.expCases),
-			ExpectedValueEGP:     round2(ma.expEGP),
-			StockHealthStatus:    healthStatus,
-			StockHealthLabelAr:   healthLabelAr,
+			Year:                         yr,
+			MonthNum:                     m,
+			MonthEN:                      ma.monthEN,
+			MonthAR:                      ma.monthAR,
+			PeriodStatus:                 status,
+			HasActualSellOut:             hasActualSellOut,
+			ActiveSKUsCount:              len(ma.skus),
+			OpeningStockCases:            openingCases,
+			OpeningStockValueEGP:         openingVal,
+			SellInCases:                  sellInCases,
+			SellInUnits:                  ma.sellInUnits,
+			SellInValueEGP:               sellInVal,
+			SellInGrossInclVATEGP:        sellInGross,
+			SellInVATAmountEGP:           sellInVAT,
+			SellOutUnits:                 sellOutUnits,
+			SellOutEstCases:              sellOutEstCases,
+			SellOutValueEGP:              sellOutVal,
+			SellOutFactoryCostExclVATEGP: sellOutFactoryCostExcl,
+			SellOutFactoryCostInclVATEGP: sellOutFactoryCostIncl,
+			ChainGrossMarginEGP:          chainMarginEGP,
+			ChainGrossMarginPct:          chainMarginPct,
+			MonthlyNetCases:              monthlyNetCases,
+			MonthlyNetValueEGP:           monthlyNetVal,
+			ClosingStockCases:            closingCases,
+			ClosingStockValueEGP:         closingVal,
+			InventoryGapEGP:              gap,
+			SellThroughRatePct:           strPct,
+			WeightTons:                   round2(ma.tons),
+			ExpectedCases:                round2(ma.expCases),
+			ExpectedValueEGP:             round2(ma.expEGP),
+			PrevYearSellOutUnits:         prevUnits,
+			PrevYearSellOutValueEGP:      prevVal,
+			YoYSellOutGrowthPct:          yoyGrowthPct,
+			StockHealthStatus:            healthStatus,
+			StockHealthLabelAr:           healthLabelAr,
 		})
 	}
 
-	// Determine Spotlight KPI metrics (Sell-In, Sell-Out, Remaining Balance Gap, STR%)
+	if matchedYear <= 0 {
+		matchedYear = 2026
+	}
+	matchedPeriodLabel := fmt.Sprintf("عام %d", matchedYear)
+	if matchedMonthsCount > 0 {
+		if matchedFirstMonthAR == matchedLastMonthAR {
+			matchedPeriodLabel = fmt.Sprintf("%s %d (%d شهر متطابق)", matchedFirstMonthAR, matchedYear, matchedMonthsCount)
+		} else {
+			matchedPeriodLabel = fmt.Sprintf("%s - %s %d (%d أشهر متطابقة)", matchedFirstMonthAR, matchedLastMonthAR, matchedYear, matchedMonthsCount)
+		}
+	}
+	pendingPeriodLabel := ""
+	if pendingMonthsCount > 0 {
+		if pendingFirstMonthAR == pendingLastMonthAR {
+			pendingPeriodLabel = fmt.Sprintf("%s %d", pendingFirstMonthAR, matchedYear)
+		} else {
+			pendingPeriodLabel = fmt.Sprintf("%s - %s %d", pendingFirstMonthAR, pendingLastMonthAR, matchedYear)
+		}
+	}
+
+	matchedRemainingCases := round2(math.Max(0, matchedSellInCases-matchedSellOutCases))
+	avgMatchedCasePriceExcl := 480.0
+	if matchedSellInCases > 0 && matchedSellInExclVAT > 0 {
+		avgMatchedCasePriceExcl = matchedSellInExclVAT / matchedSellInCases
+	}
+	matchedRemainingFactoryVal := round2(matchedRemainingCases * avgMatchedCasePriceExcl)
+	matchedSTR := 0.0
+	if matchedSellInCases > 0 {
+		matchedSTR = round2((matchedSellOutCases / matchedSellInCases) * 100.0)
+	}
+	matchedChainMarginEGP := round2(math.Max(0, matchedSellOutPOSVal-matchedSellOutFactoryCostIncl))
+	matchedChainMarginPct := 0.0
+	if matchedSellOutPOSVal > 0 {
+		matchedChainMarginPct = round2((matchedChainMarginEGP / matchedSellOutPOSVal) * 100.0)
+	}
+	matchedYoYUnitsGrowth := 0.0
+	if matchedPrevYearUnits > 0 {
+		matchedYoYUnitsGrowth = round2(((float64(matchedSellOutUnits) - float64(matchedPrevYearUnits)) / float64(matchedPrevYearUnits)) * 100.0)
+	}
+	matchedYoYValGrowth := 0.0
+	if matchedPrevYearVal > 0 {
+		matchedYoYValGrowth = round2(((matchedSellOutPOSVal - matchedPrevYearVal) / matchedPrevYearVal) * 100.0)
+	}
+
+	// Determine Spotlight KPI metrics (defaulting to Matched Window when available, else Full YTD)
 	spotlightSellInEGP := round2(ytdSellInEGP)
 	spotlightSellOutEGP := round2(totalReconciledSellOutEGP)
 	spotlightGapEGP := round2(math.Max(0, spotlightSellInEGP-spotlightSellOutEGP))
 	spotlightSTR := 0.0
-	if spotlightSellInEGP > 0 {
+	if matchedMonthsCount > 0 {
+		spotlightSellInEGP = round2(matchedSellInExclVAT)
+		spotlightSellOutEGP = round2(matchedSellOutPOSVal)
+		spotlightGapEGP = matchedRemainingFactoryVal
+		spotlightSTR = matchedSTR
+	} else if spotlightSellInEGP > 0 {
 		spotlightSTR = round2((spotlightSellOutEGP / spotlightSellInEGP) * 100.0)
 	} else if spotlightSellOutEGP > 0 {
 		spotlightSTR = 100.0
@@ -1117,65 +1401,151 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	}
 	promoSummary.TopReturnItems = topReturns
 
-	// Build SKU x Region Estimated Inventory & Suggested Replenishment PO
+	// Build SKU x Region Real Inventory & Suggested Replenishment PO (3-Way Linkage: Sell-In × Sell-Out × Product Master)
 	invItems := make([]domain.SKUBranchInventoryItem, 0, len(skuInvMap))
 	var totalEstStockCases, totalEstStockEGP float64
 	var totalSuggestedPOCases int
 	var totalSuggestedPOEGP, totalSuggestedPOTons float64
 	var urgentCount, overstockCount int
 
-	activeDays := math.Max(30.0, float64(len(monthMap))*30.0)
+	matchedActiveDays := math.Max(30.0, float64(matchedMonthsCount)*30.0)
+	if matchedMonthsCount <= 0 {
+		matchedActiveDays = math.Max(30.0, float64(len(monthMap))*30.0)
+	}
 
 	for _, sia := range skuInvMap {
 		if sia.sellInCases <= 0 {
 			continue
 		}
-		casePrice := 480.0
-		if sia.sellInCases > 0 && sia.sellInEGP > 0 {
-			casePrice = sia.sellInEGP / sia.sellInCases
+		upc := sia.unitsPerCarton
+		if upc <= 0 {
+			upc = 12
 		}
+
+		// Use actual historical Sell-In case price, enriched by Product Master official prices for PO valuation
+		actualCasePrice := 0.0
+		if sia.sellInCases > 0 && sia.sellInEGP > 0 {
+			actualCasePrice = sia.sellInEGP / sia.sellInCases
+		}
+		poCasePriceExcl := sia.officialCartonExclVAT
+		if sia.netCartonInvoiceCost > 0 {
+			// NetCartonInvoiceCost is incl. 14% VAT after 10% discount; excl VAT equivalent = NetCartonInvoiceCost / 1.14
+			poCasePriceExcl = sia.netCartonInvoiceCost / 1.14
+		}
+		if poCasePriceExcl <= 0 {
+			poCasePriceExcl = actualCasePrice
+		}
+		poCasePriceIncl := sia.netCartonInvoiceCost
+		if poCasePriceIncl <= 0 {
+			poCasePriceIncl = poCasePriceExcl * 1.14
+		}
+
 		caseTons := 0.012
 		if sia.sellInCases > 0 && sia.tons > 0 {
 			caseTons = sia.tons / sia.sellInCases
 		}
 
-		sellThroughFactor := 0.918
-		if chainFilter == "fathalla" {
-			sellThroughFactor = 0.934
-		}
-		if sia.retCases > 0 && sia.sellInCases > 0 {
-			retRatio := math.Min(0.15, sia.retCases/sia.sellInCases)
-			sellThroughFactor = math.Max(0.82, 0.945-retRatio)
-		} else if sia.octCases > sia.sepCases*0.45 && sia.octCases > 0 {
-			sellThroughFactor = 0.955
+		netSupplyCases := math.Max(0, sia.sellInCases-sia.retCases)
+		matchedNetSupplyCases := math.Max(0, sia.matchedSellInCases-sia.retCases)
+		if matchedNetSupplyCases <= 0 && matchedMonthsCount == 0 {
+			matchedNetSupplyCases = netSupplyCases
 		}
 
-		netSupplyCases := math.Max(0, sia.sellInCases-sia.retCases)
-		sellOutCases := round2(netSupplyCases * sellThroughFactor)
-		sellOutVal := round2(sellOutCases * casePrice)
+		var sellOutUnits int
+		var sellOutCases float64
+		var sellOutPOSVal float64
+		var sellOutFactoryCost float64
+
+		if useRealSellOutReconciliation {
+			// Allocate real Cashier Sell-Out for this canonical family across regions proportional to matched supply share
+			famAcc := realSellOutByFam[sia.famKey]
+			regAcc := realSellOutByFamRegion[sia.famKey+"|"+sia.region]
+			famTotalCases := famTotalSellInCases[sia.famKey]
+			regTotalCases := famRegionSellInCases[sia.famKey+"|"+sia.region]
+			famMatchedCases := famMatchedSellInCases[sia.famKey]
+			regMatchedCases := famRegionMatchedSellInCases[sia.famKey+"|"+sia.region]
+
+			if regAcc != nil && regMatchedCases > 0 && sia.matchedSellInCases > 0 {
+				shareInReg := sia.matchedSellInCases / regMatchedCases
+				sellOutUnits = int(math.Round(float64(regAcc.units) * shareInReg))
+				sellOutCases = round2(regAcc.cases * shareInReg)
+				sellOutPOSVal = round2(regAcc.posRev * shareInReg)
+				sellOutFactoryCost = round2(regAcc.factoryCostIncl * shareInReg)
+			} else if famAcc != nil && famMatchedCases > 0 && sia.matchedSellInCases > 0 {
+				shareInFam := sia.matchedSellInCases / famMatchedCases
+				sellOutUnits = int(math.Round(float64(famAcc.units) * shareInFam))
+				sellOutCases = round2(famAcc.cases * shareInFam)
+				sellOutPOSVal = round2(famAcc.posRev * shareInFam)
+				sellOutFactoryCost = round2(famAcc.factoryCostIncl * shareInFam)
+			} else if regAcc != nil && regTotalCases > 0 && famMatchedCases == 0 {
+				shareInReg := sia.sellInCases / regTotalCases
+				sellOutUnits = int(math.Round(float64(regAcc.units) * shareInReg))
+				sellOutCases = round2(regAcc.cases * shareInReg)
+				sellOutPOSVal = round2(regAcc.posRev * shareInReg)
+				sellOutFactoryCost = round2(regAcc.factoryCostIncl * shareInReg)
+			} else if famAcc != nil && famTotalCases > 0 && famMatchedCases == 0 {
+				shareInFam := sia.sellInCases / famTotalCases
+				sellOutUnits = int(math.Round(float64(famAcc.units) * shareInFam))
+				sellOutCases = round2(famAcc.cases * shareInFam)
+				sellOutPOSVal = round2(famAcc.posRev * shareInFam)
+				sellOutFactoryCost = round2(famAcc.factoryCostIncl * shareInFam)
+			}
+		} else {
+			sellThroughFactor := 0.918
+			sellOutCases = round2(netSupplyCases * sellThroughFactor)
+			sellOutUnits = int(math.Round(sellOutCases * float64(upc)))
+			sellOutPOSVal = round2(sellOutCases * poCasePriceIncl * 1.18)
+			sellOutFactoryCost = round2(sellOutCases * poCasePriceIncl)
+		}
+
+		matchedRemCases := round2(math.Max(0, matchedNetSupplyCases-sellOutCases))
+		matchedRemVal := round2(matchedRemCases * poCasePriceExcl)
 
 		estStockCases := round2(math.Max(0, netSupplyCases-sellOutCases))
-		estStockVal := round2(estStockCases * casePrice)
+		if matchedMonthsCount > 0 && sia.matchedSellInCases > 0 {
+			estStockCases = matchedRemCases
+		}
+		estStockUnits := int(math.Round(estStockCases * float64(upc)))
+		estStockVal := round2(estStockCases * poCasePriceExcl)
 
-		adr := sellOutCases / activeDays
-		if sia.octCases > 0 {
-			octDaily := (sia.octCases * sellThroughFactor) / 14.0
-			adr = (adr*0.4 + octDaily*0.6)
+		strPct := 0.0
+		if matchedNetSupplyCases > 0 && sellOutCases > 0 {
+			strPct = round2((sellOutCases / matchedNetSupplyCases) * 100.0)
+		} else if netSupplyCases > 0 && sellOutCases > 0 {
+			strPct = round2((sellOutCases / netSupplyCases) * 100.0)
+		}
+
+		// Real daily velocity (ADR) from actual Sell-Out cases over matched active days, or Sell-In run-rate when SKU has no POS scan under same name
+		adr := 0.0
+		if sellOutCases > 0 {
+			adr = sellOutCases / matchedActiveDays
+		} else if netSupplyCases > 0 {
+			adr = (netSupplyCases * 0.75) / math.Max(30.0, float64(len(monthMap))*30.0)
 		}
 		if adr < 0.05 {
 			adr = 0.05
 		}
 		adr = round2(adr)
 
+		// Use Matched Remaining Cases for DOI when evaluating depletion at the end of the matched cashier window
+		stockBasisForDOI := matchedRemCases
+		stockValForTotal := matchedRemVal
+		if matchedMonthsCount == 0 || sia.pendingSellInCases == 0 || sia.matchedSellInCases == 0 {
+			stockBasisForDOI = estStockCases
+			if matchedMonthsCount == 0 || sia.pendingSellInCases == 0 {
+				stockValForTotal = estStockVal
+			}
+		}
 		doi := 0.0
 		if adr > 0 {
-			doi = round2(estStockCases / adr)
+			doi = round2(stockBasisForDOI / adr)
 		}
 
 		targetCases := float64(leadTime+safetyDays) * adr
-		rawNeeded := math.Max(0, targetCases-estStockCases)
+		rawNeeded := math.Max(0, targetCases-stockBasisForDOI)
 		suggestedCases := int(math.Ceil(rawNeeded))
-		suggestedVal := round2(float64(suggestedCases) * casePrice)
+		suggestedValExcl := round2(float64(suggestedCases) * poCasePriceExcl)
+		suggestedValIncl := round2(float64(suggestedCases) * poCasePriceIncl)
 		suggestedTons := round2(float64(suggestedCases) * caseTons)
 
 		status := "optimal"
@@ -1198,44 +1568,78 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			overstockCount++
 		}
 
-		totalEstStockCases += estStockCases
-		totalEstStockEGP += estStockVal
+		if matchedMonthsCount > 0 && sia.matchedSellInCases > 0 {
+			totalEstStockCases += matchedRemCases
+			totalEstStockEGP += stockValForTotal
+		} else if matchedMonthsCount == 0 {
+			totalEstStockCases += estStockCases
+			totalEstStockEGP += estStockVal
+		}
 		totalSuggestedPOCases += suggestedCases
-		totalSuggestedPOEGP += suggestedVal
+		totalSuggestedPOEGP += suggestedValExcl
 		totalSuggestedPOTons += suggestedTons
 
-		invItem := domain.SKUBranchInventoryItem{
-			SKUName:                sia.skuName,
-			Brand:                  sia.brand,
-			Sector:                 sia.sector,
-			SubCategory:            sia.subCat,
-			RegionCode:             sia.region,
-			Governorate:            sia.gov,
-			SalesRep:               sia.rep,
-			SellInCases:            round2(sia.sellInCases),
-			SellInValueEGP:         round2(sia.sellInEGP),
-			SellOutEstCases:        sellOutCases,
-			SellOutValueEGP:        sellOutVal,
-			ReturnCases:            round2(sia.retCases),
-			ReturnValueEGP:         round2(sia.retEGP),
-			EstimatedStockCases:    estStockCases,
-			EstimatedStockValueEGP: estStockVal,
-			DailyRunRateCases:      adr,
-			DaysOfInventory:        doi,
-			StockStatus:            status,
-			StockStatusAr:          statusAr,
-			CasePriceEGP:           round2(casePrice),
-			WeightTons:             round2(sia.tons),
-			SuggestedPOCases:       suggestedCases,
-			SuggestedPOValueEGP:    suggestedVal,
-			SuggestedPOTons:        suggestedTons,
+		avgRetailPOS := 0.0
+		retailMarginPct := 0.0
+		chainMarginEGP := 0.0
+		if sellOutUnits > 0 && sellOutPOSVal > 0 {
+			avgRetailPOS = round2(sellOutPOSVal / float64(sellOutUnits))
+			if sellOutFactoryCost > 0 {
+				chainMarginEGP = round2(math.Max(0, sellOutPOSVal-sellOutFactoryCost))
+				retailMarginPct = round2((chainMarginEGP / sellOutPOSVal) * 100.0)
+			}
 		}
-		if pm, ok := c.lookupProductMasterLocked(normTenant, "", "", sia.skuName); ok {
-			invItem.ItemCode = pm.ItemCode
-			invItem.Barcode = pm.Barcode
-			invItem.UnitsPerCarton = pm.UnitsPerCarton
-			invItem.ItemType = pm.ItemType
-			invItem.FactoryCartonCost = pm.NetCartonInvoiceCost
+
+		invItem := domain.SKUBranchInventoryItem{
+			ItemCode:                  sia.itemCode,
+			Barcode:                   sia.barcode,
+			UnitsPerCarton:            upc,
+			ItemType:                  sia.itemType,
+			DepartmentAr:              sia.departmentAr,
+			FactoryCartonCost:         round2(poCasePriceIncl),
+			OfficialCartonExclVATEGP:  round2(sia.officialCartonExclVAT),
+			OfficialCartonInclVATEGP:  round2(sia.officialCartonInclVAT),
+			OfficialUnitInclVATEGP:    round2(sia.officialUnitInclVAT),
+			AvgRetailPOSPriceEGP:      avgRetailPOS,
+			RetailerMarginPct:         retailMarginPct,
+			SKUName:                   sia.skuName,
+			Brand:                     sia.brand,
+			Sector:                    sia.sector,
+			SubCategory:               sia.subCat,
+			RegionCode:                sia.region,
+			Governorate:               sia.gov,
+			SalesRep:                  sia.rep,
+			SellInCases:               round2(sia.sellInCases),
+			SellInUnits:               sia.sellInUnits,
+			SellInValueEGP:            round2(sia.sellInEGP),
+			SellInGrossInclVATEGP:     round2(sia.sellInGrossInclVAT),
+			MatchedSellInCases:        round2(sia.matchedSellInCases),
+			MatchedSellInValueEGP:     round2(sia.matchedSellInEGP),
+			PendingSellInCases:        round2(sia.pendingSellInCases),
+			PendingSellInValueEGP:     round2(sia.pendingSellInEGP),
+			SellOutUnits:              sellOutUnits,
+			SellOutEstCases:           sellOutCases,
+			SellOutValueEGP:           sellOutPOSVal,
+			SellOutFactoryCostEGP:     sellOutFactoryCost,
+			ChainGrossMarginEGP:       chainMarginEGP,
+			ReturnCases:               round2(sia.retCases),
+			ReturnValueEGP:            round2(sia.retEGP),
+			EstimatedStockCases:       estStockCases,
+			EstimatedStockUnits:       estStockUnits,
+			EstimatedStockValueEGP:    estStockVal,
+			MatchedRemainingCases:     matchedRemCases,
+			MatchedRemainingValueEGP:  matchedRemVal,
+			SellThroughPct:            strPct,
+			DailyRunRateCases:         adr,
+			DaysOfInventory:           doi,
+			StockStatus:               status,
+			StockStatusAr:             statusAr,
+			CasePriceEGP:              round2(poCasePriceExcl),
+			WeightTons:                round2(sia.tons),
+			SuggestedPOCases:          suggestedCases,
+			SuggestedPOValueEGP:       suggestedValExcl,
+			SuggestedPOGrossInclVATEGP: suggestedValIncl,
+			SuggestedPOTons:           suggestedTons,
 		}
 		invItems = append(invItems, invItem)
 	}
@@ -1256,8 +1660,8 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	}
 
 	displayInvItems := invItems
-	if len(displayInvItems) > 150 {
-		displayInvItems = displayInvItems[:150]
+	if len(displayInvItems) > 250 {
+		displayInvItems = displayInvItems[:250]
 	}
 
 	effectiveChainOut := chainFilter
@@ -1266,45 +1670,68 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	}
 
 	payload := &domain.CPFRDashboardPayload{
-		TenantID:                 normTenant,
-		RetailerChain:            effectiveChainOut,
-		SourceFilename:           filename,
-		TotalRecords:             len(filteredSellIn),
-		ActiveSKUsCount:          len(allSkusSet),
-		ActiveRepsCount:          len(allRepsSet),
-		SalesManagerName:         salesMgrName,
-		KAOfficerName:            kaOfficerName,
-		Jan2026SellInEGP:         round2(spotlightSellInEGP),
-		Jan2026SellOutEGP:        round2(spotlightSellOutEGP),
-		Jan2026GapEGP:            round2(spotlightGapEGP),
-		Jan2026SellThroughPct:    spotlightSTR,
-		YTD2026SellInEGP:         round2(ytdSellInEGP),
-		YTD2026SellInCases:       round2(ytdSellInCases),
-		YTD2026WeightTons:        round2(ytdWeightTons),
-		YTD2026ExpectedEGP:       round2(ytdExpectedEGP),
-		OctW1W2ActualEGP:         round2(octActualEGP),
-		OctW1W2ActualCases:       round2(octActualCases),
-		OctProjectedMonthEndEGP:  round2(octProjEGP),
-		OctProjectedCases:        round2(octProjCases),
-		MTRevenueEGP:             round2(mtRevTotal),
-		MTSharePct:               mtShare,
-		CCRevenueEGP:             round2(ccRevTotal),
-		CCSharePct:               ccShare,
-		TotalEstimatedStockCases: round2(totalEstStockCases),
-		TotalEstimatedStockEGP:   round2(totalEstStockEGP),
-		TotalSuggestedPOCases:    totalSuggestedPOCases,
-		TotalSuggestedPOEGP:      round2(totalSuggestedPOEGP),
-		TotalSuggestedPOTons:     round2(totalSuggestedPOTons),
-		UrgentReplenishmentCount: urgentCount,
-		OverstockAlertCount:      overstockCount,
-		LeadTimeDays:             leadTime,
-		SafetyStockDays:          safetyDays,
-		MonthlyReconciliation:    reconciliationList,
-		InventoryAndPOItems:      displayInvItems,
-		BrandForecasts:           brandList,
-		RegionPerformances:       regionList,
-		SalesRepScorecards:       repList,
-		PromoAndReturns:          promoSummary,
+		TenantID:                        normTenant,
+		RetailerChain:                   effectiveChainOut,
+		SourceFilename:                  filename,
+		TotalRecords:                    len(filteredSellIn),
+		ActiveSKUsCount:                 len(allSkusSet),
+		ActiveRepsCount:                 len(allRepsSet),
+		SalesManagerName:                salesMgrName,
+		KAOfficerName:                   kaOfficerName,
+		Jan2026SellInEGP:                round2(spotlightSellInEGP),
+		Jan2026SellOutEGP:               round2(spotlightSellOutEGP),
+		Jan2026GapEGP:                   round2(spotlightGapEGP),
+		Jan2026SellThroughPct:           spotlightSTR,
+		YTD2026SellInEGP:                round2(ytdSellInEGP),
+		YTD2026SellInCases:              round2(ytdSellInCases),
+		YTD2026WeightTons:               round2(ytdWeightTons),
+		YTD2026ExpectedEGP:              round2(ytdExpectedEGP),
+		YTD2026GrossInclVATEGP:          round2(ytdGrossInclVATEGP),
+		YTD2026VATAmountEGP:             round2(ytdVATAmountEGP),
+		YTD2026TotalUnits:               ytdTotalUnits,
+		OctW1W2ActualEGP:                round2(octActualEGP),
+		OctW1W2ActualCases:              round2(octActualCases),
+		OctProjectedMonthEndEGP:         round2(octProjEGP),
+		OctProjectedCases:               round2(octProjCases),
+		MTRevenueEGP:                    round2(mtRevTotal),
+		MTSharePct:                      mtShare,
+		CCRevenueEGP:                    round2(ccRevTotal),
+		CCSharePct:                      ccShare,
+		TotalEstimatedStockCases:        round2(totalEstStockCases),
+		TotalEstimatedStockEGP:          round2(totalEstStockEGP),
+		TotalSuggestedPOCases:           totalSuggestedPOCases,
+		TotalSuggestedPOEGP:             round2(totalSuggestedPOEGP),
+		TotalSuggestedPOTons:            round2(totalSuggestedPOTons),
+		UrgentReplenishmentCount:        urgentCount,
+		OverstockAlertCount:             overstockCount,
+		LeadTimeDays:                    leadTime,
+		SafetyStockDays:                 safetyDays,
+		MatchedMonthsCount:              matchedMonthsCount,
+		MatchedPeriodLabel:              matchedPeriodLabel,
+		MatchedSellInCases:              round2(matchedSellInCases),
+		MatchedSellInValueExclVATEGP:    round2(matchedSellInExclVAT),
+		MatchedSellInGrossInclVATEGP:    round2(matchedSellInGrossInclVAT),
+		MatchedSellOutUnits:             matchedSellOutUnits,
+		MatchedSellOutCases:             round2(matchedSellOutCases),
+		MatchedSellOutPOSValueEGP:       round2(matchedSellOutPOSVal),
+		MatchedSellOutFactoryCostEGP:    round2(matchedSellOutFactoryCostIncl),
+		MatchedRemainingCases:           matchedRemainingCases,
+		MatchedRemainingFactoryValueEGP: matchedRemainingFactoryVal,
+		MatchedSellThroughPct:           matchedSTR,
+		MatchedChainGrossMarginEGP:      matchedChainMarginEGP,
+		MatchedChainGrossMarginPct:      matchedChainMarginPct,
+		MatchedYoYUnitsGrowthPct:        matchedYoYUnitsGrowth,
+		MatchedYoYValueGrowthPct:        matchedYoYValGrowth,
+		PendingSellOutMonthsCount:       pendingMonthsCount,
+		PendingSellOutPeriodLabel:       pendingPeriodLabel,
+		PendingSellOutCases:             round2(pendingSellOutCases),
+		PendingSellOutValueEGP:          round2(pendingSellOutVal),
+		MonthlyReconciliation:           reconciliationList,
+		InventoryAndPOItems:             displayInvItems,
+		BrandForecasts:                  brandList,
+		RegionPerformances:              regionList,
+		SalesRepScorecards:              repList,
+		PromoAndReturns:                 promoSummary,
 	}
 
 	return payload, nil

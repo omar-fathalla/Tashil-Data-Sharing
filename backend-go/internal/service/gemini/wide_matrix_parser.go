@@ -93,11 +93,30 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		return nil, false
 	}
 
+	explicitFileYear := inferYearFromText(filename, 0)
+	hasMatchingFileYearSheet := false
+	if explicitFileYear >= 2020 && len(sheetEntries) > 1 {
+		for _, entry := range sheetEntries {
+			if inferYearFromText(entry.name, 0) == explicitFileYear {
+				hasMatchingFileYearSheet = true
+				break
+			}
+		}
+	}
+
 	var visibleWideSheets []parsedSheetSummary
 	var allWideSheets []parsedSheetSummary
 	var virtualEntries []wbSheetEntry
 
 	for _, entry := range sheetEntries {
+		// If the workbook filename explicitly targets a year (e.g. "2026 out.xlsx") and contains a matching sheet ("sale out2026"),
+		// skip leftover full-year sheets from a different year ("sale out2025") so multi-file archives never double-count 2025.
+		if hasMatchingFileYearSheet {
+			entryYear := inferYearFromText(entry.name, 0)
+			if entryYear >= 2020 && entryYear != explicitFileYear && parseSmartMonthToken(entry.name) == 0 {
+				continue
+			}
+		}
 		sampleRows, err := readWorksheetSampleRows(entry.file, sharedStrings, 3)
 		if err != nil || len(sampleRows) < 2 {
 			continue
@@ -133,7 +152,7 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 			continue
 		}
 
-		fileYear := inferYearFromText(filename, inferYearFromText(entry.name, 0))
+		fileYear := inferYearFromText(entry.name, inferYearFromText(filename, 0))
 		sheetDate := tryParseArabicSheetMonthDate(entry.name, fileYear)
 		if sheetDate == "" {
 			sheetDate = tryParseArabicSheetMonthDate(filename, fileYear)
@@ -910,7 +929,7 @@ func splitWideSheetByRowPeriods(
 		return nil
 	}
 
-	defaultYear := inferYearFromText(filename, inferYearFromText(sheetName, 2026))
+	defaultYear := inferYearFromText(sheetName, inferYearFromText(filename, 2026))
 	monthLastDays := [13]int{0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
 
 	type periodBucket struct {

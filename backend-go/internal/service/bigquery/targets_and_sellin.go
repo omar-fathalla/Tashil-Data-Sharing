@@ -132,7 +132,7 @@ func (c *Client) GetSellInRecords(ctx context.Context, tenantID string, filter S
 		if r.TenantID == "" {
 			r.TenantID = normTenant
 		}
-		if r.ItemCode == "" {
+		if r.ItemCode == "" || r.TotalUnitsSupplied == 0 || r.CanonicalFamilyKey == "" {
 			c.enrichSellInRecordLocked(&r)
 		}
 		rChain := strings.ToLower(strings.TrimSpace(r.RetailerChain))
@@ -767,6 +767,9 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 	// 2. Build Sell-Out SKU & Store Maps for Stock-Aware Allocation & Physical Branch Weights
 	sellOutStoreRev := make(map[string]float64)
 	sellOutSkuUnits := make(map[string]int)
+	sellOutCodeUnits := make(map[string]int)
+	sellOutFamCases := make(map[string]float64)
+	sellOutMonths := make(map[int]bool)
 	for _, sr := range c.records {
 		if !matchTenant(sr.TenantID, normTenant) || !isOwnRecord(sr) {
 			continue
@@ -781,27 +784,66 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 		if sr.StoreName != "" && sr.NetRevenue > 0 {
 			sellOutStoreRev[sr.StoreName] += sr.NetRevenue
 		}
+		yr, m := extractYearAndMonthFromDate(sr.TransactionDate)
+		if t.Year > 0 && yr > 0 && yr != t.Year {
+			continue
+		}
+		if m > 0 {
+			sellOutMonths[m] = true
+		}
 		if sr.SKUName != "" && sr.QuantitySold > 0 {
 			sellOutSkuUnits[sr.SKUName] += sr.QuantitySold
+			upc := sr.UnitsPerCarton
+			pm, pmOk := c.lookupProductMasterLocked(normTenant, sr.ItemCode, sr.Barcode, sr.SKUName)
+			if upc <= 0 {
+				if pmOk && pm.UnitsPerCarton > 0 {
+					upc = pm.UnitsPerCarton
+				} else {
+					upc = 12
+				}
+			}
+			codeKey := strings.ToUpper(strings.TrimSpace(sr.ItemCode))
+			if codeKey == "" && pmOk {
+				codeKey = strings.ToUpper(strings.TrimSpace(pm.ItemCode))
+			}
+			if codeKey != "" {
+				sellOutCodeUnits[codeKey] += sr.QuantitySold
+			}
+			var famKey string
+			if pmOk {
+				famKey = CanonicalSellInFamilyKey(&pm, sr.SKUName)
+			} else {
+				famKey = CanonicalSellInFamilyKey(nil, sr.SKUName)
+			}
+			sellOutFamCases[famKey] += float64(sr.QuantitySold) / float64(upc)
 		}
 	}
 
 	// 3. Aggregate Chain-Wide SKUs from weightRecs (and periodRecs for actuals)
 	type skuStat struct {
-		name        string
-		brand       string
-		sector      string
-		subCat      string
-		histRev     float64
-		histCases   float64
-		histTons    float64
-		promoRev    float64
-		actRev      float64
-		actCases    float64
-		actTons     float64
-		expRev      float64
-		expCases    float64
-		byRegionRev map[string]float64
+		itemCode              string
+		barcode               string
+		unitsPerCarton        int
+		departmentAr          string
+		officialCartonExclVAT float64
+		officialCartonInclVAT float64
+		famKey                string
+		promoType             string
+		name                  string
+		brand                 string
+		sector                string
+		subCat                string
+		histRev               float64
+		histCases             float64
+		matchedCases          float64
+		histTons              float64
+		promoRev              float64
+		actRev                float64
+		actCases              float64
+		actTons               float64
+		expRev                float64
+		expCases              float64
+		byRegionRev           map[string]float64
 	}
 	skuMap := make(map[string]*skuStat)
 
@@ -821,13 +863,30 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 				sec = "MT"
 			}
 			st = &skuStat{
-				name:        name,
-				brand:       brand,
-				sector:      sec,
-				subCat:      r.SubCategory,
-				byRegionRev: make(map[string]float64),
+				itemCode:              r.ItemCode,
+				barcode:               r.Barcode,
+				unitsPerCarton:        r.UnitsPerCarton,
+				departmentAr:          r.DepartmentAr,
+				officialCartonExclVAT: r.OfficialCartonExclVATEGP,
+				officialCartonInclVAT: r.OfficialCartonInclVATEGP,
+				famKey:                r.CanonicalFamilyKey,
+				promoType:             r.PromotionType,
+				name:                  name,
+				brand:                 brand,
+				sector:                sec,
+				subCat:                r.SubCategory,
+				byRegionRev:           make(map[string]float64),
 			}
 			skuMap[name] = st
+		}
+		if st.itemCode == "" && r.ItemCode != "" {
+			st.itemCode = r.ItemCode
+			st.barcode = r.Barcode
+			st.unitsPerCarton = r.UnitsPerCarton
+			st.departmentAr = r.DepartmentAr
+			st.officialCartonExclVAT = r.OfficialCartonExclVATEGP
+			st.officialCartonInclVAT = r.OfficialCartonInclVATEGP
+			st.famKey = r.CanonicalFamilyKey
 		}
 		if r.NetValueEGP > 0 {
 			st.histRev += r.NetValueEGP
@@ -842,6 +901,9 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 		}
 		if r.NetQtyCases > 0 {
 			st.histCases += r.NetQtyCases
+			if sellOutMonths[r.MonthNum] && (t.Year == 0 || r.Year == 0 || r.Year == t.Year) {
+				st.matchedCases += r.NetQtyCases
+			}
 		}
 		if r.WeightTons > 0 {
 			st.histTons += r.WeightTons
@@ -857,11 +919,19 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 		if !ok {
 			brand, sec := inferBrandAndSectorFromSKU(name, r.SubCategory)
 			st = &skuStat{
-				name:        name,
-				brand:       brand,
-				sector:      sec,
-				subCat:      r.SubCategory,
-				byRegionRev: make(map[string]float64),
+				itemCode:              r.ItemCode,
+				barcode:               r.Barcode,
+				unitsPerCarton:        r.UnitsPerCarton,
+				departmentAr:          r.DepartmentAr,
+				officialCartonExclVAT: r.OfficialCartonExclVATEGP,
+				officialCartonInclVAT: r.OfficialCartonInclVATEGP,
+				famKey:                r.CanonicalFamilyKey,
+				promoType:             r.PromotionType,
+				name:                  name,
+				brand:                 brand,
+				sector:                sec,
+				subCat:                r.SubCategory,
+				byRegionRev:           make(map[string]float64),
 			}
 			skuMap[name] = st
 		}
@@ -872,9 +942,11 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 		st.expCases += r.ExpectedQtyCases
 	}
 
-	// Build sorted list of Chain-Wide SKUs and compute total weight
+	// Build sorted list of Chain-Wide SKUs and compute total weight + enrich from Product Master
 	skuList := make([]*skuStat, 0, len(skuMap))
 	var totalSkuHistRev, totalSkuHistCases float64
+	famHistCasesTotal := make(map[string]float64)
+	famMatchedCasesTotal := make(map[string]float64)
 	for _, st := range skuMap {
 		if st.histRev <= 0 && st.actRev > 0 {
 			st.histRev = st.actRev
@@ -888,6 +960,32 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 		if st.histCases <= 0 {
 			st.histCases = math.Max(1.0, st.histRev/avgCasePrice)
 		}
+		actualCP := 0.0
+		if st.histCases > 0 && st.histRev > 0 {
+			actualCP = st.histRev / st.histCases
+		}
+		if st.itemCode == "" || st.unitsPerCarton <= 0 || st.officialCartonExclVAT <= 0 {
+			if pm, pmOk := c.lookupProductMasterWithPriceLocked(normTenant, st.itemCode, st.barcode, st.name, st.promoType, actualCP); pmOk {
+				st.itemCode = pm.ItemCode
+				st.barcode = pm.Barcode
+				st.unitsPerCarton = pm.UnitsPerCarton
+				st.departmentAr = pm.DepartmentAr
+				if st.departmentAr == "" {
+					st.departmentAr = domain.InferDepartmentArFromPrefix(pm.ItemCodePrefix)
+				}
+				st.officialCartonExclVAT = pm.CartonPriceExclVAT
+				st.officialCartonInclVAT = pm.CartonPriceInclVAT
+				st.famKey = CanonicalSellInFamilyKey(&pm, st.name)
+			}
+		}
+		if st.unitsPerCarton <= 0 {
+			st.unitsPerCarton = 12
+		}
+		if st.famKey == "" {
+			st.famKey = CanonicalSellInFamilyKey(nil, st.name)
+		}
+		famHistCasesTotal[st.famKey] += st.histCases
+		famMatchedCasesTotal[st.famKey] += st.matchedCases
 		totalSkuHistRev += st.histRev
 		totalSkuHistCases += st.histCases
 		skuList = append(skuList, st)
@@ -929,6 +1027,8 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 		casePrice := avgCasePrice
 		if st.histCases > 0 && st.histRev > 0 {
 			casePrice = st.histRev / st.histCases
+		} else if st.officialCartonExclVAT > 0 {
+			casePrice = st.officialCartonExclVAT * 0.90
 		}
 		tonsPerC := avgTonsPerCase
 		if st.histCases > 0 && st.histTons > 0 {
@@ -943,15 +1043,35 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 			achPct = math.Round((st.actCases/sTargetUnits)*1000) / 10
 		}
 
-		// Estimate remaining stock & stock health for this SKU
-		sellOutEstCases := float64(sellOutSkuUnits[st.name]) / 12.0
-		if sellOutEstCases <= 0 && st.histCases > 0 {
-			sellOutEstCases = st.histCases * 0.78
+		upc := st.unitsPerCarton
+		if upc <= 0 {
+			upc = 12
 		}
-		remStock := round2(math.Max(0, st.histCases-sellOutEstCases))
+
+		// Estimate remaining stock & stock health for this SKU using canonical family Sell-Out across matched months
+		var sellOutEstCases float64
+		codeKey := strings.ToUpper(strings.TrimSpace(st.itemCode))
+		if famCases, ok := sellOutFamCases[st.famKey]; ok && famCases > 0 {
+			if famMatchedCasesTotal[st.famKey] > 0 && st.matchedCases > 0 {
+				sellOutEstCases = famCases * (st.matchedCases / famMatchedCasesTotal[st.famKey])
+			} else if famHistCasesTotal[st.famKey] > 0 {
+				sellOutEstCases = famCases * (st.histCases / famHistCasesTotal[st.famKey])
+			}
+		} else if codeUnits, ok := sellOutCodeUnits[codeKey]; ok && codeKey != "" && codeUnits > 0 {
+			sellOutEstCases = float64(codeUnits) / float64(upc)
+		} else if rawUnits, ok := sellOutSkuUnits[st.name]; ok && rawUnits > 0 {
+			sellOutEstCases = float64(rawUnits) / float64(upc)
+		} else if len(sellOutFamCases) == 0 && st.histCases > 0 {
+			sellOutEstCases = st.histCases * 0.85
+		}
+		supplyBasis := st.histCases
+		if len(sellOutMonths) > 0 && st.matchedCases > 0 {
+			supplyBasis = st.matchedCases
+		}
+		remStock := round2(math.Max(0, supplyBasis-sellOutEstCases))
 		stockRatio := 0.22
-		if st.histCases > 0 {
-			stockRatio = remStock / st.histCases
+		if supplyBasis > 0 {
+			stockRatio = remStock / supplyBasis
 		}
 		stStatus := "optimal"
 		stStatusAr := "رصيد آمن ومتوازن"
@@ -969,27 +1089,35 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 		}
 
 		chainSKUTotals = append(chainSKUTotals, domain.TargetSKUBreakdown{
-			SKUName:             st.name,
-			Brand:               st.brand,
-			Sector:              st.sector,
-			SubCategory:         st.subCat,
-			SharePct:            math.Round(revShare*10000) / 100,
-			CasePriceEGP:        round2(casePrice),
-			TargetRevenueEGP:    sTargetRev,
-			TargetUnits:         sTargetUnits,
-			TargetWeightTons:    sTargetTons,
-			ActualRevenueEGP:    round2(st.actRev),
-			ActualUnits:         round2(st.actCases),
-			ActualWeightTons:    round2(st.actTons),
-			ExpectedRevenueEGP:  round2(st.expRev),
-			ExpectedUnits:       round2(st.expCases),
-			VarianceRevenueEGP:  round2(st.actRev - sTargetRev),
-			VarianceUnits:       round2(st.actCases - sTargetUnits),
-			AchievementPct:      achPct,
-			RemainingStockCases: remStock,
-			StockStatus:         stStatus,
-			StockStatusAr:       stStatusAr,
-			PromoSharePct:       pShare,
+			ItemCode:                 st.itemCode,
+			Barcode:                  st.barcode,
+			UnitsPerCarton:           upc,
+			DepartmentAr:             st.departmentAr,
+			OfficialCartonExclVATEGP: round2(st.officialCartonExclVAT),
+			OfficialCartonInclVATEGP: round2(st.officialCartonInclVAT),
+			TargetPieces:             int(math.Round(sTargetUnits * float64(upc))),
+			ActualPieces:             int(math.Round(st.actCases * float64(upc))),
+			SKUName:                  st.name,
+			Brand:                    st.brand,
+			Sector:                   st.sector,
+			SubCategory:              st.subCat,
+			SharePct:                 math.Round(revShare*10000) / 100,
+			CasePriceEGP:             round2(casePrice),
+			TargetRevenueEGP:         sTargetRev,
+			TargetUnits:              sTargetUnits,
+			TargetWeightTons:         sTargetTons,
+			ActualRevenueEGP:         round2(st.actRev),
+			ActualUnits:              round2(st.actCases),
+			ActualWeightTons:         round2(st.actTons),
+			ExpectedRevenueEGP:       round2(st.expRev),
+			ExpectedUnits:            round2(st.expCases),
+			VarianceRevenueEGP:       round2(st.actRev - sTargetRev),
+			VarianceUnits:            round2(st.actCases - sTargetUnits),
+			AchievementPct:           achPct,
+			RemainingStockCases:      remStock,
+			StockStatus:              stStatus,
+			StockStatusAr:            stStatusAr,
+			PromoSharePct:            pShare,
 		})
 	}
 
@@ -1066,8 +1194,17 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 	for i := range branchTemplates {
 		if realStoreRev, ok := sellOutStoreRev[branchTemplates[i].Name]; ok && realStoreRev > 0 {
 			branchTemplates[i].BaseWeight = realStoreRev
+			continue
+		}
+		shortName := strings.TrimSpace(strings.TrimPrefix(branchTemplates[i].Name, "فرع فتح الله -"))
+		for storeName, rev := range sellOutStoreRev {
+			if rev > 0 && shortName != "" && strings.Contains(storeName, shortName) {
+				branchTemplates[i].BaseWeight = rev
+				break
+			}
 		}
 	}
+
 	// Filter branches if the target was created for a specific branch/region
 	var activeBranches []chainBranchTemplate
 	var totalBranchWeight float64
@@ -1163,29 +1300,41 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 			if bsTargetRev > 0 {
 				bsAch = math.Round((bsActualRev/bsTargetRev)*1000) / 10
 			}
+			upc := chainSku.UnitsPerCarton
+			if upc <= 0 {
+				upc = 12
+			}
 
 			branchSKUs = append(branchSKUs, domain.TargetSKUBreakdown{
-				SKUName:             chainSku.SKUName,
-				Brand:               chainSku.Brand,
-				Sector:              chainSku.Sector,
-				SubCategory:         chainSku.SubCategory,
-				SharePct:            chainSku.SharePct,
-				CasePriceEGP:        chainSku.CasePriceEGP,
-				TargetRevenueEGP:    bsTargetRev,
-				TargetUnits:         bsTargetUnits,
-				TargetWeightTons:    bsTargetTons,
-				ActualRevenueEGP:    bsActualRev,
-				ActualUnits:         bsActualUnits,
-				ActualWeightTons:    bsActualTons,
-				ExpectedRevenueEGP:  bsExpRev,
-				ExpectedUnits:       bsExpUnits,
-				VarianceRevenueEGP:  round2(bsActualRev - bsTargetRev),
-				VarianceUnits:       round2(bsActualUnits - bsTargetUnits),
-				AchievementPct:      bsAch,
-				RemainingStockCases: bsRemStock,
-				StockStatus:         chainSku.StockStatus,
-				StockStatusAr:       chainSku.StockStatusAr,
-				PromoSharePct:       chainSku.PromoSharePct,
+				ItemCode:                 chainSku.ItemCode,
+				Barcode:                  chainSku.Barcode,
+				UnitsPerCarton:           upc,
+				DepartmentAr:             chainSku.DepartmentAr,
+				OfficialCartonExclVATEGP: chainSku.OfficialCartonExclVATEGP,
+				OfficialCartonInclVATEGP: chainSku.OfficialCartonInclVATEGP,
+				TargetPieces:             int(math.Round(bsTargetUnits * float64(upc))),
+				ActualPieces:             int(math.Round(bsActualUnits * float64(upc))),
+				SKUName:                  chainSku.SKUName,
+				Brand:                    chainSku.Brand,
+				Sector:                   chainSku.Sector,
+				SubCategory:              chainSku.SubCategory,
+				SharePct:                 chainSku.SharePct,
+				CasePriceEGP:             chainSku.CasePriceEGP,
+				TargetRevenueEGP:         bsTargetRev,
+				TargetUnits:              bsTargetUnits,
+				TargetWeightTons:         bsTargetTons,
+				ActualRevenueEGP:         bsActualRev,
+				ActualUnits:              bsActualUnits,
+				ActualWeightTons:         bsActualTons,
+				ExpectedRevenueEGP:       bsExpRev,
+				ExpectedUnits:            bsExpUnits,
+				VarianceRevenueEGP:       round2(bsActualRev - bsTargetRev),
+				VarianceUnits:            round2(bsActualUnits - bsTargetUnits),
+				AchievementPct:           bsAch,
+				RemainingStockCases:      bsRemStock,
+				StockStatus:              chainSku.StockStatus,
+				StockStatusAr:            chainSku.StockStatusAr,
+				PromoSharePct:            chainSku.PromoSharePct,
 			})
 		}
 

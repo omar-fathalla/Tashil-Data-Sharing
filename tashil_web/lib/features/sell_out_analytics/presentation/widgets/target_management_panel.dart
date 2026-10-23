@@ -6,6 +6,7 @@ import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
+import '../../../product_master/presentation/screens/product_master_screen.dart';
 
 /// TargetManagementPanel provides a unified Target entry, Excel upload, and
 /// real-time Actual vs. Target achievement comparison experience for both
@@ -2419,7 +2420,9 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
         final mName = s.skuName.toLowerCase().contains(q);
         final mBrand = s.brand.toLowerCase().contains(q);
         final mCat = s.subCategory.toLowerCase().contains(q);
-        if (!mName && !mBrand && !mCat) return false;
+        final mCode = s.itemCode.toLowerCase().contains(q);
+        final mBar = s.barcode.toLowerCase().contains(q);
+        if (!mName && !mBrand && !mCat && !mCode && !mBar) return false;
       }
       return true;
     }).toList();
@@ -2588,7 +2591,9 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
         final mName = s.skuName.toLowerCase().contains(q);
         final mBrand = s.brand.toLowerCase().contains(q);
         final mCat = s.subCategory.toLowerCase().contains(q);
-        if (!mName && !mBrand && !mCat) return false;
+        final mCode = s.itemCode.toLowerCase().contains(q);
+        final mBar = s.barcode.toLowerCase().contains(q);
+        if (!mName && !mBrand && !mCat && !mCode && !mBar) return false;
       }
       return true;
     }).toList();
@@ -2798,6 +2803,56 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
     );
   }
 
+  Future<void> _openProductIdCard({
+    required String itemCode,
+    required String barcode,
+    required String skuName,
+  }) async {
+    try {
+      final query = itemCode.trim().isNotEmpty
+          ? itemCode.trim()
+          : (barcode.trim().isNotEmpty ? barcode.trim() : skuName.trim());
+      if (query.isEmpty) return;
+
+      final res = await widget.apiClient.getProductMaster(search: query);
+      if (!mounted) return;
+      if (res.items.isEmpty) {
+        M3Feedback.showError(
+          context,
+          'لم يتم العثور على بطاقة تعريفية لهذا الصنف في كارتة الأصناف',
+        );
+        return;
+      }
+
+      ProductMasterItemModel matched = res.items.first;
+      if (itemCode.trim().isNotEmpty) {
+        for (final it in res.items) {
+          if (it.itemCode == itemCode.trim()) {
+            matched = it;
+            break;
+          }
+        }
+      } else if (barcode.trim().isNotEmpty) {
+        for (final it in res.items) {
+          if (it.barcode == barcode.trim()) {
+            matched = it;
+            break;
+          }
+        }
+      }
+
+      await ProductMasterScreen.showProductIdCardModal(
+        context,
+        apiClient: widget.apiClient,
+        item: matched,
+        onUpdated: (_) => _loadTargets(),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      M3Feedback.showError(context, 'تعذر فتح بطاقة هوية الصنف: $e');
+    }
+  }
+
   Widget _buildSkuBreakdownDataTable(
     BuildContext context,
     ThemeData theme,
@@ -2812,13 +2867,13 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
           colorScheme.surfaceContainerHigh.withOpacity(0.55),
         ),
         columns: [
-          DataColumn(label: Text('اسم الصنف في ($scopeLabel)')),
+          DataColumn(label: Text('اسم الصنف وهوية الكارتة ($scopeLabel)')),
           const DataColumn(label: Text('الماركة والقطاع')),
           const DataColumn(numeric: true, label: Text('حصة الصنف %')),
-          const DataColumn(numeric: true, label: Text('سعر الكرتونة')),
+          const DataColumn(numeric: true, label: Text('سعر الكرتونة (خطة vs كارتة)')),
           const DataColumn(
             numeric: true,
-            label: Text('كمية البضاعة المستهدفة (كرتونة)'),
+            label: Text('كمية البضاعة المستهدفة (كرتونة / قطعة)'),
           ),
           const DataColumn(
             numeric: true,
@@ -2842,49 +2897,126 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
               : (s.stockStatus == 'overstock'
                   ? Colors.orange.shade800
                   : Colors.green.shade700);
+          final packUnits = s.unitsPerCarton > 0 ? s.unitsPerCarton : 12;
+          final targetPieces = s.targetPieces > 0
+              ? s.targetPieces
+              : (s.targetUnits * packUnits).round();
+          final actualPieces = s.actualPieces > 0
+              ? s.actualPieces
+              : (s.actualUnits * packUnits).round();
+
           return DataRow(
             cells: [
               DataCell(
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 270.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        s.skuName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12.5,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (s.subCategory.isNotEmpty)
-                        Text(
-                          s.subCategory,
-                          style: TextStyle(
-                            fontSize: 11.0,
-                            color: colorScheme.onSurfaceVariant,
+                InkWell(
+                  borderRadius: BorderRadius.circular(8.0),
+                  onTap: () => _openProductIdCard(
+                    itemCode: s.itemCode,
+                    barcode: s.barcode,
+                    skuName: s.skuName,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 290.0),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  s.skuName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12.5,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 4.0),
+                              Icon(
+                                Icons.badge_outlined,
+                                size: 15.0,
+                                color: colorScheme.primary,
+                              ),
+                            ],
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                    ],
+                          if (s.itemCode.isNotEmpty || s.barcode.isNotEmpty)
+                            Text(
+                              'كود: ${s.itemCode.isNotEmpty ? s.itemCode : "-"} • باركود: ${s.barcode.isNotEmpty ? s.barcode : "-"} • شد $packUnits',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.primary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          else if (s.subCategory.isNotEmpty)
+                            Text(
+                              '${s.subCategory} • شد $packUnits',
+                              style: TextStyle(
+                                fontSize: 11.0,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
               DataCell(
-                Text(
-                  '${s.brand} (${s.sector})',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12.5,
-                  ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${s.brand} (${s.sector})',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    if (s.departmentAr.isNotEmpty)
+                      Text(
+                        s.departmentAr,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
                 ),
               ),
               DataCell(Text('${s.sharePct.toStringAsFixed(2)}%')),
-              DataCell(Text(CurrencyFormatter.formatEGP(s.casePriceEgp))),
+              DataCell(
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      CurrencyFormatter.formatEGP(s.casePriceEgp),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    if (s.officialCartonExclVatEgp > 0)
+                      Text(
+                        'كارتة: ${CurrencyFormatter.formatEGP(s.officialCartonExclVatEgp)}',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
               DataCell(
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -2895,13 +3027,27 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                     color: colorScheme.primaryContainer.withOpacity(0.55),
                     borderRadius: BorderRadius.circular(8.0),
                   ),
-                  child: Text(
-                    '${CurrencyFormatter.formatNumber(s.targetUnits.round())} كرتونة',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      color: colorScheme.primary,
-                      fontSize: 13.0,
-                    ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${CurrencyFormatter.formatNumber(s.targetUnits.round())} كرتونة',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: colorScheme.primary,
+                          fontSize: 13.0,
+                        ),
+                      ),
+                      Text(
+                        '${CurrencyFormatter.formatNumber(targetPieces)} قطعة (شد $packUnits)',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.teal.shade800,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -2926,7 +3072,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      '${CurrencyFormatter.formatNumber(s.actualUnits.round())} كرتونة',
+                      '${CurrencyFormatter.formatNumber(s.actualUnits.round())} كرتونة (${CurrencyFormatter.formatNumber(actualPieces)} ق)',
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 12.5,

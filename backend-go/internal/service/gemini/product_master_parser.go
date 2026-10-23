@@ -36,11 +36,13 @@ func IsProductMasterWorkbook(rawContent []byte) bool {
 	for _, r := range rows {
 		joined := strings.ToLower(strings.Join(r, " | "))
 		hasItemCode := strings.Contains(joined, "كود الصنف") || strings.Contains(joined, "item_code") || strings.Contains(joined, "item code")
-		hasCartonUnits := strings.Contains(joined, "عدد الوحدات بالكرتونة") || strings.Contains(joined, "وحدات بالكرتونة") || strings.Contains(joined, "units_per_carton")
+		hasCartonUnits := strings.Contains(joined, "عدد الوحدات بالكرتونة") || strings.Contains(joined, "وحدات بالكرتونة") ||
+			strings.Contains(joined, "الشدة بالكرتونة") || strings.Contains(joined, "units_per_carton") || strings.Contains(joined, "units/carton")
 		hasPrice := strings.Contains(joined, "سعر العبوه") || strings.Contains(joined, "سعر العبوة") ||
-			strings.Contains(joined, "سعر القطعه") || strings.Contains(joined, "سعر القطعة") ||
-			strings.Contains(joined, "سعر الكرتونة") || strings.Contains(joined, "unit_price_excl_vat") ||
-			strings.Contains(joined, "net_unit_invoice_cost")
+			strings.Contains(joined, "سعر الوحدة") || strings.Contains(joined, "سعر القطعه") ||
+			strings.Contains(joined, "سعر القطعة") || strings.Contains(joined, "سعر الكرتونة") ||
+			strings.Contains(joined, "unit_price_excl_vat") || strings.Contains(joined, "unit_price_incl_vat") ||
+			strings.Contains(joined, "net_unit_invoice_cost") || strings.Contains(joined, "unit incl vat")
 		if hasItemCode && (hasCartonUnits || hasPrice) {
 			return true
 		}
@@ -171,6 +173,11 @@ func ParseProductMasterWorkbook(tenantID, filename string, rawContent []byte) (*
 		cartonIncl := parseFloatDefault(getColByMap(row, colMap, "carton_price_incl_vat"), 0)
 		if cartonIncl <= 0 && unitIncl > 0 {
 			cartonIncl = unitIncl * float64(unitsPerCarton)
+		} else if unitIncl <= 0 && cartonIncl > 0 && unitsPerCarton > 0 {
+			unitIncl = cartonIncl / float64(unitsPerCarton)
+			if unitExcl <= 0 {
+				unitExcl = unitIncl / (1.0 + vatRate)
+			}
 		}
 
 		extraDisc := parseFloatDefault(getColByMap(row, colMap, "extra_discount_pct"), 0)
@@ -281,6 +288,10 @@ func BuildProductMasterSummary(
 
 	regularCount := 0
 	promoCount := 0
+	priceUpCount := 0
+	priceDownCount := 0
+	priceSameCount := 0
+	newSkuCount := 0
 	totalUnitsPerCarton := 0
 	prefixSet := make(map[string]bool)
 	brandSet := make(map[string]bool)
@@ -291,6 +302,16 @@ func BuildProductMasterSummary(
 			promoCount++
 		} else {
 			regularCount++
+		}
+		switch strings.ToLower(strings.TrimSpace(it.PriceChangeDirection)) {
+		case "up":
+			priceUpCount++
+		case "down":
+			priceDownCount++
+		case "new":
+			newSkuCount++
+		default:
+			priceSameCount++
 		}
 		totalUnitsPerCarton += it.UnitsPerCarton
 		if it.ItemCodePrefix != "" {
@@ -345,6 +366,10 @@ func BuildProductMasterSummary(
 		RegularSKUsCount:    regularCount,
 		PromoSKUsCount:      promoCount,
 		UniqueBarcodesCount: len(barcodeGroups),
+		PriceIncreasedCount: priceUpCount,
+		PriceDecreasedCount: priceDownCount,
+		PriceUnchangedCount: priceSameCount,
+		NewSKUsCount:        newSkuCount,
 		AvgUnitsPerCarton:   avgUnits,
 		AvailablePrefixes:   prefixes,
 		AvailableBrands:     brands,
@@ -355,65 +380,97 @@ func BuildProductMasterSummary(
 
 func mapProductMasterColumns(headers []string) map[string]int {
 	m := map[string]int{
-		"serial_no":               0,
-		"item_code":               1,
-		"barcode":                 2,
-		"official_name":           3,
-		"invoice_discount_pct":    4,
-		"item_type":               6,
-		"vat_rate":                7,
-		"packaging_type":          8,
-		"units_per_carton":        9,
-		"unit_price_excl_vat":     10,
-		"unit_price_incl_vat":     13,
-		"carton_price_excl_vat":   14,
-		"carton_price_incl_vat":   15,
-		"extra_discount_pct":      16,
-		"net_unit_invoice_cost":   17,
-		"net_carton_invoice_cost": 18,
+		"serial_no":               -1,
+		"item_code":               -1,
+		"barcode":                 -1,
+		"official_name":           -1,
+		"invoice_discount_pct":    -1,
+		"item_type":               -1,
+		"vat_rate":                -1,
+		"packaging_type":          -1,
+		"units_per_carton":        -1,
+		"unit_price_excl_vat":     -1,
+		"unit_price_incl_vat":     -1,
+		"carton_price_excl_vat":   -1,
+		"carton_price_incl_vat":   -1,
+		"extra_discount_pct":      -1,
+		"net_unit_invoice_cost":   -1,
+		"net_carton_invoice_cost": -1,
 		"brand":                   -1,
 		"category":                -1,
+	}
+
+	claimed := make(map[int]bool, len(headers))
+	assign := func(key string, idx int) {
+		m[key] = idx
+		claimed[idx] = true
 	}
 
 	for idx, raw := range headers {
 		h := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(raw, "\n", " ")))
 		switch {
-		case h == "م" || h == "serial_no" || h == "serial":
-			m["serial_no"] = idx
-		case strings.Contains(h, "كود الصنف") || h == "item_code" || h == "item code":
-			m["item_code"] = idx
-		case strings.Contains(h, "الباركود") || strings.Contains(h, "باركود") || h == "barcode":
-			m["barcode"] = idx
-		case strings.Contains(h, "اسم الصنف") || h == "official_name" || h == "sku_name" || h == "item_name":
-			m["official_name"] = idx
-		case strings.Contains(h, "نسبة خصم الفاتورة") || h == "invoice_discount_pct":
-			m["invoice_discount_pct"] = idx
-		case strings.Contains(h, "عادي / عرض") || strings.Contains(h, "عادي/عرض") || h == "item_type":
-			m["item_type"] = idx
-		case strings.Contains(h, "الضريبة") && strings.Contains(h, "نسبة") || h == "vat_rate":
-			m["vat_rate"] = idx
-		case strings.Contains(h, "نوع العبوة") || strings.Contains(h, "نوع العبوه") || h == "packaging_type":
-			m["packaging_type"] = idx
-		case strings.Contains(h, "عدد الوحدات بالكرتونة") || strings.Contains(h, "وحدات بالكرتونة") || h == "units_per_carton":
-			m["units_per_carton"] = idx
-		case (strings.Contains(h, "سعر العبوه") || strings.Contains(h, "سعر العبوة")) && strings.Contains(h, "غير شامل") || h == "unit_price_excl_vat":
-			m["unit_price_excl_vat"] = idx
-		case (strings.Contains(h, "سعر العبوه") || strings.Contains(h, "سعر العبوة")) && strings.Contains(h, "شامل") && !strings.Contains(h, "غير") || h == "unit_price_incl_vat":
-			m["unit_price_incl_vat"] = idx
-		case strings.Contains(h, "سعر الكرتونة") && strings.Contains(h, "غير شامل") || h == "carton_price_excl_vat":
-			m["carton_price_excl_vat"] = idx
-		case strings.Contains(h, "سعر الكرتونة") && strings.Contains(h, "شامل") && !strings.Contains(h, "غير") || h == "carton_price_incl_vat":
-			m["carton_price_incl_vat"] = idx
-		case strings.Contains(h, "الخصم الاضافية") || strings.Contains(h, "الخصم الإضافية") || h == "extra_discount_pct":
-			m["extra_discount_pct"] = idx
-		case (strings.Contains(h, "سعر القطعه") || strings.Contains(h, "سعر القطعة")) && strings.Contains(h, "بعد خصم") || h == "net_unit_invoice_cost":
-			m["net_unit_invoice_cost"] = idx
-		case strings.Contains(h, "سعر الكرتونة") && strings.Contains(h, "بعد خصم") || h == "net_carton_invoice_cost":
-			m["net_carton_invoice_cost"] = idx
-		case h == "brand" || h == "العلامة التجارية":
-			m["brand"] = idx
-		case h == "category" || h == "الفئة":
-			m["category"] = idx
+		case h == "م" || strings.HasPrefix(h, "م ") || strings.Contains(h, "serial"):
+			assign("serial_no", idx)
+		case strings.Contains(h, "كود الصنف") || strings.Contains(h, "item_code") || strings.Contains(h, "item code"):
+			assign("item_code", idx)
+		case strings.Contains(h, "الباركود") || strings.Contains(h, "باركود") || strings.Contains(h, "barcode"):
+			assign("barcode", idx)
+		case strings.Contains(h, "اسم الصنف") || strings.Contains(h, "الاسم الرسمي") || strings.Contains(h, "official_name") || strings.Contains(h, "official name") || h == "sku_name" || h == "item_name":
+			assign("official_name", idx)
+		case (strings.Contains(h, "نسبة خصم الفاتورة") || (strings.Contains(h, "خصم الفاتورة") && !strings.Contains(h, "سعر") && !strings.Contains(h, "تكلفة") && !strings.Contains(h, "قيمة") && !strings.Contains(h, "بعد") && !strings.Contains(h, "قبل"))) || strings.Contains(h, "invoice_discount") || strings.Contains(h, "invoice discount"):
+			assign("invoice_discount_pct", idx)
+		case strings.Contains(h, "عادي / عرض") || strings.Contains(h, "عادي/عرض") || strings.Contains(h, "نوع الصنف") || strings.Contains(h, "item_type") || strings.Contains(h, "item type"):
+			assign("item_type", idx)
+		case (strings.Contains(h, "الضريبة") && !strings.Contains(h, "سعر") && (strings.Contains(h, "نسبة") || strings.Contains(h, "قيمة") || strings.Contains(h, "المضافة"))) || h == "الضريبة" || strings.Contains(h, "vat_rate") || strings.Contains(h, "vat %"):
+			assign("vat_rate", idx)
+		case (strings.Contains(h, "نوع العبوة") || strings.Contains(h, "نوع العبوه") || strings.Contains(h, "التعبئة") || strings.Contains(h, "التعبئه") || h == "العبوة" || strings.Contains(h, "packaging")) && !strings.Contains(h, "سعر"):
+			assign("packaging_type", idx)
+		case strings.Contains(h, "عدد الوحدات بالكرتونة") || strings.Contains(h, "وحدات بالكرتونة") || strings.Contains(h, "الشدة بالكرتونة") || strings.Contains(h, "units_per_carton") || strings.Contains(h, "units/carton"):
+			assign("units_per_carton", idx)
+		case ((strings.Contains(h, "سعر القطعه") || strings.Contains(h, "سعر القطعة") || strings.Contains(h, "سعر العبوه") || strings.Contains(h, "سعر العبوة") || strings.Contains(h, "سعر الوحدة") || strings.Contains(h, "تكلفة الوحدة")) && (strings.Contains(h, "بعد خصم") || strings.Contains(h, "صافي"))) || strings.Contains(h, "net_unit_invoice_cost") || strings.Contains(h, "net unit cost"):
+			assign("net_unit_invoice_cost", idx)
+		case ((strings.Contains(h, "سعر الكرتونة") || strings.Contains(h, "تكلفة الكرتونة")) && (strings.Contains(h, "بعد خصم") || strings.Contains(h, "صافي"))) || strings.Contains(h, "net_carton_invoice_cost") || strings.Contains(h, "net carton cost"):
+			assign("net_carton_invoice_cost", idx)
+		case ((strings.Contains(h, "سعر العبوه") || strings.Contains(h, "سعر العبوة") || strings.Contains(h, "سعر الوحدة")) && (strings.Contains(h, "غير شامل") || strings.Contains(h, "قبل الضريبة") || strings.Contains(h, "ق.ض"))) || strings.Contains(h, "unit_price_excl_vat") || strings.Contains(h, "unit excl vat"):
+			assign("unit_price_excl_vat", idx)
+		case ((strings.Contains(h, "سعر العبوه") || strings.Contains(h, "سعر العبوة") || strings.Contains(h, "سعر الوحدة")) && ((strings.Contains(h, "شامل") && !strings.Contains(h, "غير") && !strings.Contains(h, "قبل الضريبة") && !strings.Contains(h, "بعد خصم")) || strings.Contains(h, "ش.ض"))) || strings.Contains(h, "unit_price_incl_vat") || strings.Contains(h, "unit incl vat"):
+			assign("unit_price_incl_vat", idx)
+		case (strings.Contains(h, "سعر الكرتونة") && (strings.Contains(h, "غير شامل") || strings.Contains(h, "قبل الضريبة") || strings.Contains(h, "ق.ض"))) || strings.Contains(h, "carton_price_excl_vat") || strings.Contains(h, "carton excl vat"):
+			assign("carton_price_excl_vat", idx)
+		case (strings.Contains(h, "سعر الكرتونة") && ((strings.Contains(h, "شامل") && !strings.Contains(h, "غير") && !strings.Contains(h, "قبل الضريبة") && !strings.Contains(h, "بعد خصم")) || strings.Contains(h, "ش.ض"))) || strings.Contains(h, "carton_price_incl_vat") || strings.Contains(h, "carton incl vat"):
+			assign("carton_price_incl_vat", idx)
+		case strings.Contains(h, "الخصم الاضافية") || strings.Contains(h, "الخصم الإضافية") || strings.Contains(h, "خصم إضافي") || strings.Contains(h, "extra_discount"):
+			assign("extra_discount_pct", idx)
+		case strings.Contains(h, "العلامة التجارية") || strings.Contains(h, "brand"):
+			assign("brand", idx)
+		case strings.Contains(h, "الفئة") || strings.Contains(h, "category"):
+			assign("category", idx)
+		}
+	}
+
+	if len(headers) >= 18 {
+		defaults := map[string]int{
+			"serial_no":               0,
+			"item_code":               1,
+			"barcode":                 2,
+			"official_name":           3,
+			"invoice_discount_pct":    4,
+			"item_type":               6,
+			"vat_rate":                7,
+			"packaging_type":          8,
+			"units_per_carton":        9,
+			"unit_price_excl_vat":     10,
+			"unit_price_incl_vat":     13,
+			"carton_price_excl_vat":   14,
+			"carton_price_incl_vat":   15,
+			"extra_discount_pct":      16,
+			"net_unit_invoice_cost":   17,
+			"net_carton_invoice_cost": 18,
+		}
+		for k, defIdx := range defaults {
+			if m[k] < 0 && defIdx < len(headers) && !claimed[defIdx] {
+				m[k] = defIdx
+			}
 		}
 	}
 	return m

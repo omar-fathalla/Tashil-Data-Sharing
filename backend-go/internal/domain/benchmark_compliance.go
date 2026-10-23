@@ -17,10 +17,11 @@ type StoreBenchmarkItem struct {
 
 // PricingComplianceItem represents SKU-level price monitoring and promotional uplift.
 type PricingComplianceItem struct {
-	TenantID          string  `json:"tenant_id,omitempty"`
-	ItemCode          string  `json:"item_code,omitempty"`
-	SKUName           string  `json:"sku_name"`
-	Barcode           string  `json:"barcode"`
+	TenantID           string  `json:"tenant_id,omitempty"`
+	ItemCode           string  `json:"item_code,omitempty"`
+	SKUName            string  `json:"sku_name"`
+	RetailerRawSKUName string  `json:"retailer_raw_sku_name,omitempty"`
+	Barcode            string  `json:"barcode"`
 	Category          string  `json:"category"`
 	RetailerChain     string  `json:"retailer_chain"`
 	StoreName         string  `json:"store_name"`
