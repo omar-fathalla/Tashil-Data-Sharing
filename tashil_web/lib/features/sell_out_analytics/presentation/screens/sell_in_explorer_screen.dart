@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../core/data/cache_store.dart';
 import '../../../../core/data/result.dart';
+import '../../data/target_repository.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
@@ -276,6 +278,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
         '$actionLabel (${picked.name}): ${res.validRows} حركة بإجمالي ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)}',
       );
       _repo.invalidateAll();
+      _repo.cache.invalidatePrefix(CacheStore.prefix(widget.apiClient.tenantId, TargetRepository.feature));
       await _loadAllData();
     } catch (e) {
       if (!mounted) return;
@@ -376,6 +379,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
         'تم حذف شيت (${file.fileName}) وتحديث حركات الـ Sell-In والأرصدة المتبقية بنجاح',
       );
       _repo.invalidateAll();
+      _repo.cache.invalidatePrefix(CacheStore.prefix(widget.apiClient.tenantId, TargetRepository.feature));
       await _loadAllData();
     } catch (e) {
       if (!mounted) return;

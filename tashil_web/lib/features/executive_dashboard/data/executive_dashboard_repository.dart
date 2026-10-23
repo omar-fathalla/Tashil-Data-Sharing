@@ -1,3 +1,4 @@
+import '../../../core/data/app_cache.dart';
 import '../../../core/data/cache_store.dart';
 import '../../../core/data/result.dart';
 import '../../../core/network/api_client.dart';
@@ -12,7 +13,7 @@ class ExecutiveDashboardRepository {
   final ApiClient api;
   final CacheStore cache;
 
-  ExecutiveDashboardRepository(this.api, {CacheStore? cache}) : cache = cache ?? CacheStore(defaultTtl: ttl);
+  ExecutiveDashboardRepository(this.api, {CacheStore? cache}) : cache = cache ?? AppCache.forApi(api);
 
   String _key(String period, String? startDate, String? endDate, String? chain) => CacheStore.key(api.tenantId,
       feature, [api.currentUser?.role, api.currentUser?.assignedChain, period, startDate, endDate, chain]);
@@ -39,6 +40,7 @@ class ExecutiveDashboardRepository {
     return Result.guard(() => cache.getOrLoad<ExecutiveKPIsModel>(
           k,
           () => api.getExecutiveKPIs(period: period, startDate: startDate, endDate: endDate, chain: chain),
+          ttl: identical(cache, AppCache.shared) ? ttl : null,
         ));
   }
 }

@@ -3,11 +3,14 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/features/trade_marketing/data/cached_trade_marketing_repository.dart';
 import 'package:tashil_web/features/trade_marketing/data/trade_marketing_repository.dart';
 
 void main() {
+  setUp(AppCache.clear);
+
   http.Response j(Object body, [int status = 200]) =>
       http.Response.bytes(utf8.encode(jsonEncode(body)), status, headers: {'content-type': 'application/json'});
 

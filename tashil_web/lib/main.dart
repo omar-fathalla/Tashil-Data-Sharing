@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'core/data/app_cache.dart';
 import 'core/network/api_client.dart';
 import 'core/security/zero_trust_digest.dart';
 import 'core/storage/session_storage.dart';
@@ -291,6 +292,7 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
   }
 
   void _logout() {
+    AppCache.clear();
     _popPushedRoutes();
     SessionStorage.clearSession();
     setState(() {

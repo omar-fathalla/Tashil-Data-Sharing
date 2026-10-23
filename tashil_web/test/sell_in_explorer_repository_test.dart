@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/features/sell_out_analytics/data/sell_in_explorer_repository.dart';
 
 void main() {
+  setUp(AppCache.clear);
+
   MockClient server(List<Uri> log) => MockClient((req) async {
         log.add(req.url);
         return http.Response.bytes(utf8.encode(jsonEncode({'records': [], 'total_count': 0})), 200,

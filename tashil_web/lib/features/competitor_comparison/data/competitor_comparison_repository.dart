@@ -1,3 +1,4 @@
+import '../../../core/data/app_cache.dart';
 import '../../../core/data/cache_store.dart';
 import '../../../core/data/result.dart';
 import '../../../core/network/api_client.dart';
@@ -11,7 +12,7 @@ class CompetitorComparisonRepository {
   final CacheStore cache;
 
   CompetitorComparisonRepository(this.api, {CacheStore? cache})
-      : cache = cache ?? CacheStore(defaultTtl: const Duration(minutes: 5));
+      : cache = cache ?? AppCache.forApi(api);
 
   String _key(String? chain, int year, int month) =>
       CacheStore.key(api.tenantId, feature, [api.currentUser?.role, api.currentUser?.assignedChain, chain, year, month]);

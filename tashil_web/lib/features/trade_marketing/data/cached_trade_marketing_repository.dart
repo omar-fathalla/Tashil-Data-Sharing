@@ -1,3 +1,4 @@
+import '../../../core/data/app_cache.dart';
 import '../../../core/data/cache_store.dart';
 import '../../../core/data/result.dart';
 import '../../../core/network/api_client.dart';
@@ -18,7 +19,7 @@ class CachedTradeMarketingRepository implements TradeMarketingRepository {
   final CacheStore cache;
 
   CachedTradeMarketingRepository(this.inner, this.api, {CacheStore? cache})
-      : cache = cache ?? CacheStore(defaultTtl: const Duration(minutes: 5));
+      : cache = cache ?? AppCache.forApi(api);
 
   String _key(String kind, int? year, int? month, String? chain) => CacheStore.key(
       api.tenantId, feature, [api.currentUser?.role, api.currentUser?.assignedChain, kind, year, month, chain]);

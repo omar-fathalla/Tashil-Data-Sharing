@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/utils/web_file_helper.dart';
@@ -81,6 +82,8 @@ class FakeTradeMarketingRepository implements TradeMarketingRepository {
 }
 
 void main() {
+  setUp(AppCache.clear);
+
   group('Trade Marketing & Promo ROI Screen Tests', () {
     late ApiClient apiClient;
 

@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/features/product_master/data/product_master_repository.dart';
 
 void main() {
+  setUp(AppCache.clear);
+
   MockClient server(List<Uri> log, {bool fail = false}) => MockClient((req) async {
         log.add(req.url);
         if (fail) throw http.ClientException('down');

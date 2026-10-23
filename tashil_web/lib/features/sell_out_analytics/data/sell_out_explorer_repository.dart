@@ -1,3 +1,4 @@
+import '../../../core/data/app_cache.dart';
 import '../../../core/data/cache_store.dart';
 import '../../../core/data/result.dart';
 import '../../../core/network/api_client.dart';
@@ -66,7 +67,7 @@ class SellOutExplorerRepository {
   final CacheStore cache;
 
   SellOutExplorerRepository(this.api, {CacheStore? cache})
-      : cache = cache ?? CacheStore(defaultTtl: const Duration(minutes: 5));
+      : cache = cache ?? AppCache.forApi(api);
 
   void invalidateAll() => cache.invalidatePrefix(CacheStore.prefix(api.tenantId, feature));
 
