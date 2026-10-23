@@ -56,6 +56,7 @@ func main() {
 	portalHandler := handlers.NewPortalHandler(fsRepo)
 	adminHandler := handlers.NewAdminHandler(fsRepo)
 	auditHandler := handlers.NewAuditHandler(fsRepo)
+	tradeMarketingHandler := handlers.NewTradeMarketingHandler(fsRepo, fsRepo).WithSalesSource(bqRepo)
 
 	// 5. Setup Mux Router (Go 1.22+ method + path patterns)
 	mux := http.NewServeMux()
@@ -119,6 +120,12 @@ func main() {
 	mux.HandleFunc("GET /api/v1/batches", storeHandler.HandleGetBatches)
 	mux.HandleFunc("GET /api/v1/audit/logs", auditHandler.HandleGetAuditLogs)
 	mux.HandleFunc("POST /api/v1/audit/logs", auditHandler.HandleCreateAuditLog)
+	mux.HandleFunc("GET /api/v1/trade-marketing/expenses", tradeMarketingHandler.HandleListExpenses)
+	mux.HandleFunc("POST /api/v1/trade-marketing/expenses", tradeMarketingHandler.HandleCreateExpense)
+	mux.HandleFunc("POST /api/v1/trade-marketing/expenses/upload", tradeMarketingHandler.HandleUploadExpenses)
+	mux.HandleFunc("GET /api/v1/trade-marketing/roi", tradeMarketingHandler.HandleGetROI)
+	mux.HandleFunc("PUT /api/v1/trade-marketing/expenses/{id}", tradeMarketingHandler.HandleUpdateExpense)
+	mux.HandleFunc("DELETE /api/v1/trade-marketing/expenses/{id}", tradeMarketingHandler.HandleDeleteExpense)
 
 	// 6. Wrap Middleware Chain: CORS -> Auth -> Router
 	protectedHandler := authMiddleware.Handler(mux)

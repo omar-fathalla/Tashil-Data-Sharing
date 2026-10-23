@@ -59,4 +59,11 @@ class ApiEndpoints {
   static String adminResetPassword(String tenantId) => '$baseUrl/api/v1/admin/tenants/$tenantId/reset-password';
   static String get adminChains => '$baseUrl/api/v1/admin/chains';
   static String get auditLogs => '$baseUrl/api/v1/audit/logs';
+
+  // Trade Marketing ROI (expenses persisted in Firestore, ROI from ingested sell-out/sell-in)
+  static String get tradeMarketingExpenses => '$baseUrl/api/v1/trade-marketing/expenses';
+  static String tradeMarketingExpense(String id) =>
+      '$baseUrl/api/v1/trade-marketing/expenses/${Uri.encodeComponent(id)}';
+  static String get tradeMarketingExpensesUpload => '$baseUrl/api/v1/trade-marketing/expenses/upload';
+  static String get tradeMarketingRoi => '$baseUrl/api/v1/trade-marketing/roi';
 }

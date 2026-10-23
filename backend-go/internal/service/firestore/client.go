@@ -80,6 +80,10 @@ type Client struct {
 	auditLogs          []domain.AuditLogEntry
 	cleanedTenants     map[string]bool
 	deletedArchives    map[string]bool
+
+	// Trade marketing expenses (see trade_marketing.go)
+	tmMu       sync.RWMutex
+	tmExpenses map[string]domain.MarketingExpense
 }
 
 // NewClient constructs the Firestore repository with initial seeded entities and live Cloud Firestore sync.

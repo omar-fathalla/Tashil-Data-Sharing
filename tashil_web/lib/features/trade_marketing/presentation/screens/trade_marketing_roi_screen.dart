@@ -8,6 +8,7 @@ import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_responsive_tab_bar.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
+import '../../data/trade_marketing_repository.dart';
 import '../../domain/trade_marketing_models.dart';
 
 /// TradeMarketingRoiScreen is a dedicated enterprise system for tracking
@@ -17,9 +18,13 @@ import '../../domain/trade_marketing_models.dart';
 class TradeMarketingRoiScreen extends StatefulWidget {
   final ApiClient apiClient;
 
+  /// Optional data source (tests inject a fake). Defaults to the Cloud Run API.
+  final TradeMarketingRepository? repository;
+
   const TradeMarketingRoiScreen({
     super.key,
     required this.apiClient,
+    this.repository,
   });
 
   @override
@@ -42,7 +47,14 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
   String _ledgerSortColumn = 'amount';
   bool _ledgerSortAsc = false;
 
-  late List<MarketingExpenseItem> _expenses;
+  List<MarketingExpenseItem> _expenses = [];
+
+  /// Server sales baselines keyed by [tradeMarketingBaselineKey].
+  final Map<String, TradeMarketingSalesBaseline> _baselines = {};
+  bool _loading = false;
+  String? _loadError;
+  late final TradeMarketingRepository _repo =
+      widget.repository ?? ApiTradeMarketingRepository(widget.apiClient);
 
   static const List<String> _availableChains = [
     'Fathalla',
@@ -56,10 +68,66 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
   @override
   void initState() {
     super.initState();
-    final tenantSlug = widget.apiClient.currentUser?.tenantId ?? 'adeco';
-    _expenses = List<MarketingExpenseItem>.from(
-      TradeMarketingSeedData.getInitialExpenses(tenantSlug),
-    );
+    _reload();
+  }
+
+  /// Loads expenses and ROI sales baselines from the server.
+  Future<void> _reload() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final results = await Future.wait([_repo.listExpenses(), _repo.getRoi()]);
+      if (!mounted) return;
+      setState(() {
+        _expenses = List<MarketingExpenseItem>.from(results[0] as List<MarketingExpenseItem>);
+        _baselines.clear();
+        for (final b in results[1] as List<TradeMarketingSalesBaseline>) {
+          _baselines[tradeMarketingBaselineKey(b.year, b.month, b.chainName)] = b;
+        }
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = e.toString();
+      });
+    }
+  }
+
+  Future<void> _reloadRoiOnly() async {
+    try {
+      final list = await _repo.getRoi();
+      if (!mounted) return;
+      setState(() {
+        _baselines.clear();
+        for (final b in list) {
+          _baselines[tradeMarketingBaselineKey(b.year, b.month, b.chainName)] = b;
+        }
+      });
+    } catch (_) {}
+  }
+
+  /// Ensures a server baseline exists for a chain/month (used by the what-if simulator).
+  Future<TradeMarketingSalesBaseline?> _ensureBaseline(String chain, int year, int month) async {
+    final key = tradeMarketingBaselineKey(year, month, chain);
+    if (_baselines.containsKey(key)) return _baselines[key];
+    try {
+      final list = await _repo.getRoi(year: year, month: month, chain: chain);
+      for (final b in list) {
+        _baselines[tradeMarketingBaselineKey(b.year, b.month, b.chainName)] = b;
+      }
+    } catch (_) {}
+    return _baselines[key];
+  }
+
+  /// Average historical ROMI from server data, used to project simulator lift.
+  double get _historicalRomi {
+    final rows = _monthlyRoiSummariesFor(_expenses).where((s) => s.marketingSpendEgp > 0 && s.romiMultiple > 0);
+    if (rows.isEmpty) return 3.45;
+    return rows.fold<double>(0, (a, s) => a + s.romiMultiple) / rows.length;
   }
 
   /// Filtered individual expense items
@@ -106,9 +174,11 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
   }
 
   /// Aggregated Monthly + Chain ROI summaries
-  List<MonthlyChainRoiSummary> get _monthlyRoiSummaries {
+  List<MonthlyChainRoiSummary> get _monthlyRoiSummaries => _monthlyRoiSummariesFor(_filteredExpenses);
+
+  List<MonthlyChainRoiSummary> _monthlyRoiSummariesFor(List<MarketingExpenseItem> source) {
     final grouped = <String, List<MarketingExpenseItem>>{};
-    for (final item in _filteredExpenses) {
+    for (final item in source) {
       final key = '${item.year}_${item.month}_${item.chainName}';
       grouped.putIfAbsent(key, () => []).add(item);
     }
@@ -119,12 +189,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
       final first = items.first;
       final totalSpend = items.fold<double>(0.0, (sum, e) => sum + e.amountEgp);
 
-      final salesSnapshot = TradeMarketingSeedData.getMonthlySalesSnapshot(
-        chainName: first.chainName,
-        year: first.year,
-        month: first.month,
-        totalMarketingSpendInMonth: totalSpend,
-      );
+      final baseline = _baselines[tradeMarketingBaselineKey(first.year, first.month, first.chainName)];
 
       summaries.add(
         MonthlyChainRoiSummary(
@@ -134,10 +199,10 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
           marketingSpendEgp: totalSpend,
           activitiesCount: items.length,
           expenses: items,
-          currentMonthSalesEgp: salesSnapshot['currentSales'] ?? 0.0,
-          previousMonthSalesEgp: salesSnapshot['previousMonthSales'] ?? 0.0,
-          lastYearSameMonthSalesEgp: salesSnapshot['lastYearSales'] ?? 0.0,
-          currentMonthSellInEgp: salesSnapshot['currentSellIn'] ?? 0.0,
+          currentMonthSalesEgp: baseline?.currentMonthSalesEgp ?? 0.0,
+          previousMonthSalesEgp: baseline?.previousMonthSalesEgp ?? 0.0,
+          lastYearSameMonthSalesEgp: baseline?.lastYearSameMonthSalesEgp ?? 0.0,
+          currentMonthSellInEgp: baseline?.currentMonthSellInEgp ?? 0.0,
         ),
       );
     }
@@ -458,7 +523,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                     child: const Text('Cancel / إلغاء'),
                   ),
                   FilledButton.icon(
-                    onPressed: () {
+                    onPressed: () async {
                       final parsedAmount = double.tryParse(amountCtrl.text.replaceAll(',', '').trim()) ?? 0.0;
                       if (parsedAmount <= 0) {
                         M3Feedback.showWarning(context, 'يرجى إدخال قيمة صحيحة للمصروف بالجنيه (أكبر من صفر)');
@@ -484,15 +549,26 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                         createdAt: existing?.createdAt ?? DateTime.now(),
                       );
 
+                      final MarketingExpenseItem saved;
+                      try {
+                        saved = await _repo.saveExpense(newItem, isNew: existing == null);
+                      } catch (e) {
+                        if (!mounted) return;
+                        M3Feedback.showWarning(context, 'تعذر حفظ المصروف: $e');
+                        return;
+                      }
+                      if (!mounted) return;
                       setState(() {
                         if (existing != null) {
                           final idx = _expenses.indexWhere((e) => e.id == existing.id);
-                          if (idx != -1) _expenses[idx] = newItem;
+                          if (idx != -1) _expenses[idx] = saved;
                         } else {
-                          _expenses.insert(0, newItem);
+                          _expenses.insert(0, saved);
                         }
                       });
+                      _reloadRoiOnly();
 
+                      if (!dialogCtx.mounted) return;
                       Navigator.pop(dialogCtx);
                       M3Feedback.showSuccess(
                         context,
@@ -519,6 +595,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
 
     String simChain = _selectedChain != 'all' ? _selectedChain : 'Fathalla';
     int simMonth = _selectedMonth != 0 ? _selectedMonth : 1;
+    final int simYear = _selectedYear != 0 ? _selectedYear : DateTime.now().year;
+    final requested = <String>{};
+    final historicalRomi = _historicalRomi;
     double proposedBudget = 100000.0;
     final budgetCtrl = TextEditingController(text: '100000');
 
@@ -527,15 +606,18 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
       builder: (dialogCtx) {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
-            final snapshot = TradeMarketingSeedData.getMonthlySalesSnapshot(
-              chainName: simChain,
-              year: 2026,
-              month: simMonth,
-              totalMarketingSpendInMonth: proposedBudget,
-            );
-            final prevSales = snapshot['previousMonthSales'] ?? 1450000.0;
-            final lastYearSales = snapshot['lastYearSales'] ?? 1360000.0;
-            final projectedSales = snapshot['currentSales'] ?? (prevSales + proposedBudget * 3.8);
+            // What-if projection seeded from server baselines (ingested sell-out data).
+            final simKey = tradeMarketingBaselineKey(simYear, simMonth, simChain);
+            final baseline = _baselines[simKey];
+            if (baseline == null && !requested.contains(simKey)) {
+              requested.add(simKey);
+              _ensureBaseline(simChain, simYear, simMonth).then((_) {
+                if (dialogCtx.mounted) setDialogState(() {});
+              });
+            }
+            final prevSales = baseline?.previousMonthSalesEgp ?? 0.0;
+            final lastYearSales = baseline?.lastYearSameMonthSalesEgp ?? 0.0;
+            final projectedSales = prevSales + proposedBudget * historicalRomi;
             final momLift = projectedSales - prevSales;
             final momPct = prevSales > 0 ? (momLift / prevSales) * 100.0 : 0.0;
             final yoyLift = projectedSales - lastYearSales;
@@ -1057,6 +1139,18 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // 1. Header & MD3 Large Responsive Tab Bar (Identical padding/margin to Sell-In & Sell-Out)
+              if (_loading) const LinearProgressIndicator(),
+              if (_loadError != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: MaterialBanner(
+                    content: Text('تعذر تحميل بيانات التسويق من الخادم: $_loadError'),
+                    leading: Icon(Icons.cloud_off_rounded, color: colorScheme.error),
+                    actions: [
+                      TextButton(onPressed: _reload, child: const Text('Retry / إعادة المحاولة')),
+                    ],
+                  ),
+                ),
               _buildHeaderAndTabs(theme, colorScheme),
               M3Spacing.gapMD,
 
@@ -2091,10 +2185,19 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                           IconButton(
                             tooltip: 'Delete / حذف',
                             icon: Icon(Icons.delete_outline_rounded, size: 19.0, color: colorScheme.error),
-                            onPressed: () {
+                            onPressed: () async {
+                              try {
+                                await _repo.deleteExpense(item.id);
+                              } catch (e) {
+                                if (!mounted) return;
+                                M3Feedback.showWarning(context, 'تعذر حذف المصروف: $e');
+                                return;
+                              }
+                              if (!mounted) return;
                               setState(() {
                                 _expenses.removeWhere((e) => e.id == item.id);
                               });
+                              _reloadRoiOnly();
                               M3Feedback.showInfo(
                                 context,
                                 'تم حذف المصروف التسويقي (${item.campaignTitle}) وتحديث حسابات الـ ROI',
