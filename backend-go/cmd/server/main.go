@@ -30,7 +30,6 @@ func main() {
 	// 2. Initialize Two-Tier Hybrid Gemini AI Ingestion Agent (Tier 1: Gemini 3.8 Flash, Tier 2: Gemini 4 Argon Medium / gemini-1.5-pro)
 	geminiAgent := gemini.NewAgent(cfg.GeminiAPIKey, cfg.GeminiModel, cfg.UseMockServices).WithTier2Model(cfg.GeminiTier2Model)
 
-
 	// 3. Initialize Ingestion Processor with persistent disk archive directory
 	archDir := os.Getenv("TASHIL_ARCHIVE_DIR")
 	if archDir == "" {
@@ -57,6 +56,7 @@ func main() {
 	adminHandler := handlers.NewAdminHandler(fsRepo)
 	auditHandler := handlers.NewAuditHandler(fsRepo)
 	tradeMarketingHandler := handlers.NewTradeMarketingHandler(fsRepo, fsRepo).WithSalesSource(bqRepo)
+	competitorHandler := handlers.NewCompetitorHandler(fsRepo, fsRepo)
 
 	// 5. Setup Mux Router (Go 1.22+ method + path patterns)
 	mux := http.NewServeMux()
@@ -126,6 +126,9 @@ func main() {
 	mux.HandleFunc("GET /api/v1/trade-marketing/roi", tradeMarketingHandler.HandleGetROI)
 	mux.HandleFunc("PUT /api/v1/trade-marketing/expenses/{id}", tradeMarketingHandler.HandleUpdateExpense)
 	mux.HandleFunc("DELETE /api/v1/trade-marketing/expenses/{id}", tradeMarketingHandler.HandleDeleteExpense)
+	mux.HandleFunc("GET /api/v1/competitors/custom-skus", competitorHandler.HandleListCustomSkus)
+	mux.HandleFunc("POST /api/v1/competitors/custom-skus", competitorHandler.HandleSaveCustomSku)
+	mux.HandleFunc("DELETE /api/v1/competitors/custom-skus/{id}", competitorHandler.HandleDeleteCustomSku)
 
 	// 6. Wrap Middleware Chain: CORS -> Auth -> Router
 	protectedHandler := authMiddleware.Handler(mux)

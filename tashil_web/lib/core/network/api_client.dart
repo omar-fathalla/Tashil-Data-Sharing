@@ -9999,8 +9999,186 @@ class ApiClient {
     return points;
   }
 
+  /// Server ids of persisted custom competitor SKUs, keyed by the local item barcode.
+  final Map<String, String> _customCompetitorServerIds = {};
+
+  static String _customOwnKey(String ownBarcode, String ownSkuName) =>
+      ownBarcode.trim().isNotEmpty ? ownBarcode.trim() : ownSkuName.trim();
+
+  /// True when [barcode] belongs to a user-added (custom) competitor SKU.
+  bool isCustomCompetitorSku(String barcode) =>
+      _customCompetitorServerIds.containsKey(barcode) || barcode.startsWith('CMP-');
+
   /// Adds or updates a field competitor SKU under a specific Own SKU barcode.
-  void addCustomCompetitorSku({
+  /// The local list updates instantly; the SKU is then persisted on the server
+  /// (POST /api/v1/competitors/custom-skus). On failure the local change is rolled back and rethrown.
+  Future<void> addCustomCompetitorSku({
+    required String ownBarcode,
+    required String ownSkuName,
+    required double ownUnitPrice,
+    required double ownVolumeUnits,
+    required String ownVolumeUnitLabel,
+    required String competitorSkuName,
+    required String competitorBrand,
+    required String competitorSupplier,
+    required String category,
+    required String packSizeLabel,
+    required double packVolumeUnits,
+    required double competitorPrice,
+    required String retailerChain,
+    int estimatedMonthlyUnits = 320,
+    bool isPromoActive = false,
+  }) async {
+    final cleanKey = _customOwnKey(ownBarcode, ownSkuName);
+    final list = _customPinnedCompetitors.putIfAbsent(cleanKey, () => []);
+    final previous = List<CompetitorSkuComparisonModel>.from(list);
+    final item = _buildCustomCompetitorItem(
+      ownBarcode: ownBarcode,
+      ownSkuName: ownSkuName,
+      ownUnitPrice: ownUnitPrice,
+      ownVolumeUnits: ownVolumeUnits,
+      ownVolumeUnitLabel: ownVolumeUnitLabel,
+      competitorSkuName: competitorSkuName,
+      competitorBrand: competitorBrand,
+      competitorSupplier: competitorSupplier,
+      category: category,
+      packSizeLabel: packSizeLabel,
+      packVolumeUnits: packVolumeUnits,
+      competitorPrice: competitorPrice,
+      retailerChain: retailerChain,
+      estimatedMonthlyUnits: estimatedMonthlyUnits,
+      isPromoActive: isPromoActive,
+    );
+    // Same competitor name under the same own SKU replaces (server dedupes the same way).
+    final normName = competitorSkuName.trim().toLowerCase();
+    list.removeWhere((c) => c.skuName.trim().toLowerCase() == normName);
+    list.insert(0, item);
+
+    try {
+      final resp = await http
+          .post(
+            Uri.parse(ApiEndpoints.customCompetitorSkus),
+            headers: _headers,
+            body: jsonEncode({
+              'own_barcode': ownBarcode.trim(),
+              'own_sku_name': ownSkuName.trim(),
+              'own_unit_price': ownUnitPrice,
+              'own_volume_units': ownVolumeUnits,
+              'own_volume_unit_label': ownVolumeUnitLabel,
+              'competitor_sku_name': competitorSkuName.trim(),
+              'competitor_brand': competitorBrand,
+              'competitor_supplier': competitorSupplier,
+              'category': category,
+              'pack_size_label': packSizeLabel,
+              'pack_volume_units': packVolumeUnits,
+              'competitor_price': competitorPrice,
+              'retailer_chain': retailerChain,
+              'estimated_monthly_units': estimatedMonthlyUnits,
+              'is_promo_active': isPromoActive,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (resp.statusCode != 200 && resp.statusCode != 201) {
+        String msg = 'HTTP ${resp.statusCode}';
+        try {
+          msg = (jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>)['error']?.toString() ?? msg;
+        } catch (_) {}
+        throw Exception(msg);
+      }
+      final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      final id = (data['custom_sku'] as Map<String, dynamic>?)?['id']?.toString() ?? '';
+      if (id.isNotEmpty) {
+        _customCompetitorServerIds.removeWhere((_, v) => v == id);
+        _customCompetitorServerIds[item.barcode] = id;
+      }
+    } catch (e) {
+      _customPinnedCompetitors[cleanKey] = previous;
+      rethrow;
+    }
+  }
+
+  /// Deletes a custom competitor SKU locally and on the server. Rolls back and rethrows on failure.
+  Future<void> deleteCustomCompetitorSku(String barcode) async {
+    String? ownKey;
+    List<CompetitorSkuComparisonModel>? previous;
+    for (final entry in _customPinnedCompetitors.entries) {
+      if (entry.value.any((c) => c.barcode == barcode)) {
+        ownKey = entry.key;
+        previous = List<CompetitorSkuComparisonModel>.from(entry.value);
+        entry.value.removeWhere((c) => c.barcode == barcode);
+        break;
+      }
+    }
+    final serverId = _customCompetitorServerIds[barcode];
+    if (serverId == null) return; // memory-only item (never persisted)
+    try {
+      final resp = await http
+          .delete(Uri.parse(ApiEndpoints.customCompetitorSku(serverId)), headers: _headers)
+          .timeout(const Duration(seconds: 10));
+      if (resp.statusCode != 200 && resp.statusCode != 404) {
+        throw Exception('HTTP ${resp.statusCode}');
+      }
+      _customCompetitorServerIds.remove(barcode);
+    } catch (e) {
+      if (ownKey != null && previous != null) _customPinnedCompetitors[ownKey] = previous;
+      rethrow;
+    }
+  }
+
+  /// Loads persisted custom competitor SKUs from the server and replaces the local cache.
+  /// On failure the in-memory list is kept as is.
+  Future<void> _syncCustomCompetitorSkus({String? chain}) async {
+    try {
+      final params = <String, String>{};
+      if (chain != null && chain.isNotEmpty && chain != 'all' && chain != 'الكل') {
+        params['chain'] = chain;
+      }
+      final uri = Uri.parse(ApiEndpoints.customCompetitorSkus)
+          .replace(queryParameters: params.isEmpty ? null : params);
+      final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 6));
+      if (resp.statusCode != 200) return;
+      final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      final rows = (data['custom_skus'] as List?) ?? const [];
+      final fresh = <String, List<CompetitorSkuComparisonModel>>{};
+      final ids = <String, String>{};
+      for (final raw in rows) {
+        if (raw is! Map) continue;
+        final r = Map<String, dynamic>.from(raw);
+        double d(String k) => (r[k] as num?)?.toDouble() ?? 0.0;
+        String s(String k) => r[k]?.toString() ?? '';
+        final id = s('id');
+        final item = _buildCustomCompetitorItem(
+          serverId: id,
+          ownBarcode: s('own_barcode'),
+          ownSkuName: s('own_sku_name'),
+          ownUnitPrice: d('own_unit_price'),
+          ownVolumeUnits: d('own_volume_units'),
+          ownVolumeUnitLabel: s('own_volume_unit_label'),
+          competitorSkuName: s('competitor_sku_name'),
+          competitorBrand: s('competitor_brand'),
+          competitorSupplier: s('competitor_supplier'),
+          category: s('category'),
+          packSizeLabel: s('pack_size_label'),
+          packVolumeUnits: d('pack_volume_units'),
+          competitorPrice: d('competitor_price'),
+          retailerChain: s('retailer_chain'),
+          estimatedMonthlyUnits: (r['estimated_monthly_units'] as num?)?.toInt() ?? 320,
+          isPromoActive: r['is_promo_active'] == true,
+        );
+        fresh.putIfAbsent(_customOwnKey(s('own_barcode'), s('own_sku_name')), () => []).add(item);
+        if (id.isNotEmpty) ids[item.barcode] = id;
+      }
+      _customPinnedCompetitors
+        ..clear()
+        ..addAll(fresh);
+      _customCompetitorServerIds
+        ..clear()
+        ..addAll(ids);
+    } catch (_) {}
+  }
+
+  CompetitorSkuComparisonModel _buildCustomCompetitorItem({
+    String? serverId,
     required String ownBarcode,
     required String ownSkuName,
     required double ownUnitPrice,
@@ -10017,8 +10195,6 @@ class ApiClient {
     int estimatedMonthlyUnits = 320,
     bool isPromoActive = false,
   }) {
-    final cleanKey = ownBarcode.trim().isNotEmpty ? ownBarcode.trim() : ownSkuName.trim();
-    final list = _customPinnedCompetitors.putIfAbsent(cleanKey, () => []);
     final diffEgp = competitorPrice - ownUnitPrice;
     final diffPct = ownUnitPrice > 0 ? (diffEgp / ownUnitPrice) * 100.0 : 0.0;
     final String pos;
@@ -10038,9 +10214,11 @@ class ApiClient {
       '2026-04': (price: competitorPrice, units: estimatedMonthlyUnits),
     }, filterYear: 2026);
 
-    final item = CompetitorSkuComparisonModel(
+    return CompetitorSkuComparisonModel(
       skuName: competitorSkuName,
-      barcode: 'CMP-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+      barcode: serverId != null && serverId.isNotEmpty
+          ? 'CMP-$serverId'
+          : 'CMP-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
       supplierName: competitorSupplier,
       brand: competitorBrand,
       category: category,
@@ -10058,12 +10236,11 @@ class ApiClient {
       isPromoActive: isPromoActive,
       isPinnedDirect: true,
       chainPrices: {
-        'fathalla': competitorPrice,
+        (retailerChain.trim().isNotEmpty ? retailerChain.trim() : 'fathalla'): competitorPrice,
       },
       monthlyPrices: monthlyPts,
       allMonthlyPrices: monthlyPts,
     );
-    list.insert(0, item);
   }
 
   /// Extracts pack size & unit volume (in Liters or Kg) from Arabic/English SKU name.
@@ -10125,6 +10302,7 @@ class ApiClient {
     String? query,
     int year = 2026,
     int month = 0,
+    bool syncCustomSkus = true,
   }) async {
     final effectiveChain = (currentUser?.role == 'chain_kam' &&
             currentUser?.assignedChain != null &&
@@ -10157,6 +10335,8 @@ class ApiClient {
         limit: 500,
       );
     } catch (_) {}
+
+    if (syncCustomSkus) await _syncCustomCompetitorSkus(chain: effectiveChain);
 
     final groups = _buildRichCompetitiveGroups(
       liveRecords: liveRecords,

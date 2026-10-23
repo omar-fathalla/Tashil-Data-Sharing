@@ -84,6 +84,9 @@ type Client struct {
 	// Trade marketing expenses (see trade_marketing.go)
 	tmMu       sync.RWMutex
 	tmExpenses map[string]domain.MarketingExpense
+
+	ccMu   sync.RWMutex
+	ccSkus map[string]domain.CustomCompetitorSku
 }
 
 // NewClient constructs the Firestore repository with initial seeded entities and live Cloud Firestore sync.
@@ -2143,4 +2146,3 @@ func (c *Client) IsArchiveDeleted(tenantID, archiveID, fileName string) bool {
 	}
 	return false
 }
-

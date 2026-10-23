@@ -66,4 +66,9 @@ class ApiEndpoints {
       '$baseUrl/api/v1/trade-marketing/expenses/${Uri.encodeComponent(id)}';
   static String get tradeMarketingExpensesUpload => '$baseUrl/api/v1/trade-marketing/expenses/upload';
   static String get tradeMarketingRoi => '$baseUrl/api/v1/trade-marketing/roi';
+
+  // Competitor Comparison: custom competitor SKUs persisted in Firestore
+  static String get customCompetitorSkus => '$baseUrl/api/v1/competitors/custom-skus';
+  static String customCompetitorSku(String id) =>
+      '$baseUrl/api/v1/competitors/custom-skus/${Uri.encodeComponent(id)}';
 }

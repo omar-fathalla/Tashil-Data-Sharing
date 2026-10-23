@@ -112,6 +112,54 @@ class _CompetitorComparisonScreenState
     });
   }
 
+  /// Re-renders from the ApiClient's in-memory custom SKUs without a server round-trip.
+  Future<void> _rebuildFromLocalCache() async {
+    final groups = await widget.apiClient.getCompetitiveComparisonGroups(
+      chain: _selectedChain,
+      year: _selectedYear,
+      month: _selectedMonth,
+      syncCustomSkus: false,
+    );
+    if (!mounted) return;
+    setState(() {
+      _allGroups = groups;
+      _applyLocalFilters();
+    });
+  }
+
+  Future<void> _confirmDeleteCustomCompetitor(
+      CompetitorSkuComparisonModel competitor) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف منتج المنافس'),
+        content: Text('هل تريد حذف "${competitor.skuName}" من المقارنة؟'),
+        actions: [
+          M3Button.text(label: 'إلغاء', onPressed: () => Navigator.pop(ctx, false)),
+          M3Button.primary(
+            label: 'حذف',
+            icon: Icons.delete_outline_rounded,
+            onPressed: () => Navigator.pop(ctx, true),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final deleting = widget.apiClient.deleteCustomCompetitorSku(competitor.barcode);
+    if (_selectedCompetitorBarcode == competitor.barcode) {
+      _selectedCompetitorBarcode = null;
+    }
+    await _rebuildFromLocalCache();
+    try {
+      await deleting;
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('تعذر حذف منتج المنافس: $e')));
+      await _rebuildFromLocalCache();
+    }
+  }
+
   void _applyLocalFilters() {
     final q = _searchQuery.trim().toLowerCase();
     final filtered = _allGroups.where((g) {
@@ -340,7 +388,7 @@ class _CompetitorComparisonScreenState
                   M3Button.primary(
                     label: 'إضافة للمقارنة',
                     icon: Icons.check_rounded,
-                    onPressed: () {
+                    onPressed: () async {
                       final compName = nameCtrl.text.trim();
                       final compPrice =
                           double.tryParse(priceCtrl.text.trim()) ?? 0.0;
@@ -349,7 +397,9 @@ class _CompetitorComparisonScreenState
                               currentGroup.packVolumeUnits;
                       if (compName.isEmpty || compPrice <= 0) return;
 
-                      widget.apiClient.addCustomCompetitorSku(
+                      final messenger = ScaffoldMessenger.of(context);
+                      Navigator.pop(ctx);
+                      final saving = widget.apiClient.addCustomCompetitorSku(
                         ownBarcode: currentGroup.ownBarcode,
                         ownSkuName: currentGroup.ownSkuName,
                         ownUnitPrice: currentGroup.ownUnitPrice,
@@ -370,8 +420,17 @@ class _CompetitorComparisonScreenState
                         retailerChain: 'fathalla',
                         isPromoActive: isPromo,
                       );
-                      Navigator.pop(ctx);
-                      _loadCompetitiveData();
+                      // Local list already updated: refresh instantly, then confirm with the server.
+                      _rebuildFromLocalCache();
+                      try {
+                        await saving;
+                      } catch (e) {
+                        if (!mounted) return;
+                        messenger.showSnackBar(SnackBar(
+                          content: Text('تعذر حفظ منتج المنافس على الخادم: $e'),
+                        ));
+                        _rebuildFromLocalCache();
+                      }
                     },
                   ),
                 ],
@@ -1531,6 +1590,13 @@ class _CompetitorComparisonScreenState
                           ),
                         ),
                       ),
+                      if (widget.apiClient.isCustomCompetitorSku(competitor.barcode))
+                        IconButton(
+                          tooltip: 'حذف منتج المنافس',
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.delete_outline_rounded, size: 20.0),
+                          onPressed: () => _confirmDeleteCustomCompetitor(competitor),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 8.0),
