@@ -528,11 +528,13 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
     final usableHeight = height - (topPad + bottomPad);
     final baselineY = height - bottomPad;
     final y = baselineY - (peakAtIdx / maxVal * usableHeight);
-    final headerLabel = item.monthLabel.isNotEmpty ? '${item.monthLabel} (${item.date})' : item.date;
+    final hasDistinctDate = item.monthLabel.isNotEmpty &&
+        item.date.isNotEmpty &&
+        item.monthLabel.trim() != item.date.trim();
 
     return Positioned(
       left: (x - 95).clamp(0.0, math.max(0.0, width - 210.0)),
-      top: (y - 80).clamp(0.0, math.max(0.0, height - 110.0)),
+      top: (y - 95).clamp(0.0, math.max(0.0, height - 135.0)),
       child: IgnorePointer(
         child: Container(
           constraints: const BoxConstraints(minWidth: 175.0, maxWidth: 230.0),
@@ -553,26 +555,34 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                headerLabel,
+                item.monthLabel.isNotEmpty ? item.monthLabel : item.date,
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onInverseSurface.withOpacity(0.9),
+                  color: colorScheme.onInverseSurface.withOpacity(0.95),
                   fontWeight: FontWeight.bold,
                   fontSize: 10.5,
                 ),
               ),
-              const SizedBox(height: 4.0),
+              if (hasDistinctDate)
+                Text(
+                  item.date,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onInverseSurface.withOpacity(0.72),
+                    fontSize: 9.0,
+                  ),
+                ),
+              const SizedBox(height: 5.0),
               ...seriesList.map((s) {
                 final val = idx < s.values.length ? s.values[idx] : 0.0;
                 final growth = idx < s.growthPcts.length ? s.growthPcts[idx] : 0.0;
                 final growthStr = (val > 0 && growth != 0.0)
-                    ? ' (${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(1)}%)'
+                    ? ' (\u200E${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(1)}%\u200E)'
                     : '';
                 final valueLabel = val > 0
                     ? '${CurrencyFormatter.formatEGP(val)}$growthStr'
                     : 'لا توجد بيانات مرفوعة';
                 final parts = ChainSharePie.splitBilingualLabel(s.displayName);
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 3.0),
+                  padding: const EdgeInsets.only(bottom: 5.0),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -593,13 +603,13 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              '${parts.ar}: $valueLabel',
+                              parts.ar,
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: val > 0
                                     ? colorScheme.onInverseSurface
                                     : colorScheme.onInverseSurface.withOpacity(0.65),
-                                fontWeight: val > 0 ? FontWeight.w600 : FontWeight.normal,
-                                fontSize: 10.0,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10.5,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -612,6 +622,18 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
+                            const SizedBox(height: 2.0),
+                            Text(
+                              valueLabel,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: val > 0
+                                    ? colorScheme.onInverseSurface.withOpacity(0.95)
+                                    : colorScheme.onInverseSurface.withOpacity(0.65),
+                                fontWeight: val > 0 ? FontWeight.w700 : FontWeight.normal,
+                                fontSize: 10.0,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ],
                         ),
                       ),
@@ -622,9 +644,25 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
               if (seriesList.length > 1) ...[
                 Divider(height: 6.0, color: colorScheme.onInverseSurface.withOpacity(0.2)),
                 Text(
-                  'الإجمالي: ${CurrencyFormatter.formatEGP(item.revenue)} • ${CurrencyFormatter.formatUnits(item.units)} عبوة',
+                  'الإجمالي',
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onInverseSurface.withOpacity(0.9),
+                    color: colorScheme.onInverseSurface.withOpacity(0.85),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 9.5,
+                  ),
+                ),
+                Text(
+                  CurrencyFormatter.formatEGP(item.revenue),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onInverseSurface,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10.0,
+                  ),
+                ),
+                Text(
+                  '${CurrencyFormatter.formatUnits(item.units)} عبوة',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onInverseSurface.withOpacity(0.8),
                     fontSize: 9.5,
                   ),
                 ),
