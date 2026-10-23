@@ -987,7 +987,8 @@ func (p *Processor) replayArchivedFiles(ctx context.Context, writeSink bool) err
 		}
 
 		if isProductMasterArchiveEntry(f) {
-			if p.bqRepo == nil || len(p.bqRepo.GetProductMasterItems(f.TenantID)) == 0 {
+			// During a sink backfill, always reprocess so the catalog reaches BigQuery even if it is already loaded in memory.
+			if writeSink || p.bqRepo == nil || len(p.bqRepo.GetProductMasterItems(f.TenantID)) == 0 {
 				_, _ = p.ProcessProductMaster(ctx, f.TenantID, f.FileName, raw, false)
 			}
 		} else if isSellInArchiveEntry(f) {
