@@ -26,7 +26,7 @@ func TestLoginSuccessAndTokenVerification(t *testing.T) {
 	body, _ := json.Marshal(domain.LoginRequest{
 		TenantID: "adeco",
 		Email:    "admin@adeco-retail.com",
-		Password: "AdecoAdmin2026!",
+		Password: testAdecoAdminPassword,
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
@@ -80,7 +80,7 @@ func TestLoginCrossTenantRejected(t *testing.T) {
 	body, _ := json.Marshal(domain.LoginRequest{
 		TenantID: "unilever",
 		Email:    "admin@adeco-retail.com",
-		Password: "AdecoAdmin2026!",
+		Password: testAdecoAdminPassword,
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
@@ -117,7 +117,7 @@ func TestForgotPasswordAndResetFlow(t *testing.T) {
 	}
 
 	// 2. Perform reset password with token
-	newPassword := "AdecoNewPassword2026!#"
+	newPassword := "test-only-new-adeco-pw"
 	resetBody, _ := json.Marshal(domain.ResetPasswordRequest{
 		Token:       forgotResp.ResetToken,
 		NewPassword: newPassword,
@@ -151,7 +151,7 @@ func TestChangePasswordAuthenticated(t *testing.T) {
 	_, _, handler := setupAuthTest()
 
 	changeBody, _ := json.Marshal(domain.ChangePasswordRequest{
-		OldPassword: "AdecoAdmin2026!",
+		OldPassword: testAdecoAdminPassword,
 		NewPassword: "BrandNewSecret2026!",
 	})
 
@@ -182,7 +182,7 @@ func TestLoginEmptyTenantIDRejected(t *testing.T) {
 	body, _ := json.Marshal(domain.LoginRequest{
 		TenantID: "",
 		Email:    "admin@adeco-retail.com",
-		Password: "AdecoAdmin2026!",
+		Password: testAdecoAdminPassword,
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
@@ -198,9 +198,9 @@ func TestLoginEmptyTenantIDRejected(t *testing.T) {
 func TestSuperAdminLoginGate(t *testing.T) {
 	_, _, handler := setupAuthTest()
 
-	// Construct test credentials from byte slices so no plaintext credentials exist in code
-	saEmail := string([]byte{0x73, 0x75, 0x70, 0x70, 0x6f, 0x72, 0x74, 0x40, 0x73, 0x77, 0x2d, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x2e, 0x63, 0x6f, 0x6d})
-	saPass := string([]byte{0x34, 0x38, 0x31, 0x36, 0x33, 0x36, 0x31, 0x30, 0x30, 0x41, 0x61, 0x21})
+	// Test-only credentials (see main_test.go); not real passwords
+	saEmail := testSuperAdminEmail
+	saPass := testSuperAdminPassword
 
 	// 1. Valid Super Admin login via digest-protected credentials
 	validBody, _ := json.Marshal(domain.LoginRequest{
@@ -247,7 +247,7 @@ func TestSuperAdminLoginGate(t *testing.T) {
 	vendorOnSystemBody, _ := json.Marshal(domain.LoginRequest{
 		TenantID: "system",
 		Email:    "admin@adeco-retail.com",
-		Password: "AdecoAdmin2026!",
+		Password: testAdecoAdminPassword,
 	})
 
 	reqVendor := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(vendorOnSystemBody))
@@ -261,7 +261,7 @@ func TestSuperAdminLoginGate(t *testing.T) {
 	// 4. Changing Super Admin password invalidates old password
 	changeBody, _ := json.Marshal(domain.ChangePasswordRequest{
 		OldPassword: saPass,
-		NewPassword: "NewSuperAdminSecret2026!",
+		NewPassword: "test-only-new-superadmin-pw",
 	})
 	reqChange := httptest.NewRequest(http.MethodPost, "/api/v1/auth/change-password", bytes.NewReader(changeBody))
 	superClaims := &domain.UserClaims{
@@ -288,7 +288,7 @@ func TestSuperAdminLoginGate(t *testing.T) {
 	newValidBody, _ := json.Marshal(domain.LoginRequest{
 		TenantID: "system",
 		Email:    saEmail,
-		Password: "NewSuperAdminSecret2026!",
+		Password: "test-only-new-superadmin-pw",
 	})
 	reqNewPass := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(newValidBody))
 	recNewPass := httptest.NewRecorder()

@@ -5,7 +5,7 @@ import (
 )
 
 func TestPasswordHashingAndVerification(t *testing.T) {
-	rawPassword := "AdecoSecure2026!#"
+	rawPassword := "test-only-hash-input"
 
 	hash, err := HashPassword(rawPassword)
 	if err != nil {

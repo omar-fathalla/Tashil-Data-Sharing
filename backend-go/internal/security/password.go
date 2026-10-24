@@ -7,43 +7,60 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"os"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
-const (
-	// superAdminSalt is the cryptographic domain separator for Super Admin identity verification.
-	superAdminSalt = "TashilZeroTrust#2026$"
-	// superAdminEmailDigest is the SHA-256 hex digest of (superAdminSalt + lower(email)).
-	// Neither the username/email nor the password exists in plaintext in source code.
-	superAdminEmailDigest = "61ee72585b69ceb7b91162cac5497cbc154a2db0960d552b22074855596c44e3"
-	// superAdminPassDigest is the SHA-256 hex digest of (superAdminSalt + password).
-	superAdminPassDigest = "f7bfe577dbc57526d0a91980d66af0e6e026b43194ed2bae7e3166c7a8edd023"
-)
+// Super Admin identity is verified against salted SHA-256 digests supplied at runtime through
+// environment variables (populated from Secret Manager in production). No credential material,
+// salt, or digest is compiled into the binary. When the variables are unset, Super Admin login is disabled.
+//
+//   SUPERADMIN_SALT          domain-separation salt
+//   SUPERADMIN_EMAIL_DIGEST  hex SHA-256 of (salt + lower(trim(email)))
+//   SUPERADMIN_PASS_DIGEST   hex SHA-256 of (salt + password)
+func superAdminSalt() string        { return os.Getenv("SUPERADMIN_SALT") }
+func superAdminEmailDigest() string { return strings.ToLower(strings.TrimSpace(os.Getenv("SUPERADMIN_EMAIL_DIGEST"))) }
+func superAdminPassDigest() string  { return strings.ToLower(strings.TrimSpace(os.Getenv("SUPERADMIN_PASS_DIGEST"))) }
 
-// SaltedSHA256Hex computes the lowercase hex SHA-256 digest of (superAdminSalt + value).
+// SuperAdminConfigured reports whether Super Admin digest verification material is present.
+func SuperAdminConfigured() bool {
+	return superAdminSalt() != "" && superAdminEmailDigest() != "" && superAdminPassDigest() != ""
+}
+
+// SaltedSHA256Hex computes the lowercase hex SHA-256 digest of (SUPERADMIN_SALT + value).
 func SaltedSHA256Hex(value string) string {
-	sum := sha256.Sum256([]byte(superAdminSalt + value))
+	sum := sha256.Sum256([]byte(superAdminSalt() + value))
 	return hex.EncodeToString(sum[:])
 }
 
 // IsSuperAdminEmailDigest checks in constant time whether the provided email matches the Super Admin email digest.
 func IsSuperAdminEmailDigest(email string) bool {
+	if !SuperAdminConfigured() {
+		return false
+	}
 	norm := strings.ToLower(strings.TrimSpace(email))
 	computed := SaltedSHA256Hex(norm)
-	return subtle.ConstantTimeCompare([]byte(computed), []byte(superAdminEmailDigest)) == 1
+	return subtle.ConstantTimeCompare([]byte(computed), []byte(superAdminEmailDigest())) == 1
 }
 
 // VerifySuperAdminPasswordDigest checks in constant time whether the provided password matches the Super Admin password digest.
 func VerifySuperAdminPasswordDigest(password string) bool {
+	if !SuperAdminConfigured() {
+		return false
+	}
 	computed := SaltedSHA256Hex(password)
-	return subtle.ConstantTimeCompare([]byte(computed), []byte(superAdminPassDigest)) == 1
+	return subtle.ConstantTimeCompare([]byte(computed), []byte(superAdminPassDigest())) == 1
 }
 
-// DefaultSuperAdminPasswordHash returns a bcrypt hash of the Super Admin password digest so even in-memory user records never hold plaintext.
+// DefaultSuperAdminPasswordHash returns a bcrypt hash of the Super Admin password digest so even in-memory
+// user records never hold plaintext. Returns "" (login impossible) when Super Admin is not configured.
 func DefaultSuperAdminPasswordHash() string {
-	h, _ := HashPassword("digest:" + superAdminPassDigest)
+	if !SuperAdminConfigured() {
+		return ""
+	}
+	h, _ := HashPassword("digest:" + superAdminPassDigest())
 	return h
 }
 
@@ -59,7 +76,10 @@ func HashPassword(password string) (string, error) {
 // CheckPassword compares a plaintext password against one or more newline-separated bcrypt hashes,
 // or verifies against a digest-backed bcrypt hash when prefixed.
 func CheckPassword(password, hash string) bool {
-	digestCandidate := "digest:" + SaltedSHA256Hex(password)
+	digestCandidate := ""
+	if superAdminSalt() != "" {
+		digestCandidate = "digest:" + SaltedSHA256Hex(password)
+	}
 	for _, candidate := range strings.Split(hash, "\n") {
 		candidate = strings.TrimSpace(candidate)
 		if candidate == "" {
@@ -67,6 +87,9 @@ func CheckPassword(password, hash string) bool {
 		}
 		if err := bcrypt.CompareHashAndPassword([]byte(candidate), []byte(password)); err == nil {
 			return true
+		}
+		if digestCandidate == "" {
+			continue
 		}
 		if err := bcrypt.CompareHashAndPassword([]byte(candidate), []byte(digestCandidate)); err == nil {
 			return true

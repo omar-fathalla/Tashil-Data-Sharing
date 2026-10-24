@@ -435,10 +435,12 @@ func (c *Client) seedMetadata() {
 
 	// Seed Users with Bcrypt Password Hashes (Super Admin uses zero-plaintext digest verification)
 	superAdminDigestHash := security.DefaultSuperAdminPasswordHash()
-	adecoRoleHash, _ := security.HashPassword("Adeco@2026!")
-	adecoLegacyHash, _ := security.HashPassword("AdecoAdmin2026!")
-	unileverAdminHash, _ := security.HashPassword("Unilever2026!")
-	pepsiAdminHash, _ := security.HashPassword("Pepsi2026!")
+	// Seed passwords are injected at runtime (Secret Manager -> env). When a variable is unset the
+	// account is seeded without a password hash, so it cannot log in; no default is ever used.
+	adecoAdminHash := seedPasswordHashFromEnv("ADECO_ADMIN_SEED_PASSWORD")
+	adecoRoleHash := seedPasswordHashFromEnv("ADECO_ROLE_USERS_SEED_PASSWORD")
+	unileverAdminHash := seedPasswordHashFromEnv("UNILEVER_ADMIN_SEED_PASSWORD")
+	pepsiAdminHash := seedPasswordHashFromEnv("PEPSI_ADMIN_SEED_PASSWORD")
 
 	c.users["user-super-admin"] = domain.TenantUser{
 		UserID:        "user-super-admin",
@@ -459,7 +461,7 @@ func (c *Client) seedMetadata() {
 		TenantID:      "adeco",
 		Email:         "admin@adeco-retail.com",
 		FullName:      "أحمد المنشاوي (مدير الشركة الموردة)",
-		PasswordHash:  adecoRoleHash + "\n" + adecoLegacyHash,
+		PasswordHash:  adecoAdminHash,
 		Role:          domain.RoleVendorAdmin,
 		RoleDisplayAr: "مدير الشركة الموردة",
 		Active:        true,
@@ -2145,4 +2147,18 @@ func (c *Client) IsArchiveDeleted(tenantID, archiveID, fileName string) bool {
 		return true
 	}
 	return false
+}
+
+// seedPasswordHashFromEnv returns a bcrypt hash of the password held in the named environment
+// variable, or "" when the variable is unset/empty (account seeded without a usable password).
+func seedPasswordHashFromEnv(envVar string) string {
+	pw := os.Getenv(envVar)
+	if pw == "" {
+		return ""
+	}
+	h, err := security.HashPassword(pw)
+	if err != nil {
+		return ""
+	}
+	return h
 }
