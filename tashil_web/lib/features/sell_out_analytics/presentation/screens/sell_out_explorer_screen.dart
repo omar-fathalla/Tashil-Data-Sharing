@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import '../../../../core/utils/export_columns.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -428,7 +429,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                     const SizedBox(height: 4.0),
                     Text(
                       'السلسلة: ${file.retailChain.toUpperCase()} • الحركات: ${file.rowsIngested} • القيمة: ${CurrencyFormatter.formatCompactEGP(file.totalRevenue)}',
-                      style: const TextStyle(fontSize: M3FontSize.bodySmallPlus),
+                      style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontSize: M3FontSize.bodySmallPlus)),
                     ),
                   ],
                 ),
@@ -436,7 +437,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               const SizedBox(height: 10.0),
               Text(
                 'ملاحظة: سيتم حذف حركات هذا الشيت فقط وإعادة احتساب صافي المبيعات والكميات تلقائياً دون المساس ببقية الشهور المرفوعة أو بيانات التوريد (Sell-In).',
-                style: TextStyle(fontSize: M3FontSize.bodySmall, color: cs.onSurfaceVariant),
+                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(fontSize: M3FontSize.bodySmall, color: cs.onSurfaceVariant)),
               ),
             ],
           ),
@@ -1152,7 +1153,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                               s.skuName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: M3FontSize.bodySmall),
+                              style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w700, fontSize: M3FontSize.bodySmall)),
                             ),
                           ),
                         ),
@@ -1627,11 +1628,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                             width: 34.0,
                             child: Text(
                               '#${b.rank}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: M3FontSize.bodySmall,
-                                color: b.rank <= 3 ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontWeight: FontWeight.w900,                                 fontSize: M3FontSize.bodySmall,                                 color: b.rank <= 3 ? colorScheme.primary : colorScheme.onSurfaceVariant,                               )),
                             ),
                           ),
                           SizedBox(
@@ -1640,7 +1637,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                               _shortenBranchName(b.storeName),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmallPlus),
+                              style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmallPlus)),
                             ),
                           ),
                           const SizedBox(width: 10.0),
@@ -1661,11 +1658,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                             child: Text(
                               CurrencyFormatter.formatCompactEGP(b.totalRevenue),
                               textAlign: TextAlign.end,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: M3FontSize.bodySmallPlus,
-                                color: barColor,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontWeight: FontWeight.w900,                                 fontSize: M3FontSize.bodySmallPlus,                                 color: barColor,                               )),
                             ),
                           ),
                           const SizedBox(width: 8.0),
@@ -1674,11 +1667,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                             child: Text(
                               '${sharePct.toStringAsFixed(1)}%',
                               textAlign: TextAlign.end,
-                              style: TextStyle(
-                                fontSize: M3FontSize.labelSmallPlus,
-                                fontWeight: FontWeight.w700,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontSize: M3FontSize.labelSmallPlus,                                 fontWeight: FontWeight.w700,                                 color: colorScheme.onSurfaceVariant,                               )),
                             ),
                           ),
                           if (branchYoY != null) ...[
@@ -1688,11 +1677,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                               child: Text(
                                 '${branchYoY >= 0 ? "+" : ""}${branchYoY.toStringAsFixed(0)}%',
                                 textAlign: TextAlign.end,
-                                style: TextStyle(
-                                  fontSize: M3FontSize.labelSmall,
-                                  fontWeight: FontWeight.w800,
-                                  color: branchYoY >= 0 ? colorScheme.primary : colorScheme.error,
-                                ),
+                                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                   fontSize: M3FontSize.labelSmall,                                   fontWeight: FontWeight.w800,                                   color: branchYoY >= 0 ? colorScheme.primary : colorScheme.error,                                 )),
                               ),
                             ),
                           ],
@@ -1752,11 +1737,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                             const SizedBox(width: 6.0),
                             Text(
                               rowLabelAr,
-                              style: TextStyle(
-                                fontSize: M3FontSize.labelSmall,
-                                fontWeight: FontWeight.w800,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontSize: M3FontSize.labelSmall,                                 fontWeight: FontWeight.w800,                                 color: colorScheme.onSurfaceVariant,                               )),
                             ),
                           ],
                         ),
@@ -1831,13 +1812,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                                             ),
                                             child: Text(
                                               '#${b.rank}',
-                                              style: TextStyle(
-                                                fontSize: M3FontSize.microPlus,
-                                                fontWeight: FontWeight.w900,
-                                                color: b.rank <= 3
-                                                    ? colorScheme.primary
-                                                    : colorScheme.onSurfaceVariant,
-                                              ),
+                                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                                 fontSize: M3FontSize.microPlus,                                                 fontWeight: FontWeight.w900,                                                 color: b.rank <= 3                                                     ? colorScheme.primary                                                     : colorScheme.onSurfaceVariant,                                               )),
                                             ),
                                           ),
                                           const SizedBox(height: 2.0),
@@ -1847,11 +1822,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                                                 .replaceAll(' ج.م', ''),
                                             maxLines: 1,
                                             overflow: TextOverflow.clip,
-                                            style: TextStyle(
-                                              fontSize: M3FontSize.tinyPlus,
-                                              fontWeight: FontWeight.w900,
-                                              color: barColor,
-                                            ),
+                                            style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                               fontSize: M3FontSize.tinyPlus,                                               fontWeight: FontWeight.w900,                                               color: barColor,                                             )),
                                           ),
                                           const SizedBox(height: 4.0),
                                           // Animated Vertical Bar
@@ -1889,16 +1860,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                                                 textAlign: TextAlign.center,
                                                 maxLines: 2,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontSize: M3FontSize.tinyPlus,
-                                                  height: 1.15,
-                                                  fontWeight: isSelected || b.rank <= 3
-                                                      ? FontWeight.w900
-                                                      : FontWeight.w700,
-                                                  color: isSelected
-                                                      ? colorScheme.primary
-                                                      : colorScheme.onSurface,
-                                                ),
+                                                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                                   fontSize: M3FontSize.tinyPlus,                                                   height: 1.15,                                                   fontWeight: isSelected || b.rank <= 3                                                       ? FontWeight.w900                                                       : FontWeight.w700,                                                   color: isSelected                                                       ? colorScheme.primary                                                       : colorScheme.onSurface,                                                 )),
                                               ),
                                             ),
                                           ),
@@ -2026,11 +1988,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
             child: Text(
               valueText,
               maxLines: 1,
-              style: TextStyle(
-                fontSize: M3FontSize.labelSmall,
-                fontWeight: FontWeight.w900,
-                color: color,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                 fontSize: M3FontSize.labelSmall,                 fontWeight: FontWeight.w900,                 color: color,               )),
             ),
           ),
         ],
@@ -2572,11 +2530,7 @@ onChanged: m3Legacy<String>((v) {
                     const Spacer(),
                     Text(
                       '${branchList.length} فرع نشط',
-                      style: TextStyle(
-                        fontSize: M3FontSize.bodySmall,
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                         fontSize: M3FontSize.bodySmall,                         fontWeight: FontWeight.w700,                         color: colorScheme.onSurfaceVariant,                       )),
                     ),
                   ],
                 ),
@@ -2613,7 +2567,7 @@ onChanged: m3Legacy<String>((v) {
                             foregroundColor: idx <= 3
                                 ? colorScheme.onPrimary
                                 : colorScheme.onSurfaceVariant,
-                            child: Text('$idx', style: const TextStyle(fontSize: M3FontSize.labelSmall, fontWeight: FontWeight.bold)),
+                            child: Text('$idx', style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontSize: M3FontSize.labelSmall, fontWeight: FontWeight.bold))),
                           ),
                         ),
                         DataCell(Text(b.storeName, style: const TextStyle(fontWeight: FontWeight.w700))),
@@ -2626,11 +2580,7 @@ onChanged: m3Legacy<String>((v) {
                             ),
                             child: Text(
                               b.chain.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: M3FontSize.labelSmall,
-                                fontWeight: FontWeight.w800,
-                                color: colorScheme.onSecondaryContainer,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontSize: M3FontSize.labelSmall,                                 fontWeight: FontWeight.w800,                                 color: colorScheme.onSecondaryContainer,                               )),
                             ),
                           ),
                         ),
@@ -2933,14 +2883,11 @@ onChanged: m3Legacy<String>((v) {
                             children: [
                               Text(
                                 item.storeName,
-                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.labelMediumPlus),
+                                style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.labelMediumPlus)),
                               ),
                               Text(
                                 '${item.chain.toUpperCase()} • ${item.region}',
-                                style: TextStyle(
-                                  fontSize: M3FontSize.labelSmall,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
+                                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                   fontSize: M3FontSize.labelSmall,                                   color: colorScheme.onSurfaceVariant,                                 )),
                               ),
                             ],
                           ),
@@ -2998,11 +2945,7 @@ onChanged: m3Legacy<String>((v) {
                                 )
                               : Text(
                                   'جديد ($currYearLabel)',
-                                  style: TextStyle(
-                                    fontSize: M3FontSize.labelSmallPlus,
-                                    fontWeight: FontWeight.w700,
-                                    color: colorScheme.tertiary,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.labelSmallPlus,                                     fontWeight: FontWeight.w700,                                     color: colorScheme.tertiary,                                   )),
                                 ),
                         ),
                         DataCell(
@@ -3025,11 +2968,7 @@ onChanged: m3Legacy<String>((v) {
                                 const SizedBox(width: 4.0),
                                 Text(
                                   statusLabel,
-                                  style: TextStyle(
-                                    fontSize: M3FontSize.labelSmallPlus,
-                                    fontWeight: FontWeight.w800,
-                                    color: statusFg,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.labelSmallPlus,                                     fontWeight: FontWeight.w800,                                     color: statusFg,                                   )),
                                 ),
                               ],
                             ),
@@ -3312,7 +3251,7 @@ onChanged: m3Legacy<int>((v) {
                                   children: [
                                     Icon(
                                       Icons.description_rounded,
-                                      color: Colors.green.shade700,
+                                      color: M3StatusColors.of(context).accents.positive,
                                       size: 20.0,
                                     ),
                                     const SizedBox(width: 8.0),
@@ -3326,10 +3265,7 @@ onChanged: m3Legacy<int>((v) {
                                         ),
                                         Text(
                                           _formatFileSize(file.fileSizeBytes),
-                                          style: TextStyle(
-                                            fontSize: M3FontSize.labelSmall,
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
+                                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                             fontSize: M3FontSize.labelSmall,                                             color: colorScheme.onSurfaceVariant,                                           )),
                                         ),
                                       ],
                                     ),
@@ -3345,11 +3281,7 @@ onChanged: m3Legacy<int>((v) {
                                   ),
                                   child: Text(
                                     file.retailChain.toUpperCase(),
-                                    style: TextStyle(
-                                      fontSize: M3FontSize.labelSmall,
-                                      fontWeight: FontWeight.w800,
-                                      color: colorScheme.onPrimaryContainer,
-                                    ),
+                                    style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.labelSmall,                                       fontWeight: FontWeight.w800,                                       color: colorScheme.onPrimaryContainer,                                     )),
                                   ),
                                 ),
                               ),

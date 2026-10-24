@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/widgets/app_icons.dart';
@@ -520,32 +521,19 @@ onChanged: m3Legacy<int>((v) {
                                   children: [
                                     Text(
                                       '• القيمة: ${CurrencyFormatter.formatEGP(effectiveRev)}',
-                                      style: const TextStyle(
-                                        fontSize: M3FontSize.bodySmall,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         fontWeight: FontWeight.w700,                                       )),
                                     ),
                                     Text(
                                       '• إجمالي البضاعة: ${CurrencyFormatter.formatNumber(effectiveUnits.round())} كرتونة',
-                                      style: const TextStyle(
-                                        fontSize: M3FontSize.bodySmall,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         fontWeight: FontWeight.w700,                                       )),
                                     ),
                                     Text(
                                       '• الوزن اللوجستي: ${effectiveTons.toStringAsFixed(1)} طن',
-                                      style: const TextStyle(
-                                        fontSize: M3FontSize.bodySmall,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         fontWeight: FontWeight.w700,                                       )),
                                     ),
                                     Text(
                                       '• شامل تأمين المرتجعات: ${CurrencyFormatter.formatNumber(grossUnitsWithBuffer.round())} كرتونة',
-                                      style: TextStyle(
-                                        fontSize: M3FontSize.bodySmall,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.teal.shade700,
-                                      ),
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         fontWeight: FontWeight.w700,                                         color: M3StatusColors.of(context).accents.teal,                                       )),
                                     ),
                                   ],
                                 ),
@@ -1020,7 +1008,7 @@ onChanged: m3Legacy<int>((v) {
                   ? 'EXP: ${CurrencyFormatter.formatCompactEGP(summary.totalExpectedRevenueEgp)}'
                   : 'Actual $_unitLabelEn',
               icon: Icons.insights_rounded,
-              color: Colors.teal.shade700,
+              color: M3StatusColors.of(context).accents.teal,
             );
             final card3 = _buildKpiCard(
               context,
@@ -1039,9 +1027,9 @@ onChanged: m3Legacy<int>((v) {
                       : 'Action Required'),
               icon: Icons.pie_chart_rounded,
               color: summary.overallAchievementPct >= 100
-                  ? Colors.green.shade700
+                  ? M3StatusColors.of(context).accents.positive
                   : (summary.overallAchievementPct >= 85
-                      ? Colors.orange.shade800
+                      ? M3StatusColors.of(context).accents.caution
                       : colorScheme.error),
               progressPct: summary.overallAchievementPct,
             );
@@ -1065,8 +1053,8 @@ onChanged: m3Legacy<int>((v) {
                   ? Icons.trending_up_rounded
                   : Icons.account_tree_rounded,
               color: summary.totalVarianceEgp >= 0
-                  ? Colors.green.shade700
-                  : Colors.indigo.shade700,
+                  ? M3StatusColors.of(context).accents.positive
+                  : M3StatusColors.of(context).accents.indigo,
             );
 
             if (width >= 1100) {
@@ -1405,9 +1393,9 @@ onChanged: m3Legacy<String>((v) {
                               final isSelected = item.id == activeTarget?.id;
                               final isPositive = item.varianceRevenueEgp >= 0;
                               final badgeColor = item.achievementRevPct >= 100
-                                  ? Colors.green.shade700
+                                  ? M3StatusColors.of(context).accents.positive
                                   : (item.achievementRevPct >= 85
-                                      ? Colors.orange.shade800
+                                      ? M3StatusColors.of(context).accents.caution
                                       : colorScheme.error);
                               return DataRow(
                                 selected: isSelected,
@@ -1461,11 +1449,7 @@ onChanged: m3Legacy<String>((v) {
                                             ),
                                             child: Text(
                                               '${item.branchesCount} فرع • ${item.activeSkusCount} صنف',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w800,
-                                                fontSize: M3FontSize.bodySmall,
-                                                color: colorScheme.primary,
-                                              ),
+                                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                                 fontWeight: FontWeight.w800,                                                 fontSize: M3FontSize.bodySmall,                                                 color: colorScheme.primary,                                               )),
                                             ),
                                           )
                                         : Text(
@@ -1499,7 +1483,7 @@ onChanged: m3Legacy<String>((v) {
                                       style: TextStyle(
                                         fontWeight: FontWeight.w700,
                                         color: isPositive
-                                            ? Colors.green.shade700
+                                            ? M3StatusColors.of(context).accents.positive
                                             : colorScheme.error,
                                       ),
                                     ),
@@ -1518,7 +1502,7 @@ onChanged: m3Legacy<String>((v) {
                                         '${item.actualWeightTons.toStringAsFixed(1)} / ${item.targetWeightTons.toStringAsFixed(1)} طن',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w700,
-                                          color: Colors.indigo.shade700,
+                                          color: M3StatusColors.of(context).accents.indigo,
                                         ),
                                       ),
                                     ),
@@ -1535,11 +1519,7 @@ onChanged: m3Legacy<String>((v) {
                                       ),
                                       child: Text(
                                         '${item.achievementRevPct.toStringAsFixed(1)}% (${item.statusAr})',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: M3FontSize.bodySmall,
-                                          color: badgeColor,
-                                        ),
+                                        style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontWeight: FontWeight.w800,                                           fontSize: M3FontSize.bodySmall,                                           color: badgeColor,                                         )),
                                       ),
                                     ),
                                   ),
@@ -1829,21 +1809,21 @@ onChanged: m3Legacy<String>((v) {
                       icon: Icons.shield_rounded,
                       label:
                           'إجمالي التوريد شامل احتياطي المرتجعات (+${target.historicalReturnRatePct.toStringAsFixed(1)}%): ${CurrencyFormatter.formatNumber(target.grossTargetUnits.round())} كرتونة (${CurrencyFormatter.formatCompactEGP(target.grossTargetRevenueEgp)})',
-                      color: Colors.teal.shade700,
+                      color: M3StatusColors.of(context).accents.teal,
                     ),
                     _buildInfoPill(
                       context,
                       icon: Icons.local_offer_rounded,
                       label:
                           'مزيج التوريد: عادي ${CurrencyFormatter.formatCompactEGP(target.regularTargetRevenueEgp)} • عروض (${target.promoSharePct.toStringAsFixed(1)}%) ${CurrencyFormatter.formatCompactEGP(target.promoTargetRevenueEgp)}',
-                      color: Colors.deepOrange.shade700,
+                      color: M3StatusColors.of(context).accents.alert,
                     ),
                     _buildInfoPill(
                       context,
                       icon: Icons.category_rounded,
                       label:
                           'القطاعات: منظفات (MT) ${CurrencyFormatter.formatCompactEGP(target.mtTargetRevenueEgp)} • عناية بالسيارات رابيدو (CC) ${CurrencyFormatter.formatCompactEGP(target.ccTargetRevenueEgp)}',
-                      color: Colors.indigo.shade700,
+                      color: M3StatusColors.of(context).accents.indigo,
                     ),
                   ],
                 ),
@@ -1945,11 +1925,7 @@ onChanged: m3Legacy<String>((v) {
           const SizedBox(width: 6.0),
           Text(
             label,
-            style: TextStyle(
-              fontSize: M3FontSize.bodySmall,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(               fontSize: M3FontSize.bodySmall,               fontWeight: FontWeight.w800,               color: color,             )),
           ),
         ],
       ),
@@ -2143,9 +2119,9 @@ onChanged: m3Legacy<String>((v) {
             rows: filteredBranches.map((b) {
               final isPositive = b.varianceRevenueEgp >= 0;
               final badgeColor = b.achievementRevPct >= 100
-                  ? Colors.green.shade700
+                  ? M3StatusColors.of(context).accents.positive
                   : (b.achievementRevPct >= 85
-                      ? Colors.orange.shade800
+                      ? M3StatusColors.of(context).accents.caution
                       : colorScheme.error);
               return DataRow(
                 selected: b.branchName == _selectedBranchName,
@@ -2164,17 +2140,11 @@ onChanged: m3Legacy<String>((v) {
                       children: [
                         Text(
                           b.branchName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: M3FontSize.labelMediumPlus,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                             fontWeight: FontWeight.w800,                             fontSize: M3FontSize.labelMediumPlus,                           )),
                         ),
                         Text(
                           'كود: ${b.branchCode} • ${b.activeSkusCount} صنف',
-                          style: TextStyle(
-                            fontSize: M3FontSize.labelSmall,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                             fontSize: M3FontSize.labelSmall,                             color: colorScheme.onSurfaceVariant,                           )),
                         ),
                       ],
                     ),
@@ -2186,17 +2156,11 @@ onChanged: m3Legacy<String>((v) {
                       children: [
                         Text(
                           '${b.governorate} (${b.regionCode})',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: M3FontSize.bodySmallPlus,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                             fontWeight: FontWeight.w700,                             fontSize: M3FontSize.bodySmallPlus,                           )),
                         ),
                         Text(
                           'المندوب: ${b.salesRep}',
-                          style: TextStyle(
-                            fontSize: M3FontSize.labelSmall,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                             fontSize: M3FontSize.labelSmall,                             color: colorScheme.onSurfaceVariant,                           )),
                         ),
                       ],
                     ),
@@ -2223,18 +2187,11 @@ onChanged: m3Legacy<String>((v) {
                       children: [
                         Text(
                           '${CurrencyFormatter.formatNumber(b.targetUnits.round())} كرتونة',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: M3FontSize.labelMediumPlus,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                             fontWeight: FontWeight.w800,                             fontSize: M3FontSize.labelMediumPlus,                           )),
                         ),
                         Text(
                           'شامل المرتجع: ${CurrencyFormatter.formatNumber(b.grossTargetUnits.round())} ك',
-                          style: TextStyle(
-                            fontSize: M3FontSize.tinyPlus,
-                            color: Colors.teal.shade700,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                             fontSize: M3FontSize.tinyPlus,                             color: M3StatusColors.of(context).accents.teal,                             fontWeight: FontWeight.w700,                           )),
                         ),
                       ],
                     ),
@@ -2244,7 +2201,7 @@ onChanged: m3Legacy<String>((v) {
                       '${b.targetWeightTons.toStringAsFixed(2)} طن',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: Colors.indigo.shade700,
+                        color: M3StatusColors.of(context).accents.indigo,
                       ),
                     ),
                   ),
@@ -2255,17 +2212,11 @@ onChanged: m3Legacy<String>((v) {
                       children: [
                         Text(
                           CurrencyFormatter.formatEGP(b.actualRevenueEgp),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: M3FontSize.bodySmallPlus,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                             fontWeight: FontWeight.w800,                             fontSize: M3FontSize.bodySmallPlus,                           )),
                         ),
                         Text(
                           '${CurrencyFormatter.formatNumber(b.actualUnits.round())} كرتونة',
-                          style: TextStyle(
-                            fontSize: M3FontSize.labelSmall,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                             fontSize: M3FontSize.labelSmall,                             color: colorScheme.onSurfaceVariant,                           )),
                         ),
                       ],
                     ),
@@ -2277,22 +2228,11 @@ onChanged: m3Legacy<String>((v) {
                       children: [
                         Text(
                           '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(b.varianceRevenueEgp)}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: M3FontSize.bodySmallPlus,
-                            color: isPositive
-                                ? Colors.green.shade700
-                                : colorScheme.error,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                             fontWeight: FontWeight.w700,                             fontSize: M3FontSize.bodySmallPlus,                             color: isPositive                                 ? M3StatusColors.of(context).accents.positive                                 : colorScheme.error,                           )),
                         ),
                         Text(
                           '${b.varianceUnits >= 0 ? '+' : ''}${CurrencyFormatter.formatNumber(b.varianceUnits.round())} كرتونة',
-                          style: TextStyle(
-                            fontSize: M3FontSize.labelSmall,
-                            color: isPositive
-                                ? Colors.green.shade700
-                                : colorScheme.error,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                             fontSize: M3FontSize.labelSmall,                             color: isPositive                                 ? M3StatusColors.of(context).accents.positive                                 : colorScheme.error,                           )),
                         ),
                       ],
                     ),
@@ -2309,11 +2249,7 @@ onChanged: m3Legacy<String>((v) {
                       ),
                       child: Text(
                         '${b.achievementRevPct.toStringAsFixed(1)}%',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: M3FontSize.bodySmall,
-                          color: badgeColor,
-                        ),
+                        style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                           fontWeight: FontWeight.w800,                           fontSize: M3FontSize.bodySmall,                           color: badgeColor,                         )),
                       ),
                     ),
                   ),
@@ -2487,13 +2423,13 @@ onChanged: m3Legacy<String>((v) {
                     icon: Icons.inventory_2_rounded,
                     label:
                         'إجمالي بضاعة الفرع: ${CurrencyFormatter.formatNumber(branch.targetUnits.round())} كرتونة • ${branch.targetWeightTons.toStringAsFixed(2)} طن',
-                    color: Colors.teal.shade700,
+                    color: M3StatusColors.of(context).accents.teal,
                   ),
                   _buildInfoPill(
                     context,
                     icon: Icons.person_outline_rounded,
                     label: 'المندوب: ${branch.salesRep}',
-                    color: Colors.indigo.shade700,
+                    color: M3StatusColors.of(context).accents.indigo,
                   ),
                   FilledButton.tonalIcon(
                     onPressed: () => _exportBranchSkusExcel(target, branch),
@@ -2739,7 +2675,7 @@ onChanged: m3Legacy<String>((v) {
         ),
         Text(
           'إجمالي الأصناف المطابقة: $matchedCount صنف',
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmallPlus),
+          style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmallPlus)),
         ),
       ],
     );
@@ -2840,8 +2776,8 @@ onChanged: m3Legacy<String>((v) {
           final stockColor = s.stockStatus == 'urgent_replenishment'
               ? colorScheme.error
               : (s.stockStatus == 'overstock'
-                  ? Colors.orange.shade800
-                  : Colors.green.shade700);
+                  ? M3StatusColors.of(context).accents.caution
+                  : M3StatusColors.of(context).accents.positive);
           final packUnits = s.unitsPerCarton > 0 ? s.unitsPerCarton : 12;
           final targetPieces = s.targetPieces > 0
               ? s.targetPieces
@@ -2874,10 +2810,7 @@ onChanged: m3Legacy<String>((v) {
                               Flexible(
                                 child: Text(
                                   s.skuName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: M3FontSize.bodySmallPlus,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                     fontWeight: FontWeight.w800,                                     fontSize: M3FontSize.bodySmallPlus,                                   )),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -2893,22 +2826,14 @@ onChanged: m3Legacy<String>((v) {
                           if (s.itemCode.isNotEmpty || s.barcode.isNotEmpty)
                             Text(
                               'كود: ${s.itemCode.isNotEmpty ? s.itemCode : "-"} • باركود: ${s.barcode.isNotEmpty ? s.barcode : "-"} • شد $packUnits',
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: M3FontSize.tinyPlus,
-                                fontWeight: FontWeight.w700,
-                                color: colorScheme.primary,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontFamily: 'monospace',                                 fontSize: M3FontSize.tinyPlus,                                 fontWeight: FontWeight.w700,                                 color: colorScheme.primary,                               )),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             )
                           else if (s.subCategory.isNotEmpty)
                             Text(
                               '${s.subCategory} • شد $packUnits',
-                              style: TextStyle(
-                                fontSize: M3FontSize.labelSmall,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontSize: M3FontSize.labelSmall,                                 color: colorScheme.onSurfaceVariant,                               )),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -2933,10 +2858,7 @@ onChanged: m3Legacy<String>((v) {
                     if (s.departmentAr.isNotEmpty)
                       Text(
                         s.departmentAr,
-                        style: TextStyle(
-                          fontSize: M3FontSize.tinyPlus,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                        style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                           fontSize: M3FontSize.tinyPlus,                           color: colorScheme.onSurfaceVariant,                         )),
                       ),
                   ],
                 ),
@@ -2954,10 +2876,7 @@ onChanged: m3Legacy<String>((v) {
                     if (s.officialCartonExclVatEgp > 0)
                       Text(
                         'كارتة: ${CurrencyFormatter.formatEGP(s.officialCartonExclVatEgp)}',
-                        style: TextStyle(
-                          fontSize: M3FontSize.tinyPlus,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                        style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                           fontSize: M3FontSize.tinyPlus,                           color: colorScheme.onSurfaceVariant,                         )),
                       ),
                   ],
                 ),
@@ -2978,19 +2897,11 @@ onChanged: m3Legacy<String>((v) {
                     children: [
                       Text(
                         '${CurrencyFormatter.formatNumber(s.targetUnits.round())} كرتونة',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          color: colorScheme.primary,
-                          fontSize: M3FontSize.labelMediumPlus,
-                        ),
+                        style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                           fontWeight: FontWeight.w900,                           color: colorScheme.primary,                           fontSize: M3FontSize.labelMediumPlus,                         )),
                       ),
                       Text(
                         '${CurrencyFormatter.formatNumber(targetPieces)} قطعة (شد $packUnits)',
-                        style: TextStyle(
-                          fontSize: M3FontSize.tinyPlus,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.teal.shade800,
-                        ),
+                        style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                           fontSize: M3FontSize.tinyPlus,                           fontWeight: FontWeight.w700,                           color: M3StatusColors.of(context).accents.tealStrong,                         )),
                       ),
                     ],
                   ),
@@ -3007,7 +2918,7 @@ onChanged: m3Legacy<String>((v) {
                   '${s.targetWeightTons.toStringAsFixed(2)} طن',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: Colors.indigo.shade700,
+                    color: M3StatusColors.of(context).accents.indigo,
                   ),
                 ),
               ),
@@ -3025,10 +2936,7 @@ onChanged: m3Legacy<String>((v) {
                     ),
                     Text(
                       CurrencyFormatter.formatEGP(s.actualRevenueEgp),
-                      style: TextStyle(
-                        fontSize: M3FontSize.labelSmall,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                         fontSize: M3FontSize.labelSmall,                         color: colorScheme.onSurfaceVariant,                       )),
                     ),
                   ],
                 ),
@@ -3044,18 +2952,13 @@ onChanged: m3Legacy<String>((v) {
                         fontWeight: FontWeight.w800,
                         fontSize: M3FontSize.bodySmallPlus,
                         color: isPositive
-                            ? Colors.green.shade700
+                            ? M3StatusColors.of(context).accents.positive
                             : colorScheme.error,
                       ),
                     ),
                     Text(
                       '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(s.varianceRevenueEgp)}',
-                      style: TextStyle(
-                        fontSize: M3FontSize.labelSmall,
-                        color: isPositive
-                            ? Colors.green.shade700
-                            : colorScheme.error,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                         fontSize: M3FontSize.labelSmall,                         color: isPositive                             ? M3StatusColors.of(context).accents.positive                             : colorScheme.error,                       )),
                     ),
                   ],
                 ),
@@ -3072,11 +2975,7 @@ onChanged: m3Legacy<String>((v) {
                   ),
                   child: Text(
                     '${s.stockStatusAr} (${s.remainingStockCases.round()} ك)',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: M3FontSize.labelSmallPlus,
-                      color: stockColor,
-                    ),
+                    style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                       fontWeight: FontWeight.w800,                       fontSize: M3FontSize.labelSmallPlus,                       color: stockColor,                     )),
                   ),
                 ),
               ),
@@ -3099,7 +2998,7 @@ onChanged: m3Legacy<String>((v) {
       children: [
         Text(
           'صفحة ${currentPage + 1} من $totalPages (إجمالي $totalItems صنف)',
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: M3FontSize.bodySmallPlus),
+          style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w700, fontSize: M3FontSize.bodySmallPlus)),
         ),
         Row(
           children: [
@@ -3193,10 +3092,7 @@ onChanged: m3Legacy<String>((v) {
                         ),
                         Text(
                           'مسؤول السلاسل: ${r.kaOfficer}',
-                          style: TextStyle(
-                            fontSize: M3FontSize.labelSmall,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                             fontSize: M3FontSize.labelSmall,                             color: colorScheme.onSurfaceVariant,                           )),
                         ),
                       ],
                     ),
@@ -3422,7 +3318,7 @@ onChanged: m3Legacy<String>((v) {
                       CurrencyFormatter.formatEGP(m.expectedRevenueEgp),
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: Colors.teal.shade700,
+                        color: M3StatusColors.of(context).accents.teal,
                       ),
                     ),
                   ),
@@ -3432,7 +3328,7 @@ onChanged: m3Legacy<String>((v) {
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         color: isPositive
-                            ? Colors.green.shade700
+                            ? M3StatusColors.of(context).accents.positive
                             : colorScheme.error,
                       ),
                     ),

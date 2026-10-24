@@ -20,6 +20,7 @@ class M3StatusColors extends ThemeExtension<M3StatusColors> {
     required this.infoContainer,
     required this.onInfoContainer,
     required this.chartPalette,
+    this.accents = M3AccentRoles.light,
   });
 
   final Color success;
@@ -37,6 +38,9 @@ class M3StatusColors extends ThemeExtension<M3StatusColors> {
 
   /// Ordered categorical palette for charts (series 0..n).
   final List<Color> chartPalette;
+
+  /// Dashboard accent roles (see [M3AccentRoles]).
+  final M3AccentRoles accents;
 
   /// Fixed categorical colours for retailer chains (identity colours that
   /// must stay stable across light/dark and tenants).
@@ -131,6 +135,7 @@ class M3StatusColors extends ThemeExtension<M3StatusColors> {
     Color? infoContainer,
     Color? onInfoContainer,
     List<Color>? chartPalette,
+    M3AccentRoles? accents,
   }) {
     return M3StatusColors(
       success: success ?? this.success,
@@ -146,6 +151,7 @@ class M3StatusColors extends ThemeExtension<M3StatusColors> {
       infoContainer: infoContainer ?? this.infoContainer,
       onInfoContainer: onInfoContainer ?? this.onInfoContainer,
       chartPalette: chartPalette ?? this.chartPalette,
+      accents: accents ?? this.accents,
     );
   }
 
@@ -171,6 +177,62 @@ class M3StatusColors extends ThemeExtension<M3StatusColors> {
           l(chartPalette[i],
               other.chartPalette[i % other.chartPalette.length]),
       ],
+      accents: accents.lerp(other.accents, t),
+    );
+  }
+}
+
+/// Dashboard accent roles (Sell-In / Sell-Out / Targets). Light values are
+/// identical to the Material swatches the screens used before
+/// (e.g. [positive] == Colors.green.shade700), so the look is unchanged.
+@immutable
+class M3AccentRoles {
+  const M3AccentRoles({this.positive = const Color(0xFF388E3C), this.positiveStrong = const Color(0xFF2E7D32), this.teal = const Color(0xFF00796B), this.tealStrong = const Color(0xFF00695C), this.tealDeep = const Color(0xFF004D40), this.tealSurface = const Color(0xFFE0F2F1), this.indigo = const Color(0xFF303F9F), this.caution = const Color(0xFFEF6C00), this.cautionStrong = const Color(0xFFE65100), this.cautionSurface = const Color(0xFFFFE0B2), this.alert = const Color(0xFFE64A19), this.alertStrong = const Color(0xFFD84315), this.highlight = const Color(0xFFFF6F00), this.highlightBorder = const Color(0xFFFFA000), this.highlightSurface = const Color(0xFFFFECB3), this.purple = const Color(0xFF7B1FA2), this.purpleStrong = const Color(0xFF6A1B9A), this.negative = const Color(0xFFD32F2F), this.neutral = const Color(0xFF455A64)});
+
+  final Color positive;
+  final Color positiveStrong;
+  final Color teal;
+  final Color tealStrong;
+  final Color tealDeep;
+  final Color tealSurface;
+  final Color indigo;
+  final Color caution;
+  final Color cautionStrong;
+  final Color cautionSurface;
+  final Color alert;
+  final Color alertStrong;
+  final Color highlight;
+  final Color highlightBorder;
+  final Color highlightSurface;
+  final Color purple;
+  final Color purpleStrong;
+  final Color negative;
+  final Color neutral;
+
+  static const M3AccentRoles light = M3AccentRoles();
+
+  M3AccentRoles lerp(M3AccentRoles o, double t) {
+    Color l(Color a, Color b) => Color.lerp(a, b, t)!;
+    return M3AccentRoles(
+      positive: l(positive, o.positive),
+      positiveStrong: l(positiveStrong, o.positiveStrong),
+      teal: l(teal, o.teal),
+      tealStrong: l(tealStrong, o.tealStrong),
+      tealDeep: l(tealDeep, o.tealDeep),
+      tealSurface: l(tealSurface, o.tealSurface),
+      indigo: l(indigo, o.indigo),
+      caution: l(caution, o.caution),
+      cautionStrong: l(cautionStrong, o.cautionStrong),
+      cautionSurface: l(cautionSurface, o.cautionSurface),
+      alert: l(alert, o.alert),
+      alertStrong: l(alertStrong, o.alertStrong),
+      highlight: l(highlight, o.highlight),
+      highlightBorder: l(highlightBorder, o.highlightBorder),
+      highlightSurface: l(highlightSurface, o.highlightSurface),
+      purple: l(purple, o.purple),
+      purpleStrong: l(purpleStrong, o.purpleStrong),
+      negative: l(negative, o.negative),
+      neutral: l(neutral, o.neutral),
     );
   }
 }
