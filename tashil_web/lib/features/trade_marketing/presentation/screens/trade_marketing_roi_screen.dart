@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
@@ -415,8 +416,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
             return Directionality(
               textDirection: TextDirection.rtl,
               child: AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24.0),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: M3Shape.radiusXl,
                 ),
                 title: Row(
                   children: [
@@ -424,7 +425,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                       padding: const EdgeInsets.all(10.0),
                       decoration: BoxDecoration(
                         color: colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(12.0),
+                        borderRadius: M3Shape.radiusMd,
                       ),
                       child: Icon(
                         existing == null ? Icons.add_chart_rounded : Icons.edit_note_rounded,
@@ -575,7 +576,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                                 decoration: const InputDecoration(
                                   labelText: 'قيمة المصروف بالجنيه (Amount in EGP) *',
                                   hintText: 'مثال: 100000',
-                                  prefixIcon: Icon(Icons.payments_outlined),
+                                  prefixIcon: Icon(Icons.payments_rounded),
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -589,7 +590,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                                 decoration: const InputDecoration(
                                   labelText: 'البراند المستهدف (Brand)',
                                   hintText: 'مثال: Diva / Maxell',
-                                  prefixIcon: Icon(Icons.loyalty_outlined),
+                                  prefixIcon: Icon(Icons.loyalty_rounded),
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -605,7 +606,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                           decoration: const InputDecoration(
                             labelText: 'وصف النشاط الترويجي أو الحملة (Campaign / Activity Title) *',
                             hintText: 'مثال: تأجير فلورات عرض رئيسية + إيفنت تذوق وهدايا مجانية',
-                            prefixIcon: Icon(Icons.campaign_outlined),
+                            prefixIcon: Icon(Icons.campaign_rounded),
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
@@ -618,7 +619,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                           decoration: const InputDecoration(
                             labelText: 'شركة الدعاية أو جهة التعاقد (Agency / Retailer Contract)',
                             hintText: 'مثال: إدارة التعاقدات بالسلسلة / شركة دعاية وإيفنتات',
-                            prefixIcon: Icon(Icons.business_outlined),
+                            prefixIcon: Icon(Icons.business_rounded),
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
@@ -750,14 +751,14 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
             return Directionality(
               textDirection: TextDirection.rtl,
               child: AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.0)),
+                shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusXl),
                 title: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(10.0),
                       decoration: BoxDecoration(
                         color: colorScheme.tertiaryContainer,
-                        borderRadius: BorderRadius.circular(12.0),
+                        borderRadius: M3Shape.radiusMd,
                       ),
                       child: Icon(
                         Icons.auto_graph_rounded,
@@ -837,7 +838,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
                           labelText: 'الميزانية التسويقية المقترحة للشهر (Proposed Budget in EGP)',
-                          prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                          prefixIcon: Icon(Icons.account_balance_wallet_rounded),
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
@@ -853,7 +854,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                         padding: const EdgeInsets.all(16.0),
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHighest.withOpacity(0.45),
-                          borderRadius: BorderRadius.circular(16.0),
+                          borderRadius: M3Shape.radiusLg,
                           border: Border.all(color: colorScheme.outlineVariant),
                         ),
                         child: Column(
@@ -950,14 +951,14 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.0)),
+            shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusXl),
             title: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10.0),
                   decoration: BoxDecoration(
                     color: summary.verdictColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12.0),
+                    borderRadius: M3Shape.radiusMd,
                   ),
                   child: Icon(Icons.insights_rounded, color: summary.verdictColor),
                 ),
@@ -1026,7 +1027,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                       padding: const EdgeInsets.all(14.0),
                       decoration: BoxDecoration(
                         color: summary.verdictColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(14.0),
+                        borderRadius: M3Shape.radiusMd,
                         border: Border.all(color: summary.verdictColor.withOpacity(0.4)),
                       ),
                       child: Row(
@@ -1058,7 +1059,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                         elevation: 0,
                         color: colorScheme.surfaceContainerHighest.withOpacity(0.35),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.0),
+                          borderRadius: M3Shape.radiusMd,
                           side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
                         ),
                         child: ListTile(
@@ -1113,7 +1114,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
       padding: const EdgeInsets.all(14.0),
       decoration: BoxDecoration(
         color: color.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(14.0),
+        borderRadius: M3Shape.radiusMd,
         border: Border.all(color: color.withOpacity(0.25)),
       ),
       child: Column(
@@ -1327,13 +1328,13 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
           items: const [
             M3ResponsiveTabItem<int>(
               value: 0,
-              icon: Icons.trending_up_outlined,
+              icon: Icons.trending_up_rounded,
               selectedIcon: Icons.trending_up_rounded,
               label: 'ROI & Growth Matrix',
             ),
             M3ResponsiveTabItem<int>(
               value: 1,
-              icon: Icons.receipt_long_outlined,
+              icon: Icons.receipt_long_rounded,
               selectedIcon: Icons.receipt_long_rounded,
               label: 'Campaigns & Expense Ledger',
             ),
@@ -1466,18 +1467,11 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
       padding: const EdgeInsets.all(18.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(
           color: accentColor.withOpacity(0.28),
           width: 1.2,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: accentColor.withOpacity(0.05),
-            blurRadius: 12.0,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1490,7 +1484,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                 padding: const EdgeInsets.all(10.0),
                 decoration: BoxDecoration(
                   color: accentColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(14.0),
+                  borderRadius: M3Shape.radiusMd,
                 ),
                 child: Icon(icon, color: accentColor, size: 22.0),
               ),
@@ -1553,7 +1547,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
                 decoration: BoxDecoration(
                   color: accentColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(999.0),
+                  borderRadius: M3Shape.radiusFull,
                 ),
                 child: Text(
                   badgeText,
@@ -1576,7 +1570,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
       ),
       child: Column(
@@ -1602,12 +1596,12 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                       child: DropdownButtonFormField<String>(
                         value: _selectedChain,
                         isExpanded: true,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           labelText: 'Retail Chain',
-                          prefixIcon: const Icon(Icons.storefront_outlined, size: 18.0),
+                          prefixIcon: Icon(Icons.storefront_rounded, size: 18.0),
                           isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+                          border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                         ),
                         items: [
                           const DropdownMenuItem(value: 'all', child: Text('All Chains')),
@@ -1626,12 +1620,12 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                       child: DropdownButtonFormField<int>(
                         value: _selectedMonth,
                         isExpanded: true,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           labelText: 'Month',
-                          prefixIcon: const Icon(Icons.event_note_outlined, size: 18.0),
+                          prefixIcon: Icon(Icons.event_note_rounded, size: 18.0),
                           isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+                          border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                         ),
                         items: [
                           const DropdownMenuItem(value: 0, child: Text('All Months')),
@@ -1654,12 +1648,12 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                       child: DropdownButtonFormField<int>(
                         value: _selectedYear,
                         isExpanded: true,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           labelText: 'Year',
-                          prefixIcon: const Icon(Icons.calendar_today_outlined, size: 17.0),
+                          prefixIcon: Icon(Icons.calendar_today_rounded, size: 17.0),
                           isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+                          border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                         ),
                         items: const [
                           DropdownMenuItem(value: 0, child: Text('All Years')),
@@ -1677,12 +1671,12 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                       child: DropdownButtonFormField<String>(
                         value: _selectedCategoryId,
                         isExpanded: true,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           labelText: 'Activity Type',
-                          prefixIcon: const Icon(Icons.category_outlined, size: 18.0),
+                          prefixIcon: Icon(Icons.category_rounded, size: 18.0),
                           isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+                          border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                         ),
                         items: [
                           const DropdownMenuItem(value: 'all', child: Text('All Activity Types')),
@@ -1703,12 +1697,12 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                       width: 220.0,
                       child: TextField(
                         onChanged: (val) => setState(() => _searchQuery = val),
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           hintText: 'Search campaign, brand...',
-                          prefixIcon: const Icon(Icons.search_rounded, size: 18.0),
+                          prefixIcon: Icon(Icons.search_rounded, size: 18.0),
                           isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 11.0),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 11.0),
+                          border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                         ),
                       ),
                     ),
@@ -1812,7 +1806,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                         ),
                       ),
                       onPressed: _printPdfReport,
-                      icon: const Icon(Icons.picture_as_pdf_outlined, size: 20.0),
+                      icon: const Icon(Icons.picture_as_pdf_rounded, size: 20.0),
                       label: const Text('Print PDF'),
                     ),
                   ],
@@ -1834,7 +1828,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
       ),
       padding: const EdgeInsets.all(20.0),
@@ -1864,7 +1858,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer.withOpacity(0.6),
-                  borderRadius: BorderRadius.circular(999.0),
+                  borderRadius: M3Shape.radiusFull,
                 ),
                 child: Text(
                   '${summaries.length} حملات شهرية مجمعة',
@@ -2034,7 +2028,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                               decoration: BoxDecoration(
                                 color: (momPositive ? const Color(0xFF15803D) : const Color(0xFFDC2626))
                                     .withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(999.0),
+                                borderRadius: M3Shape.radiusFull,
                               ),
                               child: Text(
                                 '${momPositive ? '+' : ''}${s.momGrowthPct.toStringAsFixed(1)}% MoM',
@@ -2067,7 +2061,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                               decoration: BoxDecoration(
                                 color: (yoyPositive ? const Color(0xFF0284C7) : const Color(0xFFDC2626))
                                     .withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(999.0),
+                                borderRadius: M3Shape.radiusFull,
                               ),
                               child: Text(
                                 '${yoyPositive ? '+' : ''}${s.yoyGrowthPct.toStringAsFixed(1)}% YoY',
@@ -2115,7 +2109,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
                           decoration: BoxDecoration(
                             color: s.verdictColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(999.0),
+                            borderRadius: M3Shape.radiusFull,
                             border: Border.all(color: s.verdictColor.withOpacity(0.35)),
                           ),
                           child: Text(
@@ -2131,7 +2125,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                       DataCell(
                         IconButton(
                           tooltip: 'عرض تفاصيل الحملة والأثر البيعي',
-                          icon: Icon(Icons.visibility_outlined, color: colorScheme.primary),
+                          icon: Icon(Icons.visibility_rounded, color: colorScheme.primary),
                           onPressed: () => _openCampaignDrillDownModal(s),
                         ),
                       ),
@@ -2154,7 +2148,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
       ),
       padding: const EdgeInsets.all(20.0),
@@ -2243,7 +2237,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                         decoration: BoxDecoration(
                           color: item.category.color.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(999.0),
+                          borderRadius: M3Shape.radiusFull,
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -2267,7 +2261,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
                         decoration: BoxDecoration(
                           color: colorScheme.secondaryContainer,
-                          borderRadius: BorderRadius.circular(8.0),
+                          borderRadius: M3Shape.radiusSm,
                         ),
                         child: Text(
                           item.brandName,
@@ -2325,7 +2319,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                         children: [
                           IconButton(
                             tooltip: 'Edit / تعديل',
-                            icon: const Icon(Icons.edit_outlined, size: 19.0),
+                            icon: const Icon(Icons.edit_rounded, size: 19.0),
                             onPressed: () => _openAddOrEditExpenseDialog(existing: item),
                           ),
                           IconButton(
@@ -2379,7 +2373,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
           padding: const EdgeInsets.all(20.0),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(20.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
           ),
           child: Column(
@@ -2408,7 +2402,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                     padding: const EdgeInsets.all(16.0),
                     decoration: BoxDecoration(
                       color: cat.color.withOpacity(0.06),
-                      borderRadius: BorderRadius.circular(16.0),
+                      borderRadius: M3Shape.radiusLg,
                       border: Border.all(color: cat.color.withOpacity(0.28)),
                     ),
                     child: Column(
@@ -2420,7 +2414,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                               padding: const EdgeInsets.all(8.0),
                               decoration: BoxDecoration(
                                 color: cat.color.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(10.0),
+                                borderRadius: M3Shape.radiusSm,
                               ),
                               child: Icon(cat.icon, color: cat.color, size: 20.0),
                             ),
@@ -2471,7 +2465,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                         ),
                         const SizedBox(height: 8.0),
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(999.0),
+                          borderRadius: M3Shape.radiusFull,
                           child: LinearProgressIndicator(
                             value: (sharePct / 100.0).clamp(0.0, 1.0),
                             minHeight: 7.0,

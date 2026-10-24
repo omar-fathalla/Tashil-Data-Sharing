@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/m3_dropdown.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
@@ -30,7 +32,8 @@ class CPFRDashboardScreen extends StatefulWidget {
 }
 
 class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
-  int _activeTab = 0; // 0: Reconciliation, 1: Stock & PO, 2: Forecast & Promos, 3: Sales Team
+  int _activeTab =
+      0; // 0: Reconciliation, 1: Stock & PO, 2: Forecast & Promos, 3: Sales Team
   bool _isLoading = true;
   bool _isReloadingWorkbook = false;
   bool _isUploadingSellIn = false;
@@ -41,16 +44,19 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
   // Dynamic Company Retail Chains
   List<RetailChainModel> _companyChains = const [];
   String _selectedChain = 'all'; // all or specific chain code
-  String _uploadTargetChain = 'fathalla'; // target chain when uploading a Sell-In file
+  String _uploadTargetChain =
+      'fathalla'; // target chain when uploading a Sell-In file
   String? _lastUploadedSellInFilename;
 
   // Horizontal ScrollController for Monthly Reconciliation Table
-  final ScrollController _reconciliationTableScrollController = ScrollController();
+  final ScrollController _reconciliationTableScrollController =
+      ScrollController();
 
   // Interactive Filters & Replenishment Parameters
   String _selectedSector = 'all'; // all, MT, CC
   String _selectedRegion = 'all'; // all, ALX, CIR, TNT, BHR, MNS
-  String _selectedStockStatus = 'all'; // all, urgent_replenishment, optimal, overstock
+  String _selectedStockStatus =
+      'all'; // all, urgent_replenishment, optimal, overstock
   int _leadTimeDays = 4;
   int _safetyStockDays = 7;
 
@@ -488,8 +494,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                 _buildGuideSectionCard(
                   theme: theme,
                   colorScheme: colorScheme,
-                  icon: Icons.local_shipping_outlined,
-                  title: '1. ملف التوريد والتنبؤ (Sell-In File) — يُرفع مباشرة هنا في صفحة CPFR',
+                  icon: Icons.local_shipping_rounded,
+                  title:
+                      '1. ملف التوريد والتنبؤ (Sell-In File) — يُرفع مباشرة هنا في صفحة CPFR',
                   items: const [
                     '• الفترة والسلسلة: السنة (Year)، الشهر (Month)، حالة الفترة (Full Month أو W1/W2)، واسم سلسلة التجزئة (Retail_Chain).',
                     '• التوزيع الجغرافي: كود الإقليم (Region_Code)، المحافظة (Governorate)، واسم الفرع أو المخزن (Branch_Name).',
@@ -503,7 +510,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                   theme: theme,
                   colorScheme: colorScheme,
                   icon: Icons.point_of_sale_rounded,
-                  title: '2. ملف المبيعات الفعلية للكاشير (Sell-Out File) — يُرفع في صفحة Upload لكل سلسلة',
+                  title:
+                      '2. ملف المبيعات الفعلية للكاشير (Sell-Out File) — يُرفع في صفحة Upload لكل سلسلة',
                   items: const [
                     '• اسم السلسلة والفرع (Branch Name) وتاريخ/شهر المبيعات.',
                     '• كود أو باركود الصنف (Barcode) واسم الصنف (SKU Name) والفئة.',
@@ -514,7 +522,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                 _buildGuideSectionCard(
                   theme: theme,
                   colorScheme: colorScheme,
-                  icon: Icons.calculate_outlined,
+                  icon: Icons.calculate_rounded,
                   title: '3. المعادلات والمؤشرات التي يحسبها النظام تلقائياً',
                   items: const [
                     '• معدل دوران المخزون (Sell-Through Rate %): (مبيعات الكاشير Sell-Out ÷ صافي التوريد Sell-In) × 100.',
@@ -565,7 +573,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
       padding: const EdgeInsets.all(14.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withOpacity(0.45),
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: M3Shape.radiusMd,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Column(
@@ -704,10 +712,14 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             else if (_data != null) ...[
               _buildTabSelector(theme, colorScheme),
               const SizedBox(height: M3Spacing.lg),
-              if (_activeTab == 0) _buildReconciliationTab(theme, colorScheme, _data!),
-              if (_activeTab == 1) _buildInventoryAndPOTab(theme, colorScheme, _data!),
-              if (_activeTab == 2) _buildForecastAndPromosTab(theme, colorScheme, _data!),
-              if (_activeTab == 3) _buildSalesRepsTab(theme, colorScheme, _data!),
+              if (_activeTab == 0)
+                _buildReconciliationTab(theme, colorScheme, _data!),
+              if (_activeTab == 1)
+                _buildInventoryAndPOTab(theme, colorScheme, _data!),
+              if (_activeTab == 2)
+                _buildForecastAndPromosTab(theme, colorScheme, _data!),
+              if (_activeTab == 3)
+                _buildSalesRepsTab(theme, colorScheme, _data!),
             ],
           ],
         ),
@@ -724,7 +736,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
         actions: [
           M3ActionItem(
             label: 'نموذج التوريد الإرشادي',
-            icon: Icons.download_for_offline_outlined,
+            icon: Icons.download_for_offline_rounded,
             onPressed: _downloadSellInGuidedDemoTemplate,
           ),
           M3ActionItem(
@@ -765,7 +777,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
       padding: const EdgeInsets.all(M3Spacing.md),
       decoration: BoxDecoration(
         color: colorScheme.primaryContainer.withOpacity(0.22),
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.primary.withOpacity(0.32)),
       ),
       child: Column(
@@ -784,10 +796,10 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                     padding: const EdgeInsets.all(10.0),
                     decoration: BoxDecoration(
                       color: colorScheme.primary.withOpacity(0.14),
-                      borderRadius: BorderRadius.circular(12.0),
+                      borderRadius: M3Shape.radiusMd,
                     ),
                     child: Icon(
-                      Icons.cloud_upload_outlined,
+                      Icons.cloud_upload_rounded,
                       color: colorScheme.primary,
                       size: 22.0,
                     ),
@@ -808,39 +820,25 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   // Target chain selector for Sell-In upload
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10.0,
-                      vertical: 2.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      borderRadius: BorderRadius.circular(20.0),
-                      border: Border.all(
-                        color: colorScheme.outlineVariant.withOpacity(0.6),
-                      ),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _companyChains.any((c) => c.code == _uploadTargetChain)
+                  M3Dropdown<String?>(
+                    value:
+                        _companyChains.any((c) => c.code == _uploadTargetChain)
                             ? _uploadTargetChain
-                            : (_companyChains.isNotEmpty ? _companyChains.first.code : null),
-                        hint: const Text('اختر سلسلة التجزئة'),
-                        isDense: true,
-                        borderRadius: BorderRadius.circular(12),
-                        items: [
-                          for (final chain in _companyChains)
-                            DropdownMenuItem(
-                              value: chain.code,
-                              child: Text(chain.displayName),
-                            ),
-                        ],
-                        onChanged: (val) {
-                          if (val == null) return;
-                          setState(() => _uploadTargetChain = val);
-                        },
-                      ),
-                    ),
+                            : (_companyChains.isNotEmpty
+                                ? _companyChains.first.code
+                                : null),
+                    hint: 'اختر سلسلة التجزئة',
+                    options: m3OptionsFromMenuItems<String?>([
+                      for (final chain in _companyChains)
+                        DropdownMenuItem(
+                          value: chain.code,
+                          child: Text(chain.displayName),
+                        ),
+                    ]),
+                    onChanged: m3Legacy<String?>((val) {
+                      if (val == null) return;
+                      setState(() => _uploadTargetChain = val);
+                    }),
                   ),
                   OutlinedButton.icon(
                     onPressed: _downloadSellInGuidedDemoTemplate,
@@ -854,7 +852,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                   ),
                   TextButton.icon(
                     onPressed: () {
-                      setState(() => _showDataGuideBanner = !_showDataGuideBanner);
+                      setState(
+                          () => _showDataGuideBanner = !_showDataGuideBanner);
                     },
                     icon: Icon(
                       _showDataGuideBanner
@@ -879,8 +878,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                     vertical: 12.0,
                     horizontal: 22.0,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10.0),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: M3Shape.radiusSm,
                   ),
                 ),
                 icon: _isUploadingSellIn
@@ -992,7 +991,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
       decoration: BoxDecoration(
         color: colorScheme.surface.withOpacity(0.85),
-        borderRadius: BorderRadius.circular(10.0),
+        borderRadius: M3Shape.radiusSm,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Column(
@@ -1025,7 +1024,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
       ),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Wrap(
@@ -1037,7 +1036,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.storefront_outlined,
+              Icon(Icons.storefront_rounded,
                   size: 18, color: colorScheme.primary),
               const SizedBox(width: 6),
               Text(
@@ -1047,41 +1046,29 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
               ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withOpacity(0.6),
-              borderRadius: BorderRadius.circular(24.0),
-              border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _companyChains.any((c) => c.code == _selectedChain) ||
-                        _selectedChain == 'all'
-                    ? _selectedChain
-                    : 'all',
-                isDense: true,
-                borderRadius: BorderRadius.circular(12),
-                items: [
-                  DropdownMenuItem(
-                    value: 'all',
-                    child: Text(
-                      'جميع السلاسل (${_companyChains.isNotEmpty ? _companyChains.length : 4})',
-                    ),
-                  ),
-                  for (final chain in _companyChains)
-                    DropdownMenuItem(
-                      value: chain.code,
-                      child: Text(chain.displayName),
-                    ),
-                ],
-                onChanged: (val) {
-                  if (val == null || _selectedChain == val) return;
-                  setState(() => _selectedChain = val);
-                  _loadDashboard();
-                },
+          M3Dropdown<String>(
+            value: _companyChains.any((c) => c.code == _selectedChain) ||
+                    _selectedChain == 'all'
+                ? _selectedChain
+                : 'all',
+            options: m3OptionsFromMenuItems<String>([
+              DropdownMenuItem(
+                value: 'all',
+                child: Text(
+                  'جميع السلاسل (${_companyChains.isNotEmpty ? _companyChains.length : 4})',
+                ),
               ),
-            ),
+              for (final chain in _companyChains)
+                DropdownMenuItem(
+                  value: chain.code,
+                  child: Text(chain.displayName),
+                ),
+            ]),
+            onChanged: m3Legacy<String>((val) {
+              if (val == null || _selectedChain == val) return;
+              setState(() => _selectedChain = val);
+              _loadDashboard();
+            }),
           ),
 
           const SizedBox(width: M3Spacing.sm),
@@ -1090,7 +1077,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.filter_alt_outlined,
+              Icon(Icons.filter_alt_rounded,
                   size: 18, color: colorScheme.primary),
               const SizedBox(width: 6),
               Text(
@@ -1106,17 +1093,17 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
               M3SegmentItem(
                 value: 'all',
                 label: 'الكل',
-                icon: Icons.dashboard_customize_outlined,
+                icon: Icons.dashboard_customize_rounded,
               ),
               M3SegmentItem(
                 value: 'MT',
                 label: 'المنظفات والعناية المنزلية',
-                icon: Icons.cleaning_services_outlined,
+                icon: Icons.cleaning_services_rounded,
               ),
               M3SegmentItem(
                 value: 'CC',
                 label: 'العناية المتخصصة',
-                icon: Icons.category_outlined,
+                icon: Icons.category_rounded,
               ),
             ],
             onSelectionChanged: (sector) {
@@ -1135,33 +1122,25 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             style: theme.textTheme.labelLarge
                 ?.copyWith(fontWeight: FontWeight.w700),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withOpacity(0.6),
-              borderRadius: BorderRadius.circular(24.0),
-              border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedRegion,
-                isDense: true,
-                borderRadius: BorderRadius.circular(12),
-                items: const [
-                  DropdownMenuItem(value: 'all', child: Text('جميع الأقاليم')),
-                  DropdownMenuItem(value: 'ALX', child: Text('ALX - الإسكندرية ومطروح')),
-                  DropdownMenuItem(value: 'CIR', child: Text('CIR - القاهرة الكبرى')),
-                  DropdownMenuItem(value: 'TNT', child: Text('TNT - الغربية (طنطا)')),
-                  DropdownMenuItem(value: 'BHR', child: Text('BHR - البحيرة')),
-                  DropdownMenuItem(value: 'MNS', child: Text('MNS - المنصورة والدلتا')),
-                ],
-                onChanged: (val) {
-                  if (val == null) return;
-                  setState(() => _selectedRegion = val);
-                  _loadDashboard();
-                },
-              ),
-            ),
+          M3Dropdown<String>(
+            value: _selectedRegion,
+            options: m3OptionsFromMenuItems<String>([
+              const DropdownMenuItem(value: 'all', child: Text('جميع الأقاليم')),
+              const DropdownMenuItem(
+                  value: 'ALX', child: Text('ALX - الإسكندرية ومطروح')),
+              const DropdownMenuItem(
+                  value: 'CIR', child: Text('CIR - القاهرة الكبرى')),
+              const DropdownMenuItem(
+                  value: 'TNT', child: Text('TNT - الغربية (طنطا)')),
+              const DropdownMenuItem(value: 'BHR', child: Text('BHR - البحيرة')),
+              const DropdownMenuItem(
+                  value: 'MNS', child: Text('MNS - المنصورة والدلتا')),
+            ]),
+            onChanged: m3Legacy<String>((val) {
+              if (val == null) return;
+              setState(() => _selectedRegion = val);
+              _loadDashboard();
+            }),
           ),
         ],
       ),
@@ -1177,7 +1156,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
       ),
       (
         1,
-        Icons.calculate_outlined,
+        Icons.calculate_rounded,
         '2. Suggested PO & Replenishment',
       ),
       (
@@ -1187,7 +1166,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
       ),
       (
         3,
-        Icons.badge_outlined,
+        Icons.badge_rounded,
         '4. أداء فريق المبيعات وهيكل الحسابات',
       ),
     ];
@@ -1195,7 +1174,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= 960;
-        final isTablet = constraints.maxWidth >= 600 && constraints.maxWidth < 960;
+        final isTablet =
+            constraints.maxWidth >= 600 && constraints.maxWidth < 960;
 
         if (isDesktop) {
           return IntrinsicHeight(
@@ -1312,7 +1292,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
     required bool isSelected,
   }) {
     return InkWell(
-      borderRadius: BorderRadius.circular(12.0),
+      borderRadius: M3Shape.radiusMd,
       onTap: () => setState(() => _activeTab = tabIndex),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -1322,7 +1302,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
           color: isSelected
               ? colorScheme.primary
               : colorScheme.surfaceContainerHighest.withOpacity(0.55),
-          borderRadius: BorderRadius.circular(12.0),
+          borderRadius: M3Shape.radiusMd,
           border: Border.all(
             color: isSelected
                 ? colorScheme.primary
@@ -1430,8 +1410,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             title: 'إجمالي التوريد للسلاسل',
             titleEn: 'Sell-In',
             value: CurrencyFormatter.formatCompactEGP(d.jan2026SellInEgp),
-            subtitle: 'القيمة الدقيقة: ${CurrencyFormatter.formatEGP(d.jan2026SellInEgp)}',
-            icon: Icons.local_shipping_outlined,
+            subtitle:
+                'القيمة الدقيقة: ${CurrencyFormatter.formatEGP(d.jan2026SellInEgp)}',
+            icon: Icons.local_shipping_rounded,
             accentColor: colorScheme.primary,
           ),
           _buildKpiCard(
@@ -1440,7 +1421,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             title: 'مبيعات الكاشير الفعلية',
             titleEn: 'Sell-Out',
             value: CurrencyFormatter.formatCompactEGP(d.jan2026SellOutEgp),
-            subtitle: 'القيمة الدقيقة: ${CurrencyFormatter.formatEGP(d.jan2026SellOutEgp)}',
+            subtitle:
+                'القيمة الدقيقة: ${CurrencyFormatter.formatEGP(d.jan2026SellOutEgp)}',
             icon: Icons.point_of_sale_rounded,
             accentColor: colorScheme.secondary,
           ),
@@ -1450,7 +1432,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             title: 'معدل دوران المخزون',
             titleEn: 'Sell-Through Rate',
             value: '${d.jan2026SellThroughPct.toStringAsFixed(1)}%',
-            subtitle: 'نسبة تصريف المبيعات الفعلية مقابل التوريد (المعيار القياسي 85%)',
+            subtitle:
+                'نسبة تصريف المبيعات الفعلية مقابل التوريد (المعيار القياسي 85%)',
             icon: Icons.autorenew_rounded,
             accentColor: colorScheme.primary,
           ),
@@ -1460,8 +1443,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             title: 'الفجوة المخزنية والرصيد المرحّل',
             titleEn: 'Inventory Gap',
             value: CurrencyFormatter.formatCompactEGP(d.jan2026GapEgp),
-            subtitle: 'فرق التوريد عن البيع (${CurrencyFormatter.formatEGP(d.jan2026GapEgp)})',
-            icon: Icons.warehouse_outlined,
+            subtitle:
+                'فرق التوريد عن البيع (${CurrencyFormatter.formatEGP(d.jan2026GapEgp)})',
+            icon: Icons.warehouse_rounded,
             accentColor: colorScheme.tertiary,
           ),
         ]),
@@ -1472,8 +1456,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
           padding: const EdgeInsets.all(M3Spacing.md),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16.0),
-            border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+            borderRadius: M3Shape.radiusLg,
+            border:
+                Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
           ),
           child: Wrap(
             spacing: M3Spacing.xl,
@@ -1515,8 +1500,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
           elevation: 0,
           color: colorScheme.surfaceContainerLow,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16.0),
-            side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+            borderRadius: M3Shape.radiusLg,
+            side:
+                BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(M3Spacing.lg),
@@ -1552,13 +1538,18 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                         Tooltip(
                           message: 'تمرير الجدول لليمين',
                           child: IconButton.outlined(
-                            icon: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                            icon: const Icon(Icons.arrow_forward_ios_rounded,
+                                size: 14),
                             onPressed: () {
-                              if (_reconciliationTableScrollController.hasClients) {
+                              if (_reconciliationTableScrollController
+                                  .hasClients) {
                                 _reconciliationTableScrollController.animateTo(
-                                  (_reconciliationTableScrollController.offset - 300).clamp(
+                                  (_reconciliationTableScrollController.offset -
+                                          300)
+                                      .clamp(
                                     0.0,
-                                    _reconciliationTableScrollController.position.maxScrollExtent,
+                                    _reconciliationTableScrollController
+                                        .position.maxScrollExtent,
                                   ),
                                   duration: const Duration(milliseconds: 300),
                                   curve: Curves.easeInOut,
@@ -1571,13 +1562,18 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                         Tooltip(
                           message: 'تمرير الجدول لليسار',
                           child: IconButton.outlined(
-                            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14),
+                            icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                                size: 14),
                             onPressed: () {
-                              if (_reconciliationTableScrollController.hasClients) {
+                              if (_reconciliationTableScrollController
+                                  .hasClients) {
                                 _reconciliationTableScrollController.animateTo(
-                                  (_reconciliationTableScrollController.offset + 300).clamp(
+                                  (_reconciliationTableScrollController.offset +
+                                          300)
+                                      .clamp(
                                     0.0,
-                                    _reconciliationTableScrollController.position.maxScrollExtent,
+                                    _reconciliationTableScrollController
+                                        .position.maxScrollExtent,
                                   ),
                                   duration: const Duration(milliseconds: 300),
                                   curve: Curves.easeInOut,
@@ -1607,36 +1603,55 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                         columns: const [
                           DataColumn(label: Text('الشهر')),
                           DataColumn(label: Text('حالة الفترة')),
-                          DataColumn(label: Text('الأصناف النشطة'), numeric: true),
-                          DataColumn(label: Text('رصيد أول الشهر'), numeric: true),
-                          DataColumn(label: Text('التوريد (كرتونة)'), numeric: true),
-                          DataColumn(label: Text('قيمة التوريد (Sell-In)'), numeric: true),
-                          DataColumn(label: Text('مبيعات الكاشير (Sell-Out)'), numeric: true),
-                          DataColumn(label: Text('صافي حركة الشهر'), numeric: true),
-                          DataColumn(label: Text('الرصيد المتبقي آخر الشهر'), numeric: true),
-                          DataColumn(label: Text('معدل الدوران (STR %)'), numeric: true),
+                          DataColumn(
+                              label: Text('الأصناف النشطة'), numeric: true),
+                          DataColumn(
+                              label: Text('رصيد أول الشهر'), numeric: true),
+                          DataColumn(
+                              label: Text('التوريد (كرتونة)'), numeric: true),
+                          DataColumn(
+                              label: Text('قيمة التوريد (Sell-In)'),
+                              numeric: true),
+                          DataColumn(
+                              label: Text('مبيعات الكاشير (Sell-Out)'),
+                              numeric: true),
+                          DataColumn(
+                              label: Text('صافي حركة الشهر'), numeric: true),
+                          DataColumn(
+                              label: Text('الرصيد المتبقي آخر الشهر'),
+                              numeric: true),
+                          DataColumn(
+                              label: Text('معدل الدوران (STR %)'),
+                              numeric: true),
                           DataColumn(label: Text('الوزن (طن)'), numeric: true),
-                          DataColumn(label: Text('المتوقع بنهاية الشهر (EXP)'), numeric: true),
+                          DataColumn(
+                              label: Text('المتوقع بنهاية الشهر (EXP)'),
+                              numeric: true),
                         ],
                         rows: d.monthlyReconciliation.map((m) {
                           final isJan = m.monthNum == 1;
                           final isOct = m.monthNum == 10;
                           return DataRow(
                             color: isJan
-                                ? WidgetStateProperty.all(
-                                    colorScheme.primaryContainer.withOpacity(0.22))
+                                ? WidgetStateProperty.all(colorScheme
+                                    .primaryContainer
+                                    .withOpacity(0.22))
                                 : (isOct
-                                    ? WidgetStateProperty.all(
-                                        colorScheme.tertiaryContainer.withOpacity(0.22))
+                                    ? WidgetStateProperty.all(colorScheme
+                                        .tertiaryContainer
+                                        .withOpacity(0.22))
                                     : null),
                             cells: [
                               DataCell(Text(
                                 '${m.monthNum} - ${m.monthAr} (${m.monthEn}) ${m.year}',
-                                style: const TextStyle(fontWeight: FontWeight.w700),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700),
                               )),
                               DataCell(_buildBadge(
                                 m.periodStatus,
-                                isOct ? colorScheme.tertiary : colorScheme.secondary,
+                                isOct
+                                    ? colorScheme.tertiary
+                                    : colorScheme.secondary,
                               )),
                               DataCell(Text('${m.activeSkusCount}')),
                               DataCell(Text(
@@ -1649,7 +1664,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                               DataCell(Text(m.sellInCases.toStringAsFixed(1))),
                               DataCell(Text(
                                 CurrencyFormatter.formatEGP(m.sellInValueEgp),
-                                style: const TextStyle(fontWeight: FontWeight.w700),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700),
                               )),
                               DataCell(Text(
                                 CurrencyFormatter.formatEGP(m.sellOutValueEgp),
@@ -1659,7 +1675,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                                 ),
                               )),
                               DataCell(Text(
-                                CurrencyFormatter.formatEGP(m.monthlyNetValueEgp),
+                                CurrencyFormatter.formatEGP(
+                                    m.monthlyNetValueEgp),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   color: colorScheme.tertiary,
@@ -1671,7 +1688,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      CurrencyFormatter.formatEGP(m.closingStockValueEgp),
+                                      CurrencyFormatter.formatEGP(
+                                          m.closingStockValueEgp),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w800,
                                         color: colorScheme.primary,
@@ -1694,11 +1712,14 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                                     ? colorScheme.primary
                                     : colorScheme.tertiary,
                               )),
-                              DataCell(Text('${m.weightTons.toStringAsFixed(1)} طن')),
+                              DataCell(Text(
+                                  '${m.weightTons.toStringAsFixed(1)} طن')),
                               DataCell(Text(
                                 CurrencyFormatter.formatEGP(m.expectedValueEgp),
                                 style: TextStyle(
-                                  fontWeight: isOct ? FontWeight.w800 : FontWeight.normal,
+                                  fontWeight: isOct
+                                      ? FontWeight.w800
+                                      : FontWeight.normal,
                                   color: isOct ? colorScheme.primary : null,
                                 ),
                               )),
@@ -1733,7 +1754,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
           padding: const EdgeInsets.all(M3Spacing.md),
           decoration: BoxDecoration(
             color: colorScheme.primaryContainer.withOpacity(0.35),
-            borderRadius: BorderRadius.circular(16.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
           ),
           child: Wrap(
@@ -1759,19 +1780,19 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text('مهلة التوريد (Lead Time): '),
-                  DropdownButton<int>(
+                  M3Dropdown<int>(
                     value: _leadTimeDays,
-                    items: const [
-                      DropdownMenuItem(value: 2, child: Text('يومان (2 Days)')),
-                      DropdownMenuItem(value: 4, child: Text('4 أيام (قياسي)')),
-                      DropdownMenuItem(value: 7, child: Text('7 أيام')),
-                      DropdownMenuItem(value: 10, child: Text('10 أيام')),
-                    ],
-                    onChanged: (v) {
+                    options: m3OptionsFromMenuItems<int>([
+                      const DropdownMenuItem(value: 2, child: Text('يومان (2 Days)')),
+                      const DropdownMenuItem(value: 4, child: Text('4 أيام (قياسي)')),
+                      const DropdownMenuItem(value: 7, child: Text('7 أيام')),
+                      const DropdownMenuItem(value: 10, child: Text('10 أيام')),
+                    ]),
+                    onChanged: m3Legacy<int>((v) {
                       if (v == null) return;
                       setState(() => _leadTimeDays = v);
                       _loadDashboard();
-                    },
+                    }),
                   ),
                 ],
               ),
@@ -1779,19 +1800,20 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text('حد الأمان (Safety Stock): '),
-                  DropdownButton<int>(
+                  M3Dropdown<int>(
                     value: _safetyStockDays,
-                    items: const [
-                      DropdownMenuItem(value: 5, child: Text('5 أيام')),
-                      DropdownMenuItem(value: 7, child: Text('7 أيام (موصى به)')),
-                      DropdownMenuItem(value: 10, child: Text('10 أيام')),
-                      DropdownMenuItem(value: 14, child: Text('14 يوماً')),
-                    ],
-                    onChanged: (v) {
+                    options: m3OptionsFromMenuItems<int>([
+                      const DropdownMenuItem(value: 5, child: Text('5 أيام')),
+                      const DropdownMenuItem(
+                          value: 7, child: Text('7 أيام (موصى به)')),
+                      const DropdownMenuItem(value: 10, child: Text('10 أيام')),
+                      const DropdownMenuItem(value: 14, child: Text('14 يوماً')),
+                    ]),
+                    onChanged: m3Legacy<int>((v) {
                       if (v == null) return;
                       setState(() => _safetyStockDays = v);
                       _loadDashboard();
-                    },
+                    }),
                   ),
                 ],
               ),
@@ -1799,22 +1821,25 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text('تصفية الحالة: '),
-                  DropdownButton<String>(
+                  M3Dropdown<String>(
                     value: _selectedStockStatus,
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('جميع الأصناف')),
-                      DropdownMenuItem(
+                    options: m3OptionsFromMenuItems<String>([
+                      const DropdownMenuItem(
+                          value: 'all', child: Text('جميع الأصناف')),
+                      const DropdownMenuItem(
                         value: 'urgent_replenishment',
                         child: Text('خطر نفاد عاجل (يحتاج توريد فوري)'),
                       ),
-                      DropdownMenuItem(value: 'optimal', child: Text('رصيد آمن ومثالي')),
-                      DropdownMenuItem(value: 'overstock', child: Text('تكدس مخزني')),
-                    ],
-                    onChanged: (v) {
+                      const DropdownMenuItem(
+                          value: 'optimal', child: Text('رصيد آمن ومثالي')),
+                      const DropdownMenuItem(
+                          value: 'overstock', child: Text('تكدس مخزني')),
+                    ]),
+                    onChanged: m3Legacy<String>((v) {
                       if (v == null) return;
                       setState(() => _selectedStockStatus = v);
                       _loadDashboard();
-                    },
+                    }),
                   ),
                 ],
               ),
@@ -1829,8 +1854,10 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             theme: theme,
             colorScheme: colorScheme,
             title: 'إجمالي الرصيد التقديري الحالي بالفروع',
-            value: '${CurrencyFormatter.formatUnits(d.totalEstimatedStockCases.round())} كرتونة',
-            subtitle: 'بقيمة تقديرية: ${CurrencyFormatter.formatCompactEGP(d.totalEstimatedStockEgp)}',
+            value:
+                '${CurrencyFormatter.formatUnits(d.totalEstimatedStockCases.round())} كرتونة',
+            subtitle:
+                'بقيمة تقديرية: ${CurrencyFormatter.formatCompactEGP(d.totalEstimatedStockEgp)}',
             icon: Icons.inventory_rounded,
             accentColor: colorScheme.primary,
           ),
@@ -1838,8 +1865,10 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             theme: theme,
             colorScheme: colorScheme,
             title: 'إجمالي أوامر التوريد المقترحة \u200E(Suggested PO)\u200E',
-            value: '${CurrencyFormatter.formatUnits(d.totalSuggestedPoCases)} كرتونة',
-            subtitle: 'بقيمة: ${CurrencyFormatter.formatCompactEGP(d.totalSuggestedPoEgp)} (${d.totalSuggestedPoTons.toStringAsFixed(1)} طن)',
+            value:
+                '${CurrencyFormatter.formatUnits(d.totalSuggestedPoCases)} كرتونة',
+            subtitle:
+                'بقيمة: ${CurrencyFormatter.formatCompactEGP(d.totalSuggestedPoEgp)} (${d.totalSuggestedPoTons.toStringAsFixed(1)} طن)',
             icon: Icons.add_shopping_cart_rounded,
             accentColor: colorScheme.secondary,
           ),
@@ -1849,7 +1878,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             title: 'أصناف تحتاج أمر توريد عاجل',
             value: '${d.urgentReplenishmentCount} صنف/إقليم',
             subtitle: 'رصيدها يغطي أقل من مهلة التوريد + حد الأمان',
-            icon: Icons.notification_important_outlined,
+            icon: Icons.notification_important_rounded,
             accentColor: colorScheme.error,
           ),
           _buildKpiCard(
@@ -1857,7 +1886,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             colorScheme: colorScheme,
             title: 'خيارات تصريف التكدس المخزني \u200E(Overstock)\u200E',
             value: '${d.overstockAlertCount} صنف/إقليم',
-            subtitle: 'تغطيتها تتجاوز 28 يوماً (يوصى بعمل عرض ترويجي لتصريف الرصيد)',
+            subtitle:
+                'تغطيتها تتجاوز 28 يوماً (يوصى بعمل عرض ترويجي لتصريف الرصيد)',
             icon: Icons.hourglass_bottom_rounded,
             accentColor: colorScheme.tertiary,
           ),
@@ -1869,12 +1899,15 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
           elevation: 0,
           color: colorScheme.surfaceContainerLow,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16.0),
-            side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+            borderRadius: M3Shape.radiusLg,
+            side:
+                BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
           ),
           child: Padding(
             padding: EdgeInsets.all(
-              MediaQuery.sizeOf(context).width < 600.0 ? M3Spacing.md : M3Spacing.lg,
+              MediaQuery.sizeOf(context).width < 600.0
+                  ? M3Spacing.md
+                  : M3Spacing.lg,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1925,17 +1958,25 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                       DataColumn(label: Text('العلامة / القطاع')),
                       DataColumn(label: Text('الإقليم')),
                       DataColumn(label: Text('المندوب المسند')),
-                      DataColumn(label: Text('التوريد (كرتونة)'), numeric: true),
-                      DataColumn(label: Text('المبيعات (كرتونة)'), numeric: true),
+                      DataColumn(
+                          label: Text('التوريد (كرتونة)'), numeric: true),
+                      DataColumn(
+                          label: Text('المبيعات (كرتونة)'), numeric: true),
                       DataColumn(label: Text('الرصيد التقديري'), numeric: true),
-                      DataColumn(label: Text('السحب اليومي (ADR)'), numeric: true),
-                      DataColumn(label: Text('أيام التغطية (DOI)'), numeric: true),
+                      DataColumn(
+                          label: Text('السحب اليومي (ADR)'), numeric: true),
+                      DataColumn(
+                          label: Text('أيام التغطية (DOI)'), numeric: true),
                       DataColumn(label: Text('حالة المخزون')),
-                      DataColumn(label: Text('أمر التوريد المقترح (PO)'), numeric: true),
-                      DataColumn(label: Text('قيمة أمر التوريد'), numeric: true),
+                      DataColumn(
+                          label: Text('أمر التوريد المقترح (PO)'),
+                          numeric: true),
+                      DataColumn(
+                          label: Text('قيمة أمر التوريد'), numeric: true),
                     ],
                     rows: d.inventoryAndPoItems.take(60).map((item) {
-                      final isUrgent = item.stockStatus == 'urgent_replenishment';
+                      final isUrgent =
+                          item.stockStatus == 'urgent_replenishment';
                       return DataRow(
                         cells: [
                           DataCell(SizedBox(
@@ -1946,10 +1987,12 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                               children: [
                                 Text(
                                   item.skuName,
-                                  style: const TextStyle(fontWeight: FontWeight.w700),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700),
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                if (item.itemCode.isNotEmpty || item.barcode.isNotEmpty)
+                                if (item.itemCode.isNotEmpty ||
+                                    item.barcode.isNotEmpty)
                                   Text(
                                     '${item.itemCode.isNotEmpty ? item.itemCode : ""}${item.itemCode.isNotEmpty && item.barcode.isNotEmpty ? " • " : ""}${item.barcode}',
                                     style: TextStyle(
@@ -1964,16 +2007,20 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                             ),
                           )),
                           DataCell(Text('${item.brand} (${item.sector})')),
-                          DataCell(Text('${item.governorate} (${item.regionCode})')),
+                          DataCell(
+                              Text('${item.governorate} (${item.regionCode})')),
                           DataCell(Text(item.salesRep)),
                           DataCell(Text(item.sellInCases.toStringAsFixed(1))),
-                          DataCell(Text(item.sellOutEstCases.toStringAsFixed(1))),
+                          DataCell(
+                              Text(item.sellOutEstCases.toStringAsFixed(1))),
                           DataCell(Text(
                             '${item.estimatedStockCases.toStringAsFixed(1)} ك',
                             style: const TextStyle(fontWeight: FontWeight.w800),
                           )),
-                          DataCell(Text('${item.dailyRunRateCases.toStringAsFixed(2)} ك/يوم')),
-                          DataCell(Text('${item.daysOfInventory.toStringAsFixed(1)} يوم')),
+                          DataCell(Text(
+                              '${item.dailyRunRateCases.toStringAsFixed(2)} ك/يوم')),
+                          DataCell(Text(
+                              '${item.daysOfInventory.toStringAsFixed(1)} يوم')),
                           DataCell(_buildBadge(
                             item.stockStatusAr,
                             isUrgent
@@ -1992,7 +2039,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                             ),
                           )),
                           DataCell(Text(
-                            CurrencyFormatter.formatEGP(item.suggestedPoValueEgp),
+                            CurrencyFormatter.formatEGP(
+                                item.suggestedPoValueEgp),
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           )),
                         ],
@@ -2027,7 +2075,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             colorScheme: colorScheme,
             title: 'المسحوبات الفعلية للفترة الحالية \u200E(W1 + W2)\u200E',
             value: CurrencyFormatter.formatCompactEGP(d.octW1W2ActualEgp),
-            subtitle: '${CurrencyFormatter.formatUnits(d.octW1W2ActualCases.round())} كرتونة محققة فعلياً',
+            subtitle:
+                '${CurrencyFormatter.formatUnits(d.octW1W2ActualCases.round())} كرتونة محققة فعلياً',
             icon: Icons.calendar_today_rounded,
             accentColor: colorScheme.primary,
           ),
@@ -2035,8 +2084,10 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             theme: theme,
             colorScheme: colorScheme,
             title: 'محرك التنبؤ بنهاية الشهر \u200E(Projected EXP)\u200E',
-            value: CurrencyFormatter.formatCompactEGP(d.octProjectedMonthEndEgp),
-            subtitle: 'متوقع إغلاق ${CurrencyFormatter.formatUnits(d.octProjectedCases.round())} كرتونة (معادلة Run-Rate)',
+            value:
+                CurrencyFormatter.formatCompactEGP(d.octProjectedMonthEndEgp),
+            subtitle:
+                'متوقع إغلاق ${CurrencyFormatter.formatUnits(d.octProjectedCases.round())} كرتونة (معادلة Run-Rate)',
             icon: Icons.auto_graph_rounded,
             accentColor: colorScheme.tertiary,
           ),
@@ -2045,8 +2096,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             colorScheme: colorScheme,
             title: 'مساهمة العروض الترويجية \u200E(Promotions)\u200E',
             value: CurrencyFormatter.formatCompactEGP(pr.promoValueEgp),
-            subtitle: '${pr.promoValueSharePct.toStringAsFixed(1)}% من القيمة (${pr.promoRecordsCount} حركة عرض • ${pr.promoTons.toStringAsFixed(1)} طن)',
-            icon: Icons.local_offer_outlined,
+            subtitle:
+                '${pr.promoValueSharePct.toStringAsFixed(1)}% من القيمة (${pr.promoRecordsCount} حركة عرض • ${pr.promoTons.toStringAsFixed(1)} طن)',
+            icon: Icons.local_offer_rounded,
             accentColor: colorScheme.secondary,
           ),
           _buildKpiCard(
@@ -2054,8 +2106,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             colorScheme: colorScheme,
             title: 'تحليل المرتجعات السالبة \u200E(Returns Rate)\u200E',
             value: '${pr.overallReturnPct.toStringAsFixed(2)}%',
-            subtitle: '${pr.returnRecordsCount} سجل مرتجع (${pr.totalReturnCases.toStringAsFixed(1)} كرتونة • ${CurrencyFormatter.formatCompactEGP(pr.totalReturnValueEgp)})',
-            icon: Icons.assignment_return_outlined,
+            subtitle:
+                '${pr.returnRecordsCount} سجل مرتجع (${pr.totalReturnCases.toStringAsFixed(1)} كرتونة • ${CurrencyFormatter.formatCompactEGP(pr.totalReturnValueEgp)})',
+            icon: Icons.assignment_return_rounded,
             accentColor: colorScheme.error,
           ),
         ]),
@@ -2066,8 +2119,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
           elevation: 0,
           color: colorScheme.surfaceContainerLow,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16.0),
-            side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+            borderRadius: M3Shape.radiusLg,
+            side:
+                BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(M3Spacing.lg),
@@ -2091,12 +2145,19 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                       DataColumn(label: Text('القطاع')),
                       DataColumn(label: Text('العلامة التجارية (Brand)')),
                       DataColumn(label: Text('عدد الأصناف'), numeric: true),
-                      DataColumn(label: Text('الكمية الفعلية (كرتونة)'), numeric: true),
-                      DataColumn(label: Text('القيمة الفعلية (ج.م)'), numeric: true),
-                      DataColumn(label: Text('الكمية المتوقعة (EXP)'), numeric: true),
-                      DataColumn(label: Text('القيمة المتوقعة (EXP ج.م)'), numeric: true),
+                      DataColumn(
+                          label: Text('الكمية الفعلية (كرتونة)'),
+                          numeric: true),
+                      DataColumn(
+                          label: Text('القيمة الفعلية (ج.م)'), numeric: true),
+                      DataColumn(
+                          label: Text('الكمية المتوقعة (EXP)'), numeric: true),
+                      DataColumn(
+                          label: Text('القيمة المتوقعة (EXP ج.م)'),
+                          numeric: true),
                       DataColumn(label: Text('الوزن (طن)'), numeric: true),
-                      DataColumn(label: Text('الحصة من الإجمالي %'), numeric: true),
+                      DataColumn(
+                          label: Text('الحصة من الإجمالي %'), numeric: true),
                     ],
                     rows: d.brandForecasts.map((b) {
                       final isCC = b.sector.toUpperCase() == 'CC';
@@ -2124,8 +2185,10 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                               color: colorScheme.primary,
                             ),
                           )),
-                          DataCell(Text('${b.weightTons.toStringAsFixed(1)} طن')),
-                          DataCell(Text('${b.shareOfTotalPct.toStringAsFixed(1)}%')),
+                          DataCell(
+                              Text('${b.weightTons.toStringAsFixed(1)} طن')),
+                          DataCell(
+                              Text('${b.shareOfTotalPct.toStringAsFixed(1)}%')),
                         ],
                       );
                     }).toList(),
@@ -2142,8 +2205,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
           elevation: 0,
           color: colorScheme.surfaceContainerLow,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16.0),
-            side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+            borderRadius: M3Shape.radiusLg,
+            side:
+                BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(M3Spacing.lg),
@@ -2168,8 +2232,10 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                       DataColumn(label: Text('العلامة التجارية')),
                       DataColumn(label: Text('الإقليم والمحافظة')),
                       DataColumn(label: Text('المندوب')),
-                      DataColumn(label: Text('كمية المرتجع (كرتونة)'), numeric: true),
-                      DataColumn(label: Text('قيمة المرتجع (ج.م)'), numeric: true),
+                      DataColumn(
+                          label: Text('كمية المرتجع (كرتونة)'), numeric: true),
+                      DataColumn(
+                          label: Text('قيمة المرتجع (ج.م)'), numeric: true),
                       DataColumn(label: Text('نسبة المرتجع %'), numeric: true),
                     ],
                     rows: pr.topReturnItems.take(15).map((ret) {
@@ -2180,7 +2246,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           )),
                           DataCell(Text('${ret.brand} (${ret.sector})')),
-                          DataCell(Text('${ret.governorate} (${ret.regionCode})')),
+                          DataCell(
+                              Text('${ret.governorate} (${ret.regionCode})')),
                           DataCell(Text(ret.salesRep)),
                           DataCell(Text(
                             ret.returnCases.toStringAsFixed(2),
@@ -2229,8 +2296,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
           padding: const EdgeInsets.all(M3Spacing.lg),
           decoration: BoxDecoration(
             color: colorScheme.secondaryContainer.withOpacity(0.45),
-            borderRadius: BorderRadius.circular(16.0),
-            border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+            borderRadius: M3Shape.radiusLg,
+            border:
+                Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
           ),
           child: Wrap(
             spacing: M3Spacing.xl,
@@ -2272,7 +2340,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
               value: CurrencyFormatter.formatCompactEGP(reg.actualValueEgp),
               subtitle:
                   '${CurrencyFormatter.formatUnits(reg.actualCases.round())} كرتونة • ${reg.weightTons.toStringAsFixed(1)} طن (${reg.sharePct}%)',
-              icon: Icons.location_on_outlined,
+              icon: Icons.location_on_rounded,
               accentColor: colorScheme.secondary,
             );
           }).toList(),
@@ -2284,8 +2352,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
           elevation: 0,
           color: colorScheme.surfaceContainerLow,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16.0),
-            side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+            borderRadius: M3Shape.radiusLg,
+            side:
+                BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(M3Spacing.lg),
@@ -2309,9 +2378,14 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                       DataColumn(label: Text('مندوب المبيعات (Sales Rep)')),
                       DataColumn(label: Text('الإقليم / المحافظة')),
                       DataColumn(label: Text('الأصناف النشطة'), numeric: true),
-                      DataColumn(label: Text('الكمية الفعلية (كرتونة)'), numeric: true),
-                      DataColumn(label: Text('القيمة الفعلية (ج.م)'), numeric: true),
-                      DataColumn(label: Text('المتوقع بنهاية الشهر (EXP)'), numeric: true),
+                      DataColumn(
+                          label: Text('الكمية الفعلية (كرتونة)'),
+                          numeric: true),
+                      DataColumn(
+                          label: Text('القيمة الفعلية (ج.م)'), numeric: true),
+                      DataColumn(
+                          label: Text('المتوقع بنهاية الشهر (EXP)'),
+                          numeric: true),
                       DataColumn(label: Text('الوزن (طن)'), numeric: true),
                       DataColumn(label: Text('نسبة العروض %'), numeric: true),
                       DataColumn(label: Text('نسبة المرتجع %'), numeric: true),
@@ -2323,7 +2397,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                             rep.salesRep,
                             style: const TextStyle(fontWeight: FontWeight.w800),
                           )),
-                          DataCell(Text('${rep.governorate} (${rep.regionCode})')),
+                          DataCell(
+                              Text('${rep.governorate} (${rep.regionCode})')),
                           DataCell(Text('${rep.activeSkusCount}')),
                           DataCell(Text(rep.actualCases.toStringAsFixed(1))),
                           DataCell(Text(
@@ -2337,8 +2412,10 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                               color: colorScheme.primary,
                             ),
                           )),
-                          DataCell(Text('${rep.weightTons.toStringAsFixed(2)} طن')),
-                          DataCell(Text('${rep.promoSharePct.toStringAsFixed(1)}%')),
+                          DataCell(
+                              Text('${rep.weightTons.toStringAsFixed(2)} طن')),
+                          DataCell(
+                              Text('${rep.promoSharePct.toStringAsFixed(1)}%')),
                           DataCell(_buildBadge(
                             '${rep.returnRatePct.toStringAsFixed(1)}%',
                             rep.returnRatePct > 5
@@ -2372,7 +2449,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
       padding: const EdgeInsets.all(M3Spacing.md),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Column(
@@ -2384,7 +2461,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                   color: accentColor.withOpacity(0.14),
-                  borderRadius: BorderRadius.circular(10.0),
+                  borderRadius: M3Shape.radiusSm,
                 ),
                 child: Icon(icon, color: accentColor, size: 20.0),
               ),
@@ -2469,7 +2546,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: color.withOpacity(0.35)),
       ),
       child: Text(
@@ -2488,7 +2565,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
       padding: const EdgeInsets.all(M3Spacing.lg),
       decoration: BoxDecoration(
         color: colorScheme.errorContainer.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
       ),
       child: Column(
         children: [

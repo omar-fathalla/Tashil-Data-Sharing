@@ -109,3 +109,6 @@ List<M3DropdownOption<T>> m3OptionsFromMenuItems<T>(List<DropdownMenuItem<T>> it
       M3DropdownOption<T>(item.value as T, find(item.child) ?? '${item.value}'),
   ];
 }
+
+/// Adapts a legacy nullable `onChanged` callback to [M3Dropdown].
+ValueChanged<T> m3Legacy<T>(ValueChanged<T?> f) => (T v) => f(v);
