@@ -203,13 +203,13 @@ class _AppShellState extends State<AppShell> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'أقسام منصة تسهيل',
+                              'Tashil Sections',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
                             Text(
-                              ApiClient.getDisplayNameForTenant(widget.activeTenant),
+                              ApiClient.getEnglishDisplayNameForTenant(widget.activeTenant),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
                               ),
@@ -241,22 +241,13 @@ class _AppShellState extends State<AppShell> {
                               : colorScheme.onSurfaceVariant,
                         ),
                         title: Text(
-                          dest.labelAr,
+                          dest.labelEn,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight:
                                 isSelected ? FontWeight.w800 : FontWeight.w600,
                             color: isSelected
                                 ? colorScheme.onSecondaryContainer
                                 : colorScheme.onSurface,
-                          ),
-                        ),
-                        subtitle: Text(
-                          dest.labelEn,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: isSelected
-                                ? colorScheme.onSecondaryContainer
-                                    .withOpacity(0.8)
-                                : colorScheme.onSurfaceVariant,
                           ),
                         ),
                         trailing: isSelected
@@ -446,7 +437,7 @@ class _AppShellState extends State<AppShell> {
                             ),
                           IconButton(
                             icon: const Icon(Icons.manage_accounts_rounded),
-                            tooltip: 'الملف الشخصي والـحساب',
+                            tooltip: 'Profile & Account',
                             onPressed: _openUserProfile,
                           ),
                           if (widget.onLogout != null)
@@ -455,7 +446,7 @@ class _AppShellState extends State<AppShell> {
                                 Icons.logout_rounded,
                                 color: colorScheme.error,
                               ),
-                              tooltip: 'تسجيل الخروج',
+                              tooltip: 'Log Out',
                               onPressed: widget.onLogout,
                             ),
                         ],
@@ -635,7 +626,7 @@ class _AppShellState extends State<AppShell> {
                           ),
                           const SizedBox(height: 2.0),
                           Text(
-                            ApiClient.getDisplayNameForTenant(widget.activeTenant),
+                            ApiClient.getEnglishDisplayNameForTenant(widget.activeTenant),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.primary,
                               fontWeight: FontWeight.w700,
@@ -658,12 +649,6 @@ class _AppShellState extends State<AppShell> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(dest.labelEn, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        Text(
-                          dest.labelAr,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall,
-                        ),
                       ],
                     ),
                   ),
@@ -682,7 +667,7 @@ class _AppShellState extends State<AppShell> {
                       ),
                       leading: const Icon(Icons.manage_accounts_rounded),
                       title: Text(
-                        user?.fullName ?? user?.email ?? 'الملف الشخصي',
+                        user?.fullName ?? user?.email ?? 'Profile',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.w700),
@@ -704,7 +689,7 @@ class _AppShellState extends State<AppShell> {
                           color: colorScheme.error,
                         ),
                         title: Text(
-                          'تسجيل الخروج',
+                          'Log Out',
                           style: TextStyle(
                             color: colorScheme.error,
                             fontWeight: FontWeight.w700,

@@ -52,7 +52,7 @@ void main() {
     expect(sidebarRect.left, greaterThan(contentRect.left),
         reason: 'In RTL the sidebar must be on the start (right) side');
 
-    expect(find.text('لوحة القيادة'), findsOneWidget);
+    expect(find.text('لوحة القيادة'), findsNothing);
     expect(find.text('Dashboard'), findsOneWidget);
 
     // Scroll the nav list to the end; 'Product Master' must be fully above the footer.

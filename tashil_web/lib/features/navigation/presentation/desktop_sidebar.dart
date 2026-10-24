@@ -155,7 +155,7 @@ class DesktopSidebar extends StatelessWidget {
                         ],
                       ),
                       Text(
-                        'منصة مشاركة البيانات',
+                        'Data Sharing Platform',
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -228,7 +228,7 @@ class DesktopSidebar extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                dest.labelAr,
+                                dest.label,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.labelLarge?.copyWith(
@@ -236,16 +236,6 @@ class DesktopSidebar extends StatelessWidget {
                                       ? colorScheme.onSecondaryContainer
                                       : colorScheme.onSurface,
                                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                ),
-                              ),
-                              Text(
-                                dest.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: isSelected
-                                      ? colorScheme.onSecondaryContainer
-                                      : colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ],
@@ -288,7 +278,7 @@ class DesktopSidebar extends StatelessWidget {
                   color: colorScheme.primary,
                 ),
                 label: Text(
-                  'العودة للإدارة المركزية',
+                  'Back to Super Admin',
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: colorScheme.primary,
@@ -315,7 +305,7 @@ class DesktopSidebar extends StatelessWidget {
                 const SizedBox(width: 6.0),
                 Expanded(
                   child: Text(
-                    'الاستيراد الذكي يعمل · Smart Ingestion Active',
+                    'Smart Ingestion Active',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelSmall?.copyWith(
