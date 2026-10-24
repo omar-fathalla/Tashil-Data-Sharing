@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/m3_shape.dart';
 import '../theme/m3_motion.dart';
 
 /// Item descriptor for an M3 Segmented Button.
@@ -41,18 +42,11 @@ class M3SegmentedButtonGroup<T> extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(30.0),
+          borderRadius: M3Shape.radiusXl,
           border: Border.all(
             color: colorScheme.outlineVariant.withOpacity(0.6),
             width: 1.0,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.shadow.withOpacity(0.04),
-              blurRadius: 6.0,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         padding: const EdgeInsets.all(3.0),
         child: SegmentedButton<T>(

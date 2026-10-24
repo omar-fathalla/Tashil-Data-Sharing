@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/m3_shape.dart';
 
 /// A Material Design 3 container for DataTables and wide tabular content.
 ///
@@ -97,7 +98,7 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(10.0),
+        borderRadius: M3Shape.radiusSm,
         border: Border.all(
           color: colorScheme.outlineVariant.withOpacity(0.4),
         ),
@@ -127,7 +128,7 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(7.0),
+                borderRadius: M3Shape.radiusSm,
                 onTap: _scrollRight,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -136,7 +137,7 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
                   ),
                   decoration: BoxDecoration(
                     color: colorScheme.surface,
-                    borderRadius: BorderRadius.circular(7.0),
+                    borderRadius: M3Shape.radiusSm,
                     border: Border.all(
                       color: colorScheme.outlineVariant.withOpacity(0.8),
                     ),
@@ -169,7 +170,7 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(7.0),
+                borderRadius: M3Shape.radiusSm,
                 onTap: _scrollLeft,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -178,7 +179,7 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
                   ),
                   decoration: BoxDecoration(
                     color: colorScheme.surface,
-                    borderRadius: BorderRadius.circular(7.0),
+                    borderRadius: M3Shape.radiusSm,
                     border: Border.all(
                       color: colorScheme.outlineVariant.withOpacity(0.8),
                     ),

@@ -279,9 +279,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                             ),
                                         decoration: BoxDecoration(
                                           color: colorScheme.primaryContainer,
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
+                                          borderRadius: M3Shape.radiusLg,
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
@@ -518,11 +516,9 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                                   },
                                                   activeColor:
                                                       colorScheme.primary,
-                                                  shape: RoundedRectangleBorder(
+                                                  shape: const RoundedRectangleBorder(
                                                     borderRadius:
-                                                        BorderRadius.circular(
-                                                          4,
-                                                        ),
+                                                        M3Shape.radiusXs,
                                                   ),
                                                 ),
                                               ),

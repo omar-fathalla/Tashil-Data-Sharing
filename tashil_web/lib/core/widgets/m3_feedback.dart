@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/m3_shape.dart';
 import '../theme/m3_spacing.dart';
 
 /// M3Feedback provides accessible, theme-driven user feedback dialogs and SnackBars
@@ -28,7 +29,7 @@ class M3Feedback {
           backgroundColor: colorScheme.surfaceContainerHigh,
           surfaceTintColor: Colors.transparent,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.0),
+            borderRadius: M3Shape.radiusLg,
             side: BorderSide(color: colorScheme.outlineVariant, width: 1.0),
           ),
           icon: Container(
@@ -68,7 +69,7 @@ class M3Feedback {
                   padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(8.0),
+                    borderRadius: M3Shape.radiusSm,
                     border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
                   ),
                   child: Text(
@@ -119,7 +120,7 @@ class M3Feedback {
         ),
         backgroundColor: colorScheme.primaryContainer,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+        shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusMd),
       ),
     );
   }
@@ -144,7 +145,7 @@ class M3Feedback {
         ),
         backgroundColor: colorScheme.errorContainer,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+        shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusMd),
       ),
     );
   }
@@ -167,7 +168,7 @@ class M3Feedback {
         ),
         backgroundColor: Colors.amber.shade300,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+        shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusMd),
       ),
     );
   }
@@ -192,7 +193,7 @@ class M3Feedback {
         ),
         backgroundColor: colorScheme.secondaryContainer,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+        shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusMd),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/m3_shape.dart';
 
 /// M3Button adheres strictly to Google Material Design 3 button specifications.
 /// Enforces the STRICT SINGLE-ICON RULE:
@@ -171,18 +172,11 @@ class M3ActionButtonGroup extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(28.0),
+        borderRadius: M3Shape.radiusXl,
         border: Border.all(
           color: colorScheme.outlineVariant.withOpacity(0.75),
           width: 1.0,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.04),
-            blurRadius: 6.0,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       padding: const EdgeInsets.all(3.0),
       child: SingleChildScrollView(
@@ -231,11 +225,11 @@ class M3ActionButtonGroup extends StatelessWidget {
 
     return Material(
       color: bgColor,
-      borderRadius: BorderRadius.circular(24.0),
+      borderRadius: M3Shape.radiusXl,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: item.isLoading ? null : item.onPressed,
-        borderRadius: BorderRadius.circular(24.0),
+        borderRadius: M3Shape.radiusXl,
         hoverColor: item.isPrimary
             ? colorScheme.onPrimary.withOpacity(0.1)
             : colorScheme.surfaceContainerHigh,
@@ -345,7 +339,7 @@ class M3PageHeader extends StatelessWidget {
                 Directionality(
                   textDirection: TextDirection.ltr,
                   child: Align(
-                    alignment: Alignment.centerRight,
+                    alignment: AlignmentDirectional.centerEnd,
                     child: Text(
                       titleEn,
                       textDirection: TextDirection.ltr,
@@ -364,7 +358,7 @@ class M3PageHeader extends StatelessWidget {
                   Directionality(
                     textDirection: TextDirection.rtl,
                     child: Align(
-                      alignment: Alignment.centerRight,
+                      alignment: AlignmentDirectional.centerEnd,
                       child: actions!,
                     ),
                   ),

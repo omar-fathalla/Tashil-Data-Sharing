@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/m3_shape.dart';
 import '../theme/m3_motion.dart';
 
 class M3ResponsiveTabItem<T> {
@@ -91,7 +92,7 @@ class M3ResponsiveTabBar<T> extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(16.0),
+              borderRadius: M3Shape.radiusLg,
               border: Border.all(
                 color: colorScheme.outlineVariant.withOpacity(0.7),
                 width: 1.0,
@@ -121,7 +122,7 @@ class M3ResponsiveTabBar<T> extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.7),
               width: 1.0,
