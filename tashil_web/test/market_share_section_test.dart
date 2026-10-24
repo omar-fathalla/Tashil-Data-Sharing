@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/screens/executive_screen.dart';
+import 'package:tashil_web/features/executive_dashboard/presentation/widgets/bento_kpi_grid.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/widgets/market_share_section.dart';
 
 /// Test fixture shaped like GET /api/v1/analytics/cpfr (test-only numbers).
@@ -77,10 +78,17 @@ void main() {
       expect(find.byKey(const ValueKey('stock_per_sku_table')), findsOneWidget);
       expect(find.byKey(const ValueKey('sell_in_vs_out_chart')), findsOneWidget);
 
-      // New sections sit above the existing Bento KPI grid.
-      final newTop = tester.getTopLeft(find.byKey(const ValueKey('market_share_section'))).dy;
-      final trendTop = tester.getTopLeft(find.text('Category Contribution').first).dy;
-      expect(newTop, lessThan(trendTop));
+      // The original four KPI cards open the page; market share sits under them,
+      // and the older sections (category contribution, trend, Pareto) stay below that.
+      final kpiTop = tester.getTopLeft(find.byType(BentoKpiGrid)).dy;
+      final shareTop = tester.getTopLeft(find.byKey(const ValueKey('market_share_section'))).dy;
+      final categoryTop = tester.getTopLeft(find.text('Category Contribution').first).dy;
+      expect(kpiTop, lessThan(shareTop));
+      expect(shareTop, lessThan(categoryTop));
+      expect(find.text('Total Retail Sell-Out'), findsOneWidget);
+      expect(find.text('Total Units Sold'), findsOneWidget);
+      expect(find.text('Active Covered Branches'), findsOneWidget);
+      expect(find.text('Out-of-Stock Rate (OOS Rate)'), findsOneWidget);
     });
   }
 
@@ -150,5 +158,124 @@ void main() {
     expect(find.text('P&G'), findsOneWidget);
     expect(find.text('Henkel'), findsOneWidget);
     expect(find.byKey(const ValueKey('category_competitor_Laundry_1')), findsOneWidget);
+  });
+
+  ExecutiveKPIsModel shareFixture({int skuCount = 6, bool tallCategories = false}) {
+    final categories = [
+      for (final spec in [
+        ('Floor cleaner', 1, 14, 510.0, 51.0),
+        ('Dish soap', 1, 9, 330.0, 33.0),
+        ('Softener', 2, 8, 270.0, 27.0),
+        ('Bleach', 1, 4, 580.0, 58.0),
+      ])
+        {
+          'category': spec.$1,
+          'total_revenue': spec.$4,
+          'total_units': 10,
+          'share_pct': spec.$5,
+          'sku_count': 2,
+          'market_total_revenue': 1000.0,
+          'tenant_category_share_pct': spec.$5,
+          'tenant_rank': spec.$2,
+          'supplier_count': spec.$3,
+          'top_competitors': [
+            for (var i = 0; i < (tallCategories ? 3 : 2); i++)
+              {'name': 'Competitor ${spec.$1} $i', 'revenue': 100.0 - i * 10, 'share_pct': 10.0 - i},
+          ],
+        },
+    ];
+    final skus = [
+      for (var i = 0; i < skuCount; i++)
+        {
+          'barcode': 'sku-$i',
+          'sku_name': 'Test SKU $i',
+          'category': categories[i % categories.length]['category'],
+          'total_revenue': 200.0 - i * 10,
+          'total_units': 5,
+          'revenue_share_pct': 10.0,
+          'cumulative_share_pct': 10.0,
+          'is_top_80_contributor': true,
+        },
+    ];
+    return ExecutiveKPIsModel.fromJson({
+      'category_contributions': categories,
+      'pareto_skus': skus,
+    });
+  }
+
+  Future<void> pumpShare(WidgetTester tester, double width, ExecutiveKPIsModel kpis) async {
+    tester.view.physicalSize = Size(width, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: MarketShareSection(
+              kpis: kpis,
+              cpfr: null,
+              cpfrLoading: false,
+              cpfrError: null,
+              periodMonths: const {1, 2, 3, 4},
+              year: 2026,
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+  }
+
+  for (final width in [1280.0, 1440.0, 1920.0]) {
+    testWidgets('Share cards are equal height at ${width.toInt()}px and category donuts grow', (tester) async {
+      await pumpShare(tester, width, shareFixture());
+      expect(tester.takeException(), isNull);
+      final sku = tester.getRect(find.byKey(const ValueKey('share_per_sku_card')));
+      final cat = tester.getRect(find.byKey(const ValueKey('share_per_category_card')));
+      expect(sku.height, closeTo(cat.height, 1));
+      expect(sku.top, closeTo(cat.top, 1));
+      // RTL: category card is the second child, so it sits on the left.
+      expect(cat.right, lessThanOrEqualTo(sku.left + 1));
+      expect(find.text('Test SKU 0'), findsOneWidget);
+      expect(find.text('Test SKU 5'), findsOneWidget);
+      expect(find.text('Rank #1 of 14'), findsOneWidget);
+      expect(find.text('Competitor Floor cleaner 0'), findsOneWidget);
+      expect(find.text('This SKU'), findsOneWidget);
+      expect(find.text('Our other SKUs'), findsOneWidget);
+      expect(find.text('Competitors'), findsWidgets);
+      final donut = tester.getSize(find.byKey(const ValueKey('category_donut_Floor cleaner')));
+      expect(donut.height, greaterThan(64));
+      expect(donut.width, closeTo(donut.height, 1));
+    });
+  }
+
+  testWidgets('When category tiles are taller, SKU bars grow and cards still match', (tester) async {
+    await pumpShare(tester, 1280, shareFixture(skuCount: 1, tallCategories: true));
+    expect(tester.takeException(), isNull);
+    final sku = tester.getRect(find.byKey(const ValueKey('share_per_sku_card')));
+    final cat = tester.getRect(find.byKey(const ValueKey('share_per_category_card')));
+    expect(sku.height, closeTo(cat.height, 1));
+    expect(tester.getSize(find.byKey(const ValueKey('sku_share_bar_0'))).height, greaterThan(18));
+    expect(find.text('Test SKU 0'), findsOneWidget);
+    expect(find.text('Rank #2 of 8'), findsOneWidget);
+    expect(find.text('Competitor Bleach 2'), findsOneWidget);
+  });
+
+  testWidgets('Narrow width stacks the share cards without dropping content', (tester) async {
+    await pumpShare(tester, 700, shareFixture());
+    expect(tester.takeException(), isNull);
+    final sku = tester.getRect(find.byKey(const ValueKey('share_per_sku_card')));
+    final cat = tester.getRect(find.byKey(const ValueKey('share_per_category_card')));
+    expect(cat.top, greaterThanOrEqualTo(sku.bottom - 1));
+    expect(sku.width, closeTo(cat.width, 1));
+    expect(find.text('Share per SKU'), findsOneWidget);
+    expect(find.text('Share per Category'), findsOneWidget);
+    expect(find.text('Test SKU 5'), findsOneWidget);
+    expect(find.text('Rank #1 of 4'), findsOneWidget);
+    // Compact donut when the card is not stretched to a sibling.
+    expect(tester.getSize(find.byKey(const ValueKey('category_donut_Floor cleaner'))).height, closeTo(64, 1));
   });
 }

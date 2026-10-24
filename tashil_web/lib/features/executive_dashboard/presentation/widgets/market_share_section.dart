@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -48,13 +51,10 @@ class MarketShareSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (wide)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: sku),
-                M3Spacing.gapMD,
-                Expanded(child: cat),
-              ],
+            _EqualHeightRow(
+              spacing: M3Spacing.md,
+              textDirection: Directionality.of(context),
+              children: [sku, cat],
             )
           else ...[
             sku,
@@ -188,8 +188,8 @@ class _SkuShareCard extends StatelessWidget {
       key: const ValueKey('share_per_sku_card'),
       child: Padding(
         padding: M3Spacing.pMd,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: _FillColumn(
+          textDirection: Directionality.of(context),
           children: [
             _CardHeader(
               icon: AppIcons.analytics,
@@ -208,35 +208,30 @@ class _SkuShareCard extends StatelessWidget {
             if (rows.isEmpty)
               const _EmptyNote('No SKU-level category share data for this period.', keyName: 'share_per_sku_empty')
             else
-              for (final r in rows)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(r.sku.skuName,
+              _GrowingColumn(
+                children: [
+                  for (var i = 0; i < rows.length; i++)
+                    _SkuRow(
+                      title: Text(rows[i].sku.skuName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
-                      Text(r.sku.category,
+                      category: Text(rows[i].sku.category,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-                      M3Spacing.gapXXS,
-                      ClipRRect(
+                      bar: ClipRRect(
+                        key: ValueKey('sku_share_bar_$i'),
                         borderRadius: M3Shape.radiusSm,
-                        child: SizedBox(
-                          height: 18.0,
-                          child: Row(children: [
-                            _seg(context, r.self, cs.primary, cs.onPrimary),
-                            _seg(context, r.ownOther, cs.primaryContainer, cs.onPrimaryContainer),
-                            _seg(context, r.comp, acc.competitor, cs.onSurface),
-                          ]),
-                        ),
+                        child: Row(children: [
+                          _seg(context, rows[i].self, cs.primary, cs.onPrimary),
+                          _seg(context, rows[i].ownOther, cs.primaryContainer, cs.onPrimaryContainer),
+                          _seg(context, rows[i].comp, acc.competitor, cs.onSurface),
+                        ]),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                ],
+              ),
           ],
         ),
       ),
@@ -277,8 +272,8 @@ class _CategoryShareCard extends StatelessWidget {
       key: const ValueKey('share_per_category_card'),
       child: Padding(
         padding: M3Spacing.pMd,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: _FillColumn(
+          textDirection: Directionality.of(context),
           children: [
             _CardHeader(
               icon: AppIcons.donutChart,
@@ -291,13 +286,12 @@ class _CategoryShareCard extends StatelessWidget {
             if (top.isEmpty)
               const _EmptyNote('No category market data for this period.', keyName: 'share_per_category_empty')
             else
-              LayoutBuilder(builder: (context, c) {
-                final cols = c.maxWidth >= 420 ? 2 : 1;
-                final w = (c.maxWidth - (cols - 1) * 12.0) / cols;
-                return Wrap(spacing: 12.0, runSpacing: 12.0, children: [
-                  for (final cat in top) SizedBox(width: w, child: _CategoryTile(cat: cat)),
-                ]);
-              }),
+              _GrowingGrid(
+                spacing: 12.0,
+                twoColumnMinWidth: 420.0,
+                textDirection: Directionality.of(context),
+                children: [for (final cat in top) _CategoryTile(cat: cat)],
+              ),
           ],
         ),
       ),
@@ -317,66 +311,51 @@ class _CategoryTile extends StatelessWidget {
     final ours = cat.tenantCategorySharePct.clamp(0.0, 100.0);
     return Card.filled(
       margin: EdgeInsets.zero,
-      child: Padding(
-        padding: M3Spacing.pSm,
-        child: Row(children: [
-          SizedBox(
-            width: 64.0,
-            height: 64.0,
-            child: Stack(alignment: Alignment.center, children: [
-              SizedBox.expand(
-                child: CircularProgressIndicator(
-                  year2023: false,
-                  value: ours / 100.0,
-                  strokeWidth: 7.0,
-                  backgroundColor: acc.competitorSurface,
-                ),
+      child: _ShareTile(
+        textDirection: Directionality.of(context),
+        donut: _Donut(
+          key: ValueKey('category_donut_${cat.category}'),
+          value: ours / 100.0,
+          label: _pct(ours),
+        ),
+        details: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(cat.category,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+          M3Spacing.gapXXS,
+          if (cat.tenantRank > 0)
+            Text(
+              'Rank #${cat.tenantRank}${cat.supplierCount > 0 ? ' of ${cat.supplierCount}' : ''}',
+              key: ValueKey('category_rank_${cat.category}'),
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: cat.tenantRank == 1 ? acc.tealBase : cs.onSurface,
+                fontWeight: FontWeight.w800,
               ),
-              Text(_pct(ours), style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
-            ]),
-          ),
-          M3Spacing.gapSM,
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(cat.category,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
-              M3Spacing.gapXXS,
-              if (cat.tenantRank > 0)
-                Text(
-                  'Rank #${cat.tenantRank}${cat.supplierCount > 0 ? ' of ${cat.supplierCount}' : ''}',
-                  key: ValueKey('category_rank_${cat.category}'),
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: cat.tenantRank == 1 ? acc.tealBase : cs.onSurface,
-                    fontWeight: FontWeight.w800,
-                  ),
+            ),
+          M3Spacing.gapXXS,
+          _CompetitorBar(cat: cat, ours: ours),
+          M3Spacing.gapXXS,
+          if (cat.topCompetitors.isEmpty)
+            Text('Competitors ${_pct(100.0 - ours)}',
+                style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant))
+          else
+            for (final (i, c) in cat.topCompetitors.take(3).indexed)
+              Row(key: ValueKey('category_competitor_${cat.category}_$i'), children: [
+                Container(
+                  width: 8.0,
+                  height: 8.0,
+                  decoration: BoxDecoration(color: _competitorShade(acc, i), shape: BoxShape.circle),
                 ),
-              M3Spacing.gapXXS,
-              _CompetitorBar(cat: cat, ours: ours),
-              M3Spacing.gapXXS,
-              if (cat.topCompetitors.isEmpty)
-                Text('Competitors ${_pct(100.0 - ours)}',
-                    style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant))
-              else
-                for (final (i, c) in cat.topCompetitors.take(3).indexed)
-                  Row(key: ValueKey('category_competitor_${cat.category}_$i'), children: [
-                    Container(
-                      width: 8.0,
-                      height: 8.0,
-                      decoration: BoxDecoration(color: _competitorShade(acc, i), shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 4.0),
-                    Expanded(
-                      child: Text(c.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-                    ),
-                    Text(_pct(c.sharePct), style: theme.textTheme.labelSmall),
-                  ]),
-            ]),
-          ),
+                const SizedBox(width: 4.0),
+                Expanded(
+                  child: Text(c.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                ),
+                Text(_pct(c.sharePct), style: theme.textTheme.labelSmall),
+              ]),
         ]),
       ),
     );
@@ -715,5 +694,602 @@ class _CompetitorBar extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+/// Donut whose stroke and percent grow with the tile, staying the compact
+/// 64dp look when the tile is not stretched.
+class _Donut extends StatelessWidget {
+  const _Donut({super.key, required this.value, required this.label});
+  final double value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final acc = M3StatusColors.of(context).accents;
+    return LayoutBuilder(builder: (context, c) {
+      final s = c.biggest.shortestSide;
+      final stroke = (s * 0.11).clamp(7.0, 14.0);
+      final style = s >= 112
+          ? theme.textTheme.titleLarge
+          : s >= 88
+              ? theme.textTheme.titleMedium
+              : theme.textTheme.labelLarge;
+      return Stack(alignment: Alignment.center, children: [
+        SizedBox.expand(
+          child: CircularProgressIndicator(
+            year2023: false,
+            value: value,
+            strokeWidth: stroke,
+            backgroundColor: acc.competitorSurface,
+          ),
+        ),
+        Text(label, style: style?.copyWith(fontWeight: FontWeight.w800)),
+      ]);
+    });
+  }
+}
+
+/// Side-by-side cards that share the height of the taller card.
+class _EqualHeightRow extends MultiChildRenderObjectWidget {
+  const _EqualHeightRow({
+    required this.spacing,
+    required this.textDirection,
+    required super.children,
+  });
+
+  final double spacing;
+  final TextDirection textDirection;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderEqualHeightRow(spacing: spacing, textDirection: textDirection);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderEqualHeightRow renderObject) {
+    renderObject
+      ..spacing = spacing
+      ..textDirection = textDirection;
+  }
+}
+
+/// Column whose last child absorbs any height beyond the children's natural size.
+class _FillColumn extends MultiChildRenderObjectWidget {
+  const _FillColumn({required this.textDirection, required super.children});
+
+  final TextDirection textDirection;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderFillColumn(textDirection: textDirection);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderFillColumn renderObject) {
+    renderObject.textDirection = textDirection;
+  }
+}
+
+/// Vertical list that shares extra height across its children.
+class _GrowingColumn extends MultiChildRenderObjectWidget {
+  const _GrowingColumn({required super.children});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderGrowingColumn();
+}
+
+/// Category tile grid. Two columns from [twoColumnMinWidth], one below that.
+class _GrowingGrid extends MultiChildRenderObjectWidget {
+  const _GrowingGrid({
+    required this.spacing,
+    required this.twoColumnMinWidth,
+    required this.textDirection,
+    required super.children,
+  });
+
+  final double spacing;
+  final double twoColumnMinWidth;
+  final TextDirection textDirection;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderGrowingGrid(
+        spacing: spacing,
+        twoColumnMinWidth: twoColumnMinWidth,
+        textDirection: textDirection,
+      );
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderGrowingGrid renderObject) {
+    renderObject
+      ..spacing = spacing
+      ..twoColumnMinWidth = twoColumnMinWidth
+      ..textDirection = textDirection;
+  }
+}
+
+/// One SKU share row. Extra height thickens the bar, then the padding.
+class _SkuRow extends MultiChildRenderObjectWidget {
+  _SkuRow({required Widget title, required Widget category, required Widget bar})
+      : super(children: [title, category, bar]);
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderSkuRow();
+}
+
+/// Category tile: donut on the start side, copy beside it. Extra height
+/// enlarges the donut (capped) and centers both in the tile.
+class _ShareTile extends MultiChildRenderObjectWidget {
+  _ShareTile({required Widget donut, required Widget details, required this.textDirection})
+      : super(children: [donut, details]);
+
+  final TextDirection textDirection;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderShareTile(textDirection: textDirection);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderShareTile renderObject) {
+    renderObject.textDirection = textDirection;
+  }
+}
+
+class _OffsetParentData extends ContainerBoxParentData<RenderBox> {}
+
+mixin _OffsetChildren on ContainerRenderObjectMixin<RenderBox, _OffsetParentData> {
+  void setupOffsetParentData(RenderBox child) {
+    if (child.parentData is! _OffsetParentData) {
+      child.parentData = _OffsetParentData();
+    }
+  }
+
+  List<RenderBox> offsetChildren() {
+    final out = <RenderBox>[];
+    var child = firstChild;
+    while (child != null) {
+      out.add(child);
+      child = (child.parentData! as _OffsetParentData).nextSibling;
+    }
+    return out;
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    var child = firstChild;
+    while (child != null) {
+      final pd = child.parentData! as _OffsetParentData;
+      context.paintChild(child, offset + pd.offset);
+      child = pd.nextSibling;
+    }
+  }
+
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    var child = lastChild;
+    while (child != null) {
+      final current = child;
+      final pd = current.parentData! as _OffsetParentData;
+      final hit = result.addWithPaintOffset(
+        offset: pd.offset,
+        position: position,
+        hitTest: (BoxHitTestResult result, Offset transformed) => current.hitTest(result, position: transformed),
+      );
+      if (hit) return true;
+      child = pd.previousSibling;
+    }
+    return false;
+  }
+}
+
+class _RenderEqualHeightRow extends RenderBox
+    with ContainerRenderObjectMixin<RenderBox, _OffsetParentData>, _OffsetChildren {
+  _RenderEqualHeightRow({required double spacing, required TextDirection textDirection})
+      : _spacing = spacing,
+        _textDirection = textDirection;
+
+  double _spacing;
+  double get spacing => _spacing;
+  set spacing(double value) {
+    if (value == _spacing) return;
+    _spacing = value;
+    markNeedsLayout();
+  }
+
+  TextDirection _textDirection;
+  TextDirection get textDirection => _textDirection;
+  set textDirection(TextDirection value) {
+    if (value == _textDirection) return;
+    _textDirection = value;
+    markNeedsLayout();
+  }
+
+  @override
+  void setupParentData(RenderBox child) => setupOffsetParentData(child);
+
+  double _childWidth(double width) {
+    final n = childCount;
+    if (n == 0) return 0;
+    return math.max(0.0, (width - spacing * (n - 1)) / n);
+  }
+
+  @override
+  double computeMinIntrinsicHeight(double width) => computeMaxIntrinsicHeight(width);
+
+  @override
+  double computeMaxIntrinsicHeight(double width) {
+    final childW = _childWidth(width);
+    var maxH = 0.0;
+    for (final child in offsetChildren()) {
+      maxH = math.max(maxH, child.getMaxIntrinsicHeight(childW));
+    }
+    return maxH;
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) => 0;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) => 0;
+
+  @override
+  void performLayout() {
+    final width = constraints.maxWidth;
+    final kids = offsetChildren();
+    final childW = _childWidth(width);
+    var maxH = 0.0;
+    for (final child in kids) {
+      maxH = math.max(maxH, child.getMaxIntrinsicHeight(childW));
+    }
+    final n = kids.length;
+    for (var i = 0; i < n; i++) {
+      final child = kids[i];
+      child.layout(BoxConstraints.tightFor(width: childW, height: maxH), parentUsesSize: true);
+      final slot = textDirection == TextDirection.rtl ? n - 1 - i : i;
+      (child.parentData! as _OffsetParentData).offset = Offset(slot * (childW + spacing), 0);
+    }
+    size = constraints.constrain(Size(width.isFinite ? width : 0, maxH));
+  }
+}
+
+class _RenderFillColumn extends RenderBox
+    with ContainerRenderObjectMixin<RenderBox, _OffsetParentData>, _OffsetChildren {
+  _RenderFillColumn({required TextDirection textDirection}) : _textDirection = textDirection;
+
+  TextDirection _textDirection;
+  TextDirection get textDirection => _textDirection;
+  set textDirection(TextDirection value) {
+    if (value == _textDirection) return;
+    _textDirection = value;
+    markNeedsLayout();
+  }
+
+  @override
+  void setupParentData(RenderBox child) => setupOffsetParentData(child);
+
+  @override
+  double computeMinIntrinsicHeight(double width) => computeMaxIntrinsicHeight(width);
+
+  @override
+  double computeMaxIntrinsicHeight(double width) {
+    var h = 0.0;
+    for (final child in offsetChildren()) {
+      h += child.getMaxIntrinsicHeight(width);
+    }
+    return h;
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) => 0;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) => 0;
+
+  @override
+  void performLayout() {
+    final width = constraints.hasBoundedWidth ? constraints.maxWidth : 0.0;
+    final kids = offsetChildren();
+    if (kids.isEmpty) {
+      size = constraints.constrain(Size(width, 0));
+      return;
+    }
+    final flex = kids.last;
+    var y = 0.0;
+    for (final child in kids.sublist(0, kids.length - 1)) {
+      child.layout(BoxConstraints(maxWidth: width), parentUsesSize: true);
+      final x = textDirection == TextDirection.rtl ? width - child.size.width : 0.0;
+      (child.parentData! as _OffsetParentData).offset = Offset(x, y);
+      y += child.size.height;
+    }
+    final flexNatural = flex.getMaxIntrinsicHeight(width);
+    final flexH = constraints.hasBoundedHeight
+        ? math.max(flexNatural, constraints.maxHeight - y)
+        : flexNatural;
+    flex.layout(BoxConstraints.tightFor(width: width, height: flexH), parentUsesSize: true);
+    (flex.parentData! as _OffsetParentData).offset = Offset(0, y);
+    size = constraints.constrain(Size(width, y + flex.size.height));
+  }
+}
+
+class _RenderGrowingColumn extends RenderBox
+    with ContainerRenderObjectMixin<RenderBox, _OffsetParentData>, _OffsetChildren {
+  @override
+  void setupParentData(RenderBox child) => setupOffsetParentData(child);
+
+  @override
+  double computeMinIntrinsicHeight(double width) => computeMaxIntrinsicHeight(width);
+
+  @override
+  double computeMaxIntrinsicHeight(double width) {
+    var h = 0.0;
+    for (final child in offsetChildren()) {
+      h += child.getMaxIntrinsicHeight(width);
+    }
+    return h;
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) => 0;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) => 0;
+
+  @override
+  void performLayout() {
+    final width = constraints.hasBoundedWidth ? constraints.maxWidth : 0.0;
+    final kids = offsetChildren();
+    final naturals = [for (final child in kids) child.getMaxIntrinsicHeight(width)];
+    final natural = naturals.fold<double>(0, (a, b) => a + b);
+    final avail = constraints.hasBoundedHeight ? math.max(constraints.maxHeight, natural) : natural;
+    final extra = kids.isEmpty ? 0.0 : (avail - natural) / kids.length;
+    var y = 0.0;
+    for (var i = 0; i < kids.length; i++) {
+      final h = naturals[i] + extra;
+      kids[i].layout(BoxConstraints.tightFor(width: width, height: h), parentUsesSize: true);
+      (kids[i].parentData! as _OffsetParentData).offset = Offset(0, y);
+      y += h;
+    }
+    size = constraints.constrain(Size(width, y));
+  }
+}
+
+class _RenderGrowingGrid extends RenderBox
+    with ContainerRenderObjectMixin<RenderBox, _OffsetParentData>, _OffsetChildren {
+  _RenderGrowingGrid({
+    required double spacing,
+    required double twoColumnMinWidth,
+    required TextDirection textDirection,
+  })  : _spacing = spacing,
+        _twoColumnMinWidth = twoColumnMinWidth,
+        _textDirection = textDirection;
+
+  double _spacing;
+  double get spacing => _spacing;
+  set spacing(double value) {
+    if (value == _spacing) return;
+    _spacing = value;
+    markNeedsLayout();
+  }
+
+  double _twoColumnMinWidth;
+  double get twoColumnMinWidth => _twoColumnMinWidth;
+  set twoColumnMinWidth(double value) {
+    if (value == _twoColumnMinWidth) return;
+    _twoColumnMinWidth = value;
+    markNeedsLayout();
+  }
+
+  TextDirection _textDirection;
+  TextDirection get textDirection => _textDirection;
+  set textDirection(TextDirection value) {
+    if (value == _textDirection) return;
+    _textDirection = value;
+    markNeedsLayout();
+  }
+
+  @override
+  void setupParentData(RenderBox child) => setupOffsetParentData(child);
+
+  int _columns(double width, int n) {
+    if (n <= 1 || !width.isFinite || width < twoColumnMinWidth) return 1;
+    return 2;
+  }
+
+  double _heightFor(double width, List<RenderBox> kids, int cols) {
+    if (kids.isEmpty) return 0;
+    final cellW = cols <= 1 ? width : (width - spacing * (cols - 1)) / cols;
+    final rows = (kids.length + cols - 1) ~/ cols;
+    final rowH = List<double>.filled(rows, 0);
+    for (var i = 0; i < kids.length; i++) {
+      final r = i ~/ cols;
+      rowH[r] = math.max(rowH[r], kids[i].getMaxIntrinsicHeight(cellW));
+    }
+    return rowH.fold<double>(0, (a, b) => a + b) + spacing * (rows - 1);
+  }
+
+  @override
+  double computeMinIntrinsicHeight(double width) => computeMaxIntrinsicHeight(width);
+
+  @override
+  double computeMaxIntrinsicHeight(double width) {
+    final kids = offsetChildren();
+    return _heightFor(width, kids, _columns(width, kids.length));
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) => 0;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) => 0;
+
+  @override
+  void performLayout() {
+    final width = constraints.hasBoundedWidth ? constraints.maxWidth : 0.0;
+    final kids = offsetChildren();
+    final cols = _columns(width, kids.length);
+    final natural = _heightFor(width, kids, cols);
+    final avail = constraints.hasBoundedHeight ? math.max(constraints.maxHeight, natural) : natural;
+    if (kids.isEmpty) {
+      size = constraints.constrain(Size(width, 0));
+      return;
+    }
+    final cellW = cols <= 1 ? width : (width - spacing * (cols - 1)) / cols;
+    final rows = (kids.length + cols - 1) ~/ cols;
+    final rowH = List<double>.filled(rows, 0);
+    for (var i = 0; i < kids.length; i++) {
+      rowH[i ~/ cols] = math.max(rowH[i ~/ cols], kids[i].getMaxIntrinsicHeight(cellW));
+    }
+    final extra = (avail - natural) / rows;
+    var y = 0.0;
+    for (var r = 0; r < rows; r++) {
+      final h = rowH[r] + extra;
+      for (var c = 0; c < cols; c++) {
+        final i = r * cols + c;
+        if (i >= kids.length) break;
+        kids[i].layout(BoxConstraints.tightFor(width: cellW, height: h), parentUsesSize: true);
+        final x = textDirection == TextDirection.rtl
+            ? width - (c + 1) * cellW - c * spacing
+            : c * (cellW + spacing);
+        (kids[i].parentData! as _OffsetParentData).offset = Offset(x, y);
+      }
+      y += h;
+      if (r != rows - 1) y += spacing;
+    }
+    size = constraints.constrain(Size(width, y));
+  }
+}
+
+class _RenderSkuRow extends RenderBox
+    with ContainerRenderObjectMixin<RenderBox, _OffsetParentData>, _OffsetChildren {
+  static const double _vPad = 6.0;
+  static const double _gap = 4.0;
+  static const double _barH = 18.0;
+  static const double _barExtraMax = 18.0;
+
+  @override
+  void setupParentData(RenderBox child) => setupOffsetParentData(child);
+
+  List<RenderBox>? _parts() {
+    final kids = offsetChildren();
+    if (kids.length != 3) return null;
+    return kids;
+  }
+
+  @override
+  double computeMinIntrinsicHeight(double width) => computeMaxIntrinsicHeight(width);
+
+  @override
+  double computeMaxIntrinsicHeight(double width) {
+    final kids = _parts();
+    if (kids == null) return 0;
+    return _vPad * 2 +
+        kids[0].getMaxIntrinsicHeight(width) +
+        kids[1].getMaxIntrinsicHeight(width) +
+        _gap +
+        _barH;
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) => 0;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) => 0;
+
+  @override
+  void performLayout() {
+    final width = constraints.hasBoundedWidth ? constraints.maxWidth : 0.0;
+    final kids = _parts();
+    if (kids == null) {
+      size = constraints.constrain(Size(width, 0));
+      return;
+    }
+    final loose = BoxConstraints(minWidth: width, maxWidth: width);
+    kids[0].layout(loose, parentUsesSize: true);
+    kids[1].layout(loose, parentUsesSize: true);
+    final natural = _vPad * 2 + kids[0].size.height + kids[1].size.height + _gap + _barH;
+    final used = constraints.hasBoundedHeight ? math.max(constraints.maxHeight, natural) : natural;
+    final extra = math.max(0.0, used - natural);
+    final barExtra = math.min(_barExtraMax, extra);
+    final vPad = _vPad + (extra - barExtra) / 2;
+    final barH = _barH + barExtra;
+    kids[2].layout(BoxConstraints.tightFor(width: width, height: barH), parentUsesSize: true);
+    var y = vPad;
+    (kids[0].parentData! as _OffsetParentData).offset = Offset(0, y);
+    y += kids[0].size.height;
+    (kids[1].parentData! as _OffsetParentData).offset = Offset(0, y);
+    y += kids[1].size.height + _gap;
+    (kids[2].parentData! as _OffsetParentData).offset = Offset(0, y);
+    size = constraints.constrain(Size(width, used));
+  }
+}
+
+class _RenderShareTile extends RenderBox
+    with ContainerRenderObjectMixin<RenderBox, _OffsetParentData>, _OffsetChildren {
+  _RenderShareTile({required TextDirection textDirection}) : _textDirection = textDirection;
+
+  static const double _minDonut = 64.0;
+  static const double _maxDonut = 148.0;
+  static const double _gap = 16.0;
+  static const double _pad = 16.0;
+
+  TextDirection _textDirection;
+  TextDirection get textDirection => _textDirection;
+  set textDirection(TextDirection value) {
+    if (value == _textDirection) return;
+    _textDirection = value;
+    markNeedsLayout();
+  }
+
+  @override
+  void setupParentData(RenderBox child) => setupOffsetParentData(child);
+
+  List<RenderBox>? _parts() {
+    final kids = offsetChildren();
+    if (kids.length != 2) return null;
+    return kids;
+  }
+
+  double _textWidth(double width, double donut, double pad) =>
+      math.max(0.0, width - pad * 2 - _gap - donut);
+
+  @override
+  double computeMinIntrinsicHeight(double width) => computeMaxIntrinsicHeight(width);
+
+  @override
+  double computeMaxIntrinsicHeight(double width) {
+    final kids = _parts();
+    if (kids == null) return 0;
+    final textH = kids[1].getMaxIntrinsicHeight(_textWidth(width, _minDonut, _pad));
+    return math.max(_minDonut, textH) + _pad * 2;
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) => 0;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) => 0;
+
+  @override
+  void performLayout() {
+    final width = constraints.hasBoundedWidth ? constraints.maxWidth : 0.0;
+    final kids = _parts();
+    if (kids == null) {
+      size = constraints.constrain(Size(width, 0));
+      return;
+    }
+    final natural = getMaxIntrinsicHeight(width);
+    final used = constraints.hasBoundedHeight ? math.max(constraints.maxHeight, natural) : natural;
+    // Only the height added to match the sibling card enlarges the donut.
+    // A tall competitor list keeps the compact 64dp ring.
+    final extra = math.max(0.0, used - natural);
+    final donut = (_minDonut + extra).clamp(_minDonut, _maxDonut);
+    final textW = _textWidth(width, donut, _pad);
+    kids[1].layout(BoxConstraints(minWidth: textW, maxWidth: textW), parentUsesSize: true);
+    kids[0].layout(BoxConstraints.tightFor(width: donut, height: donut), parentUsesSize: true);
+    final contentH = math.max(0.0, used - _pad * 2);
+    final donutY = _pad + math.max(0.0, (contentH - donut) / 2);
+    final textY = _pad + math.max(0.0, (contentH - kids[1].size.height) / 2);
+    final rtl = textDirection == TextDirection.rtl;
+    final donutX = rtl ? width - _pad - donut : _pad;
+    final textX = rtl ? _pad : _pad + donut + _gap;
+    (kids[0].parentData! as _OffsetParentData).offset = Offset(donutX, donutY);
+    (kids[1].parentData! as _OffsetParentData).offset = Offset(textX, textY);
+    size = constraints.constrain(Size(width, used));
   }
 }
