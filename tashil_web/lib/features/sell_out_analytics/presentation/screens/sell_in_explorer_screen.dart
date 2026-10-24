@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/export_columns.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/data/cache_store.dart';
 import '../../../../core/data/result.dart';
@@ -454,32 +455,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
       return;
     }
     final records = _data.records;
-    final headers = [
-      'السنة',
-      'الشهر',
-      'السلسلة',
-      'المحافظة / الإقليم',
-      'العميل / الفرع',
-      'القطاع',
-      'العلامة التجارية',
-      'الفئة الفرعية',
-      'كود الصنف (Item Code)',
-      'الباركود (Barcode)',
-      'اسم الصنف',
-      'مندوب المبيعات',
-      'شد الكرتونة (Units/Carton)',
-      'الكمية بالكرتونة (Cases)',
-      'إجمالي الكمية بالقطعة (Units)',
-      'سعر الكرتونة الرسمي (Official Carton Excl VAT)',
-      'سعر الكرتونة الفعلي (Actual Case Price Excl VAT)',
-      'نسبة الخصم الفعلي %',
-      'صافي قيمة التوريد غير شامل الضريبة (Net EGP)',
-      'ضريبة القيمة المضافة 14% (VAT EGP)',
-      'إجمالي قيمة الفاتورة شامل الضريبة (Gross Incl VAT EGP)',
-      'الوزن بالطن (Tons)',
-      'حالة التسعير (Pricing Wave)',
-      'الشيت المصدري (Source Sheet)',
-    ];
+    const headers = ExportColumns.sellInRecords;
     final rows = records
         .map(
           (r) => [
@@ -578,23 +554,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
   void _handleExportStockBalanceExcel() {
     final d = _stockDashboard;
     if (d == null) return;
-    final headers = [
-      'السنة (Year)',
-      'الشهر (Month)',
-      'حالة الفترة',
-      'رصيد أول الشهر بالكرتونة (Opening Cases)',
-      'رصيد أول الشهر بالجنيه (Opening EGP)',
-      'التوريد الشهري بالكرتونة (Sell-In Cases)',
-      'قيمة التوريد الشهري (Sell-In EGP)',
-      'المبيعات الفعلية بالكرتونة التقديرية (Sell-Out Cases)',
-      'قيمة المبيعات الفعلية (Sell-Out EGP)',
-      'صافي حركة الشهر بالكرتونة (Monthly Net Cases)',
-      'صافي حركة الشهر بالجنيه (Monthly Net EGP)',
-      'الرصيد المتبقي آخر الشهر بالكرتونة (Closing Stock Cases)',
-      'الرصيد المتبقي آخر الشهر بالجنيه (Closing Stock EGP)',
-      'نسبة التصريف (Sell-Through %)',
-      'تشخيص حالة الرصيد (Stock Health)',
-    ];
+    const headers = ExportColumns.sellInReconciliation;
     final rows = d.monthlyReconciliation
         .map(
           (m) => [

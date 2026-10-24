@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/export_columns.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
@@ -621,25 +622,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
   }
 
   void _exportReplenishmentPOExcel(CPFRDashboardModel d) {
-    final headers = [
-      'اسم الصنف (SKU)',
-      'العلامة التجارية (Brand)',
-      'القطاع (Sector)',
-      'الإقليم (Region)',
-      'المحافظة (Governorate)',
-      'مندوب المبيعات (Sales Rep)',
-      'إجمالي التوريد بالكرتونة (Sell-In Cases)',
-      'البيع الفعلي التقديري بالكرتونة (Sell-Out Cases)',
-      'المرتجعات بالكرتونة (Returns)',
-      'الرصيد التقديري الحالي بالكرتونة (Est. Stock Cases)',
-      'قيمة الرصيد التقديري (Est. Stock EGP)',
-      'معدل السحب اليومي (Daily Run-Rate Cases)',
-      'أيام تغطية المخزون (DOI Days)',
-      'حالة الرصيد (Stock Status)',
-      'أمر التوريد المقترح بالكرتونة (Suggested PO Cases)',
-      'قيمة أمر التوريد المقترح (Suggested PO EGP)',
-      'وزن أمر التوريد بالطن (Suggested PO Tons)',
-    ];
+    const headers = ExportColumns.cpfrReplenishment;
 
     final rows = d.inventoryAndPoItems
         .where((item) => item.suggestedPoCases > 0)

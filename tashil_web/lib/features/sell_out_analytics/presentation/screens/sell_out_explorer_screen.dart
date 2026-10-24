@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../../core/utils/export_columns.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/data/cache_store.dart';
@@ -493,17 +494,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       return;
     }
 
-    final headers = [
-      'الباركود الدولي',
-      'اسم الصنف',
-      'السلسلة',
-      'الفرع',
-      'الفئة',
-      'الكمية المباعة',
-      'سعر الوحدة',
-      'صافي المبيعات (ج.م)',
-      'تاريخ البيع',
-    ];
+    const headers = ExportColumns.sellOutRecords;
 
     final rows = records
         .map((r) => [
