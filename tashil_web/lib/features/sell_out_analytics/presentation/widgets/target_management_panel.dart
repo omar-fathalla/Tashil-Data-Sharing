@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_text_variants.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
@@ -509,7 +510,7 @@ onChanged: m3Legacy<int>((v) {
                                         ),
                                         label: const Text(
                                           'تعبئة الكراتين تلقائياً',
-                                          style: TextStyle(fontSize: M3FontSize.labelSmallPlus),
+                                          style: M3TextVariants.denseLabel,
                                         ),
                                       ),
                                   ],
@@ -1207,10 +1208,7 @@ onChanged: m3Legacy<String>((v) {
                         horizontal: 20.0,
                         vertical: 12.0,
                       ),
-                      textStyle: const TextStyle(
-                        fontSize: M3FontSize.bodyMediumPlus,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      textStyle: M3TextVariants.titleDenseBold,
                       shape: const RoundedRectangleBorder(
                         borderRadius: M3Shape.radiusMd,
                       ),
@@ -1232,10 +1230,7 @@ onChanged: m3Legacy<String>((v) {
                         horizontal: 20.0,
                         vertical: 12.0,
                       ),
-                      textStyle: const TextStyle(
-                        fontSize: M3FontSize.bodyMediumPlus,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      textStyle: M3TextVariants.titleDenseBold,
                       shape: const RoundedRectangleBorder(
                         borderRadius: M3Shape.radiusMd,
                       ),
@@ -1251,10 +1246,7 @@ onChanged: m3Legacy<String>((v) {
                         horizontal: 18.0,
                         vertical: 12.0,
                       ),
-                      textStyle: const TextStyle(
-                        fontSize: M3FontSize.bodyMediumPlus,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      textStyle: M3TextVariants.titleDenseBold,
                       shape: const RoundedRectangleBorder(
                         borderRadius: M3Shape.radiusMd,
                       ),
@@ -1272,10 +1264,7 @@ onChanged: m3Legacy<String>((v) {
                         horizontal: 18.0,
                         vertical: 12.0,
                       ),
-                      textStyle: const TextStyle(
-                        fontSize: M3FontSize.bodyMediumPlus,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      textStyle: M3TextVariants.titleDenseBold,
                       shape: const RoundedRectangleBorder(
                         borderRadius: M3Shape.radiusMd,
                       ),
@@ -1957,10 +1946,7 @@ onChanged: m3Legacy<String>((v) {
             : colorScheme.surfaceContainerHighest.withOpacity(0.6),
         foregroundColor:
             selected ? colorScheme.onPrimary : colorScheme.onSurface,
-        textStyle: const TextStyle(
-          fontSize: M3FontSize.labelMediumPlus,
-          fontWeight: FontWeight.w800,
-        ),
+        textStyle: M3TextVariants.compactLabelHeavy,
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 11.0),
         shape: const RoundedRectangleBorder(
           borderRadius: M3Shape.radiusMd,
@@ -2278,10 +2264,7 @@ onChanged: m3Legacy<String>((v) {
                           ),
                           label: Text(
                             'أصناف الفرع (${b.skus.length})',
-                            style: const TextStyle(
-                              fontSize: M3FontSize.bodySmall,
-                              fontWeight: FontWeight.w800,
-                            ),
+                            style: M3TextVariants.cellHeavy,
                           ),
                         ),
                         const SizedBox(width: 4.0),
@@ -2850,10 +2833,7 @@ onChanged: m3Legacy<String>((v) {
                   children: [
                     Text(
                       '${s.brand} (${s.sector})',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: M3FontSize.bodySmallPlus,
-                      ),
+                      style: M3TextVariants.cellPlusBold,
                     ),
                     if (s.departmentAr.isNotEmpty)
                       Text(
@@ -2929,10 +2909,7 @@ onChanged: m3Legacy<String>((v) {
                   children: [
                     Text(
                       '${CurrencyFormatter.formatNumber(s.actualUnits.round())} كرتونة (${CurrencyFormatter.formatNumber(actualPieces)} ق)',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: M3FontSize.bodySmallPlus,
-                      ),
+                      style: M3TextVariants.cellPlusHeavy,
                     ),
                     Text(
                       CurrencyFormatter.formatEGP(s.actualRevenueEgp),
@@ -2948,13 +2925,9 @@ onChanged: m3Legacy<String>((v) {
                   children: [
                     Text(
                       '${s.varianceUnits >= 0 ? '+' : ''}${CurrencyFormatter.formatNumber(s.varianceUnits.round())} كرتونة',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: M3FontSize.bodySmallPlus,
-                        color: isPositive
+                      style: M3TextVariants.cellPlusHeavy.copyWith(color: isPositive
                             ? M3StatusColors.of(context).accents.positive
-                            : colorScheme.error,
-                      ),
+                            : colorScheme.error),
                     ),
                     Text(
                       '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(s.varianceRevenueEgp)}',
@@ -3119,7 +3092,7 @@ onChanged: m3Legacy<String>((v) {
                   DataCell(
                     Text(
                       'MT: ${CurrencyFormatter.formatCompactEGP(r.mtTargetRevenueEgp)} • CC: ${CurrencyFormatter.formatCompactEGP(r.ccTargetRevenueEgp)}',
-                      style: const TextStyle(fontSize: M3FontSize.bodySmall),
+                      style: M3TextVariants.cell,
                     ),
                   ),
                   DataCell(

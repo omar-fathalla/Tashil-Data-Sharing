@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_text_variants.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import '../../../../core/utils/export_columns.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
@@ -1110,18 +1111,18 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                 dataRowMaxHeight: 48.0,
                 columnSpacing: 18.0,
                 columns: const [
-                  DataColumn(label: Text('كود الكارتة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: M3FontSize.labelSmallPlus))),
-                  DataColumn(label: Text('الصنف الرسمي', style: TextStyle(fontWeight: FontWeight.bold, fontSize: M3FontSize.labelSmallPlus))),
-                  DataColumn(numeric: true, label: Text('الشد', style: TextStyle(fontWeight: FontWeight.bold, fontSize: M3FontSize.labelSmallPlus))),
-                  DataColumn(numeric: true, label: Text('الوحدات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: M3FontSize.labelSmallPlus))),
-                  DataColumn(numeric: true, label: Text('الكراتين', style: TextStyle(fontWeight: FontWeight.bold, fontSize: M3FontSize.labelSmallPlus))),
-                  DataColumn(numeric: true, label: Text('سعر الكارتة (شامل)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: M3FontSize.labelSmallPlus))),
-                  DataColumn(numeric: true, label: Text('سعر الكاشير الفعلي', style: TextStyle(fontWeight: FontWeight.bold, fontSize: M3FontSize.labelSmallPlus))),
-                  DataColumn(numeric: true, label: Text('انحراف السعر', style: TextStyle(fontWeight: FontWeight.bold, fontSize: M3FontSize.labelSmallPlus))),
-                  DataColumn(numeric: true, label: Text('تكلفة المصنع للقطعة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: M3FontSize.labelSmallPlus))),
-                  DataColumn(numeric: true, label: Text('صافي الكرتونة للفاتورة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: M3FontSize.labelSmallPlus))),
-                  DataColumn(numeric: true, label: Text('صافي المبيعات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: M3FontSize.labelSmallPlus))),
-                  DataColumn(numeric: true, label: Text('هامش السلسلة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: M3FontSize.labelSmallPlus))),
+                  DataColumn(label: Text('كود الكارتة', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(label: Text('الصنف الرسمي', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('الشد', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('الوحدات', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('الكراتين', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('سعر الكارتة (شامل)', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('سعر الكاشير الفعلي', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('انحراف السعر', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('تكلفة المصنع للقطعة', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('صافي الكرتونة للفاتورة', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('صافي المبيعات', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('هامش السلسلة', style: M3TextVariants.denseLabelBold)),
                 ],
                 rows: filteredItems.map((s) {
                   final isNegMargin = s.retailerMarginPct < 0;
@@ -1134,13 +1135,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                           onTap: () => _openProductIdCardForSummary(s),
                           child: Text(
                             s.itemCode.isNotEmpty ? s.itemCode : s.barcode,
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: M3FontSize.labelSmall,
-                              fontWeight: FontWeight.w800,
-                              color: colorScheme.primary,
-                              decoration: TextDecoration.underline,
-                            ),
+                            style: M3TextVariants.microHeavy.copyWith(fontFamily: 'monospace', color: colorScheme.primary, decoration: TextDecoration.underline),
                           ),
                         ),
                       ),
@@ -1158,36 +1153,28 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                           ),
                         ),
                       ),
-                      DataCell(Text('${s.unitsPerCarton}', style: const TextStyle(fontSize: M3FontSize.labelSmallPlus))),
-                      DataCell(Text(CurrencyFormatter.formatNumber(s.totalUnitsSold), style: const TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w700))),
-                      DataCell(Text(s.totalCartonsSold.toStringAsFixed(1), style: const TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w700))),
-                      DataCell(Text(s.officialConsumerRsp > 0 ? '${s.officialConsumerRsp.toStringAsFixed(2)} ج.م' : '—', style: const TextStyle(fontSize: M3FontSize.labelSmallPlus))),
-                      DataCell(Text('${s.avgSellingPrice.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w700))),
+                      DataCell(Text('${s.unitsPerCarton}', style: M3TextVariants.denseLabel)),
+                      DataCell(Text(CurrencyFormatter.formatNumber(s.totalUnitsSold), style: M3TextVariants.denseLabelBold)),
+                      DataCell(Text(s.totalCartonsSold.toStringAsFixed(1), style: M3TextVariants.denseLabelBold)),
+                      DataCell(Text(s.officialConsumerRsp > 0 ? '${s.officialConsumerRsp.toStringAsFixed(2)} ج.م' : '—', style: M3TextVariants.denseLabel)),
+                      DataCell(Text('${s.avgSellingPrice.toStringAsFixed(2)} ج.م', style: M3TextVariants.denseLabelBold)),
                       DataCell(
                         Text(
                           s.officialConsumerRsp > 0 ? '$deltaSign${s.priceDeltaPct.toStringAsFixed(1)}%' : '—',
-                          style: TextStyle(
-                            fontSize: M3FontSize.labelSmallPlus,
-                            fontWeight: FontWeight.w700,
-                            color: s.priceDeltaPct < -5.0
+                          style: M3TextVariants.denseLabelBold.copyWith(color: s.priceDeltaPct < -5.0
                                 ? colorScheme.tertiary
-                                : (s.priceDeltaPct > 5.0 ? colorScheme.error : colorScheme.onSurfaceVariant),
-                          ),
+                                : (s.priceDeltaPct > 5.0 ? colorScheme.error : colorScheme.onSurfaceVariant)),
                         ),
                       ),
-                      DataCell(Text(s.factoryUnitCost > 0 ? '${s.factoryUnitCost.toStringAsFixed(2)} ج.م' : '—', style: const TextStyle(fontSize: M3FontSize.labelSmallPlus))),
-                      DataCell(Text(s.netCartonInvoiceCost > 0 ? '${s.netCartonInvoiceCost.toStringAsFixed(2)} ج.م' : '—', style: const TextStyle(fontSize: M3FontSize.labelSmallPlus))),
-                      DataCell(Text(CurrencyFormatter.formatCompactEGP(s.totalNetRevenue), style: TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w800, color: colorScheme.primary))),
+                      DataCell(Text(s.factoryUnitCost > 0 ? '${s.factoryUnitCost.toStringAsFixed(2)} ج.م' : '—', style: M3TextVariants.denseLabel)),
+                      DataCell(Text(s.netCartonInvoiceCost > 0 ? '${s.netCartonInvoiceCost.toStringAsFixed(2)} ج.م' : '—', style: M3TextVariants.denseLabel)),
+                      DataCell(Text(CurrencyFormatter.formatCompactEGP(s.totalNetRevenue), style: M3TextVariants.denseLabelHeavy.copyWith(color: colorScheme.primary))),
                       DataCell(
                         Text(
                           s.retailerMarginPct != 0
                               ? '${s.retailerMarginPct.toStringAsFixed(1)}% (${CurrencyFormatter.formatCompactEGP(s.retailerGrossProfit)})'
                               : '—',
-                          style: TextStyle(
-                            fontSize: M3FontSize.labelSmallPlus,
-                            fontWeight: FontWeight.w800,
-                            color: marginColor,
-                          ),
+                          style: M3TextVariants.denseLabelHeavy.copyWith(color: marginColor),
                         ),
                       ),
                     ],
@@ -1392,13 +1379,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                       key: ValueKey('branch_chart_year_${yrItem.year}'),
                       label: Text(
                         yrItem.label,
-                        style: TextStyle(
-                          fontSize: M3FontSize.bodySmall,
-                          fontWeight: FontWeight.w800,
-                          color: _selectedYear == yrItem.year
+                        style: M3TextVariants.cellHeavy.copyWith(color: _selectedYear == yrItem.year
                               ? colorScheme.onPrimary
-                              : colorScheme.onSurface,
-                        ),
+                              : colorScheme.onSurface),
                       ),
                       selected: _selectedYear == yrItem.year,
                       selectedColor: colorScheme.primary,
@@ -1431,7 +1414,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                     ),
                     label: Text(
                       _chartSortAscending ? 'الأقل للأعلى' : 'الأعلى للأقل',
-                      style: const TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w800),
+                      style: M3TextVariants.denseLabelHeavy,
                     ),
                   ),
 
@@ -1971,11 +1954,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               '$label: $branchName',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: M3FontSize.labelSmallPlus,
-                fontWeight: FontWeight.w800,
-                color: colorScheme.onSurface,
-              ),
+              style: M3TextVariants.denseLabelHeavy.copyWith(color: colorScheme.onSurface),
             ),
           ),
           const SizedBox(width: 6.0),
@@ -2682,11 +2661,7 @@ onChanged: m3Legacy<String>((v) {
                                 'Branch YoY & MoM Growth Matrix • متابعة الفروع الصاعدة والمتراجعة ($perfPeriodBadgeAr)',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: M3FontSize.labelSmallPlus,
-                                  fontWeight: FontWeight.w600,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
+                                style: M3TextVariants.denseLabelSemi.copyWith(color: colorScheme.onSurfaceVariant),
                               ),
                             ],
                           ),
@@ -3317,10 +3292,7 @@ onChanged: m3Legacy<int>((v) {
                                   file.uploadedAt.length >= 16
                                       ? file.uploadedAt.substring(0, 16).replaceAll('T', ' ')
                                       : file.uploadedAt,
-                                  style: TextStyle(
-                                    fontSize: M3FontSize.bodySmall,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
+                                  style: M3TextVariants.cell.copyWith(color: colorScheme.onSurfaceVariant),
                                 ),
                               ),
                               DataCell(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_text_variants.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
@@ -1126,10 +1127,7 @@ onChanged: m3Legacy<int>((v) {
                         horizontal: 18.0,
                         vertical: 10.0,
                       ),
-                      textStyle: const TextStyle(
-                        fontSize: M3FontSize.bodyCompact,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      textStyle: M3TextVariants.titleCompactBold,
                     ),
                     onPressed: _isUploading ? null : () => _pickAndUploadSellInFile(),
                     icon: _isUploading
@@ -1148,10 +1146,7 @@ onChanged: m3Legacy<int>((v) {
                         horizontal: 18.0,
                         vertical: 10.0,
                       ),
-                      textStyle: const TextStyle(
-                        fontSize: M3FontSize.bodyCompact,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      textStyle: M3TextVariants.titleCompactBold,
                     ),
                     onPressed: _handleExportExcel,
                     icon: const Icon(Icons.download_rounded, size: 20.0),
@@ -1164,10 +1159,7 @@ onChanged: m3Legacy<int>((v) {
                         horizontal: 18.0,
                         vertical: 10.0,
                       ),
-                      textStyle: const TextStyle(
-                        fontSize: M3FontSize.bodyCompact,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      textStyle: M3TextVariants.titleCompactBold,
                     ),
                     onPressed: _handleExportPdf,
                     icon: const Icon(Icons.print_rounded, size: 20.0),
@@ -1420,10 +1412,7 @@ onChanged: m3Legacy<int>((v) {
                                   r.sourceFilename.isNotEmpty
                                       ? r.sourceFilename
                                       : 'Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx',
-                                  style: TextStyle(
-                                    fontSize: M3FontSize.labelSmallPlus,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
+                                  style: M3TextVariants.denseLabel.copyWith(color: colorScheme.onSurfaceVariant),
                                 ),
                               ),
                             ],
@@ -1581,13 +1570,9 @@ onChanged: m3Legacy<int>((v) {
                     selected: !_showFullYtdReconciliation,
                     label: Text(
                       'الفترة المتطابقة ($matchedLabel — ${d.matchedMonthsCount > 0 ? d.matchedMonthsCount : 4} أشهر)',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: M3FontSize.bodySmallPlus,
-                        color: !_showFullYtdReconciliation
+                      style: M3TextVariants.cellPlusHeavy.copyWith(color: !_showFullYtdReconciliation
                             ? colorScheme.onPrimaryContainer
-                            : colorScheme.onSurface,
-                      ),
+                            : colorScheme.onSurface),
                     ),
                     onSelected: (_) => setState(() => _showFullYtdReconciliation = false),
                   ),
@@ -1595,13 +1580,9 @@ onChanged: m3Legacy<int>((v) {
                     selected: _showFullYtdReconciliation,
                     label: Text(
                       'إجمالي العام شامل التوريدات تحت التصريف (يناير - أكتوبر)',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: M3FontSize.bodySmallPlus,
-                        color: _showFullYtdReconciliation
+                      style: M3TextVariants.cellPlusHeavy.copyWith(color: _showFullYtdReconciliation
                             ? colorScheme.onPrimaryContainer
-                            : colorScheme.onSurface,
-                      ),
+                            : colorScheme.onSurface),
                     ),
                     onSelected: (_) => setState(() => _showFullYtdReconciliation = true),
                   ),
@@ -2123,13 +2104,9 @@ onChanged: m3Legacy<String>((v) {
                         DataCell(
                           Text(
                             m.stockHealthLabelAr,
-                            style: TextStyle(
-                              fontSize: M3FontSize.bodySmall,
-                              fontWeight: FontWeight.w600,
-                              color: m.stockHealthStatus == 'overstock'
+                            style: M3TextVariants.cellSemi.copyWith(color: m.stockHealthStatus == 'overstock'
                                   ? M3StatusColors.of(context).accents.caution
-                                  : M3StatusColors.of(context).accents.teal,
-                            ),
+                                  : M3StatusColors.of(context).accents.teal),
                           ),
                         ),
                       ],
@@ -2293,7 +2270,7 @@ onChanged: m3Legacy<String>((v) {
                               controller: _skuSearchController,
                               decoration: InputDecoration(
                                 hintText: 'بحث بالصنف أو البراند (مثلاً: Maxell, Diva, Dove)...',
-                                hintStyle: TextStyle(fontSize: M3FontSize.labelMediumPlus, color: colorScheme.onSurfaceVariant),
+                                hintStyle: M3TextVariants.compactLabel.copyWith(color: colorScheme.onSurfaceVariant),
                                 prefixIcon: const Icon(Icons.search_rounded, size: 20),
                                 suffixIcon: _skuSearchQuery.isNotEmpty
                                     ? IconButton(
@@ -2336,7 +2313,7 @@ options: m3OptionsFromMenuItems<String>([
                                   value: 'all',
                                   child: Text(
                                     'كل الماركات (All Brands) (${d.inventoryAndPoItems.length})',
-                                    style: const TextStyle(fontSize: M3FontSize.labelMediumPlus, fontWeight: FontWeight.bold),
+                                    style: M3TextVariants.compactLabelBold,
                                   ),
                                 ),
                                 ...availableBrands.map(
@@ -2344,7 +2321,7 @@ options: m3OptionsFromMenuItems<String>([
                                     value: b,
                                     child: Text(
                                       '$b (${brandItemCounts[b] ?? 0})',
-                                      style: const TextStyle(fontSize: M3FontSize.labelMediumPlus),
+                                      style: M3TextVariants.compactLabel,
                                     ),
                                   ),
                                 ),
@@ -2366,22 +2343,21 @@ leadingIcon: Icons.filter_alt_rounded,
 options: m3OptionsFromMenuItems<String>([
                                 const DropdownMenuItem(
                                   value: 'all',
-                                  child: Text('كل الحالات (All)', style: TextStyle(fontSize: M3FontSize.labelMediumPlus)),
+                                  child: Text('كل الحالات (All)'),
                                 ),
                                 const DropdownMenuItem(
                                   value: 'urgent_replenishment',
                                   child: Text(
                                     '🚨 خطر نفاد عاجل (Urgent)',
-                                    style: TextStyle(fontSize: M3FontSize.labelMediumPlus, fontWeight: FontWeight.bold, color: Colors.red),
                                   ),
                                 ),
                                 const DropdownMenuItem(
                                   value: 'optimal',
-                                  child: Text('✅ رصيد آمن (Optimal)', style: TextStyle(fontSize: M3FontSize.labelMediumPlus, color: Colors.teal)),
+                                  child: Text('✅ رصيد آمن (Optimal)'),
                                 ),
                                 const DropdownMenuItem(
                                   value: 'overstock',
-                                  child: Text('⚠️ تكدس مخزني (Overstock)', style: TextStyle(fontSize: M3FontSize.labelMediumPlus, color: Colors.orange)),
+                                  child: Text('⚠️ تكدس مخزني (Overstock)'),
                                 ),
                               ]),
 onChanged: m3Legacy<String>((val) {
@@ -3234,10 +3210,7 @@ onChanged: m3Legacy<int>((v) {
                                           .substring(0, 16)
                                           .replaceAll('T', ' ')
                                       : file.uploadedAt,
-                                  style: TextStyle(
-                                    fontSize: M3FontSize.bodySmall,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
+                                  style: M3TextVariants.cell.copyWith(color: colorScheme.onSurfaceVariant),
                                 ),
                               ),
                               DataCell(
