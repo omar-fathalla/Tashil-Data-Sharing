@@ -2910,7 +2910,7 @@ class ApiClient {
         'limit': limit.toString(),
         'offset': offset.toString(),
       });
-      final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+      final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 60));
       if (resp.statusCode == 200) {
         isServerOnline.value = true;
         lastConnectionError = null;
@@ -8735,7 +8735,7 @@ class ApiClient {
       final uri = Uri.parse(ApiEndpoints.sellInRecords).replace(queryParameters: params);
       final response = await http
           .get(uri, headers: _headers)
-          .timeout(const Duration(seconds: 12));
+          .timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
