@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -1781,12 +1782,12 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
 
   Color _getChainColor(String chain) {
     final c = chain.toLowerCase().trim();
-    if (c.contains('fathalla') || c.contains('فتح الله')) return const Color(0xFF10B981);
-    if (c.contains('beet') || c.contains('بيت الجملة')) return const Color(0xFF7C3AED);
-    if (c.contains('gomla') || c.contains('جملة')) return const Color(0xFFF59E0B);
-    if (c.contains('carrefour') || c.contains('كارفور')) return const Color(0xFF2563EB);
-    if (c.contains('spinneys') || c.contains('سبينيس')) return const Color(0xFFE11D48);
-    return const Color(0xFF6B7280);
+    if (c.contains('fathalla') || c.contains('فتح الله')) return M3Palette.emerald;
+    if (c.contains('beet') || c.contains('بيت الجملة')) return M3Palette.violet;
+    if (c.contains('gomla') || c.contains('جملة')) return M3Palette.amber;
+    if (c.contains('carrefour') || c.contains('كارفور')) return M3Palette.blue;
+    if (c.contains('spinneys') || c.contains('سبينيس')) return M3Palette.rose;
+    return M3Palette.neutral;
   }
 
   String _getChainDisplayName(String chain) {

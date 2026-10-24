@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
@@ -1302,7 +1303,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
       return const ChainBrandStyle(
         background: Color(0xFFCCFBF1),
         border: Color(0xFF99F6E4),
-        foreground: Color(0xFF0F766E),
+        foreground: M3Palette.teal,
         accent: Color(0xFF0D9488),
         icon: Icons.corporate_fare_rounded,
         displayNameAr: 'قطاع المؤسسات',
@@ -1314,7 +1315,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
         background: Color(0xFFDBEAFE),
         border: Color(0xFFBFDBFE),
         foreground: Color(0xFF1D4ED8),
-        accent: Color(0xFF2563EB),
+        accent: M3Palette.blue,
         icon: Icons.shopping_bag_rounded,
         displayNameAr: 'أسواق فتح الله',
         displayNameEn: 'Fathalla',
@@ -1324,8 +1325,8 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
       return const ChainBrandStyle(
         background: Color(0xFFFEF3C7),
         border: Color(0xFFFDE68A),
-        foreground: Color(0xFFB45309),
-        accent: Color(0xFFD97706),
+        foreground: M3Palette.amberDeep,
+        accent: M3Palette.warning,
         icon: Icons.local_offer_rounded,
         displayNameAr: 'جملة ماركت',
         displayNameEn: 'Gomla Market',
@@ -1336,7 +1337,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
         background: Color(0xFFE0F2FE),
         border: Color(0xFFBAE6FD),
         foreground: Color(0xFF0369A1),
-        accent: Color(0xFF0284C7),
+        accent: M3Palette.info,
         icon: Icons.local_grocery_store_rounded,
         displayNameAr: 'كارفور مصر',
         displayNameEn: 'Carrefour',
@@ -1347,7 +1348,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
         background: Color(0xFFD1FAE5),
         border: Color(0xFFA7F3D0),
         foreground: Color(0xFF047857),
-        accent: Color(0xFF059669),
+        accent: M3Palette.emeraldDeep,
         icon: Icons.shopping_basket_rounded,
         displayNameAr: 'سبينيس مصر',
         displayNameEn: 'Spinneys',
@@ -1358,7 +1359,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
         background: Color(0xFFFFE4E6),
         border: Color(0xFFFECDD3),
         foreground: Color(0xFFBE123C),
-        accent: Color(0xFFE11D48),
+        accent: M3Palette.rose,
         icon: Icons.store_mall_directory_rounded,
         displayNameAr: 'مترو ماركت',
         displayNameEn: 'Metro',

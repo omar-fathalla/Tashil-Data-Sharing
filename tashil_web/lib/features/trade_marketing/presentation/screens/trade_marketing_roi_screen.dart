@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 
 import 'package:flutter/material.dart';
@@ -865,21 +866,21 @@ onChanged: m3Legacy<int>((v) {
                             _buildSimMetricRow(
                               'الزيادة المتوقعة عن الشهر السابق (MoM Lift):',
                               '+${CurrencyFormatter.formatEGP(momLift)} (+${momPct.toStringAsFixed(1)}%)',
-                              const Color(0xFF15803D),
+                              M3Palette.success,
                               isBold: true,
                             ),
                             const SizedBox(height: 6.0),
                             _buildSimMetricRow(
                               'الزيادة المتوقعة عن العام السابق (YoY Lift):',
                               '+${CurrencyFormatter.formatEGP(yoyLift)} (+${yoyPct.toStringAsFixed(1)}%)',
-                              const Color(0xFF0284C7),
+                              M3Palette.info,
                               isBold: true,
                             ),
                             const SizedBox(height: 6.0),
                             _buildSimMetricRow(
                               'العائد لكل 1 جنيه تسويق (ROMI Multiple):',
                               '${romi.toStringAsFixed(2)}x (كل 1 ج.م يحقق ${romi.toStringAsFixed(2)} ج.م نمو مبيعات)',
-                              const Color(0xFF7C3AED),
+                              M3Palette.violet,
                               isBold: true,
                             ),
                           ],
@@ -975,7 +976,7 @@ onChanged: m3Legacy<int>((v) {
                           titleEn: 'Campaign Spend',
                           value: CurrencyFormatter.formatEGP(summary.marketingSpendEgp),
                           sub: '${summary.activitiesCount} أنشطة ترويجية',
-                          color: const Color(0xFF7C3AED),
+                          color: M3Palette.violet,
                         ),
                         _buildMiniDrillCard(
                           titleAr: 'مبيعات الشهر الحالي',
@@ -989,14 +990,14 @@ onChanged: m3Legacy<int>((v) {
                           titleEn: 'vs. Previous Month (${CurrencyFormatter.formatEGP(summary.previousMonthSalesEgp)})',
                           value: '${summary.momLiftEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(summary.momLiftEgp)}',
                           sub: '${summary.momGrowthPct >= 0 ? '+' : ''}${summary.momGrowthPct.toStringAsFixed(1)}% MoM Growth',
-                          color: summary.momGrowthPct >= 0 ? const Color(0xFF15803D) : const Color(0xFFDC2626),
+                          color: summary.momGrowthPct >= 0 ? M3Palette.success : M3Palette.danger,
                         ),
                         _buildMiniDrillCard(
                           titleAr: 'النمو عن نفس الشهر بالعام السابق (YoY)',
                           titleEn: 'vs. Last Year (${CurrencyFormatter.formatEGP(summary.lastYearSameMonthSalesEgp)})',
                           value: '${summary.yoyLiftEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(summary.yoyLiftEgp)}',
                           sub: '${summary.yoyGrowthPct >= 0 ? '+' : ''}${summary.yoyGrowthPct.toStringAsFixed(1)}% YoY Growth',
-                          color: summary.yoyGrowthPct >= 0 ? const Color(0xFF0284C7) : const Color(0xFFDC2626),
+                          color: summary.yoyGrowthPct >= 0 ? M3Palette.info : M3Palette.danger,
                         ),
                       ],
                     ),
@@ -1356,7 +1357,7 @@ onChanged: m3Legacy<int>((v) {
             badgeText: '$activitiesCount Campaigns / Activities',
             subText: 'الفلورات، الدعاية، الهدايا، والإيفنتات',
             icon: Icons.campaign_rounded,
-            accentColor: const Color(0xFF7C3AED),
+            accentColor: M3Palette.violet,
           ),
           _buildSymmetricalKpiCard(
             theme: theme,
@@ -1367,7 +1368,7 @@ onChanged: m3Legacy<int>((v) {
             badgeText: '${totalMomPct >= 0 ? '+' : ''}${totalMomPct.toStringAsFixed(1)}% MoM',
             subText: 'مقارنة بمبيعات الشهر السابق مباشرةً',
             icon: Icons.show_chart_rounded,
-            accentColor: totalMomLift >= 0 ? const Color(0xFF15803D) : const Color(0xFFDC2626),
+            accentColor: totalMomLift >= 0 ? M3Palette.success : M3Palette.danger,
           ),
           _buildSymmetricalKpiCard(
             theme: theme,
@@ -1378,7 +1379,7 @@ onChanged: m3Legacy<int>((v) {
             badgeText: '${totalYoyPct >= 0 ? '+' : ''}${totalYoyPct.toStringAsFixed(1)}% YoY',
             subText: 'مقارنة بنفس الشهر من السنة السابقة',
             icon: Icons.calendar_month_rounded,
-            accentColor: totalYoyLift >= 0 ? const Color(0xFF0284C7) : const Color(0xFFDC2626),
+            accentColor: totalYoyLift >= 0 ? M3Palette.info : M3Palette.danger,
           ),
           _buildSymmetricalKpiCard(
             theme: theme,
@@ -1389,7 +1390,7 @@ onChanged: m3Legacy<int>((v) {
             badgeText: 'Cost Ratio: ${spendRatioPct.toStringAsFixed(1)}%',
             subText: 'كل 1 ج.م تسويق حقق ${overallRomi.toStringAsFixed(2)} ج.م نمو',
             icon: Icons.workspace_premium_rounded,
-            accentColor: const Color(0xFFD97706),
+            accentColor: M3Palette.warning,
           ),
         ];
 
@@ -1939,7 +1940,7 @@ onChanged: m3Legacy<String>((v) {
                               CurrencyFormatter.formatEGP(s.marketingSpendEgp),
                               style: const TextStyle(
                                 fontWeight: FontWeight.w900,
-                                color: Color(0xFF7C3AED),
+                                color: M3Palette.violet,
                                 fontSize: M3FontSize.bodyCompact,
                               ),
                             ),
@@ -1984,7 +1985,7 @@ onChanged: m3Legacy<String>((v) {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
                               decoration: BoxDecoration(
-                                color: (momPositive ? const Color(0xFF15803D) : const Color(0xFFDC2626))
+                                color: (momPositive ? M3Palette.success : M3Palette.danger)
                                     .withOpacity(0.12),
                                 borderRadius: M3Shape.radiusFull,
                               ),
@@ -1993,7 +1994,7 @@ onChanged: m3Legacy<String>((v) {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   fontSize: M3FontSize.labelSmallPlus,
-                                  color: momPositive ? const Color(0xFF15803D) : const Color(0xFFDC2626),
+                                  color: momPositive ? M3Palette.success : M3Palette.danger,
                                 ),
                               ),
                             ),
@@ -2003,7 +2004,7 @@ onChanged: m3Legacy<String>((v) {
                               style: TextStyle(
                                 fontSize: M3FontSize.labelSmallPlus,
                                 fontWeight: FontWeight.w700,
-                                color: momPositive ? const Color(0xFF15803D) : const Color(0xFFDC2626),
+                                color: momPositive ? M3Palette.success : M3Palette.danger,
                               ),
                             ),
                           ],
@@ -2017,7 +2018,7 @@ onChanged: m3Legacy<String>((v) {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
                               decoration: BoxDecoration(
-                                color: (yoyPositive ? const Color(0xFF0284C7) : const Color(0xFFDC2626))
+                                color: (yoyPositive ? M3Palette.info : M3Palette.danger)
                                     .withOpacity(0.12),
                                 borderRadius: M3Shape.radiusFull,
                               ),
@@ -2026,7 +2027,7 @@ onChanged: m3Legacy<String>((v) {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   fontSize: M3FontSize.labelSmallPlus,
-                                  color: yoyPositive ? const Color(0xFF0284C7) : const Color(0xFFDC2626),
+                                  color: yoyPositive ? M3Palette.info : M3Palette.danger,
                                 ),
                               ),
                             ),
@@ -2036,7 +2037,7 @@ onChanged: m3Legacy<String>((v) {
                               style: TextStyle(
                                 fontSize: M3FontSize.labelSmallPlus,
                                 fontWeight: FontWeight.w700,
-                                color: yoyPositive ? const Color(0xFF0284C7) : const Color(0xFFDC2626),
+                                color: yoyPositive ? M3Palette.info : M3Palette.danger,
                               ),
                             ),
                           ],

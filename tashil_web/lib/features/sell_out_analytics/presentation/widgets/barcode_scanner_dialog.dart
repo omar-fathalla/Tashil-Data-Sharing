@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -232,7 +233,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                       borderRadius: M3Shape.radiusLg,
                       border: Border.all(
                         color: _isDetecting
-                            ? const Color(0xFF10B981)
+                            ? M3Palette.emerald
                             : colorScheme.primary.withOpacity(0.6),
                         width: 2.0,
                       ),
@@ -262,8 +263,8 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                                       colors: [
                                         colorScheme.primary.withOpacity(0.0),
                                         _isDetecting
-                                            ? const Color(0xFF10B981)
-                                            : const Color(0xFF38BDF8),
+                                            ? M3Palette.emerald
+                                            : M3Palette.sky,
                                         colorScheme.primary.withOpacity(0.0),
                                       ],
                                     ),
@@ -300,7 +301,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         color: _isDetecting
-                                            ? const Color(0xFF10B981)
+                                            ? M3Palette.emerald
                                             : const Color(0xFFEF4444),
                                       ),
                                     ),
@@ -370,7 +371,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                                   : 'Point camera at product barcode',
                               style: TextStyle(
                                 color: _isDetecting
-                                    ? const Color(0xFF10B981)
+                                    ? M3Palette.emerald
                                     : Colors.white,
                                 fontSize: M3FontSize.bodySmall,
                                 fontWeight: FontWeight.w600,
@@ -537,7 +538,7 @@ class _ScannerReticle extends StatelessWidget {
   Widget build(BuildContext context) {
     const cornerSize = 22.0;
     const cornerWidth = 3.0;
-    const cornerColor = Color(0xFF38BDF8);
+    const cornerColor = M3Palette.sky;
 
     return Center(
       child: SizedBox(

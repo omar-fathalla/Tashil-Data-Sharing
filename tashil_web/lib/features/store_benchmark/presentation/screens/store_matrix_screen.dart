@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -1123,18 +1124,18 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
   Color _getChainColor(String chain) {
     switch (chain.toLowerCase()) {
       case 'fathalla':
-        return const Color(0xFF10B981); // Emerald Green
+        return M3Palette.emerald; // Emerald Green
       case 'gomla':
-        return const Color(0xFFF59E0B); // Amber / Orange
+        return M3Palette.amber; // Amber / Orange
       case 'beet-elgomla':
       case 'beet_elgomla':
-        return const Color(0xFF7C3AED); // Royal Violet
+        return M3Palette.violet; // Royal Violet
       case 'carrefour':
-        return const Color(0xFF2563EB); // Royal Blue
+        return M3Palette.blue; // Royal Blue
       case 'spinneys':
-        return const Color(0xFFE11D48); // Rose / Red
+        return M3Palette.rose; // Rose / Red
       default:
-        return const Color(0xFF6B7280);
+        return M3Palette.neutral;
     }
   }
 

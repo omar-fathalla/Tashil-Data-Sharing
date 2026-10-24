@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_palette.dart';
 
 /// Categories of FMCG Trade Marketing & Promotional activities
 enum MarketingExpenseCategory {
@@ -7,21 +8,21 @@ enum MarketingExpenseCategory {
     labelAr: 'تأجير فلورات ومساحات عرض',
     labelEn: 'Floor Display & Gondola Rentals',
     icon: Icons.storefront_rounded,
-    color: Color(0xFF0284C7),
+    color: M3Palette.info,
   ),
   advertising(
     id: 'advertising',
     labelAr: 'دعاية وإعلانات ومجلات عروض',
     labelEn: 'Advertising, Flyers & Branding',
     icon: Icons.campaign_rounded,
-    color: Color(0xFF7C3AED),
+    color: M3Palette.violet,
   ),
   giftsAndSamples(
     id: 'gifts_samples',
     labelAr: 'هدايا وعينات مجانية وبوندل',
     labelEn: 'Free Gifts, Samples & Promo Bundles',
     icon: Icons.card_giftcard_rounded,
-    color: Color(0xFFD97706),
+    color: M3Palette.warning,
   ),
   eventsAndAgencies(
     id: 'events_agencies',
@@ -35,14 +36,14 @@ enum MarketingExpenseCategory {
     labelAr: 'حوافز مروجي ومنسقي المبيعات',
     labelEn: 'Promoter & Merchandiser Incentives',
     icon: Icons.badge_rounded,
-    color: Color(0xFF059669),
+    color: M3Palette.emeraldDeep,
   ),
   equipmentRental(
     id: 'equipment_rental',
     labelAr: 'تأجير ثلاجات ومعدات عرض',
     labelEn: 'Chillers & Display Equipment Rentals',
     icon: Icons.kitchen_rounded,
-    color: Color(0xFF2563EB),
+    color: M3Palette.blue,
   );
 
   final String id;
@@ -232,13 +233,13 @@ class MonthlyChainRoiSummary {
   Color get verdictColor {
     if (marketingSpendEgp <= 0) return const Color(0xFF64748B);
     if (romiMultiple >= 3.5 && momGrowthPct >= 10.0) {
-      return const Color(0xFF15803D);
+      return M3Palette.success;
     } else if (romiMultiple >= 1.5 || (momGrowthPct >= 5.0 && yoyGrowthPct >= 10.0)) {
-      return const Color(0xFF0284C7);
+      return M3Palette.info;
     } else if (momGrowthPct > 0 || yoyGrowthPct > 5.0) {
-      return const Color(0xFFD97706);
+      return M3Palette.warning;
     } else {
-      return const Color(0xFFDC2626);
+      return M3Palette.danger;
     }
   }
 }

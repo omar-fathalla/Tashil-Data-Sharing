@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_icons.dart';
@@ -564,8 +565,8 @@ class _CompetitorComparisonScreenState
                     value: '$advantageSkusCount من $totalOwnSkus أصناف',
                     subtitle: 'سعر بيعنا أقل من متوسط المنافسين المباشرين',
                     icon: Icons.trending_down_rounded,
-                    containerColor: const Color(0xFFE6F4EA),
-                    onContainerColor: const Color(0xFF0D652D),
+                    containerColor: M3Palette.successSurface,
+                    onContainerColor: M3Palette.onSuccessSurface,
                   ),
                   _buildKpiCard(
                     context: context,
@@ -574,8 +575,8 @@ class _CompetitorComparisonScreenState
                         '▲ $priceIncreasedSkusCount زاد | ▼ $priceDecreasedSkusCount نزل',
                     subtitle: 'تتبع شهري لارتفاع وانخفاض الأسعار (يناير - أبريل)',
                     icon: Icons.show_chart_rounded,
-                    containerColor: const Color(0xFFFEF7E0),
-                    onContainerColor: const Color(0xFFB06000),
+                    containerColor: M3Palette.warningSurface,
+                    onContainerColor: M3Palette.onWarningSurface,
                   ),
                   _buildKpiCard(
                     context: context,
@@ -851,7 +852,7 @@ class _CompetitorComparisonScreenState
                   const Icon(
                     Icons.verified_rounded,
                     size: 18.0,
-                    color: Color(0xFF0D652D),
+                    color: M3Palette.onSuccessSurface,
                   ),
                   Text(
                     'السلسلة التجارية المعتمدة:',
@@ -1049,14 +1050,14 @@ class _CompetitorComparisonScreenState
     final bool weAreMoreExpensive = vsAvgDiffPct > 1.5;
 
     final Color badgeBg = weAreCheaper
-        ? const Color(0xFFE6F4EA)
+        ? M3Palette.successSurface
         : weAreMoreExpensive
-            ? const Color(0xFFFCE8E6)
+            ? M3Palette.dangerSurface
             : colorScheme.secondaryContainer;
     final Color badgeFg = weAreCheaper
-        ? const Color(0xFF0D652D)
+        ? M3Palette.onSuccessSurface
         : weAreMoreExpensive
-            ? const Color(0xFFA50E0E)
+            ? M3Palette.onDangerSurface
             : colorScheme.onSecondaryContainer;
     final String badgeText = weAreCheaper
         ? 'أرخص من السوق بـ ${vsAvgDiffPct.abs().toStringAsFixed(1)}%'
@@ -1155,8 +1156,8 @@ class _CompetitorComparisonScreenState
                                 ),
                                 decoration: BoxDecoration(
                                   color: priceRose
-                                      ? const Color(0xFFFEF7E0)
-                                      : const Color(0xFFE8F0FE),
+                                      ? M3Palette.warningSurface
+                                      : M3Palette.infoSurface,
                                   borderRadius: M3Shape.radiusSm,
                                 ),
                                 child: Text(
@@ -1167,8 +1168,8 @@ class _CompetitorComparisonScreenState
                                     fontSize: M3FontSize.tiny,
                                     fontWeight: FontWeight.w800,
                                     color: priceRose
-                                        ? const Color(0xFFB06000)
-                                        : const Color(0xFF1967D2),
+                                        ? M3Palette.onWarningSurface
+                                        : M3Palette.onInfoSurface,
                                   ),
                                 ),
                               ),
@@ -1502,14 +1503,14 @@ class _CompetitorComparisonScreenState
     final bool isCompLower = competitor.pricePosition == 'lower';
 
     final Color statusBg = isCompHigher
-        ? const Color(0xFFE6F4EA)
+        ? M3Palette.successSurface
         : isCompLower
-            ? const Color(0xFFFCE8E6)
+            ? M3Palette.dangerSurface
             : colorScheme.secondaryContainer;
     final Color statusFg = isCompHigher
-        ? const Color(0xFF0D652D)
+        ? M3Palette.onSuccessSurface
         : isCompLower
-            ? const Color(0xFFA50E0E)
+            ? M3Palette.onDangerSurface
             : colorScheme.onSecondaryContainer;
 
     final String priceStatusText = isCompHigher
@@ -1518,7 +1519,7 @@ class _CompetitorComparisonScreenState
             ? 'أرخص منك بـ -${competitor.priceDiffEgp.abs().toStringAsFixed(1)} ج (-${competitor.priceDiffPct.abs().toStringAsFixed(1)}%)'
             : 'مساوي لسعرك';
 
-    const Color activeAccent = Color(0xFFD93025);
+    const Color activeAccent = M3Palette.dangerAccent;
 
     return Material(
       color: isSelected
@@ -1750,7 +1751,7 @@ class _CompetitorComparisonScreenState
         ? selectedCompetitor.allMonthlyPrices
         : selectedCompetitor.monthlyPrices;
 
-    const Color compColor = Color(0xFFD93025);
+    const Color compColor = M3Palette.dangerAccent;
 
     // Check Shrinkflation between our SKU and the selected competitor
     final bool isCompLower = selectedCompetitor.pricePosition == 'lower';
@@ -1926,10 +1927,10 @@ class _CompetitorComparisonScreenState
                 vertical: 10.0,
               ),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF7E0),
+                color: M3Palette.warningSurface,
                 borderRadius: M3Shape.radiusMd,
                 border: Border.all(
-                  color: const Color(0xFFEA8600).withValues(alpha: 0.5),
+                  color: M3Palette.warningAccent.withValues(alpha: 0.5),
                 ),
               ),
               child: Row(
@@ -1937,14 +1938,14 @@ class _CompetitorComparisonScreenState
                   const Icon(
                     Icons.lightbulb_outline_rounded,
                     size: 19.0,
-                    color: Color(0xFFB06000),
+                    color: M3Palette.onWarningSurface,
                   ),
                   const SizedBox(width: 10.0),
                   Expanded(
                     child: Text(
                       'تنبيه الحجم الصافي (Shrinkflation): رغم أن سعر عبوة ${selectedCompetitor.brand} (${selectedCompetitor.unitPrice.toStringAsFixed(1)} ج.م) أقل من عبوتك (${effectiveOwnPrice.toStringAsFixed(1)} ج.م)، إلا أن عبوة المنافس (${selectedCompetitor.packSizeLabel}) أصغر حجماً، وبالتالي سعر الـ ${selectedCompetitor.volumeUnitLabel} عندك أرخص فعلياً (${effectiveOwnPricePerVol.toStringAsFixed(1)} مقابل ${selectedCompetitor.pricePerUnitVolume.toStringAsFixed(1)} ج.م)!',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF8A4B00),
+                        color: M3Palette.onWarningSurfaceDeep,
                         fontWeight: FontWeight.w700,
                         height: 1.5,
                       ),
@@ -2112,8 +2113,8 @@ class _CompetitorComparisonScreenState
     }
 
     Color deltaColor(SkuMonthlyPricePointModel pt) {
-      if (pt.trendDirection == 'up') return const Color(0xFFB06000);
-      if (pt.trendDirection == 'down') return const Color(0xFF0D652D);
+      if (pt.trendDirection == 'up') return M3Palette.onWarningSurface;
+      if (pt.trendDirection == 'down') return M3Palette.onSuccessSurface;
       return colorScheme.onSurfaceVariant;
     }
 
@@ -2162,9 +2163,9 @@ class _CompetitorComparisonScreenState
                     ),
                     decoration: BoxDecoration(
                       color: compHigher
-                          ? const Color(0xFFE6F4EA)
+                          ? M3Palette.successSurface
                           : compLower
-                              ? const Color(0xFFFCE8E6)
+                              ? M3Palette.dangerSurface
                               : colorScheme.surfaceContainerHighest,
                       borderRadius: M3Shape.radiusSm,
                     ),
@@ -2178,9 +2179,9 @@ class _CompetitorComparisonScreenState
                         fontSize: M3FontSize.tinyPlus,
                         fontWeight: FontWeight.w900,
                         color: compHigher
-                            ? const Color(0xFF0D652D)
+                            ? M3Palette.onSuccessSurface
                             : compLower
-                                ? const Color(0xFFA50E0E)
+                                ? M3Palette.onDangerSurface
                                 : colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -2352,12 +2353,12 @@ class _CompetitorComparisonScreenState
       }
       monthlyMovementSummary = parts.join(' | ');
       if (group.periodPriceChangePct > 0.5) {
-        movementBg = const Color(0xFFFEF7E0);
-        movementFg = const Color(0xFFB06000);
+        movementBg = M3Palette.warningSurface;
+        movementFg = M3Palette.onWarningSurface;
         movementIcon = Icons.trending_up_rounded;
       } else if (group.periodPriceChangePct < -0.5) {
-        movementBg = const Color(0xFFE8F0FE);
-        movementFg = const Color(0xFF1967D2);
+        movementBg = M3Palette.infoSurface;
+        movementFg = M3Palette.onInfoSurface;
         movementIcon = Icons.trending_down_rounded;
       }
     }
@@ -2515,14 +2516,14 @@ class _CompetitorComparisonScreenState
               ),
               _buildStatusCountPill(
                 label: '$higherCount منافس سعره أعلى منك (أنت أرخص)',
-                bgColor: const Color(0xFFE6F4EA),
-                fgColor: const Color(0xFF0D652D),
+                bgColor: M3Palette.successSurface,
+                fgColor: M3Palette.onSuccessSurface,
                 icon: Icons.arrow_upward_rounded,
               ),
               _buildStatusCountPill(
                 label: '$lowerCount منافس سعره أقل منك (أنت أغلى)',
-                bgColor: const Color(0xFFFCE8E6),
-                fgColor: const Color(0xFFA50E0E),
+                bgColor: M3Palette.dangerSurface,
+                fgColor: M3Palette.onDangerSurface,
                 icon: Icons.arrow_downward_rounded,
               ),
               if (equalCount > 0)
@@ -2736,8 +2737,8 @@ class _CompetitorComparisonScreenState
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: revDiff >= 0
-                      ? const Color(0xFF0D652D)
-                      : const Color(0xFFA50E0E),
+                      ? M3Palette.onSuccessSurface
+                      : M3Palette.onDangerSurface,
                 ),
               ),
             ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_states.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -337,7 +338,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: const Color(0xFF0F766E),
+        backgroundColor: M3Palette.teal,
         content: Text(
           'تم حذف الشيت "${file.fileName}" وإلغاء تأثيراته واسترجاع الأسعار السابقة بنجاح.',
         ),
@@ -504,7 +505,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                                         fontWeight:
                                                             FontWeight.w800,
                                                         color:
-                                                            Color(0xFF0F766E),
+                                                            M3Palette.teal,
                                                       ),
                                                     ),
                                                   ),
@@ -611,12 +612,12 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                 Container(
                   padding: const EdgeInsets.all(8.0),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F766E).withValues(alpha: 0.14),
+                    color: M3Palette.teal.withValues(alpha: 0.14),
                     borderRadius: M3Shape.radiusSm,
                   ),
                   child: const Icon(
                     Icons.auto_awesome_rounded,
-                    color: Color(0xFF0F766E),
+                    color: M3Palette.teal,
                     size: 22.0,
                   ),
                 ),
@@ -658,21 +659,21 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                         icon: Icons.trending_up_rounded,
                         labelAr: 'أصناف زاد سعرها',
                         count: upCount,
-                        color: const Color(0xFFDC2626),
+                        color: M3Palette.danger,
                       ),
                       _buildDiffStatCard(
                         cs: cs,
                         icon: Icons.trending_down_rounded,
                         labelAr: 'أصناف انخفض سعرها',
                         count: downCount,
-                        color: const Color(0xFF0F766E),
+                        color: M3Palette.teal,
                       ),
                       _buildDiffStatCard(
                         cs: cs,
                         icon: Icons.fiber_new_rounded,
                         labelAr: 'أصناف جديدة مضافة',
                         count: newCount,
-                        color: const Color(0xFF0284C7),
+                        color: M3Palette.info,
                       ),
                       _buildDiffStatCard(
                         cs: cs,
@@ -700,10 +701,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                             final isUp = item.direction == 'up';
                             final isDown = item.direction == 'down';
                             final badgeColor = isUp
-                                ? const Color(0xFFDC2626)
+                                ? M3Palette.danger
                                 : isDown
-                                    ? const Color(0xFF0F766E)
-                                    : const Color(0xFF0284C7);
+                                    ? M3Palette.teal
+                                    : M3Palette.info;
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 6.0),
                               child: Container(
@@ -1188,11 +1189,11 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 vertical: 4.5,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFD97706)
+                                color: M3Palette.warning
                                     .withValues(alpha: 0.14),
                                 borderRadius: M3Shape.radiusFull,
                                 border: Border.all(
-                                  color: const Color(0xFFD97706)
+                                  color: M3Palette.warning
                                       .withValues(alpha: 0.45),
                                 ),
                               ),
@@ -1202,7 +1203,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                   const Icon(
                                     Icons.price_change_rounded,
                                     size: 14.0,
-                                    color: Color(0xFFB45309),
+                                    color: M3Palette.amberDeep,
                                   ),
                                   const SizedBox(width: 5.0),
                                   Text(
@@ -1210,7 +1211,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                     style: const TextStyle(
                                       fontSize: M3FontSize.labelSmallPlus,
                                       fontWeight: FontWeight.w800,
-                                      color: Color(0xFFB45309),
+                                      color: M3Palette.amberDeep,
                                     ),
                                   ),
                                 ],
@@ -1357,7 +1358,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             subtitle:
                 'تمثل ${summary.totalSkus > 0 ? ((summary.regularSkusCount / summary.totalSkus) * 100).toStringAsFixed(1) : 0}% من إجمالي الكارتة',
             icon: Icons.check_circle_outline_rounded,
-            accentColor: const Color(0xFF0F766E),
+            accentColor: M3Palette.teal,
           ),
           _buildKpiCard(
             theme: theme,
@@ -1367,7 +1368,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             value: '${_intFmt.format(summary.promoSkusCount)} عرض ترويجي',
             subtitle: 'أكواد العروض الخاصة والشرنك والباقات الترويجية',
             icon: Icons.local_offer_rounded,
-            accentColor: const Color(0xFFD97706),
+            accentColor: M3Palette.warning,
           ),
           _buildKpiCard(
             theme: theme,
@@ -1378,7 +1379,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             subtitle:
                 'متوسط سعة الكرتونة: ${summary.avgUnitsPerCarton.toStringAsFixed(1)} وحدة/كرتونة',
             icon: Icons.view_in_ar_rounded,
-            accentColor: const Color(0xFF4F46E5),
+            accentColor: M3Palette.indigo,
           ),
           _buildKpiCard(
             theme: theme,
@@ -1389,7 +1390,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             subtitle:
                 'غير مسحوب (فرصة توزيع): ${_intFmt.format(summary.unpulledSkusCount)} صنف',
             icon: Icons.storefront_rounded,
-            accentColor: const Color(0xFF0284C7),
+            accentColor: M3Palette.info,
           ),
         ];
 
@@ -2044,7 +2045,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                   '${_currFmt.format(item.netUnitInvoiceCost)} ج.م',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF0F766E),
+                                    color: M3Palette.teal,
                                   ),
                                 ),
                                 Text(
@@ -2070,9 +2071,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                   ),
                                   decoration: BoxDecoration(
                                     color: isPromo
-                                        ? const Color(0xFFD97706)
+                                        ? M3Palette.warning
                                             .withValues(alpha: 0.15)
-                                        : const Color(0xFF0F766E)
+                                        : M3Palette.teal
                                             .withValues(alpha: 0.15),
                                     borderRadius: M3Shape.radiusFull,
                                   ),
@@ -2082,8 +2083,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                       fontSize: M3FontSize.tinyPlus,
                                       fontWeight: FontWeight.w800,
                                       color: isPromo
-                                          ? const Color(0xFFB45309)
-                                          : const Color(0xFF0F766E),
+                                          ? M3Palette.amberDeep
+                                          : M3Palette.teal,
                                     ),
                                   ),
                                 ),
@@ -2096,7 +2097,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                     fontSize: M3FontSize.tiny,
                                     fontWeight: FontWeight.w700,
                                     color: item.isActiveInChains
-                                        ? const Color(0xFF0284C7)
+                                        ? M3Palette.info
                                         : cs.onSurfaceVariant,
                                   ),
                                 ),
@@ -2252,28 +2253,28 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             value: 'changed',
             label: 'الأصناف التي تغير سعرها فقط ($changedCount)',
             icon: Icons.published_with_changes_rounded,
-            color: const Color(0xFFD97706),
+            color: M3Palette.warning,
           ),
           buildChip(
             keyId: 'price_filter_up',
             value: 'up',
             label: 'زاد السعر ↑ ($upCount)',
             icon: Icons.trending_up_rounded,
-            color: const Color(0xFFDC2626),
+            color: M3Palette.danger,
           ),
           buildChip(
             keyId: 'price_filter_down',
             value: 'down',
             label: 'انخفض السعر ↓ ($downCount)',
             icon: Icons.trending_down_rounded,
-            color: const Color(0xFF0F766E),
+            color: M3Palette.teal,
           ),
           buildChip(
             keyId: 'price_filter_new',
             value: 'new',
             label: 'أصناف جديدة ($newCount)',
             icon: Icons.fiber_new_rounded,
-            color: const Color(0xFF0284C7),
+            color: M3Palette.info,
           ),
           if (summary.diffSummary != null)
             ActionChip(
@@ -2331,10 +2332,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                 ),
                 decoration: BoxDecoration(
                   color: isUp
-                      ? const Color(0xFFDC2626).withValues(alpha: 0.14)
+                      ? M3Palette.danger.withValues(alpha: 0.14)
                       : isDown
-                          ? const Color(0xFF0F766E).withValues(alpha: 0.14)
-                          : const Color(0xFF0284C7).withValues(alpha: 0.14),
+                          ? M3Palette.teal.withValues(alpha: 0.14)
+                          : M3Palette.info.withValues(alpha: 0.14),
                   borderRadius: M3Shape.radiusFull,
                 ),
                 child: Row(
@@ -2348,10 +2349,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                               : Icons.fiber_new_rounded,
                       size: 11.0,
                       color: isUp
-                          ? const Color(0xFFDC2626)
+                          ? M3Palette.danger
                           : isDown
-                              ? const Color(0xFF0F766E)
-                              : const Color(0xFF0284C7),
+                              ? M3Palette.teal
+                              : M3Palette.info,
                     ),
                     const SizedBox(width: 2.0),
                     Text(
@@ -2364,10 +2365,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                         fontSize: M3FontSize.microPlus,
                         fontWeight: FontWeight.w900,
                         color: isUp
-                            ? const Color(0xFFDC2626)
+                            ? M3Palette.danger
                             : isDown
-                                ? const Color(0xFF0F766E)
-                                : const Color(0xFF0284C7),
+                                ? M3Palette.teal
+                                : M3Palette.info,
                       ),
                     ),
                   ],
@@ -2727,28 +2728,28 @@ onChanged: m3Legacy<ProductMasterItemModel>((val) {
                     'قيمة ضريبة القيمة المضافة (14%)',
                     'VAT Amount (14%)',
                     '${_currFmt.format(vatAmount)} ج.م',
-                    const Color(0xFFD97706),
+                    M3Palette.warning,
                   ),
                   _buildCalcResultTile(
                     cs,
                     'إجمالي قيمة الخصومات التجارية',
                     'Total Invoice & Extra Discounts',
                     '-${_currFmt.format(totalDiscountEgp)} ج.م',
-                    const Color(0xFFDC2626),
+                    M3Palette.danger,
                   ),
                   _buildCalcResultTile(
                     cs,
                     'صافي الفاتورة المستحق لأدكو',
                     'Net Payable Invoice Value',
                     '${_currFmt.format(netPayable)} ج.م (الوحدة: ${_currFmt.format(netUnitCost)})',
-                    const Color(0xFF0F766E),
+                    M3Palette.teal,
                   ),
                   _buildCalcResultTile(
                     cs,
                     'هامش ربح السلسلة المتوقع',
                     'Projected Retailer Shelf Margin',
                     '${retailerMarginPct.toStringAsFixed(1)}% (${_currFmt.format(retailerProfitEgp)} ج.م)',
-                    const Color(0xFF4F46E5),
+                    M3Palette.indigo,
                   ),
                 ],
               ),
@@ -2903,7 +2904,7 @@ onChanged: m3Legacy<ProductMasterItemModel>((val) {
                       key: ValueKey('archive_tab_delete_sheet_${file.id}'),
                       icon: const Icon(
                         Icons.delete_outline_rounded,
-                        color: Color(0xFFDC2626),
+                        color: M3Palette.danger,
                       ),
                       tooltip: 'حذف الشيت والتراجع عن تحديثاته',
                       onPressed: () => _handleDeleteProductMasterSheet(file),
@@ -3098,7 +3099,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                             '• صافي تكلفة الوحدة: ${i.netUnitInvoiceCost.toStringAsFixed(2)} ج.م',
                             style: theme.textTheme.labelSmall?.copyWith(
                               fontWeight: FontWeight.w800,
-                              color: const Color(0xFF0F766E),
+                              color: M3Palette.teal,
                             ),
                           ),
                           Text(
@@ -3114,8 +3115,8 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                             style: theme.textTheme.labelSmall?.copyWith(
                               fontWeight: FontWeight.w800,
                               color: i.isActiveInChains
-                                  ? const Color(0xFF0284C7)
-                                  : const Color(0xFFD97706),
+                                  ? M3Palette.info
+                                  : M3Palette.warning,
                             ),
                           ),
                         ],
