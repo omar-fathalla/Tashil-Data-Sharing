@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
@@ -318,7 +319,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
         backgroundColor: colorScheme.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24.0),
+          borderRadius: M3Shape.radiusXl,
           side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
         ),
         titlePadding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 12.0),
@@ -366,7 +367,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
               padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
               decoration: BoxDecoration(
                 color: colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(20.0),
+                borderRadius: M3Shape.radiusLg,
               ),
               child: Text(
                 roleEn,
@@ -390,7 +391,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                   padding: const EdgeInsets.all(16.0),
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(16.0),
+                    borderRadius: M3Shape.radiusLg,
                     border: Border.all(
                       color: colorScheme.outlineVariant.withOpacity(0.5),
                     ),
@@ -421,12 +422,12 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
 
                 // Connected M3 Action Button Group (Edit Profile | Password | Audit Logs)
                 Align(
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   child: M3ActionButtonGroup(
                     actions: [
                       M3ActionItem(
                         label: 'Edit Profile',
-                        icon: Icons.edit_outlined,
+                        icon: Icons.edit_rounded,
                         isPrimary: _isEditingProfile,
                         onPressed: () {
                           setState(() {
@@ -455,7 +456,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                       if (canViewAudit)
                         M3ActionItem(
                           label: 'Audit Logs',
-                          icon: Icons.policy_outlined,
+                          icon: Icons.policy_rounded,
                           onPressed: () {
                             AuditLogsPanel.showAuditLogsDialog(
                               context,
@@ -474,7 +475,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                     padding: const EdgeInsets.all(16.0),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(16.0),
+                      borderRadius: M3Shape.radiusLg,
                       border: Border.all(
                         color: colorScheme.primary.withOpacity(0.4),
                       ),
@@ -508,13 +509,13 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                           decoration: const InputDecoration(
                             labelText: 'Email Address',
                             hintText: 'e.g. manager@adeco-retail.com',
-                            prefixIcon: Icon(Icons.email_outlined),
+                            prefixIcon: Icon(Icons.email_rounded),
                             border: OutlineInputBorder(),
                           ),
                         ),
                         const SizedBox(height: 14.0),
                         Align(
-                          alignment: Alignment.centerRight,
+                          alignment: AlignmentDirectional.centerEnd,
                           child: M3ActionButtonGroup(
                             actions: [
                               M3ActionItem(
@@ -546,7 +547,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                     padding: const EdgeInsets.all(16.0),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(16.0),
+                      borderRadius: M3Shape.radiusLg,
                       border: Border.all(
                         color: colorScheme.primary.withOpacity(0.4),
                       ),
@@ -593,7 +594,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                         ),
                         const SizedBox(height: 14.0),
                         Align(
-                          alignment: Alignment.centerRight,
+                          alignment: AlignmentDirectional.centerEnd,
                           child: M3ActionButtonGroup(
                             actions: [
                               M3ActionItem(
@@ -644,7 +645,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                     padding: const EdgeInsets.only(bottom: 8.0),
                     child: InkWell(
                       key: ValueKey('rbac_persona_${persona.id}'),
-                      borderRadius: BorderRadius.circular(12.0),
+                      borderRadius: M3Shape.radiusMd,
                       onTap: () => _applyPersona(persona),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -655,7 +656,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                           color: selected
                               ? colorScheme.secondaryContainer.withOpacity(0.55)
                               : colorScheme.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(12.0),
+                          borderRadius: M3Shape.radiusMd,
                           border: Border.all(
                             color: selected
                                 ? colorScheme.primary

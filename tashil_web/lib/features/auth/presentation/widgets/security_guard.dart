@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
@@ -53,7 +54,7 @@ class TenantSecurityGuard extends StatelessWidget {
                 elevation: 0,
                 color: colorScheme.errorContainer.withOpacity(0.4),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20.0),
+                  borderRadius: M3Shape.radiusLg,
                   side: BorderSide(color: colorScheme.error),
                 ),
                 child: Padding(

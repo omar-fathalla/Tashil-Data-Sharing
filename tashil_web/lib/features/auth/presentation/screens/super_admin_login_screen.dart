@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/security/zero_trust_digest.dart';
 import '../../../../core/widgets/m3_button.dart';
@@ -156,7 +157,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                 elevation: 0,
                 color: cs.surfaceContainerLowest,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: M3Shape.radiusXl,
                   side: BorderSide(
                     color: cs.outlineVariant.withValues(alpha: 0.7),
                   ),
@@ -183,7 +184,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                                   color: cs.secondaryContainer.withValues(
                                     alpha: 0.7,
                                   ),
-                                  borderRadius: BorderRadius.circular(999),
+                                  borderRadius: M3Shape.radiusFull,
                                   border: Border.all(
                                     color: cs.primary.withValues(alpha: 0.3),
                                   ),
@@ -216,7 +217,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                               height: 48,
                               decoration: BoxDecoration(
                                 color: cs.primaryContainer,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: M3Shape.radiusMd,
                               ),
                               child: Icon(
                                 Icons.admin_panel_settings_rounded,
@@ -232,7 +233,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                         Directionality(
                           textDirection: TextDirection.ltr,
                           child: Align(
-                            alignment: Alignment.centerLeft,
+                            alignment: AlignmentDirectional.centerStart,
                             child: Text(
                               'Super Admin Security Gate',
                               style: tt.headlineSmall?.copyWith(
@@ -247,7 +248,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                         Directionality(
                           textDirection: TextDirection.rtl,
                           child: Align(
-                            alignment: Alignment.centerRight,
+                            alignment: AlignmentDirectional.centerEnd,
                             child: Text(
                               'بوابة التحكم المركزي المشفرة لإدارة الشركات وسلاسل التجزئة وسجلات التدقيق',
                               style: tt.bodyMedium?.copyWith(
@@ -264,7 +265,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: cs.errorContainer.withValues(alpha: 0.75),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: M3Shape.radiusMd,
                               border: Border.all(
                                 color: cs.error.withValues(alpha: 0.4),
                               ),
@@ -309,8 +310,8 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                               ),
                               filled: true,
                               fillColor: cs.surfaceContainerLow,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              border: const OutlineInputBorder(
+                                borderRadius: M3Shape.radiusMd,
                               ),
                             ),
                             validator: (v) {
@@ -345,14 +346,14 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                                 ),
                                 icon: Icon(
                                   _obscurePassword
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
+                                      ? Icons.visibility_rounded
+                                      : Icons.visibility_off_rounded,
                                 ),
                               ),
                               filled: true,
                               fillColor: cs.surfaceContainerLow,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              border: const OutlineInputBorder(
+                                borderRadius: M3Shape.radiusMd,
                               ),
                             ),
                             validator: (v) {
@@ -375,7 +376,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                                     ? 'Locked (${_remainingLockoutSeconds}s)'
                                     : (_isLoading ? 'Verifying...' : 'Sign In'),
                                 icon: _isLockedOut
-                                    ? Icons.timer_outlined
+                                    ? Icons.timer_rounded
                                     : Icons.login_rounded,
                                 isPrimary: true,
                                 onPressed:
@@ -383,7 +384,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                               ),
                               M3ActionItem(
                                 label: 'Portal',
-                                icon: Icons.storefront_outlined,
+                                icon: Icons.storefront_rounded,
                                 onPressed: _isLoading ? null : widget.onCancel,
                               ),
                             ],
@@ -400,19 +401,19 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                             _buildSecurityBadgeChip(
                               cs,
                               tt,
-                              Icons.enhanced_encryption_outlined,
+                              Icons.enhanced_encryption_rounded,
                               'Zero Plaintext Secrets',
                             ),
                             _buildSecurityBadgeChip(
                               cs,
                               tt,
-                              Icons.shield_outlined,
+                              Icons.shield_rounded,
                               'RLS Multi-Tenant Guard',
                             ),
                             _buildSecurityBadgeChip(
                               cs,
                               tt,
-                              Icons.policy_outlined,
+                              Icons.policy_rounded,
                               'Brute-Force Lockout',
                             ),
                           ],
@@ -439,7 +440,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: M3Shape.radiusSm,
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Row(

@@ -120,7 +120,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                     controller: _emailController,
                     decoration: const InputDecoration(
                       labelText: 'البريد الإلكتروني',
-                      prefixIcon: Icon(Icons.email_outlined),
+                      prefixIcon: Icon(Icons.email_rounded),
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -140,7 +140,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                     decoration: const InputDecoration(
                       labelText: 'رمز التحقق (Reset Token)',
                       hintText: 'أدخل رمز الاستعادة المكون من 48 حرفاً',
-                      prefixIcon: Icon(Icons.vpn_key_outlined),
+                      prefixIcon: Icon(Icons.vpn_key_rounded),
                       border: OutlineInputBorder(),
                     ),
                   ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../main.dart';
@@ -268,7 +269,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                       alpha: 0,
                                     ),
                                     child: InkWell(
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: M3Shape.radiusLg,
                                       onTap: _toggleLanguage,
                                       child: Container(
                                         padding:
@@ -318,8 +319,8 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                             child: Material(
                               color: colorScheme.primary,
                               elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: M3Shape.radiusXl,
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: SizedBox(
@@ -426,7 +427,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                           hintText: isArabic
                                               ? 'البريد الإلكتروني'
                                               : 'Email',
-                                          prefixIcon: Icons.email_outlined,
+                                          prefixIcon: Icons.email_rounded,
                                           colorScheme: colorScheme,
                                         ),
                                         validator: (value) {
@@ -471,7 +472,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                               _obscurePassword
                                                   ? Icons
                                                       .visibility_off_outlined
-                                                  : Icons.visibility_outlined,
+                                                  : Icons.visibility_rounded,
                                               color:
                                                   colorScheme.onSurfaceVariant,
                                               size: 22,
@@ -669,7 +670,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                   decoration: BoxDecoration(
                                     color: colorScheme.primaryContainer
                                         .withValues(alpha: 0.3),
-                                    borderRadius: BorderRadius.circular(20),
+                                    borderRadius: M3Shape.radiusLg,
                                     border: Border.all(
                                       color: colorScheme.primary.withValues(
                                         alpha: 0.3,
@@ -702,7 +703,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                   const SizedBox(height: 12),
                                   TextButton.icon(
                                     icon: const Icon(
-                                      Icons.admin_panel_settings_outlined,
+                                      Icons.admin_panel_settings_rounded,
                                       size: 16,
                                     ),
                                     label: Text(
