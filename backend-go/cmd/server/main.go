@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -41,12 +42,36 @@ func main() {
 	// Durable BigQuery persistence of uploaded sheets (off unless BIGQUERY_SINK_ENABLED=true)
 	ingestProcessor.WithSink(bqsink.New(context.Background(), bqsink.ConfigFromEnv(cfg.ProjectID, cfg.BigQueryDataset)))
 
-	// Wipe all fake/synthetic seed data on server startup and replay ONLY real user-uploaded archived files
-	_ = ingestProcessor.ClearTenantData(context.Background(), "all")
-	if err := ingestProcessor.ReplayArchivedFilesToDatabase(context.Background()); err != nil {
-		log.Printf("[Tashil Cloud Run] Warning during archive replay: %v", err)
-	} else {
-		log.Printf("[Tashil Cloud Run] Archive replayed successfully. Only user-uploaded files are active.")
+	// Inputs whose contents feed the replayed in-memory state; any change invalidates the startup snapshot.
+	pmDir := os.Getenv("TASHIL_PRODUCT_MASTER_DIR")
+	if pmDir == "" {
+		pmDir = "data/product_master"
+	}
+	targetsDir := os.Getenv("TASHIL_TARGETS_DIR")
+	if targetsDir == "" {
+		targetsDir = "data/targets"
+	}
+	ingestProcessor.WithSnapshotInputs([]string{pmDir, targetsDir}, []string{
+		"data/product_master/adeco_product_master_2026_08_01.xlsx",
+		"/app/data/product_master/adeco_product_master_2026_08_01.xlsx",
+		"data/cpfr_seed/Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx",
+		"/app/data/cpfr_seed/Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx",
+	})
+
+	// Data loading runs after the HTTP server starts listening (see step 7). Until it finishes,
+	// data endpoints wait (up to dataReadyWait) instead of seeing a half-loaded dataset.
+	dataReady := make(chan struct{})
+	loadData := func() {
+		defer close(dataReady)
+		bootStart := time.Now()
+		// Wipe all fake/synthetic seed data and restore ONLY real user-uploaded archived files
+		_ = ingestProcessor.ClearTenantData(context.Background(), "all")
+		mode, err := ingestProcessor.RestoreOrReplay(context.Background())
+		if err != nil {
+			log.Printf("[Tashil Cloud Run] Warning during archive load (%s): %v", mode, err)
+		} else {
+			log.Printf("[Tashil Cloud Run] Data ready via %s in %s. Only user-uploaded files are active.", mode, time.Since(bootStart).Round(time.Millisecond))
+		}
 	}
 
 	// 4. Initialize Handlers and Auth Middleware
@@ -138,9 +163,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/competitors/custom-skus", competitorHandler.HandleSaveCustomSku)
 	mux.HandleFunc("DELETE /api/v1/competitors/custom-skus/{id}", competitorHandler.HandleDeleteCustomSku)
 
-	// 6. Wrap Middleware Chain: CORS -> Auth -> Router
-	protectedHandler := authMiddleware.Handler(mux)
-	corsHandler := middleware.CORS(protectedHandler)
+	// 6. Wrap Middleware Chain: CORS -> Data-ready gate -> Auth -> Snapshot hook -> Router
+	protectedHandler := authMiddleware.Handler(snapshotOnMutation(mux, ingestProcessor))
+	corsHandler := middleware.CORS(waitForData(protectedHandler, dataReady))
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -158,6 +183,8 @@ func main() {
 		}
 	}()
 
+	go loadData()
+
 	// 8. Graceful Shutdown on SIGINT/SIGTERM (Cloud Run lifecycle)
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
@@ -172,4 +199,61 @@ func main() {
 	}
 
 	log.Println("[Tashil Cloud Run] Server stopped cleanly.")
+}
+
+const dataReadyWait = 170 * time.Second
+
+// waitForData holds data requests until the startup load has finished. Health, version,
+// auth and portal metadata do not depend on the replayed dataset and are served immediately.
+func waitForData(next http.Handler, ready <-chan struct{}) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		if !strings.HasPrefix(p, "/api/v1/") || strings.HasPrefix(p, "/api/v1/auth/") ||
+			strings.HasPrefix(p, "/api/v1/portal/") || p == "/api/v1/version" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		select {
+		case <-ready:
+			next.ServeHTTP(w, r)
+		case <-r.Context().Done():
+			return
+		case <-time.After(dataReadyWait):
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Retry-After", "10")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprint(w, `{"status":"loading","error":"Data is still loading, please retry shortly"}`)
+		}
+	})
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *statusRecorder) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// snapshotOnMutation schedules a (debounced) startup snapshot after every successful data change.
+func snapshotOnMutation(next http.Handler, p *ingestion.Processor) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !ingestion.IsSnapshotMutation(r.Method, r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		if rec.status >= 200 && rec.status < 300 {
+			p.ScheduleSnapshot()
+		}
+	})
 }
