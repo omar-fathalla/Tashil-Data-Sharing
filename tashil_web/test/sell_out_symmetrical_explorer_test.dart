@@ -133,8 +133,8 @@ void main() {
       // Verify Tab 1 Year (2026 Default) and Month Filter Dropdowns
       expect(find.byKey(const ValueKey('perf_year_dropdown')), findsOneWidget);
       expect(find.byKey(const ValueKey('perf_month_dropdown')), findsOneWidget);
-      expect(find.text('2026 (Default)'), findsOneWidget);
-      expect(find.text('كل الشهور'), findsOneWidget);
+      expect(find.text('2026 (Default)'), findsWidgets);
+      expect(find.text('كل الشهور'), findsWidgets);
 
       // Verify Tables (SKU Pareto Breakdown table was removed and replaced with Branch YoY & MoM Growth Matrix)
       expect(find.textContaining('Branch Sales Velocity'), findsOneWidget);
@@ -213,7 +213,7 @@ void main() {
       expect(find.textContaining('إدارة شيتات الإكسيل المرفوعة للـ Sell-Out'), findsOneWidget);
       expect(find.text('Upload Sell Out'), findsOneWidget);
       expect(find.text('تحديث القائمة'), findsOneWidget);
-      expect(find.text('Target Chain'), findsOneWidget);
+      expect(find.text('Target Chain'), findsWidgets);
     });
 
     test('parses enriched SellOutRecordModel, SellOutSkuSummaryModel, and SellOutRecordsSummaryModel accurately', () {

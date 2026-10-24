@@ -28,6 +28,7 @@ class M3Dropdown<T> extends StatelessWidget {
     this.dense = true,
     this.enabled = true,
     this.menuHeight = 360.0,
+    this.errorText,
   });
 
   final List<M3DropdownOption<T>> options;
@@ -41,6 +42,9 @@ class M3Dropdown<T> extends StatelessWidget {
   final bool dense;
   final bool enabled;
   final double menuHeight;
+
+  /// Shows the M3 error state (red outline + message) when non-null.
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +62,7 @@ class M3Dropdown<T> extends StatelessWidget {
       enableSearch: false,
       label: label == null ? null : Text(label!),
       hintText: hint,
+      errorText: errorText,
       leadingIcon: leadingIcon == null ? null : Icon(leadingIcon, size: 20.0),
       trailingIcon: const Icon(AppIcons.dropDown),
       selectedTrailingIcon: const Icon(Icons.arrow_drop_up_rounded),

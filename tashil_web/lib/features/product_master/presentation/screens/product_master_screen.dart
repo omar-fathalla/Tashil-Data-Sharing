@@ -2623,16 +2623,11 @@ onChanged: m3Legacy<String>(onChanged),
                 ],
               ),
               const SizedBox(height: 16.0),
-              DropdownButtonFormField<ProductMasterItemModel>(
-                value: summary.items.contains(sku) ? sku : summary.items.first,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'اختر الصنف من كارتة الأصناف (Select SKU)',
-                  border: OutlineInputBorder(
-                    borderRadius: M3Shape.radiusMd,
-                  ),
-                ),
-                items: summary.items
+              M3Dropdown<ProductMasterItemModel>(
+value: summary.items.contains(sku) ? sku : summary.items.first,
+label: 'اختر الصنف من كارتة الأصناف (Select SKU)',
+expand: true,
+options: m3OptionsFromMenuItems<ProductMasterItemModel>(summary.items
                     .take(200)
                     .map(
                       (item) => DropdownMenuItem<ProductMasterItemModel>(
@@ -2643,13 +2638,13 @@ onChanged: m3Legacy<String>(onChanged),
                         ),
                       ),
                     )
-                    .toList(),
-                onChanged: (val) {
+                    .toList()),
+onChanged: m3Legacy<ProductMasterItemModel>((val) {
                   if (val != null) {
                     setState(() => _selectCalculatorSku(val));
                   }
-                },
-              ),
+                }),
+),
               const SizedBox(height: 16.0),
               Wrap(
                 spacing: 16.0,
@@ -3221,26 +3216,23 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                   ],
                 ),
                 const SizedBox(height: 12.0),
-                DropdownButtonFormField<String>(
-                  value: _itemType,
-                  decoration: const InputDecoration(
-                    labelText: 'نوع الصنف (Item Type)',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
+                M3Dropdown<String>(
+value: _itemType,
+label: 'نوع الصنف (Item Type)',
+options: m3OptionsFromMenuItems<String>([
+                    const DropdownMenuItem(
                       value: 'عادي',
                       child: Text('عادي (Regular SKU)'),
                     ),
-                    DropdownMenuItem(
+                    const DropdownMenuItem(
                       value: 'عرض',
                       child: Text('عرض ترويجي (Promotional Bundle)'),
                     ),
-                  ],
-                  onChanged: (v) {
+                  ]),
+onChanged: m3Legacy<String>((v) {
                     if (v != null) setState(() => _itemType = v);
-                  },
-                ),
+                  }),
+),
               ],
             ),
           ),

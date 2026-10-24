@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'helpers/m3_dropdown_tester.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/features/data_ingestion/presentation/screens/upload_portal_screen.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/widgets/chain_share_pie.dart';
@@ -181,7 +183,7 @@ void main() {
       await tester.ensureVisible(dropdown);
       await tester.tap(dropdown);
       await tester.pumpAndSettle();
-      await tester.tap(find.textContaining('جملة ماركت').last);
+      await tester.tap(m3MenuEntry('جملة ماركت').last);
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('missing_chain_error_banner')), findsNothing);

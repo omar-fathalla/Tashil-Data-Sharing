@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'helpers/m3_dropdown_tester.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/utils/excel_export_service.dart';
@@ -257,7 +259,7 @@ void main() {
     // no longer includes Carrefour, so target Fathalla).
     await tester.tap(find.byKey(const ValueKey('ingestion_retail_chain_dropdown')));
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('فتح الله').last);
+    await tester.tap(m3MenuEntry('فتح الله').last);
     await tester.pumpAndSettle();
 
     // Tap device file picker button (has 3 valid rows + 1 short barcode = 4 total)
@@ -353,7 +355,7 @@ void main() {
     // no longer includes Carrefour, so target Fathalla).
     await tester.tap(find.byKey(const ValueKey('ingestion_retail_chain_dropdown')));
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('فتح الله').last);
+    await tester.tap(m3MenuEntry('فتح الله').last);
     await tester.pumpAndSettle();
 
     // The VM stub picker no longer fabricates a sample file, so provide the

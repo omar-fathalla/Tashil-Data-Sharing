@@ -2348,26 +2348,21 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                   // 1. Year Filter (Default: 2026)
                   SizedBox(
                     width: 170.0,
-                    child: DropdownButtonFormField<int>(
-                      key: const ValueKey('perf_year_dropdown'),
-                      isExpanded: true,
-                      value: const [2026, 2025, 2024, 0].contains(_selectedYear)
+                    child: M3Dropdown<int>(
+key: const ValueKey('perf_year_dropdown'),
+value: const [2026, 2025, 2024, 0].contains(_selectedYear)
                           ? _selectedYear
                           : 2026,
-                      decoration: const InputDecoration(
-                        labelText: 'السنة (Year)',
-                        isDense: true,
-                        prefixIcon: Icon(Icons.calendar_today_rounded, size: 17.0),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-                        border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 2026, child: Text('2026 (Default)')),
-                        DropdownMenuItem(value: 2025, child: Text('2025')),
-                        DropdownMenuItem(value: 2024, child: Text('2024')),
-                        DropdownMenuItem(value: 0, child: Text('كل السنوات (All)')),
-                      ],
-                      onChanged: (v) {
+label: 'السنة (Year)',
+leadingIcon: Icons.calendar_today_rounded,
+expand: true,
+options: m3OptionsFromMenuItems<int>([
+                        const DropdownMenuItem(value: 2026, child: Text('2026 (Default)')),
+                        const DropdownMenuItem(value: 2025, child: Text('2025')),
+                        const DropdownMenuItem(value: 2024, child: Text('2024')),
+                        const DropdownMenuItem(value: 0, child: Text('كل السنوات (All)')),
+                      ]),
+onChanged: m3Legacy<int>((v) {
                         if (v != null) {
                           setState(() {
                             _selectedYear = v;
@@ -2375,25 +2370,20 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                           });
                           _loadRecords();
                         }
-                      },
-                    ),
+                      }),
+),
                   ),
 
                   // 2. Month Filter (Default: All Months / 0)
                   SizedBox(
                     width: 175.0,
-                    child: DropdownButtonFormField<int>(
-                      key: const ValueKey('perf_month_dropdown'),
-                      isExpanded: true,
-                      value: _selectedMonth,
-                      decoration: const InputDecoration(
-                        labelText: 'الشهر (Month)',
-                        isDense: true,
-                        prefixIcon: Icon(Icons.date_range_rounded, size: 17.0),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-                        border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
-                      ),
-                      items: monthLabelsAr.entries
+                    child: M3Dropdown<int>(
+key: const ValueKey('perf_month_dropdown'),
+value: _selectedMonth,
+label: 'الشهر (Month)',
+leadingIcon: Icons.date_range_rounded,
+expand: true,
+options: m3OptionsFromMenuItems<int>(monthLabelsAr.entries
                           .map(
                             (e) => DropdownMenuItem<int>(
                               value: e.key,
@@ -2403,8 +2393,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                               ),
                             ),
                           )
-                          .toList(),
-                      onChanged: (v) {
+                          .toList()),
+onChanged: m3Legacy<int>((v) {
                         if (v != null) {
                           setState(() {
                             _selectedMonth = v;
@@ -2412,31 +2402,26 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                           });
                           _loadRecords();
                         }
-                      },
-                    ),
+                      }),
+),
                   ),
 
                   // 3. Chain Filter
                   SizedBox(
                     width: 175.0,
-                    child: DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      value: _perfChain,
-                      decoration: const InputDecoration(
-                        labelText: 'السلسلة (Chain)',
-                        isDense: true,
-                        prefixIcon: Icon(Icons.storefront_rounded, size: 18.0),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-                        border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'all', child: Text('All Chains (الكل)')),
-                        DropdownMenuItem(value: 'fathalla', child: Text('أسواق فتح الله (Fathalla)')),
-                        DropdownMenuItem(value: 'gomla', child: Text('جملة ماركت (Gomla)')),
-                        DropdownMenuItem(value: 'beet-elgomla', child: Text('بيت الجملة (Beet El Gomla)')),
-                        DropdownMenuItem(value: 'chain-1080314', child: Text('الوكالة (El Wakala)')),
-                      ],
-                      onChanged: (v) {
+                    child: M3Dropdown<String>(
+value: _perfChain,
+label: 'السلسلة (Chain)',
+leadingIcon: Icons.storefront_rounded,
+expand: true,
+options: m3OptionsFromMenuItems<String>([
+                        const DropdownMenuItem(value: 'all', child: Text('All Chains (الكل)')),
+                        const DropdownMenuItem(value: 'fathalla', child: Text('أسواق فتح الله (Fathalla)')),
+                        const DropdownMenuItem(value: 'gomla', child: Text('جملة ماركت (Gomla)')),
+                        const DropdownMenuItem(value: 'beet-elgomla', child: Text('بيت الجملة (Beet El Gomla)')),
+                        const DropdownMenuItem(value: 'chain-1080314', child: Text('الوكالة (El Wakala)')),
+                      ]),
+onChanged: m3Legacy<String>((v) {
                         if (v != null) {
                           setState(() {
                             _perfChain = v;
@@ -2445,33 +2430,28 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                           });
                           _loadRecords();
                         }
-                      },
-                    ),
+                      }),
+),
                   ),
                   SizedBox(
                     width: 210.0,
-                    child: DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      value: availableBrands.contains(_perfBrand) ? _perfBrand : 'all',
-                      decoration: const InputDecoration(
-                        labelText: 'Brand Filter (الماركة)',
-                        isDense: true,
-                        prefixIcon: Icon(Icons.branding_watermark_rounded, size: 18.0),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-                        border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
-                      ),
-                      items: [
+                    child: M3Dropdown<String>(
+value: availableBrands.contains(_perfBrand) ? _perfBrand : 'all',
+label: 'Brand Filter (الماركة)',
+leadingIcon: Icons.branding_watermark_rounded,
+expand: true,
+options: m3OptionsFromMenuItems<String>([
                         const DropdownMenuItem(value: 'all', child: Text('All Brands (الكل)')),
                         ...availableBrands.map((b) => DropdownMenuItem(value: b, child: Text(b))),
-                      ],
-                      onChanged: (v) {
+                      ]),
+onChanged: m3Legacy<String>((v) {
                         if (v != null) {
                           setState(() {
                             _perfBrand = v;
                           });
                         }
-                      },
-                    ),
+                      }),
+),
                   ),
                   SizedBox(
                     width: 220.0,
@@ -3145,99 +3125,69 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                     children: [
                       SizedBox(
                         width: 200.0,
-                        child: DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          value: _archiveUploadChain,
-                          decoration: const InputDecoration(
-                            labelText: 'Target Chain',
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12.0,
-                              vertical: 10.0,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: M3Shape.radiusMd,
-                            ),
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'fathalla', child: Text('Fathalla Market')),
-                            DropdownMenuItem(value: 'gomla', child: Text('Gomla Market')),
-                            DropdownMenuItem(value: 'beet-elgomla', child: Text('Beet El Gomla')),
-                            DropdownMenuItem(value: 'chain-1080314', child: Text('El Wakala')),
-                          ],
-                          onChanged: (v) {
+                        child: M3Dropdown<String>(
+value: _archiveUploadChain,
+label: 'Target Chain',
+expand: true,
+options: m3OptionsFromMenuItems<String>([
+                            const DropdownMenuItem(value: 'fathalla', child: Text('Fathalla Market')),
+                            const DropdownMenuItem(value: 'gomla', child: Text('Gomla Market')),
+                            const DropdownMenuItem(value: 'beet-elgomla', child: Text('Beet El Gomla')),
+                            const DropdownMenuItem(value: 'chain-1080314', child: Text('El Wakala')),
+                          ]),
+onChanged: m3Legacy<String>((v) {
                             if (v != null) {
                               setState(() => _archiveUploadChain = v);
                             }
-                          },
-                        ),
+                          }),
+),
                       ),
                       SizedBox(
                         width: 155.0,
-                        child: DropdownButtonFormField<int>(
-                          isExpanded: true,
-                          value: _archiveUploadYear,
-                          decoration: const InputDecoration(
-                            labelText: 'Year (Optional)',
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12.0,
-                              vertical: 10.0,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: M3Shape.radiusMd,
-                            ),
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 0, child: Text('Auto from Sheet')),
-                            DropdownMenuItem(value: 2026, child: Text('2026')),
-                            DropdownMenuItem(value: 2025, child: Text('2025')),
-                            DropdownMenuItem(value: 2024, child: Text('2024')),
-                          ],
-                          onChanged: (v) {
+                        child: M3Dropdown<int>(
+value: _archiveUploadYear,
+label: 'Year (Optional)',
+expand: true,
+options: m3OptionsFromMenuItems<int>([
+                            const DropdownMenuItem(value: 0, child: Text('Auto from Sheet')),
+                            const DropdownMenuItem(value: 2026, child: Text('2026')),
+                            const DropdownMenuItem(value: 2025, child: Text('2025')),
+                            const DropdownMenuItem(value: 2024, child: Text('2024')),
+                          ]),
+onChanged: m3Legacy<int>((v) {
                             if (v != null) {
                               setState(() => _archiveUploadYear = v);
                             }
-                          },
-                        ),
+                          }),
+),
                       ),
                       SizedBox(
                         width: 175.0,
-                        child: DropdownButtonFormField<int>(
-                          isExpanded: true,
-                          value: _archiveUploadMonth,
-                          decoration: const InputDecoration(
-                            labelText: 'Month (Optional)',
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12.0,
-                              vertical: 10.0,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: M3Shape.radiusMd,
-                            ),
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 0, child: Text('Auto from Sheet')),
-                            DropdownMenuItem(value: 1, child: Text('January (01)')),
-                            DropdownMenuItem(value: 2, child: Text('February (02)')),
-                            DropdownMenuItem(value: 3, child: Text('March (03)')),
-                            DropdownMenuItem(value: 4, child: Text('April (04)')),
-                            DropdownMenuItem(value: 5, child: Text('May (05)')),
-                            DropdownMenuItem(value: 6, child: Text('June (06)')),
-                            DropdownMenuItem(value: 7, child: Text('July (07)')),
-                            DropdownMenuItem(value: 8, child: Text('August (08)')),
-                            DropdownMenuItem(value: 9, child: Text('September (09)')),
-                            DropdownMenuItem(value: 10, child: Text('October (10)')),
-                            DropdownMenuItem(value: 11, child: Text('November (11)')),
-                            DropdownMenuItem(value: 12, child: Text('December (12)')),
-                          ],
-                          onChanged: (v) {
+                        child: M3Dropdown<int>(
+value: _archiveUploadMonth,
+label: 'Month (Optional)',
+expand: true,
+options: m3OptionsFromMenuItems<int>([
+                            const DropdownMenuItem(value: 0, child: Text('Auto from Sheet')),
+                            const DropdownMenuItem(value: 1, child: Text('January (01)')),
+                            const DropdownMenuItem(value: 2, child: Text('February (02)')),
+                            const DropdownMenuItem(value: 3, child: Text('March (03)')),
+                            const DropdownMenuItem(value: 4, child: Text('April (04)')),
+                            const DropdownMenuItem(value: 5, child: Text('May (05)')),
+                            const DropdownMenuItem(value: 6, child: Text('June (06)')),
+                            const DropdownMenuItem(value: 7, child: Text('July (07)')),
+                            const DropdownMenuItem(value: 8, child: Text('August (08)')),
+                            const DropdownMenuItem(value: 9, child: Text('September (09)')),
+                            const DropdownMenuItem(value: 10, child: Text('October (10)')),
+                            const DropdownMenuItem(value: 11, child: Text('November (11)')),
+                            const DropdownMenuItem(value: 12, child: Text('December (12)')),
+                          ]),
+onChanged: m3Legacy<int>((v) {
                             if (v != null) {
                               setState(() => _archiveUploadMonth = v);
                             }
-                          },
-                        ),
+                          }),
+),
                       ),
                     ],
                   ),

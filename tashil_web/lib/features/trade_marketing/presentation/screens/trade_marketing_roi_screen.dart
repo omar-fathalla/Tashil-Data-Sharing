@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
@@ -468,34 +469,26 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                           children: [
                             Expanded(
                               flex: 2,
-                              child: DropdownButtonFormField<String>(
-                                value: chain,
-                                isExpanded: true,
-                                decoration: const InputDecoration(
-                                  labelText: 'السلسلة التجارية (Retail Chain)',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                ),
-                                items: _availableChains
+                              child: M3Dropdown<String>(
+value: chain,
+label: 'السلسلة التجارية (Retail Chain)',
+expand: true,
+options: m3OptionsFromMenuItems<String>(_availableChains
                                     .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                                    .toList(),
-                                onChanged: (val) {
+                                    .toList()),
+onChanged: m3Legacy<String>((val) {
                                   if (val != null) setDialogState(() => chain = val);
-                                },
-                              ),
+                                }),
+),
                             ),
                             const SizedBox(width: 12.0),
                             Expanded(
                               flex: 2,
-                              child: DropdownButtonFormField<int>(
-                                value: month,
-                                isExpanded: true,
-                                decoration: const InputDecoration(
-                                  labelText: 'الشهر (Campaign Month)',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                ),
-                                items: List.generate(12, (idx) {
+                              child: M3Dropdown<int>(
+value: month,
+label: 'الشهر (Campaign Month)',
+expand: true,
+options: m3OptionsFromMenuItems<int>(List.generate(12, (idx) {
                                   final m = idx + 1;
                                   return DropdownMenuItem(
                                     value: m,
@@ -503,46 +496,38 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                                       '${MarketingExpenseItem.monthNamesAr[m]} - ${MarketingExpenseItem.monthNamesEn[m]}',
                                     ),
                                   );
-                                }),
-                                onChanged: (val) {
+                                })),
+onChanged: m3Legacy<int>((val) {
                                   if (val != null) setDialogState(() => month = val);
-                                },
-                              ),
+                                }),
+),
                             ),
                             const SizedBox(width: 12.0),
                             Expanded(
                               flex: 1,
-                              child: DropdownButtonFormField<int>(
-                                value: year,
-                                isExpanded: true,
-                                decoration: const InputDecoration(
-                                  labelText: 'السنة (Year)',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                ),
-                                items: const [
-                                  DropdownMenuItem(value: 2026, child: Text('2026')),
-                                  DropdownMenuItem(value: 2025, child: Text('2025')),
-                                ],
-                                onChanged: (val) {
+                              child: M3Dropdown<int>(
+value: year,
+label: 'السنة (Year)',
+expand: true,
+options: m3OptionsFromMenuItems<int>([
+                                  const DropdownMenuItem(value: 2026, child: Text('2026')),
+                                  const DropdownMenuItem(value: 2025, child: Text('2025')),
+                                ]),
+onChanged: m3Legacy<int>((val) {
                                   if (val != null) setDialogState(() => year = val);
-                                },
-                              ),
+                                }),
+),
                             ),
                           ],
                         ),
                         const SizedBox(height: 14.0),
 
                         // Row 2: Expense Category
-                        DropdownButtonFormField<MarketingExpenseCategory>(
-                          value: category,
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'نوع المصروف التسويقي (Expense Category)',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          items: MarketingExpenseCategory.values.map((cat) {
+                        M3Dropdown<MarketingExpenseCategory>(
+value: category,
+label: 'نوع المصروف التسويقي (Expense Category)',
+expand: true,
+options: m3OptionsFromMenuItems<MarketingExpenseCategory>(MarketingExpenseCategory.values.map((cat) {
                             return DropdownMenuItem(
                               value: cat,
                               child: Row(
@@ -558,11 +543,11 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                                 ],
                               ),
                             );
-                          }).toList(),
-                          onChanged: (val) {
+                          }).toList()),
+onChanged: m3Legacy<MarketingExpenseCategory>((val) {
                             if (val != null) setDialogState(() => category = val);
-                          },
-                        ),
+                          }),
+),
                         const SizedBox(height: 14.0),
 
                         // Row 3: Amount EGP + Brand
@@ -792,43 +777,35 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                       Row(
                         children: [
                           Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: simChain,
-                              isExpanded: true,
-                              decoration: const InputDecoration(
-                                labelText: 'السلسلة (Chain)',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              items: _availableChains
+                            child: M3Dropdown<String>(
+value: simChain,
+label: 'السلسلة (Chain)',
+expand: true,
+options: m3OptionsFromMenuItems<String>(_availableChains
                                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                                  .toList(),
-                              onChanged: (v) {
+                                  .toList()),
+onChanged: m3Legacy<String>((v) {
                                 if (v != null) setDialogState(() => simChain = v);
-                              },
-                            ),
+                              }),
+),
                           ),
                           const SizedBox(width: 12.0),
                           Expanded(
-                            child: DropdownButtonFormField<int>(
-                              value: simMonth,
-                              isExpanded: true,
-                              decoration: const InputDecoration(
-                                labelText: 'الشهر (Month)',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              items: List.generate(12, (idx) {
+                            child: M3Dropdown<int>(
+value: simMonth,
+label: 'الشهر (Month)',
+expand: true,
+options: m3OptionsFromMenuItems<int>(List.generate(12, (idx) {
                                 final m = idx + 1;
                                 return DropdownMenuItem(
                                   value: m,
                                   child: Text('${MarketingExpenseItem.monthNamesAr[m]} (${MarketingExpenseItem.monthNamesEn[m]})'),
                                 );
-                              }),
-                              onChanged: (v) {
+                              })),
+onChanged: m3Legacy<int>((v) {
                                 if (v != null) setDialogState(() => simMonth = v);
-                              },
-                            ),
+                              }),
+),
                           ),
                         ],
                       ),
@@ -1593,41 +1570,31 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                     // Chain Filter
                     SizedBox(
                       width: 170.0,
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedChain,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Retail Chain',
-                          prefixIcon: Icon(Icons.storefront_rounded, size: 18.0),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-                          border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
-                        ),
-                        items: [
+                      child: M3Dropdown<String>(
+value: _selectedChain,
+label: 'Retail Chain',
+leadingIcon: Icons.storefront_rounded,
+expand: true,
+options: m3OptionsFromMenuItems<String>([
                           const DropdownMenuItem(value: 'all', child: Text('All Chains')),
                           ..._availableChains.map(
                             (c) => DropdownMenuItem(value: c, child: Text(c)),
                           ),
-                        ],
-                        onChanged: (v) {
+                        ]),
+onChanged: m3Legacy<String>((v) {
                           if (v != null) setState(() => _selectedChain = v);
-                        },
-                      ),
+                        }),
+),
                     ),
                     // Month Filter
                     SizedBox(
                       width: 165.0,
-                      child: DropdownButtonFormField<int>(
-                        value: _selectedMonth,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Month',
-                          prefixIcon: Icon(Icons.event_note_rounded, size: 18.0),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-                          border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
-                        ),
-                        items: [
+                      child: M3Dropdown<int>(
+value: _selectedMonth,
+label: 'Month',
+leadingIcon: Icons.event_note_rounded,
+expand: true,
+options: m3OptionsFromMenuItems<int>([
                           const DropdownMenuItem(value: 0, child: Text('All Months')),
                           ...List.generate(12, (idx) {
                             final m = idx + 1;
@@ -1636,49 +1603,39 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                               child: Text(MarketingExpenseItem.monthNamesEn[m]!),
                             );
                           }),
-                        ],
-                        onChanged: (v) {
+                        ]),
+onChanged: m3Legacy<int>((v) {
                           if (v != null) setState(() => _selectedMonth = v);
-                        },
-                      ),
+                        }),
+),
                     ),
                     // Year Filter
                     SizedBox(
                       width: 135.0,
-                      child: DropdownButtonFormField<int>(
-                        value: _selectedYear,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Year',
-                          prefixIcon: Icon(Icons.calendar_today_rounded, size: 17.0),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-                          border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 0, child: Text('All Years')),
-                          DropdownMenuItem(value: 2026, child: Text('2026')),
-                          DropdownMenuItem(value: 2025, child: Text('2025')),
-                        ],
-                        onChanged: (v) {
+                      child: M3Dropdown<int>(
+value: _selectedYear,
+label: 'Year',
+leadingIcon: Icons.calendar_today_rounded,
+expand: true,
+options: m3OptionsFromMenuItems<int>([
+                          const DropdownMenuItem(value: 0, child: Text('All Years')),
+                          const DropdownMenuItem(value: 2026, child: Text('2026')),
+                          const DropdownMenuItem(value: 2025, child: Text('2025')),
+                        ]),
+onChanged: m3Legacy<int>((v) {
                           if (v != null) setState(() => _selectedYear = v);
-                        },
-                      ),
+                        }),
+),
                     ),
                     // Activity Category Filter
                     SizedBox(
                       width: 220.0,
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedCategoryId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Activity Type',
-                          prefixIcon: Icon(Icons.category_rounded, size: 18.0),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-                          border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
-                        ),
-                        items: [
+                      child: M3Dropdown<String>(
+value: _selectedCategoryId,
+label: 'Activity Type',
+leadingIcon: Icons.category_rounded,
+expand: true,
+options: m3OptionsFromMenuItems<String>([
                           const DropdownMenuItem(value: 'all', child: Text('All Activity Types')),
                           ...MarketingExpenseCategory.values.map(
                             (c) => DropdownMenuItem(
@@ -1686,11 +1643,11 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
                               child: Text(c.labelEn, overflow: TextOverflow.ellipsis),
                             ),
                           ),
-                        ],
-                        onChanged: (v) {
+                        ]),
+onChanged: m3Legacy<String>((v) {
                           if (v != null) setState(() => _selectedCategoryId = v);
-                        },
-                      ),
+                        }),
+),
                     ),
                     // Search Box
                     SizedBox(

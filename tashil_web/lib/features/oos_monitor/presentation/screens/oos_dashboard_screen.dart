@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
@@ -935,17 +936,11 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
               ),
             );
 
-            final brandDropdown = DropdownButtonFormField<String>(
-              value: _availableBrands.contains(_selectedBrand) ? _selectedBrand : 'الكل',
-              isDense: true,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'الماركة (Brand)',
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-                border: OutlineInputBorder(borderRadius: M3Shape.radiusSm),
-              ),
-              items: _availableBrands.map((b) {
+            final brandDropdown = M3Dropdown<String>(
+value: _availableBrands.contains(_selectedBrand) ? _selectedBrand : 'الكل',
+label: 'الماركة (Brand)',
+expand: true,
+options: m3OptionsFromMenuItems<String>(_availableBrands.map((b) {
                 return DropdownMenuItem<String>(
                   value: b,
                   child: Text(
@@ -954,23 +949,17 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 );
-              }).toList(),
-              onChanged: (val) {
+              }).toList()),
+onChanged: m3Legacy<String>((val) {
                 if (val != null) setState(() => _selectedBrand = val);
-              },
-            );
+              }),
+);
 
-            final branchDropdown = DropdownButtonFormField<String>(
-              value: _availableBranches.contains(_selectedBranch) ? _selectedBranch : 'الكل',
-              isDense: true,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'الفرع (Branch)',
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-                border: OutlineInputBorder(borderRadius: M3Shape.radiusSm),
-              ),
-              items: _availableBranches.map((b) {
+            final branchDropdown = M3Dropdown<String>(
+value: _availableBranches.contains(_selectedBranch) ? _selectedBranch : 'الكل',
+label: 'الفرع (Branch)',
+expand: true,
+options: m3OptionsFromMenuItems<String>(_availableBranches.map((b) {
                 return DropdownMenuItem<String>(
                   value: b,
                   child: Text(
@@ -979,31 +968,25 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 );
-              }).toList(),
-              onChanged: (val) {
+              }).toList()),
+onChanged: m3Legacy<String>((val) {
                 if (val != null) setState(() => _selectedBranch = val);
-              },
-            );
+              }),
+);
 
-            final severityDropdown = DropdownButtonFormField<String>(
-              value: _selectedSeverity,
-              isDense: true,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'مستوى الخطورة',
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-                border: OutlineInputBorder(borderRadius: M3Shape.radiusSm),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'الكل', child: Text('الكل', style: TextStyle(fontSize: 12.0))),
-                DropdownMenuItem(value: 'حرج جداً', child: Text('حرج جداً', style: TextStyle(fontSize: 12.0, color: Colors.red))),
-                DropdownMenuItem(value: 'أولوية مرتفعة', child: Text('أولوية مرتفعة', style: TextStyle(fontSize: 12.0, color: Colors.orange))),
-              ],
-              onChanged: (val) {
+            final severityDropdown = M3Dropdown<String>(
+value: _selectedSeverity,
+label: 'مستوى الخطورة',
+expand: true,
+options: m3OptionsFromMenuItems<String>([
+                const DropdownMenuItem(value: 'الكل', child: Text('الكل', style: TextStyle(fontSize: 12.0))),
+                const DropdownMenuItem(value: 'حرج جداً', child: Text('حرج جداً', style: TextStyle(fontSize: 12.0, color: Colors.red))),
+                const DropdownMenuItem(value: 'أولوية مرتفعة', child: Text('أولوية مرتفعة', style: TextStyle(fontSize: 12.0, color: Colors.orange))),
+              ]),
+onChanged: m3Legacy<String>((val) {
                 if (val != null) setState(() => _selectedSeverity = val);
-              },
-            );
+              }),
+);
 
             final resetButton = (_selectedBrand != 'الكل' || _selectedBranch != 'الكل' || _selectedSeverity != 'الكل' || _searchQuery.isNotEmpty)
                 ? IconButton(

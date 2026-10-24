@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'helpers/m3_dropdown_tester.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/utils/web_file_helper.dart';
@@ -48,7 +50,7 @@ void main() {
       // Select 'أسواق فتح الله' from chain dropdown -> clears red error banner
       await tester.tap(find.byKey(const ValueKey('ingestion_retail_chain_dropdown')));
       await tester.pumpAndSettle();
-      await tester.tap(find.textContaining('أسواق فتح الله').last);
+      await tester.tap(m3MenuEntry('أسواق فتح الله').last);
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('missing_chain_error_banner')), findsNothing);
 
@@ -99,7 +101,7 @@ void main() {
       // Select 'fathalla' first, then upload a file whose name/content is 'gomla' (Gomla Market)
       await tester.tap(find.byKey(const ValueKey('ingestion_retail_chain_dropdown')));
       await tester.pumpAndSettle();
-      await tester.tap(find.textContaining('أسواق فتح الله').last);
+      await tester.tap(m3MenuEntry('أسواق فتح الله').last);
       await tester.pumpAndSettle();
 
       WebFileHelper.nextMockPickedFile = PickedFileData(

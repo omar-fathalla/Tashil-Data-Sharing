@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
@@ -1137,74 +1138,14 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
           M3Spacing.gapMD,
           LayoutBuilder(
             builder: (context, constraints) {
-              final chainBorderColor = _showChainRequiredError
-                  ? colorScheme.error
-                  : colorScheme.outline;
-              final chainDropdown = DropdownButtonFormField<String>(
-                key: const ValueKey('ingestion_retail_chain_dropdown'),
-                isExpanded: true,
-                focusColor: Colors.transparent,
-                dropdownColor: colorScheme.surfaceContainerHigh,
-                borderRadius: M3Shape.radiusMd,
-                icon: Icon(
-                  Icons.arrow_drop_down_rounded,
-                  color: _showChainRequiredError
-                      ? colorScheme.error
-                      : colorScheme.onSurfaceVariant,
-                ),
-                value: hasSelectedChain ? _selectedChain : null,
-                hint: Text(
-                  '-- اختر سلسلة التجزئة المستهدفة --',
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: _showChainRequiredError
-                        ? colorScheme.error
-                        : colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                decoration: InputDecoration(
-                  labelText: 'سلسلة التجزئة المستهدفة (Target Retail Chain) *',
-                  labelStyle: _showChainRequiredError
-                      ? TextStyle(
-                          color: colorScheme.error,
-                          fontWeight: FontWeight.bold,
-                        )
-                      : null,
-                  prefixIcon: Icon(
-                    Icons.store_mall_directory_rounded,
-                    color: _showChainRequiredError ? colorScheme.error : null,
-                  ),
-                  filled: true,
-                  fillColor: _showChainRequiredError
-                      ? colorScheme.errorContainer.withOpacity(0.3)
-                      : colorScheme.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: M3Shape.radiusMd,
-                    borderSide: BorderSide(
-                      color: chainBorderColor,
-                      width: _showChainRequiredError ? 2.0 : 1.0,
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: M3Shape.radiusMd,
-                    borderSide: BorderSide(
-                      color: chainBorderColor,
-                      width: _showChainRequiredError ? 2.0 : 1.0,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: M3Shape.radiusMd,
-                    borderSide: BorderSide(
-                      color: _showChainRequiredError
-                          ? colorScheme.error
-                          : colorScheme.primary,
-                      width: 2.0,
-                    ),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-                ),
-                items: _availableChains.map((c) {
+              final chainDropdown = M3Dropdown<String?>(
+key: const ValueKey('ingestion_retail_chain_dropdown'),
+value: hasSelectedChain ? _selectedChain : null,
+label: 'سلسلة التجزئة المستهدفة (Target Retail Chain) *',
+leadingIcon: Icons.store_mall_directory_rounded,
+expand: true,
+errorText: _showChainRequiredError ? 'مطلوب' : null,
+options: m3OptionsFromMenuItems<String?>(_availableChains.map((c) {
                   final label = c.storeCount > 0 ? '${c.displayName} (${c.storeCount} فرع)' : c.displayName;
                   return DropdownMenuItem<String>(
                     value: c.code,
@@ -1213,73 +1154,43 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   );
-                }).toList(),
-                onChanged: (val) {
+                }).toList()),
+onChanged: m3Legacy<String?>((val) {
                   if (val != null) {
                     setState(() {
                       _selectedChain = val;
                       _showChainRequiredError = false;
                     });
                   }
-                },
-              );
+                }),
+);
 
-              final yearDropdown = DropdownButtonFormField<String>(
-                key: const ValueKey('ingestion_year_dropdown'),
-                isExpanded: true,
-                focusColor: Colors.transparent,
-                dropdownColor: colorScheme.surfaceContainerHigh,
-                borderRadius: M3Shape.radiusMd,
-                icon: Icon(
-                  Icons.arrow_drop_down_rounded,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                value: _selectedYear,
-                decoration: InputDecoration(
-                  labelText: 'سنة البيانات (Target Year)',
-                  prefixIcon: const Icon(Icons.calendar_today_rounded),
-                  filled: true,
-                  fillColor: colorScheme.surface,
-                  border: const OutlineInputBorder(
-                    borderRadius: M3Shape.radiusMd,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 14.0),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'auto', child: Text('تلقائي من الشيت (Auto)', overflow: TextOverflow.ellipsis)),
-                  DropdownMenuItem(value: '2026', child: Text('سنة 2026 (26)', overflow: TextOverflow.ellipsis)),
-                  DropdownMenuItem(value: '2025', child: Text('سنة 2025 (25)', overflow: TextOverflow.ellipsis)),
-                  DropdownMenuItem(value: '2024', child: Text('سنة 2024 (24)', overflow: TextOverflow.ellipsis)),
-                ],
-                onChanged: (val) {
+              final yearDropdown = M3Dropdown<String>(
+key: const ValueKey('ingestion_year_dropdown'),
+value: _selectedYear,
+label: 'سنة البيانات (Target Year)',
+leadingIcon: Icons.calendar_today_rounded,
+expand: true,
+options: m3OptionsFromMenuItems<String>([
+                  const DropdownMenuItem(value: 'auto', child: Text('تلقائي من الشيت (Auto)', overflow: TextOverflow.ellipsis)),
+                  const DropdownMenuItem(value: '2026', child: Text('سنة 2026 (26)', overflow: TextOverflow.ellipsis)),
+                  const DropdownMenuItem(value: '2025', child: Text('سنة 2025 (25)', overflow: TextOverflow.ellipsis)),
+                  const DropdownMenuItem(value: '2024', child: Text('سنة 2024 (24)', overflow: TextOverflow.ellipsis)),
+                ]),
+onChanged: m3Legacy<String>((val) {
                   if (val != null) {
                     setState(() => _selectedYear = val);
                   }
-                },
-              );
+                }),
+);
 
-              final monthDropdown = DropdownButtonFormField<String>(
-                key: const ValueKey('ingestion_month_dropdown'),
-                isExpanded: true,
-                focusColor: Colors.transparent,
-                dropdownColor: colorScheme.surfaceContainerHigh,
-                borderRadius: M3Shape.radiusMd,
-                icon: Icon(
-                  Icons.arrow_drop_down_rounded,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                value: _selectedMonth,
-                decoration: InputDecoration(
-                  labelText: 'الشهر المستهدف (Target Month)',
-                  prefixIcon: const Icon(Icons.date_range_rounded),
-                  filled: true,
-                  fillColor: colorScheme.surface,
-                  border: const OutlineInputBorder(
-                    borderRadius: M3Shape.radiusMd,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 14.0),
-                ),
-                items: [
+              final monthDropdown = M3Dropdown<String>(
+key: const ValueKey('ingestion_month_dropdown'),
+value: _selectedMonth,
+label: 'الشهر المستهدف (Target Month)',
+leadingIcon: Icons.date_range_rounded,
+expand: true,
+options: m3OptionsFromMenuItems<String>([
                   const DropdownMenuItem(value: 'auto', child: Text('تلقائي (Auto)', overflow: TextOverflow.ellipsis)),
                   ..._monthNamesAr.entries.map(
                     (e) => DropdownMenuItem(
@@ -1287,13 +1198,13 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                       child: Text(e.value, overflow: TextOverflow.ellipsis),
                     ),
                   ),
-                ],
-                onChanged: (val) {
+                ]),
+onChanged: m3Legacy<String>((val) {
                   if (val != null) {
                     setState(() => _selectedMonth = val);
                   }
-                },
-              );
+                }),
+);
 
               if (constraints.maxWidth >= 820) {
                 return Row(
@@ -1916,33 +1827,24 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
       },
     );
 
-    final yearDropdown = DropdownButtonFormField<String>(
-      key: const ValueKey('archive_year_filter_dropdown'),
-      value: _archiveYearFilter,
-      isExpanded: true,
-      decoration: InputDecoration(
-        labelText: 'تصفية بالسنة',
-        isDense: true,
-        filled: true,
-        fillColor: colorScheme.surface,
-        border: const OutlineInputBorder(
-          borderRadius: M3Shape.radiusMd,
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-      ),
-      items: const [
-        DropdownMenuItem(value: 'all', child: Text('كل السنوات')),
-        DropdownMenuItem(value: '2026', child: Text('سنة 2026')),
-        DropdownMenuItem(value: '2025', child: Text('سنة 2025')),
-        DropdownMenuItem(value: '2024', child: Text('سنة 2024')),
-      ],
-      onChanged: (val) {
+    final yearDropdown = M3Dropdown<String>(
+key: const ValueKey('archive_year_filter_dropdown'),
+value: _archiveYearFilter,
+label: 'تصفية بالسنة',
+expand: true,
+options: m3OptionsFromMenuItems<String>([
+        const DropdownMenuItem(value: 'all', child: Text('كل السنوات')),
+        const DropdownMenuItem(value: '2026', child: Text('سنة 2026')),
+        const DropdownMenuItem(value: '2025', child: Text('سنة 2025')),
+        const DropdownMenuItem(value: '2024', child: Text('سنة 2024')),
+      ]),
+onChanged: m3Legacy<String>((val) {
         if (val != null) {
           setState(() => _archiveYearFilter = val);
           _loadArchive();
         }
-      },
-    );
+      }),
+);
 
     return Container(
       key: const ValueKey('excel_upload_archive_section'),

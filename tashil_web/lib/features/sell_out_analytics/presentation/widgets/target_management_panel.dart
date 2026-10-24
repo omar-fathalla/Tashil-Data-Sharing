@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/data/result.dart';
@@ -352,17 +353,13 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                           ),
                           const SizedBox(height: 14.0),
                         ],
-                        DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          value: _chainOptions.any((c) => c.code == chain)
+                        M3Dropdown<String>(
+value: _chainOptions.any((c) => c.code == chain)
                               ? chain
                               : 'fathalla',
-                          decoration: const InputDecoration(
-                            labelText: 'سلسلة التجزئة (Retail Chain) *',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          items: _chainOptions
+label: 'سلسلة التجزئة (Retail Chain) *',
+expand: true,
+options: m3OptionsFromMenuItems<String>(_chainOptions
                               .map(
                                 (c) => DropdownMenuItem<String>(
                                   value: c.code,
@@ -372,25 +369,21 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                   ),
                                 ),
                               )
-                              .toList(),
-                          onChanged: (v) {
+                              .toList()),
+onChanged: m3Legacy<String>((v) {
                             if (v != null) setDialogState(() => chain = v);
-                          },
-                        ),
+                          }),
+),
                         const SizedBox(height: 12.0),
                         Row(
                           children: [
                             Expanded(
-                              child: DropdownButtonFormField<int>(
-                                key: const ValueKey('target_dialog_year_dropdown'),
-                                isExpanded: true,
-                                value: year,
-                                decoration: const InputDecoration(
-                                  labelText: 'السنة (Year) *',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                ),
-                                items: planningYears
+                              child: M3Dropdown<int>(
+key: const ValueKey('target_dialog_year_dropdown'),
+value: year,
+label: 'السنة (Year) *',
+expand: true,
+options: m3OptionsFromMenuItems<int>(planningYears
                                     .map(
                                       (yr) => DropdownMenuItem<int>(
                                         value: yr,
@@ -400,23 +393,19 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                         ),
                                       ),
                                     )
-                                    .toList(),
-                                onChanged: (v) {
+                                    .toList()),
+onChanged: m3Legacy<int>((v) {
                                   if (v != null) setDialogState(() => year = v);
-                                },
-                              ),
+                                }),
+),
                             ),
                             const SizedBox(width: 12.0),
                             Expanded(
-                              child: DropdownButtonFormField<int>(
-                                isExpanded: true,
-                                value: month,
-                                decoration: const InputDecoration(
-                                  labelText: 'الفترة / الشهر (Period)',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                ),
-                                items: _months
+                              child: M3Dropdown<int>(
+value: month,
+label: 'الفترة / الشهر (Period)',
+expand: true,
+options: m3OptionsFromMenuItems<int>(_months
                                     .map(
                                       (m) => DropdownMenuItem<int>(
                                         value: m.month,
@@ -426,11 +415,11 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                         ),
                                       ),
                                     )
-                                    .toList(),
-                                onChanged: (v) {
+                                    .toList()),
+onChanged: m3Legacy<int>((v) {
                                   if (v != null) setDialogState(() => month = v);
-                                },
-                              ),
+                                }),
+),
                             ),
                           ],
                         ),
@@ -1156,23 +1145,13 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                 children: [
                   SizedBox(
                     width: 175.0,
-                    child: DropdownButtonFormField<int>(
-                      isExpanded: true,
-                      value: [0, ..._targetPlanningYears].contains(_selectedYear)
+                    child: M3Dropdown<int>(
+value: [0, ..._targetPlanningYears].contains(_selectedYear)
                           ? _selectedYear
                           : 0,
-                      decoration: const InputDecoration(
-                        labelText: 'Target Year',
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12.0,
-                          vertical: 11.0,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: M3Shape.radiusMd,
-                        ),
-                      ),
-                      items: [
+label: 'Target Year',
+expand: true,
+options: m3OptionsFromMenuItems<int>([
                         const DropdownMenuItem(value: 0, child: Text('All Years')),
                         ..._targetPlanningYears.map(
                           (yr) => DropdownMenuItem<int>(
@@ -1180,34 +1159,24 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                             child: Text('$yr'),
                           ),
                         ),
-                      ],
-                      onChanged: (v) {
+                      ]),
+onChanged: m3Legacy<int>((v) {
                         if (v != null) {
                           setState(() => _selectedYear = v);
                           _loadTargets();
                         }
-                      },
-                    ),
+                      }),
+),
                   ),
                   SizedBox(
                     width: 240.0,
-                    child: DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      value: _chainOptions.any((c) => c.code == _selectedChain)
+                    child: M3Dropdown<String>(
+value: _chainOptions.any((c) => c.code == _selectedChain)
                           ? _selectedChain
                           : 'all',
-                      decoration: const InputDecoration(
-                        labelText: 'Retail Chain',
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12.0,
-                          vertical: 11.0,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: M3Shape.radiusMd,
-                        ),
-                      ),
-                      items: _chainOptions
+label: 'Retail Chain',
+expand: true,
+options: m3OptionsFromMenuItems<String>(_chainOptions
                           .map(
                             (c) => DropdownMenuItem<String>(
                               value: c.code,
@@ -1217,14 +1186,14 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                               ),
                             ),
                           )
-                          .toList(),
-                      onChanged: (v) {
+                          .toList()),
+onChanged: m3Legacy<String>((v) {
                         if (v != null) {
                           setState(() => _selectedChain = v);
                           _loadTargets();
                         }
-                      },
-                    ),
+                      }),
+),
                   ),
                 ],
               ),
@@ -2082,47 +2051,36 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
               children: [
                 SizedBox(
                   width: 175.0,
-                  child: DropdownButtonFormField<String>(
-                    value: _branchRegionFilter,
-                    isDense: true,
-                    decoration: const InputDecoration(
-                      labelText: 'الإقليم / المحافظة',
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 10.0,
-                        vertical: 9.0,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: M3Shape.radiusSm,
-                      ),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('كل الأقاليم')),
-                      DropdownMenuItem(
+                  child: M3Dropdown<String>(
+value: _branchRegionFilter,
+label: 'الإقليم / المحافظة',
+options: m3OptionsFromMenuItems<String>([
+                      const DropdownMenuItem(value: 'all', child: Text('كل الأقاليم')),
+                      const DropdownMenuItem(
                         value: 'ALX',
                         child: Text('الإسكندرية ومطروح (ALX)'),
                       ),
-                      DropdownMenuItem(
+                      const DropdownMenuItem(
                         value: 'CIR',
                         child: Text('القاهرة الكبرى (CIR)'),
                       ),
-                      DropdownMenuItem(
+                      const DropdownMenuItem(
                         value: 'TNT',
                         child: Text('الغربية وطنطا (TNT)'),
                       ),
-                      DropdownMenuItem(
+                      const DropdownMenuItem(
                         value: 'BHR',
                         child: Text('البحيرة ودمنهور (BHR)'),
                       ),
-                      DropdownMenuItem(
+                      const DropdownMenuItem(
                         value: 'MNS',
                         child: Text('المنصورة ودمياط (MNS)'),
                       ),
-                    ],
-                    onChanged: (v) {
+                    ]),
+onChanged: m3Legacy<String>((v) {
                       if (v != null) setState(() => _branchRegionFilter = v);
-                    },
-                  ),
+                    }),
+),
                 ),
                 SizedBox(
                   width: 240.0,
@@ -2484,21 +2442,11 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                   const SizedBox(width: 12.0),
                   SizedBox(
                     width: 310.0,
-                    child: DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      value: branch.branchName,
-                      decoration: const InputDecoration(
-                        labelText: 'الفرع المختار (Level 3 Branch)',
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12.0,
-                          vertical: 10.0,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: M3Shape.radiusSm,
-                        ),
-                      ),
-                      items: target.branches
+                    child: M3Dropdown<String>(
+value: branch.branchName,
+label: 'الفرع المختار (Level 3 Branch)',
+expand: true,
+options: m3OptionsFromMenuItems<String>(target.branches
                           .map(
                             (b) => DropdownMenuItem<String>(
                               value: b.branchName,
@@ -2508,16 +2456,16 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                               ),
                             ),
                           )
-                          .toList(),
-                      onChanged: (v) {
+                          .toList()),
+onChanged: m3Legacy<String>((v) {
                         if (v != null) {
                           setState(() {
                             _selectedBranchName = v;
                             _skuPage = 0;
                           });
                         }
-                      },
-                    ),
+                      }),
+),
                   ),
                 ],
               ),
@@ -2684,21 +2632,11 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
           children: [
             SizedBox(
               width: 170.0,
-              child: DropdownButtonFormField<String>(
-                isExpanded: true,
-                value: brands.contains(_skuBrandFilter) ? _skuBrandFilter : 'all',
-                decoration: const InputDecoration(
-                  labelText: 'الماركة (Brand)',
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 10.0,
-                    vertical: 9.0,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: M3Shape.radiusSm,
-                  ),
-                ),
-                items: brands
+              child: M3Dropdown<String>(
+value: brands.contains(_skuBrandFilter) ? _skuBrandFilter : 'all',
+label: 'الماركة (Brand)',
+expand: true,
+options: m3OptionsFromMenuItems<String>(brands
                     .map(
                       (b) => DropdownMenuItem<String>(
                         value: b,
@@ -2708,92 +2646,72 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                         ),
                       ),
                     )
-                    .toList(),
-                onChanged: (v) {
+                    .toList()),
+onChanged: m3Legacy<String>((v) {
                   if (v != null) {
                     setState(() {
                       _skuBrandFilter = v;
                       _skuPage = 0;
                     });
                   }
-                },
-              ),
+                }),
+),
             ),
             SizedBox(
               width: 165.0,
-              child: DropdownButtonFormField<String>(
-                value: _skuSectorFilter,
-                decoration: const InputDecoration(
-                  labelText: 'القطاع (Sector)',
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 10.0,
-                    vertical: 9.0,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: M3Shape.radiusSm,
-                  ),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'all', child: Text('كل القطاعات')),
-                  DropdownMenuItem(
+              child: M3Dropdown<String>(
+value: _skuSectorFilter,
+label: 'القطاع (Sector)',
+options: m3OptionsFromMenuItems<String>([
+                  const DropdownMenuItem(value: 'all', child: Text('كل القطاعات')),
+                  const DropdownMenuItem(
                     value: 'MT',
                     child: Text('منظفات (MT)'),
                   ),
-                  DropdownMenuItem(
+                  const DropdownMenuItem(
                     value: 'CC',
                     child: Text('عناية سيارات رابيدو (CC)'),
                   ),
-                ],
-                onChanged: (v) {
+                ]),
+onChanged: m3Legacy<String>((v) {
                   if (v != null) {
                     setState(() {
                       _skuSectorFilter = v;
                       _skuPage = 0;
                     });
                   }
-                },
-              ),
+                }),
+),
             ),
             SizedBox(
               width: 195.0,
-              child: DropdownButtonFormField<String>(
-                value: _skuStockStatusFilter,
-                decoration: const InputDecoration(
-                  labelText: 'حالة الرصيد المتبقي',
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 10.0,
-                    vertical: 9.0,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: M3Shape.radiusSm,
-                  ),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'all', child: Text('كل الحالات')),
-                  DropdownMenuItem(
+              child: M3Dropdown<String>(
+value: _skuStockStatusFilter,
+label: 'حالة الرصيد المتبقي',
+options: m3OptionsFromMenuItems<String>([
+                  const DropdownMenuItem(value: 'all', child: Text('كل الحالات')),
+                  const DropdownMenuItem(
                     value: 'urgent_replenishment',
                     child: Text('سحب عالي / أولوية توريد'),
                   ),
-                  DropdownMenuItem(
+                  const DropdownMenuItem(
                     value: 'optimal',
                     child: Text('رصيد آمن ومتوازن'),
                   ),
-                  DropdownMenuItem(
+                  const DropdownMenuItem(
                     value: 'overstock',
                     child: Text('تكدس مخزني - تهدئة توريد'),
                   ),
-                ],
-                onChanged: (v) {
+                ]),
+onChanged: m3Legacy<String>((v) {
                   if (v != null) {
                     setState(() {
                       _skuStockStatusFilter = v;
                       _skuPage = 0;
                     });
                   }
-                },
-              ),
+                }),
+),
             ),
             SizedBox(
               width: 240.0,
