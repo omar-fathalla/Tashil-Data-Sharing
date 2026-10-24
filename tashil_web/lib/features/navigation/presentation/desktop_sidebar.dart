@@ -41,57 +41,68 @@ class DesktopSidebar extends StatelessWidget {
         icon: Icons.dashboard_rounded,
         selectedIcon: Icons.dashboard_rounded,
         label: 'Dashboard',
+        labelAr: 'لوحة القيادة',
       ),
       _NavDestination(
         icon: Icons.analytics_rounded,
         selectedIcon: Icons.analytics_rounded,
         label: 'Sell-Out',
+        labelAr: 'المبيعات (Sell-Out)',
       ),
       _NavDestination(
         icon: Icons.local_shipping_rounded,
         selectedIcon: Icons.local_shipping_rounded,
         label: 'Sell-In',
+        labelAr: 'التوريد (Sell-In)',
       ),
       _NavDestination(
         icon: Icons.warning_amber_rounded,
         selectedIcon: Icons.warning_amber_rounded,
         label: 'OOS Monitor',
+        labelAr: 'مراقب النواقص',
         badgeCount: 3,
       ),
       _NavDestination(
         icon: Icons.store_mall_directory_rounded,
         selectedIcon: Icons.store_mall_directory_rounded,
         label: 'Store Matrix',
+        labelAr: 'مصفوفة الفروع',
       ),
       _NavDestination(
         icon: Icons.price_change_rounded,
         selectedIcon: Icons.price_change_rounded,
         label: 'Pricing & Promos',
+        labelAr: 'التسعير والعروض',
       ),
       _NavDestination(
         icon: Icons.compare_arrows_rounded,
         selectedIcon: Icons.compare_arrows_rounded,
         label: 'Compare',
+        labelAr: 'مقارنة المنافسين',
       ),
       _NavDestination(
         icon: Icons.campaign_rounded,
         selectedIcon: Icons.campaign_rounded,
         label: 'Trade Marketing & ROI',
+        labelAr: 'التسويق التجاري والعائد',
       ),
       _NavDestination(
         icon: Icons.inventory_2_rounded,
         selectedIcon: Icons.inventory_2_rounded,
         label: 'CPFR Replenishment',
+        labelAr: 'التجديد وأوامر الشراء',
       ),
       _NavDestination(
         icon: Icons.auto_awesome_rounded,
         selectedIcon: Icons.auto_awesome_rounded,
         label: 'Upload',
+        labelAr: 'رفع البيانات الذكي',
       ),
       _NavDestination(
         icon: Icons.qr_code_2_rounded,
         selectedIcon: Icons.qr_code_2_rounded,
         label: 'Product Master',
+        labelAr: 'كارتة الأصناف',
       ),
     ];
 
@@ -108,7 +119,7 @@ class DesktopSidebar extends StatelessWidget {
         children: [
           // Header: Brand & App Title
           Padding(
-            padding: const EdgeInsets.fromLTRB(16.0, 24.0, 16.0, 16.0),
+            padding: const EdgeInsetsDirectional.fromSTEB(16.0, 24.0, 16.0, 16.0),
             child: Row(
               children: [
                 const DataSharingLogo(
@@ -138,16 +149,14 @@ class DesktopSidebar extends StatelessWidget {
                             textDirection: TextDirection.ltr,
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: colorScheme.onSurfaceVariant.withOpacity(0.7),
-                              fontSize: 10.0,
                             ),
                           ),
                         ],
                       ),
                       Text(
-                        'Data Sharing Platform',
+                        'منصة مشاركة البيانات',
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
-                          fontSize: 10.0,
                         ),
                       ),
                     ],
@@ -175,7 +184,7 @@ class DesktopSidebar extends StatelessWidget {
           // Navigation Items
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              padding: const EdgeInsets.fromLTRB(12.0, 0.0, 12.0, 12.0),
               itemCount: destinations.length,
               separatorBuilder: (_, __) => const SizedBox(height: 4.0),
               itemBuilder: (context, index) {
@@ -188,8 +197,8 @@ class DesktopSidebar extends StatelessWidget {
                   child: AnimatedContainer(
                     duration: M3Motion.short4,
                     curve: M3Motion.standard,
-                    height: 48.0,
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    height: 52.0,
+                    padding: const EdgeInsetsDirectional.symmetric(horizontal: 16.0),
                     decoration: BoxDecoration(
                       color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
                       borderRadius: M3Shape.radiusXl,
@@ -213,21 +222,32 @@ class DesktopSidebar extends StatelessWidget {
                         ),
                         M3Spacing.gapSM,
                         Expanded(
-                          child: AnimatedDefaultTextStyle(
-                            duration: M3Motion.short4,
-                            curve: M3Motion.standard,
-                            style: (theme.textTheme.labelLarge ?? const TextStyle()).copyWith(
-                              color: isSelected
-                                  ? colorScheme.onSecondaryContainer
-                                  : colorScheme.onSurfaceVariant,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              fontFamily: 'Cairo',
-                            ),
-                            child: Text(
-                              dest.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                dest.labelAr,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: isSelected
+                                      ? colorScheme.onSecondaryContainer
+                                      : colorScheme.onSurface,
+                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                dest.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: isSelected
+                                      ? colorScheme.onSecondaryContainer
+                                      : colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         if (dest.badgeCount != null && dest.badgeCount! > 0)
@@ -267,7 +287,7 @@ class DesktopSidebar extends StatelessWidget {
                   color: colorScheme.primary,
                 ),
                 label: Text(
-                  'Back to Central Admin',
+                  'العودة للإدارة المركزية',
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: colorScheme.primary,
@@ -283,40 +303,24 @@ class DesktopSidebar extends StatelessWidget {
               ),
             ),
 
-          // System Health & Engine Footer
-          Container(
-            padding: M3Spacing.pSm,
-            margin: const EdgeInsets.all(12.0),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-              borderRadius: M3Shape.radiusMd,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // System Health footer: fixed below the scrollable list (never overlaps it).
+          const Divider(height: 1.0),
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(16.0, 8.0, 16.0, 12.0),
+            child: Row(
+              key: const ValueKey('sidebar_footer_status'),
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.bolt_rounded, size: 14.0, color: colorScheme.primary),
-                    const SizedBox(width: 4.0),
-                    Expanded(
-                      child: Text(
-                        'Smart Ingestion Active',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10.0,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                Icon(Icons.bolt_rounded, size: 16.0, color: colorScheme.primary),
+                const SizedBox(width: 6.0),
+                Expanded(
+                  child: Text(
+                    'الاستيراد الذكي يعمل · Smart Ingestion Active',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 2.0),
-                Text(
-                  'BigQuery Streaming OLAP Active',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontSize: 10.0,
-                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -332,12 +336,14 @@ class _NavDestination {
   final IconData icon;
   final IconData selectedIcon;
   final String label;
+  final String labelAr;
   final int? badgeCount;
 
   _NavDestination({
     required this.icon,
     required this.selectedIcon,
     required this.label,
+    required this.labelAr,
     this.badgeCount,
   });
 }

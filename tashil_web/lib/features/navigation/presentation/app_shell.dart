@@ -115,7 +115,7 @@ class _AppShellState extends State<AppShell> {
     _NavDestinationSpec(
       index: 6,
       labelEn: 'Compare',
-      labelAr: 'Compare',
+      labelAr: 'مقارنة المنافسين',
       shortLabel: 'Compare',
       icon: Icons.compare_arrows_rounded,
       selectedIcon: Icons.compare_arrows_rounded,
@@ -285,6 +285,8 @@ class _AppShellState extends State<AppShell> {
     final layout = M3Layout.of(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    // Shell direction is derived from the locale (see shellTextDirectionFor).
+    final shellDirection = shellTextDirectionFor(Localizations.maybeLocaleOf(context));
 
     final tenantKey = ApiClient.normalizeTenantSlug(widget.activeTenant);
     final user = widget.apiClient.currentUser;
@@ -353,10 +355,10 @@ class _AppShellState extends State<AppShell> {
     if (layout.isDesktop) {
       return Scaffold(
         body: Directionality(
-          textDirection: TextDirection.ltr,
+          textDirection: shellDirection,
           child: Row(
             children: [
-              // Desktop Sidebar positioned on the LEFT
+              // Sidebar sits on the start side (right in RTL).
               DesktopSidebar(
                 selectedIndex: _selectedIndex,
                 onDestinationSelected: (index) => setState(() => _selectedIndex = index),
@@ -388,10 +390,10 @@ class _AppShellState extends State<AppShell> {
     if (layout.isMedium) {
       return Scaffold(
         body: Directionality(
-          textDirection: TextDirection.ltr,
+          textDirection: shellDirection,
           child: Row(
             children: [
-              // Navigation Rail positioned on the LEFT with Brand Logo & Account Actions
+              // Sidebar sits on the start side (right in RTL).
               NavigationRail(
                 selectedIndex: _selectedIndex,
                 onDestinationSelected: (index) => setState(() => _selectedIndex = index),
@@ -526,7 +528,7 @@ class _AppShellState extends State<AppShell> {
         automaticallyImplyLeading: false,
         titleSpacing: 0,
         title: Directionality(
-          textDirection: TextDirection.ltr,
+          textDirection: shellDirection,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
             child: Row(
@@ -725,7 +727,7 @@ class _AppShellState extends State<AppShell> {
         ),
       ),
       bottomNavigationBar: Directionality(
-        textDirection: TextDirection.ltr,
+        textDirection: shellDirection,
         child: NavigationBar(
           backgroundColor: colorScheme.surfaceContainer,
           surfaceTintColor: Colors.transparent,
@@ -793,3 +795,8 @@ class _AppShellState extends State<AppShell> {
     return 'Company ${clean[0].toUpperCase()}${clean.substring(1)}';
   }
 }
+
+/// The shell's text direction. All page content is Arabic, so the navigation
+/// chrome is RTL (sidebar/rail on the start = right side) for both supported
+/// locales ('ar' and the 'en' default) to stay consistent with the content.
+TextDirection shellTextDirectionFor(Locale? locale) => TextDirection.rtl;
