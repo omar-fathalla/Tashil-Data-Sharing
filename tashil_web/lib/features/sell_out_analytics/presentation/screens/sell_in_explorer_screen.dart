@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/data/cache_store.dart';
 import '../../../../core/data/result.dart';
 import '../../data/target_repository.dart';
@@ -299,7 +300,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
       builder: (ctx) {
         final cs = Theme.of(ctx).colorScheme;
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+          shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusLg),
           title: Row(
             children: [
               Icon(Icons.delete_forever_rounded, color: cs.error, size: 26.0),
@@ -322,7 +323,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                 padding: const EdgeInsets.all(12.0),
                 decoration: BoxDecoration(
                   color: cs.errorContainer.withOpacity(0.35),
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -703,25 +704,25 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
               items: [
                 const M3ResponsiveTabItem<int>(
                   value: 0,
-                  icon: Icons.local_shipping_outlined,
+                  icon: Icons.local_shipping_rounded,
                   selectedIcon: Icons.local_shipping_rounded,
                   label: 'Sell-In Data & Operations',
                 ),
                 const M3ResponsiveTabItem<int>(
                   value: 1,
-                  icon: Icons.warehouse_outlined,
+                  icon: Icons.warehouse_rounded,
                   selectedIcon: Icons.warehouse_rounded,
                   label: 'Remaining Stock & Reports (Sell-In − Sell-Out)',
                 ),
                 const M3ResponsiveTabItem<int>(
                   value: 2,
-                  icon: Icons.track_changes_outlined,
+                  icon: Icons.track_changes_rounded,
                   selectedIcon: Icons.track_changes_rounded,
                   label: 'Target Management (Sell-In)',
                 ),
                 M3ResponsiveTabItem<int>(
                   value: 3,
-                  icon: Icons.folder_copy_outlined,
+                  icon: Icons.folder_copy_rounded,
                   selectedIcon: Icons.folder_copy_rounded,
                   label: 'Uploaded Sheets (${_archivedSellInFiles.length})',
                 ),
@@ -769,7 +770,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(14.0),
+        borderRadius: M3Shape.radiusMd,
         border: Border.all(color: accentColor.withOpacity(0.35)),
       ),
       child: Row(
@@ -779,7 +780,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
             padding: const EdgeInsets.all(8.0),
             decoration: BoxDecoration(
               color: accentColor.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10.0),
+              borderRadius: M3Shape.radiusSm,
             ),
             child: Icon(icon, size: 18.0, color: accentColor),
           ),
@@ -914,7 +915,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                 colorScheme.secondaryContainer.withOpacity(0.24),
               ],
             ),
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.primary.withOpacity(0.28),
             ),
@@ -946,7 +947,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: colorScheme.primary.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(999.0),
+                      borderRadius: M3Shape.radiusFull,
                     ),
                     child: Text(
                       'اضغط على أي صنف بالجدول لفتح بطاقة الهوية (Product ID Card)',
@@ -985,7 +986,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                         '${CurrencyFormatter.formatCompactEGP(discountGranted)} (${discountPct.toStringAsFixed(1)}%)',
                     subText: 'خصم فاتورة + خصم إضافي (10% + 5%)',
                     accentColor: Colors.deepOrange.shade700,
-                    icon: Icons.discount_outlined,
+                    icon: Icons.discount_rounded,
                   ),
                   Icon(
                     Icons.drag_handle_rounded,
@@ -999,7 +1000,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     subText:
                         '${CurrencyFormatter.formatNumber(_data.totalCases.round())} كرتونة • ${CurrencyFormatter.formatNumber(_data.totalUnitsPieces)} قطعة',
                     accentColor: colorScheme.primary,
-                    icon: Icons.local_shipping_outlined,
+                    icon: Icons.local_shipping_rounded,
                   ),
                   Icon(
                     Icons.add_circle_outline_rounded,
@@ -1040,7 +1041,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
           padding: const EdgeInsets.all(14.0),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
             ),
@@ -1060,15 +1061,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     width: 190.0,
                     child: DropdownButtonFormField<String>(
                       value: _selectedChain,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Chain',
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
+                        contentPadding: EdgeInsets.symmetric(
                           horizontal: 12.0,
                           vertical: 10.0,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
+                          borderRadius: M3Shape.radiusMd,
                         ),
                       ),
                       items: const [
@@ -1106,15 +1107,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     width: 130.0,
                     child: DropdownButtonFormField<int>(
                       value: _selectedYear,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Year',
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
+                        contentPadding: EdgeInsets.symmetric(
                           horizontal: 12.0,
                           vertical: 10.0,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
+                          borderRadius: M3Shape.radiusMd,
                         ),
                       ),
                       items: const [
@@ -1136,15 +1137,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     width: 150.0,
                     child: DropdownButtonFormField<int>(
                       value: _selectedMonth,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Month',
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
+                        contentPadding: EdgeInsets.symmetric(
                           horizontal: 12.0,
                           vertical: 10.0,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
+                          borderRadius: M3Shape.radiusMd,
                         ),
                       ),
                       items: const [
@@ -1185,8 +1186,8 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                           horizontal: 12.0,
                           vertical: 10.0,
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
+                        border: const OutlineInputBorder(
+                          borderRadius: M3Shape.radiusMd,
                         ),
                       ),
                       onChanged: (val) {
@@ -1267,7 +1268,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
         Container(
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
             ),
@@ -1362,7 +1363,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: colorScheme.primaryContainer.withOpacity(0.6),
-                                        borderRadius: BorderRadius.circular(999.0),
+                                        borderRadius: M3Shape.radiusFull,
                                       ),
                                       child: Text(
                                         r.retailerChain.toUpperCase(),
@@ -1388,7 +1389,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                               ),
                               DataCell(
                                 InkWell(
-                                  borderRadius: BorderRadius.circular(8.0),
+                                  borderRadius: M3Shape.radiusSm,
                                   onTap: () => _openProductIdCard(
                                     itemCode: r.itemCode,
                                     barcode: r.barcode,
@@ -1414,7 +1415,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                                             ),
                                             const SizedBox(width: 4.0),
                                             Icon(
-                                              Icons.badge_outlined,
+                                              Icons.badge_rounded,
                                               size: 15.0,
                                               color: colorScheme.primary,
                                             ),
@@ -1656,7 +1657,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                 colorScheme.tertiaryContainer.withOpacity(0.25),
               ],
             ),
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.primary.withOpacity(0.3),
             ),
@@ -1736,7 +1737,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: Colors.amber.shade100.withOpacity(0.85),
-                        borderRadius: BorderRadius.circular(10.0),
+                        borderRadius: M3Shape.radiusSm,
                         border: Border.all(color: Colors.amber.shade700.withOpacity(0.5)),
                       ),
                       child: Row(
@@ -1878,7 +1879,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
           padding: const EdgeInsets.all(14.0),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
             ),
@@ -1898,15 +1899,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     width: 190.0,
                     child: DropdownButtonFormField<String>(
                       value: _selectedChain,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Chain',
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
+                        contentPadding: EdgeInsets.symmetric(
                           horizontal: 12.0,
                           vertical: 10.0,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
+                          borderRadius: M3Shape.radiusMd,
                         ),
                       ),
                       items: const [
@@ -1941,15 +1942,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     width: 140.0,
                     child: DropdownButtonFormField<int>(
                       value: _selectedYear,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Year',
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
+                        contentPadding: EdgeInsets.symmetric(
                           horizontal: 12.0,
                           vertical: 10.0,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
+                          borderRadius: M3Shape.radiusMd,
                         ),
                       ),
                       items: const [
@@ -1971,15 +1972,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     width: 210.0,
                     child: DropdownButtonFormField<String>(
                       value: _stockStatusFilter,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Stock Status',
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
+                        contentPadding: EdgeInsets.symmetric(
                           horizontal: 12.0,
                           vertical: 10.0,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
+                          borderRadius: M3Shape.radiusMd,
                         ),
                       ),
                       items: const [
@@ -2048,7 +2049,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
           padding: const EdgeInsets.all(18.0),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
             ),
@@ -2278,7 +2279,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                               color: isPositiveClosing
                                   ? colorScheme.primaryContainer.withOpacity(0.55)
                                   : colorScheme.errorContainer.withOpacity(0.55),
-                              borderRadius: BorderRadius.circular(10.0),
+                              borderRadius: M3Shape.radiusSm,
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -2433,7 +2434,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
               padding: const EdgeInsets.all(18.0),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(18.0),
+                borderRadius: M3Shape.radiusLg,
                 border: Border.all(
                   color: colorScheme.outlineVariant.withOpacity(0.5),
                 ),
@@ -2475,7 +2476,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     padding: const EdgeInsets.all(14.0),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHigh.withOpacity(0.35),
-                      borderRadius: BorderRadius.circular(14.0),
+                      borderRadius: M3Shape.radiusMd,
                       border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.4)),
                     ),
                     child: Column(
@@ -2504,11 +2505,11 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                                     : null,
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
+                                  borderRadius: M3Shape.radiusSm,
                                   borderSide: BorderSide(color: colorScheme.outlineVariant),
                                 ),
                                 enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
+                                  borderRadius: M3Shape.radiusSm,
                                   borderSide: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.6)),
                                 ),
                                 filled: true,
@@ -2530,11 +2531,11 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                                 prefixIcon: const Icon(Icons.branding_watermark_rounded, size: 20),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
+                                  borderRadius: M3Shape.radiusSm,
                                   borderSide: BorderSide(color: colorScheme.outlineVariant),
                                 ),
                                 enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
+                                  borderRadius: M3Shape.radiusSm,
                                   borderSide: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.6)),
                                 ),
                                 filled: true,
@@ -2573,14 +2574,14 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                               decoration: InputDecoration(
                                 labelText: 'حالة الرصيد (Status)',
                                 labelStyle: const TextStyle(fontSize: 12.0),
-                                prefixIcon: const Icon(Icons.filter_alt_outlined, size: 20),
+                                prefixIcon: const Icon(Icons.filter_alt_rounded, size: 20),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
+                                  borderRadius: M3Shape.radiusSm,
                                   borderSide: BorderSide(color: colorScheme.outlineVariant),
                                 ),
                                 enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
+                                  borderRadius: M3Shape.radiusSm,
                                   borderSide: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.6)),
                                 ),
                                 filled: true,
@@ -2838,7 +2839,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                           cells: [
                             DataCell(
                               InkWell(
-                                borderRadius: BorderRadius.circular(8.0),
+                                borderRadius: M3Shape.radiusSm,
                                 onTap: () => _openProductIdCard(
                                   itemCode: item.itemCode,
                                   barcode: item.barcode,
@@ -2861,7 +2862,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                                           ),
                                           const SizedBox(width: 4.0),
                                           Icon(
-                                            Icons.badge_outlined,
+                                            Icons.badge_rounded,
                                             size: 15.0,
                                             color: colorScheme.primary,
                                           ),
@@ -2989,7 +2990,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                                       : isOverstock
                                           ? Colors.orange.shade100
                                           : Colors.teal.shade50,
-                                  borderRadius: BorderRadius.circular(8.0),
+                                  borderRadius: M3Shape.radiusSm,
                                 ),
                                 child: Text(
                                   item.stockStatusAr,
@@ -3049,7 +3050,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHigh.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(12.0),
+                      borderRadius: M3Shape.radiusMd,
                       border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.4)),
                     ),
                     child: Row(
@@ -3079,7 +3080,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 6.0),
                           decoration: BoxDecoration(
                             color: colorScheme.primaryContainer.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(8.0),
+                            borderRadius: M3Shape.radiusSm,
                           ),
                           child: Text(
                             'صفحة ${totalSkuPages == 0 ? 0 : clampedCurrentPage + 1} من ${totalSkuPages == 0 ? 1 : totalSkuPages}',
@@ -3130,7 +3131,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
           padding: const EdgeInsets.all(18.0),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.6),
             ),
@@ -3144,7 +3145,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     padding: const EdgeInsets.all(10.0),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12.0),
+                      borderRadius: M3Shape.radiusMd,
                     ),
                     child: Icon(
                       Icons.cloud_upload_rounded,
@@ -3191,15 +3192,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                         width: 200.0,
                         child: DropdownButtonFormField<String>(
                           value: _archiveUploadChain,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: 'Target Chain',
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
+                            contentPadding: EdgeInsets.symmetric(
                               horizontal: 12.0,
                               vertical: 10.0,
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.0),
+                              borderRadius: M3Shape.radiusMd,
                             ),
                           ),
                           items: const [
@@ -3231,15 +3232,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                         width: 155.0,
                         child: DropdownButtonFormField<int>(
                           value: _archiveUploadYear,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: 'Year (Optional)',
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
+                            contentPadding: EdgeInsets.symmetric(
                               horizontal: 12.0,
                               vertical: 10.0,
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.0),
+                              borderRadius: M3Shape.radiusMd,
                             ),
                           ),
                           items: const [
@@ -3262,15 +3263,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                         width: 175.0,
                         child: DropdownButtonFormField<int>(
                           value: _archiveUploadMonth,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: 'Month (Optional)',
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
+                            contentPadding: EdgeInsets.symmetric(
                               horizontal: 12.0,
                               vertical: 10.0,
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.0),
+                              borderRadius: M3Shape.radiusMd,
                             ),
                           ),
                           items: const [
@@ -3358,7 +3359,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
         Container(
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
             ),
@@ -3376,7 +3377,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.folder_off_outlined,
+                              Icons.folder_off_rounded,
                               size: 48.0,
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -3475,7 +3476,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                                   decoration: BoxDecoration(
                                     color:
                                         colorScheme.primaryContainer.withOpacity(0.6),
-                                    borderRadius: BorderRadius.circular(999.0),
+                                    borderRadius: M3Shape.radiusFull,
                                   ),
                                   child: Text(
                                     file.retailChain.toUpperCase(),
@@ -3564,7 +3565,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                                               ),
                                             )
                                           : const Icon(
-                                              Icons.edit_document,
+                                              Icons.edit_note_rounded,
                                               size: 16.0,
                                             ),
                                       label: const Text('تعديل / استبدال'),
@@ -3693,7 +3694,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(
           color: colorScheme.outlineVariant.withOpacity(0.5),
         ),
@@ -3707,7 +3708,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                 ),
                 child: Icon(icon, color: color, size: 20.0),
               ),

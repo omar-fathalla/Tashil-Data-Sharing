@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/m3_dropdown.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/data/cache_store.dart';
 import '../../../../core/data/result.dart';
 import '../../data/target_repository.dart';
@@ -389,7 +391,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       builder: (ctx) {
         final cs = Theme.of(ctx).colorScheme;
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+          shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusLg),
           title: Row(
             children: [
               Icon(Icons.delete_forever_rounded, color: cs.error, size: 26.0),
@@ -412,7 +414,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                 padding: const EdgeInsets.all(12.0),
                 decoration: BoxDecoration(
                   color: cs.errorContainer.withOpacity(0.35),
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -634,25 +636,25 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               items: [
                 const M3ResponsiveTabItem<int>(
                   value: 0,
-                  icon: Icons.point_of_sale_outlined,
+                  icon: Icons.point_of_sale_rounded,
                   selectedIcon: Icons.point_of_sale_rounded,
                   label: 'Sell-Out Data & Operations',
                 ),
                 const M3ResponsiveTabItem<int>(
                   value: 1,
-                  icon: Icons.insights_outlined,
+                  icon: Icons.insights_rounded,
                   selectedIcon: Icons.insights_rounded,
                   label: 'Performance & Branch Analytics',
                 ),
                 const M3ResponsiveTabItem<int>(
                   value: 2,
-                  icon: Icons.track_changes_outlined,
+                  icon: Icons.track_changes_rounded,
                   selectedIcon: Icons.track_changes_rounded,
                   label: 'Target Management (Sell-Out)',
                 ),
                 M3ResponsiveTabItem<int>(
                   value: 3,
-                  icon: Icons.folder_copy_outlined,
+                  icon: Icons.folder_copy_rounded,
                   selectedIcon: Icons.folder_copy_rounded,
                   label: 'Uploaded Sheets (${_archivedSellOutFiles.length})',
                 ),
@@ -827,7 +829,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
             padding: M3Spacing.pSm,
             decoration: BoxDecoration(
               color: colorScheme.errorContainer.withOpacity(0.55),
-              borderRadius: BorderRadius.circular(12.0),
+              borderRadius: M3Shape.radiusMd,
               border: Border.all(color: colorScheme.error.withOpacity(0.4)),
             ),
             child: Row(
@@ -1019,7 +1021,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18.0),
+        borderRadius: M3Shape.radiusLg,
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.55)),
       ),
       child: Padding(
@@ -1061,7 +1063,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer.withOpacity(0.55),
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Text(
                     'إجمالي الكراتين المباعة: ${CurrencyFormatter.formatNumber(_recordsSummary.totalCartonsSold.round())} كرتونة • صافي المصنع: ${CurrencyFormatter.formatCompactEGP(_recordsSummary.totalFactoryCost)} • ربح السلسلة: ${CurrencyFormatter.formatCompactEGP(_recordsSummary.totalRetailerGrossProfit)} (${_recordsSummary.avgRetailerMarginPct.toStringAsFixed(1)}%)',
@@ -1289,7 +1291,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       padding: const EdgeInsets.all(18.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(
           color: colorScheme.outlineVariant.withOpacity(0.55),
         ),
@@ -1311,7 +1313,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                     padding: const EdgeInsets.all(10.0),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12.0),
+                      borderRadius: M3Shape.radiusMd,
                     ),
                     child: Icon(
                       Icons.bar_chart_rounded,
@@ -1362,47 +1364,29 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   // Chain Dropdown inside Chart
-                  Container(
-                    height: 38.0,
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withOpacity(0.55),
-                      borderRadius: BorderRadius.circular(12.0),
-                      border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        key: const ValueKey('branch_chart_chain_dropdown'),
-                        value: const ['fathalla', 'gomla', 'beet-elgomla', 'carrefour', 'spinneys', 'all']
-                                .contains(activeChainCode)
-                            ? activeChainCode
-                            : 'fathalla',
-                        isDense: true,
-                        focusColor: Colors.transparent,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: colorScheme.onSurface,
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'fathalla', child: Text('أسواق فتح الله (Fathalla)')),
-                          DropdownMenuItem(value: 'gomla', child: Text('جملة ماركت (Gomla)')),
-                          DropdownMenuItem(value: 'beet-elgomla', child: Text('بيت الجملة (Beet El-Gomla)')),
-                          DropdownMenuItem(value: 'carrefour', child: Text('كارفور (Carrefour)')),
-                          DropdownMenuItem(value: 'spinneys', child: Text('سبينيس (Spinneys)')),
-                          DropdownMenuItem(value: 'all', child: Text('كل السلاسل (All Chains)')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() {
-                              _chartChain = val;
-                              selectedChain = val == 'all' ? null : val;
-                              selectedStoreId = null;
-                            });
-                            _loadRecords();
-                          }
-                        },
-                      ),
-                    ),
+                  M3Dropdown<String>(
+                    key: const ValueKey('branch_chart_chain_dropdown'),
+                    width: 240.0,
+                    value: const ['fathalla', 'gomla', 'beet-elgomla', 'carrefour', 'spinneys', 'all']
+                            .contains(activeChainCode)
+                        ? activeChainCode
+                        : 'fathalla',
+                    options: const [
+                      M3DropdownOption('fathalla', 'أسواق فتح الله (Fathalla)'),
+                      M3DropdownOption('gomla', 'جملة ماركت (Gomla)'),
+                      M3DropdownOption('beet-elgomla', 'بيت الجملة (Beet El-Gomla)'),
+                      M3DropdownOption('carrefour', 'كارفور (Carrefour)'),
+                      M3DropdownOption('spinneys', 'سبينيس (Spinneys)'),
+                      M3DropdownOption('all', 'كل السلاسل (All Chains)'),
+                    ],
+                    onChanged: (val) {
+                      setState(() {
+                        _chartChain = val;
+                        selectedChain = val == 'all' ? null : val;
+                        selectedStoreId = null;
+                      });
+                      _loadRecords();
+                    },
                   ),
 
                   // Year Switcher Chips (Default: 2026, 2025, All)
@@ -1625,7 +1609,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                           : Color.lerp(colorScheme.primary, colorScheme.outline, 0.35)!);
 
                   return InkWell(
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                     onTap: () {
                       setState(() {
                         selectedStoreId = isSelected ? null : (b.storeId.isNotEmpty ? b.storeId : b.storeName);
@@ -1638,7 +1622,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                         color: isSelected
                             ? colorScheme.primaryContainer.withOpacity(0.45)
                             : colorScheme.surfaceContainerLowest,
-                        borderRadius: BorderRadius.circular(10.0),
+                        borderRadius: M3Shape.radiusSm,
                         border: Border.all(
                           color: isSelected
                               ? colorScheme.primary
@@ -1670,7 +1654,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                           const SizedBox(width: 10.0),
                           Expanded(
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(6.0),
+                              borderRadius: M3Shape.radiusSm,
                               child: LinearProgressIndicator(
                                 value: ratio,
                                 minHeight: 14.0,
@@ -1823,7 +1807,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                                   message:
                                       'الترتيب #${b.rank}: ${b.storeName}\nصافي المبيعات: ${CurrencyFormatter.formatEGP(b.totalRevenue)} (${sharePct.toStringAsFixed(1)}%)\nالكمية المباعة: ${CurrencyFormatter.formatNumber(b.totalUnits)} قطعة${branchYoY != null ? "\nمقارنة بـ $compYear: ${branchYoY >= 0 ? "+" : ""}${branchYoY.toStringAsFixed(1)}% (${CurrencyFormatter.formatCompactEGP(prevItem!.totalRevenue)})" : ""}',
                                   child: InkWell(
-                                    borderRadius: BorderRadius.circular(8.0),
+                                    borderRadius: M3Shape.radiusSm,
                                     onTap: () {
                                       setState(() {
                                         selectedStoreId = isSelected
@@ -1839,7 +1823,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                                         color: isSelected
                                             ? colorScheme.primaryContainer.withOpacity(0.45)
                                             : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(8.0),
+                                        borderRadius: M3Shape.radiusSm,
                                       ),
                                       child: Column(
                                         mainAxisAlignment: MainAxisAlignment.end,
@@ -1851,7 +1835,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                                               color: b.rank <= 3
                                                   ? colorScheme.primaryContainer
                                                   : colorScheme.surfaceContainerHighest.withOpacity(0.6),
-                                              borderRadius: BorderRadius.circular(999.0),
+                                              borderRadius: M3Shape.radiusFull,
                                             ),
                                             child: Text(
                                               '#${b.rank}',
@@ -1952,7 +1936,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 6.0),
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerLowest,
-                        borderRadius: BorderRadius.circular(14.0),
+                        borderRadius: M3Shape.radiusMd,
                         border: Border.all(
                           color: colorScheme.outlineVariant.withOpacity(0.4),
                         ),
@@ -2010,7 +1994,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
         color: isHighlighted
             ? colorScheme.primaryContainer.withOpacity(0.42)
             : colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: M3Shape.radiusMd,
         border: Border.all(
           color: isHighlighted
               ? colorScheme.primary.withOpacity(0.45)
@@ -2023,7 +2007,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
             padding: const EdgeInsets.all(6.0),
             decoration: BoxDecoration(
               color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(8.0),
+              borderRadius: M3Shape.radiusSm,
             ),
             child: Icon(icon, size: 15.0, color: color),
           ),
@@ -2045,7 +2029,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
             decoration: BoxDecoration(
               color: color.withOpacity(0.10),
-              borderRadius: BorderRadius.circular(999.0),
+              borderRadius: M3Shape.radiusFull,
             ),
             child: Text(
               valueText,
@@ -2354,7 +2338,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
           padding: const EdgeInsets.all(14.0),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
             ),
@@ -2379,12 +2363,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                       value: const [2026, 2025, 2024, 0].contains(_selectedYear)
                           ? _selectedYear
                           : 2026,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'السنة (Year)',
                         isDense: true,
-                        prefixIcon: const Icon(Icons.calendar_today_rounded, size: 17.0),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                        prefixIcon: Icon(Icons.calendar_today_rounded, size: 17.0),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+                        border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                       ),
                       items: const [
                         DropdownMenuItem(value: 2026, child: Text('2026 (Default)')),
@@ -2411,12 +2395,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                       key: const ValueKey('perf_month_dropdown'),
                       isExpanded: true,
                       value: _selectedMonth,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'الشهر (Month)',
                         isDense: true,
-                        prefixIcon: const Icon(Icons.date_range_rounded, size: 17.0),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                        prefixIcon: Icon(Icons.date_range_rounded, size: 17.0),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+                        border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                       ),
                       items: monthLabelsAr.entries
                           .map(
@@ -2447,12 +2431,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                     child: DropdownButtonFormField<String>(
                       isExpanded: true,
                       value: _perfChain,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'السلسلة (Chain)',
                         isDense: true,
-                        prefixIcon: const Icon(Icons.storefront_rounded, size: 18.0),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                        prefixIcon: Icon(Icons.storefront_rounded, size: 18.0),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                        border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                       ),
                       items: const [
                         DropdownMenuItem(value: 'all', child: Text('All Chains (الكل)')),
@@ -2478,12 +2462,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                     child: DropdownButtonFormField<String>(
                       isExpanded: true,
                       value: availableBrands.contains(_perfBrand) ? _perfBrand : 'all',
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Brand Filter (الماركة)',
                         isDense: true,
-                        prefixIcon: const Icon(Icons.branding_watermark_rounded, size: 18.0),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                        prefixIcon: Icon(Icons.branding_watermark_rounded, size: 18.0),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                        border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                       ),
                       items: [
                         const DropdownMenuItem(value: 'all', child: Text('All Brands (الكل)')),
@@ -2518,7 +2502,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                               )
                             : null,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                        border: const OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                       ),
                       onChanged: (val) {
                         setState(() {
@@ -2593,7 +2577,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
         Container(
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
             ),
@@ -2666,7 +2650,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
                             decoration: BoxDecoration(
                               color: colorScheme.secondaryContainer.withOpacity(0.6),
-                              borderRadius: BorderRadius.circular(999.0),
+                              borderRadius: M3Shape.radiusFull,
                             ),
                             child: Text(
                               b.chain.toUpperCase(),
@@ -2695,7 +2679,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                               SizedBox(
                                 width: 50.0,
                                 child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(4.0),
+                                  borderRadius: M3Shape.radiusXs,
                                   child: LinearProgressIndicator(
                                     value: (sharePct / 100).clamp(0.0, 1.0),
                                     backgroundColor: colorScheme.surfaceContainerHighest,
@@ -2725,7 +2709,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
           key: const ValueKey('branch_growth_matrix_section'),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
             ),
@@ -2749,7 +2733,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                           padding: const EdgeInsets.all(8.0),
                           decoration: BoxDecoration(
                             color: colorScheme.primaryContainer.withOpacity(0.55),
-                            borderRadius: BorderRadius.circular(10.0),
+                            borderRadius: M3Shape.radiusSm,
                           ),
                           child: Icon(
                             Icons.trending_up_rounded,
@@ -3060,7 +3044,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                             decoration: BoxDecoration(
                               color: statusBg,
-                              borderRadius: BorderRadius.circular(999.0),
+                              borderRadius: M3Shape.radiusFull,
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -3111,7 +3095,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
           padding: const EdgeInsets.all(18.0),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.6),
             ),
@@ -3125,7 +3109,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                     padding: const EdgeInsets.all(10.0),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12.0),
+                      borderRadius: M3Shape.radiusMd,
                     ),
                     child: Icon(
                       Icons.cloud_upload_rounded,
@@ -3173,15 +3157,15 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                         child: DropdownButtonFormField<String>(
                           isExpanded: true,
                           value: _archiveUploadChain,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: 'Target Chain',
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
+                            contentPadding: EdgeInsets.symmetric(
                               horizontal: 12.0,
                               vertical: 10.0,
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.0),
+                              borderRadius: M3Shape.radiusMd,
                             ),
                           ),
                           items: const [
@@ -3202,15 +3186,15 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                         child: DropdownButtonFormField<int>(
                           isExpanded: true,
                           value: _archiveUploadYear,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: 'Year (Optional)',
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
+                            contentPadding: EdgeInsets.symmetric(
                               horizontal: 12.0,
                               vertical: 10.0,
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.0),
+                              borderRadius: M3Shape.radiusMd,
                             ),
                           ),
                           items: const [
@@ -3231,15 +3215,15 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                         child: DropdownButtonFormField<int>(
                           isExpanded: true,
                           value: _archiveUploadMonth,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: 'Month (Optional)',
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
+                            contentPadding: EdgeInsets.symmetric(
                               horizontal: 12.0,
                               vertical: 10.0,
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.0),
+                              borderRadius: M3Shape.radiusMd,
                             ),
                           ),
                           items: const [
@@ -3314,7 +3298,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
         Container(
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
             ),
@@ -3332,7 +3316,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.folder_off_outlined,
+                              Icons.folder_off_rounded,
                               size: 48.0,
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -3415,7 +3399,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                                   padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
                                   decoration: BoxDecoration(
                                     color: colorScheme.primaryContainer.withOpacity(0.6),
-                                    borderRadius: BorderRadius.circular(999.0),
+                                    borderRadius: M3Shape.radiusFull,
                                   ),
                                   child: Text(
                                     file.retailChain.toUpperCase(),
@@ -3487,7 +3471,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                                               height: 14.0,
                                               child: CircularProgressIndicator(strokeWidth: 2.0),
                                             )
-                                          : const Icon(Icons.edit_document, size: 16.0),
+                                          : const Icon(Icons.edit_note_rounded, size: 16.0),
                                       label: const Text('تعديل / استبدال'),
                                     ),
                                     const SizedBox(width: 6.0),
@@ -3606,7 +3590,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(
           color: colorScheme.outlineVariant.withOpacity(0.5),
         ),
@@ -3620,7 +3604,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                 ),
                 child: Icon(icon, color: color, size: 20.0),
               ),

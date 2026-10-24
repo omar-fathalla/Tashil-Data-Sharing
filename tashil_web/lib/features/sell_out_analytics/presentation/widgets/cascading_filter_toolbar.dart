@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/network/api_client.dart';
@@ -115,8 +116,8 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16.0),
+              shape: const RoundedRectangleBorder(
+                borderRadius: M3Shape.radiusLg,
               ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 440.0),
@@ -216,7 +217,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                         children: [
                           Expanded(
                             child: InkWell(
-                              borderRadius: BorderRadius.circular(10.0),
+                              borderRadius: M3Shape.radiusSm,
                               onTap: () async {
                                 final picked = await showDatePicker(
                                   context: context,
@@ -233,7 +234,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                                 padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
                                 decoration: BoxDecoration(
                                   color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
-                                  borderRadius: BorderRadius.circular(10.0),
+                                  borderRadius: M3Shape.radiusSm,
                                   border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
                                 ),
                                 child: Column(
@@ -260,7 +261,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                           const SizedBox(width: 12.0),
                           Expanded(
                             child: InkWell(
-                              borderRadius: BorderRadius.circular(10.0),
+                              borderRadius: M3Shape.radiusSm,
                               onTap: () async {
                                 final picked = await showDatePicker(
                                   context: context,
@@ -277,7 +278,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                                 padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
                                 decoration: BoxDecoration(
                                   color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
-                                  borderRadius: BorderRadius.circular(10.0),
+                                  borderRadius: M3Shape.radiusSm,
                                   border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
                                 ),
                                 child: Column(
@@ -465,7 +466,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
     // Unified control container decoration
     final controlDecoration = BoxDecoration(
       color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
-      borderRadius: BorderRadius.circular(10.0),
+      borderRadius: M3Shape.radiusSm,
       border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
     );
 
@@ -532,7 +533,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                       color: colorScheme.primary,
                     ),
                     tooltip: 'Scan Barcode with Camera / مسح الباركود بالكاميرا',
-                    padding: const EdgeInsets.only(right: 6.0),
+                    padding: const EdgeInsetsDirectional.only(end: 6.0),
                     constraints: const BoxConstraints(minWidth: 38.0, minHeight: 44.0),
                     splashRadius: 18.0,
                     onPressed: _openBarcodeScanner,
@@ -622,7 +623,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
     Widget buildDateRangeButton({bool expand = false}) {
       final child = InkWell(
         key: const ValueKey('sellout_date_range_chip'),
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         onTap: () => _showCompactDateRangeBubble(context),
         child: AnimatedContainer(
           duration: M3Motion.short4,
@@ -633,7 +634,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
             color: hasDateRange
                 ? colorScheme.primaryContainer.withOpacity(0.55)
                 : colorScheme.surfaceContainerHighest.withOpacity(0.45),
-            borderRadius: BorderRadius.circular(20.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: hasDateRange
                   ? colorScheme.primary.withOpacity(0.6)
@@ -645,7 +646,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.date_range_outlined,
+                Icons.date_range_rounded,
                 size: 15.0,
                 color: hasDateRange ? colorScheme.primary : colorScheme.onSurfaceVariant,
               ),
@@ -667,7 +668,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                 const SizedBox(width: 4.0),
                 InkWell(
                   onTap: () => onDateRangeChanged?.call(null),
-                  borderRadius: BorderRadius.circular(10.0),
+                  borderRadius: M3Shape.radiusSm,
                   child: Icon(
                     Icons.close_rounded,
                     size: 14.0,
@@ -687,21 +688,14 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
       final isUp = widget.isUploading;
       final child = InkWell(
         key: const ValueKey('upload_sellout_button'),
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         onTap: isUp ? null : widget.onUpload,
         child: Container(
           height: 38.0,
           padding: const EdgeInsets.symmetric(horizontal: 14.0),
           decoration: BoxDecoration(
             color: colorScheme.secondary,
-            borderRadius: BorderRadius.circular(20.0),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.shadow.withOpacity(0.08),
-                blurRadius: 4.0,
-                offset: const Offset(0, 1),
-              ),
-            ],
+            borderRadius: M3Shape.radiusLg,
           ),
           child: Row(
             mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
@@ -746,27 +740,20 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
       if (onExportPdf == null) return const SizedBox.shrink();
       final child = InkWell(
         key: const ValueKey('export_pdf_button'),
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         onTap: onExportPdf,
         child: Container(
           height: 38.0,
           padding: const EdgeInsets.symmetric(horizontal: 10.0),
           decoration: BoxDecoration(
             color: colorScheme.primary,
-            borderRadius: BorderRadius.circular(20.0),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.shadow.withOpacity(0.06),
-                blurRadius: 4.0,
-                offset: const Offset(0, 1),
-              ),
-            ],
+            borderRadius: M3Shape.radiusLg,
           ),
           child: Row(
             mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.print_outlined, size: 15.0, color: colorScheme.onPrimary),
+              Icon(Icons.print_rounded, size: 15.0, color: colorScheme.onPrimary),
               const SizedBox(width: 5.0),
               Flexible(
                 child: Text(
@@ -790,14 +777,14 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
     Widget buildExportExcelButton({bool expand = false}) {
       final child = InkWell(
         key: const ValueKey('export_excel_button'),
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         onTap: onExportExcel,
         child: Container(
           height: 38.0,
           padding: const EdgeInsets.symmetric(horizontal: 10.0),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(20.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.6),
             ),
@@ -806,7 +793,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
             mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.file_download_outlined, size: 15.0, color: colorScheme.onSurface),
+              Icon(Icons.file_download_rounded, size: 15.0, color: colorScheme.onSurface),
               const SizedBox(width: 5.0),
               Flexible(
                 child: Text(
@@ -831,7 +818,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
       elevation: 0,
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Padding(

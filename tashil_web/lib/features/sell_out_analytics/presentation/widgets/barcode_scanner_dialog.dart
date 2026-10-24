@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 
 /// Product barcode specimen model for quick testing and scanner demonstration
 class BarcodeSpecimen {
@@ -156,7 +157,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
         vertical: isCompact ? 24.0 : 40.0,
       ),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24.0),
+        borderRadius: M3Shape.radiusXl,
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Directionality(
@@ -180,7 +181,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                         padding: const EdgeInsets.all(8.0),
                         decoration: BoxDecoration(
                           color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(12.0),
+                          borderRadius: M3Shape.radiusMd,
                         ),
                         child: Icon(
                           Icons.qr_code_scanner_rounded,
@@ -222,12 +223,12 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
 
                 // Live Camera Viewfinder Simulation
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(18.0),
+                  borderRadius: M3Shape.radiusLg,
                   child: Container(
                     height: 230.0,
                     decoration: BoxDecoration(
                       color: const Color(0xFF0D1117),
-                      borderRadius: BorderRadius.circular(18.0),
+                      borderRadius: M3Shape.radiusLg,
                       border: Border.all(
                         color: _isDetecting
                             ? const Color(0xFF10B981)
@@ -265,16 +266,6 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                                         colorScheme.primary.withOpacity(0.0),
                                       ],
                                     ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: (_isDetecting
-                                                ? const Color(0xFF10B981)
-                                                : const Color(0xFF38BDF8))
-                                            .withOpacity(0.8),
-                                        blurRadius: 8.0,
-                                        spreadRadius: 2.0,
-                                      ),
-                                    ],
                                   ),
                                 ),
                               );
@@ -297,7 +288,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                                     horizontal: 8.0, vertical: 4.0),
                                 decoration: BoxDecoration(
                                   color: Colors.black.withOpacity(0.6),
-                                  borderRadius: BorderRadius.circular(8.0),
+                                  borderRadius: M3Shape.radiusSm,
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -367,7 +358,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                                 horizontal: 12.0, vertical: 5.0),
                             decoration: BoxDecoration(
                               color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(12.0),
+                              borderRadius: M3Shape.radiusMd,
                               border: Border.all(
                                 color: Colors.white.withOpacity(0.15),
                               ),
@@ -396,7 +387,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                 // Material Design 3 Connected Button Group (Camera Scan & Scan Image)
                 Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14.0),
+                    borderRadius: M3Shape.radiusMd,
                     border: Border.all(color: colorScheme.outlineVariant),
                     color: colorScheme.surfaceContainerHighest.withOpacity(0.35),
                   ),
@@ -450,7 +441,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.photo_library_outlined, size: 18.0, color: colorScheme.primary),
+                                  Icon(Icons.photo_library_rounded, size: 18.0, color: colorScheme.primary),
                                   const SizedBox(width: 8.0),
                                   Text(
                                     'Scan Image',
@@ -474,7 +465,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                 // Catalog Quick-Scan Specimens
                 Row(
                   children: [
-                    Icon(Icons.inventory_2_outlined,
+                    Icon(Icons.inventory_2_rounded,
                         size: 15.0, color: colorScheme.primary),
                     const SizedBox(width: 6.0),
                     Expanded(
@@ -495,7 +486,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                   runSpacing: 6.0,
                   children: _specimens.map((specimen) {
                     return InkWell(
-                      borderRadius: BorderRadius.circular(20.0),
+                      borderRadius: M3Shape.radiusLg,
                       onTap: () => _triggerScanDetection(specimen.barcode,
                           skuName: specimen.skuName),
                       child: Container(
@@ -503,7 +494,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                             horizontal: 10.0, vertical: 6.0),
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHighest.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(20.0),
+                          borderRadius: M3Shape.radiusLg,
                           border: Border.all(
                             color: colorScheme.outlineVariant.withOpacity(0.6),
                           ),

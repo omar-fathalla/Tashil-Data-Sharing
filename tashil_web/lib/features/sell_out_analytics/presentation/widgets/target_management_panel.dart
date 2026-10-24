@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/data/result.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/target_repository.dart';
@@ -285,8 +286,8 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
             return Directionality(
               textDirection: TextDirection.rtl,
               child: AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24.0),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: M3Shape.radiusXl,
                 ),
                 title: Row(
                   children: [
@@ -321,7 +322,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                             padding: const EdgeInsets.all(12.0),
                             decoration: BoxDecoration(
                               color: colorScheme.primaryContainer.withOpacity(0.35),
-                              borderRadius: BorderRadius.circular(14.0),
+                              borderRadius: M3Shape.radiusMd,
                               border: Border.all(
                                 color: colorScheme.primary.withOpacity(0.3),
                               ),
@@ -479,7 +480,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                             decoration: BoxDecoration(
                               color: colorScheme.surfaceContainerHighest
                                   .withOpacity(0.55),
-                              borderRadius: BorderRadius.circular(12.0),
+                              borderRadius: M3Shape.radiusMd,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1135,7 +1136,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
           padding: const EdgeInsets.all(14.0),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
             ),
@@ -1159,15 +1160,15 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                       value: [0, ..._targetPlanningYears].contains(_selectedYear)
                           ? _selectedYear
                           : 0,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Target Year',
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
+                        contentPadding: EdgeInsets.symmetric(
                           horizontal: 12.0,
                           vertical: 11.0,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
+                          borderRadius: M3Shape.radiusMd,
                         ),
                       ),
                       items: [
@@ -1194,15 +1195,15 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                       value: _chainOptions.any((c) => c.code == _selectedChain)
                           ? _selectedChain
                           : 'all',
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Retail Chain',
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
+                        contentPadding: EdgeInsets.symmetric(
                           horizontal: 12.0,
                           vertical: 11.0,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
+                          borderRadius: M3Shape.radiusMd,
                         ),
                       ),
                       items: _chainOptions
@@ -1251,8 +1252,8 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                         fontSize: 14.5,
                         fontWeight: FontWeight.w700,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14.0),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: M3Shape.radiusMd,
                       ),
                     ),
                   ),
@@ -1276,8 +1277,8 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                         fontSize: 14.5,
                         fontWeight: FontWeight.w700,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14.0),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: M3Shape.radiusMd,
                       ),
                     ),
                   ),
@@ -1295,8 +1296,8 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                         fontSize: 14.5,
                         fontWeight: FontWeight.w700,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14.0),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: M3Shape.radiusMd,
                       ),
                     ),
                   ),
@@ -1316,8 +1317,8 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                         fontSize: 14.5,
                         fontWeight: FontWeight.w700,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14.0),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: M3Shape.radiusMd,
                       ),
                     ),
                   ),
@@ -1333,7 +1334,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
         Container(
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
             ),
@@ -1485,7 +1486,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                                   .primaryContainer
                                                   .withOpacity(0.5),
                                               borderRadius:
-                                                  BorderRadius.circular(8.0),
+                                                  M3Shape.radiusSm,
                                             ),
                                             child: Text(
                                               '${item.branchesCount} فرع • ${item.activeSkusCount} صنف',
@@ -1559,7 +1560,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                       decoration: BoxDecoration(
                                         color: badgeColor.withOpacity(0.12),
                                         borderRadius:
-                                            BorderRadius.circular(999.0),
+                                            M3Shape.radiusFull,
                                       ),
                                       child: Text(
                                         '${item.achievementRevPct.toStringAsFixed(1)}% (${item.statusAr})',
@@ -1590,7 +1591,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                               });
                                             },
                                             icon: const Icon(
-                                              Icons.account_tree_outlined,
+                                              Icons.account_tree_rounded,
                                               size: 16.0,
                                             ),
                                             label: const Text('تفاصيل الفروع'),
@@ -1598,7 +1599,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                         IconButton(
                                           tooltip: 'تعديل المستهدف',
                                           icon: const Icon(
-                                            Icons.edit_outlined,
+                                            Icons.edit_rounded,
                                             size: 18.0,
                                           ),
                                           onPressed: () =>
@@ -1755,7 +1756,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
       padding: const EdgeInsets.all(18.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(
           color: colorScheme.primary.withOpacity(0.35),
           width: 1.4,
@@ -1769,7 +1770,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
             padding: const EdgeInsets.all(14.0),
             decoration: BoxDecoration(
               color: colorScheme.primaryContainer.withOpacity(0.28),
-              borderRadius: BorderRadius.circular(16.0),
+              borderRadius: M3Shape.radiusLg,
               border: Border.all(
                 color: colorScheme.primary.withOpacity(0.25),
               ),
@@ -1854,21 +1855,21 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                     ),
                     _buildInfoPill(
                       context,
-                      icon: Icons.shield_outlined,
+                      icon: Icons.shield_rounded,
                       label:
                           'إجمالي التوريد شامل احتياطي المرتجعات (+${target.historicalReturnRatePct.toStringAsFixed(1)}%): ${CurrencyFormatter.formatNumber(target.grossTargetUnits.round())} كرتونة (${CurrencyFormatter.formatCompactEGP(target.grossTargetRevenueEgp)})',
                       color: Colors.teal.shade700,
                     ),
                     _buildInfoPill(
                       context,
-                      icon: Icons.local_offer_outlined,
+                      icon: Icons.local_offer_rounded,
                       label:
                           'مزيج التوريد: عادي ${CurrencyFormatter.formatCompactEGP(target.regularTargetRevenueEgp)} • عروض (${target.promoSharePct.toStringAsFixed(1)}%) ${CurrencyFormatter.formatCompactEGP(target.promoTargetRevenueEgp)}',
                       color: Colors.deepOrange.shade700,
                     ),
                     _buildInfoPill(
                       context,
-                      icon: Icons.category_outlined,
+                      icon: Icons.category_rounded,
                       label:
                           'القطاعات: منظفات (MT) ${CurrencyFormatter.formatCompactEGP(target.mtTargetRevenueEgp)} • عناية بالسيارات رابيدو (CC) ${CurrencyFormatter.formatCompactEGP(target.ccTargetRevenueEgp)}',
                       color: Colors.indigo.shade700,
@@ -1963,7 +1964,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10.0),
+        borderRadius: M3Shape.radiusSm,
         border: Border.all(color: color.withOpacity(0.28)),
       ),
       child: Row(
@@ -2014,8 +2015,8 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
           fontWeight: FontWeight.w800,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 11.0),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12.0),
+        shape: const RoundedRectangleBorder(
+          borderRadius: M3Shape.radiusMd,
         ),
       ),
     );
@@ -2083,15 +2084,15 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                   child: DropdownButtonFormField<String>(
                     value: _branchRegionFilter,
                     isDense: true,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: 'الإقليم / المحافظة',
                       isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
+                      contentPadding: EdgeInsets.symmetric(
                         horizontal: 10.0,
                         vertical: 9.0,
                       ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10.0),
+                        borderRadius: M3Shape.radiusSm,
                       ),
                     ),
                     items: const [
@@ -2126,16 +2127,16 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                   width: 240.0,
                   child: TextField(
                     onChanged: (v) => setState(() => _branchSearchQuery = v),
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       hintText: 'ابحث باسم الفرع أو الكود أو المندوب...',
-                      prefixIcon: const Icon(Icons.search_rounded, size: 18.0),
+                      prefixIcon: Icon(Icons.search_rounded, size: 18.0),
                       isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
+                      contentPadding: EdgeInsets.symmetric(
                         horizontal: 10.0,
                         vertical: 10.0,
                       ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10.0),
+                        borderRadius: M3Shape.radiusSm,
                       ),
                     ),
                   ),
@@ -2344,7 +2345,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                       ),
                       decoration: BoxDecoration(
                         color: badgeColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(999.0),
+                        borderRadius: M3Shape.radiusFull,
                       ),
                       child: Text(
                         '${b.achievementRevPct.toStringAsFixed(1)}%',
@@ -2376,7 +2377,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                             });
                           },
                           icon: const Icon(
-                            Icons.inventory_2_outlined,
+                            Icons.inventory_2_rounded,
                             size: 15.0,
                           ),
                           label: Text(
@@ -2463,7 +2464,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
           padding: const EdgeInsets.all(14.0),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerHigh.withOpacity(0.45),
-            borderRadius: BorderRadius.circular(14.0),
+            borderRadius: M3Shape.radiusMd,
           ),
           child: Wrap(
             spacing: 14.0,
@@ -2485,15 +2486,15 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                     child: DropdownButtonFormField<String>(
                       isExpanded: true,
                       value: branch.branchName,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'الفرع المختار (Level 3 Branch)',
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
+                        contentPadding: EdgeInsets.symmetric(
                           horizontal: 12.0,
                           vertical: 10.0,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10.0),
+                          borderRadius: M3Shape.radiusSm,
                         ),
                       ),
                       items: target.branches
@@ -2526,14 +2527,14 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                 children: [
                   _buildInfoPill(
                     context,
-                    icon: Icons.payments_outlined,
+                    icon: Icons.payments_rounded,
                     label:
                         'تارجت الفرع: ${CurrencyFormatter.formatEGP(branch.targetRevenueEgp)} (${branch.shareOfChainPct.toStringAsFixed(2)}% من السلسلة)',
                     color: colorScheme.primary,
                   ),
                   _buildInfoPill(
                     context,
-                    icon: Icons.inventory_2_outlined,
+                    icon: Icons.inventory_2_rounded,
                     label:
                         'إجمالي بضاعة الفرع: ${CurrencyFormatter.formatNumber(branch.targetUnits.round())} كرتونة • ${branch.targetWeightTons.toStringAsFixed(2)} طن',
                     color: Colors.teal.shade700,
@@ -2685,15 +2686,15 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
               child: DropdownButtonFormField<String>(
                 isExpanded: true,
                 value: brands.contains(_skuBrandFilter) ? _skuBrandFilter : 'all',
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'الماركة (Brand)',
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
+                  contentPadding: EdgeInsets.symmetric(
                     horizontal: 10.0,
                     vertical: 9.0,
                   ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                 ),
                 items: brands
@@ -2721,15 +2722,15 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
               width: 165.0,
               child: DropdownButtonFormField<String>(
                 value: _skuSectorFilter,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'القطاع (Sector)',
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
+                  contentPadding: EdgeInsets.symmetric(
                     horizontal: 10.0,
                     vertical: 9.0,
                   ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                 ),
                 items: const [
@@ -2757,15 +2758,15 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
               width: 195.0,
               child: DropdownButtonFormField<String>(
                 value: _skuStockStatusFilter,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'حالة الرصيد المتبقي',
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
+                  contentPadding: EdgeInsets.symmetric(
                     horizontal: 10.0,
                     vertical: 9.0,
                   ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                 ),
                 items: const [
@@ -2800,16 +2801,16 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                   _skuSearchQuery = v;
                   _skuPage = 0;
                 }),
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   hintText: 'ابحث باسم الصنف أو العبوة...',
-                  prefixIcon: const Icon(Icons.search_rounded, size: 18.0),
+                  prefixIcon: Icon(Icons.search_rounded, size: 18.0),
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
+                  contentPadding: EdgeInsets.symmetric(
                     horizontal: 10.0,
                     vertical: 10.0,
                   ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                 ),
               ),
@@ -2933,7 +2934,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
             cells: [
               DataCell(
                 InkWell(
-                  borderRadius: BorderRadius.circular(8.0),
+                  borderRadius: M3Shape.radiusSm,
                   onTap: () => _openProductIdCard(
                     itemCode: s.itemCode,
                     barcode: s.barcode,
@@ -2963,7 +2964,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                               ),
                               const SizedBox(width: 4.0),
                               Icon(
-                                Icons.badge_outlined,
+                                Icons.badge_rounded,
                                 size: 15.0,
                                 color: colorScheme.primary,
                               ),
@@ -3049,7 +3050,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                   ),
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer.withOpacity(0.55),
-                    borderRadius: BorderRadius.circular(8.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -3147,7 +3148,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                   ),
                   decoration: BoxDecoration(
                     color: stockColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Text(
                     '${s.stockStatusAr} (${s.remainingStockCases.round()} ك)',
@@ -3549,7 +3550,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(
           color: colorScheme.outlineVariant.withOpacity(0.5),
         ),
@@ -3565,7 +3566,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                 padding: const EdgeInsets.all(9.0),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                 ),
                 child: Icon(icon, color: color, size: 22.0),
               ),
@@ -3611,7 +3612,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
           if (progressPct != null) ...[
             const SizedBox(height: 8.0),
             ClipRRect(
-              borderRadius: BorderRadius.circular(999.0),
+              borderRadius: M3Shape.radiusFull,
               child: LinearProgressIndicator(
                 value: (progressPct / 100.0).clamp(0.0, 1.0),
                 minHeight: 6.0,

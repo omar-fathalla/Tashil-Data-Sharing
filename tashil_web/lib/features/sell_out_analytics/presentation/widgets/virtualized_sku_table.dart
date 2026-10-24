@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/m3_dropdown.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
@@ -124,7 +126,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
 
     final content = InkWell(
       key: ValueKey('sort_header_$columnKey'),
-      borderRadius: BorderRadius.circular(6.0),
+      borderRadius: M3Shape.radiusSm,
       onTap: () => _handleSort(columnKey),
       child: Container(
         height: _headerHeight,
@@ -188,7 +190,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
               children: [
                 // Top Row: Sort Title Label without colon (ترتيب حسب)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0, right: 4.0, left: 4.0),
+                  padding: const EdgeInsetsDirectional.only(bottom: 8.0, end: 4.0, start: 4.0),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -223,7 +225,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                               ? (_sortAscending
                                   ? Icons.arrow_upward_rounded
                                   : Icons.arrow_downward_rounded)
-                              : Icons.payments_outlined,
+                              : Icons.payments_rounded,
                           size: 14.0,
                         ),
                       ),
@@ -235,7 +237,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                               ? (_sortAscending
                                   ? Icons.arrow_upward_rounded
                                   : Icons.arrow_downward_rounded)
-                              : Icons.shopping_basket_outlined,
+                              : Icons.shopping_basket_rounded,
                           size: 14.0,
                         ),
                       ),
@@ -247,7 +249,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                               ? (_sortAscending
                                   ? Icons.arrow_upward_rounded
                                   : Icons.arrow_downward_rounded)
-                              : Icons.category_outlined,
+                              : Icons.category_rounded,
                           size: 14.0,
                         ),
                       ),
@@ -259,7 +261,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                               ? (_sortAscending
                                   ? Icons.arrow_upward_rounded
                                   : Icons.arrow_downward_rounded)
-                              : Icons.calendar_today_outlined,
+                              : Icons.calendar_today_rounded,
                           size: 14.0,
                         ),
                       ),
@@ -272,8 +274,8 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                       }
                     },
                     style: SegmentedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24.0),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: M3Shape.radiusXl,
                       ),
                       visualDensity: VisualDensity.compact,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -302,7 +304,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
             return Card(
               elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16.0),
+                borderRadius: M3Shape.radiusLg,
                 side: BorderSide(
                   color: colorScheme.outlineVariant.withOpacity(0.5),
                   width: 1.0,
@@ -341,7 +343,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: brandStyle.background,
-                                    borderRadius: BorderRadius.circular(20.0),
+                                    borderRadius: M3Shape.radiusLg,
                                     border: Border.all(
                                       color: brandStyle.border,
                                       width: 1.0,
@@ -376,13 +378,13 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   decoration: BoxDecoration(
                                     color: colorScheme.surfaceContainerHighest
                                         .withOpacity(0.5),
-                                    borderRadius: BorderRadius.circular(8.0),
+                                    borderRadius: M3Shape.radiusSm,
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
-                                        Icons.calendar_today_outlined,
+                                        Icons.calendar_today_rounded,
                                         size: 11.5,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
@@ -425,7 +427,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     onTap: widget.onRecordTap != null
                                         ? () => widget.onRecordTap!(r)
                                         : null,
-                                    borderRadius: BorderRadius.circular(6.0),
+                                    borderRadius: M3Shape.radiusSm,
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 7.0,
@@ -434,7 +436,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       decoration: BoxDecoration(
                                         color: colorScheme.primaryContainer
                                             .withOpacity(0.55),
-                                        borderRadius: BorderRadius.circular(6.0),
+                                        borderRadius: M3Shape.radiusSm,
                                       ),
                                       child: Text(
                                         r.itemCode,
@@ -459,7 +461,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   decoration: BoxDecoration(
                                     color: colorScheme.surfaceContainerHighest
                                         .withOpacity(0.4),
-                                    borderRadius: BorderRadius.circular(6.0),
+                                    borderRadius: M3Shape.radiusSm,
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -491,13 +493,13 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   decoration: BoxDecoration(
                                     color: colorScheme.surfaceContainerHighest
                                         .withOpacity(0.4),
-                                    borderRadius: BorderRadius.circular(6.0),
+                                    borderRadius: M3Shape.radiusSm,
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
-                                        Icons.storefront_outlined,
+                                        Icons.storefront_rounded,
                                         size: 13.0,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
@@ -522,13 +524,13 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     decoration: BoxDecoration(
                                       color: colorScheme.surfaceContainerHighest
                                           .withOpacity(0.4),
-                                      borderRadius: BorderRadius.circular(6.0),
+                                      borderRadius: M3Shape.radiusSm,
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
-                                          Icons.sell_outlined,
+                                          Icons.sell_rounded,
                                           size: 12.0,
                                           color: colorScheme.onSurfaceVariant,
                                         ),
@@ -556,7 +558,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainerHighest
                                     .withOpacity(0.4),
-                                borderRadius: BorderRadius.circular(12.0),
+                                borderRadius: M3Shape.radiusMd,
                                 border: Border.all(
                                   color: colorScheme.outlineVariant
                                       .withOpacity(0.35),
@@ -688,7 +690,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.inbox_outlined, size: 40.0, color: colorScheme.onSurfaceVariant),
+                Icon(Icons.inbox_rounded, size: 40.0, color: colorScheme.onSurfaceVariant),
                 M3Spacing.gapSM,
                 Text(
                   'لا توجد سجلات تطابق معايير الفلترة المحددة',
@@ -732,7 +734,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
             ),
             child: Row(
               children: [
-                Icon(Icons.push_pin_outlined, size: 16.0, color: colorScheme.primary),
+                Icon(Icons.push_pin_rounded, size: 16.0, color: colorScheme.primary),
                 const SizedBox(width: 8.0),
                 Expanded(
                   child: Text(
@@ -751,8 +753,8 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                     tooltip: _forceTableOnMobile ? 'عرض كبطاقات موبايل' : 'عرض كجدول',
                     icon: Icon(
                       _forceTableOnMobile
-                          ? Icons.view_agenda_outlined
-                          : Icons.table_chart_outlined,
+                          ? Icons.view_agenda_rounded
+                          : Icons.table_chart_rounded,
                       size: 18.0,
                       color: colorScheme.primary,
                     ),
@@ -906,7 +908,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           ),
                                         Row(
                                           children: [
-                                            Icon(Icons.qr_code_2, size: 13.0, color: colorScheme.onSurfaceVariant),
+                                            Icon(Icons.qr_code_2_rounded, size: 13.0, color: colorScheme.onSurfaceVariant),
                                             const SizedBox(width: 3.0),
                                             Expanded(
                                               child: SelectableText(
@@ -1043,7 +1045,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
                                           decoration: BoxDecoration(
                                             color: brandStyle.background,
-                                            borderRadius: BorderRadius.circular(8.0),
+                                            borderRadius: M3Shape.radiusSm,
                                             border: Border.all(
                                               color: brandStyle.border,
                                               width: 1.0,
@@ -1219,37 +1221,21 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                           ),
                         ),
                         const SizedBox(width: 6.0),
-                        DropdownButtonHideUnderline(
-                          child: DropdownButton<int>(
-                            key: const ValueKey('rows_per_page_dropdown'),
-                            value: _rowsPerPage,
-                            isDense: true,
-                            focusColor: Colors.transparent,
-                            dropdownColor: colorScheme.surfaceContainerHigh,
-                            borderRadius: BorderRadius.circular(14.0),
-                            icon: Icon(
-                              Icons.arrow_drop_down_rounded,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontFamily: 'Cairo',
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                            ),
-                            items: const [
-                              DropdownMenuItem(value: 10, child: Text('10')),
-                              DropdownMenuItem(value: 25, child: Text('25')),
-                              DropdownMenuItem(value: 50, child: Text('50')),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() {
-                                  _rowsPerPage = val;
-                                  _currentPage = 0;
-                                });
-                              }
-                            },
-                          ),
+                        M3Dropdown<int>(
+                          key: const ValueKey('rows_per_page_dropdown'),
+                          width: 96.0,
+                          value: _rowsPerPage,
+                          options: const [
+                            M3DropdownOption(10, '10'),
+                            M3DropdownOption(25, '25'),
+                            M3DropdownOption(50, '50'),
+                          ],
+                          onChanged: (val) {
+                            setState(() {
+                              _rowsPerPage = val;
+                              _currentPage = 0;
+                            });
+                          },
                         ),
                       ],
                     ),

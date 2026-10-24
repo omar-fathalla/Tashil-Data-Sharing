@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
@@ -103,7 +104,7 @@ void main() {
       );
 
       expect(find.text('لا توجد سجلات تطابق معايير الفلترة المحددة'), findsOneWidget);
-      expect(find.byIcon(Icons.inbox_outlined), findsOneWidget);
+      expect(find.byIcon(AppIcons.empty), findsOneWidget);
     });
 
     testWidgets('supports interactive column sorting ascending and descending', (WidgetTester tester) async {
