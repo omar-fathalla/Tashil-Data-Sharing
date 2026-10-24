@@ -91,126 +91,40 @@ class M3Button extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    if (isLoading) {
-      return SizedBox(
-        height: 40.0,
-        child: FilledButton(
-          onPressed: null,
-          style: FilledButton.styleFrom(
-            shape: const StadiumBorder(),
-          ),
-          child: SizedBox(
+    // Thin wrapper: shape, size, padding and text style come from the
+    // Filled/Outlined/TextButton themes in AppTheme.
+    final cs = Theme.of(context).colorScheme;
+    final Widget? leading = isLoading
+        ? SizedBox(
             width: 18.0,
             height: 18.0,
             child: CircularProgressIndicator(
               strokeWidth: 2.0,
-              color: colorScheme.onPrimary,
+              color: isText || isOutlined ? cs.primary : null,
             ),
-          ),
-        ),
-      );
-    }
+          )
+        : (icon == null ? null : Icon(icon));
+    final VoidCallback? action = isLoading ? null : onPressed;
+    final Widget text = Text(label);
 
     if (isText) {
-      if (icon != null) {
-        return TextButton.icon(
-          onPressed: onPressed,
-          icon: Icon(icon, size: 18.0),
-          label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-          style: TextButton.styleFrom(
-            shape: const StadiumBorder(),
-            minimumSize: const Size(80.0, 42.0),
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-          ),
-        );
-      }
-      return TextButton(
-        onPressed: onPressed,
-        style: TextButton.styleFrom(
-          shape: const StadiumBorder(),
-          minimumSize: const Size(80.0, 42.0),
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-        ),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-      );
+      return leading == null
+          ? TextButton(onPressed: action, child: text)
+          : TextButton.icon(onPressed: action, icon: leading, label: text);
     }
-
     if (isOutlined) {
-      if (icon != null) {
-        return OutlinedButton.icon(
-          onPressed: onPressed,
-          icon: Icon(icon, size: 18.0),
-          label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-          style: OutlinedButton.styleFrom(
-            shape: const StadiumBorder(),
-            side: BorderSide(color: colorScheme.outlineVariant),
-            minimumSize: const Size(88.0, 42.0),
-            padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 12.0),
-          ),
-        );
-      }
-      return OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          shape: const StadiumBorder(),
-          side: BorderSide(color: colorScheme.outlineVariant),
-          minimumSize: const Size(88.0, 42.0),
-          padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 12.0),
-        ),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-      );
+      return leading == null
+          ? OutlinedButton(onPressed: action, child: text)
+          : OutlinedButton.icon(onPressed: action, icon: leading, label: text);
     }
-
     if (isTonal) {
-      if (icon != null) {
-        return FilledButton.tonalIcon(
-          onPressed: onPressed,
-          icon: Icon(icon, size: 18.0),
-          label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-          style: FilledButton.styleFrom(
-            shape: const StadiumBorder(),
-            minimumSize: const Size(88.0, 42.0),
-            padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 12.0),
-          ),
-        );
-      }
-      return FilledButton.tonal(
-        onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          shape: const StadiumBorder(),
-          minimumSize: const Size(88.0, 42.0),
-          padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 12.0),
-        ),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-      );
+      return leading == null
+          ? FilledButton.tonal(onPressed: action, child: text)
+          : FilledButton.tonalIcon(onPressed: action, icon: leading, label: text);
     }
-
-    // Default: Primary Filled Button
-    if (icon != null) {
-      return FilledButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 18.0),
-        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-        style: FilledButton.styleFrom(
-          shape: const StadiumBorder(),
-          minimumSize: const Size(88.0, 42.0),
-          padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 12.0),
-        ),
-      );
-    }
-
-    return FilledButton(
-      onPressed: onPressed,
-      style: FilledButton.styleFrom(
-        shape: const StadiumBorder(),
-        minimumSize: const Size(88.0, 42.0),
-        padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 12.0),
-      ),
-      child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-    );
+    return leading == null
+        ? FilledButton(onPressed: action, child: text)
+        : FilledButton.icon(onPressed: action, icon: leading, label: text);
   }
 }
 

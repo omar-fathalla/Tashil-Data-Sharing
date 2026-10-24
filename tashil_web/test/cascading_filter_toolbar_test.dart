@@ -45,7 +45,8 @@ void main() {
       expect(find.byKey(const ValueKey('export_excel_button')), findsOneWidget);
       expect(find.byKey(const ValueKey('export_pdf_button')), findsOneWidget);
       expect(find.text('Search SKU or Barcode...'), findsOneWidget);
-      expect(find.text('All Chains'), findsOneWidget);
+      // DropdownMenu also lays out its entries offstage for sizing.
+      expect(find.text('All Chains'), findsWidgets);
 
       // Tap export buttons to ensure callbacks fire
       await tester.tap(find.byKey(const ValueKey('export_excel_button')));
@@ -123,10 +124,12 @@ void main() {
         ),
       );
 
-      final dropdowns = tester.widgetList<DropdownButton<String?>>(find.byType(DropdownButton<String?>));
+      // All toolbar dropdowns are M3 DropdownMenu (no legacy DropdownButton).
+      expect(find.byType(DropdownButton<String?>), findsNothing);
+      final dropdowns = tester.widgetList<DropdownMenu<String?>>(find.byType(DropdownMenu<String?>));
       expect(dropdowns.length, greaterThanOrEqualTo(3));
       for (final dd in dropdowns) {
-        expect(dd.focusColor, equals(Colors.transparent));
+        expect(dd.requestFocusOnTap, isFalse);
       }
     });
 
@@ -156,7 +159,7 @@ void main() {
       );
 
       // Open the chains dropdown
-      await tester.tap(find.text('All Chains'));
+      await tester.tap(find.byKey(const ValueKey('sellout_chain_dropdown')));
       await tester.pumpAndSettle();
 
       // Verify English names exist without Arabic parentheses

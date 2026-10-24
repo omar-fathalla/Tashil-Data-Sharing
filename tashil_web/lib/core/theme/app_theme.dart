@@ -178,18 +178,41 @@ class AppTheme {
         style: ButtonStyle(
           animationDuration: M3Motion.short4,
           shape: WidgetStateProperty.all(const StadiumBorder()),
+          minimumSize: WidgetStateProperty.all(const Size(64.0, 40.0)),
+          padding: WidgetStateProperty.all(
+            const EdgeInsets.symmetric(horizontal: M3Spacing.md, vertical: 10.0),
+          ),
+          iconSize: WidgetStateProperty.all(18.0),
+          textStyle: WidgetStateProperty.all(textTheme.labelLarge),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: ButtonStyle(
           animationDuration: M3Motion.short4,
           shape: WidgetStateProperty.all(const StadiumBorder()),
+          minimumSize: WidgetStateProperty.all(const Size(64.0, 40.0)),
+          padding: WidgetStateProperty.all(
+            const EdgeInsets.symmetric(horizontal: M3Spacing.md, vertical: 10.0),
+          ),
+          side: WidgetStateProperty.resolveWith((states) => BorderSide(
+            color: states.contains(WidgetState.disabled)
+                ? colorScheme.onSurface.withOpacity(0.12)
+                : colorScheme.outline,
+          )),
+          iconSize: WidgetStateProperty.all(18.0),
+          textStyle: WidgetStateProperty.all(textTheme.labelLarge),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: ButtonStyle(
           animationDuration: M3Motion.short4,
           shape: WidgetStateProperty.all(const StadiumBorder()),
+          minimumSize: WidgetStateProperty.all(const Size(64.0, 40.0)),
+          padding: WidgetStateProperty.all(
+            const EdgeInsets.symmetric(horizontal: M3Spacing.md, vertical: 10.0),
+          ),
+          iconSize: WidgetStateProperty.all(18.0),
+          textStyle: WidgetStateProperty.all(textTheme.labelLarge),
         ),
       ),
 

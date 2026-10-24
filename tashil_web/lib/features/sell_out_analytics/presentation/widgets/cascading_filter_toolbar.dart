@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/m3_dropdown.dart';
+import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
@@ -545,169 +547,74 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
     }
 
     Widget buildChainDropdown({required bool expand}) {
-      return AnimatedContainer(
-        duration: M3Motion.short4,
-        curve: M3Motion.standard,
-        height: 42.0,
-        padding: const EdgeInsets.symmetric(horizontal: 12.0),
-        decoration: controlDecoration,
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String?>(
-            value: selectedChain,
-            isExpanded: expand,
-            hint: const Text('All Chains', overflow: TextOverflow.ellipsis),
-            isDense: true,
-            focusColor: Colors.transparent,
-            dropdownColor: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(14.0),
-            icon: Icon(
-              Icons.arrow_drop_down_rounded,
-              color: colorScheme.onSurfaceVariant,
-            ),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontFamily: 'Cairo',
-              color: colorScheme.onSurface,
-            ),
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All Chains', overflow: TextOverflow.ellipsis)),
-              DropdownMenuItem(value: 'fathalla', child: Text('Fathalla Market', overflow: TextOverflow.ellipsis)),
-              DropdownMenuItem(value: 'beet-elgomla', child: Text('Beet El-Gomla', overflow: TextOverflow.ellipsis)),
-              DropdownMenuItem(value: 'institutions', child: Text('Institutions', overflow: TextOverflow.ellipsis)),
-              DropdownMenuItem(value: 'carrefour', child: Text('Carrefour', overflow: TextOverflow.ellipsis)),
-              DropdownMenuItem(value: 'gomla', child: Text('Gomla Market', overflow: TextOverflow.ellipsis)),
-              DropdownMenuItem(value: 'spinneys', child: Text('Spinneys', overflow: TextOverflow.ellipsis)),
-            ],
-            onChanged: (val) {
-              onChainChanged(val);
-              onStoreChanged(null); // Reset cascaded store
-            },
-          ),
-        ),
+      return M3Dropdown<String?>(
+        key: const ValueKey('sellout_chain_dropdown'),
+        expand: expand,
+        width: expand ? null : 190.0,
+        value: selectedChain,
+        hint: 'All Chains',
+        options: const [
+          M3DropdownOption(null, 'All Chains'),
+          M3DropdownOption('fathalla', 'Fathalla Market'),
+          M3DropdownOption('beet-elgomla', 'Beet El-Gomla'),
+          M3DropdownOption('institutions', 'Institutions'),
+          M3DropdownOption('carrefour', 'Carrefour'),
+          M3DropdownOption('gomla', 'Gomla Market'),
+          M3DropdownOption('spinneys', 'Spinneys'),
+        ],
+        onChanged: (val) {
+          onChainChanged(val);
+          onStoreChanged(null); // Reset cascaded store
+        },
       );
     }
 
     Widget buildStoreDropdown({required bool expand}) {
-      return AnimatedContainer(
-        duration: M3Motion.short4,
-        curve: M3Motion.standard,
-        height: 42.0,
-        padding: const EdgeInsets.symmetric(horizontal: 12.0),
-        decoration: controlDecoration,
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String?>(
-            value: validStoreId,
-            isExpanded: expand,
-            hint: Text('All Branches (${availableStores.length})', overflow: TextOverflow.ellipsis),
-            isDense: true,
-            focusColor: Colors.transparent,
-            dropdownColor: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(14.0),
-            icon: Icon(
-              Icons.arrow_drop_down_rounded,
-              color: colorScheme.onSurfaceVariant,
-            ),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontFamily: 'Cairo',
-              color: colorScheme.onSurface,
-            ),
-            items: [
-              DropdownMenuItem(
-                value: null,
-                child: Text('All Branches (${availableStores.length})', overflow: TextOverflow.ellipsis),
-              ),
-              ...availableStores.map((s) {
-                return DropdownMenuItem(
-                  value: s['id'],
-                  child: Text(s['name']!, overflow: TextOverflow.ellipsis),
-                );
-              }),
-            ],
-            onChanged: onStoreChanged,
-          ),
-        ),
+      return M3Dropdown<String?>(
+        key: const ValueKey('sellout_store_dropdown'),
+        expand: expand,
+        width: expand ? null : 220.0,
+        value: validStoreId,
+        hint: 'All Branches (${availableStores.length})',
+        options: [
+          M3DropdownOption(null, 'All Branches (${availableStores.length})'),
+          ...availableStores.map((s) => M3DropdownOption<String?>(s['id'], s['name']!)),
+        ],
+        onChanged: onStoreChanged,
       );
     }
 
     Widget buildCategoryDropdown({required bool expand}) {
-      return AnimatedContainer(
-        duration: M3Motion.short4,
-        curve: M3Motion.standard,
-        height: 42.0,
-        padding: const EdgeInsets.symmetric(horizontal: 12.0),
-        decoration: controlDecoration,
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String?>(
-            value: selectedCategory,
-            isExpanded: expand,
-            hint: const Text('All Categories', overflow: TextOverflow.ellipsis),
-            isDense: true,
-            focusColor: Colors.transparent,
-            dropdownColor: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(14.0),
-            icon: Icon(
-              Icons.arrow_drop_down_rounded,
-              color: colorScheme.onSurfaceVariant,
-            ),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontFamily: 'Cairo',
-              color: colorScheme.onSurface,
-            ),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('All Categories', overflow: TextOverflow.ellipsis)),
-              ...categories.map(
-                (cat) => DropdownMenuItem(value: cat, child: Text(cat, overflow: TextOverflow.ellipsis)),
-              ),
-            ],
-            onChanged: onCategoryChanged,
-          ),
-        ),
+      return M3Dropdown<String?>(
+        key: const ValueKey('sellout_category_dropdown'),
+        expand: expand,
+        width: expand ? null : 200.0,
+        value: selectedCategory,
+        hint: 'All Categories',
+        options: [
+          const M3DropdownOption(null, 'All Categories'),
+          ...categories.map((cat) => M3DropdownOption<String?>(cat, cat)),
+        ],
+        onChanged: onCategoryChanged,
       );
     }
 
     Widget buildYearSelectorPill() {
       if (widget.onYearChanged == null) return const SizedBox.shrink();
       final activeYr = widget.selectedYear ?? 2026;
-      return Container(
+      return KeyedSubtree(
         key: const ValueKey('sellout_year_selector_pill'),
-        height: 38.0,
-        padding: const EdgeInsets.symmetric(horizontal: 10.0),
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer.withOpacity(0.55),
-          borderRadius: BorderRadius.circular(20.0),
-          border: Border.all(
-            color: colorScheme.primary.withOpacity(0.5),
-          ),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<int>(
-            value: const [2026, 2025, 2024, 0].contains(activeYr) ? activeYr : 2026,
-            isDense: true,
-            focusColor: Colors.transparent,
-            dropdownColor: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(14.0),
-            icon: Icon(
-              Icons.arrow_drop_down_rounded,
-              size: 18.0,
-              color: colorScheme.primary,
-            ),
-            style: theme.textTheme.labelMedium?.copyWith(
-              fontFamily: 'Cairo',
-              fontWeight: FontWeight.w800,
-              fontSize: 11.5,
-              color: colorScheme.onPrimaryContainer,
-            ),
-            items: const [
-              DropdownMenuItem(value: 2026, child: Text('Year: 2026 (Default)')),
-              DropdownMenuItem(value: 2025, child: Text('Year: 2025')),
-              DropdownMenuItem(value: 2024, child: Text('Year: 2024')),
-              DropdownMenuItem(value: 0, child: Text('All Years (2025–2026)')),
-            ],
-            onChanged: (val) {
-              if (val != null) {
-                widget.onYearChanged!(val);
-              }
-            },
-          ),
+        child: M3Dropdown<int>(
+          width: 210.0,
+          value: const [2026, 2025, 2024, 0].contains(activeYr) ? activeYr : 2026,
+          leadingIcon: AppIcons.calendar,
+          options: const [
+            M3DropdownOption(2026, 'Year: 2026 (Default)'),
+            M3DropdownOption(2025, 'Year: 2025'),
+            M3DropdownOption(2024, 'Year: 2024'),
+            M3DropdownOption(0, 'All Years (2025–2026)'),
+          ],
+          onChanged: (val) => widget.onYearChanged!(val),
         ),
       );
     }
