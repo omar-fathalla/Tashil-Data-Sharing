@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'm3_color_roles.dart';
 import 'm3_motion.dart';
+import 'm3_shape.dart';
+import 'm3_spacing.dart';
+import 'm3_status_colors.dart';
 
 /// AppTheme builds the official Google Material Design 3 (M3) theme
 /// using single-seed dynamic color palette generation, M3 Motion & Transitions,
@@ -43,53 +46,31 @@ class AppTheme {
       baseTextTheme = const TextTheme();
     }
 
+    // Full M3 type scale (sizes per M3 spec, tuned for Cairo/Arabic legibility).
+    TextStyle? t(TextStyle? base, double size, FontWeight w, Color c,
+            {double? ls, double? h}) =>
+        base?.copyWith(
+          fontSize: size,
+          fontWeight: w,
+          color: c,
+          letterSpacing: ls,
+          height: h,
+        );
+    final onS = colorScheme.onSurface;
+    final onSV = colorScheme.onSurfaceVariant;
     final textTheme = baseTextTheme.copyWith(
-      displayLarge: baseTextTheme.displayLarge?.copyWith(
-        fontSize: 40.0,
-        fontWeight: FontWeight.w700,
-        color: colorScheme.onSurface,
-        letterSpacing: -0.5,
-      ),
-      displayMedium: baseTextTheme.displayMedium?.copyWith(
-        fontSize: 32.0,
-        fontWeight: FontWeight.w700,
-        color: colorScheme.onSurface,
-      ),
-      headlineMedium: baseTextTheme.headlineMedium?.copyWith(
-        fontSize: 24.0,
-        fontWeight: FontWeight.w600,
-        color: colorScheme.onSurface,
-      ),
-      headlineSmall: baseTextTheme.headlineSmall?.copyWith(
-        fontSize: 20.0,
-        fontWeight: FontWeight.w600,
-        color: colorScheme.onSurface,
-      ),
-      titleLarge: baseTextTheme.titleLarge?.copyWith(
-        fontSize: 18.0,
-        fontWeight: FontWeight.w600,
-        color: colorScheme.onSurface,
-      ),
-      titleMedium: baseTextTheme.titleMedium?.copyWith(
-        fontSize: 15.0,
-        fontWeight: FontWeight.w500,
-        color: colorScheme.onSurface,
-      ),
-      titleSmall: baseTextTheme.titleSmall?.copyWith(
-        fontSize: 13.0,
-        fontWeight: FontWeight.w500,
-        color: colorScheme.onSurfaceVariant,
-      ),
-      bodyLarge: baseTextTheme.bodyLarge?.copyWith(
-        fontSize: 15.0,
-        fontWeight: FontWeight.w400,
-        color: colorScheme.onSurface,
-      ),
-      bodyMedium: baseTextTheme.bodyMedium?.copyWith(
-        fontSize: 13.0,
-        fontWeight: FontWeight.w400,
-        color: colorScheme.onSurfaceVariant,
-      ),
+      displayLarge: t(baseTextTheme.displayLarge, 40.0, FontWeight.w700, onS, ls: -0.5),
+      displayMedium: t(baseTextTheme.displayMedium, 32.0, FontWeight.w700, onS),
+      displaySmall: t(baseTextTheme.displaySmall, 28.0, FontWeight.w700, onS),
+      headlineLarge: t(baseTextTheme.headlineLarge, 26.0, FontWeight.w600, onS),
+      headlineMedium: t(baseTextTheme.headlineMedium, 24.0, FontWeight.w600, onS),
+      headlineSmall: t(baseTextTheme.headlineSmall, 20.0, FontWeight.w600, onS),
+      titleLarge: t(baseTextTheme.titleLarge, 18.0, FontWeight.w600, onS),
+      titleMedium: t(baseTextTheme.titleMedium, 15.0, FontWeight.w500, onS),
+      titleSmall: t(baseTextTheme.titleSmall, 13.0, FontWeight.w500, onSV),
+      bodyLarge: t(baseTextTheme.bodyLarge, 15.0, FontWeight.w400, onS),
+      bodyMedium: t(baseTextTheme.bodyMedium, 13.0, FontWeight.w400, onSV),
+      bodySmall: t(baseTextTheme.bodySmall, 12.0, FontWeight.w400, onSV),
       labelLarge: baseTextTheme.labelLarge?.copyWith(
         fontSize: 14.0,
         fontWeight: FontWeight.w600,
@@ -99,10 +80,14 @@ class AppTheme {
         fontSize: 12.0,
         fontWeight: FontWeight.w500,
       ),
+      labelSmall: baseTextTheme.labelSmall?.copyWith(
+        fontSize: 11.0,
+        fontWeight: FontWeight.w500,
+      ),
     );
 
     final menuShape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(14.0),
+      borderRadius: M3Shape.radiusMd,
       side: BorderSide(
         color: colorScheme.outlineVariant.withOpacity(0.5),
         width: 1.0,
@@ -138,29 +123,37 @@ class AppTheme {
         color: colorScheme.surfaceContainerLow,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0),
-          side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.4), width: 1.0),
+          borderRadius: M3Shape.radiusMd,
+          side: BorderSide(color: colorScheme.outlineVariant, width: 1.0),
         ),
         margin: EdgeInsets.zero,
       ),
 
       // M3 Input Field Theme
       inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        filled: false,
         focusColor: Colors.transparent,
         hoverColor: Colors.transparent,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: M3Spacing.sm, vertical: 12.0),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0),
+          borderRadius: M3Shape.radiusSm,
           borderSide: BorderSide(color: colorScheme.outlineVariant, width: 1.0),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0),
-          borderSide: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.6), width: 1.0),
+          borderRadius: M3Shape.radiusSm,
+          borderSide: BorderSide(color: colorScheme.outline, width: 1.0),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: M3Shape.radiusSm,
+          borderSide: BorderSide(color: colorScheme.error, width: 1.0),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: M3Shape.radiusSm,
+          borderSide: BorderSide(color: colorScheme.error, width: 2.0),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0),
+          borderRadius: M3Shape.radiusSm,
           borderSide: BorderSide(color: colorScheme.primary, width: 2.0),
         ),
       ),
@@ -205,7 +198,7 @@ class AppTheme {
       menuButtonTheme: MenuButtonThemeData(
         style: ButtonStyle(
           shape: WidgetStateProperty.all(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+            const RoundedRectangleBorder(borderRadius: M3Shape.radiusSm),
           ),
           padding: WidgetStateProperty.all(
             const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
@@ -239,21 +232,20 @@ class AppTheme {
         ),
         menuStyle: menuStyle,
         inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: colorScheme.surfaceContainerHigh,
+          filled: false,
           focusColor: Colors.transparent,
           hoverColor: Colors.transparent,
           contentPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
+            borderRadius: M3Shape.radiusSm,
             borderSide: BorderSide(color: colorScheme.outlineVariant),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-            borderSide: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.7)),
+            borderRadius: M3Shape.radiusSm,
+            borderSide: BorderSide(color: colorScheme.outline),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
+            borderRadius: M3Shape.radiusSm,
             borderSide: BorderSide(color: colorScheme.primary, width: 2.0),
           ),
         ),
@@ -299,7 +291,7 @@ class AppTheme {
           fontWeight: FontWeight.bold,
         ),
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.7)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+        shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusSm),
       ),
 
       // M3 Dialog Theme
@@ -307,8 +299,8 @@ class AppTheme {
         backgroundColor: colorScheme.surfaceContainerHigh,
         surfaceTintColor: colorScheme.surfaceTint,
         elevation: 6.0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24.0),
+        shape: const RoundedRectangleBorder(
+          borderRadius: M3Shape.radiusXl,
         ),
       ),
 
@@ -317,6 +309,22 @@ class AppTheme {
         backgroundColor: colorScheme.surfaceContainer,
         elevation: 0,
         shape: const RoundedRectangleBorder(),
+      ),
+
+      navigationDrawerTheme: NavigationDrawerThemeData(
+        backgroundColor: colorScheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        indicatorColor: colorScheme.secondaryContainer,
+        indicatorShape: const StadiumBorder(),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return textTheme.labelLarge?.copyWith(
+              color: colorScheme.onSecondaryContainer,
+            );
+          }
+          return textTheme.labelLarge?.copyWith(color: onSV);
+        }),
       ),
 
       // M3 Navigation Rail Theme
@@ -352,6 +360,124 @@ class AppTheme {
             color: colorScheme.onSurfaceVariant,
           );
         }),
+      ),
+
+      extensions: <ThemeExtension<dynamic>>[
+        M3StatusColors.fromScheme(colorScheme),
+      ],
+
+      // M3 Icon Button Theme
+      iconButtonTheme: IconButtonThemeData(
+        style: ButtonStyle(
+          animationDuration: M3Motion.short4,
+          shape: WidgetStateProperty.all(const StadiumBorder()),
+        ),
+      ),
+
+      // M3 FAB Theme
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: colorScheme.primaryContainer,
+        foregroundColor: colorScheme.onPrimaryContainer,
+        elevation: 3.0,
+        shape: M3Shape.shapeLg,
+      ),
+
+      // M3 SnackBar Theme
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: colorScheme.inverseSurface,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: colorScheme.onInverseSurface,
+        ),
+        actionTextColor: colorScheme.inversePrimary,
+        shape: M3Shape.shapeXs,
+        elevation: 3.0,
+        showCloseIcon: false,
+      ),
+
+      // M3 Banner Theme
+      bannerTheme: MaterialBannerThemeData(
+        backgroundColor: colorScheme.surfaceContainerLow,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(color: onS),
+        padding: const EdgeInsetsDirectional.only(
+            start: M3Spacing.sm, top: M3Spacing.xxs, end: M3Spacing.xs),
+        elevation: 1.0,
+        dividerColor: colorScheme.outlineVariant,
+      ),
+
+      // M3 Data Table Theme
+      dataTableTheme: DataTableThemeData(
+        headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainer),
+        headingTextStyle: textTheme.labelLarge?.copyWith(color: onS),
+        dataTextStyle: textTheme.bodyMedium?.copyWith(color: onS),
+        dividerThickness: 1.0,
+        headingRowHeight: 48.0,
+        dataRowMinHeight: 44.0,
+        dataRowMaxHeight: 52.0,
+        horizontalMargin: M3Spacing.sm,
+        columnSpacing: M3Spacing.md,
+        dataRowColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return colorScheme.secondaryContainer.withOpacity(0.6);
+          }
+          if (states.contains(WidgetState.hovered)) {
+            return colorScheme.surfaceContainerHighest.withOpacity(0.4);
+          }
+          return null;
+        }),
+      ),
+
+      // M3 Divider / ListTile / Tooltip / Progress / Badge
+      dividerTheme: DividerThemeData(
+        color: colorScheme.outlineVariant,
+        thickness: 1.0,
+        space: 1.0,
+      ),
+      listTileTheme: ListTileThemeData(
+        shape: M3Shape.shapeSm,
+        iconColor: onSV,
+        titleTextStyle: textTheme.bodyLarge,
+        subtitleTextStyle: textTheme.bodyMedium,
+        contentPadding:
+            const EdgeInsetsDirectional.symmetric(horizontal: M3Spacing.sm),
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: colorScheme.inverseSurface,
+          borderRadius: M3Shape.radiusXs,
+        ),
+        textStyle: textTheme.bodySmall?.copyWith(
+          color: colorScheme.onInverseSurface,
+        ),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: colorScheme.primary,
+        linearTrackColor: colorScheme.surfaceContainerHighest,
+        circularTrackColor: Colors.transparent,
+      ),
+      badgeTheme: BadgeThemeData(
+        backgroundColor: colorScheme.error,
+        textColor: colorScheme.onError,
+      ),
+
+      // M3 Date Picker Theme
+      datePickerTheme: DatePickerThemeData(
+        backgroundColor: colorScheme.surfaceContainerHigh,
+        surfaceTintColor: Colors.transparent,
+        shape: M3Shape.shapeXl,
+        headerHeadlineStyle: textTheme.headlineSmall,
+        rangePickerBackgroundColor: colorScheme.surfaceContainerHigh,
+        rangeSelectionBackgroundColor: colorScheme.secondaryContainer,
+      ),
+
+      // M3 Bottom Sheet Theme
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: colorScheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+        showDragHandle: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(M3Shape.xl)),
+        ),
       ),
 
       // M3 App Bar Theme

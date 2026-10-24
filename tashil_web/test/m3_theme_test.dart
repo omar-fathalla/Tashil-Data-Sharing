@@ -5,6 +5,8 @@ import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/theme/m3_color_roles.dart';
 import 'package:tashil_web/core/theme/m3_motion.dart';
 import 'package:tashil_web/core/theme/m3_spacing.dart';
+import 'package:tashil_web/core/theme/m3_shape.dart';
+import 'package:tashil_web/core/theme/m3_status_colors.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -77,6 +79,35 @@ void main() {
       expect(M3Motion.menuAnimationStyle.duration, equals(M3Motion.medium1));
       expect(M3Motion.menuAnimationStyle.reverseDuration, equals(M3Motion.short3));
       expect(M3Motion.dialogAnimationStyle.duration, equals(M3Motion.medium2));
+    });
+    test('M3 Shape scale tokens', () {
+      expect(M3Shape.xs, 4.0);
+      expect(M3Shape.sm, 8.0);
+      expect(M3Shape.md, 12.0);
+      expect(M3Shape.lg, 16.0);
+      expect(M3Shape.xl, 28.0);
+      expect(M3Shape.full, 999.0);
+    });
+
+    testWidgets('Status/chart ThemeExtension and full component themes', (tester) async {
+      for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+        final ext = theme.extension<M3StatusColors>();
+        expect(ext, isNotNull);
+        expect(ext!.chartPalette.length, greaterThanOrEqualTo(8));
+        expect(ext.chart(0), theme.colorScheme.primary);
+        expect(ext.chart(8), ext.chart(0));
+        expect(theme.snackBarTheme.behavior, SnackBarBehavior.floating);
+        expect(theme.inputDecorationTheme.filled, isFalse);
+        expect(theme.dataTableTheme.headingRowColor, isNotNull);
+        expect(theme.iconButtonTheme.style, isNotNull);
+        expect(theme.datePickerTheme.shape, M3Shape.shapeXl);
+        expect(theme.dialogTheme.shape, isA<RoundedRectangleBorder>());
+        expect(theme.textTheme.bodySmall, isNotNull);
+        expect(theme.textTheme.labelSmall, isNotNull);
+      }
+      final ext = AppTheme.light().extension<M3StatusColors>()!;
+      final mid = ext.lerp(AppTheme.dark().extension<M3StatusColors>(), 0.5);
+      expect(mid.chartPalette.length, ext.chartPalette.length);
     });
   });
 }
