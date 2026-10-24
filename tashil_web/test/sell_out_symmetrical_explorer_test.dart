@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/network/api_client.dart';
@@ -50,12 +51,49 @@ void main() {
       expect(find.text('إجمالي الفروع النشطة'), findsOneWidget);
       expect(find.text('Active Stores & Outlets'), findsOneWidget);
 
+      // 2b. All 4 KPI cards share identical width, height and top/bottom edges
+      final kpiRects = [
+        'Total Net Revenue (EGP)',
+        'Total Units Sold',
+        'Active SKUs & Branch Velocity',
+        'Active Stores & Outlets',
+      ].map((t) => tester.getRect(find.byKey(ValueKey('kpi_card_$t')))).toList();
+      for (final r in kpiRects.skip(1)) {
+        expect(r.height, closeTo(kpiRects.first.height, 0.5));
+        expect(r.width, closeTo(kpiRects.first.width, 0.5));
+        expect(r.top, closeTo(kpiRects.first.top, 0.5));
+        expect(r.bottom, closeTo(kpiRects.first.bottom, 0.5));
+      }
+
       // 3. Verify Full-Width Branch Sales Ranking Chart with Year 2026 Default & Two-Row Layout
       expect(find.byKey(const ValueKey('full_width_branch_sales_chart')), findsOneWidget);
       expect(find.text('شارت ترتيب مبيعات فروع السلسلة من الأعلى للأقل'), findsOneWidget);
       expect(find.text('Branch Sales Ranking Chart'), findsOneWidget);
-      expect(find.textContaining('الصف الأول: الفروع الأعلى مبيعاً'), findsOneWidget);
-      expect(find.textContaining('الصف الثاني: باقي فروع السلسلة'), findsOneWidget);
+      // Vertical columns mode is removed entirely; chart starts collapsed.
+      expect(find.textContaining('الصف الأول: الفروع الأعلى مبيعاً'), findsNothing);
+      expect(find.byKey(const ValueKey('branch_chart_layout_toggle')), findsNothing);
+      expect(find.byKey(const ValueKey('branch_chart_header')), findsOneWidget);
+      expect(find.byIcon(AppIcons.expandMore), findsOneWidget);
+      expect(find.byKey(const ValueKey('branch_growth_slot_1')), findsNothing);
+
+      // Expand: horizontal bar list appears with identical fixed-width growth slots.
+      await tester.ensureVisible(find.byKey(const ValueKey('branch_chart_header')));
+      await tester.tap(find.byKey(const ValueKey('branch_chart_header')));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(AppIcons.expandLess), findsOneWidget);
+      final slots = find.byWidgetPredicate((w) =>
+          w.key is ValueKey<String> &&
+          (w.key as ValueKey<String>).value.startsWith('branch_growth_slot_'));
+      expect(slots, findsWidgets);
+      for (final e in slots.evaluate()) {
+        expect(tester.getSize(find.byWidget(e.widget)).width, closeTo(64.0, 0.1));
+      }
+
+      // Collapse again.
+      await tester.tap(find.byKey(const ValueKey('branch_chart_header')));
+      await tester.pumpAndSettle();
+      expect(slots, findsNothing);
+      expect(find.byIcon(AppIcons.expandMore), findsOneWidget);
       expect(find.byKey(const ValueKey('branch_chart_year_2026')), findsOneWidget);
       expect(find.byKey(const ValueKey('branch_chart_year_2025')), findsOneWidget);
 
@@ -63,9 +101,18 @@ void main() {
       expect(find.byKey(const ValueKey('upload_sellout_button')), findsOneWidget);
       expect(find.byKey(const ValueKey('export_excel_button')), findsOneWidget);
       expect(find.byKey(const ValueKey('export_pdf_button')), findsOneWidget);
+
+      // 4b. Action buttons sit flush at the row's end, adjacent to each other
+      final excel = tester.getRect(find.byKey(const ValueKey('export_excel_button')));
+      final pdf = tester.getRect(find.byKey(const ValueKey('export_pdf_button')));
+      final up = tester.getRect(find.byKey(const ValueKey('upload_sellout_button')));
+      expect((excel.center.dy - pdf.center.dy).abs(), lessThan(1.0));
+      expect((pdf.center.dy - up.center.dy).abs(), lessThan(1.0));
+      final gaps = [ (pdf.left - excel.right).abs(), (excel.left - pdf.right).abs() ]..sort();
+      expect(gaps.first, lessThan(16.0));
     });
 
-    testWidgets('switches Year between 2026 (Default) and 2025 in Full-Width Branch Sales Chart',
+    testWidgets('switches Year between 2026 and 2025 in Full-Width Branch Sales Chart',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -133,7 +180,8 @@ void main() {
       // Verify Tab 1 Year (2026 Default) and Month Filter Dropdowns
       expect(find.byKey(const ValueKey('perf_year_dropdown')), findsOneWidget);
       expect(find.byKey(const ValueKey('perf_month_dropdown')), findsOneWidget);
-      expect(find.text('2026 (Default)'), findsWidgets);
+      expect(find.text('2026'), findsWidgets);
+      expect(find.textContaining('Default'), findsNothing);
       expect(find.text('كل الشهور'), findsWidgets);
 
       // Verify Tables (SKU Pareto Breakdown table was removed and replaced with Branch YoY & MoM Growth Matrix)

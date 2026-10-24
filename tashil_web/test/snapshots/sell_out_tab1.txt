@@ -664,8 +664,8 @@
 2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 209,511 ج.م | 13.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 209,511 ج.م | 13.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 209,511 ج.م | 13.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43

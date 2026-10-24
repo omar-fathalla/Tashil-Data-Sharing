@@ -17,6 +17,7 @@ import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
+import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_responsive_tab_bar.dart';
@@ -76,7 +77,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
   // Full-Width Chain Branches Sales Ranking Chart State
   String _chartChain = 'fathalla'; // Default to Fathalla Market (أسواق فتح الله)
   bool _chartSortAscending = false; // false = High to Low (الأعلى للأقل)
-  bool _chartHorizontalMode = false; // false = Full-Width Columns, true = Horizontal Ranked Bars
+  bool _branchChartExpanded = false; // Branch ranking chart starts collapsed
   List<StoreBenchmarkItem> _branchChartItems = const [];
   Map<String, StoreBenchmarkItem> _prevYearBranchMap = const {};
   double _prevYearTotalChainRevenue = 0.0;
@@ -772,9 +773,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     final String cartonsSubtitle = totalCartonsSold > 0
         ? ' (${CurrencyFormatter.formatNumber(totalCartonsSold.round())} كرتونة بالشد الفعلي)'
         : '';
-    final String marginSubtitle = totalFactoryCost > 0
-        ? ' • صافي المصنع: ${CurrencyFormatter.formatCompactEGP(totalFactoryCost)} • ربح السلسلة: ${CurrencyFormatter.formatCompactEGP(totalGrossProfit)} (${avgMarginPct.toStringAsFixed(1)}%)'
-        : '';
+    final String shortYearAr = selectedDateRange != null
+        ? '${_formatDate(selectedDateRange!.start)} – ${_formatDate(selectedDateRange!.end)}'
+        : (_selectedYear > 0 ? 'سنة $_selectedYear' : '2025–2026');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -787,9 +788,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               titleAr: 'إجمالي صافي المبيعات',
               titleEn: 'Total Net Revenue (EGP)',
               value: CurrencyFormatter.formatCompactEGP(totalNetRevenue),
-              subtitle:
-                  '$yearBadgeAr • ${CurrencyFormatter.formatNumber(totalTransactionsCount)} حركة بيع فعلية$dateSpanAr$yoySubtitleSuffix$marginSubtitle',
-              icon: Icons.payments_rounded,
+              subtitle: '$shortYearAr$yoySubtitleSuffix',
+              icon: AppIcons.money,
               color: colorScheme.primary,
             );
             final card2 = _buildSummaryCard(
@@ -797,8 +797,10 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               titleAr: 'إجمالي الكمية المباعة',
               titleEn: 'Total Units Sold',
               value: CurrencyFormatter.formatNumber(totalUnitsSold),
-              subtitle: 'قطعة / وحدة مباعة للمستهلك$cartonsSubtitle • $yearBadgeAr',
-              icon: Icons.shopping_bag_rounded,
+              subtitle: totalCartonsSold > 0
+                  ? '${CurrencyFormatter.formatNumber(totalCartonsSold.round())} كرتونة'
+                  : shortYearAr,
+              icon: AppIcons.units,
               color: Color.lerp(colorScheme.primary, colorScheme.secondary, 0.30) ?? colorScheme.primary,
             );
             final card3 = _buildSummaryCard(
@@ -806,9 +808,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               titleAr: 'الأصناف النشطة ومتوسط الفرع',
               titleEn: 'Active SKUs & Branch Velocity',
               value: '$activeSkusCount صنف نشط',
-              subtitle:
-                  'متوسط الفرع: ${CurrencyFormatter.formatCompactEGP(avgBranchRevenue)} • الأعلى: $shortTopBranch',
-              icon: Icons.auto_awesome_mosaic_rounded,
+              subtitle: 'متوسط الفرع: ${CurrencyFormatter.formatCompactEGP(avgBranchRevenue)}',
+              icon: AppIcons.productMaster,
               color: Color.lerp(colorScheme.primary, colorScheme.tertiary, 0.40) ?? colorScheme.primary,
             );
             final card4 = _buildSummaryCard(
@@ -816,8 +817,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               titleAr: 'إجمالي الفروع النشطة',
               titleEn: 'Active Stores & Outlets',
               value: '$activeStoresCount فرع',
-              subtitle: 'موزعة على السلاسل التجارية • $yearBadgeAr',
-              icon: Icons.storefront_rounded,
+              subtitle: shortYearAr,
+              icon: AppIcons.storeMatrix,
               color: colorScheme.secondary,
             );
 
@@ -867,7 +868,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
 
         M3Spacing.gapMD,
 
-        // 3. Cascading Filter Toolbar with integrated Year (2026 Default), Date Range, Upload, Export & Search
+        // 3. Cascading Filter Toolbar with integrated Year (2026), Date Range, Upload, Export & Search
         CascadingFilterToolbar(
           key: ValueKey('toolbar_${widget.apiClient.tenantId}'),
           selectedChain: selectedChain,
@@ -1087,7 +1088,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               ],
             ),
             const SizedBox(height: 10.0),
-            // Filter Chips: الكل, هامش صحي 📈, هامش منخفض ⚠️, بيع بأقل من التكلفة / حرق سعر 🚨, عروض ترويجية 🎁
+            // Filter Chips: الكل, هامش صحي, هامش منخفض, بيع بأقل من التكلفة / حرق سعر, عروض ترويجية
             Wrap(
               spacing: 8.0,
               runSpacing: 8.0,
@@ -1098,22 +1099,26 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                   onSelected: (_) => setState(() => _priceMatrixFilter = 'all'),
                 ),
                 ChoiceChip(
-                  label: Text('هامش صحي 📈 ($healthyCount)'),
+                  avatar: Icon(AppIcons.trendingUp, size: 18.0),
+                  label: Text('هامش صحي ($healthyCount)'),
                   selected: _priceMatrixFilter == 'healthy',
                   onSelected: (_) => setState(() => _priceMatrixFilter = 'healthy'),
                 ),
                 ChoiceChip(
-                  label: Text('هامش منخفض ⚠️ ($lowMarginCount)'),
+                  avatar: Icon(AppIcons.warning, size: 18.0),
+                  label: Text('هامش منخفض ($lowMarginCount)'),
                   selected: _priceMatrixFilter == 'low_margin',
                   onSelected: (_) => setState(() => _priceMatrixFilter = 'low_margin'),
                 ),
                 ChoiceChip(
-                  label: Text('بيع بأقل من التكلفة / حرق سعر 🚨 ($negMarginCount)'),
+                  avatar: Icon(AppIcons.error, size: 18.0),
+                  label: Text('بيع بأقل من التكلفة / حرق سعر ($negMarginCount)'),
                   selected: _priceMatrixFilter == 'negative_margin',
                   onSelected: (_) => setState(() => _priceMatrixFilter = 'negative_margin'),
                 ),
                 ChoiceChip(
-                  label: Text('عروض ترويجية 🎁 ($promoCount)'),
+                  avatar: Icon(AppIcons.promo, size: 18.0),
+                  label: Text('عروض ترويجية ($promoCount)'),
                   selected: _priceMatrixFilter == 'promo',
                   onSelected: (_) => setState(() => _priceMatrixFilter = 'promo'),
                 ),
@@ -1303,7 +1308,23 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Row(
+              InkWell(
+                key: const ValueKey('branch_chart_header'),
+                borderRadius: M3Shape.radiusMd,
+                onTap: () => setState(
+                    () => _branchChartExpanded = !_branchChartExpanded),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _branchChartExpanded
+                          ? AppIcons.expandLess
+                          : AppIcons.expandMore,
+                      key: const ValueKey('branch_chart_expand_chevron'),
+                      size: 24.0,
+                    ),
+                    const SizedBox(width: 6.0),
+                    Flexible(child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
@@ -1352,6 +1373,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                     ),
                   ),
                 ],
+              )),
+                  ],
+                ),
               ),
 
               // Controls: Chain Selector + Year Switcher (2026 Default, 2025) + Sort & View Mode
@@ -1435,21 +1459,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                     ),
                   ),
 
-                  // View Mode Toggle (Vertical Columns vs Horizontal Ranked Bars)
-                  IconButton.outlined(
-                    key: const ValueKey('branch_chart_layout_toggle'),
-                    tooltip: _chartHorizontalMode
-                        ? 'عرض كأعمدة رأسية بالعرض الكامل'
-                        : 'عرض كأشرطة أفقية تفصيلية',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () {
-                      setState(() => _chartHorizontalMode = !_chartHorizontalMode);
-                    },
-                    icon: Icon(
-                      _chartHorizontalMode ? Icons.bar_chart_rounded : Icons.align_horizontal_left_rounded,
-                      size: 18.0,
-                    ),
-                  ),
+                  
                 ],
               ),
             ],
@@ -1458,7 +1468,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
           const SizedBox(height: 14.0),
 
           // 2. Quick Executive Branch Highlights Strip (4 Single-Line Cards on One Row + Theme-Derived Palette)
-          if (rawBranches.isNotEmpty) ...[
+          if (_branchChartExpanded && rawBranches.isNotEmpty) ...[
             LayoutBuilder(
               builder: (context, badgeConstraints) {
                 // First 3 cards derive their color directly from the unified Theme primary color
@@ -1564,7 +1574,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
           ],
 
           // 3. All Branches Visual Chart Area (Split Across Two Rows for Maximum Clarity & Breathing Room)
-          if (rawBranches.isEmpty)
+          if (!_branchChartExpanded)
+            const SizedBox.shrink()
+          else if (rawBranches.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 28.0),
               child: Center(
@@ -1576,7 +1588,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                 ),
               ),
             )
-          else if (_chartHorizontalMode)
+          else
             // Horizontal Ranked Bars View (All Branches)
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 420.0),
@@ -1670,17 +1682,27 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                               style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontSize: M3FontSize.labelSmallPlus,                                 fontWeight: FontWeight.w700,                                 color: colorScheme.onSurfaceVariant,                               )),
                             ),
                           ),
-                          if (branchYoY != null) ...[
-                            const SizedBox(width: 8.0),
-                            SizedBox(
-                              width: 64.0,
-                              child: Text(
-                                '${branchYoY >= 0 ? "+" : ""}${branchYoY.toStringAsFixed(0)}%',
-                                textAlign: TextAlign.end,
-                                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                   fontSize: M3FontSize.labelSmall,                                   fontWeight: FontWeight.w800,                                   color: branchYoY >= 0 ? colorScheme.primary : colorScheme.error,                                 )),
-                              ),
-                            ),
-                          ],
+                          const SizedBox(width: 8.0),
+                          SizedBox(
+                            key: ValueKey('branch_growth_slot_${b.rank}'),
+                            width: 64.0,
+                            child: branchYoY == null
+                                ? const SizedBox.shrink()
+                                : Text(
+                                    '${branchYoY >= 0 ? "+" : ""}${branchYoY.toStringAsFixed(0)}%',
+                                    textAlign: TextAlign.end,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium!
+                                        .merge(TextStyle(
+                                          fontSize: M3FontSize.labelSmall,
+                                          fontWeight: FontWeight.w800,
+                                          color: branchYoY >= 0
+                                              ? colorScheme.primary
+                                              : colorScheme.error,
+                                        )),
+                                  ),
+                          ),
                         ],
                       ),
                     ),
@@ -1688,245 +1710,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                 },
               ),
             )
-          else
-            // Two-Row Full-Width Vertical Columns Chart for All Chain Branches
-            LayoutBuilder(
-              builder: (context, chartConstraints) {
-                final int totalCount = rawBranches.length;
-                final bool useTwoRows = totalCount > 12;
-                final int firstRowCount = useTwoRows ? (totalCount / 2).ceil() : totalCount;
-                final List<StoreBenchmarkItem> row1Branches = rawBranches.take(firstRowCount).toList();
-                final List<StoreBenchmarkItem> row2Branches =
-                    useTwoRows ? rawBranches.skip(firstRowCount).toList() : const [];
-
-                const double minColWidth = 54.0;
-                final double neededWidth = firstRowCount * minColWidth;
-                final double canvasWidth = math.max(chartConstraints.maxWidth, neededWidth);
-                final double colWidth = canvasWidth / firstRowCount;
-
-                Widget buildBranchRow(
-                  List<StoreBenchmarkItem> rowItems, {
-                  required String rowLabelAr,
-                  required int targetSlots,
-                }) {
-                  final double rowMaxRev = rowItems.isNotEmpty
-                      ? rowItems.map((b) => b.totalRevenue).reduce(math.max)
-                      : maxBranchRev;
-                  // Blend global scale and row scale so Row 2 bars are also clearly legible while preserving rank hierarchy
-                  final double effectiveScaleMax = (rowMaxRev < maxBranchRev * 0.35 && rowMaxRev > 0)
-                      ? rowMaxRev * 1.35
-                      : maxBranchRev;
-
-                  final int emptySlots = math.max(0, targetSlots - rowItems.length);
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 7.0,
-                              height: 7.0,
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6.0),
-                            Text(
-                              rowLabelAr,
-                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontSize: M3FontSize.labelSmall,                                 fontWeight: FontWeight.w800,                                 color: colorScheme.onSurfaceVariant,                               )),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(
-                        height: 222.0,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            ...rowItems.map((b) {
-                              final ratio = effectiveScaleMax > 0
-                                  ? (b.totalRevenue / effectiveScaleMax).clamp(0.08, 1.0)
-                                  : 0.08;
-                              final barHeight = 112.0 * ratio;
-                              final sharePct = totalChainRev > 0
-                                  ? (b.totalRevenue / totalChainRev) * 100.0
-                                  : 0.0;
-                              final prevItem =
-                                  _prevYearBranchMap[b.storeId.isNotEmpty ? b.storeId : b.storeName];
-                              final double? branchYoY =
-                                  (prevItem != null && prevItem.totalRevenue > 0 && _selectedYear > 0)
-                                      ? ((b.totalRevenue - prevItem.totalRevenue) /
-                                              prevItem.totalRevenue) *
-                                          100.0
-                                      : null;
-                              final isSelected = selectedStoreId != null &&
-                                  (selectedStoreId == b.storeId || selectedStoreId == b.storeName);
-
-                              // Unified Theme-derived bar color palette
-                              final Color barColor = b.rank <= 3
-                                  ? colorScheme.primary
-                                  : (b.totalRevenue >= avgBranchRev
-                                      ? Color.lerp(colorScheme.primary, colorScheme.secondary, 0.28)!
-                                      : Color.lerp(colorScheme.primary, colorScheme.secondary, 0.58)!);
-
-                              final shortName = _shortenBranchName(b.storeName);
-
-                              return Expanded(
-                                child: Tooltip(
-                                  message:
-                                      'الترتيب #${b.rank}: ${b.storeName}\nصافي المبيعات: ${CurrencyFormatter.formatEGP(b.totalRevenue)} (${sharePct.toStringAsFixed(1)}%)\nالكمية المباعة: ${CurrencyFormatter.formatNumber(b.totalUnits)} قطعة${branchYoY != null ? "\nمقارنة بـ $compYear: ${branchYoY >= 0 ? "+" : ""}${branchYoY.toStringAsFixed(1)}% (${CurrencyFormatter.formatCompactEGP(prevItem!.totalRevenue)})" : ""}',
-                                  child: InkWell(
-                                    borderRadius: M3Shape.radiusSm,
-                                    onTap: () {
-                                      setState(() {
-                                        selectedStoreId = isSelected
-                                            ? null
-                                            : (b.storeId.isNotEmpty ? b.storeId : b.storeName);
-                                      });
-                                      _loadRecords();
-                                    },
-                                    child: Container(
-                                      margin: const EdgeInsets.symmetric(horizontal: 2.0),
-                                      padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 4.0),
-                                      decoration: BoxDecoration(
-                                        color: isSelected
-                                            ? colorScheme.primaryContainer.withOpacity(0.45)
-                                            : Colors.transparent,
-                                        borderRadius: M3Shape.radiusSm,
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.end,
-                                        children: [
-                                          // Rank Badge
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 1.0),
-                                            decoration: BoxDecoration(
-                                              color: b.rank <= 3
-                                                  ? colorScheme.primaryContainer
-                                                  : colorScheme.surfaceContainerHighest.withOpacity(0.6),
-                                              borderRadius: M3Shape.radiusFull,
-                                            ),
-                                            child: Text(
-                                              '#${b.rank}',
-                                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                                 fontSize: M3FontSize.microPlus,                                                 fontWeight: FontWeight.w900,                                                 color: b.rank <= 3                                                     ? colorScheme.primary                                                     : colorScheme.onSurfaceVariant,                                               )),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2.0),
-                                          // Compact Revenue Label above Bar
-                                          Text(
-                                            CurrencyFormatter.formatCompactEGP(b.totalRevenue)
-                                                .replaceAll(' ج.م', ''),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.clip,
-                                            style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                               fontSize: M3FontSize.tinyPlus,                                               fontWeight: FontWeight.w900,                                               color: barColor,                                             )),
-                                          ),
-                                          const SizedBox(height: 4.0),
-                                          // Animated Vertical Bar
-                                          AnimatedContainer(
-                                            duration: const Duration(milliseconds: 280),
-                                            height: barHeight,
-                                            width: (colWidth * 0.54).clamp(18.0, 38.0),
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                begin: Alignment.topCenter,
-                                                end: Alignment.bottomCenter,
-                                                colors: [
-                                                  barColor,
-                                                  barColor.withOpacity(0.68),
-                                                ],
-                                              ),
-                                              borderRadius: const BorderRadius.vertical(
-                                                top: Radius.circular(7.0),
-                                              ),
-                                              border: isSelected
-                                                  ? Border.all(
-                                                      color: colorScheme.onSurface,
-                                                      width: 2.0,
-                                                    )
-                                                  : null,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 6.0),
-                                          // Branch Short Name Label (2 lines horizontal when wide, or clean rotated)
-                                          SizedBox(
-                                            height: 44.0,
-                                            child: Center(
-                                              child: Text(
-                                                shortName,
-                                                textAlign: TextAlign.center,
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                                   fontSize: M3FontSize.tinyPlus,                                                   height: 1.15,                                                   fontWeight: isSelected || b.rank <= 3                                                       ? FontWeight.w900                                                       : FontWeight.w700,                                                   color: isSelected                                                       ? colorScheme.primary                                                       : colorScheme.onSurface,                                                 )),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }),
-                            for (int s = 0; s < emptySlots; s++) const Expanded(child: SizedBox.shrink()),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                }
-
-                return Scrollbar(
-                  controller: _branchChartScrollController,
-                  thumbVisibility: canvasWidth > chartConstraints.maxWidth,
-                  child: SingleChildScrollView(
-                    controller: _branchChartScrollController,
-                    scrollDirection: Axis.horizontal,
-                    child: Container(
-                      width: canvasWidth,
-                      padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 6.0),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerLowest,
-                        borderRadius: M3Shape.radiusMd,
-                        border: Border.all(
-                          color: colorScheme.outlineVariant.withOpacity(0.4),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          buildBranchRow(
-                            row1Branches,
-                            rowLabelAr: useTwoRows
-                                ? 'الصف الأول: الفروع الأعلى مبيعاً (من #${row1Branches.first.rank} إلى #${row1Branches.last.rank})'
-                                : 'جميع فروع السلسلة (${row1Branches.length} فرع)',
-                            targetSlots: firstRowCount,
-                          ),
-                          if (row2Branches.isNotEmpty) ...[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-                              child: Divider(
-                                height: 1.0,
-                                color: colorScheme.outlineVariant.withOpacity(0.45),
-                              ),
-                            ),
-                            buildBranchRow(
-                              row2Branches,
-                              rowLabelAr:
-                                  'الصف الثاني: باقي فروع السلسلة (من #${row2Branches.first.rank} إلى #${row2Branches.last.rank})',
-                              targetSlots: firstRowCount,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
+          
         ],
       ),
     );
@@ -2312,7 +2096,7 @@ label: 'السنة (Year)',
 leadingIcon: Icons.calendar_today_rounded,
 expand: true,
 options: m3OptionsFromMenuItems<int>([
-                        const DropdownMenuItem(value: 2026, child: Text('2026 (Default)')),
+                        const DropdownMenuItem(value: 2026, child: Text('2026')),
                         const DropdownMenuItem(value: 2025, child: Text('2025')),
                         const DropdownMenuItem(value: 2024, child: Text('2024')),
                         const DropdownMenuItem(value: 0, child: Text('كل السنوات (All)')),
@@ -2696,18 +2480,21 @@ onChanged: m3Legacy<String>((v) {
                           onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'all'),
                         ),
                         ChoiceChip(
-                          label: Text('فروع صاعدة 📈 ($growingBranchesCount)'),
+                          avatar: Icon(AppIcons.trendingUp, size: 18.0),
+                  label: Text('فروع صاعدة ($growingBranchesCount)'),
                           selected: _perfGrowthStatusFilter == 'growing',
                           onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'growing'),
                         ),
                         ChoiceChip(
-                          label: Text('تحتاج تنشيط 📉 ($decliningBranchesCount)'),
+                          avatar: Icon(AppIcons.trendingDown, size: 18.0),
+                  label: Text('تحتاج تنشيط ($decliningBranchesCount)'),
                           selected: _perfGrowthStatusFilter == 'declining',
                           onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'declining'),
                         ),
                         if (newBranchesCount > 0)
                           ChoiceChip(
-                            label: Text('فروع جديدة ✨ ($newBranchesCount)'),
+                            avatar: Icon(AppIcons.newItem, size: 18.0),
+                  label: Text('فروع جديدة ($newBranchesCount)'),
                             selected: _perfGrowthStatusFilter == 'new_branch',
                             onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'new_branch'),
                           ),
@@ -2843,18 +2630,18 @@ onChanged: m3Legacy<String>((v) {
                     if (item.status == 'new_branch') {
                       statusBg = colorScheme.tertiaryContainer.withOpacity(0.7);
                       statusFg = colorScheme.onTertiaryContainer;
-                      statusLabel = 'فرع جديد ✨';
-                      statusIcon = Icons.fiber_new_rounded;
+                      statusLabel = 'فرع جديد';
+                      statusIcon = AppIcons.newItem;
                     } else if (item.status == 'growing') {
                       statusBg = colorScheme.primaryContainer.withOpacity(0.75);
                       statusFg = colorScheme.onPrimaryContainer;
-                      statusLabel = (yoyPct ?? 0) >= 15.0 ? 'نمو قوي 🚀' : 'نمو إيجابي 📈';
-                      statusIcon = Icons.trending_up_rounded;
+                      statusLabel = (yoyPct ?? 0) >= 15.0 ? 'نمو قوي' : 'نمو إيجابي';
+                      statusIcon = AppIcons.trendingUp;
                     } else {
                       statusBg = colorScheme.errorContainer.withOpacity(0.65);
                       statusFg = colorScheme.onErrorContainer;
-                      statusLabel = 'يحتاج تنشيط 📉';
-                      statusIcon = Icons.trending_down_rounded;
+                      statusLabel = 'يحتاج تنشيط';
+                      statusIcon = AppIcons.trendingDown;
                     }
 
                     return DataRow(
@@ -3390,52 +3177,41 @@ onChanged: m3Legacy<int>((v) {
     Widget card3,
     Widget card4,
   ) {
-    if (maxWidth >= 960) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: card1),
-          const SizedBox(width: 12.0),
-          Expanded(child: card2),
-          const SizedBox(width: 12.0),
-          Expanded(child: card3),
-          const SizedBox(width: 12.0),
-          Expanded(child: card4),
-        ],
+    Widget row(List<Widget> cards) {
+      final children = <Widget>[];
+      for (var k = 0; k < cards.length; k++) {
+        if (k > 0) children.add(const SizedBox(width: 12.0));
+        children.add(Expanded(flex: 1, child: cards[k]));
+      }
+      return IntrinsicHeight(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
       );
+    }
+
+    if (maxWidth >= 960) {
+      return KeyedSubtree(key: const ValueKey('kpi_cards_row'), child: row([card1, card2, card3, card4]));
     } else if (maxWidth >= 580) {
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(child: card1),
-              const SizedBox(width: 12.0),
-              Expanded(child: card2),
-            ],
-          ),
+          row([card1, card2]),
           const SizedBox(height: 12.0),
-          Row(
-            children: [
-              Expanded(child: card3),
-              const SizedBox(width: 12.0),
-              Expanded(child: card4),
-            ],
-          ),
-        ],
-      );
-    } else {
-      return Column(
-        children: [
-          card1,
-          const SizedBox(height: 12.0),
-          card2,
-          const SizedBox(height: 12.0),
-          card3,
-          const SizedBox(height: 12.0),
-          card4,
+          row([card3, card4]),
         ],
       );
     }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        card1,
+        const SizedBox(height: 12.0),
+        card2,
+        const SizedBox(height: 12.0),
+        card3,
+        const SizedBox(height: 12.0),
+        card4,
+      ],
+    );
   }
 
   Widget _buildSummaryCard(
@@ -3450,6 +3226,7 @@ onChanged: m3Legacy<int>((v) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Container(
+      key: ValueKey('kpi_card_$titleEn'),
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
@@ -3479,6 +3256,8 @@ onChanged: m3Legacy<int>((v) {
                   children: [
                     Text(
                       titleAr,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: colorScheme.onSurface,
@@ -3487,6 +3266,8 @@ onChanged: m3Legacy<int>((v) {
                     const SizedBox(height: 1.0),
                     Text(
                       titleEn,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
@@ -3501,6 +3282,8 @@ onChanged: m3Legacy<int>((v) {
           const SizedBox(height: 12.0),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w900,
               color: colorScheme.onSurface,
@@ -3509,6 +3292,8 @@ onChanged: m3Legacy<int>((v) {
           const SizedBox(height: 6.0),
           Text(
             subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),

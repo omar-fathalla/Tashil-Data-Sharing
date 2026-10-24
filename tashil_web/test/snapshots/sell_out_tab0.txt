@@ -1,103 +1,11 @@
-#1 | 9.5 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-#1 | 9.5 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-#10 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#10 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#11 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#11 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#12 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#12 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#13 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#13 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#14 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#14 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#15 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#15 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#16 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#16 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#17 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#17 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#18 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#18 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#19 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#19 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#2 | 9.5 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-#2 | 9.5 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-#20 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#20 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#21 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#21 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#22 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#22 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#23 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#23 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#24 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#24 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#25 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#25 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#26 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#26 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#27 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#27 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#28 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#28 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#29 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#29 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#3 | 9.5 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-#3 | 9.5 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-#30 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#30 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#31 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#31 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#32 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#32 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#33 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#33 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#34 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#34 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#4 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#4 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#5 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#5 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#6 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#6 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#7 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#7 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#8 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#8 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#9 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
-#9 | 9.5 | FontWeight.w900 | ff45464f | 0.25 | 1.43
 1,455 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 1,455 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-1.05M | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-1.05M | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-1.12M | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-1.12M | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-1.18M ج.م | 11.0 | FontWeight.w900 | ff365fa4 | 0.25 | 1.43
-1.18M ج.م | 11.0 | FontWeight.w900 | ff365fa4 | 0.25 | 1.43
-1.20M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.20M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.28M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.28M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.39M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.39M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.49M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.49M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.60M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.60M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.71M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.71M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.84M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.84M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.98M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-1.98M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
 10 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 10 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 10 صنف نشط | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 10 صنف نشط | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 105,921 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 105,921 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-114.2K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-114.2K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
 115.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 115.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 120 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
@@ -116,22 +24,16 @@
 159.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 16 فرع | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 16 فرع | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
-168.4K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-168.4K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
 18,000 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 18,000 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 180 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 180 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-2.15M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-2.15M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-2.39M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-2.39M | 10.5 | FontWeight.w900 | ff2863aa | 0.25 | 1.43
-2.74M | 10.5 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-2.74M | 10.5 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-2.99M | 10.5 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-2.99M | 10.5 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-2.99M ج.م (7.4%) | 11.0 | FontWeight.w900 | ff2663ac | 0.25 | 1.43
-2.99M ج.م (7.4%) | 11.0 | FontWeight.w900 | ff2663ac | 0.25 | 1.43
+2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2026-01-31 | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 2026-01-31 | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 2026-01-31 | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
@@ -152,8 +54,6 @@
 2026-03-07 | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 2026-03-07 | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 2026-03-07 | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-218.5K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-218.5K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
 22,500 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 22,500 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 23,400 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
@@ -164,76 +64,38 @@
 25.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 250 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 250 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-264.2K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-264.2K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
 300 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 300 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-308.4K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-308.4K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-354.6K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-354.6K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
 362 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 362 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-38.9K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-38.9K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-38.9K ج.م (0.1%) | 11.0 | FontWeight.w900 | ff585e71 | 0.25 | 1.43
-38.9K ج.م (0.1%) | 11.0 | FontWeight.w900 | ff585e71 | 0.25 | 1.43
 40.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 40.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-402.1K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-402.1K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-452.8K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-452.8K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
 498 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 498 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 50 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 50 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-504.2K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-504.2K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-52.4K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-52.4K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
 55,607 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 55,607 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-558.9K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-558.9K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
 567 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 567 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 6,000 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 6,000 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 6,247 | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 6,247 | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
-6.33M | 10.5 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-6.33M | 10.5 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-6.33M ج.م (15.7%) | 11.0 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-6.33M ج.م (15.7%) | 11.0 | FontWeight.w900 | ff1565c0 | 0.25 | 1.43
-612.4K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-612.4K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
 623 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 623 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 65,175 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 65,175 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-668.5K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-668.5K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
 7,500 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 7,500 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 720.9K ج.م | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 720.9K ج.م | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
-724.1K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-724.1K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
 73.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 73.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 74,417 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 74,417 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-782.4K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-782.4K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-845.6K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-845.6K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
 90.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 90.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-912.5K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-912.5K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-984.2K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
-984.2K | 10.5 | FontWeight.w900 | ff3c6192 | 0.25 | 1.43
 99,043 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 99,043 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 Active SKUs & Branch Velocity | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
@@ -362,28 +224,16 @@ Upload Sell-Out | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
 Upload Sell-Out | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
 Uploaded Sheets (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 Uploaded Sheets (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Year: 2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Year: 2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Year: 2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Year: 2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Year: 2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Year: 2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 أسواق فتح الله (Fathalla Market) • سنة 2026 • 34 فرع • إجمالي السلسلة: 40.23M ج.م (+26.1% عن 2025) | 11.0 | FontWeight.w600 | d945464f | 0.4 | 1.33
 أسواق فتح الله (Fathalla Market) • سنة 2026 • 34 فرع • إجمالي السلسلة: 40.23M ج.م (+26.1% عن 2025) | 11.0 | FontWeight.w600 | d945464f | 0.4 | 1.33
 أسواق فتح الله (Fathalla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 أسواق فتح الله (Fathalla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-أكتوبر | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-أكتوبر | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-أمواج - الساحل الشمالي | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-أمواج - الساحل الشمالي | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
 إجمالي الفروع النشطة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 إجمالي الفروع النشطة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 إجمالي الكمية المباعة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 إجمالي الكمية المباعة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 إجمالي صافي المبيعات | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 إجمالي صافي المبيعات | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
-ابو يوسف | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-ابو يوسف | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
 ادوات نظافة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 ادوات نظافة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 اقراص غسالات اطباق | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -393,36 +243,9 @@ Year: 2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 الأعلى للأقل | 11.5 | FontWeight.w800 | ff1565c0 | 0.1 | null
 الأعلى للأقل | 11.5 | FontWeight.w800 | ff1565c0 | 0.1 | null
 الأعلى للأقل | 11.5 | FontWeight.w800 | ff1565c0 | 0.1 | null
-الأعلى مبيعاً (#1): مدينة الرحاب | 11.5 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-الأعلى مبيعاً (#1): مدينة الرحاب | 11.5 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-الأعلى مبيعاً (#1): مدينة الرحاب | 11.5 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-الأقل مبيعاً (#34): نيس2 | 11.5 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-الأقل مبيعاً (#34): نيس2 | 11.5 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-الأقل مبيعاً (#34): نيس2 | 11.5 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-الأنفوشي | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-الأنفوشي | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-الإبراهيمية | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-الإبراهيمية | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-الإبراهيمية ميني | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-الإبراهيمية ميني | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-الدخيلة مينى 2 | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-الدخيلة مينى 2 | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-الدخيلة ميني | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-الدخيلة ميني | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-الصف الأول: الفروع الأعلى مبيعاً (من #1 إلى #17) | 11.0 | FontWeight.w800 | ff45464f | 0.25 | 1.43
-الصف الأول: الفروع الأعلى مبيعاً (من #1 إلى #17) | 11.0 | FontWeight.w800 | ff45464f | 0.25 | 1.43
-الصف الثاني: باقي فروع السلسلة (من #18 إلى #34) | 11.0 | FontWeight.w800 | ff45464f | 0.25 | 1.43
-الصف الثاني: باقي فروع السلسلة (من #18 إلى #34) | 11.0 | FontWeight.w800 | ff45464f | 0.25 | 1.43
 الكل | 12.0 | FontWeight.w800 | ff1a1b21 | null | null
 الكل | 12.0 | FontWeight.w800 | ff1a1b21 | null | null
 الكل | 12.0 | FontWeight.w800 | ff1a1b21 | null | null
-المحلة الكبرى | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-المحلة الكبرى | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-المركز الثاني (#2): سموحة | 11.5 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-المركز الثاني (#2): سموحة | 11.5 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-المركز الثاني (#2): سموحة | 11.5 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-النصر | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-النصر | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
 بيت الجملة (Beet El-Gomla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 بيت الجملة (Beet El-Gomla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 بيت الجملة - التجمع الخامس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -431,8 +254,6 @@ Year: 2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 بيت الجملة - المهندسين | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 بيت الجملة - مدينة نصر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 بيت الجملة - مدينة نصر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-جاردينيا | 10.5 | FontWeight.w900 | ff1a1b21 | 0.25 | 1.15
-جاردينيا | 10.5 | FontWeight.w900 | ff1a1b21 | 0.25 | 1.15
 جل غسيل اطباق | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 جل غسيل اطباق | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 جملة ماركت (Gomla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -445,46 +266,28 @@ Year: 2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 جملة ماركت - مدينة نصر | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 جملة ماركت - مدينة نصر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 جملة ماركت - مدينة نصر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-دمنهور - الاستاد | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-دمنهور - الاستاد | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-دمنهور الأندلس | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-دمنهور الأندلس | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-دمياط الجديدة | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-دمياط الجديدة | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
 ديتول ومطهرات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 ديتول ومطهرات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 ديفا هاند ووش500مل بامب + لتر هديه توت برى | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 ديفا هاند ووش500مل بامب + لتر هديه توت برى | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-روزانا | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-روزانا | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
 سبينيس (Spinneys) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 سبينيس (Spinneys) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 سبينيس - مول العرب | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 سبينيس - مول العرب | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 سبينيس - مول العرب | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 سبينيس - مول العرب | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-ستانلى | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-ستانلى | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-سموحة | 10.5 | FontWeight.w900 | ff1a1b21 | 0.25 | 1.15
-سموحة | 10.5 | FontWeight.w900 | ff1a1b21 | 0.25 | 1.15
-سموحة ميني | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-سموحة ميني | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
 سنة 2025 | 12.0 | FontWeight.w800 | ff1a1b21 | null | null
 سنة 2025 | 12.0 | FontWeight.w800 | ff1a1b21 | null | null
 سنة 2025 | 12.0 | FontWeight.w800 | ff1a1b21 | null | null
+سنة 2026 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+سنة 2026 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+سنة 2026 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+سنة 2026 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 سنة 2026 | 12.0 | FontWeight.w800 | ffffffff | null | null
 سنة 2026 | 12.0 | FontWeight.w800 | ffffffff | null | null
 سنة 2026 | 12.0 | FontWeight.w800 | ffffffff | null | null
-سنة 2026 • 16 حركة بيع فعلية (2026-01-31 -> 2026-03-07) • نمو -97.7% عن 2025 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-سنة 2026 • 16 حركة بيع فعلية (2026-01-31 -> 2026-03-07) • نمو -97.7% عن 2025 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-سيتي سكوير | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-سيتي سكوير | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-سيدي بشر ميني | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-سيدي بشر ميني | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-سيدي جابر المحطة | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-سيدي جابر المحطة | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-سيدي جابر ميني | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-سيدي جابر ميني | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
+سنة 2026 • نمو -97.7% عن 2025 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+سنة 2026 • نمو -97.7% عن 2025 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 شارت ترتيب مبيعات فروع السلسلة من الأعلى للأقل | 15.0 | FontWeight.w900 | ff1a1b21 | 0.15 | 1.2
 شارت ترتيب مبيعات فروع السلسلة من الأعلى للأقل | 15.0 | FontWeight.w900 | ff1a1b21 | 0.15 | 1.2
 شامبو وبلسم | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -497,14 +300,6 @@ Year: 2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 صابون قطع | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 صابون وجه | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 صابون وجه | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-طنطا - اوت ليت مول | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-طنطا - اوت ليت مول | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-طنطا | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-طنطا | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-طوسون | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-طوسون | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-عجمي ستار | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-عجمي ستار | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
 فتح الله - ستانلي | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 فتح الله - ستانلي | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 فتح الله جملة ماركت - سموحة | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
@@ -583,8 +378,6 @@ Year: 2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 فرع فتح الله - نيس2 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 فرع فتح الله - هانوفيل (نهال فيل) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 فرع فتح الله - هانوفيل (نهال فيل) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-فلمنج | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-فلمنج | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
 فيبا 3 كجم 1 روائح عاديه + 1 روائح مميزه | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 فيبا 3 كجم 1 روائح عاديه + 1 روائح مميزه | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 فيبا 3 كجم 1 روائح عاديه + 1 روائح مميزه | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
@@ -601,8 +394,6 @@ Year: 2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 قطاع المستشفيات والشركات - التوريدات الطبية | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 قطاع الوزارات والهيئات - التوريد المركزي | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 قطاع الوزارات والهيئات - التوريد المركزي | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-قطعة / وحدة مباعة للمستهلك • سنة 2026 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-قطعة / وحدة مباعة للمستهلك • سنة 2026 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 كارفور (Carrefour) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كارفور (Carrefour) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كارفور المعادي سيتي سنتر | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
@@ -615,27 +406,16 @@ Year: 2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كارفور داندي مول | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كارفور سيتي ستارز | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كارفور سيتي ستارز | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-كفر الدوار - مول | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-كفر الدوار - مول | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-كفر الدوار | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-كفر الدوار | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
 كل السلاسل (All Chains) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كل السلاسل (All Chains) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كلور ابيض و الوان | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كلور ابيض و الوان | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-متوسط الفرع: 34 فرع نشط | 11.5 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-متوسط الفرع: 34 فرع نشط | 11.5 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-متوسط الفرع: 34 فرع نشط | 11.5 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-متوسط الفرع: 45.1K ج.م • الأعلى: كارفور المعادي سيتي سنتر | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-متوسط الفرع: 45.1K ج.م • الأعلى: كارفور المعادي سيتي سنتر | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-مدينة الرحاب | 10.5 | FontWeight.w900 | ff1a1b21 | 0.25 | 1.15
-مدينة الرحاب | 10.5 | FontWeight.w900 | ff1a1b21 | 0.25 | 1.15
+متوسط الفرع: 45.1K ج.م | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+متوسط الفرع: 45.1K ج.م | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 مساحيق جيل اوتوماتيك | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 مساحيق جيل اوتوماتيك | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 مسحوق اوتوماتيك | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 مسحوق اوتوماتيك | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-مطروح | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-مطروح | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
 مطهر عام | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 مطهر عام | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 معجون اسنان | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -646,8 +426,6 @@ Year: 2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 معطر جو | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 معقم ومطهر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 معقم ومطهر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-ملك حفنى | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-ملك حفنى | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
 ملمع اثاث | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 ملمع اثاث | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 ملمع زجاج | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -669,14 +447,8 @@ Year: 2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 منظومة مبيعات التجزئة (Sell-Out)، تحليلات باريتو وأداء الفروع، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
 منعمات ملابس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 منعمات ملابس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-موزعة على السلاسل التجارية • سنة 2026 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-موزعة على السلاسل التجارية • سنة 2026 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-نيس2 | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-نيس2 | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
 هاند وواش | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 هاند وواش | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-هانوفيل (نهال فيل) | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
-هانوفيل (نهال فيل) | 10.5 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.15
 󰁘 | 20.0 | null | ff1565c0 | null | 1.0
 󰂭 | 20.0 | null | ff404659 | null | 1.0
 󰃀 | 15.0 | null | ffffffff | null | 1.0
@@ -693,18 +465,13 @@ Year: 2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 󰃊 | 13.0 | null | ff45464f | null | 1.0
 󰃌 | 20.0 | null | ff1565c0 | null | 1.0
 󰄽 | 20.0 | null | ff45464f | null | 1.0
-󰅯 | 20.0 | null | ff2963a8 | null | 1.0
 󰇡 | 20.0 | null | ff585e71 | null | 1.0
 󰉈 | 20.0 | null | ff45464f | null | 1.0
-󰉒 | 15.0 | null | ff585e71 | null | 1.0
 󰉒 | 16.0 | null | ff1565c0 | null | 1.0
 󰉪 | 16.0 | null | ffffffff | null | 1.0
 󰌞 | 20.0 | null | ff45464f | null | 1.0
-󰏀 | 15.0 | null | ff2663ac | null | 1.0
 󰛈 | 20.0 | null | dd000000 | null | 1.0
 󰛈 | 20.0 | null | ff45464f | null | 1.0
- | 18.0 | null | ff45464f | null | 1.0
- | 15.0 | null | ff365fa4 | null | 1.0
  | 18.0 | null | ff45464f | null | 1.0
  | 18.0 | null | ff45464f | null | 1.0
  | 18.0 | null | ff45464f | null | 1.0
@@ -717,11 +484,12 @@ Year: 2026 (Default) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
  | 24.0 | null | ff45464f | null | 1.0
  | 24.0 | null | ff45464f | null | 1.0
  | 24.0 | null | ff45464f | null | 1.0
- | 20.0 | null | ff3b5ea0 | null | 1.0
  | 24.0 | null | ff304578 | null | 1.0
+ | 20.0 | null | ff3b5ea0 | null | 1.0
  | 20.0 | null | 611a1b21 | null | 1.0
  | 20.0 | null | ff45464f | null | 1.0
  | 15.0 | null | ff45464f | null | 1.0
- | 15.0 | null | ff1565c0 | null | 1.0
+ | 24.0 | null | dd000000 | null | 1.0
  | 15.0 | null | ff1a1b21 | null | 1.0
  | 20.0 | null | ff45464f | null | 1.0
+ | 20.0 | null | ff2963a8 | null | 1.0

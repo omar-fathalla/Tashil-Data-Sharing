@@ -55,6 +55,8 @@ class AppIcons {
   static const IconData arrowDown = Icons.arrow_downward_rounded;
   static const IconData trendingUp = Icons.trending_up_rounded;
   static const IconData trendingDown = Icons.trending_down_rounded;
+  static const IconData promo = Icons.redeem_rounded;
+  static const IconData newItem = Icons.fiber_new_rounded;
 
   // Dates
   static const IconData calendar = Icons.calendar_month_rounded;
@@ -88,5 +90,7 @@ class AppIcons {
   static const IconData groups = Icons.groups_rounded;
   static const IconData collapseAll = Icons.unfold_less_rounded;
   static const IconData expandAll = Icons.unfold_more_rounded;
+  static const IconData expandMore = Icons.expand_more_rounded;
+  static const IconData expandLess = Icons.expand_less_rounded;
   static const IconData premium = Icons.workspace_premium_rounded;
 }
