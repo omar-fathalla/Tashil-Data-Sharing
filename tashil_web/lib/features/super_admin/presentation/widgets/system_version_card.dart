@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icons.dart';
+import '../../../../core/widgets/m3_card.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../../core/config/app_version.dart';
@@ -61,48 +63,40 @@ class _SystemVersionCardState extends State<SystemVersionCard> {
       MapEntry('Backend revision', b('revision')),
       MapEntry('Backend commit', b('git_commit')),
     ];
-    return Card(
+    return M3Card.outlined(
       key: const ValueKey('system-version-card'),
-      elevation: 0,
-      color: cs.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Icon(Icons.info_outline_rounded, color: cs.primary),
-              const SizedBox(width: 8),
-              Text('System version',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-            ]),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 24,
-              runSpacing: 8,
-              children: [
-                for (final r in rows)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(r.key,
-                          style: theme.textTheme.labelSmall
-                              ?.copyWith(color: cs.onSurfaceVariant)),
-                      SelectableText(r.value,
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-              ],
-            ),
-          ],
-        ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(AppIcons.info, color: cs.primary),
+            const SizedBox(width: 8),
+            Text('System version',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+          ]),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 24,
+            runSpacing: 8,
+            children: [
+              for (final r in rows)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(r.key,
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: cs.onSurfaceVariant)),
+                    SelectableText(r.value,
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

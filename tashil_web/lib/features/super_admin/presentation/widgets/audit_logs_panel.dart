@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icons.dart';
+import '../../../../core/widgets/m3_states.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
@@ -37,7 +40,7 @@ class AuditLogsPanel extends StatefulWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: Align(
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   child: M3ActionButtonGroup(
                     compact: true,
                     actions: [
@@ -158,7 +161,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.7)),
       ),
       child: Column(
@@ -183,7 +186,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: cs.primaryContainer,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: M3Shape.radiusSm,
                           ),
                           child: Icon(
                             Icons.policy_rounded,
@@ -222,7 +225,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                     ),
                     decoration: BoxDecoration(
                       color: cs.secondaryContainer.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: M3Shape.radiusSm,
                     ),
                     child: Text(
                       '${filtered.length} Records • 25 / Page',
@@ -307,7 +310,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                     filled: true,
                     fillColor: cs.surfaceContainerLow,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: M3Shape.radiusSm,
                       borderSide: BorderSide(color: cs.outlineVariant),
                     ),
                   ),
@@ -318,24 +321,11 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
           const SizedBox(height: 16),
 
           if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: CircularProgressIndicator()),
-            )
+            const M3LoadingState(message: 'جاري تحميل سجلات التدقيق...')
           else if (filtered.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Text(
-                  'لا توجد سجلات تدقيق مطابقة للفلتر المحدد',
-                  style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                ),
-              ),
+            const M3EmptyState(
+              icon: AppIcons.empty,
+              title: 'لا توجد سجلات تدقيق مطابقة للفلتر المحدد',
             )
           else ...[
             LayoutBuilder(
@@ -479,7 +469,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: cs.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: M3Shape.radiusMd,
                 border: Border.all(
                   color: cs.outlineVariant.withValues(alpha: 0.5),
                 ),
@@ -565,7 +555,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: M3Shape.radiusMd,
         border: Border.all(
           color: cs.outlineVariant.withValues(alpha: 0.45),
         ),
@@ -579,7 +569,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: M3Shape.radiusSm,
                 ),
                 child: Text(
                   '#$rowNumber',
@@ -594,7 +584,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: badge.$3,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: M3Shape.radiusSm,
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -617,7 +607,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                 decoration: BoxDecoration(
                   color: isSuccess ? cs.secondaryContainer : cs.errorContainer,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: M3Shape.radiusSm,
                 ),
                 child: Text(
                   entry.status.toUpperCase(),
@@ -649,7 +639,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: M3Shape.radiusXs,
                 ),
                 child: Text(
                   entry.resource,
@@ -682,7 +672,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
               _buildMetaChip(
                 cs,
                 tt,
-                Icons.badge_outlined,
+                Icons.badge_rounded,
                 TenantUserModel.mapRoleToEnglish(entry.actorRole),
               ),
             ],
@@ -740,7 +730,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: M3Shape.radiusSm,
               ),
               child: Text(
                 '#$rowNumber',
@@ -768,7 +758,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                   ),
                   decoration: BoxDecoration(
                     color: badge.$3,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -799,7 +789,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                     color: isSuccess
                         ? cs.secondaryContainer
                         : cs.errorContainer,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Text(
                     entry.status.toUpperCase(),
@@ -841,7 +831,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                       ),
                       decoration: BoxDecoration(
                         color: cs.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: M3Shape.radiusXs,
                       ),
                       child: Text(
                         entry.resource,
@@ -880,7 +870,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                 _buildMetaChip(
                   cs,
                   tt,
-                  Icons.badge_outlined,
+                  Icons.badge_rounded,
                   TenantUserModel.mapRoleToEnglish(entry.actorRole),
                 ),
               ],
@@ -930,7 +920,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: M3Shape.radiusSm,
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Row(

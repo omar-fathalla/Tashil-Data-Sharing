@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/m3_states.dart';
+import '../../../../core/theme/m3_shape.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
@@ -125,7 +127,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusLg),
         title: Row(
           children: [
             Icon(Icons.warning_amber_rounded, color: theme.colorScheme.error),
@@ -362,7 +364,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.7)),
       ),
       child: Column(
@@ -375,7 +377,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: M3Shape.radiusMd,
                 ),
                 child: Icon(icon, color: accentColor, size: 22),
               ),
@@ -385,7 +387,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: cs.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Text(
                     chipText,
@@ -435,7 +437,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
 
     if (onTap == null) return content;
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: M3Shape.radiusLg,
       onTap: onTap,
       child: content,
     );
@@ -452,7 +454,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.7)),
       ),
       child: Column(
@@ -477,7 +479,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: cs.primaryContainer,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: M3Shape.radiusSm,
                           ),
                           child: Icon(
                             Icons.business_rounded,
@@ -536,7 +538,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                         filled: true,
                         fillColor: cs.surfaceContainerLow,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: M3Shape.radiusSm,
                           borderSide: BorderSide(color: cs.outlineVariant),
                         ),
                       ),
@@ -560,10 +562,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
           const SizedBox(height: 20),
 
           if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: CircularProgressIndicator()),
-            )
+            const M3LoadingState(message: 'جاري تحميل الشركات...')
           else if (filtered.isEmpty)
             _buildEmptyState(cs, theme)
           else
@@ -595,7 +594,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: M3Shape.radiusMd,
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
       ),
       child: Column(
@@ -616,7 +615,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                     height: 48,
                     decoration: BoxDecoration(
                       color: brandColor,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: M3Shape.radiusMd,
                     ),
                     alignment: Alignment.center,
                     child: Text(
@@ -657,7 +656,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                             _buildChip(
                               cs: cs,
                               tt: tt,
-                              icon: Icons.palette_outlined,
+                              icon: Icons.palette_rounded,
                               label: tenant.brandSeedColor.toUpperCase(),
                               bgColor: cs.surfaceContainerHighest,
                               fgColor: cs.onSurfaceVariant,
@@ -683,7 +682,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                               _buildChip(
                                 cs: cs,
                                 tt: tt,
-                                icon: Icons.storefront_outlined,
+                                icon: Icons.storefront_rounded,
                                 label: 'إدخال السلاسل من بوابة الشركة',
                                 bgColor: cs.secondaryContainer
                                     .withValues(alpha: 0.5),
@@ -694,7 +693,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                                 _buildChip(
                                   cs: cs,
                                   tt: tt,
-                                  icon: Icons.storefront_outlined,
+                                  icon: Icons.storefront_rounded,
                                   label: ApiClient.getRetailChainShortAr(chain),
                                   bgColor: cs.secondaryContainer
                                       .withValues(alpha: 0.65),
@@ -736,7 +735,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                     ),
                     M3ActionItem(
                       label: 'Edit',
-                      icon: Icons.edit_outlined,
+                      icon: Icons.edit_rounded,
                       onPressed: () => _openEditTenantDialog(tenant),
                     ),
                     M3ActionItem(
@@ -761,7 +760,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: cs.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: M3Shape.radiusSm,
               border: Border.all(
                 color: cs.outlineVariant.withValues(alpha: 0.5),
               ),
@@ -806,34 +805,16 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
   }
 
   Widget _buildEmptyState(ColorScheme cs, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(40.0),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14.0),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.business_outlined,
-            size: 44.0,
-            color: cs.onSurfaceVariant,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'لا توجد شركات مطابقة للبحث الحالي',
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 12),
-          M3ActionButtonGroup(
-            actions: [
-              M3ActionItem(
-                label: 'New Company',
-                icon: Icons.add_business_rounded,
-                isPrimary: true,
-                onPressed: _openProvisionWizard,
-              ),
-            ],
+    return M3EmptyState(
+      icon: Icons.business_rounded,
+      title: 'لا توجد شركات مطابقة للبحث الحالي',
+      action: M3ActionButtonGroup(
+        actions: [
+          M3ActionItem(
+            label: 'New Company',
+            icon: Icons.add_business_rounded,
+            isPrimary: true,
+            onPressed: _openProvisionWizard,
           ),
         ],
       ),
@@ -852,7 +833,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: M3Shape.radiusSm,
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Row(
@@ -957,7 +938,7 @@ class _EditTenantDialogState extends State<_EditTenantDialog> {
 
     return Dialog(
       backgroundColor: cs.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.0)),
+      shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusXl),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 580.0),
         child: Padding(
@@ -975,7 +956,7 @@ class _EditTenantDialogState extends State<_EditTenantDialog> {
                         padding: const EdgeInsets.all(10.0),
                         decoration: BoxDecoration(
                           color: currentSeed.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(12.0),
+                          borderRadius: M3Shape.radiusMd,
                         ),
                         child: Icon(
                           Icons.edit_note_rounded,
@@ -1036,7 +1017,7 @@ class _EditTenantDialogState extends State<_EditTenantDialog> {
                     controller: _emailController,
                     decoration: const InputDecoration(
                       labelText: 'البريد الإلكتروني لمسؤول الشركة *',
-                      prefixIcon: Icon(Icons.email_outlined),
+                      prefixIcon: Icon(Icons.email_rounded),
                       border: OutlineInputBorder(),
                     ),
                     validator: (v) => (v == null || !v.contains('@'))
@@ -1073,7 +1054,7 @@ class _EditTenantDialogState extends State<_EditTenantDialog> {
                     padding: const EdgeInsets.all(12.0),
                     decoration: BoxDecoration(
                       color: cs.secondaryContainer.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(10.0),
+                      borderRadius: M3Shape.radiusSm,
                       border: Border.all(
                         color: cs.outlineVariant.withValues(alpha: 0.6),
                       ),
@@ -1100,7 +1081,7 @@ class _EditTenantDialogState extends State<_EditTenantDialog> {
                   ),
                   const SizedBox(height: 24),
                   Align(
-                    alignment: Alignment.centerLeft,
+                    alignment: AlignmentDirectional.centerStart,
                     child: Directionality(
                       textDirection: TextDirection.ltr,
                       child: M3ActionButtonGroup(
@@ -1240,7 +1221,7 @@ class _TenantProvisionWizardDialogState
 
     final size = MediaQuery.sizeOf(context);
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.0)),
+      shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusXl),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: 600.0,
@@ -1279,7 +1260,7 @@ class _TenantProvisionWizardDialogState
                 padding: const EdgeInsets.all(10.0),
                 decoration: BoxDecoration(
                   color: currentSeed.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                 ),
                 child: Icon(
                   Icons.domain_add_rounded,
@@ -1345,7 +1326,7 @@ class _TenantProvisionWizardDialogState
                 const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(8.0),
+              borderRadius: M3Shape.radiusSm,
             ),
             child: Row(
               children: [
@@ -1395,7 +1376,7 @@ class _TenantProvisionWizardDialogState
             padding: const EdgeInsets.all(12.0),
             decoration: BoxDecoration(
               color: colorScheme.secondaryContainer.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(10.0),
+              borderRadius: M3Shape.radiusSm,
               border: Border.all(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.6),
               ),
@@ -1426,7 +1407,7 @@ class _TenantProvisionWizardDialogState
             decoration: const InputDecoration(
               labelText: 'البريد الإلكتروني لمسؤول الشركة *',
               hintText: 'admin@company.com',
-              prefixIcon: Icon(Icons.email_outlined),
+              prefixIcon: Icon(Icons.email_rounded),
               border: OutlineInputBorder(),
             ),
             validator: (v) => (v == null || !v.contains('@'))
@@ -1454,7 +1435,7 @@ class _TenantProvisionWizardDialogState
           ),
           M3Spacing.gapLG,
           Align(
-            alignment: Alignment.centerLeft,
+            alignment: AlignmentDirectional.centerStart,
             child: Directionality(
               textDirection: TextDirection.ltr,
               child: M3ActionButtonGroup(
@@ -1527,7 +1508,7 @@ class _TenantProvisionWizardDialogState
           padding: M3Spacing.pMd,
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(12.0),
+            borderRadius: M3Shape.radiusMd,
             border: Border.all(
               color: colorScheme.outlineVariant.withValues(alpha: 0.5),
             ),
@@ -1563,7 +1544,7 @@ class _TenantProvisionWizardDialogState
         ),
         M3Spacing.gapLG,
         Align(
-          alignment: Alignment.centerLeft,
+          alignment: AlignmentDirectional.centerStart,
           child: M3ActionButtonGroup(
             actions: [
               M3ActionItem(
@@ -1654,7 +1635,7 @@ class _AdminResetPasswordModalState extends State<_AdminResetPasswordModal> {
     final colorScheme = theme.colorScheme;
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusLg),
       title: Row(
         children: [
           Icon(Icons.lock_reset_rounded, color: colorScheme.error),
@@ -1684,7 +1665,7 @@ class _AdminResetPasswordModalState extends State<_AdminResetPasswordModal> {
                 padding: M3Spacing.pMd,
                 decoration: BoxDecoration(
                   color: Colors.green.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10.0),
+                  borderRadius: M3Shape.radiusSm,
                   border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
                 ),
                 child: Row(
