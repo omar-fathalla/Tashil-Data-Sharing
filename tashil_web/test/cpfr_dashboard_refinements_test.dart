@@ -171,8 +171,8 @@ void main() {
     expect(find.text('تحديد السلسلة تلقائياً من الملف (Multi-Chain)'), findsNothing);
 
     // 5. Verify horizontal scroll controller and arrows for monthly reconciliation table
-    expect(find.byTooltip('تمرير الجدول لليمين'), findsOneWidget);
-    expect(find.byTooltip('تمرير الجدول لليسار'), findsOneWidget);
+    expect(find.byTooltip('تمرير الجدول للبداية'), findsOneWidget);
+    expect(find.byTooltip('تمرير الجدول للنهاية'), findsOneWidget);
     expect(find.byType(Scrollbar), findsWidgets);
   });
 

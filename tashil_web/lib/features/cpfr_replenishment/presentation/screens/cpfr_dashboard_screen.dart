@@ -8,6 +8,7 @@ import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
+import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
@@ -1519,10 +1520,12 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Tooltip(
-                          message: 'تمرير الجدول لليمين',
+                          // Scrolls toward the reading start (right in RTL,
+                          // left in LTR); the chevron mirrors automatically.
+                          message: 'تمرير الجدول للبداية',
                           child: IconButton.outlined(
-                            icon: const Icon(Icons.arrow_forward_ios_rounded,
-                                size: 14),
+                            key: const ValueKey('cpfr_scroll_start'),
+                            icon: const Icon(AppIcons.chevronStart, size: 18),
                             onPressed: () {
                               if (_reconciliationTableScrollController
                                   .hasClients) {
@@ -1543,10 +1546,10 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                         ),
                         const SizedBox(width: 8),
                         Tooltip(
-                          message: 'تمرير الجدول لليسار',
+                          message: 'تمرير الجدول للنهاية',
                           child: IconButton.outlined(
-                            icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                                size: 14),
+                            key: const ValueKey('cpfr_scroll_end'),
+                            icon: const Icon(AppIcons.chevronEnd, size: 18),
                             onPressed: () {
                               if (_reconciliationTableScrollController
                                   .hasClients) {

@@ -28,6 +28,11 @@ void main() {
     expect(bad, isEmpty, reason: bad.join('\n'));
   });
 
+  test('no legacy DropdownButtonFormField (use M3Dropdown)', () {
+    final bad = offenders(RegExp(r'\bDropdownButtonFormField\b'));
+    expect(bad, isEmpty, reason: bad.join('\n'));
+  });
+
   test('no raw BorderRadius.circular outside the shape tokens', () {
     final bad = offenders(RegExp(r'BorderRadius\.circular\('))
         .where((l) => !l.startsWith('lib/core/theme/'))
