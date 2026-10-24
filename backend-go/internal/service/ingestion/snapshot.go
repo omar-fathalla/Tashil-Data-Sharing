@@ -1,0 +1,369 @@
+package ingestion
+
+import (
+	"bytes"
+	"compress/gzip"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"log"
+	"os"
+	"path/filepath"
+	"reflect"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+)
+
+// Startup snapshot
+//
+// On boot the server used to re-parse every archived workbook (minutes on
+// GCSFuse). After every successful data change we now also write a gzip'd JSON
+// snapshot of the parsed in-memory dataset to <archive dir>/_snapshot/. On the
+// next boot the snapshot is used only if it was written by the same server
+// binary and the archive, product-master and targets files are byte-for-byte
+// the same set (name, size, mtime) as when it was taken. In every other case
+// (missing, corrupt, stale, different build) the server falls back to the full
+// Excel replay and then writes a fresh snapshot. The archive itself is never
+// modified by this code.
+
+const (
+	// SnapshotSchemaVersion must be bumped whenever the snapshot layout changes.
+	SnapshotSchemaVersion = 1
+	snapshotDirName       = "_snapshot"
+	snapshotFileName      = "state.json.gz"
+	snapshotDebounce      = 5 * time.Second
+)
+
+// SnapshotStore is implemented by repositories whose in-memory state is rebuilt by the archive replay.
+type SnapshotStore interface {
+	ExportSnapshot() ([]byte, error)
+	ImportSnapshot(raw []byte) error
+}
+
+// ManifestEntry describes one input file the in-memory state was derived from.
+type ManifestEntry struct {
+	Path    string `json:"path"`
+	Size    int64  `json:"size"`
+	ModTime int64  `json:"mod_time_unix_nano"`
+}
+
+type snapshotEnvelope struct {
+	SchemaVersion int             `json:"schema_version"`
+	BuildID       string          `json:"build_id"`
+	CreatedAt     time.Time       `json:"created_at"`
+	Manifest      []ManifestEntry `json:"manifest"`
+	BigQuery      json.RawMessage `json:"bigquery"`
+	Firestore     json.RawMessage `json:"firestore"`
+}
+
+type snapshotConfig struct {
+	mu        sync.Mutex // serialises snapshot writes
+	timerMu   sync.Mutex
+	timer     *time.Timer
+	extraDirs []string
+	extraFile []string
+	buildID   string
+	disabled  bool
+}
+
+var (
+	buildIDOnce sync.Once
+	buildIDVal  string
+)
+
+// currentBuildID returns a hash of the running executable so a snapshot is
+// never reused by a server built from different parsing code.
+func currentBuildID() string {
+	buildIDOnce.Do(func() {
+		exe, err := os.Executable()
+		if err != nil {
+			return
+		}
+		f, err := os.Open(exe)
+		if err != nil {
+			return
+		}
+		defer f.Close()
+		h := sha256.New()
+		if _, err := io.Copy(h, f); err != nil {
+			return
+		}
+		buildIDVal = hex.EncodeToString(h.Sum(nil))
+	})
+	return buildIDVal
+}
+
+// WithSnapshotInputs registers extra directories / files (product master, targets,
+// seed workbooks) whose contents feed the in-memory state, so a change to any of
+// them invalidates the snapshot.
+func (p *Processor) WithSnapshotInputs(dirs []string, files []string) *Processor {
+	p.snap.extraDirs = append(p.snap.extraDirs, dirs...)
+	p.snap.extraFile = append(p.snap.extraFile, files...)
+	return p
+}
+
+func (p *Processor) snapshotStores() (SnapshotStore, SnapshotStore, bool) {
+	if p.snap.disabled || p.archiveDir == "" {
+		return nil, nil, false
+	}
+	bq, ok1 := p.bqRepo.(SnapshotStore)
+	fsr, ok2 := p.fsRepo.(SnapshotStore)
+	if !ok1 || !ok2 {
+		return nil, nil, false
+	}
+	return bq, fsr, true
+}
+
+// SnapshotPath is where the startup snapshot lives.
+func (p *Processor) SnapshotPath() string {
+	if p.archiveDir == "" {
+		return ""
+	}
+	return filepath.Join(p.archiveDir, snapshotDirName, snapshotFileName)
+}
+
+func (p *Processor) buildID() string {
+	if p.snap.buildID != "" {
+		return p.snap.buildID
+	}
+	return currentBuildID()
+}
+
+// buildManifest lists every input file (sorted) with size and mtime.
+func (p *Processor) buildManifest() ([]ManifestEntry, error) {
+	var out []ManifestEntry
+	addDir := func(label, root string) error {
+		if root == "" {
+			return nil
+		}
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				if path == root && errors.Is(err, fs.ErrNotExist) {
+					return fs.SkipDir
+				}
+				return err
+			}
+			if d.IsDir() {
+				if d.Name() == snapshotDirName {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			rel, _ := filepath.Rel(root, path)
+			out = append(out, ManifestEntry{Path: label + ":" + filepath.ToSlash(rel), Size: info.Size(), ModTime: info.ModTime().UnixNano()})
+			return nil
+		})
+		if errors.Is(err, fs.SkipDir) {
+			return nil
+		}
+		return err
+	}
+	if err := addDir("archive", p.archiveDir); err != nil {
+		return nil, err
+	}
+	for i, d := range p.snap.extraDirs {
+		if filepath.Clean(d) == filepath.Clean(p.archiveDir) {
+			continue
+		}
+		if err := addDir(fmt.Sprintf("extra%d", i), d); err != nil {
+			return nil, err
+		}
+	}
+	for _, f := range p.snap.extraFile {
+		info, err := os.Stat(f)
+		if err != nil {
+			out = append(out, ManifestEntry{Path: "file:" + f, Size: -1})
+			continue
+		}
+		out = append(out, ManifestEntry{Path: "file:" + f, Size: info.Size(), ModTime: info.ModTime().UnixNano()})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	return out, nil
+}
+
+// WriteSnapshot captures the current in-memory dataset. It refuses to write if
+// an input file changed while the state was being captured.
+func (p *Processor) WriteSnapshot() error {
+	bq, fsr, ok := p.snapshotStores()
+	if !ok {
+		return nil
+	}
+	p.snap.mu.Lock()
+	defer p.snap.mu.Unlock()
+
+	before, err := p.buildManifest()
+	if err != nil {
+		return fmt.Errorf("snapshot manifest: %w", err)
+	}
+	bqRaw, err := bq.ExportSnapshot()
+	if err != nil {
+		return err
+	}
+	fsRaw, err := fsr.ExportSnapshot()
+	if err != nil {
+		return err
+	}
+	after, err := p.buildManifest()
+	if err != nil {
+		return fmt.Errorf("snapshot manifest: %w", err)
+	}
+	if !reflect.DeepEqual(before, after) {
+		return errors.New("snapshot skipped: archive changed while capturing state")
+	}
+	env := snapshotEnvelope{
+		SchemaVersion: SnapshotSchemaVersion,
+		BuildID:       p.buildID(),
+		CreatedAt:     time.Now().UTC(),
+		Manifest:      after,
+		BigQuery:      bqRaw,
+		Firestore:     fsRaw,
+	}
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if err := json.NewEncoder(zw).Encode(&env); err != nil {
+		return fmt.Errorf("snapshot encode: %w", err)
+	}
+	if err := zw.Close(); err != nil {
+		return fmt.Errorf("snapshot gzip: %w", err)
+	}
+
+	target := p.SnapshotPath()
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return fmt.Errorf("snapshot mkdir: %w", err)
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(target), ".state-*.tmp")
+	if err != nil {
+		return fmt.Errorf("snapshot temp: %w", err)
+	}
+	tmpName := tmp.Name()
+	cleanup := func() { _ = os.Remove(tmpName) }
+	if _, err := tmp.Write(buf.Bytes()); err != nil {
+		tmp.Close()
+		cleanup()
+		return fmt.Errorf("snapshot write: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		cleanup()
+		return fmt.Errorf("snapshot sync: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return fmt.Errorf("snapshot close: %w", err)
+	}
+	if err := os.Rename(tmpName, target); err != nil {
+		cleanup()
+		return fmt.Errorf("snapshot rename: %w", err)
+	}
+	log.Printf("[Tashil Snapshot] Wrote %s (%d bytes, %d input files)", target, buf.Len(), len(after))
+	return nil
+}
+
+// ScheduleSnapshot writes a snapshot shortly after the last data change (debounced).
+func (p *Processor) ScheduleSnapshot() {
+	if _, _, ok := p.snapshotStores(); !ok || p.replaying.Load() {
+		return
+	}
+	p.snap.timerMu.Lock()
+	defer p.snap.timerMu.Unlock()
+	if p.snap.timer != nil {
+		p.snap.timer.Stop()
+	}
+	p.snap.timer = time.AfterFunc(snapshotDebounce, func() {
+		if err := p.WriteSnapshot(); err != nil {
+			log.Printf("[Tashil Snapshot] %v", err)
+		}
+	})
+}
+
+// loadSnapshot restores state from the snapshot if it is present, intact and current.
+func (p *Processor) loadSnapshot() error {
+	bq, fsr, ok := p.snapshotStores()
+	if !ok {
+		return errors.New("snapshot not supported")
+	}
+	f, err := os.Open(p.SnapshotPath())
+	if err != nil {
+		return fmt.Errorf("no snapshot: %w", err)
+	}
+	defer f.Close()
+	zr, err := gzip.NewReader(f)
+	if err != nil {
+		return fmt.Errorf("snapshot corrupt: %w", err)
+	}
+	var env snapshotEnvelope
+	if err := json.NewDecoder(zr).Decode(&env); err != nil {
+		return fmt.Errorf("snapshot corrupt: %w", err)
+	}
+	if _, err := io.Copy(io.Discard, zr); err != nil {
+		return fmt.Errorf("snapshot corrupt: %w", err)
+	}
+	if env.SchemaVersion != SnapshotSchemaVersion {
+		return fmt.Errorf("snapshot schema %d != %d", env.SchemaVersion, SnapshotSchemaVersion)
+	}
+	if env.BuildID == "" || env.BuildID != p.buildID() {
+		return errors.New("snapshot was written by a different server build")
+	}
+	current, err := p.buildManifest()
+	if err != nil {
+		return fmt.Errorf("snapshot manifest: %w", err)
+	}
+	if !reflect.DeepEqual(env.Manifest, current) {
+		return fmt.Errorf("snapshot stale: archive files changed (%d in snapshot, %d on disk)", len(env.Manifest), len(current))
+	}
+	if len(env.BigQuery) == 0 || len(env.Firestore) == 0 {
+		return errors.New("snapshot corrupt: missing sections")
+	}
+	if err := fsr.ImportSnapshot(env.Firestore); err != nil {
+		return err
+	}
+	if err := bq.ImportSnapshot(env.BigQuery); err != nil {
+		return err
+	}
+	return nil
+}
+
+// RestoreOrReplay loads the startup snapshot when valid; otherwise it performs
+// the full archive replay and writes a fresh snapshot. It returns which path was used.
+func (p *Processor) RestoreOrReplay(ctx context.Context) (string, error) {
+	start := time.Now()
+	if err := p.loadSnapshot(); err == nil {
+		log.Printf("[Tashil Snapshot] Startup restored from snapshot %s in %s", p.SnapshotPath(), time.Since(start).Round(time.Millisecond))
+		return "snapshot", nil
+	} else {
+		log.Printf("[Tashil Snapshot] Snapshot not used (%v); falling back to full archive replay", err)
+	}
+	// Make sure a partially imported snapshot can never leak into the replayed state.
+	_ = p.bqRepo.ClearTenantData(ctx, "all")
+	_ = p.fsRepo.ClearTenantData(ctx, "all")
+	replayStart := time.Now()
+	err := p.ReplayArchivedFilesToDatabase(ctx)
+	log.Printf("[Tashil Snapshot] Full archive replay took %s", time.Since(replayStart).Round(time.Millisecond))
+	if err == nil {
+		if werr := p.WriteSnapshot(); werr != nil {
+			log.Printf("[Tashil Snapshot] Could not write snapshot after replay: %v", werr)
+		}
+	}
+	return "replay", err
+}
+
+// isSnapshotMutation reports whether a successful request may have changed replayed data.
+func IsSnapshotMutation(method, path string) bool {
+	if method == "GET" || method == "HEAD" || method == "OPTIONS" {
+		return false
+	}
+	return strings.HasPrefix(path, "/api/v1/ingest/") ||
+		strings.HasPrefix(path, "/api/v1/product-master") ||
+		strings.HasPrefix(path, "/api/v1/analytics/targets")
+}

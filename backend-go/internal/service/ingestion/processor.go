@@ -101,6 +101,7 @@ type Processor struct {
 	archivedBytes map[string][]byte
 	sink          bqsink.Sink
 	replaying     atomic.Bool
+	snap          snapshotConfig
 }
 
 // NewProcessor constructs a new ingestion processor.

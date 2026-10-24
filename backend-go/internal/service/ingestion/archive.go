@@ -215,7 +215,7 @@ func (p *Processor) loadDiskArchiveLocked() {
 		return
 	}
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), "_") {
 			continue
 		}
 		indexFile := filepath.Join(p.archiveDir, entry.Name(), "index.json")
