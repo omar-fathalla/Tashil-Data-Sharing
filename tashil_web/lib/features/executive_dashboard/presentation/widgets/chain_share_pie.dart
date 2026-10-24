@@ -116,7 +116,7 @@ class ChainSharePie extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Card(
+    return Card.outlined(
       child: Padding(
         padding: M3Spacing.pMd,
         child: Column(

@@ -221,7 +221,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
     final hasOthers =
         !_showAll && (remainingRevenue > 1000.0 || remainingSharePct > 0.05);
 
-    return Card(
+    return Card.filled(
       key: const ValueKey('supplier_market_share_card'),
       child: Padding(
         padding: M3Spacing.pMd,
@@ -718,6 +718,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                   ClipRRect(
                     borderRadius: M3Shape.radiusSm,
                     child: LinearProgressIndicator(
+year2023: false,
                       value: ratio,
                       minHeight: 8.0,
                       backgroundColor: colorScheme.surfaceContainerHighest,
@@ -913,6 +914,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                     ClipRRect(
                       borderRadius: M3Shape.radiusSm,
                       child: LinearProgressIndicator(
+year2023: false,
                         value: (remainingSharePct / 25.0).clamp(0.02, 1.0),
                         minHeight: 8.0,
                         backgroundColor: colorScheme.surfaceContainerHighest,
@@ -981,7 +983,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
     final hasOtherCategories =
         !_showAll && (remainingCount > 0 || remainingSharePct > 0.1);
 
-    return Card(
+    return Card.outlined(
       key: const ValueKey('category_contribution_card'),
       child: Padding(
         padding: M3Spacing.pMd,
@@ -1334,6 +1336,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                           ClipRRect(
                             borderRadius: M3Shape.radiusSm,
                             child: LinearProgressIndicator(
+year2023: false,
                               value: ratio,
                               minHeight: 8.0,
                               backgroundColor: colorScheme.surfaceContainerHighest,
@@ -1474,6 +1477,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                           ClipRRect(
                             borderRadius: M3Shape.radiusSm,
                             child: LinearProgressIndicator(
+year2023: false,
                               value: (remainingSharePct / 100.0).clamp(0.0, 1.0),
                               minHeight: 8.0,
                               backgroundColor: colorScheme.surfaceContainerHighest,
@@ -1579,7 +1583,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
       skusToDisplay = paretoSkus.take(10).toList();
     }
 
-    return Card(
+    return Card.outlined(
       key: const ValueKey('pareto_80_20_card'),
       child: Padding(
         padding: M3Spacing.pMd,
@@ -1612,12 +1616,27 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 1.0),
-                      Text(
-                        'Pareto 80/20 Power SKUs',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                            'Pareto 80/20 Power SKUs',
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          ),
+                          const SizedBox(width: 6.0),
+                          Badge.count(
+                            key: const ValueKey('pareto_class_a_badge'),
+                            count: paretoSkus.where((s) => s.isTop80Contributor).length,
+                            backgroundColor: colorScheme.primary,
+                            textColor: colorScheme.onPrimary,
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 2.0),
                       Text(
@@ -1697,7 +1716,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8.0),
-                      TextButton(
+                      FilledButton.tonal(
                         onPressed: onClearCategory,
                         child: const Text('Show All'),
                       ),

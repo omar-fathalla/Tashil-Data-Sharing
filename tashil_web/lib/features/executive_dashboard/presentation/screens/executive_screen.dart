@@ -216,25 +216,22 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
       orElse: () => chains.first,
     );
 
-    return PopupMenuButton<String>(
+    return _menuFilter<String>(
       key: const ValueKey('executive_chain_dropdown'),
       tooltip: 'Filter by Retail Chain',
-      initialValue: selectedChain,
-      position: PopupMenuPosition.under,
-      popUpAnimationStyle: M3Motion.menuAnimationStyle,
       onSelected: (chainCode) {
         setState(() => selectedChain = chainCode);
         _loadData();
       },
-      itemBuilder: (context) => chains.map((c) {
+      items: chains.map((c) {
         final isSelected = c.code == selectedChain;
         final chainColor = c.code == 'all'
             ? colorScheme.primary
             : ChainSharePie.colorForChain(c.code);
         final parts = ChainSharePie.splitBilingualLabel(c.fullName);
-        return PopupMenuItem<String>(
-          value: c.code,
-          child: Row(
+        return (
+          c.code,
+          Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (isSelected)
@@ -327,7 +324,32 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
       orElse: () => _months.first,
     );
 
-    return Container(
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // M3 SegmentedButton: the year filter has only a few fixed options.
+        SegmentedButton<int>(
+          key: const ValueKey('executive_year_segmented'),
+          segments: [
+            for (final y in _years)
+              ButtonSegment<int>(value: y, label: Text('$y'), tooltip: 'Year $y'),
+          ],
+          selected: {selectedYear},
+          showSelectedIcon: false,
+          style: ButtonStyle(
+            visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: const WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 6.0)),
+            textStyle: WidgetStatePropertyAll(Theme.of(context).textTheme.labelMedium),
+          ),
+          onSelectionChanged: (s) {
+            setState(() => selectedYear = s.first);
+            _loadData();
+          },
+        ),
+        const SizedBox(width: 8.0),
+        Container(
       height: 38.0,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
@@ -339,95 +361,20 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Year Dropdown Button Segment
-          PopupMenuButton<int>(
-            key: const ValueKey('executive_year_dropdown'),
-            tooltip: 'Select Year',
-            initialValue: selectedYear,
-            position: PopupMenuPosition.under,
-            popUpAnimationStyle: M3Motion.menuAnimationStyle,
-            onSelected: (year) {
-              setState(() => selectedYear = year);
-              _loadData();
-            },
-            itemBuilder: (context) => _years.map((y) {
-              final isSelected = y == selectedYear;
-              return PopupMenuItem<int>(
-                value: y,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isSelected)
-                      Icon(
-                        AppIcons.check,
-                        size: 18.0,
-                        color: colorScheme.primary,
-                      )
-                    else
-                      const SizedBox(width: 18.0),
-                    const SizedBox(width: 10.0),
-                    Text(
-                      y.toString(),
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected
-                            ? colorScheme.primary
-                            : colorScheme.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: isCompact ? 8.0 : 12.0),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(AppIcons.calendarToday, size: 14.0, color: colorScheme.primary),
-                  const SizedBox(width: 5.0),
-                  Text(
-                    'Year: $selectedYear',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(width: 3.0),
-                  Icon(
-                    AppIcons.dropDown,
-                    size: 16.0,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Vertical divider separating Year and Month
-          Container(
-            height: 18.0,
-            width: 1.0,
-            color: colorScheme.outlineVariant.withOpacity(0.8),
-          ),
-
           // Month Dropdown Button Segment
-          PopupMenuButton<int>(
+          _menuFilter<int>(
             key: const ValueKey('executive_month_dropdown'),
             tooltip: 'Select Month',
-            initialValue: selectedMonth,
-            constraints: const BoxConstraints(minWidth: 220.0),
-            position: PopupMenuPosition.under,
-            popUpAnimationStyle: M3Motion.menuAnimationStyle,
+            minWidth: 220.0,
             onSelected: (month) {
               setState(() => selectedMonth = month);
               _loadData();
             },
-            itemBuilder: (context) => _months.map((m) {
+            items: _months.map((m) {
               final isSelected = m.number == selectedMonth;
-              return PopupMenuItem<int>(
-                value: m.number,
-                child: SizedBox(
+              return (
+                m.number,
+                SizedBox(
                   width: 210.0,
                   child: Row(
                     children: [
@@ -485,8 +432,40 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
           ),
         ],
       ),
+        ),
+      ],
     );
   }
+
+  /// M3 MenuAnchor-based filter menu.
+  Widget _menuFilter<T>({
+    required Key key,
+    required String tooltip,
+    required List<(T, Widget)> items,
+    required ValueChanged<T> onSelected,
+    required Widget child,
+    double? minWidth,
+  }) {
+    return MenuAnchor(
+      style: minWidth == null
+          ? null
+          : MenuStyle(minimumSize: WidgetStatePropertyAll(Size(minWidth, 0))),
+      menuChildren: [
+        for (final (value, label) in items)
+          MenuItemButton(onPressed: () => onSelected(value), child: label),
+      ],
+      builder: (context, controller, _) => Tooltip(
+        message: tooltip,
+        child: InkWell(
+          key: key,
+          borderRadius: M3Shape.radiusLg,
+          onTap: () => controller.isOpen ? controller.close() : controller.open(),
+          child: child,
+        ),
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -528,7 +507,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
                       key: ValueKey('exec_loading_state'),
                       child: Padding(
                         padding: EdgeInsets.all(64.0),
-                        child: CircularProgressIndicator(),
+                        child: SizedBox(width: 240.0, child: LinearProgressIndicator(year2023: false)),
                       ),
                     )
                   : kpis != null

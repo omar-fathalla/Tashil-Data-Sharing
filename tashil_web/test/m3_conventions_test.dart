@@ -136,6 +136,7 @@ void main() {
       'M3Palette direct': RegExp(r'M3Palette\.'),
       'numeric fontSize': RegExp(r'fontSize:\s*[0-9]'),
       'direct Icons.*': RegExp(r'(?<![A-Za-z])Icons\.'),
+      'legacy menu/dropdown': RegExp(r'PopupMenuButton|PopupMenuItem|DropdownButton'),
     };
     final violations = <String>[];
     for (final f in files) {

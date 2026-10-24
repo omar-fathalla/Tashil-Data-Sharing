@@ -230,7 +230,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
     final colorScheme = theme.colorScheme;
 
     if (widget.trends.isEmpty) {
-      return Card(
+      return Card.outlined(
         child: Container(
           width: double.infinity,
           height: 320.0,
@@ -254,7 +254,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
     }
     if (maxVal <= 0) maxVal = 1.0;
 
-    return Card(
+    return Card.outlined(
       child: Padding(
         padding: M3Spacing.pMd,
         child: Column(

@@ -62,6 +62,12 @@
 2,950 عبوة مباعة | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 2.18M ج.م | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
 2.18M ج.م | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+2024 | 12.0 | FontWeight.w500 | ff45464f | 0.5 | 1.33
+2024 | 12.0 | FontWeight.w500 | ff45464f | 0.5 | 1.33
+2025 | 12.0 | FontWeight.w500 | ff45464f | 0.5 | 1.33
+2025 | 12.0 | FontWeight.w500 | ff45464f | 0.5 | 1.33
+2026 | 12.0 | FontWeight.w500 | ff304578 | 0.5 | 1.33
+2026 | 12.0 | FontWeight.w500 | ff304578 | 0.5 | 1.33
 2026-03-01 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 2026-03-01 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 2026-03-02 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
@@ -85,6 +91,8 @@
 256 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 256 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 256 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+3 | 11.0 | FontWeight.w500 | ffffffff | 0.5 | 1.45
+3 | 11.0 | FontWeight.w500 | ffffffff | 0.5 | 1.45
 3.10M ج.م مبيعاتنا من إجمالي 7.42M ج.م بالسوق | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 3.10M ج.م مبيعاتنا من إجمالي 7.42M ج.م بالسوق | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 3.10M ج.م مبيعاتنا من إجمالي 7.42M ج.م بالسوق | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
@@ -220,6 +228,7 @@ P&G | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 P&G | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Pareto 80/20 Power SKUs | 12.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.33
 Pareto 80/20 Power SKUs | 12.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.33
+Pareto 80/20 Power SKUs | 12.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.33
 Sell-Out Trend | 12.0 | FontWeight.w700 | ff1565c0 | 0.2 | 1.33
 Sell-Out Trend | 12.0 | FontWeight.w700 | ff1565c0 | 0.2 | 1.33
 Spinneys | 11.0 | FontWeight.w600 | ff1565c0 | 0.5 | 1.45
@@ -230,8 +239,6 @@ Total Sell-Out | 9.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Total Sell-Out | 9.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Total Units Sold | 11.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.45
 Total Units Sold | 11.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.45
-Year: 2026 | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
-Year: 2026 | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
 YoY | 11.0 | FontWeight.w600 | cc304578 | 0.5 | 1.45
 YoY | 11.0 | FontWeight.w600 | cc304578 | 0.5 | 1.45
 YoY | 11.0 | FontWeight.w600 | cc304578 | 0.5 | 1.45
@@ -404,8 +411,6 @@ YoY | 11.0 | FontWeight.w600 | cc304578 | 0.5 | 1.45
 󰛈 | 14.0 | null | ff1565c0 | null | 1.0
  | 16.0 | null | ff45464f | null | 1.0
  | 16.0 | null | ff45464f | null | 1.0
- | 16.0 | null | ff45464f | null | 1.0
- | 14.0 | null | ff1565c0 | null | 1.0
  | 20.0 | null | ff1565c0 | null | 1.0
  | 13.0 | null | ff404659 | null | 1.0
  | 14.0 | null | ff45464f | null | 1.0

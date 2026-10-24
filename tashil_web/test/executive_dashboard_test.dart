@@ -169,7 +169,7 @@ void main() {
 
     // Verify 3 dropdowns exist
     expect(find.byKey(const ValueKey('executive_chain_dropdown')), findsOneWidget);
-    expect(find.byKey(const ValueKey('executive_year_dropdown')), findsOneWidget);
+    expect(find.byKey(const ValueKey('executive_year_segmented')), findsOneWidget);
     expect(find.byKey(const ValueKey('executive_month_dropdown')), findsOneWidget);
 
     // Open Month dropdown and choose 'All Months'
@@ -182,15 +182,15 @@ void main() {
 
     expect(find.text('Month: All'), findsOneWidget);
 
-    // Open Year dropdown and select 2025
-    await tester.tap(find.byKey(const ValueKey('executive_year_dropdown')));
+    // Select 2025 in the M3 SegmentedButton year filter
+    await tester.tap(find.descendant(
+        of: find.byKey(const ValueKey('executive_year_segmented')),
+        matching: find.text('2025')));
     await tester.pumpAndSettle();
 
-    expect(find.text('2025'), findsWidgets);
-    await tester.tap(find.text('2025').last);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Year: 2025'), findsOneWidget);
+    final seg = tester.widget<SegmentedButton<int>>(
+        find.byKey(const ValueKey('executive_year_segmented')));
+    expect(seg.selected, {2025});
   });
 
   testWidgets('ExecutiveScreen Month dropdown displays pure English month names without Arabic parentheticals', (WidgetTester tester) async {
@@ -223,9 +223,9 @@ void main() {
     expect(find.text('April'), findsOneWidget);
 
     // Verify NO mixed Arabic parentheticals appear in the month dropdown
-    expect(find.descendant(of: find.byType(PopupMenuItem<int>), matching: find.textContaining('يناير')), findsNothing);
-    expect(find.descendant(of: find.byType(PopupMenuItem<int>), matching: find.textContaining('فبراير')), findsNothing);
-    expect(find.descendant(of: find.byType(PopupMenuItem<int>), matching: find.textContaining('مارس')), findsNothing);
+    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('يناير')), findsNothing);
+    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('فبراير')), findsNothing);
+    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('مارس')), findsNothing);
 
     // Select February and verify the pill updates to 'Month: Feb'
     await tester.tap(find.text('February'));
@@ -429,7 +429,7 @@ void main() {
 
     expect(find.text('January'), findsOneWidget);
     expect(find.text('December'), findsOneWidget);
-    expect(find.descendant(of: find.byType(PopupMenuItem<int>), matching: find.textContaining('يناير')), findsNothing);
+    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('يناير')), findsNothing);
 
     await tester.tap(find.text('March'));
     await tester.pumpAndSettle();
@@ -631,7 +631,7 @@ void main() {
     expect(find.text('Gomla'), findsWidgets);
 
     await tester.tap(find.descendant(
-      of: find.byType(PopupMenuItem<String>),
+      of: find.byType(MenuItemButton),
       matching: find.text('جملة ماركت'),
     ));
     await tester.pumpAndSettle();

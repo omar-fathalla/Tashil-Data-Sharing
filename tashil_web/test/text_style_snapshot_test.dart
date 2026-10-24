@@ -104,7 +104,7 @@ void main() {
     await _pump(tester, ExecutiveScreen(apiClient: ApiClient()));
     await _check(tester, 'executive');
     // Open each header filter menu so menu item styles are covered too.
-    for (final k in ['executive_chain_dropdown', 'executive_year_dropdown', 'executive_month_dropdown']) {
+    for (final k in ['executive_chain_dropdown', 'executive_month_dropdown']) {
       await tester.tap(find.byKey(ValueKey(k)));
       await tester.pumpAndSettle();
       await _check(tester, 'executive_menu_${k.split('_')[1]}');
