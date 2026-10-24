@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -43,7 +44,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                       padding: const EdgeInsets.all(8.0),
                       decoration: BoxDecoration(
                         color: Colors.purple.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10.0),
+                        borderRadius: M3Shape.radiusSm,
                       ),
                       child: const Icon(
                         Icons.auto_awesome_rounded,
@@ -86,7 +87,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                           decoration: BoxDecoration(
                             color: Colors.amber.withOpacity(0.18),
-                            borderRadius: BorderRadius.circular(16.0),
+                            borderRadius: M3Shape.radiusLg,
                             border: Border.all(color: Colors.amber.shade700.withOpacity(0.4)),
                           ),
                           child: Row(
@@ -108,7 +109,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                         decoration: BoxDecoration(
                           color: Colors.green.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(16.0),
+                          borderRadius: M3Shape.radiusLg,
                         ),
                         child: Text(
                           'درجة الثقة: ${(result!.confidenceScore * 100).toStringAsFixed(1)}%',
@@ -139,7 +140,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                 padding: M3Spacing.pSm,
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                 ),
                 child: Wrap(
                   spacing: M3Spacing.md,
@@ -165,7 +166,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                   padding: M3Spacing.pSm,
                   decoration: BoxDecoration(
                     color: colorScheme.secondaryContainer.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(12.0),
+                    borderRadius: M3Shape.radiusMd,
                     border: Border.all(color: colorScheme.secondary.withOpacity(0.35)),
                   ),
                   child: Column(
@@ -188,7 +189,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
                             decoration: BoxDecoration(
                               color: colorScheme.surface,
-                              borderRadius: BorderRadius.circular(6.0),
+                              borderRadius: M3Shape.radiusSm,
                             ),
                             child: Text(
                               'تم الاستيعاب الكامل بالذكاء الاصطناعي',
@@ -224,7 +225,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                               color: isHidden
                                   ? colorScheme.surfaceContainerHighest.withOpacity(0.5)
                                   : colorScheme.surface,
-                              borderRadius: BorderRadius.circular(8.0),
+                              borderRadius: M3Shape.radiusSm,
                               border: Border.all(
                                 color: isHidden
                                     ? colorScheme.outlineVariant.withOpacity(0.4)
@@ -235,7 +236,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  isHidden ? Icons.visibility_off_outlined : Icons.tab_rounded,
+                                  isHidden ? Icons.visibility_off_rounded : Icons.tab_rounded,
                                   size: 13.0,
                                   color: isHidden
                                       ? colorScheme.onSurfaceVariant
@@ -269,7 +270,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                   padding: M3Spacing.pSm,
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer.withOpacity(0.22),
-                    borderRadius: BorderRadius.circular(12.0),
+                    borderRadius: M3Shape.radiusMd,
                     border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
                   ),
                   child: Column(
@@ -300,7 +301,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                             decoration: BoxDecoration(
                               color: colorScheme.surface,
-                              borderRadius: BorderRadius.circular(8.0),
+                              borderRadius: M3Shape.radiusSm,
                               border: Border.all(color: colorScheme.outlineVariant),
                             ),
                             child: Text(
@@ -338,7 +339,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                               decoration: BoxDecoration(
                                 color: colorScheme.tertiaryContainer.withOpacity(0.55),
-                                borderRadius: BorderRadius.circular(8.0),
+                                borderRadius: M3Shape.radiusSm,
                               ),
                               child: Text(
                                 cat,
@@ -368,7 +369,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            isDone ? Icons.check_circle_rounded : (isInProgress ? Icons.hourglass_top_rounded : Icons.radio_button_unchecked),
+            isDone ? Icons.check_circle_rounded : (isInProgress ? Icons.hourglass_top_rounded : Icons.radio_button_unchecked_rounded),
             size: 16.0,
             color: isDone ? Colors.green : (isInProgress ? Colors.amber : Colors.grey),
           ),

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/m3_states.dart';
+import '../../../../core/theme/m3_shape.dart';
+import '../../../../core/widgets/m3_dropdown.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
@@ -361,7 +364,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                       padding: const EdgeInsets.all(8.0),
                       decoration: BoxDecoration(
                         color: cs.primaryContainer,
-                        borderRadius: BorderRadius.circular(10.0),
+                        borderRadius: M3Shape.radiusSm,
                       ),
                       child: Icon(
                         Icons.folder_copy_rounded,
@@ -407,7 +410,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           padding: const EdgeInsets.all(24.0),
                           decoration: BoxDecoration(
                             color: cs.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(14.0),
+                            borderRadius: M3Shape.radiusMd,
                           ),
                           child: const Center(
                             child: Text('لا توجد شيتات مرفوعة حالياً'),
@@ -433,7 +436,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                     color: isLatest
                                         ? cs.primaryContainer.withValues(alpha: 0.45)
                                         : cs.surfaceContainerLow,
-                                    borderRadius: BorderRadius.circular(16.0),
+                                    borderRadius: M3Shape.radiusLg,
                                     border: Border.all(
                                       color: isLatest
                                           ? cs.primary.withValues(alpha: 0.5)
@@ -491,8 +494,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                                           .withValues(
                                                               alpha: 0.15),
                                                       borderRadius:
-                                                          BorderRadius.circular(
-                                                              999.0),
+                                                          M3Shape.radiusFull,
                                                     ),
                                                     child: const Text(
                                                       'مفعل حالياً',
@@ -609,7 +611,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   padding: const EdgeInsets.all(8.0),
                   decoration: BoxDecoration(
                     color: const Color(0xFF0F766E).withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: const Icon(
                     Icons.auto_awesome_rounded,
@@ -710,7 +712,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 ),
                                 decoration: BoxDecoration(
                                   color: cs.surfaceContainerLow,
-                                  borderRadius: BorderRadius.circular(10.0),
+                                  borderRadius: M3Shape.radiusSm,
                                 ),
                                 child: Row(
                                   children: [
@@ -804,7 +806,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       padding: const EdgeInsets.all(12.0),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: M3Shape.radiusMd,
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
@@ -906,7 +908,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     final cs = theme.colorScheme;
 
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const M3LoadingState();
     }
 
     if (_errorMessage != null && _summary == null) {
@@ -955,7 +957,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   Container(
                     decoration: BoxDecoration(
                       color: cs.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(14.0),
+                      borderRadius: M3Shape.radiusMd,
                       border: Border.all(
                         color: cs.outlineVariant.withValues(alpha: 0.45),
                       ),
@@ -973,12 +975,12 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           titleEn: 'Official SKU Catalog & Price List',
                         ),
                         _buildBilingualTab(
-                          icon: Icons.calculate_outlined,
+                          icon: Icons.calculate_rounded,
                           titleAr: 'حاسبة الطلبيات والخصومات والهامش',
                           titleEn: 'Order, VAT & Margin Calculator',
                         ),
                         _buildBilingualTab(
-                          icon: Icons.cloud_upload_outlined,
+                          icon: Icons.cloud_upload_rounded,
                           titleAr: 'الشيتات المرفوعة وتحديث الكارتة (${_archivedMasterFiles.length})',
                           titleEn: 'Uploaded Price Sheets & Sync',
                         ),
@@ -1065,7 +1067,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           begin: AlignmentDirectional.topStart,
           end: AlignmentDirectional.bottomEnd,
         ),
-        borderRadius: BorderRadius.circular(18.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: cs.primary.withValues(alpha: 0.25)),
       ),
       child: Wrap(
@@ -1081,7 +1083,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                 padding: const EdgeInsets.all(12.0),
                 decoration: BoxDecoration(
                   color: cs.primary,
-                  borderRadius: BorderRadius.circular(14.0),
+                  borderRadius: M3Shape.radiusMd,
                 ),
                 child: Icon(
                   Icons.inventory_rounded,
@@ -1121,19 +1123,19 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                         ),
                         _buildMetaChip(
                           cs,
-                          Icons.discount_outlined,
+                          Icons.discount_rounded,
                           'خصم الفاتورة الأساسي: ${summary.defaultDiscountPct.toStringAsFixed(0)}%',
                         ),
                         _buildMetaChip(
                           cs,
-                          Icons.receipt_long_outlined,
+                          Icons.receipt_long_rounded,
                           'ضريبة القيمة المضافة: ${(summary.defaultVatRate * 100).toStringAsFixed(0)}%',
                         ),
                         // Compact interactive File Sheets bubble button replacing cluttered file list
                         InkWell(
                           key: const ValueKey('product_master_file_sheets_btn'),
                           onTap: _showFileSheetsModal,
-                          borderRadius: BorderRadius.circular(999.0),
+                          borderRadius: M3Shape.radiusFull,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12.0,
@@ -1141,7 +1143,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                             ),
                             decoration: BoxDecoration(
                               color: cs.primary.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(999.0),
+                              borderRadius: M3Shape.radiusFull,
                               border: Border.all(
                                 color: cs.primary.withValues(alpha: 0.45),
                               ),
@@ -1178,7 +1180,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                             key: const ValueKey(
                                 'product_master_diff_summary_chip'),
                             onTap: () => _showUploadDiffSummaryDialog(summary),
-                            borderRadius: BorderRadius.circular(999.0),
+                            borderRadius: M3Shape.radiusFull,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10.0,
@@ -1187,7 +1189,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                               decoration: BoxDecoration(
                                 color: const Color(0xFFD97706)
                                     .withValues(alpha: 0.14),
-                                borderRadius: BorderRadius.circular(999.0),
+                                borderRadius: M3Shape.radiusFull,
                                 border: Border.all(
                                   color: const Color(0xFFD97706)
                                       .withValues(alpha: 0.45),
@@ -1228,7 +1230,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               OutlinedButton.icon(
                 key: const ValueKey('product_master_header_sheets_btn'),
                 onPressed: _showFileSheetsModal,
-                icon: const Icon(Icons.layers_outlined, size: 18.0),
+                icon: const Icon(Icons.layers_rounded, size: 18.0),
                 label: Text('File Sheets (${_archivedMasterFiles.length})'),
               ),
               OutlinedButton.icon(
@@ -1273,7 +1275,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                     },
                   );
                 },
-                icon: const Icon(Icons.add_box_outlined, size: 18.0),
+                icon: const Icon(Icons.add_box_rounded, size: 18.0),
                 label: const Text('إضافة صنف جديد'),
               ),
               FilledButton.icon(
@@ -1304,7 +1306,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
       decoration: BoxDecoration(
         color: cs.surface.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(999.0),
+        borderRadius: M3Shape.radiusFull,
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Row(
@@ -1363,7 +1365,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             titleEn: 'Promos • Promotional & Bundle SKUs (PR)',
             value: '${_intFmt.format(summary.promoSkusCount)} عرض ترويجي',
             subtitle: 'أكواد العروض الخاصة والشرنك والباقات الترويجية',
-            icon: Icons.local_offer_outlined,
+            icon: Icons.local_offer_rounded,
             accentColor: const Color(0xFFD97706),
           ),
           _buildKpiCard(
@@ -1434,7 +1436,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
       ),
       child: Column(
@@ -1448,7 +1450,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                   color: accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10.0),
+                  borderRadius: M3Shape.radiusSm,
                 ),
                 child: Icon(icon, color: accentColor, size: 20.0),
               ),
@@ -1552,7 +1554,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           padding: const EdgeInsets.all(16.0),
           decoration: BoxDecoration(
             color: cs.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
           ),
           child: Column(
@@ -1584,8 +1586,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           horizontal: 16.0,
                           vertical: 12.0,
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
+                        border: const OutlineInputBorder(
+                          borderRadius: M3Shape.radiusMd,
                         ),
                       ),
                     ),
@@ -1705,7 +1707,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         Container(
           decoration: BoxDecoration(
             color: cs.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
           ),
           child: Column(
@@ -1885,7 +1887,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                             InkWell(
                               onTap: () =>
                                   _copyToClipboard(item.itemCode, 'كود الصنف'),
-                              borderRadius: BorderRadius.circular(8.0),
+                              borderRadius: M3Shape.radiusSm,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8.0,
@@ -1894,7 +1896,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 decoration: BoxDecoration(
                                   color: cs.primaryContainer
                                       .withValues(alpha: 0.55),
-                                  borderRadius: BorderRadius.circular(8.0),
+                                  borderRadius: M3Shape.radiusSm,
                                   border: Border.all(
                                     color: cs.primary.withValues(alpha: 0.35),
                                   ),
@@ -1956,7 +1958,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                             InkWell(
                               onTap: () =>
                                   _copyToClipboard(item.barcode, 'الباركود'),
-                              borderRadius: BorderRadius.circular(8.0),
+                              borderRadius: M3Shape.radiusSm,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8.0,
@@ -1965,7 +1967,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 decoration: BoxDecoration(
                                   color: cs.surfaceContainerHighest
                                       .withValues(alpha: 0.6),
-                                  borderRadius: BorderRadius.circular(8.0),
+                                  borderRadius: M3Shape.radiusSm,
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -2071,7 +2073,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                             .withValues(alpha: 0.15)
                                         : const Color(0xFF0F766E)
                                             .withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(999.0),
+                                    borderRadius: M3Shape.radiusFull,
                                   ),
                                   child: Text(
                                     isPromo ? 'عرض (Promo)' : 'عادي (Regular)',
@@ -2107,7 +2109,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                               children: [
                                 IconButton(
                                   icon: const Icon(
-                                    Icons.badge_outlined,
+                                    Icons.badge_rounded,
                                     size: 18.0,
                                   ),
                                   tooltip: 'بطاقة تعريف الصنف وتعديل السعر',
@@ -2129,7 +2131,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 ),
                                 IconButton(
                                   icon: const Icon(
-                                    Icons.calculate_outlined,
+                                    Icons.calculate_rounded,
                                     size: 18.0,
                                   ),
                                   tooltip: 'حساب طلبية وهامش ربح لهذا الصنف',
@@ -2218,7 +2220,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: M3Shape.radiusMd,
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Wrap(
@@ -2229,7 +2231,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.price_change_outlined, size: 17.0, color: cs.primary),
+              Icon(Icons.price_change_rounded, size: 17.0, color: cs.primary),
               const SizedBox(width: 6.0),
               const Text(
                 'فلتر سريع لتغيرات الأسعار:',
@@ -2332,7 +2334,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                       : isDown
                           ? const Color(0xFF0F766E).withValues(alpha: 0.14)
                           : const Color(0xFF0284C7).withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(999.0),
+                  borderRadius: M3Shape.radiusFull,
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -2419,21 +2421,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         ),
         const SizedBox(width: 6.0),
         DropdownButtonHideUnderline(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 2.0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10.0),
-              border: Border.all(
-                color: Theme.of(context)
-                    .colorScheme
-                    .outlineVariant
-                    .withValues(alpha: 0.6),
-              ),
-            ),
-            child: DropdownButton<String>(
-              value: safeValue,
-              isDense: true,
-              items: items.entries
+          child: M3Dropdown<String>(
+value: safeValue,
+options: m3OptionsFromMenuItems<String>(items.entries
                   .map((e) => DropdownMenuItem<String>(
                         value: e.key,
                         child: Text(
@@ -2441,10 +2431,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           style: const TextStyle(fontSize: 12.0),
                         ),
                       ))
-                  .toList(),
-              onChanged: onChanged,
-            ),
-          ),
+                  .toList()),
+onChanged: m3Legacy<String>(onChanged),
+),
         ),
       ],
     );
@@ -2581,7 +2570,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           padding: const EdgeInsets.all(20.0),
           decoration: BoxDecoration(
             color: cs.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
           ),
           child: Column(
@@ -2637,10 +2626,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               DropdownButtonFormField<ProductMasterItemModel>(
                 value: summary.items.contains(sku) ? sku : summary.items.first,
                 isExpanded: true,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'اختر الصنف من كارتة الأصناف (Select SKU)',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
+                    borderRadius: M3Shape.radiusMd,
                   ),
                 ),
                 items: summary.items
@@ -2786,7 +2775,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       padding: const EdgeInsets.all(14.0),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(14.0),
+        borderRadius: M3Shape.radiusMd,
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Column(
@@ -2826,7 +2815,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           padding: const EdgeInsets.all(24.0),
           decoration: BoxDecoration(
             color: cs.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
           ),
           child: Column(
@@ -2873,7 +2862,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             padding: const EdgeInsets.all(24.0),
             decoration: BoxDecoration(
               color: cs.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(14.0),
+              borderRadius: M3Shape.radiusMd,
             ),
             child: Row(
               children: [
@@ -3090,7 +3079,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                   padding: const EdgeInsets.all(12.0),
                   decoration: BoxDecoration(
                     color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
-                    borderRadius: BorderRadius.circular(12.0),
+                    borderRadius: M3Shape.radiusMd,
                     border: Border.all(
                       color: cs.outlineVariant.withValues(alpha: 0.5),
                     ),
@@ -3263,7 +3252,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
           ),
           FilledButton.icon(
             onPressed: _isSaving ? null : _saveChanges,
-            icon: const Icon(Icons.save_outlined, size: 18),
+            icon: const Icon(Icons.save_rounded, size: 18),
             label: Text(_isSaving ? 'جاري الحفظ...' : 'حفظ وتحديث الكارتة'),
           ),
         ],

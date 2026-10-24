@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_spacing.dart';
 
 /// AnomalyResolutionTable lists anomalies detected and resolved by Gemini 3.8 Flash.
@@ -21,7 +22,7 @@ class AnomalyResolutionTable extends StatelessWidget {
           padding: M3Spacing.pMd,
           child: Row(
             children: [
-              const Icon(Icons.check_circle_outline, color: Colors.green, size: 20.0),
+              const Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 20.0),
               M3Spacing.gapSM,
               Text(
                 'لم يتم رصد أي شذوذ في البيانات؛ جميع السجلات مطابقة للمعايير القياسية بنسبة 100%.',
@@ -81,7 +82,7 @@ class AnomalyResolutionTable extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
                       decoration: BoxDecoration(
                         color: badgeColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(6.0),
+                        borderRadius: M3Shape.radiusSm,
                       ),
                       child: Text(
                         'صف $rowNum: $issueType',

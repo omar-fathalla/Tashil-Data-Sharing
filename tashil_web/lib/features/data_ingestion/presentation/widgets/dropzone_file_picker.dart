@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/widgets/m3_button.dart';
@@ -77,7 +78,7 @@ class _DropzoneFilePickerState extends State<DropzoneFilePicker> {
                     : _isDraggingOver
                         ? colorScheme.primaryContainer.withOpacity(0.35)
                         : colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(16.0),
+                borderRadius: M3Shape.radiusLg,
                 border: Border.all(
                   color: widget.hasError
                       ? colorScheme.error
@@ -144,7 +145,7 @@ class _DropzoneFilePickerState extends State<DropzoneFilePicker> {
                     padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
                     decoration: BoxDecoration(
                       color: colorScheme.secondaryContainer.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(10.0),
+                      borderRadius: M3Shape.radiusSm,
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
@@ -196,14 +197,14 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
         final colorScheme = Theme.of(ctx).colorScheme;
         final theme = Theme.of(ctx);
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+          shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusLg),
           title: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(10.0),
+                  borderRadius: M3Shape.radiusSm,
                 ),
                 child: Icon(Icons.edit_note_rounded, color: colorScheme.onPrimaryContainer, size: 22.0),
               ),
@@ -235,7 +236,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                       labelText: 'اسم السلسلة بالعربية (Arabic)',
                       hintText: 'مثال: الوكالة، أسواق فتح الله...',
                       prefixIcon: const Icon(Icons.language_rounded, size: 18.0),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                      border: const OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                       filled: true,
                       fillColor: colorScheme.surfaceContainerHigh,
                     ),
@@ -249,7 +250,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                       labelText: 'اسم السلسلة بالإنجليزية (English)',
                       hintText: 'e.g. El Wakala, Fathalla Market...',
                       prefixIcon: const Icon(Icons.translate_rounded, size: 18.0),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                      border: const OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                       filled: true,
                       fillColor: colorScheme.surfaceContainerHigh,
                     ),
@@ -586,7 +587,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                     margin: const EdgeInsets.only(bottom: 16.0),
                     decoration: BoxDecoration(
                       color: Colors.amber.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(10.0),
+                      borderRadius: M3Shape.radiusSm,
                       border: Border.all(color: Colors.amber.shade700.withOpacity(0.4)),
                     ),
                     child: Row(
@@ -616,7 +617,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                   padding: const EdgeInsets.all(12.0),
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Column(
                     children: [
@@ -778,7 +779,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
               padding: const EdgeInsets.all(10.0),
               decoration: BoxDecoration(
                 color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8.0),
+                borderRadius: M3Shape.radiusSm,
                 border: Border.all(color: Colors.red.shade200),
               ),
               child: Row(
@@ -897,7 +898,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(20.0),
+                  borderRadius: M3Shape.radiusLg,
                   border: Border.all(color: colorScheme.primary.withOpacity(0.35)),
                 ),
                 child: Row(
@@ -925,7 +926,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                 padding: M3Spacing.pSm,
                 decoration: BoxDecoration(
                   color: colorScheme.errorContainer.withOpacity(0.55),
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                   border: Border.all(color: colorScheme.error.withOpacity(0.4)),
                 ),
                 child: Row(
@@ -1023,7 +1024,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
       padding: M3Spacing.pMd,
       decoration: BoxDecoration(
         color: colorScheme.errorContainer.withOpacity(0.45),
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.error, width: 1.5),
       ),
       child: Row(
@@ -1033,7 +1034,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
             padding: const EdgeInsets.all(10.0),
             decoration: BoxDecoration(
               color: colorScheme.error,
-              borderRadius: BorderRadius.circular(10.0),
+              borderRadius: M3Shape.radiusSm,
             ),
             child: Icon(
               Icons.error_outline_rounded,
@@ -1080,7 +1081,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
       margin: const EdgeInsets.only(bottom: 16.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(
           color: _showChainRequiredError
               ? colorScheme.error
@@ -1097,7 +1098,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(10.0),
+                  borderRadius: M3Shape.radiusSm,
                 ),
                 child: Icon(
                   Icons.tune_rounded,
@@ -1144,7 +1145,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                 isExpanded: true,
                 focusColor: Colors.transparent,
                 dropdownColor: colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(14.0),
+                borderRadius: M3Shape.radiusMd,
                 icon: Icon(
                   Icons.arrow_drop_down_rounded,
                   color: _showChainRequiredError
@@ -1179,21 +1180,21 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                       ? colorScheme.errorContainer.withOpacity(0.3)
                       : colorScheme.surface,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
+                    borderRadius: M3Shape.radiusMd,
                     borderSide: BorderSide(
                       color: chainBorderColor,
                       width: _showChainRequiredError ? 2.0 : 1.0,
                     ),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
+                    borderRadius: M3Shape.radiusMd,
                     borderSide: BorderSide(
                       color: chainBorderColor,
                       width: _showChainRequiredError ? 2.0 : 1.0,
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
+                    borderRadius: M3Shape.radiusMd,
                     borderSide: BorderSide(
                       color: _showChainRequiredError
                           ? colorScheme.error
@@ -1228,7 +1229,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                 isExpanded: true,
                 focusColor: Colors.transparent,
                 dropdownColor: colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(14.0),
+                borderRadius: M3Shape.radiusMd,
                 icon: Icon(
                   Icons.arrow_drop_down_rounded,
                   color: colorScheme.onSurfaceVariant,
@@ -1239,8 +1240,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                   prefixIcon: const Icon(Icons.calendar_today_rounded),
                   filled: true,
                   fillColor: colorScheme.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
+                  border: const OutlineInputBorder(
+                    borderRadius: M3Shape.radiusMd,
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 14.0),
                 ),
@@ -1262,7 +1263,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                 isExpanded: true,
                 focusColor: Colors.transparent,
                 dropdownColor: colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(14.0),
+                borderRadius: M3Shape.radiusMd,
                 icon: Icon(
                   Icons.arrow_drop_down_rounded,
                   color: colorScheme.onSurfaceVariant,
@@ -1273,8 +1274,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                   prefixIcon: const Icon(Icons.date_range_rounded),
                   filled: true,
                   fillColor: colorScheme.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
+                  border: const OutlineInputBorder(
+                    borderRadius: M3Shape.radiusMd,
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 14.0),
                 ),
@@ -1332,7 +1333,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                   : (_showChainRequiredError
                       ? colorScheme.errorContainer.withOpacity(0.45)
                       : colorScheme.tertiaryContainer.withOpacity(0.35)),
-              borderRadius: BorderRadius.circular(8.0),
+              borderRadius: M3Shape.radiusSm,
               border: Border.all(
                 color: hasSelectedChain
                     ? colorScheme.secondary.withOpacity(0.25)
@@ -1384,7 +1385,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
       padding: M3Spacing.pMd,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.primary.withOpacity(0.35)),
       ),
       child: Row(
@@ -1394,7 +1395,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
             padding: const EdgeInsets.all(10.0),
             decoration: BoxDecoration(
               color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(12.0),
+              borderRadius: M3Shape.radiusMd,
             ),
             child: Icon(
               Icons.rule_folder_rounded,
@@ -1423,7 +1424,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
                       decoration: BoxDecoration(
                         color: colorScheme.tertiaryContainer.withOpacity(0.55),
-                        borderRadius: BorderRadius.circular(6.0),
+                        borderRadius: M3Shape.radiusSm,
                         border: Border.all(color: colorScheme.tertiary.withOpacity(0.45)),
                       ),
                       child: Text(
@@ -1461,7 +1462,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
       padding: M3Spacing.pMd,
       decoration: BoxDecoration(
         color: colorScheme.tertiaryContainer.withOpacity(0.35),
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.tertiary, width: 1.5),
       ),
       child: Column(
@@ -1474,7 +1475,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                   color: colorScheme.tertiary,
-                  borderRadius: BorderRadius.circular(10.0),
+                  borderRadius: M3Shape.radiusSm,
                 ),
                 child: Icon(
                   Icons.warning_amber_rounded,
@@ -1517,7 +1518,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
           ),
           M3Spacing.gapMD,
           Align(
-            alignment: Alignment.centerLeft,
+            alignment: AlignmentDirectional.centerStart,
             child: M3Button.primary(
               label: 'تصحيح السلسلة',
               icon: Icons.auto_fix_high_rounded,
@@ -1535,7 +1536,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
       padding: M3Spacing.pMd,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.primary.withOpacity(0.4), width: 1.5),
       ),
       child: Wrap(
@@ -1547,7 +1548,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.verified_outlined, color: colorScheme.primary, size: 24.0),
+              Icon(Icons.verified_rounded, color: colorScheme.primary, size: 24.0),
               const SizedBox(width: 8.0),
               Flexible(
                 child: Column(
@@ -1602,7 +1603,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
       padding: M3Spacing.pMd,
       decoration: BoxDecoration(
         color: colorScheme.secondaryContainer.withOpacity(0.45),
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.secondary, width: 1.5),
       ),
       child: Row(
@@ -1611,7 +1612,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
             padding: const EdgeInsets.all(10.0),
             decoration: BoxDecoration(
               color: colorScheme.secondary,
-              borderRadius: BorderRadius.circular(12.0),
+              borderRadius: M3Shape.radiusMd,
             ),
             child: Icon(
               Icons.check_circle_rounded,
@@ -1665,15 +1666,15 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
         filled: true,
         fillColor: colorScheme.surface,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0),
+          borderRadius: M3Shape.radiusMd,
           borderSide: BorderSide(color: colorScheme.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0),
+          borderRadius: M3Shape.radiusMd,
           borderSide: BorderSide(color: colorScheme.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0),
+          borderRadius: M3Shape.radiusMd,
           borderSide: BorderSide(color: colorScheme.primary, width: 2.0),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
@@ -1696,7 +1697,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
       ),
       style: FilledButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 12.0),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+        shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusMd),
       ),
     );
 
@@ -1705,15 +1706,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.7), width: 1.0),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.02),
-            blurRadius: 6.0,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1724,7 +1718,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(10.0),
+                  borderRadius: M3Shape.radiusSm,
                 ),
                 child: Icon(Icons.storefront_rounded, size: 20.0, color: colorScheme.onPrimaryContainer),
               ),
@@ -1773,18 +1767,11 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(24.0),
+        borderRadius: M3Shape.radiusXl,
         border: Border.all(
           color: colorScheme.outlineVariant.withOpacity(0.7),
           width: 1.0,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.03),
-            blurRadius: 6.0,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       padding: const EdgeInsets.all(4.0),
       child: SingleChildScrollView(
@@ -1816,7 +1803,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
 
     return Material(
       color: isSelected ? colorScheme.primary : Colors.transparent,
-      borderRadius: BorderRadius.circular(20.0),
+      borderRadius: M3Shape.radiusLg,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         key: ValueKey('company_chain_btn_${c.code}'),
@@ -1829,7 +1816,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
         hoverColor: isSelected
             ? colorScheme.onPrimary.withOpacity(0.1)
             : colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         child: Tooltip(
           message: c.displayName,
           child: Padding(
@@ -1838,7 +1825,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  isSelected ? Icons.check_circle_rounded : Icons.store_mall_directory_outlined,
+                  isSelected ? Icons.check_circle_rounded : Icons.store_mall_directory_rounded,
                   size: 16.0,
                   color: isSelected ? colorScheme.onPrimary : colorScheme.primary,
                 ),
@@ -1855,11 +1842,11 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                 InkWell(
                   key: ValueKey('edit_company_chain_${c.code}'),
                   onTap: () => _showEditCompanyChainDialog(c),
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                   child: Padding(
                     padding: const EdgeInsets.all(4.0),
                     child: Icon(
-                      Icons.edit_outlined,
+                      Icons.edit_rounded,
                       size: 14.0,
                       color: isSelected ? colorScheme.onPrimary.withOpacity(0.9) : colorScheme.primary,
                     ),
@@ -1870,7 +1857,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                 InkWell(
                   key: ValueKey('delete_company_chain_${c.code}'),
                   onTap: () => _handleDeleteCompanyChain(c),
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                   child: Padding(
                     padding: const EdgeInsets.all(4.0),
                     child: Icon(
@@ -1918,8 +1905,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
         isDense: true,
         filled: true,
         fillColor: colorScheme.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0),
+        border: const OutlineInputBorder(
+          borderRadius: M3Shape.radiusMd,
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
       ),
@@ -1938,8 +1925,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
         isDense: true,
         filled: true,
         fillColor: colorScheme.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0),
+        border: const OutlineInputBorder(
+          borderRadius: M3Shape.radiusMd,
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
       ),
@@ -1962,7 +1949,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
       padding: isCompact ? M3Spacing.pMd : M3Spacing.pLg,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.55)),
       ),
       child: Column(
@@ -1982,7 +1969,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                     padding: const EdgeInsets.all(10.0),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12.0),
+                      borderRadius: M3Shape.radiusMd,
                     ),
                     child: Icon(
                       Icons.inventory_2_rounded,
@@ -2020,7 +2007,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
                     decoration: BoxDecoration(
                       color: colorScheme.secondaryContainer.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(20.0),
+                      borderRadius: M3Shape.radiusLg,
                     ),
                     child: Text(
                       'إجمالي الملفات: $totalAllChains شيت',
@@ -2105,7 +2092,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
               padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
               decoration: BoxDecoration(
                 color: colorScheme.surface,
-                borderRadius: BorderRadius.circular(16.0),
+                borderRadius: M3Shape.radiusLg,
                 border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.4)),
               ),
               child: Column(
@@ -2156,7 +2143,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
       padding: M3Spacing.pMd,
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.55)),
       ),
       child: LayoutBuilder(
@@ -2172,7 +2159,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                   color: isExcel
                       ? colorScheme.secondaryContainer
                       : colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                 ),
                 child: Icon(
                   isExcel ? Icons.table_view_rounded : Icons.description_rounded,
@@ -2202,7 +2189,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 3.0),
                           decoration: BoxDecoration(
                             color: chainColor.withOpacity(0.14),
-                            borderRadius: BorderRadius.circular(20.0),
+                            borderRadius: M3Shape.radiusLg,
                             border: Border.all(color: chainColor.withOpacity(0.45)),
                           ),
                           child: Row(
@@ -2224,7 +2211,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
                           decoration: BoxDecoration(
                             color: colorScheme.secondaryContainer.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(8.0),
+                            borderRadius: M3Shape.radiusSm,
                           ),
                           child: Text(
                             'سنة ${file.targetYear}',
@@ -2239,7 +2226,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
                             decoration: BoxDecoration(
                               color: colorScheme.tertiaryContainer.withOpacity(0.6),
-                              borderRadius: BorderRadius.circular(8.0),
+                              borderRadius: M3Shape.radiusSm,
                             ),
                             child: Text(
                               'كارتة الأصناف والأسعار (Product Master)',
@@ -2262,17 +2249,17 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                           theme,
                         ),
                         _buildArchiveMetaChip(
-                          Icons.fact_check_outlined,
+                          Icons.fact_check_rounded,
                           'عدد السجلات: ${file.rowsIngested} سجل',
                           theme,
                         ),
                         _buildArchiveMetaChip(
-                          Icons.payments_outlined,
+                          Icons.payments_rounded,
                           'إجمالي المبيعات: ${CurrencyFormatter.formatCompactEGP(file.totalRevenue)}',
                           theme,
                         ),
                         _buildArchiveMetaChip(
-                          Icons.sd_storage_outlined,
+                          Icons.sd_storage_rounded,
                           'حجم الملف: ${_formatFileSize(file.fileSizeBytes)}',
                           theme,
                         ),
@@ -2321,7 +2308,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                 fileInfoWidget,
                 const SizedBox(height: 12.0),
                 Align(
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   child: actionsWidget,
                 ),
               ],
