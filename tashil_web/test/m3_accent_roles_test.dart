@@ -24,5 +24,8 @@ void main() {
     expect(a.purpleStrong, Colors.purple.shade800);
     expect(a.negative, Colors.red.shade700);
     expect(a.neutral, Colors.blueGrey.shade700);
+    expect(a.tealBase, Color(Colors.teal.toARGB32()));
+    expect(a.redBase, Color(Colors.red.toARGB32()));
+    expect(a.orangeBase, Color(Colors.orange.toARGB32()));
   });
 }

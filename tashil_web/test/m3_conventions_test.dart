@@ -105,4 +105,23 @@ void main() {
     }
     expect(bad, isEmpty, reason: bad.join('\n'));
   });
+
+  test('Sell-In / Sell-Out / Targets use theme colour roles, not Material swatches', () {
+    const files = [
+      'lib/features/sell_out_analytics/presentation/screens/sell_in_explorer_screen.dart',
+      'lib/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart',
+      'lib/features/sell_out_analytics/presentation/widgets/target_management_panel.dart',
+    ];
+    // Any Colors.<swatch> (teal, red, orange, …) incl. .shadeNNN; only
+    // transparent/white/black are allowed. Use M3StatusColors.of(context).
+    final swatch = RegExp(r'(?<![A-Za-z0-9_])Colors\.(?!transparent\b|white\b|black\b)[a-z][A-Za-z]*');
+    final bad = <String>[];
+    for (final f in files) {
+      final lines = File(f).readAsLinesSync();
+      for (var i = 0; i < lines.length; i++) {
+        if (swatch.hasMatch(lines[i])) bad.add('$f:${i + 1}: ${lines[i].trim()}');
+      }
+    }
+    expect(bad, isEmpty, reason: bad.join('\n'));
+  });
 }
