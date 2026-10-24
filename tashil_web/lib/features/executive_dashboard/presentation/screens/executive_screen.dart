@@ -632,7 +632,12 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
                           ),
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // New: Market Share + Sell In vs Sell Out overview (above existing sections)
+                            // Original top summary: the four KPI cards.
+                            BentoKpiGrid(kpis: kpis!),
+
+                            M3Spacing.gapMD,
+
+                            // Share per SKU / Category, then Sell In vs Sell Out.
                             MarketShareSection(
                               kpis: kpis!,
                               cpfr: _cpfr,
@@ -641,11 +646,6 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
                               periodMonths: _periodMonths,
                               year: selectedYear,
                             ),
-
-                            // Bento KPI Grid
-                            BentoKpiGrid(kpis: kpis!),
-
-                            M3Spacing.gapMD,
 
                             // Full-width Monthly Sell-Out Trend Chart (100% width for all 12 months)
                             SelloutTrendChart(trends: kpis!.dailyTrends),
