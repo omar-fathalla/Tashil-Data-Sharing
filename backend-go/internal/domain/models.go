@@ -516,6 +516,19 @@ type CategoryContribution struct {
 	SKUCount               int     `json:"sku_count"`
 	MarketTotalRevenue     float64 `json:"market_total_revenue"`
 	TenantCategorySharePct float64 `json:"tenant_category_share_pct"`
+	// TenantRank is the tenant's 1-based revenue rank among all suppliers in the category (0 = unknown).
+	TenantRank int `json:"tenant_rank,omitempty"`
+	// SupplierCount is the number of distinct suppliers selling in the category.
+	SupplierCount int `json:"supplier_count,omitempty"`
+	// TopCompetitors are the largest named competitor suppliers in the category.
+	TopCompetitors []CategoryCompetitor `json:"top_competitors,omitempty"`
+}
+
+// CategoryCompetitor is one named competitor supplier's revenue and share in a category.
+type CategoryCompetitor struct {
+	Name     string  `json:"name"`
+	Revenue  float64 `json:"revenue"`
+	SharePct float64 `json:"share_pct"`
 }
 
 // ParetoSKUItem represents a SKU in the 80/20 Pareto revenue analysis.

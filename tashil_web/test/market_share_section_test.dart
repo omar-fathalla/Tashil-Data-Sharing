@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/screens/executive_screen.dart';
+import 'package:tashil_web/features/executive_dashboard/presentation/widgets/market_share_section.dart';
 
 /// Test fixture shaped like GET /api/v1/analytics/cpfr (test-only numbers).
 final _cpfrFixture = {
@@ -105,5 +106,49 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('sell_in_vs_out_empty')), findsOneWidget);
     expect(find.byKey(const ValueKey('kpi_net_accumulation')), findsNothing);
+  });
+
+  testWidgets('Category tiles show our rank and named competitors from the backend', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final kpis = ExecutiveKPIsModel.fromJson({
+      'category_contributions': [
+        {
+          'category': 'Laundry',
+          'total_revenue': 300.0,
+          'market_total_revenue': 1100.0,
+          'tenant_category_share_pct': 27.3,
+          'tenant_rank': 2,
+          'supplier_count': 4,
+          'top_competitors': [
+            {'name': 'P&G', 'revenue': 500.0, 'share_pct': 45.5},
+            {'name': 'Henkel', 'revenue': 200.0, 'share_pct': 18.2},
+          ],
+        },
+      ],
+    });
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: MarketShareSection(
+            kpis: kpis,
+            cpfr: null,
+            cpfrLoading: false,
+            cpfrError: null,
+            periodMonths: const {1, 2, 3},
+            year: 2026,
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Rank #2 of 4'), findsOneWidget);
+    expect(find.text('P&G'), findsOneWidget);
+    expect(find.text('Henkel'), findsOneWidget);
+    expect(find.byKey(const ValueKey('category_competitor_Laundry_1')), findsOneWidget);
   });
 }

@@ -446,6 +446,12 @@ class CategoryContributionModel {
   final int skuCount;
   final double marketTotalRevenue;
   final double tenantCategorySharePct;
+  /// Our 1-based revenue rank among all suppliers in the category (0 = unknown / not provided).
+  final int tenantRank;
+  /// Distinct suppliers selling in the category (0 = unknown).
+  final int supplierCount;
+  /// Largest named competitor suppliers in the category (from sell-out market data).
+  final List<CategoryCompetitorModel> topCompetitors;
 
   double get categoryMarketRevenue => marketTotalRevenue;
 
@@ -458,6 +464,9 @@ class CategoryContributionModel {
     double? marketTotalRevenue,
     double? categoryMarketRevenue,
     this.tenantCategorySharePct = 0.0,
+    this.tenantRank = 0,
+    this.supplierCount = 0,
+    this.topCompetitors = const [],
   }) : marketTotalRevenue = categoryMarketRevenue ?? marketTotalRevenue ?? 0.0;
 
   factory CategoryContributionModel.fromJson(Map<String, dynamic> json) {
@@ -473,6 +482,12 @@ class CategoryContributionModel {
               0.0,
       tenantCategorySharePct:
           (json['tenant_category_share_pct'] as num?)?.toDouble() ?? 0.0,
+      tenantRank: (json['tenant_rank'] as num?)?.toInt() ?? 0,
+      supplierCount: (json['supplier_count'] as num?)?.toInt() ?? 0,
+      topCompetitors: (json['top_competitors'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(CategoryCompetitorModel.fromJson)
+          .toList(),
     );
   }
 
@@ -485,7 +500,28 @@ class CategoryContributionModel {
         'market_total_revenue': marketTotalRevenue,
         'category_market_revenue': marketTotalRevenue,
         'tenant_category_share_pct': tenantCategorySharePct,
+        if (tenantRank > 0) 'tenant_rank': tenantRank,
+        if (supplierCount > 0) 'supplier_count': supplierCount,
+        if (topCompetitors.isNotEmpty)
+          'top_competitors': topCompetitors.map((c) => c.toJson()).toList(),
       };
+}
+
+/// One named competitor supplier's revenue and share within a category.
+class CategoryCompetitorModel {
+  final String name;
+  final double revenue;
+  final double sharePct;
+
+  const CategoryCompetitorModel({required this.name, required this.revenue, required this.sharePct});
+
+  factory CategoryCompetitorModel.fromJson(Map<String, dynamic> json) => CategoryCompetitorModel(
+        name: json['name'] as String? ?? '',
+        revenue: (json['revenue'] as num?)?.toDouble() ?? 0.0,
+        sharePct: (json['share_pct'] as num?)?.toDouble() ?? 0.0,
+      );
+
+  Map<String, dynamic> toJson() => {'name': name, 'revenue': revenue, 'share_pct': sharePct};
 }
 
 /// Pareto 80/20 Power SKU Model

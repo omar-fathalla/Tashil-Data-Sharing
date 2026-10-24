@@ -343,19 +343,38 @@ class _CategoryTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
               M3Spacing.gapXXS,
-              ClipRRect(
-                borderRadius: M3Shape.radiusSm,
-                child: LinearProgressIndicator(
-                  year2023: false,
-                  value: ours / 100.0,
-                  minHeight: 6.0,
-                  color: cs.primary,
-                  backgroundColor: acc.competitor,
+              if (cat.tenantRank > 0)
+                Text(
+                  'Rank #${cat.tenantRank}${cat.supplierCount > 0 ? ' of ${cat.supplierCount}' : ''}',
+                  key: ValueKey('category_rank_${cat.category}'),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: cat.tenantRank == 1 ? acc.tealBase : cs.onSurface,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
               M3Spacing.gapXXS,
-              Text('Competitors ${_pct(100.0 - ours)}',
-                  style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+              _CompetitorBar(cat: cat, ours: ours),
+              M3Spacing.gapXXS,
+              if (cat.topCompetitors.isEmpty)
+                Text('Competitors ${_pct(100.0 - ours)}',
+                    style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant))
+              else
+                for (final (i, c) in cat.topCompetitors.take(3).indexed)
+                  Row(key: ValueKey('category_competitor_${cat.category}_$i'), children: [
+                    Container(
+                      width: 8.0,
+                      height: 8.0,
+                      decoration: BoxDecoration(color: _competitorShade(acc, i), shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 4.0),
+                    Expanded(
+                      child: Text(c.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                    ),
+                    Text(_pct(c.sharePct), style: theme.textTheme.labelSmall),
+                  ]),
             ]),
           ),
         ]),
@@ -662,4 +681,39 @@ class _MonthlyBars extends StatelessWidget {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(4.0)),
         ),
       );
+}
+
+/// Grey shades for the named competitors (strongest first); MD3 theme roles only.
+Color _competitorShade(M3AccentRoles acc, int i) =>
+    [acc.competitorStrong, acc.competitor, acc.competitorSurface][i.clamp(0, 2)];
+
+/// Category share bar: ours, then the top 3 named competitors, then everyone else.
+class _CompetitorBar extends StatelessWidget {
+  const _CompetitorBar({required this.cat, required this.ours});
+  final CategoryContributionModel cat;
+  final double ours;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final acc = M3StatusColors.of(context).accents;
+    final named = cat.topCompetitors.take(3).toList();
+    final namedSum = named.fold<double>(0, (a, c) => a + c.sharePct);
+    final rest = (100.0 - ours - namedSum).clamp(0.0, 100.0);
+    int f(double v) => (v * 10).round();
+    final segs = <(double, Color)>[
+      (ours, cs.primary),
+      for (final (i, c) in named.indexed) (c.sharePct, _competitorShade(acc, i)),
+      (rest, cs.surfaceContainerHighest),
+    ].where((e) => f(e.$1) > 0).toList();
+    return ClipRRect(
+      borderRadius: M3Shape.radiusSm,
+      child: SizedBox(
+        height: 6.0,
+        child: Row(children: [
+          for (final e in segs) Expanded(flex: f(e.$1), child: ColoredBox(color: e.$2)),
+        ]),
+      ),
+    );
+  }
 }

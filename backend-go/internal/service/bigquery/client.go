@@ -1543,6 +1543,9 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 	storeMap := make(map[string]bool)
 	catMap := make(map[string]*catAccumulator)
 	catMarketMap := make(map[string]float64)
+	// Per-category revenue by supplier (own brand under ownSupplierKey) for rank + named competitors.
+	catSupplierMap := make(map[string]map[string]float64)
+	const ownSupplierKey = "\x00own"
 	skuMap := make(map[string]*skuAccumulator)
 	supMap := make(map[string]*supAccumulator)
 	ownSKUSet := make(map[string]bool)
@@ -1608,6 +1611,14 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 		if skuID != "" {
 			sAcc.skus[skuID] = true
 		}
+		catSupKey := supName
+		if isOwn {
+			catSupKey = ownSupplierKey
+		}
+		if catSupplierMap[catName] == nil {
+			catSupplierMap[catName] = make(map[string]float64)
+		}
+		catSupplierMap[catName][catSupKey] += r.NetRevenue
 
 		if !isOwn {
 			continue
@@ -1668,7 +1679,11 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 		if mktCatRev > 0 {
 			catMktShare = math.Round((acc.revenue/mktCatRev)*1000) / 10
 		}
+		rank, supplierCount, topCompetitors := categoryCompetition(catSupplierMap[acc.category], ownSupplierKey, mktCatRev, 5)
 		categoryContributions = append(categoryContributions, domain.CategoryContribution{
+			TenantRank:             rank,
+			SupplierCount:          supplierCount,
+			TopCompetitors:         topCompetitors,
 			Category:               acc.category,
 			TotalRevenue:           math.Round(acc.revenue*100) / 100,
 			TotalUnits:             acc.units,
@@ -2831,3 +2846,43 @@ func (c *Client) GetMonthlyPriceElasticity(ctx context.Context, tenantID string,
 }
 
 
+
+// categoryCompetition ranks suppliers in one category by revenue and returns
+// the tenant's 1-based rank, the number of suppliers, and the top-N named
+// competitors (tenant excluded) with their share of the category market.
+func categoryCompetition(sup map[string]float64, ownKey string, marketRev float64, topN int) (int, int, []domain.CategoryCompetitor) {
+	type kv struct {
+		name string
+		rev  float64
+	}
+	list := make([]kv, 0, len(sup))
+	for k, v := range sup {
+		list = append(list, kv{k, v})
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].rev == list[j].rev {
+			return list[i].name < list[j].name
+		}
+		return list[i].rev > list[j].rev
+	})
+	rank := 0
+	out := make([]domain.CategoryCompetitor, 0, topN)
+	for i, e := range list {
+		if e.name == ownKey {
+			rank = i + 1
+			continue
+		}
+		if len(out) < topN {
+			share := 0.0
+			if marketRev > 0 {
+				share = math.Round((e.rev/marketRev)*1000) / 10
+			}
+			out = append(out, domain.CategoryCompetitor{
+				Name:     e.name,
+				Revenue:  math.Round(e.rev*100) / 100,
+				SharePct: share,
+			})
+		}
+	}
+	return rank, len(list), out
+}
