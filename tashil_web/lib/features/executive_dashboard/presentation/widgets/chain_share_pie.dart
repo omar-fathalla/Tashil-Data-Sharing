@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
+import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -12,42 +14,33 @@ class ChainSharePie extends StatelessWidget {
     required this.chainShares,
   });
 
-  static const List<Color> _chainColors = [
-    Color(0xFF10B981), // Fathalla: Emerald Green
-    Color(0xFFF59E0B), // Gomla: Amber Orange
-    Color(0xFF7C3AED), // Beet El Gomla: Royal Violet / Purple
-    Color(0xFF2563EB), // Carrefour: Royal Blue
-    Color(0xFFE11D48), // Spinneys: Crimson / Coral
-    Color(0xFF0891B2), // Seoudi: Deep Cyan
-    Color(0xFFD946EF), // Metro: Magenta Pink
-    Color(0xFFDC2626), // Kazyon: Fire Red
-  ];
+  static const List<Color> _chainColors = M3StatusColors.chainPalette;
 
   static Color colorForChain(String chainCode, [int fallbackIndex = -1]) {
     final clean = chainCode.trim().toLowerCase();
     switch (clean) {
       case 'fathalla':
-        return const Color(0xFF10B981); // Emerald Green
+        return M3StatusColors.chainFathalla;
       case 'gomla':
-        return const Color(0xFFF59E0B); // Amber Orange
+        return M3StatusColors.chainGomla;
       case 'beet-elgomla':
       case 'beet_elgomla':
       case 'beet elgomla':
-        return const Color(0xFF7C3AED); // Royal Violet / Purple (Distinguishable from Fathalla Green)
+        return M3StatusColors.chainBeetElGomla;
       case 'carrefour':
-        return const Color(0xFF2563EB); // Royal Blue
+        return M3StatusColors.chainCarrefour;
       case 'spinneys':
-        return const Color(0xFFE11D48); // Crimson / Coral
+        return M3StatusColors.chainSpinneys;
       case 'metro':
-        return const Color(0xFFD946EF); // Magenta / Pink
+        return M3StatusColors.chainMetro;
       case 'seoudi':
       case 'chain-1080314':
       case 'el-wakala':
       case 'wakala':
       case 'الوكالة':
-        return const Color(0xFF0891B2); // Deep Cyan
+        return M3StatusColors.chainSeoudi;
       case 'kazyon':
-        return const Color(0xFFDC2626); // Fire Red
+        return M3StatusColors.chainKazyon;
       default:
         if (fallbackIndex >= 0) {
           return _chainColors[fallbackIndex % _chainColors.length];
@@ -158,7 +151,7 @@ class ChainSharePie extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(12.0),
+                    borderRadius: M3Shape.radiusMd,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -197,7 +190,7 @@ class ChainSharePie extends StatelessWidget {
             // Stacked Bar Representation
             if (chainShares.isNotEmpty)
               ClipRRect(
-                borderRadius: BorderRadius.circular(8.0),
+                borderRadius: M3Shape.radiusSm,
                 child: SizedBox(
                   height: 14.0,
                   child: Row(
@@ -290,7 +283,7 @@ class ChainSharePie extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
                           decoration: BoxDecoration(
                             color: color.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(6.0),
+                            borderRadius: M3Shape.radiusSm,
                           ),
                           child: Text(
                             '${item.marketShare.toStringAsFixed(1)}%',

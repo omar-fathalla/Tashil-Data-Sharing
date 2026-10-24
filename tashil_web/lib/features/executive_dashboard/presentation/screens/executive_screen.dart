@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/executive_dashboard_repository.dart';
@@ -286,7 +287,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
         padding: EdgeInsets.symmetric(horizontal: isCompact ? 10.0 : 14.0),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(20.0),
+          borderRadius: M3Shape.radiusLg,
           border: Border.all(
             color: colorScheme.outlineVariant.withOpacity(0.8),
           ),
@@ -328,7 +329,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
       height: 38.0,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(
           color: colorScheme.outlineVariant.withOpacity(0.8),
         ),

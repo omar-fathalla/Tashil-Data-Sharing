@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -307,7 +308,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
                       decoration: BoxDecoration(
                         color: series.color.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(16.0),
+                        borderRadius: M3Shape.radiusLg,
                         border: Border.all(color: series.color.withOpacity(0.4)),
                       ),
                       child: Row(
@@ -541,14 +542,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
           padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
           decoration: BoxDecoration(
             color: colorScheme.inverseSurface,
-            borderRadius: BorderRadius.circular(10.0),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.shadow.withOpacity(0.18),
-                blurRadius: 10.0,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            borderRadius: M3Shape.radiusSm,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

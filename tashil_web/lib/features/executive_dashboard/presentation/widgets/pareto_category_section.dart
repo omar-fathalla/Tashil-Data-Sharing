@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
@@ -237,7 +238,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                       padding: const EdgeInsets.all(8.0),
                       decoration: BoxDecoration(
                         color: colorScheme.primaryContainer.withOpacity(0.65),
-                        borderRadius: BorderRadius.circular(10.0),
+                        borderRadius: M3Shape.radiusSm,
                       ),
                       child: Icon(
                         Icons.pie_chart_rounded,
@@ -288,7 +289,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                       ),
                       decoration: BoxDecoration(
                         color: colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(10.0),
+                        borderRadius: M3Shape.radiusSm,
                         border: Border.all(color: colorScheme.primary.withOpacity(0.35)),
                       ),
                       child: Row(
@@ -322,7 +323,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                         ),
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(10.0),
+                          borderRadius: M3Shape.radiusSm,
                           border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
                         ),
                         child: Row(
@@ -355,7 +356,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                         ),
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(10.0),
+                          borderRadius: M3Shape.radiusSm,
                           border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
                         ),
                         child: Row(
@@ -385,14 +386,14 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                     if (widget.supplierShares.length > 8)
                       InkWell(
                         onTap: () => setState(() => _showAll = !_showAll),
-                        borderRadius: BorderRadius.circular(10.0),
+                        borderRadius: M3Shape.radiusSm,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
                           decoration: BoxDecoration(
                             color: _showAll
                                 ? colorScheme.primaryContainer
                                 : colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(10.0),
+                            borderRadius: M3Shape.radiusSm,
                             border: Border.all(
                               color: _showAll
                                   ? colorScheme.primary.withOpacity(0.4)
@@ -450,7 +451,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                   color: isTenant
                       ? colorScheme.primaryContainer.withOpacity(0.18)
                       : colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(14.0),
+                  borderRadius: M3Shape.radiusMd,
                   border: Border.all(
                     color: isTenant
                         ? colorScheme.primary.withOpacity(0.45)
@@ -477,7 +478,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 color: isTenant
                                     ? colorScheme.primary
                                     : colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(8.0),
+                                borderRadius: M3Shape.radiusSm,
                                 border: isTenant
                                     ? null
                                     : Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
@@ -522,7 +523,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               padding: const EdgeInsets.symmetric(horizontal: 9.0, vertical: 4.5),
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainerHighest.withOpacity(0.65),
-                                borderRadius: BorderRadius.circular(20.0),
+                                borderRadius: M3Shape.radiusLg,
                                 border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
                               ),
                               child: Row(
@@ -555,7 +556,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 padding: const EdgeInsets.symmetric(horizontal: 9.0, vertical: 4.5),
                                 decoration: BoxDecoration(
                                   color: colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(20.0),
+                                  borderRadius: M3Shape.radiusLg,
                                   border: Border.all(color: colorScheme.primary.withOpacity(0.35)),
                                 ),
                                 child: Row(
@@ -616,7 +617,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 color: isTenant
                                     ? colorScheme.primary
                                     : colorScheme.secondaryContainer,
-                                borderRadius: BorderRadius.circular(8.0),
+                                borderRadius: M3Shape.radiusSm,
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -652,7 +653,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 color: isTenant
                                     ? colorScheme.primaryContainer.withOpacity(0.65)
                                     : colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(8.0),
+                              borderRadius: M3Shape.radiusSm,
                               border: Border.all(
                                 color: isTenant
                                     ? colorScheme.primary.withOpacity(0.3)
@@ -712,7 +713,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                   const SizedBox(height: 12.0),
                   // Progress Bar
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(6.0),
+                    borderRadius: M3Shape.radiusSm,
                     child: LinearProgressIndicator(
                       value: ratio,
                       minHeight: 8.0,
@@ -731,7 +732,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
               padding: const EdgeInsets.all(14.0),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest.withOpacity(0.45),
-                borderRadius: BorderRadius.circular(14.0),
+                borderRadius: M3Shape.radiusMd,
                 border: Border.all(
                   color: colorScheme.outlineVariant.withOpacity(0.45),
                 ),
@@ -740,7 +741,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                 onTap: widget.supplierShares.length > 8
                     ? () => setState(() => _showAll = true)
                     : null,
-                borderRadius: BorderRadius.circular(10.0),
+                borderRadius: M3Shape.radiusSm,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -758,7 +759,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                   horizontal: 10.0, vertical: 5.0),
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(8.0),
+                                borderRadius: M3Shape.radiusSm,
                                 border: Border.all(
                                     color: colorScheme.outlineVariant.withOpacity(0.5)),
                               ),
@@ -785,7 +786,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainerHighest
                                     .withOpacity(0.65),
-                                borderRadius: BorderRadius.circular(20.0),
+                                borderRadius: M3Shape.radiusLg,
                                 border: Border.all(
                                     color: colorScheme.outlineVariant.withOpacity(0.5)),
                               ),
@@ -831,7 +832,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                   horizontal: 10.0, vertical: 5.5),
                               decoration: BoxDecoration(
                                 color: colorScheme.secondaryContainer.withOpacity(0.7),
-                                borderRadius: BorderRadius.circular(8.0),
+                                borderRadius: M3Shape.radiusSm,
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -857,7 +858,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                   horizontal: 10.0, vertical: 5.5),
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(8.0),
+                                borderRadius: M3Shape.radiusSm,
                                 border: Border.all(
                                     color: colorScheme.outlineVariant.withOpacity(0.5)),
                               ),
@@ -907,7 +908,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                     ),
                     const SizedBox(height: 12.0),
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(6.0),
+                      borderRadius: M3Shape.radiusSm,
                       child: LinearProgressIndicator(
                         value: (remainingSharePct / 25.0).clamp(0.02, 1.0),
                         minHeight: 8.0,
@@ -994,7 +995,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                   padding: const EdgeInsets.all(8.0),
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer.withOpacity(0.55),
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Icon(
                     Icons.category_rounded,
@@ -1034,14 +1035,14 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                 if (widget.categories.length > 10) ...[
                   InkWell(
                     onTap: () => setState(() => _showAll = !_showAll),
-                    borderRadius: BorderRadius.circular(8.0),
+                    borderRadius: M3Shape.radiusSm,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                       decoration: BoxDecoration(
                         color: _showAll
                             ? colorScheme.primaryContainer
                             : colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8.0),
+                        borderRadius: M3Shape.radiusSm,
                         border: Border.all(
                           color: _showAll
                               ? colorScheme.primary.withOpacity(0.4)
@@ -1077,12 +1078,12 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                 if (hasActiveFilter)
                   InkWell(
                     onTap: () => widget.onCategorySelected(null),
-                    borderRadius: BorderRadius.circular(8.0),
+                    borderRadius: M3Shape.radiusSm,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8.0),
+                        borderRadius: M3Shape.radiusSm,
                         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
                       ),
                       child: Row(
@@ -1110,7 +1111,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
               padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(10.0),
+                borderRadius: M3Shape.radiusSm,
                 border: Border.all(
                   color: colorScheme.outlineVariant.withOpacity(0.4),
                 ),
@@ -1149,7 +1150,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                         padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 1.5),
                         decoration: BoxDecoration(
                           color: colorScheme.primaryContainer.withOpacity(0.75),
-                          borderRadius: BorderRadius.circular(6.0),
+                          borderRadius: M3Shape.radiusSm,
                         ),
                         child: Text(
                           'حصتنا بالسوق %',
@@ -1190,7 +1191,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                         padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 1.5),
                         decoration: BoxDecoration(
                           color: colorScheme.secondaryContainer.withOpacity(0.75),
-                          borderRadius: BorderRadius.circular(6.0),
+                          borderRadius: M3Shape.radiusSm,
                         ),
                         child: Text(
                           '% من مبيعاتنا',
@@ -1220,9 +1221,9 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                   color: isSelected
                       ? colorScheme.primaryContainer.withOpacity(0.3)
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10.0),
+                  borderRadius: M3Shape.radiusSm,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                     onTap: () => widget.onCategorySelected(cat.category),
                     hoverColor: colorScheme.surfaceContainerHighest.withOpacity(0.35),
                     child: AnimatedContainer(
@@ -1230,7 +1231,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                       curve: M3Motion.standard,
                       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10.0),
+                        borderRadius: M3Shape.radiusSm,
                         border: Border.all(
                           color: isSelected
                               ? colorScheme.primary
@@ -1267,7 +1268,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: colorScheme.surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(6.0),
+                                        borderRadius: M3Shape.radiusSm,
                                       ),
                                       child: Text(
                                         '${cat.skuCount} صنف',
@@ -1285,7 +1286,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: colorScheme.primaryContainer.withOpacity(0.75),
-                                          borderRadius: BorderRadius.circular(6.0),
+                                          borderRadius: M3Shape.radiusSm,
                                         ),
                                         child: Text(
                                           'حصتنا بالسوق: ${cat.tenantCategorySharePct.toStringAsFixed(1)}%',
@@ -1332,7 +1333,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                           ),
                           const SizedBox(height: 6.0),
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(6.0),
+                            borderRadius: M3Shape.radiusSm,
                             child: LinearProgressIndicator(
                               value: ratio,
                               minHeight: 8.0,
@@ -1379,9 +1380,9 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                 padding: const EdgeInsets.only(bottom: 8.0),
                 child: Material(
                   color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(10.0),
+                  borderRadius: M3Shape.radiusSm,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                     onTap: widget.categories.length > 10
                         ? () => setState(() => _showAll = true)
                         : null,
@@ -1389,7 +1390,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10.0),
+                        borderRadius: M3Shape.radiusSm,
                         color: colorScheme.surfaceContainerHighest.withOpacity(0.35),
                         border: Border.all(
                           color: colorScheme.outlineVariant.withOpacity(0.3),
@@ -1423,7 +1424,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: colorScheme.surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(6.0),
+                                        borderRadius: M3Shape.radiusSm,
                                       ),
                                       child: Text(
                                         'فئات إضافية',
@@ -1472,7 +1473,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                           ),
                           const SizedBox(height: 6.0),
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(6.0),
+                            borderRadius: M3Shape.radiusSm,
                             child: LinearProgressIndicator(
                               value: (remainingSharePct / 100.0).clamp(0.0, 1.0),
                               minHeight: 8.0,
@@ -1592,7 +1593,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                   padding: const EdgeInsets.all(8.0),
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer.withOpacity(0.55),
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Icon(
                     Icons.insights_rounded,
@@ -1642,7 +1643,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer.withOpacity(0.35),
-                  borderRadius: BorderRadius.circular(8.0),
+                  borderRadius: M3Shape.radiusSm,
                   border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
                 ),
                 child: Row(
@@ -1688,7 +1689,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.inventory_2_outlined, size: 36.0, color: colorScheme.outline),
+                      Icon(Icons.inventory_2_rounded, size: 36.0, color: colorScheme.outline),
                       const SizedBox(height: 8.0),
                       Text(
                         'لا توجد أصناف مسجلة لهذه الفئة حالياً',
@@ -1723,7 +1724,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                         color: isClassA
                             ? colorScheme.primaryContainer.withOpacity(0.22)
                             : colorScheme.surfaceContainerLowest,
-                        borderRadius: BorderRadius.circular(10.0),
+                        borderRadius: M3Shape.radiusSm,
                         border: Border.all(
                           color: isClassA
                               ? colorScheme.primary.withOpacity(0.25)
@@ -1754,7 +1755,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                         color: isClassA
                                             ? colorScheme.primaryContainer
                                             : colorScheme.surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(6.0),
+                                        borderRadius: M3Shape.radiusSm,
                                       ),
                                       child: Text(
                                         isClassA ? 'فئة A • 80%' : 'فئة B/C',
@@ -1861,7 +1862,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                     color: isClassA
                                         ? colorScheme.primaryContainer
                                         : colorScheme.surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(8.0),
+                                    borderRadius: M3Shape.radiusSm,
                                   ),
                                   child: Text(
                                     isClassA ? 'فئة A • 80% من المبيعات' : 'فئة B/C',

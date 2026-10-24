@@ -38,6 +38,29 @@ class M3StatusColors extends ThemeExtension<M3StatusColors> {
   /// Ordered categorical palette for charts (series 0..n).
   final List<Color> chartPalette;
 
+  /// Fixed categorical colours for retailer chains (identity colours that
+  /// must stay stable across light/dark and tenants).
+  static const Color chainFathalla = Color(0xFF10B981);
+  static const Color chainGomla = Color(0xFFF59E0B);
+  static const Color chainBeetElGomla = Color(0xFF7C3AED);
+  static const Color chainCarrefour = Color(0xFF2563EB);
+  static const Color chainSpinneys = Color(0xFFE11D48);
+  static const Color chainSeoudi = Color(0xFF0891B2);
+  static const Color chainMetro = Color(0xFFD946EF);
+  static const Color chainKazyon = Color(0xFFDC2626);
+
+  /// Ordered chain palette (used for unknown chains / fallback indexes).
+  static const List<Color> chainPalette = [
+    chainFathalla,
+    chainGomla,
+    chainBeetElGomla,
+    chainCarrefour,
+    chainSpinneys,
+    chainSeoudi,
+    chainMetro,
+    chainKazyon,
+  ];
+
   static const Color _successSeed = Color(0xFF2E7D32);
   static const Color _warningSeed = Color(0xFFF9A825);
   static const Color _infoSeed = Color(0xFF0277BD);
