@@ -8228,6 +8228,9 @@ class ApiClient {
     int? year,
     int leadTimeDays = 4,
     int safetyStockDays = 7,
+    // When false, never return the synthetic local CPFR dataset; throw instead
+    // so callers that must show only real data can render an empty state.
+    bool allowLocalFallback = true,
   }) async {
     final queryParams = <String, String>{
       'lead_time_days': '$leadTimeDays',
@@ -8272,6 +8275,9 @@ class ApiClient {
       // Proceed to deterministic local CPFR fallback
     }
 
+    if (!allowLocalFallback) {
+      throw ServerConnectionException('CPFR dashboard unavailable');
+    }
     // 3. Deterministic local CPFR fallback so the screen never fails with 'ClientException: Failed to fetch'
     return _buildFallbackCPFRDashboard(
       chain: chain,

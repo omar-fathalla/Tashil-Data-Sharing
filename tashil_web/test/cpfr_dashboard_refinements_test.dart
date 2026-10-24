@@ -46,6 +46,7 @@ class MockCPFRApiClient extends Fake implements ApiClient {
     int leadTimeDays = 4,
     int safetyStockDays = 7,
     int? year,
+    bool allowLocalFallback = true,
   }) async {
     return CPFRDashboardModel.fromJson({
       'tenant_id': 'tenant-adeco',

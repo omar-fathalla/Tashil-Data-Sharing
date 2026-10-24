@@ -21,10 +21,23 @@ const _update = bool.fromEnvironment('UPDATE_TEXT_SNAPSHOTS');
 
 String _c(Color? c) => c == null ? '-' : c.toARGB32().toRadixString(16);
 
-List<String> _collect(WidgetTester tester) {
+List<String> _collect(WidgetTester tester, {List<Key> exclude = const []}) {
+  // Paragraphs under excluded keys (new sections) are skipped so the
+  // snapshot of pre-existing sections stays byte-identical.
+  final skip = <RenderObject>{};
+  for (final k in exclude) {
+    for (final e in find.byKey(k).evaluate()) {
+      void walk(RenderObject r) {
+        skip.add(r);
+        r.visitChildren(walk);
+      }
+      final r = e.renderObject;
+      if (r != null) walk(r);
+    }
+  }
   final out = <String>[];
   for (final ro in tester.allRenderObjects) {
-    if (ro is! RenderParagraph) continue;
+    if (ro is! RenderParagraph || skip.contains(ro)) continue;
     void visit(InlineSpan span, TextStyle? parent) {
       final s = (parent ?? const TextStyle()).merge(span.style);
       if (span is TextSpan && (span.text ?? '').trim().isNotEmpty) {
@@ -43,8 +56,8 @@ List<String> _collect(WidgetTester tester) {
   return out;
 }
 
-Future<void> _check(WidgetTester tester, String name) async {
-  final lines = _collect(tester);
+Future<void> _check(WidgetTester tester, String name, {List<Key> exclude = const []}) async {
+  final lines = _collect(tester, exclude: exclude);
   final f = File('test/snapshots/$name.txt');
   if (_update || !f.existsSync()) {
     f.writeAsStringSync('${lines.join('\n')}\n');
@@ -102,12 +115,16 @@ void main() {
 
   testWidgets('Executive dashboard text/icon styles are unchanged', (tester) async {
     await _pump(tester, ExecutiveScreen(apiClient: ApiClient()));
-    await _check(tester, 'executive');
+    const newSections = [
+      ValueKey('market_share_section'),
+      ValueKey('executive_period_segmented'),
+    ];
+    await _check(tester, 'executive', exclude: newSections);
     // Open each header filter menu so menu item styles are covered too.
     for (final k in ['executive_chain_dropdown', 'executive_month_dropdown']) {
       await tester.tap(find.byKey(ValueKey(k)));
       await tester.pumpAndSettle();
-      await _check(tester, 'executive_menu_${k.split('_')[1]}');
+      await _check(tester, 'executive_menu_${k.split('_')[1]}', exclude: newSections);
       await tester.tapAt(const Offset(5, 5));
       await tester.pumpAndSettle();
     }

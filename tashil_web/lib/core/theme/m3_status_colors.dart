@@ -187,7 +187,7 @@ class M3StatusColors extends ThemeExtension<M3StatusColors> {
 /// (e.g. [positive] == Colors.green.shade700), so the look is unchanged.
 @immutable
 class M3AccentRoles {
-  const M3AccentRoles({this.positive = const Color(0xFF388E3C), this.positiveStrong = const Color(0xFF2E7D32), this.teal = const Color(0xFF00796B), this.tealStrong = const Color(0xFF00695C), this.tealDeep = const Color(0xFF004D40), this.tealSurface = const Color(0xFFE0F2F1), this.indigo = const Color(0xFF303F9F), this.caution = const Color(0xFFEF6C00), this.cautionStrong = const Color(0xFFE65100), this.cautionSurface = const Color(0xFFFFE0B2), this.alert = const Color(0xFFE64A19), this.alertStrong = const Color(0xFFD84315), this.highlight = const Color(0xFFFF6F00), this.highlightBorder = const Color(0xFFFFA000), this.highlightSurface = const Color(0xFFFFECB3), this.purple = const Color(0xFF7B1FA2), this.purpleStrong = const Color(0xFF6A1B9A), this.negative = const Color(0xFFD32F2F), this.neutral = const Color(0xFF455A64), this.tealBase = const Color(0xFF009688), this.redBase = const Color(0xFFF44336), this.orangeBase = const Color(0xFFFF9800)});
+  const M3AccentRoles({this.positive = const Color(0xFF388E3C), this.positiveStrong = const Color(0xFF2E7D32), this.teal = const Color(0xFF00796B), this.tealStrong = const Color(0xFF00695C), this.tealDeep = const Color(0xFF004D40), this.tealSurface = const Color(0xFFE0F2F1), this.indigo = const Color(0xFF303F9F), this.caution = const Color(0xFFEF6C00), this.cautionStrong = const Color(0xFFE65100), this.cautionSurface = const Color(0xFFFFE0B2), this.alert = const Color(0xFFE64A19), this.alertStrong = const Color(0xFFD84315), this.highlight = const Color(0xFFFF6F00), this.highlightBorder = const Color(0xFFFFA000), this.highlightSurface = const Color(0xFFFFECB3), this.purple = const Color(0xFF7B1FA2), this.purpleStrong = const Color(0xFF6A1B9A), this.negative = const Color(0xFFD32F2F), this.neutral = const Color(0xFF455A64), this.tealBase = const Color(0xFF009688), this.redBase = const Color(0xFFF44336), this.orangeBase = const Color(0xFFFF9800), this.competitor = const Color(0xFF90A4AE), this.competitorStrong = const Color(0xFF607D8B), this.competitorSurface = const Color(0xFFCFD8DC)});
 
   final Color positive;
   final Color positiveStrong;
@@ -215,6 +215,10 @@ class M3AccentRoles {
   final Color redBase;
   /// == Colors.orange (base [500] swatch).
   final Color orangeBase;
+  /// Neutral grey for competitor series in market-share charts.
+  final Color competitor;
+  final Color competitorStrong;
+  final Color competitorSurface;
 
   static const M3AccentRoles light = M3AccentRoles();
 
@@ -224,6 +228,9 @@ class M3AccentRoles {
       tealBase: l(tealBase, o.tealBase),
       redBase: l(redBase, o.redBase),
       orangeBase: l(orangeBase, o.orangeBase),
+      competitor: l(competitor, o.competitor),
+      competitorStrong: l(competitorStrong, o.competitorStrong),
+      competitorSurface: l(competitorSurface, o.competitorSurface),
       positive: l(positive, o.positive),
       positiveStrong: l(positiveStrong, o.positiveStrong),
       teal: l(teal, o.teal),

@@ -141,10 +141,24 @@ void main() {
       expect(find.text('Category Contribution'), findsOneWidget);
       expect(find.text('Pareto 80/20 Power SKUs'), findsOneWidget);
       expect(find.text('توزيع الإيرادات والحصة السوقية داخل كل مجموعة رئيسية'), findsOneWidget);
-      expect(find.text('زيوت طعام'), findsOneWidget);
+      // Exclude the new Market Share section above, which also lists categories.
+      final inNewSection = find.descendant(
+        of: find.byKey(const ValueKey('market_share_section')),
+        matching: find.text('زيوت طعام'),
+      );
+      expect(
+        find.text('زيوت طعام').evaluate().length - inNewSection.evaluate().length,
+        1,
+      );
 
       // Verify interactive drilldown: tapping a category filters the Pareto list
-      await tester.tap(find.text('زيوت طعام'));
+      final existingCat = find.descendant(
+        of: find.byKey(const ValueKey('category_contribution_card')),
+        matching: find.text('زيوت طعام'),
+      ).first;
+      await tester.ensureVisible(existingCat);
+      await tester.pumpAndSettle();
+      await tester.tap(existingCat);
       await tester.pumpAndSettle();
 
       expect(find.textContaining('أصناف فئة: زيوت طعام'), findsOneWidget);

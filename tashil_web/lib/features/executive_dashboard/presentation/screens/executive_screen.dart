@@ -12,6 +12,8 @@ import '../widgets/bento_kpi_grid.dart';
 import '../widgets/chain_share_pie.dart';
 import '../widgets/pareto_category_section.dart';
 import '../widgets/sellout_trend_chart.dart';
+import '../widgets/market_share_section.dart';
+import '../../../cpfr_replenishment/domain/cpfr_models.dart';
 
 /// ExecutiveScreen is the primary executive management overview.
 class ExecutiveScreen extends StatefulWidget {
@@ -37,6 +39,13 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
   String selectedChain = 'all';
   bool isLoading = true;
   String? loadError;
+  /// Period granularity for the Market Share overview: monthly | quarterly | yearly.
+  String _periodMode = 'yearly';
+  int _selectedQuarter = 1;
+  CPFRDashboardModel? _cpfr;
+  bool _cpfrLoading = false;
+  String? _cpfrError;
+  int _cpfrRequestId = 0;
   ExecutiveKPIsModel? kpis;
   late String _lastTenantId;
   String? _lastRole;
@@ -146,7 +155,15 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
     final requestId = ++_loadRequestId;
     String? startDate;
     String? endDate;
-    if (selectedMonth == 0) {
+    if (_periodMode == 'quarterly') {
+      // Explicit date range; 'MTD' only labels it (dates take precedence).
+      selectedPeriod = 'MTD';
+      final firstM = (_selectedQuarter - 1) * 3 + 1;
+      final lastM = firstM + 2;
+      final lastDay = DateTime(selectedYear, lastM + 1, 0).day;
+      startDate = '$selectedYear-${firstM.toString().padLeft(2, '0')}-01';
+      endDate = '$selectedYear-${lastM.toString().padLeft(2, '0')}-${lastDay.toString().padLeft(2, '0')}';
+    } else if (selectedMonth == 0) {
       selectedPeriod = 'YTD';
       startDate = '$selectedYear-01-01';
       endDate = '$selectedYear-12-31';
@@ -159,6 +176,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
     }
 
     final effectiveChain = selectedChain == 'all' ? null : selectedChain;
+    _loadCpfr();
     final cached = _repo.peekFresh(
           period: selectedPeriod,
           startDate: startDate,
@@ -210,6 +228,93 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
         }
       }
     });
+  }
+
+  Future<void> _loadCpfr() async {
+    final id = ++_cpfrRequestId;
+    setState(() {
+      _cpfrLoading = true;
+      _cpfrError = null;
+    });
+    try {
+      final res = await widget.apiClient.fetchCPFRDashboard(
+        chain: selectedChain,
+        year: selectedYear,
+        allowLocalFallback: false, // real data only
+      );
+      if (!mounted || id != _cpfrRequestId) return;
+      setState(() {
+        _cpfr = res;
+        _cpfrLoading = false;
+      });
+    } catch (e) {
+      if (!mounted || id != _cpfrRequestId) return;
+      setState(() {
+        _cpfr = null;
+        _cpfrLoading = false;
+        _cpfrError = e.toString();
+      });
+    }
+  }
+
+  Set<int> get _periodMonths {
+    if (_periodMode == 'quarterly') {
+      final f = (_selectedQuarter - 1) * 3 + 1;
+      return {f, f + 1, f + 2};
+    }
+    if (selectedMonth == 0) return {for (var m = 1; m <= 12; m++) m};
+    return {selectedMonth};
+  }
+
+  Widget _buildPeriodControls(BuildContext context) {
+    final style = ButtonStyle(
+      visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 6.0)),
+      textStyle: WidgetStatePropertyAll(Theme.of(context).textTheme.labelMedium),
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SegmentedButton<String>(
+          key: const ValueKey('executive_period_segmented'),
+          segments: const [
+            ButtonSegment(value: 'monthly', label: Text('Monthly')),
+            ButtonSegment(value: 'quarterly', label: Text('Quarterly')),
+            ButtonSegment(value: 'yearly', label: Text('Yearly')),
+          ],
+          selected: {_periodMode},
+          showSelectedIcon: false,
+          style: style,
+          onSelectionChanged: (sel) {
+            final mode = sel.first;
+            setState(() {
+              _periodMode = mode;
+              if (mode == 'yearly') selectedMonth = 0;
+              if (mode == 'monthly' && selectedMonth == 0) selectedMonth = 1;
+              if (mode == 'quarterly') selectedMonth = 0;
+            });
+            _loadData();
+          },
+        ),
+        if (_periodMode == 'quarterly') ...[
+          const SizedBox(width: 8.0),
+          SegmentedButton<int>(
+            key: const ValueKey('executive_quarter_segmented'),
+            segments: [
+              for (var q = 1; q <= 4; q++) ButtonSegment(value: q, label: Text('Q$q')),
+            ],
+            selected: {_selectedQuarter},
+            showSelectedIcon: false,
+            style: style,
+            onSelectionChanged: (sel) {
+              setState(() => _selectedQuarter = sel.first);
+              _loadData();
+            },
+          ),
+        ],
+      ],
+    );
   }
 
   Widget _buildChainDropdown(BuildContext context, {bool isCompact = false}) {
@@ -372,7 +477,10 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
             tooltip: 'Select Month',
             minWidth: 220.0,
             onSelected: (month) {
-              setState(() => selectedMonth = month);
+              setState(() {
+                selectedMonth = month;
+                _periodMode = month == 0 ? 'yearly' : 'monthly';
+              });
               _loadData();
             },
             items: _months.map((m) {
@@ -497,6 +605,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
                     _buildChainDropdown(context, isCompact: isCompact),
                     const SizedBox(width: 8.0),
                     _buildYearMonthConnectedGroup(context, isCompact: isCompact),
+                    const SizedBox(width: 8.0),
+                    _buildPeriodControls(context),
                   ],
                 ),
               ),
@@ -522,6 +632,16 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
                           ),
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // New: Market Share + Sell In vs Sell Out overview (above existing sections)
+                            MarketShareSection(
+                              kpis: kpis!,
+                              cpfr: _cpfr,
+                              cpfrLoading: _cpfrLoading,
+                              cpfrError: _cpfrError,
+                              periodMonths: _periodMonths,
+                              year: selectedYear,
+                            ),
+
                             // Bento KPI Grid
                             BentoKpiGrid(kpis: kpis!),
 
