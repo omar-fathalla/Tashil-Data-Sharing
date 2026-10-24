@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/m3_spacing.dart';
+import '../../../core/theme/m3_shape.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/layout/window_size_classes.dart';
 import '../../../../core/network/api_client.dart';
@@ -67,7 +69,7 @@ class _AppShellState extends State<AppShell> {
       labelEn: 'Executive Overview',
       labelAr: 'لوحة القيادة التنفيذية',
       shortLabel: 'Dashboard',
-      icon: Icons.dashboard_outlined,
+      icon: Icons.dashboard_rounded,
       selectedIcon: Icons.dashboard_rounded,
     ),
     _NavDestinationSpec(
@@ -75,7 +77,7 @@ class _AppShellState extends State<AppShell> {
       labelEn: 'Sell-Out & Targets',
       labelAr: 'المبيعات ومستهدفات الـ Sell-Out',
       shortLabel: 'Sell-Out',
-      icon: Icons.analytics_outlined,
+      icon: Icons.analytics_rounded,
       selectedIcon: Icons.analytics_rounded,
     ),
     _NavDestinationSpec(
@@ -83,7 +85,7 @@ class _AppShellState extends State<AppShell> {
       labelEn: 'Sell-In & Targets',
       labelAr: 'التوريد ومستهدفات الـ Sell-In',
       shortLabel: 'Sell-In',
-      icon: Icons.local_shipping_outlined,
+      icon: Icons.local_shipping_rounded,
       selectedIcon: Icons.local_shipping_rounded,
     ),
     _NavDestinationSpec(
@@ -91,7 +93,7 @@ class _AppShellState extends State<AppShell> {
       labelEn: 'OOS Monitor',
       labelAr: 'مراقب النواقص',
       shortLabel: 'OOS',
-      icon: Icons.warning_amber_outlined,
+      icon: Icons.warning_amber_rounded,
       selectedIcon: Icons.warning_amber_rounded,
     ),
     _NavDestinationSpec(
@@ -99,7 +101,7 @@ class _AppShellState extends State<AppShell> {
       labelEn: 'Store Matrix',
       labelAr: 'مصفوفة الفروع',
       shortLabel: 'Matrix',
-      icon: Icons.store_mall_directory_outlined,
+      icon: Icons.store_mall_directory_rounded,
       selectedIcon: Icons.store_mall_directory_rounded,
     ),
     _NavDestinationSpec(
@@ -107,7 +109,7 @@ class _AppShellState extends State<AppShell> {
       labelEn: 'Pricing & Promos',
       labelAr: 'التسعير والعروض',
       shortLabel: 'Pricing',
-      icon: Icons.price_change_outlined,
+      icon: Icons.price_change_rounded,
       selectedIcon: Icons.price_change_rounded,
     ),
     _NavDestinationSpec(
@@ -115,7 +117,7 @@ class _AppShellState extends State<AppShell> {
       labelEn: 'Compare',
       labelAr: 'Compare',
       shortLabel: 'Compare',
-      icon: Icons.compare_arrows_outlined,
+      icon: Icons.compare_arrows_rounded,
       selectedIcon: Icons.compare_arrows_rounded,
     ),
     _NavDestinationSpec(
@@ -123,7 +125,7 @@ class _AppShellState extends State<AppShell> {
       labelEn: 'Trade Marketing & ROI',
       labelAr: 'المصروفات الترويجية وعائد التسويق',
       shortLabel: 'Promo ROI',
-      icon: Icons.campaign_outlined,
+      icon: Icons.campaign_rounded,
       selectedIcon: Icons.campaign_rounded,
     ),
     _NavDestinationSpec(
@@ -131,7 +133,7 @@ class _AppShellState extends State<AppShell> {
       labelEn: 'CPFR & PO',
       labelAr: 'التجديد وأوامر الشراء',
       shortLabel: 'CPFR',
-      icon: Icons.inventory_2_outlined,
+      icon: Icons.inventory_2_rounded,
       selectedIcon: Icons.inventory_2_rounded,
     ),
     _NavDestinationSpec(
@@ -139,7 +141,7 @@ class _AppShellState extends State<AppShell> {
       labelEn: 'Smart Upload',
       labelAr: 'رفع البيانات الذكي',
       shortLabel: 'Upload',
-      icon: Icons.auto_awesome_outlined,
+      icon: Icons.auto_awesome_rounded,
       selectedIcon: Icons.auto_awesome_rounded,
     ),
     _NavDestinationSpec(
@@ -147,7 +149,7 @@ class _AppShellState extends State<AppShell> {
       labelEn: 'Product Master & Price List',
       labelAr: 'كارتة الأصناف والأسعار',
       shortLabel: 'Master',
-      icon: Icons.qr_code_2_outlined,
+      icon: Icons.qr_code_2_rounded,
       selectedIcon: Icons.qr_code_2_rounded,
     ),
   ];
@@ -224,8 +226,8 @@ class _AppShellState extends State<AppShell> {
                       padding: const EdgeInsets.only(bottom: 4.0),
                       child: ListTile(
                         dense: true,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16.0),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: M3Shape.radiusLg,
                         ),
                         tileColor: isSelected
                             ? colorScheme.secondaryContainer
@@ -409,7 +411,7 @@ class _AppShellState extends State<AppShell> {
                         ),
                         decoration: BoxDecoration(
                           color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(999.0),
+                          borderRadius: M3Shape.radiusFull,
                         ),
                         child: Text(
                           widget.activeTenant.toUpperCase(),
@@ -434,12 +436,12 @@ class _AppShellState extends State<AppShell> {
                           if (widget.onNavigateToAdmin != null &&
                               widget.apiClient.currentUser?.isSuperAdmin == true)
                             IconButton(
-                              icon: const Icon(Icons.admin_panel_settings_outlined),
+                              icon: const Icon(Icons.admin_panel_settings_rounded),
                               tooltip: 'Super Admin Portal',
                               onPressed: widget.onNavigateToAdmin,
                             ),
                           IconButton(
-                            icon: const Icon(Icons.manage_accounts_outlined),
+                            icon: const Icon(Icons.manage_accounts_rounded),
                             tooltip: 'الملف الشخصي والـحساب',
                             onPressed: _openUserProfile,
                           ),
@@ -566,13 +568,13 @@ class _AppShellState extends State<AppShell> {
                     if (widget.onNavigateToAdmin != null &&
                         widget.apiClient.currentUser?.isSuperAdmin == true)
                       IconButton(
-                        icon: const Icon(Icons.admin_panel_settings_outlined),
+                        icon: const Icon(Icons.admin_panel_settings_rounded),
                         tooltip: 'لوحة الإدارة',
                         visualDensity: VisualDensity.compact,
                         onPressed: widget.onNavigateToAdmin,
                       ),
                     IconButton(
-                      icon: const Icon(Icons.manage_accounts_outlined),
+                      icon: const Icon(Icons.manage_accounts_rounded),
                       tooltip: 'الملف الشخصي',
                       visualDensity: VisualDensity.compact,
                       onPressed: _openUserProfile,
@@ -592,12 +594,16 @@ class _AppShellState extends State<AppShell> {
           ),
         ),
       ),
-      drawer: Drawer(
-        backgroundColor: colorScheme.surfaceContainer,
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+      drawer: NavigationDrawer(
+        selectedIndex: () {
+          final i = _destinations.indexWhere((d) => d.index == _selectedIndex);
+          return i < 0 ? null : i;
+        }(),
+        onDestinationSelected: (pos) {
+          setState(() => _selectedIndex = _destinations[pos].index);
+          Navigator.pop(context);
+        },
+        children: [
               Container(
                 padding: const EdgeInsets.fromLTRB(20.0, 20.0, 20.0, 16.0),
                 decoration: BoxDecoration(
@@ -637,48 +643,26 @@ class _AppShellState extends State<AppShell> {
                   ],
                 ),
               ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12.0,
-                    vertical: 10.0,
-                  ),
-                  children: _destinations.map((dest) {
-                    final isSelected = _selectedIndex == dest.index;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 4.0),
-                      child: ListTile(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28.0),
-                        ),
-                        selected: isSelected,
-                        selectedTileColor: colorScheme.secondaryContainer,
-                        leading: Icon(
-                          isSelected ? dest.selectedIcon : dest.icon,
-                          color: isSelected
-                              ? colorScheme.onSecondaryContainer
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                        title: Text(
-                          dest.labelEn,
-                          style: TextStyle(
-                            fontWeight:
-                                isSelected ? FontWeight.w800 : FontWeight.w600,
-                          ),
-                        ),
-                        subtitle: Text(
+              M3Spacing.gapXS,
+              ..._destinations.map(
+                (dest) => NavigationDrawerDestination(
+                  icon: Icon(dest.icon),
+                  selectedIcon: Icon(dest.selectedIcon),
+                  label: Flexible(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(dest.labelEn, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(
                           dest.labelAr,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
                         ),
-                        onTap: () {
-                          setState(() => _selectedIndex = dest.index);
-                          Navigator.pop(context);
-                        },
-                      ),
-                    );
-                  }).toList(),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const Divider(height: 1.0),
@@ -689,10 +673,10 @@ class _AppShellState extends State<AppShell> {
                   children: [
                     ListTile(
                       dense: true,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14.0),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: M3Shape.radiusMd,
                       ),
-                      leading: const Icon(Icons.manage_accounts_outlined),
+                      leading: const Icon(Icons.manage_accounts_rounded),
                       title: Text(
                         user?.fullName ?? user?.email ?? 'الملف الشخصي',
                         maxLines: 1,
@@ -708,8 +692,8 @@ class _AppShellState extends State<AppShell> {
                     if (widget.onLogout != null)
                       ListTile(
                         dense: true,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14.0),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: M3Shape.radiusMd,
                         ),
                         leading: Icon(
                           Icons.logout_rounded,
@@ -730,9 +714,7 @@ class _AppShellState extends State<AppShell> {
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
+        ],
       ),
       body: Directionality(
         textDirection: TextDirection.rtl,
@@ -765,22 +747,22 @@ class _AppShellState extends State<AppShell> {
           },
           destinations: [
             const NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
+              icon: Icon(Icons.dashboard_rounded),
               selectedIcon: Icon(Icons.dashboard_rounded),
               label: 'Dashboard',
             ),
             const NavigationDestination(
-              icon: Icon(Icons.analytics_outlined),
+              icon: Icon(Icons.analytics_rounded),
               selectedIcon: Icon(Icons.analytics_rounded),
               label: 'Sell-Out',
             ),
             const NavigationDestination(
-              icon: Icon(Icons.price_change_outlined),
+              icon: Icon(Icons.price_change_rounded),
               selectedIcon: Icon(Icons.price_change_rounded),
               label: 'Pricing',
             ),
             const NavigationDestination(
-              icon: Icon(Icons.warning_amber_outlined),
+              icon: Icon(Icons.warning_amber_rounded),
               selectedIcon: Icon(Icons.warning_amber_rounded),
               label: 'OOS',
             ),
@@ -788,7 +770,7 @@ class _AppShellState extends State<AppShell> {
               icon: Icon(
                 isSecondarySelected
                     ? activeSecondarySpec.icon
-                    : Icons.apps_outlined,
+                    : Icons.apps_rounded,
               ),
               selectedIcon: Icon(
                 isSecondarySelected

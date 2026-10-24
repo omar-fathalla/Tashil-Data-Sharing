@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/m3_shape.dart';
 import '../../../../core/config/app_version.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
@@ -37,58 +38,58 @@ class DesktopSidebar extends StatelessWidget {
 
     final destinations = [
       _NavDestination(
-        icon: Icons.dashboard_outlined,
+        icon: Icons.dashboard_rounded,
         selectedIcon: Icons.dashboard_rounded,
         label: 'Dashboard',
       ),
       _NavDestination(
-        icon: Icons.analytics_outlined,
+        icon: Icons.analytics_rounded,
         selectedIcon: Icons.analytics_rounded,
         label: 'Sell-Out',
       ),
       _NavDestination(
-        icon: Icons.local_shipping_outlined,
+        icon: Icons.local_shipping_rounded,
         selectedIcon: Icons.local_shipping_rounded,
         label: 'Sell-In',
       ),
       _NavDestination(
-        icon: Icons.warning_amber_outlined,
+        icon: Icons.warning_amber_rounded,
         selectedIcon: Icons.warning_amber_rounded,
         label: 'OOS Monitor',
         badgeCount: 3,
       ),
       _NavDestination(
-        icon: Icons.store_mall_directory_outlined,
+        icon: Icons.store_mall_directory_rounded,
         selectedIcon: Icons.store_mall_directory_rounded,
         label: 'Store Matrix',
       ),
       _NavDestination(
-        icon: Icons.price_change_outlined,
+        icon: Icons.price_change_rounded,
         selectedIcon: Icons.price_change_rounded,
         label: 'Pricing & Promos',
       ),
       _NavDestination(
-        icon: Icons.compare_arrows_outlined,
+        icon: Icons.compare_arrows_rounded,
         selectedIcon: Icons.compare_arrows_rounded,
         label: 'Compare',
       ),
       _NavDestination(
-        icon: Icons.campaign_outlined,
+        icon: Icons.campaign_rounded,
         selectedIcon: Icons.campaign_rounded,
         label: 'Trade Marketing & ROI',
       ),
       _NavDestination(
-        icon: Icons.inventory_2_outlined,
+        icon: Icons.inventory_2_rounded,
         selectedIcon: Icons.inventory_2_rounded,
         label: 'CPFR Replenishment',
       ),
       _NavDestination(
-        icon: Icons.auto_awesome_outlined,
+        icon: Icons.auto_awesome_rounded,
         selectedIcon: Icons.auto_awesome_rounded,
         label: 'Upload',
       ),
       _NavDestination(
-        icon: Icons.qr_code_2_outlined,
+        icon: Icons.qr_code_2_rounded,
         selectedIcon: Icons.qr_code_2_rounded,
         label: 'Product Master',
       ),
@@ -183,7 +184,7 @@ class DesktopSidebar extends StatelessWidget {
 
                 return InkWell(
                   onTap: () => onDestinationSelected(index),
-                  borderRadius: BorderRadius.circular(28.0), // M3 pill shape
+                  borderRadius: M3Shape.radiusXl, // M3 pill shape
                   child: AnimatedContainer(
                     duration: M3Motion.short4,
                     curve: M3Motion.standard,
@@ -191,7 +192,7 @@ class DesktopSidebar extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     decoration: BoxDecoration(
                       color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
-                      borderRadius: BorderRadius.circular(28.0),
+                      borderRadius: M3Shape.radiusXl,
                     ),
                     child: Row(
                       children: [
@@ -234,7 +235,7 @@ class DesktopSidebar extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
                             decoration: BoxDecoration(
                               color: colorScheme.error,
-                              borderRadius: BorderRadius.circular(10.0),
+                              borderRadius: M3Shape.radiusSm,
                             ),
                             child: Text(
                               dest.badgeCount.toString(),
@@ -275,8 +276,8 @@ class DesktopSidebar extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
                   side: BorderSide(color: colorScheme.primary.withOpacity(0.5)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10.0),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: M3Shape.radiusSm,
                   ),
                 ),
               ),
@@ -288,14 +289,14 @@ class DesktopSidebar extends StatelessWidget {
             margin: const EdgeInsets.all(12.0),
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(12.0),
+              borderRadius: M3Shape.radiusMd,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.bolt, size: 14.0, color: colorScheme.primary),
+                    Icon(Icons.bolt_rounded, size: 14.0, color: colorScheme.primary),
                     const SizedBox(width: 4.0),
                     Expanded(
                       child: Text(

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/m3_status_colors.dart';
+import '../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_color_roles.dart';
 import '../../../../core/theme/m3_spacing.dart';
@@ -51,7 +53,7 @@ class TenantProfileCard extends StatelessWidget {
       padding: M3Spacing.pSm,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: M3Shape.radiusMd,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
       ),
       child: Column(
@@ -59,7 +61,7 @@ class TenantProfileCard extends StatelessWidget {
         children: [
           InkWell(
             onTap: onOpenProfile,
-            borderRadius: BorderRadius.circular(8.0),
+            borderRadius: M3Shape.radiusSm,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 4.0),
               child: Row(
@@ -98,8 +100,8 @@ class TenantProfileCard extends StatelessWidget {
                             Container(
                               width: 7.0,
                               height: 7.0,
-                              decoration: const BoxDecoration(
-                                color: Colors.green,
+                              decoration: BoxDecoration(
+                                color: M3StatusColors.of(context).success,
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -119,7 +121,7 @@ class TenantProfileCard extends StatelessWidget {
                   ),
                   if (onOpenProfile != null)
                     IconButton(
-                      icon: const Icon(Icons.manage_accounts_outlined, size: 20.0),
+                      icon: const Icon(Icons.manage_accounts_rounded, size: 20.0),
                       tooltip: 'User Profile & Settings',
                       onPressed: onOpenProfile,
                     ),

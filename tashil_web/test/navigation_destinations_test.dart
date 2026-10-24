@@ -52,9 +52,9 @@ void main() {
       expect(find.text('Upload'), findsOneWidget);
 
       // Verify store matrix icon
-      expect(find.byIcon(Icons.store_mall_directory_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.store_mall_directory_rounded), findsWidgets);
       // Verify price change icon
-      expect(find.byIcon(Icons.price_change_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.price_change_rounded), findsWidgets);
 
       // Tap on destination 2 ('Sell-In')
       await tester.tap(find.text('Sell-In'));
@@ -161,12 +161,12 @@ void main() {
       expect(find.text('Pricing'), findsOneWidget);
 
       // Tap on 'Matrix' (Store Matrix)
-      await tester.tap(find.byIcon(Icons.store_mall_directory_outlined));
+      await tester.tap(find.text('Matrix'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Store Matrix Benchmarking'), findsOneWidget);
 
       // Tap on 'Pricing' (Pricing Compliance)
-      await tester.tap(find.byIcon(Icons.price_change_outlined));
+      await tester.tap(find.text('Pricing'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Pricing & Promo Compliance'), findsOneWidget);
     });
