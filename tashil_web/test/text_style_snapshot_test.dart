@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/features/executive_dashboard/presentation/screens/executive_screen.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_in_explorer_screen.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
 
@@ -97,5 +98,18 @@ void main() {
     await _check(tester, 'sell_in_targets');
     await _tab(tester, 'Uploaded Sheets');
     await _check(tester, 'sell_in_sheets');
+  });
+
+  testWidgets('Executive dashboard text/icon styles are unchanged', (tester) async {
+    await _pump(tester, ExecutiveScreen(apiClient: ApiClient()));
+    await _check(tester, 'executive');
+    // Open each header filter menu so menu item styles are covered too.
+    for (final k in ['executive_chain_dropdown', 'executive_year_dropdown', 'executive_month_dropdown']) {
+      await tester.tap(find.byKey(ValueKey(k)));
+      await tester.pumpAndSettle();
+      await _check(tester, 'executive_menu_${k.split('_')[1]}');
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+    }
   });
 }

@@ -1,0 +1,422 @@
+#1 | 12.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+#1 | 12.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+#2 | 12.0 | FontWeight.w700 | ff45464f | 0.5 | 1.33
+#2 | 12.0 | FontWeight.w700 | ff45464f | 0.5 | 1.33
+#3 | 12.0 | FontWeight.w700 | ff45464f | 0.5 | 1.33
+#3 | 12.0 | FontWeight.w700 | ff45464f | 0.5 | 1.33
+#4 | 12.0 | FontWeight.w700 | ff45464f | 0.5 | 1.33
+#4 | 12.0 | FontWeight.w700 | ff45464f | 0.5 | 1.33
+#5 | 12.0 | FontWeight.w700 | ff45464f | 0.5 | 1.33
+#5 | 12.0 | FontWeight.w700 | ff45464f | 0.5 | 1.33
+#9+ | 12.0 | FontWeight.w700 | ff45464f | 0.5 | 1.33
+#9+ | 12.0 | FontWeight.w700 | ff45464f | 0.5 | 1.33
+% من مبيعاتنا | 9.5 | FontWeight.w700 | ff404659 | 0.5 | 1.45
+% من مبيعاتنا | 9.5 | FontWeight.w700 | ff404659 | 0.5 | 1.45
++14.8% شهري | 11.0 | FontWeight.w700 | ff404659 | 0.5 | 1.45
++14.8% شهري | 11.0 | FontWeight.w700 | ff404659 | 0.5 | 1.45
++16.4% سنوي | 11.0 | FontWeight.w600 | ff304578 | 0.5 | 1.45
++16.4% سنوي | 11.0 | FontWeight.w600 | ff304578 | 0.5 | 1.45
++24.5% سنوي | 11.0 | FontWeight.w600 | ff304578 | 0.5 | 1.45
++24.5% سنوي | 11.0 | FontWeight.w600 | ff304578 | 0.5 | 1.45
++9.2% شهري | 11.0 | FontWeight.w700 | ff404659 | 0.5 | 1.45
++9.2% شهري | 11.0 | FontWeight.w700 | ff404659 | 0.5 | 1.45
+0 ج.م | 9.5 | FontWeight.w700 | d945464f | 0.5 | 1.45
+0 ج.م | 9.5 | FontWeight.w700 | d945464f | 0.5 | 1.45
+1.16M ج.م مبيعاتنا من إجمالي 4.08M ج.م بالسوق | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+1.16M ج.م مبيعاتنا من إجمالي 4.08M ج.م بالسوق | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+1.16M ج.م مبيعاتنا من إجمالي 4.08M ج.م بالسوق | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+1.55M ج.م | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+1.55M ج.م | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+100% Coverage | 11.0 | FontWeight.w600 | d9304578 | 0.5 | 1.45
+100% Coverage | 11.0 | FontWeight.w600 | d9304578 | 0.5 | 1.45
+109 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+109 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+109 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+11.21% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+11.21% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+11.21% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+118K ج.م | 9.5 | FontWeight.w700 | d945464f | 0.5 | 1.45
+118K ج.م | 9.5 | FontWeight.w700 | d945464f | 0.5 | 1.45
+12,500 عبوة مباعة | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+12,500 عبوة مباعة | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+12.0% | 14.0 | FontWeight.w700 | fff57c00 | 0.1 | 1.43
+12.0% | 14.0 | FontWeight.w700 | fff57c00 | 0.1 | 1.43
+13.92% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+13.92% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+13.92% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+15.0% | 10.0 | FontWeight.w700 | fff59e0b | 0.5 | 1.45
+15.0% | 10.0 | FontWeight.w700 | fff59e0b | 0.5 | 1.45
+153 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+153 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+153 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+17,200 عبوة مباعة | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+17,200 عبوة مباعة | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+176K ج.م | 9.5 | FontWeight.w700 | d945464f | 0.5 | 1.45
+176K ج.م | 9.5 | FontWeight.w700 | d945464f | 0.5 | 1.45
+18.44% | 12.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+18.44% | 12.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+18.44% | 12.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+19.76M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+19.76M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+2,950 عبوة مباعة | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+2,950 عبوة مباعة | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+2.18M ج.م | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+2.18M ج.م | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+2024 | 14.0 | FontWeight.w500 | ff1a1b21 | 0.1 | 1.43
+2024 | 14.0 | FontWeight.w500 | ff1a1b21 | 0.1 | 1.43
+2025 | 14.0 | FontWeight.w500 | ff1a1b21 | 0.1 | 1.43
+2025 | 14.0 | FontWeight.w500 | ff1a1b21 | 0.1 | 1.43
+2026 | 14.0 | FontWeight.w700 | ff1565c0 | 0.1 | 1.43
+2026 | 14.0 | FontWeight.w700 | ff1565c0 | 0.1 | 1.43
+2026-03-01 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+2026-03-01 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+2026-03-02 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+2026-03-02 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+2026-03-03 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+2026-03-03 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+2026-03-04 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+2026-03-04 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+2026-03-05 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+2026-03-05 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+2026-03-06 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+2026-03-06 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+2026-03-07 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+2026-03-07 | 10.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+235K ج.م | 9.5 | FontWeight.w700 | d945464f | 0.5 | 1.45
+235K ج.م | 9.5 | FontWeight.w700 | d945464f | 0.5 | 1.45
+24,608 عبوة | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+24,608 عبوة | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+24.0% | 14.0 | FontWeight.w700 | ff00897b | 0.1 | 1.43
+24.0% | 14.0 | FontWeight.w700 | ff00897b | 0.1 | 1.43
+256 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+256 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+256 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+3.10M ج.م مبيعاتنا من إجمالي 7.42M ج.م بالسوق | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+3.10M ج.م مبيعاتنا من إجمالي 7.42M ج.م بالسوق | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+3.10M ج.م مبيعاتنا من إجمالي 7.42M ج.م بالسوق | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+3.2% | 24.0 | FontWeight.w700 | ffba1a1a | 0.0 | 1.29
+3.2% | 24.0 | FontWeight.w700 | ffba1a1a | 0.0 | 1.29
+32.0% | 10.0 | FontWeight.w700 | ff10b981 | 0.5 | 1.45
+32.0% | 10.0 | FontWeight.w700 | ff10b981 | 0.5 | 1.45
+34 فرع | 24.0 | FontWeight.w700 | ff1a1b21 | 0.0 | 1.29
+34 فرع | 24.0 | FontWeight.w700 | ff1a1b21 | 0.0 | 1.29
+38,450 عبوة | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+38,450 عبوة | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+38.20% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+38.20% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+38.5K قطعة | 24.0 | FontWeight.w700 | ff1a1b21 | 0.0 | 1.29
+38.5K قطعة | 24.0 | FontWeight.w700 | ff1a1b21 | 0.0 | 1.29
+388.0K ج.م | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+388.0K ج.م | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+4 Active Chains | 9.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+4 Active Chains | 9.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+4 سلاسل نشطة | 11.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.45
+4 سلاسل نشطة | 11.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.45
+4 صنف | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+4 صنف | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+4,614 عبوة | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+4,614 عبوة | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+4,850,230 ج.م | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+4,850,230 ج.م | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+4.32M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+4.32M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+4.32M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+4.85M ج.م | 24.0 | FontWeight.w700 | ff1a1b21 | 0.0 | 1.29
+4.85M ج.م | 24.0 | FontWeight.w700 | ff1a1b21 | 0.0 | 1.29
+40 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+40 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+40 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+45.0% | 10.0 | FontWeight.w700 | ff2563eb | 0.5 | 1.45
+45.0% | 10.0 | FontWeight.w700 | ff2563eb | 0.5 | 1.45
+5 صنف | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+5 صنف | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+5,800 عبوة مباعة | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+5,800 عبوة مباعة | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+5.11M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+5.11M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+5.11M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+5.80M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+5.80M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+5.80M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+582.0K ج.م مبيعاتنا من إجمالي 2.10M ج.م بالسوق | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+582.0K ج.م مبيعاتنا من إجمالي 2.10M ج.م بالسوق | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+582.0K ج.م مبيعاتنا من إجمالي 2.10M ج.م بالسوق | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+59K ج.م | 9.5 | FontWeight.w700 | d945464f | 0.5 | 1.45
+59K ج.م | 9.5 | FontWeight.w700 | d945464f | 0.5 | 1.45
+64.0% | 14.0 | FontWeight.w700 | ff1565c0 | 0.1 | 1.43
+64.0% | 14.0 | FontWeight.w700 | ff1565c0 | 0.1 | 1.43
+7.20M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+7.20M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+7.20M ج.م | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+727.5K ج.م | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+727.5K ج.م | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+8 صنف | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+8 صنف | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+8.0% | 10.0 | FontWeight.w700 | ffe11d48 | 0.5 | 1.45
+8.0% | 10.0 | FontWeight.w700 | ffe11d48 | 0.5 | 1.45
+8.36% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+8.36% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+8.36% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+81 مورد منافس | 12.0 | FontWeight.w600 | ff45464f | 0.5 | 1.33
+81 مورد منافس | 12.0 | FontWeight.w600 | ff45464f | 0.5 | 1.33
+81 مورد منافس | 12.0 | FontWeight.w600 | ff45464f | 0.5 | 1.33
+86 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+86 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+86 باركود | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+9,228 عبوة | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+9,228 عبوة | 11.5 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+9.54M ج.م | 12.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.33
+9.54M ج.م | 12.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.33
+9.54M ج.م | 12.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.33
+9.88% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+9.88% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+9.88% | 12.0 | FontWeight.w700 | ff404659 | 0.5 | 1.33
+Active Covered Branches | 11.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.45
+Active Covered Branches | 11.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.45
+Adeco Extra Virgin Olive Oil 500ml | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Adeco Extra Virgin Olive Oil 500ml | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Adeco Premium Tomato Paste 380g | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Adeco Premium Tomato Paste 380g | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Adeco Pure Corn Oil 800ml | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Adeco Pure Corn Oil 800ml | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Adeco Pure Sunflower Oil 1L | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Adeco Pure Sunflower Oil 1L | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Adeco Traditional Fava Beans 400g | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Adeco Traditional Fava Beans 400g | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Arma | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Arma | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Carrefour | 11.0 | FontWeight.w600 | ff1565c0 | 0.5 | 1.45
+Carrefour | 11.0 | FontWeight.w600 | ff1565c0 | 0.5 | 1.45
+Category Contribution | 12.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.33
+Category Contribution | 12.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.33
+Chain Market Share | 12.0 | FontWeight.w700 | ff1565c0 | 0.2 | 1.33
+Chain Market Share | 12.0 | FontWeight.w700 | ff1565c0 | 0.2 | 1.33
+Chain: All | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+Chain: All | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+Executive Dashboard | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Executive Dashboard | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Executive Dashboard | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Fathalla | 11.0 | FontWeight.w600 | ff1565c0 | 0.5 | 1.45
+Fathalla | 11.0 | FontWeight.w600 | ff1565c0 | 0.5 | 1.45
+Fridal | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Fridal | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Gomla | 11.0 | FontWeight.w600 | ff1565c0 | 0.5 | 1.45
+Gomla | 11.0 | FontWeight.w600 | ff1565c0 | 0.5 | 1.45
+Henkel | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Henkel | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Market Leader | 10.0 | FontWeight.w600 | d9304578 | 0.5 | 1.45
+Market Leader | 10.0 | FontWeight.w600 | d9304578 | 0.5 | 1.45
+Market Share vs. Competitors | 12.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.33
+Market Share vs. Competitors | 12.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.33
+Market Share • 256 SKUs | 11.0 | FontWeight.w600 | cc304578 | 0.5 | 1.45
+Market Share • 256 SKUs | 11.0 | FontWeight.w600 | cc304578 | 0.5 | 1.45
+MoM | 11.0 | FontWeight.w600 | d9404659 | 0.5 | 1.45
+MoM | 11.0 | FontWeight.w600 | d9404659 | 0.5 | 1.45
+MoM | 11.0 | FontWeight.w600 | d9404659 | 0.5 | 1.45
+MoM | 11.0 | FontWeight.w600 | d9404659 | 0.5 | 1.45
+Month: All | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+Month: All | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+OOS Rate • 18 OOS Incidents | 11.0 | FontWeight.w600 | cc93000a | 0.5 | 1.45
+OOS Rate • 18 OOS Incidents | 11.0 | FontWeight.w600 | cc93000a | 0.5 | 1.45
+On-Shelf Availability (OSA) | 11.0 | FontWeight.w600 | d993000a | 0.5 | 1.45
+On-Shelf Availability (OSA) | 11.0 | FontWeight.w600 | d993000a | 0.5 | 1.45
+Out-of-Stock Rate (OOS Rate) | 11.0 | FontWeight.w700 | ffba1a1a | 0.15 | 1.45
+Out-of-Stock Rate (OOS Rate) | 11.0 | FontWeight.w700 | ffba1a1a | 0.15 | 1.45
+P&G | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+P&G | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Pareto 80/20 Power SKUs | 12.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.33
+Pareto 80/20 Power SKUs | 12.0 | FontWeight.w700 | ff1565c0 | 0.5 | 1.33
+Sell-Out Trend | 12.0 | FontWeight.w700 | ff1565c0 | 0.2 | 1.33
+Sell-Out Trend | 12.0 | FontWeight.w700 | ff1565c0 | 0.2 | 1.33
+Spinneys | 11.0 | FontWeight.w600 | ff1565c0 | 0.5 | 1.45
+Spinneys | 11.0 | FontWeight.w600 | ff1565c0 | 0.5 | 1.45
+Total Retail Sell-Out | 11.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.45
+Total Retail Sell-Out | 11.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.45
+Total Sell-Out | 9.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Total Sell-Out | 9.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Total Units Sold | 11.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.45
+Total Units Sold | 11.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.45
+Year: 2026 | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+Year: 2026 | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+YoY | 11.0 | FontWeight.w600 | cc304578 | 0.5 | 1.45
+YoY | 11.0 | FontWeight.w600 | cc304578 | 0.5 | 1.45
+YoY | 11.0 | FontWeight.w600 | cc304578 | 0.5 | 1.45
+YoY | 11.0 | FontWeight.w600 | cc304578 | 0.5 | 1.45
+أرما التجارية - منظفات | 14.0 | FontWeight.w700 | ff1a1b21 | 0.1 | 1.43
+أرما التجارية - منظفات | 14.0 | FontWeight.w700 | ff1a1b21 | 0.1 | 1.43
+إجمالي السوق: 51.73M ج.م | 12.0 | FontWeight.w600 | ff45464f | 0.5 | 1.33
+إجمالي السوق: 51.73M ج.م | 12.0 | FontWeight.w600 | ff45464f | 0.5 | 1.33
+إجمالي السوق: 51.73M ج.م | 12.0 | FontWeight.w600 | ff45464f | 0.5 | 1.33
+إجمالي المبيعات | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.45
+إجمالي المبيعات | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.45
+إجمالي الوحدات المباعة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+إجمالي الوحدات المباعة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+إجمالي مبيعات التجزئة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+إجمالي مبيعات التجزئة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+الأصناف القائدة للمبيعات (باريتو 80/20) | 15.0 | FontWeight.w700 | ff1a1b21 | 0.15 | 1.5
+الأصناف القائدة للمبيعات (باريتو 80/20) | 15.0 | FontWeight.w700 | ff1a1b21 | 0.15 | 1.5
+الأصناف المحركة لـ 80% من إجمالي المبيعات (سهم تراكمي %) | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+الأصناف المحركة لـ 80% من إجمالي المبيعات (سهم تراكمي %) | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+الحصة السوقية لشركة أديكو مقارنة بالموردين المنافسين عبر كافة المجموعات | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+الحصة السوقية لشركة أديكو مقارنة بالموردين المنافسين عبر كافة المجموعات | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+الحصة السوقية مقارنة بالمنافسين | 15.0 | FontWeight.w700 | ff1a1b21 | 0.15 | 1.5
+الحصة السوقية مقارنة بالمنافسين | 15.0 | FontWeight.w700 | ff1a1b21 | 0.15 | 1.5
+الحصة السوقية: 18.44% • 256 صنف | 11.0 | FontWeight.w600 | ff304578 | 0.5 | 1.45
+الحصة السوقية: 18.44% • 256 صنف | 11.0 | FontWeight.w600 | ff304578 | 0.5 | 1.45
+الحصص البيعية للسلاسل | 15.0 | FontWeight.w700 | ff1a1b21 | 0.15 | 1.5
+الحصص البيعية للسلاسل | 15.0 | FontWeight.w700 | ff1a1b21 | 0.15 | 1.5
+الشركة الرائدة (#1) | 11.0 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+الشركة الرائدة (#1) | 11.0 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+الفروع النشطة المغطاة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+الفروع النشطة المغطاة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+المساهمة في مبيعات الشركة | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+المساهمة في مبيعات الشركة | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+باقي الموردين والمنافسين (77 مورد آخر) | 14.0 | FontWeight.w700 | ff1a1b21 | 0.1 | 1.43
+باقي الموردين والمنافسين (77 مورد آخر) | 14.0 | FontWeight.w700 | ff1a1b21 | 0.1 | 1.43
+بروكتر آند جامبل مصر | 14.0 | FontWeight.w700 | ff1a1b21 | 0.1 | 1.43
+بروكتر آند جامبل مصر | 14.0 | FontWeight.w700 | ff1a1b21 | 0.1 | 1.43
+بقوليات ومعلبات | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+بقوليات ومعلبات | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+بقوليات ومعلبات • باركود: 6221155003016 • 397.7K ج.م | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+بقوليات ومعلبات • باركود: 6221155003016 • 397.7K ج.م | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+تتبع المبيعات ونمو الإيرادات شهرياً لكل سلسلة تجارية بلونها المميز | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+تتبع المبيعات ونمو الإيرادات شهرياً لكل سلسلة تجارية بلونها المميز | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+تراكمي: 100.0% | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+تراكمي: 100.0% | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+تراكمي: 34.2% | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+تراكمي: 34.2% | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+تراكمي: 61.0% | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+تراكمي: 61.0% | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+تراكمي: 79.5% | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+تراكمي: 79.5% | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+تراكمي: 91.8% | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+تراكمي: 91.8% | 10.5 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+تغطية 100% | 11.0 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+تغطية 100% | 11.0 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+تغطية باقي السوق | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+تغطية باقي السوق | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+توافر الرفوف: 96.8% | 11.0 | FontWeight.w700 | ff93000a | 0.5 | 1.45
+توافر الرفوف: 96.8% | 11.0 | FontWeight.w700 | ff93000a | 0.5 | 1.45
+توزيع إيرادات مبيعات التجزئة وحجم الاستهلاك للسلاسل التي تحتوي على بيانات في الفترة المحددة | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+توزيع إيرادات مبيعات التجزئة وحجم الاستهلاك للسلاسل التي تحتوي على بيانات في الفترة المحددة | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+توزيع الإيرادات والحصة السوقية داخل كل مجموعة رئيسية | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+توزيع الإيرادات والحصة السوقية داخل كل مجموعة رئيسية | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+جملة ماركت | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+جملة ماركت | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+حصة أديكو السوقية: 18.44% (#1) | 12.0 | FontWeight.w700 | ff304578 | 0.5 | 1.33
+حصة أديكو السوقية: 18.44% (#1) | 12.0 | FontWeight.w700 | ff304578 | 0.5 | 1.33
+حصة أديكو السوقية: 18.44% (#1) | 12.0 | FontWeight.w700 | ff304578 | 0.5 | 1.33
+حصة الشركة من السوق | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+حصة الشركة من السوق | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+حصة: 12.3% | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+حصة: 12.3% | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+حصة: 18.5% | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+حصة: 18.5% | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+حصة: 26.8% | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+حصة: 26.8% | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+حصة: 34.2% | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+حصة: 34.2% | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+حصة: 8.2% | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+حصة: 8.2% | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+حصتنا بالسوق % | 9.5 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+حصتنا بالسوق % | 9.5 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+حصتنا بالسوق: 27.7% | 10.0 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+حصتنا بالسوق: 27.7% | 10.0 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+حصتنا بالسوق: 28.5% | 10.0 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+حصتنا بالسوق: 28.5% | 10.0 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+حصتنا بالسوق: 41.8% | 10.0 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+حصتنا بالسوق: 41.8% | 10.0 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+خسارة تقديرية: 148.5K ج.م | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+خسارة تقديرية: 148.5K ج.م | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+زيوت طعام | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+زيوت طعام | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+زيوت طعام • باركود: 6221155001234 • 1.66M ج.م | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+زيوت طعام • باركود: 6221155001234 • 1.66M ج.م | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+زيوت طعام • باركود: 6221155001241 • 1.30M ج.م | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+زيوت طعام • باركود: 6221155001241 • 1.30M ج.م | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+زيوت طعام • باركود: 6221155001258 • 897.3K ج.م | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+زيوت طعام • باركود: 6221155001258 • 897.3K ج.م | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+سبينيس | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+سبينيس | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+شركة أديكو | 15.0 | FontWeight.w700 | ff1565c0 | 0.1 | 1.43
+شركة أديكو | 15.0 | FontWeight.w700 | ff1565c0 | 0.1 | 1.43
+صلصة ومعلبات | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+صلصة ومعلبات | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+صلصة ومعلبات • باركود: 6221155002019 • 596.6K ج.م | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+صلصة ومعلبات • باركود: 6221155002019 • 596.6K ج.م | 11.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+فئة A • 80% من المبيعات | 10.5 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+فئة A • 80% من المبيعات | 10.5 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+فئة A • 80% من المبيعات | 10.5 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+فئة A • 80% من المبيعات | 10.5 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+فئة A • 80% من المبيعات | 10.5 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+فئة A • 80% من المبيعات | 10.5 | FontWeight.w700 | ff304578 | 0.5 | 1.45
+فئة B/C | 10.5 | FontWeight.w700 | ff45464f | 0.5 | 1.45
+فئة B/C | 10.5 | FontWeight.w700 | ff45464f | 0.5 | 1.45
+فئة B/C | 10.5 | FontWeight.w700 | ff45464f | 0.5 | 1.45
+فئة B/C | 10.5 | FontWeight.w700 | ff45464f | 0.5 | 1.45
+فتح الله | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+فتح الله | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+فروع كارفور • أسواق فتح الله • جملة ماركت • سبينيس المستنتجة من الإكسيل | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+فروع كارفور • أسواق فتح الله • جملة ماركت • سبينيس المستنتجة من الإكسيل | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+فريدال للصناعات | 14.0 | FontWeight.w700 | ff1a1b21 | 0.1 | 1.43
+فريدال للصناعات | 14.0 | FontWeight.w700 | ff1a1b21 | 0.1 | 1.43
+كارفور | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+كارفور | 13.0 | FontWeight.w700 | ff45464f | 0.1 | 1.43
+مؤشرات الأداء المالي والبيعي الفوري لسلاسل التجزئة المصرية | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+مؤشرات الأداء المالي والبيعي الفوري لسلاسل التجزئة المصرية | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+مؤشرات الأداء المالي والبيعي الفوري لسلاسل التجزئة المصرية | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+مساهمة الفئات والمجموعات السلعية | 15.0 | FontWeight.w700 | ff1a1b21 | 0.15 | 1.5
+مساهمة الفئات والمجموعات السلعية | 15.0 | FontWeight.w700 | ff1a1b21 | 0.15 | 1.5
+من مبيعاتنا | 10.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+من مبيعاتنا | 10.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+من مبيعاتنا | 10.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+من مبيعاتنا | 10.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+من مبيعاتنا | 10.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+من مبيعاتنا | 10.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+منحنى نمو المبيعات الشهري حسب السلاسل | 15.0 | FontWeight.w700 | ff1a1b21 | 0.15 | 1.5
+منحنى نمو المبيعات الشهري حسب السلاسل | 15.0 | FontWeight.w700 | ff1a1b21 | 0.15 | 1.5
+نسبة النواقص | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+نسبة النواقص | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+نسبة النواقص: 3.2% • 18 صنف ناقص | 11.0 | FontWeight.w600 | ff93000a | 0.5 | 1.45
+نسبة النواقص: 3.2% • 18 صنف ناقص | 11.0 | FontWeight.w600 | ff93000a | 0.5 | 1.45
+هنكل - برسيل مصر | 14.0 | FontWeight.w700 | ff1a1b21 | 0.1 | 1.43
+هنكل - برسيل مصر | 14.0 | FontWeight.w700 | ff1a1b21 | 0.1 | 1.43
+󰁘 | 14.0 | null | ff1565c0 | null | 1.0
+󰁘 | 14.0 | null | ff45464f | null | 1.0
+󰁘 | 14.0 | null | ff45464f | null | 1.0
+󰁘 | 14.0 | null | ff45464f | null | 1.0
+󰁘 | 14.0 | null | ff45464f | null | 1.0
+󰁘 | 14.0 | null | ff45464f | null | 1.0
+󰁘 | 20.0 | null | ff1565c0 | null | 1.0
+󰂚 | 13.0 | null | ff304578 | null | 1.0
+󰂚 | 14.0 | null | ff404659 | null | 1.0
+󰂚 | 14.0 | null | ff404659 | null | 1.0
+󰂚 | 14.0 | null | ff404659 | null | 1.0
+󰂚 | 14.0 | null | ff404659 | null | 1.0
+󰂚 | 14.0 | null | ff404659 | null | 1.0
+󰂚 | 14.0 | null | ffffffff | null | 1.0
+󰂚 | 20.0 | null | ff1565c0 | null | 1.0
+󰂚 | 20.0 | null | ff1565c0 | null | 1.0
+󰃊 | 14.0 | null | ff45464f | null | 1.0
+󰃊 | 14.0 | null | ff45464f | null | 1.0
+󰃊 | 14.0 | null | ff45464f | null | 1.0
+󰃊 | 14.0 | null | ff45464f | null | 1.0
+󰃊 | 14.0 | null | ff45464f | null | 1.0
+󰇠 | 20.0 | null | ff1565c0 | null | 1.0
+󰇡 | 15.0 | null | ff1565c0 | null | 1.0
+󰇡 | 15.0 | null | ff45464f | null | 1.0
+󰊠 | 20.0 | null | ffba1a1a | null | 1.0
+󰏀 | 15.0 | null | ff304578 | null | 1.0
+󰛈 | 14.0 | null | ff1565c0 | null | 1.0
+ | 16.0 | null | ff45464f | null | 1.0
+ | 16.0 | null | ff45464f | null | 1.0
+ | 16.0 | null | ff45464f | null | 1.0
+ | 14.0 | null | ff1565c0 | null | 1.0
+ | 20.0 | null | ff1565c0 | null | 1.0
+ | 18.0 | null | ff1565c0 | null | 1.0
+ | 13.0 | null | ff404659 | null | 1.0
+ | 14.0 | null | ff45464f | null | 1.0
+ | 15.0 | null | ff45464f | null | 1.0
+ | 20.0 | null | ff1565c0 | null | 1.0
+ | 20.0 | null | ff1565c0 | null | 1.0
+ | 15.0 | null | ff304578 | null | 1.0
