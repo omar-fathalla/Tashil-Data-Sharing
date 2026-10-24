@@ -70,6 +70,7 @@ func main() {
 
 	// Public Health Probes
 	mux.HandleFunc("GET /healthz", handlers.Healthz)
+	mux.HandleFunc("GET /api/v1/version", handlers.Version)
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, `{"service":"Tashil Data Sharing Backend","status":"online","version":"1.0.0"}`)

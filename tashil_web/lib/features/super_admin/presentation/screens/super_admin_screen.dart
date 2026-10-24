@@ -9,6 +9,7 @@ import '../../../../core/widgets/data_sharing_logo.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../widgets/audit_logs_panel.dart';
+import '../widgets/system_version_card.dart';
 
 /// SuperAdminScreen provides enterprise multi-tenant provisioning, full CRUD
 /// management for companies and retail chains, and 25-row paginated audit logs.
@@ -236,6 +237,8 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 20),
+              const SystemVersionCard(),
               const SizedBox(height: 20),
 
               // 1. Metric / Security Summary Hero Cards
