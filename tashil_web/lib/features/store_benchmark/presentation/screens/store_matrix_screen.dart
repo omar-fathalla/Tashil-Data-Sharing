@@ -1174,13 +1174,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
         M3Dropdown<T>(
           expand: isCompact,
           value: value,
-          options: [
-            for (final item in items)
-              M3DropdownOption<T>(
-                item.value as T,
-                item.child is Text ? ((item.child as Text).data ?? '') : '${item.value}',
-              ),
-          ],
+          options: m3OptionsFromMenuItems(items),
           onChanged: onChanged,
         ),
       ],

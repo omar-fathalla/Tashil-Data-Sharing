@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/data/result.dart';
 import '../../../../core/network/api_client.dart';
@@ -271,8 +272,8 @@ class _CompetitorComparisonScreenState
             return Directionality(
               textDirection: TextDirection.rtl,
               child: AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24.0),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: M3Shape.radiusXl,
                 ),
                 title: Row(
                   children: [
@@ -280,7 +281,7 @@ class _CompetitorComparisonScreenState
                       padding: const EdgeInsets.all(10.0),
                       decoration: BoxDecoration(
                         color: colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(12.0),
+                        borderRadius: M3Shape.radiusMd,
                       ),
                       child: Icon(
                         Icons.add_chart_rounded,
@@ -322,7 +323,7 @@ class _CompetitorComparisonScreenState
                           decoration: const InputDecoration(
                             labelText:
                                 'اسم الصنف المنافس (مثال: بريل ليمون 2.5 لتر)',
-                            prefixIcon: Icon(Icons.inventory_2_outlined),
+                            prefixIcon: Icon(Icons.inventory_2_rounded),
                           ),
                         ),
                         const SizedBox(height: 12.0),
@@ -333,7 +334,7 @@ class _CompetitorComparisonScreenState
                                 controller: brandCtrl,
                                 decoration: const InputDecoration(
                                   labelText: 'العلامة التجارية (Brand)',
-                                  prefixIcon: Icon(Icons.sell_outlined),
+                                  prefixIcon: Icon(Icons.sell_rounded),
                                 ),
                               ),
                             ),
@@ -343,7 +344,7 @@ class _CompetitorComparisonScreenState
                                 controller: supplierCtrl,
                                 decoration: const InputDecoration(
                                   labelText: 'الشركة المنافسة (Supplier)',
-                                  prefixIcon: Icon(Icons.business_outlined),
+                                  prefixIcon: Icon(Icons.business_rounded),
                                 ),
                               ),
                             ),
@@ -362,7 +363,7 @@ class _CompetitorComparisonScreenState
                                   labelText:
                                       'سعر بيع المنافس بالجنيه (سعرنا: ${currentGroup.ownUnitPrice.toStringAsFixed(1)} ج.م)',
                                   prefixIcon:
-                                      const Icon(Icons.payments_outlined),
+                                      const Icon(Icons.payments_rounded),
                                 ),
                               ),
                             ),
@@ -376,7 +377,7 @@ class _CompetitorComparisonScreenState
                                 decoration: InputDecoration(
                                   labelText:
                                       'الوزن/الحجم بالـ (${currentGroup.volumeUnitLabel})',
-                                  prefixIcon: const Icon(Icons.scale_outlined),
+                                  prefixIcon: const Icon(Icons.scale_rounded),
                                 ),
                               ),
                             ),
@@ -686,7 +687,7 @@ class _CompetitorComparisonScreenState
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.6),
         ),
@@ -702,7 +703,7 @@ class _CompetitorComparisonScreenState
             ),
             decoration: BoxDecoration(
               color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(14.0),
+              borderRadius: M3Shape.radiusMd,
               border: Border.all(
                 color: colorScheme.primary.withValues(alpha: 0.25),
               ),
@@ -830,11 +831,11 @@ class _CompetitorComparisonScreenState
                     filled: true,
                     fillColor: colorScheme.surface,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(999.0),
+                      borderRadius: M3Shape.radiusFull,
                       borderSide: BorderSide(color: colorScheme.outlineVariant),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(999.0),
+                      borderRadius: M3Shape.radiusFull,
                       borderSide: BorderSide(color: colorScheme.outlineVariant),
                     ),
                   ),
@@ -884,7 +885,7 @@ class _CompetitorComparisonScreenState
               child: Row(
                 children: [
                   Icon(
-                    Icons.category_outlined,
+                    Icons.category_rounded,
                     size: 18.0,
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -932,7 +933,7 @@ class _CompetitorComparisonScreenState
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24.0),
+        borderRadius: M3Shape.radiusXl,
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.65),
         ),
@@ -958,7 +959,7 @@ class _CompetitorComparisonScreenState
                   padding: const EdgeInsets.all(8.0),
                   decoration: BoxDecoration(
                     color: colorScheme.primary,
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Icon(
                     Icons.touch_app_rounded,
@@ -995,7 +996,7 @@ class _CompetitorComparisonScreenState
                   ),
                   decoration: BoxDecoration(
                     color: colorScheme.surface,
-                    borderRadius: BorderRadius.circular(999.0),
+                    borderRadius: M3Shape.radiusFull,
                   ),
                   child: Text(
                     '${_filteredGroups.length} صنف',
@@ -1067,10 +1068,10 @@ class _CompetitorComparisonScreenState
 
     return Material(
       color: isSelected ? colorScheme.primaryContainer : colorScheme.surface,
-      borderRadius: BorderRadius.circular(18.0),
+      borderRadius: M3Shape.radiusLg,
       elevation: isSelected ? 2.0 : 0.0,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18.0),
+        borderRadius: M3Shape.radiusLg,
         onTap: () {
           setState(() {
             _selectedOwnBarcode = group.ownBarcode;
@@ -1084,7 +1085,7 @@ class _CompetitorComparisonScreenState
           duration: M3Motion.short4,
           padding: const EdgeInsets.all(14.0),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: isSelected
                   ? colorScheme.primary
@@ -1115,7 +1116,7 @@ class _CompetitorComparisonScreenState
                                 color: isSelected
                                     ? colorScheme.primary
                                     : colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(6.0),
+                                borderRadius: M3Shape.radiusSm,
                               ),
                               child: Text(
                                 group.ownBrand,
@@ -1135,7 +1136,7 @@ class _CompetitorComparisonScreenState
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainerHighest
                                     .withValues(alpha: 0.7),
-                                borderRadius: BorderRadius.circular(6.0),
+                                borderRadius: M3Shape.radiusSm,
                               ),
                               child: Text(
                                 group.packSizeLabel,
@@ -1154,7 +1155,7 @@ class _CompetitorComparisonScreenState
                                   color: priceRose
                                       ? const Color(0xFFFEF7E0)
                                       : const Color(0xFFE8F0FE),
-                                  borderRadius: BorderRadius.circular(6.0),
+                                  borderRadius: M3Shape.radiusSm,
                                 ),
                                 child: Text(
                                   priceRose
@@ -1217,7 +1218,7 @@ class _CompetitorComparisonScreenState
                     ),
                     decoration: BoxDecoration(
                       color: badgeBg,
-                      borderRadius: BorderRadius.circular(999.0),
+                      borderRadius: M3Shape.radiusFull,
                     ),
                     child: Text(
                       badgeText,
@@ -1388,7 +1389,7 @@ class _CompetitorComparisonScreenState
       padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24.0),
+        borderRadius: M3Shape.radiusXl,
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.65),
         ),
@@ -1402,7 +1403,7 @@ class _CompetitorComparisonScreenState
                 padding: const EdgeInsets.all(10.0),
                 decoration: BoxDecoration(
                   color: colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                 ),
                 child: Icon(
                   Icons.compare_arrows_rounded,
@@ -1521,10 +1522,10 @@ class _CompetitorComparisonScreenState
       color: isSelected
           ? activeAccent.withValues(alpha: 0.08)
           : colorScheme.surface,
-      borderRadius: BorderRadius.circular(20.0),
+      borderRadius: M3Shape.radiusLg,
       elevation: isSelected ? 3.0 : 0.0,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         onTap: () {
           setState(() {
             _selectedCompetitorBarcode = competitor.barcode;
@@ -1534,7 +1535,7 @@ class _CompetitorComparisonScreenState
           duration: M3Motion.short4,
           padding: const EdgeInsets.all(16.0),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: isSelected
                   ? activeAccent
@@ -1594,7 +1595,7 @@ class _CompetitorComparisonScreenState
                           color: isSelected
                               ? activeAccent
                               : colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(999.0),
+                          borderRadius: M3Shape.radiusFull,
                         ),
                         child: Text(
                           competitor.packSizeLabel,
@@ -1686,7 +1687,7 @@ class _CompetitorComparisonScreenState
                     ),
                     decoration: BoxDecoration(
                       color: statusBg,
-                      borderRadius: BorderRadius.circular(10.0),
+                      borderRadius: M3Shape.radiusSm,
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1758,7 +1759,7 @@ class _CompetitorComparisonScreenState
       padding: const EdgeInsets.all(24.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24.0),
+        borderRadius: M3Shape.radiusXl,
         border: Border.all(
           color: colorScheme.primary.withValues(alpha: 0.3),
           width: 1.2,
@@ -1787,7 +1788,7 @@ class _CompetitorComparisonScreenState
                     ),
                     decoration: BoxDecoration(
                       color: colorScheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999.0),
+                      borderRadius: M3Shape.radiusFull,
                       border:
                           Border.all(color: colorScheme.primary, width: 1.5),
                     ),
@@ -1827,7 +1828,7 @@ class _CompetitorComparisonScreenState
                     ),
                     decoration: BoxDecoration(
                       color: compColor.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(999.0),
+                      borderRadius: M3Shape.radiusFull,
                       border: Border.all(color: compColor, width: 1.5),
                     ),
                     child: Row(
@@ -1896,7 +1897,7 @@ class _CompetitorComparisonScreenState
             padding: const EdgeInsets.fromLTRB(18.0, 24.0, 22.0, 14.0),
             decoration: BoxDecoration(
               color: colorScheme.surface,
-              borderRadius: BorderRadius.circular(20.0),
+              borderRadius: M3Shape.radiusLg,
               border: Border.all(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.55),
               ),
@@ -1924,7 +1925,7 @@ class _CompetitorComparisonScreenState
               ),
               decoration: BoxDecoration(
                 color: const Color(0xFFFEF7E0),
-                borderRadius: BorderRadius.circular(12.0),
+                borderRadius: M3Shape.radiusMd,
                 border: Border.all(
                   color: const Color(0xFFEA8600).withValues(alpha: 0.5),
                 ),
@@ -2123,14 +2124,14 @@ class _CompetitorComparisonScreenState
       color: isSelectedMonth
           ? colorScheme.primaryContainer.withValues(alpha: 0.55)
           : colorScheme.surface,
-      borderRadius: BorderRadius.circular(18.0),
+      borderRadius: M3Shape.radiusLg,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18.0),
+        borderRadius: M3Shape.radiusLg,
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(14.0),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18.0),
+            borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: isSelectedMonth
                   ? colorScheme.primary
@@ -2163,7 +2164,7 @@ class _CompetitorComparisonScreenState
                           : compLower
                               ? const Color(0xFFFCE8E6)
                               : colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(6.0),
+                      borderRadius: M3Shape.radiusSm,
                     ),
                     child: Text(
                       compHigher
@@ -2194,7 +2195,7 @@ class _CompetitorComparisonScreenState
                 padding: const EdgeInsets.all(10.0),
                 decoration: BoxDecoration(
                   color: colorScheme.primary.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2250,7 +2251,7 @@ class _CompetitorComparisonScreenState
                   padding: const EdgeInsets.all(10.0),
                   decoration: BoxDecoration(
                     color: compColor.withValues(alpha: 0.07),
-                    borderRadius: BorderRadius.circular(12.0),
+                    borderRadius: M3Shape.radiusMd,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2370,7 +2371,7 @@ class _CompetitorComparisonScreenState
           begin: AlignmentDirectional.topStart,
           end: AlignmentDirectional.bottomEnd,
         ),
-        borderRadius: BorderRadius.circular(24.0),
+        borderRadius: M3Shape.radiusXl,
         border: Border.all(
           color: colorScheme.primary.withValues(alpha: 0.35),
           width: 1.5,
@@ -2402,7 +2403,7 @@ class _CompetitorComparisonScreenState
                           ),
                           decoration: BoxDecoration(
                             color: colorScheme.primary,
-                            borderRadius: BorderRadius.circular(999.0),
+                            borderRadius: M3Shape.radiusFull,
                           ),
                           child: Text(
                             'صنفنا الافتراضي ($_activePeriodLabelAr)',
@@ -2419,7 +2420,7 @@ class _CompetitorComparisonScreenState
                           ),
                           decoration: BoxDecoration(
                             color: colorScheme.surface,
-                            borderRadius: BorderRadius.circular(999.0),
+                            borderRadius: M3Shape.radiusFull,
                           ),
                           child: Text(
                             'الفئة: ${group.category}',
@@ -2435,7 +2436,7 @@ class _CompetitorComparisonScreenState
                           ),
                           decoration: BoxDecoration(
                             color: colorScheme.surface,
-                            borderRadius: BorderRadius.circular(999.0),
+                            borderRadius: M3Shape.radiusFull,
                           ),
                           child: Text(
                             'العبوة: ${group.packSizeLabel}',
@@ -2556,7 +2557,7 @@ class _CompetitorComparisonScreenState
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
       decoration: BoxDecoration(
         color: isHighlighted ? colorScheme.primary : colorScheme.surface,
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(
           color: isHighlighted
               ? colorScheme.primary
@@ -2610,7 +2611,7 @@ class _CompetitorComparisonScreenState
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(999.0),
+        borderRadius: M3Shape.radiusFull,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2654,7 +2655,7 @@ class _CompetitorComparisonScreenState
       padding: const EdgeInsets.all(18.0),
       decoration: BoxDecoration(
         color: colorScheme.secondaryContainer.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.primary.withValues(alpha: 0.4)),
       ),
       child: Column(
@@ -2751,7 +2752,7 @@ class _CompetitorComparisonScreenState
       padding: const EdgeInsets.all(48.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24.0),
+        borderRadius: M3Shape.radiusXl,
       ),
       child: Column(
         children: [
@@ -2801,7 +2802,7 @@ class _CompetitorComparisonScreenState
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.6),
         ),
@@ -2812,7 +2813,7 @@ class _CompetitorComparisonScreenState
             padding: const EdgeInsets.all(12.0),
             decoration: BoxDecoration(
               color: containerColor,
-              borderRadius: BorderRadius.circular(14.0),
+              borderRadius: M3Shape.radiusMd,
             ),
             child: Icon(icon, color: onContainerColor, size: 24.0),
           ),

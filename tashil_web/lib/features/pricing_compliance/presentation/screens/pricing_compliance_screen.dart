@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/m3_dropdown.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
@@ -245,7 +247,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                   M3ActionItem(
                     label: _showPriceImpact ? 'إخفاء المؤشر' : 'أثر الأسعار',
                     icon: _showPriceImpact
-                        ? Icons.visibility_off_outlined
+                        ? Icons.visibility_off_rounded
                         : Icons.insights_rounded,
                     isPrimary: _showPriceImpact,
                     onPressed: () {
@@ -273,7 +275,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                     title: 'معدل الالتزام السعري (Compliance Rate)',
                     value: '${complianceRate.toStringAsFixed(1)}%',
                     subtitle: '$compliantCount من أصل $totalCount صنف مطابق',
-                    icon: Icons.verified_outlined,
+                    icon: Icons.verified_rounded,
                     containerColor: colorScheme.primaryContainer,
                     onContainerColor: colorScheme.onPrimaryContainer,
                   ),
@@ -331,7 +333,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
               elevation: 0,
               color: colorScheme.surfaceContainerLow,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16.0),
+                borderRadius: M3Shape.radiusLg,
                 side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
               ),
               child: Padding(
@@ -484,8 +486,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                           horizontal: 14.0,
                           vertical: 10.0,
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
+                        border: const OutlineInputBorder(
+                          borderRadius: M3Shape.radiusMd,
                         ),
                       ),
                     ),
@@ -540,7 +542,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
               elevation: 0,
               color: colorScheme.surfaceContainerLow,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16.0),
+                borderRadius: M3Shape.radiusLg,
                 side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
               ),
               child: Padding(
@@ -575,7 +577,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: M3Spacing.xxs),
                           decoration: BoxDecoration(
                             color: colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(12.0),
+                            borderRadius: M3Shape.radiusMd,
                           ),
                           child: Text(
                             'هامش السماح المعتمد: ±2.0%',
@@ -657,7 +659,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                             padding: const EdgeInsets.all(14.0),
                                             decoration: BoxDecoration(
                                               color: colorScheme.surface,
-                                              borderRadius: BorderRadius.circular(14.0),
+                                              borderRadius: M3Shape.radiusMd,
                                               border: Border.all(
                                                 color: colorScheme.outlineVariant.withOpacity(0.55),
                                               ),
@@ -1030,7 +1032,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest.withOpacity(0.6),
-                borderRadius: BorderRadius.circular(8.0),
+                borderRadius: M3Shape.radiusSm,
               ),
               child: Text(
                 totalItems > 0
@@ -1101,7 +1103,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
       elevation: 0,
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Padding(
@@ -1115,7 +1117,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                   padding: const EdgeInsets.all(8.0),
                   decoration: BoxDecoration(
                     color: containerColor,
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Icon(icon, color: onContainerColor, size: 20.0),
                 ),
@@ -1194,7 +1196,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
       padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: M3Shape.radiusMd,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1225,7 +1227,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
         padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs, vertical: 3.0),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(8.0),
+          borderRadius: M3Shape.radiusSm,
         ),
         child: Text(
           'بدون عرض',
@@ -1241,7 +1243,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
       padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
       decoration: BoxDecoration(
         color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: M3Shape.radiusMd,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1278,7 +1280,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
       elevation: 0,
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.6)),
       ),
       child: Padding(
@@ -1293,7 +1295,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                   padding: const EdgeInsets.all(8.0),
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Icon(Icons.insights_rounded, color: colorScheme.onPrimaryContainer, size: 22.0),
                 ),
@@ -1326,7 +1328,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                     decoration: BoxDecoration(
                       color: colorScheme.secondaryContainer.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(12.0),
+                      borderRadius: M3Shape.radiusMd,
                     ),
                     child: Text(
                       '${_selectedChain != 'all' ? _getChainDisplayName(_selectedChain) : 'كافة السلاسل'} • ${_selectedYear > 0 ? '$_selectedYear' : 'كل السنوات'}',
@@ -1354,7 +1356,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                 padding: const EdgeInsets.all(14.0),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer.withOpacity(0.25),
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                   border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
                 ),
                 child: Column(
@@ -1434,7 +1436,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                       padding: const EdgeInsets.all(14.0),
                       decoration: BoxDecoration(
                         color: colorScheme.surface,
-                        borderRadius: BorderRadius.circular(12.0),
+                        borderRadius: M3Shape.radiusMd,
                         border: Border.all(
                           color: colorScheme.outlineVariant.withOpacity(0.6),
                         ),
@@ -1466,7 +1468,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                   color: isRevUp
                                       ? colorScheme.primaryContainer
                                       : (isRevDown ? colorScheme.errorContainer : colorScheme.surfaceContainerHighest),
-                                  borderRadius: BorderRadius.circular(8.0),
+                                  borderRadius: M3Shape.radiusSm,
                                 ),
                                 child: Text(
                                   point.revenueChangePct == 0
@@ -1555,7 +1557,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                             decoration: BoxDecoration(
                               color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(6.0),
+                              borderRadius: M3Shape.radiusSm,
                             ),
                             child: Text(
                               point.elasticityVerdict,
@@ -1593,7 +1595,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(8.0),
+        borderRadius: M3Shape.radiusSm,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Row(
@@ -1680,8 +1682,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                             padding: EdgeInsets.zero,
                             labelPadding: const EdgeInsets.symmetric(horizontal: 4.0),
                             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10.0),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: M3Shape.radiusSm,
                             ),
                             onSelected: (_) {
                               setState(() {
@@ -1740,30 +1742,11 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
           ],
         ),
         const SizedBox(height: M3Spacing.xs),
-        Container(
-          height: 40.0,
-          width: isCompact ? double.infinity : null,
-          padding: const EdgeInsets.symmetric(horizontal: 12.0),
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(12.0),
-            border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<T>(
-              value: value,
-              isDense: true,
-              isExpanded: isCompact,
-              borderRadius: BorderRadius.circular(12.0),
-              icon: Icon(Icons.arrow_drop_down_rounded, color: colorScheme.primary),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
-              ),
-              items: items,
-              onChanged: onChanged,
-            ),
-          ),
+        M3Dropdown<T>(
+          expand: isCompact,
+          value: value,
+          options: m3OptionsFromMenuItems(items),
+          onChanged: onChanged,
         ),
       ],
     );

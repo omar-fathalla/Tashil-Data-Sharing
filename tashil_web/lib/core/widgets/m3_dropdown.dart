@@ -87,3 +87,25 @@ class M3Dropdown<T> extends StatelessWidget {
     return expand ? SizedBox(width: double.infinity, child: menu) : menu;
   }
 }
+
+/// Bridges legacy `DropdownMenuItem` lists to [M3DropdownOption]s, using the
+/// first [Text] found in each item's child as the label.
+List<M3DropdownOption<T>> m3OptionsFromMenuItems<T>(List<DropdownMenuItem<T>> items) {
+  String? find(Widget w) {
+    if (w is Text) return w.data;
+    if (w is Flex) {
+      for (final c in w.children) {
+        final r = find(c);
+        if (r != null) return r;
+      }
+    }
+    if (w is Flexible) return find(w.child);
+    if (w is Padding && w.child != null) return find(w.child!);
+    return null;
+  }
+
+  return [
+    for (final item in items)
+      M3DropdownOption<T>(item.value as T, find(item.child) ?? '${item.value}'),
+  ];
+}
