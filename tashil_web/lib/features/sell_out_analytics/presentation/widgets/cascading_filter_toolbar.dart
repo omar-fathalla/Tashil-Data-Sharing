@@ -611,9 +611,9 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
           value: const [2026, 2025, 2024, 0].contains(activeYr) ? activeYr : 2026,
           leadingIcon: AppIcons.calendar,
           options: const [
-            M3DropdownOption(2026, 'Year: 2026 (Default)'),
-            M3DropdownOption(2025, 'Year: 2025'),
-            M3DropdownOption(2024, 'Year: 2024'),
+            M3DropdownOption(2026, '2026'),
+            M3DropdownOption(2025, '2025'),
+            M3DropdownOption(2024, '2024'),
             M3DropdownOption(0, 'All Years (2025–2026)'),
           ],
           onChanged: (val) => widget.onYearChanged!(val),
@@ -882,8 +882,13 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                       ],
                       // Flexible so a long active date-range label ellipsizes
                       // instead of overflowing the actions row.
-                      Flexible(child: buildDateRangeButton(expand: false)),
-                      const Spacer(),
+                      Expanded(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: buildDateRangeButton(expand: false),
+                        ),
+                      ),
+                      const SizedBox(width: 8.0),
                       if (widget.onUpload != null) ...[
                         buildUploadSellOutButton(expand: false),
                         const SizedBox(width: 8.0),

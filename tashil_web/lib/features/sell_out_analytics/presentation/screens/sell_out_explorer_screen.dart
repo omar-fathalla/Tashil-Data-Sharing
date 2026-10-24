@@ -1125,9 +1125,13 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               ],
             ),
             const SizedBox(height: 12.0),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
+            LayoutBuilder(
+              key: const ValueKey('price_matrix_table'),
+              builder: (context, constraints) => SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: DataTable(
                 headingRowHeight: 42.0,
                 dataRowMinHeight: 42.0,
                 dataRowMaxHeight: 48.0,
@@ -1202,6 +1206,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                     ],
                   );
                 }).toList(),
+              ),
+                ),
               ),
             ),
           ],

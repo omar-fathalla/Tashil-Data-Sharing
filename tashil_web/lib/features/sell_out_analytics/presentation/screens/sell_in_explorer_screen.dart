@@ -2366,16 +2366,16 @@ options: m3OptionsFromMenuItems<String>([
                                 const DropdownMenuItem(
                                   value: 'urgent_replenishment',
                                   child: Text(
-                                    '🚨 خطر نفاد عاجل (Urgent)',
+                                    'خطر نفاد عاجل (Urgent)',
                                   ),
                                 ),
                                 const DropdownMenuItem(
                                   value: 'optimal',
-                                  child: Text('✅ رصيد آمن (Optimal)'),
+                                  child: Text('رصيد آمن (Optimal)'),
                                 ),
                                 const DropdownMenuItem(
                                   value: 'overstock',
-                                  child: Text('⚠️ تكدس مخزني (Overstock)'),
+                                  child: Text('تكدس مخزني (Overstock)'),
                                 ),
                               ]),
 onChanged: m3Legacy<String>((val) {

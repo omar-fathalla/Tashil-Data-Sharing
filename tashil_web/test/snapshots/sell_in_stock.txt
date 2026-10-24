@@ -409,6 +409,8 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 تحت التصريف | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
 تشخيص حالة الرصيد | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 تشخيص حالة الرصيد | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+تكدس مخزني (Overstock) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+تكدس مخزني (Overstock) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 تكدس مخزني (يحتاج عرض ترويجي) | 11.5 | FontWeight.w800 | ffe65100 | 0.25 | 1.43
 تكدس مخزني (يحتاج عرض ترويجي) | 11.5 | FontWeight.w800 | ffe65100 | 0.25 | 1.43
 جل غسيل ملابس أوتوماتيك 3 لتر × 4 عبوة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
@@ -423,10 +425,14 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 حالة الرصيد (Status) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 حالة الرصيد | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 حالة الرصيد | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+خطر نفاد عاجل (Urgent) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+خطر نفاد عاجل (Urgent) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 ربح السلسلة المحقق (هامش %) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 ربح السلسلة المحقق (هامش %) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 ربح السلسلة المحقق وهامش الربح الفعلي (Retailer Gross Margin) | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 ربح السلسلة المحقق وهامش الربح الفعلي (Retailer Gross Margin) | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+رصيد آمن (Optimal) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+رصيد آمن (Optimal) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 رصيد آمن ومتوازن | 11.5 | FontWeight.w800 | ff004d40 | 0.25 | 1.43
 رصيد آمن ومتوازن | 11.5 | FontWeight.w800 | ff004d40 | 0.25 | 1.43
 رصيد آمن ومتوازن | 12.0 | FontWeight.w600 | ff00796b | 0.25 | 1.43
@@ -523,12 +529,6 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 يمين | 11.0 | FontWeight.w700 | ff1d1b20 | 0.5 | 1.45
 − مبيعات الكاشير (بشد الكارتة الحقيقي) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 − مبيعات الكاشير (بشد الكارتة الحقيقي) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-⚠️ تكدس مخزني (Overstock) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-⚠️ تكدس مخزني (Overstock) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-✅ رصيد آمن (Optimal) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-✅ رصيد آمن (Optimal) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-🚨 خطر نفاد عاجل (Urgent) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-🚨 خطر نفاد عاجل (Urgent) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 󰁀 | 20.0 | null | ff2e7d32 | null | 1.0
 󰂭 | 20.0 | null | ff00796b | null | 1.0
 󰃀 | 20.0 | null | ff404659 | null | 1.0
