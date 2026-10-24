@@ -36,6 +36,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
   int selectedMonth = 0;
   String selectedChain = 'all';
   bool isLoading = true;
+  String? loadError;
   ExecutiveKPIsModel? kpis;
   late String _lastTenantId;
   String? _lastRole;
@@ -188,7 +189,10 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
     if (!mounted || requestId != _loadRequestId) return;
     final error = loaded.errorOrNull;
     if (error != null) {
-      setState(() => isLoading = false);
+      setState(() {
+        isLoading = false;
+        loadError = error.toString();
+      });
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         SnackBar(content: Text('تعذر تحميل مؤشرات الأداء: $error')),
       );
@@ -198,6 +202,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
     setState(() {
       kpis = result;
       isLoading = false;
+      loadError = null;
       if (selectedChain != 'all') {
         final chains = _availableChains;
         if (chains.every((c) => c.code.toLowerCase() != selectedChain.toLowerCase())) {
@@ -543,7 +548,31 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
                             ),
                           ],
                         )
-                      : const SizedBox.shrink(key: ValueKey('exec_empty_state')),
+                      : Padding(
+                          key: const ValueKey('exec_error_state'),
+                          padding: const EdgeInsets.all(48.0),
+                          child: Column(
+                            children: [
+                              Icon(AppIcons.error, size: 40.0, color: Theme.of(context).colorScheme.error),
+                              M3Spacing.gapSM,
+                              Text(
+                                loadError == null ? 'No data to display' : 'Could not load dashboard data',
+                                style: Theme.of(context).textTheme.titleMedium,
+                                textAlign: TextAlign.center,
+                              ),
+                              M3Spacing.gapSM,
+                              FilledButton.tonalIcon(
+                                key: const ValueKey('exec_retry_button'),
+                                onPressed: () {
+                                  setState(() => isLoading = true);
+                                  _loadData();
+                                },
+                                icon: const Icon(AppIcons.refresh),
+                                label: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        ),
             ),
           ],
         ),

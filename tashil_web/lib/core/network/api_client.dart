@@ -1940,6 +1940,15 @@ class ApiClient {
   static bool defaultAllowMockFallback = !kIsWeb;
   bool allowMockFallback;
   final ValueNotifier<bool> isServerOnline = ValueNotifier<bool>(true);
+
+  /// Called when the backend rejects the session (HTTP 401/403), e.g. a stale
+  /// token after a deploy. The app wires this to logout so the user re-auths
+  /// instead of seeing an empty dashboard.
+  static VoidCallback? onSessionExpired;
+
+  static void reportAuthStatus(int statusCode) {
+    if (statusCode == 401 || statusCode == 403) onSessionExpired?.call();
+  }
   String? lastConnectionError;
 
   ApiClient({
@@ -2806,6 +2815,7 @@ class ApiClient {
         _executiveKpisCache[cacheKey] = rbacModel;
         return rbacModel;
       } else {
+        reportAuthStatus(resp.statusCode);
         failureError = 'HTTP ${resp.statusCode}: ${resp.body}';
       }
     } catch (e) {
