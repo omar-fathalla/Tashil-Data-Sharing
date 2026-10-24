@@ -564,20 +564,20 @@ class _AppShellState extends State<AppShell> {
                         widget.apiClient.currentUser?.isSuperAdmin == true)
                       IconButton(
                         icon: const Icon(Icons.admin_panel_settings_rounded),
-                        tooltip: 'لوحة الإدارة',
+                        tooltip: 'Admin Panel',
                         visualDensity: VisualDensity.compact,
                         onPressed: widget.onNavigateToAdmin,
                       ),
                     IconButton(
                       icon: const Icon(Icons.manage_accounts_rounded),
-                      tooltip: 'الملف الشخصي',
+                      tooltip: 'Profile & Account',
                       visualDensity: VisualDensity.compact,
                       onPressed: _openUserProfile,
                     ),
                     Builder(
                       builder: (ctx) => IconButton(
                         icon: const Icon(Icons.menu_rounded),
-                        tooltip: 'القائمة',
+                        tooltip: 'Menu',
                         visualDensity: VisualDensity.compact,
                         onPressed: () => Scaffold.of(ctx).openDrawer(),
                       ),
