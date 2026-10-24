@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/network/api_client.dart';
@@ -169,7 +170,7 @@ class ChainSharePie extends StatelessWidget {
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.w600,
-                          fontSize: 9.5,
+                          fontSize: M3FontSize.microPlus,
                         ),
                       ),
                     ],
@@ -255,7 +256,7 @@ class ChainSharePie extends StatelessWidget {
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: colorScheme.primary,
                                 fontWeight: FontWeight.w600,
-                                fontSize: 11.0,
+                                fontSize: M3FontSize.labelSmall,
                               ),
                             ),
                           ],
@@ -264,7 +265,7 @@ class ChainSharePie extends StatelessWidget {
                             '${CurrencyFormatter.formatUnits(item.totalUnits)} عبوة مباعة',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
-                              fontSize: 11.0,
+                              fontSize: M3FontSize.labelSmall,
                             ),
                           ),
                         ],
@@ -290,7 +291,7 @@ class ChainSharePie extends StatelessWidget {
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: color,
                               fontWeight: FontWeight.bold,
-                              fontSize: 10.0,
+                              fontSize: M3FontSize.tiny,
                             ),
                           ),
                         ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
@@ -453,7 +454,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
             style: tt.labelSmall?.copyWith(
               color: cs.onSurfaceVariant,
               fontWeight: FontWeight.w700,
-              fontSize: 11,
+              fontSize: M3FontSize.labelSmall,
             ),
           ),
         ],

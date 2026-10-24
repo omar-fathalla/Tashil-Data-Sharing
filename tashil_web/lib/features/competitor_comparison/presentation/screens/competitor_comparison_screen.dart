@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -390,7 +391,7 @@ class _CompetitorComparisonScreenState
                           title: const Text(
                             'هذا السعر خاضع لعرض ترويجي حالياً لدى المنافس (Promo Price)',
                             style: TextStyle(
-                                fontSize: 13.0, fontWeight: FontWeight.w600),
+                                fontSize: M3FontSize.labelMediumPlus, fontWeight: FontWeight.w600),
                           ),
                           value: isPromo,
                           onChanged: (v) => setDialogState(() => isPromo = v),
@@ -1163,7 +1164,7 @@ class _CompetitorComparisonScreenState
                                       ? '▲ +${momPct.toStringAsFixed(1)}% في $_selectedYear'
                                       : '▼ ${momPct.toStringAsFixed(1)}% في $_selectedYear',
                                   style: TextStyle(
-                                    fontSize: 10.0,
+                                    fontSize: M3FontSize.tiny,
                                     fontWeight: FontWeight.w800,
                                     color: priceRose
                                         ? const Color(0xFFB06000)
@@ -1201,7 +1202,7 @@ class _CompetitorComparisonScreenState
                         '${group.ownPricePerUnitVolume.toStringAsFixed(1)} ج/${group.volumeUnitLabel}',
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
-                          fontSize: 10.5,
+                          fontSize: M3FontSize.tinyPlus,
                         ),
                       ),
                     ],
@@ -1226,7 +1227,7 @@ class _CompetitorComparisonScreenState
                       style: theme.textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: badgeFg,
-                        fontSize: 10.5,
+                        fontSize: M3FontSize.tinyPlus,
                       ),
                     ),
                   ),
@@ -1707,7 +1708,7 @@ class _CompetitorComparisonScreenState
                           child: Text(
                             priceStatusText,
                             style: TextStyle(
-                              fontSize: 11.5,
+                              fontSize: M3FontSize.labelSmallPlus,
                               fontWeight: FontWeight.w900,
                               color: statusFg,
                             ),
@@ -2174,7 +2175,7 @@ class _CompetitorComparisonScreenState
                               ? 'المنافس ${gapEgp.toStringAsFixed(1)} ج'
                               : 'سعر متقارب',
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: M3FontSize.tinyPlus,
                         fontWeight: FontWeight.w900,
                         color: compHigher
                             ? const Color(0xFF0D652D)
@@ -2214,7 +2215,7 @@ class _CompetitorComparisonScreenState
                         Text(
                           formatDelta(ownPoint),
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: M3FontSize.tinyPlus,
                             fontWeight: FontWeight.w900,
                             color: deltaColor(ownPoint),
                           ),
@@ -2274,7 +2275,7 @@ class _CompetitorComparisonScreenState
                           Text(
                             formatDelta(compPoint),
                             style: TextStyle(
-                              fontSize: 10.5,
+                              fontSize: M3FontSize.tinyPlus,
                               fontWeight: FontWeight.w900,
                               color: deltaColor(compPoint),
                             ),
@@ -2594,7 +2595,7 @@ class _CompetitorComparisonScreenState
                   ? colorScheme.onPrimary.withValues(alpha: 0.85)
                   : colorScheme.primary,
               fontWeight: FontWeight.w700,
-              fontSize: 10.5,
+              fontSize: M3FontSize.tinyPlus,
             ),
           ),
         ],
@@ -2624,7 +2625,7 @@ class _CompetitorComparisonScreenState
             style: TextStyle(
               color: fgColor,
               fontWeight: FontWeight.w800,
-              fontSize: 12.0,
+              fontSize: M3FontSize.bodySmall,
             ),
           ),
         ],
@@ -2939,7 +2940,7 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
           text: '${val.toStringAsFixed(0)} ج',
           style: TextStyle(
             color: textColor,
-            fontSize: 11.0,
+            fontSize: M3FontSize.labelSmall,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -2972,7 +2973,7 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
           text: label,
           style: TextStyle(
             color: isHighlightedMonth ? ownColor : textColor,
-            fontSize: 12.0,
+            fontSize: M3FontSize.bodySmall,
             fontWeight:
                 isHighlightedMonth ? FontWeight.w900 : FontWeight.w800,
           ),
@@ -3024,7 +3025,7 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
             text: calloutText,
             style: TextStyle(
               color: compColor,
-              fontSize: 10.5,
+              fontSize: M3FontSize.tinyPlus,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -3117,7 +3118,7 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
           text: calloutText,
           style: TextStyle(
             color: ownColor,
-            fontSize: 11.0,
+            fontSize: M3FontSize.labelSmall,
             fontWeight: FontWeight.w900,
           ),
         ),

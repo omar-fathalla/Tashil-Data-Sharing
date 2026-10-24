@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_states.dart';
 import '../../../../core/theme/m3_shape.dart';
 import 'package:flutter/services.dart';
@@ -396,7 +397,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                     style: tt.labelSmall?.copyWith(
                       color: cs.onSurfaceVariant,
                       fontWeight: FontWeight.w700,
-                      fontSize: 10,
+                      fontSize: M3FontSize.tiny,
                     ),
                   ),
                 ),
@@ -846,7 +847,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
             style: tt.labelSmall?.copyWith(
               color: fgColor,
               fontWeight: FontWeight.w700,
-              fontSize: 11,
+              fontSize: M3FontSize.labelSmall,
             ),
           ),
         ],
@@ -1574,12 +1575,12 @@ class _TenantProvisionWizardDialogState
             children: [
               Text(
                 label,
-                style: const TextStyle(fontSize: 12.0, color: Colors.grey),
+                style: const TextStyle(fontSize: M3FontSize.bodySmall, color: Colors.grey),
               ),
               SelectableText(
                 value,
                 style: TextStyle(
-                  fontSize: 14.0,
+                  fontSize: M3FontSize.bodyMedium,
                   fontWeight: FontWeight.bold,
                   fontFamily: isSecret ? 'monospace' : null,
                 ),
@@ -1676,12 +1677,12 @@ class _AdminResetPasswordModalState extends State<_AdminResetPasswordModal> {
                         children: [
                           const Text(
                             'كلمة المرور الجديدة:',
-                            style: TextStyle(fontSize: 12.0),
+                            style: TextStyle(fontSize: M3FontSize.bodySmall),
                           ),
                           SelectableText(
                             _newPassword!,
                             style: const TextStyle(
-                              fontSize: 16.0,
+                              fontSize: M3FontSize.bodyLarge,
                               fontWeight: FontWeight.bold,
                               fontFamily: 'monospace',
                             ),

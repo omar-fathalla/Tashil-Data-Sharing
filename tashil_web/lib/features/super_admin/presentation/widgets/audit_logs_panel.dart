@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_states.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -596,7 +597,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                       style: tt.labelSmall?.copyWith(
                         color: badge.$4,
                         fontWeight: FontWeight.w800,
-                        fontSize: 10.5,
+                        fontSize: M3FontSize.tinyPlus,
                       ),
                     ),
                   ],
@@ -612,7 +613,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                 child: Text(
                   entry.status.toUpperCase(),
                   style: tt.labelSmall?.copyWith(
-                    fontSize: 9.5,
+                    fontSize: M3FontSize.microPlus,
                     fontWeight: FontWeight.w800,
                     color: isSuccess
                         ? cs.onSecondaryContainer
@@ -646,7 +647,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                   style: tt.labelSmall?.copyWith(
                     color: cs.primary,
                     fontWeight: FontWeight.w700,
-                    fontSize: 10,
+                    fontSize: M3FontSize.tiny,
                   ),
                 ),
               ),
@@ -688,14 +689,14 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                   style: tt.labelSmall?.copyWith(
                     color: cs.onSurfaceVariant,
                     fontWeight: FontWeight.w700,
-                    fontSize: 10.5,
+                    fontSize: M3FontSize.tinyPlus,
                   ),
                 ),
                 Text(
                   'IP: ${entry.ipAddress}',
                   style: tt.labelSmall?.copyWith(
                     color: cs.onSurfaceVariant,
-                    fontSize: 10,
+                    fontSize: M3FontSize.tiny,
                   ),
                 ),
               ],
@@ -773,7 +774,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                           style: tt.labelSmall?.copyWith(
                             color: badge.$4,
                             fontWeight: FontWeight.w800,
-                            fontSize: 10.5,
+                            fontSize: M3FontSize.tinyPlus,
                           ),
                         ),
                       ),
@@ -794,7 +795,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                   child: Text(
                     entry.status.toUpperCase(),
                     style: tt.labelSmall?.copyWith(
-                      fontSize: 9.5,
+                      fontSize: M3FontSize.microPlus,
                       fontWeight: FontWeight.w800,
                       color: isSuccess
                           ? cs.onSecondaryContainer
@@ -838,7 +839,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                         style: tt.labelSmall?.copyWith(
                           color: cs.primary,
                           fontWeight: FontWeight.w700,
-                          fontSize: 10,
+                          fontSize: M3FontSize.tiny,
                         ),
                       ),
                     ),
@@ -890,7 +891,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                     style: tt.labelSmall?.copyWith(
                       color: cs.onSurface,
                       fontWeight: FontWeight.w700,
-                      fontSize: 11,
+                      fontSize: M3FontSize.labelSmall,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -898,7 +899,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                     'IP: ${entry.ipAddress}',
                     style: tt.labelSmall?.copyWith(
                       color: cs.onSurfaceVariant,
-                      fontSize: 10,
+                      fontSize: M3FontSize.tiny,
                     ),
                   ),
                 ],
@@ -935,7 +936,7 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
               style: tt.labelSmall?.copyWith(
                 color: cs.onSurfaceVariant,
                 fontWeight: FontWeight.w700,
-                fontSize: 10.5,
+                fontSize: M3FontSize.tinyPlus,
               ),
             ),
           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 
 /// DataSharingLogo renders the official Tashil Data Sharing brand mark:
 /// A Material Design 3 Medium Contrast Blue (#1B6EF3) squircle with a bold,
@@ -93,7 +94,7 @@ class DataSharingLogo extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: cs.onSurfaceVariant,
-                  fontSize: 11.0,
+                  fontSize: M3FontSize.labelSmall,
                   fontWeight: FontWeight.w500,
                 ),
               ),

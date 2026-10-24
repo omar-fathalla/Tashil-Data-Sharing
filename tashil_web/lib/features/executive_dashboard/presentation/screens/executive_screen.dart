@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
@@ -272,7 +273,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
                         style: theme.textTheme.labelSmall?.copyWith(
                           fontWeight: FontWeight.w500,
                           color: isSelected ? chainColor : colorScheme.onSurfaceVariant,
-                          fontSize: 10.5,
+                          fontSize: M3FontSize.tinyPlus,
                         ),
                       ),
                   ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
@@ -196,7 +197,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: Colors.green.shade800,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 10.0,
+                                fontSize: M3FontSize.tiny,
                               ),
                             ),
                           ),
@@ -374,7 +375,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
             color: isDone ? Colors.green : (isInProgress ? Colors.amber : Colors.grey),
           ),
           const SizedBox(width: 8.0),
-          Text(title, style: const TextStyle(fontSize: 12.0)),
+          Text(title, style: const TextStyle(fontSize: M3FontSize.bodySmall)),
         ],
       ),
     );
@@ -383,12 +384,12 @@ class AiAnalysisProgressCard extends StatelessWidget {
   Widget _buildStatCol(String title, String val, Color? valColor) {
     return Column(
       children: [
-        Text(title, style: const TextStyle(fontSize: 11.0, color: Colors.grey)),
+        Text(title, style: const TextStyle(fontSize: M3FontSize.labelSmall, color: Colors.grey)),
         const SizedBox(height: 2.0),
         Text(
           val,
           style: TextStyle(
-            fontSize: 14.0,
+            fontSize: M3FontSize.bodyMedium,
             fontWeight: FontWeight.bold,
             color: valColor,
           ),

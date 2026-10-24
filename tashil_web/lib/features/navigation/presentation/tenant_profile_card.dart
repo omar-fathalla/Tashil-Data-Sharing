@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../core/theme/m3_status_colors.dart';
 import '../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
@@ -111,7 +112,7 @@ class TenantProfileCard extends StatelessWidget {
                           '$userNameEn • $roleEn',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
-                            fontSize: 10.5,
+                            fontSize: M3FontSize.tinyPlus,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

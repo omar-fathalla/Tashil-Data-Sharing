@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
@@ -503,7 +504,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                   style: theme.textTheme.titleSmall?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: isTenant ? colorScheme.primary : colorScheme.onSurface,
-                                    fontSize: isTenant ? 15.0 : 14.0,
+                                    fontSize: isTenant ? M3FontSize.bodyMediumLarge : M3FontSize.bodyMedium,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -543,7 +544,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                       style: theme.textTheme.labelSmall?.copyWith(
                                         color: colorScheme.onSurfaceVariant,
                                         fontWeight: FontWeight.w600,
-                                        fontSize: 11.0,
+                                        fontSize: M3FontSize.labelSmall,
                                       ),
                                     ),
                                   ),
@@ -582,7 +583,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                             style: theme.textTheme.labelSmall?.copyWith(
                                               color: colorScheme.onPrimaryContainer,
                                               fontWeight: FontWeight.bold,
-                                              fontSize: 11.0,
+                                              fontSize: M3FontSize.labelSmall,
                                             ),
                                           ),
                                           if (rank == 1)
@@ -593,7 +594,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                               style: theme.textTheme.labelSmall?.copyWith(
                                                 color: colorScheme.onPrimaryContainer.withOpacity(0.85),
                                                 fontWeight: FontWeight.w600,
-                                                fontSize: 10.0,
+                                                fontSize: M3FontSize.tiny,
                                               ),
                                             ),
                                         ],
@@ -776,7 +777,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: colorScheme.onSurface,
-                                fontSize: 14.0,
+                                fontSize: M3FontSize.bodyMedium,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -804,7 +805,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 11.0,
+                                      fontSize: M3FontSize.labelSmall,
                                     ),
                                   ),
                                 ],
@@ -816,7 +817,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: colorScheme.primary,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 11.0,
+                                  fontSize: M3FontSize.labelSmall,
                                 ),
                               ),
                           ],
@@ -1157,7 +1158,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.onPrimaryContainer,
                             fontWeight: FontWeight.bold,
-                            fontSize: 9.5,
+                            fontSize: M3FontSize.microPlus,
                           ),
                         ),
                       ),
@@ -1198,7 +1199,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.onSecondaryContainer,
                             fontWeight: FontWeight.bold,
-                            fontSize: 9.5,
+                            fontSize: M3FontSize.microPlus,
                           ),
                         ),
                       ),
@@ -1274,7 +1275,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                         '${cat.skuCount} صنف',
                                         style: theme.textTheme.labelSmall?.copyWith(
                                           color: colorScheme.onSurfaceVariant,
-                                          fontSize: 10.5,
+                                          fontSize: M3FontSize.tinyPlus,
                                         ),
                                       ),
                                     ),
@@ -1293,7 +1294,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                           style: theme.textTheme.labelSmall?.copyWith(
                                             color: colorScheme.onPrimaryContainer,
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 10.0,
+                                            fontSize: M3FontSize.tiny,
                                           ),
                                         ),
                                       ),
@@ -1324,7 +1325,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                     'من مبيعاتنا',
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
-                                      fontSize: 10.0,
+                                      fontSize: M3FontSize.tiny,
                                     ),
                                   ),
                                 ],
@@ -1352,7 +1353,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                       : '${CurrencyFormatter.formatCompactEGP(cat.totalRevenue)} مبيعاتنا',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
-                                    fontSize: 11.5,
+                                    fontSize: M3FontSize.labelSmallPlus,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -1362,7 +1363,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                 '${CurrencyFormatter.formatUnits(cat.totalUnits)} عبوة',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
-                                  fontSize: 11.5,
+                                  fontSize: M3FontSize.labelSmallPlus,
                                 ),
                               ),
                             ],
@@ -1430,7 +1431,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                         'فئات إضافية',
                                         style: theme.textTheme.labelSmall?.copyWith(
                                           color: colorScheme.onSurfaceVariant,
-                                          fontSize: 10.5,
+                                          fontSize: M3FontSize.tinyPlus,
                                         ),
                                       ),
                                     ),
@@ -1440,7 +1441,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                         style: theme.textTheme.labelSmall?.copyWith(
                                           color: colorScheme.primary,
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 10.5,
+                                          fontSize: M3FontSize.tinyPlus,
                                         ),
                                       ),
                                   ],
@@ -1464,7 +1465,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                     'من مبيعاتنا',
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
-                                      fontSize: 10.0,
+                                      fontSize: M3FontSize.tiny,
                                     ),
                                   ),
                                 ],
@@ -1491,7 +1492,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                   '${CurrencyFormatter.formatCompactEGP(remainingRevenue)} مبيعاتنا',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
-                                    fontSize: 11.5,
+                                    fontSize: M3FontSize.labelSmallPlus,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -1501,7 +1502,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                 '${CurrencyFormatter.formatUnits(remainingUnits)} عبوة',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
-                                  fontSize: 11.5,
+                                  fontSize: M3FontSize.labelSmallPlus,
                                 ),
                               ),
                             ],
@@ -1764,7 +1765,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                               ? colorScheme.onPrimaryContainer
                                               : colorScheme.onSurfaceVariant,
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 10.0,
+                                          fontSize: M3FontSize.tiny,
                                         ),
                                       ),
                                     ),
@@ -1775,7 +1776,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                   '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود: ${sku.itemCode} • " : ""}باركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
-                                    fontSize: 11.0,
+                                    fontSize: M3FontSize.labelSmall,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -1786,7 +1787,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.onSurface,
-                                    fontSize: 10.5,
+                                    fontSize: M3FontSize.tinyPlus,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -1815,7 +1816,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                         '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود: ${sku.itemCode} • " : ""}باركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
                                         style: theme.textTheme.bodySmall?.copyWith(
                                           color: colorScheme.onSurfaceVariant,
-                                          fontSize: 11.0,
+                                          fontSize: M3FontSize.labelSmall,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -1844,7 +1845,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                         'تراكمي: ${sku.cumulativeSharePct.toStringAsFixed(1)}%',
                                         style: theme.textTheme.labelSmall?.copyWith(
                                           color: colorScheme.onSurfaceVariant,
-                                          fontSize: 10.5,
+                                          fontSize: M3FontSize.tinyPlus,
                                         ),
                                         maxLines: 1,
                                       ),
@@ -1871,7 +1872,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                           ? colorScheme.onPrimaryContainer
                                           : colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 10.5,
+                                      fontSize: M3FontSize.tinyPlus,
                                     ),
                                   ),
                                 ),

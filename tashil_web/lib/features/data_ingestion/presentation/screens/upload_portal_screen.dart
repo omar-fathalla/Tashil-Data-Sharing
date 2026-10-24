@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
@@ -772,7 +773,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
               'سيتم حذف هذا الشيت من التخزين (Storage) ومسح كافة البيانات والسجلات التحليلية المستوردة منه من قاعدة البيانات نهائياً.',
               style: TextStyle(
                 color: Theme.of(dialogCtx).colorScheme.onSurfaceVariant,
-                fontSize: 13.0,
+                fontSize: M3FontSize.labelMediumPlus,
               ),
             ),
             const SizedBox(height: 12.0),
@@ -791,7 +792,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> {
                     child: Text(
                       'عند حذف جميع الشيتات المرفوعة، سيتم تصفير كافة أرقام المبيعات والتحليلات بالكامل.',
                       style: TextStyle(
-                        fontSize: 12.0,
+                        fontSize: M3FontSize.bodySmall,
                         color: Colors.red.shade900,
                         fontWeight: FontWeight.w600,
                       ),

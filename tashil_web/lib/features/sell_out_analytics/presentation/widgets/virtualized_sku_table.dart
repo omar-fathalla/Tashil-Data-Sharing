@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -144,7 +145,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 12.0,
+                  fontSize: M3FontSize.bodySmall,
                   color: isSorted ? colorScheme.primary : colorScheme.onSurface,
                 ),
               ),
@@ -205,7 +206,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                         style: theme.textTheme.labelMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                           color: colorScheme.onSurface,
-                          fontSize: 13.0,
+                          fontSize: M3FontSize.labelMediumPlus,
                         ),
                       ),
                     ],
@@ -290,7 +291,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                       textStyle: theme.textTheme.labelSmall?.copyWith(
                         fontFamily: 'Cairo',
                         fontWeight: FontWeight.w700,
-                        fontSize: 11.5,
+                        fontSize: M3FontSize.labelSmallPlus,
                       ),
                     ),
                   ),
@@ -362,7 +363,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                         brandStyle.displayNameAr,
                                         style: TextStyle(
                                           color: brandStyle.foreground,
-                                          fontSize: 11.0,
+                                          fontSize: M3FontSize.labelSmall,
                                           fontWeight: FontWeight.w800,
                                         ),
                                       ),
@@ -395,7 +396,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           color: colorScheme.onSurfaceVariant,
                                           fontFamily: 'monospace',
                                           fontWeight: FontWeight.w600,
-                                          fontSize: 11.0,
+                                          fontSize: M3FontSize.labelSmall,
                                         ),
                                       ),
                                     ],
@@ -410,7 +411,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                               r.skuName,
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w800,
-                                fontSize: 14.5,
+                                fontSize: M3FontSize.bodyMediumPlus,
                                 color: colorScheme.onSurface,
                                 height: 1.3,
                               ),
@@ -442,7 +443,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                         r.itemCode,
                                         style: TextStyle(
                                           fontFamily: 'monospace',
-                                          fontSize: 10.5,
+                                          fontSize: M3FontSize.tinyPlus,
                                           fontWeight: FontWeight.w800,
                                           color: colorScheme.primary,
                                           decoration: widget.onRecordTap != null
@@ -476,7 +477,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                         r.barcode,
                                         style: TextStyle(
                                           fontFamily: 'monospace',
-                                          fontSize: 11.0,
+                                          fontSize: M3FontSize.labelSmall,
                                           fontWeight: FontWeight.w600,
                                           color: colorScheme.onSurfaceVariant,
                                         ),
@@ -508,7 +509,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                         r.storeName,
                                         style: theme.textTheme.labelSmall?.copyWith(
                                           color: colorScheme.onSurfaceVariant,
-                                          fontSize: 11.0,
+                                          fontSize: M3FontSize.labelSmall,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -539,7 +540,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           r.category,
                                           style: theme.textTheme.labelSmall?.copyWith(
                                             color: colorScheme.onSurfaceVariant,
-                                            fontSize: 11.0,
+                                            fontSize: M3FontSize.labelSmall,
                                           ),
                                         ),
                                       ],
@@ -576,7 +577,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           'الكمية وسعر الوحدة',
                                           style: theme.textTheme.labelSmall?.copyWith(
                                             color: colorScheme.onSurfaceVariant,
-                                            fontSize: 11.0,
+                                            fontSize: M3FontSize.labelSmall,
                                           ),
                                         ),
                                         const SizedBox(height: 3.0),
@@ -593,7 +594,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                               : '× ${r.unitPrice.toStringAsFixed(2)} ج.م',
                                           style: theme.textTheme.labelSmall?.copyWith(
                                             color: colorScheme.onSurfaceVariant,
-                                            fontSize: 10.5,
+                                            fontSize: M3FontSize.tinyPlus,
                                           ),
                                         ),
                                       ],
@@ -615,7 +616,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           'صافي المبيعات وهامش السلسلة',
                                           style: theme.textTheme.labelSmall?.copyWith(
                                             color: colorScheme.onSurfaceVariant,
-                                            fontSize: 11.0,
+                                            fontSize: M3FontSize.labelSmall,
                                           ),
                                         ),
                                         const SizedBox(height: 2.0),
@@ -635,7 +636,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             color: r.retailerMarginPct < 0
                                                 ? colorScheme.error
                                                 : colorScheme.primary.withOpacity(0.75),
-                                            fontSize: 10.5,
+                                            fontSize: M3FontSize.tinyPlus,
                                             fontFamily: 'monospace',
                                           ),
                                         ),
@@ -895,7 +896,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                               r.itemCode,
                                               style: TextStyle(
                                                 fontFamily: 'monospace',
-                                                fontSize: 10.0,
+                                                fontSize: M3FontSize.tiny,
                                                 fontWeight: FontWeight.w800,
                                                 color: colorScheme.primary,
                                                 decoration: widget.onRecordTap != null
@@ -913,7 +914,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             Expanded(
                                               child: SelectableText(
                                                 r.barcode,
-                                                style: const TextStyle(fontFamily: 'monospace', fontSize: 10.5),
+                                                style: const TextStyle(fontFamily: 'monospace', fontSize: M3FontSize.tinyPlus),
                                                 maxLines: 1,
                                               ),
                                             ),
@@ -934,7 +935,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             : r.skuName,
                                         child: Text(
                                           r.skuName,
-                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.0),
+                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: M3FontSize.bodySmall),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -1056,7 +1057,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             brandStyle.displayNameEn,
                                             style: TextStyle(
                                               color: brandStyle.foreground,
-                                              fontSize: 11.0,
+                                              fontSize: M3FontSize.labelSmall,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
@@ -1067,7 +1068,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       width: colStoreWidth,
                                       child: Text(
                                         r.storeName,
-                                        style: const TextStyle(fontSize: 12.0),
+                                        style: const TextStyle(fontSize: M3FontSize.bodySmall),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -1081,14 +1082,14 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           Text(
                                             '${CurrencyFormatter.formatUnits(r.quantitySold)} units',
                                             textAlign: TextAlign.end,
-                                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                            style: const TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w600),
                                           ),
                                           if (r.cartonsSold > 0)
                                             Text(
                                               '${r.cartonsSold.toStringAsFixed(1)} كرتونة (${r.unitsPerCarton}/ك)',
                                               textAlign: TextAlign.end,
                                               style: TextStyle(
-                                                fontSize: 9.5,
+                                                fontSize: M3FontSize.microPlus,
                                                 color: colorScheme.onSurfaceVariant,
                                               ),
                                               maxLines: 1,
@@ -1110,14 +1111,14 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             Text(
                                               '${r.unitPrice.toStringAsFixed(2)} EGP',
                                               textAlign: TextAlign.end,
-                                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                              style: const TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w600),
                                             ),
                                             if (r.recommendedPrice > 0 || r.factoryUnitCost > 0)
                                               Text(
                                                 'كارتة ${r.recommendedPrice.toStringAsFixed(2)} • مصنع ${r.factoryUnitCost.toStringAsFixed(2)}',
                                                 textAlign: TextAlign.end,
                                                 style: TextStyle(
-                                                  fontSize: 9.0,
+                                                  fontSize: M3FontSize.micro,
                                                   color: colorScheme.onSurfaceVariant,
                                                 ),
                                                 maxLines: 1,
@@ -1142,7 +1143,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                               textAlign: TextAlign.end,
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
-                                                fontSize: 11.5,
+                                                fontSize: M3FontSize.labelSmallPlus,
                                                 color: colorScheme.primary,
                                               ),
                                             ),
@@ -1151,7 +1152,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                                 'هامش ${r.retailerMarginPct.toStringAsFixed(1)}% (${CurrencyFormatter.formatUnits(r.retailerGrossProfit.round())} ج)',
                                                 textAlign: TextAlign.end,
                                                 style: TextStyle(
-                                                  fontSize: 9.0,
+                                                  fontSize: M3FontSize.micro,
                                                   fontWeight: FontWeight.w700,
                                                   color: r.retailerMarginPct < 0
                                                       ? colorScheme.error
@@ -1169,7 +1170,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       child: Text(
                                         r.transactionDate,
                                         textAlign: TextAlign.center,
-                                        style: const TextStyle(fontSize: 11.0),
+                                        style: const TextStyle(fontSize: M3FontSize.labelSmall),
                                       ),
                                     ),
                                   ],

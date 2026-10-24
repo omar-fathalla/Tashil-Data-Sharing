@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/widgets/m3_feedback.dart';
@@ -258,7 +259,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                   Text(
                                     isArabic ? 'تسهيل' : 'Tashil',
                                     style: TextStyle(
-                                      fontSize: 28,
+                                      fontSize: M3FontSize.headlineMedium,
                                       fontWeight: FontWeight.w900,
                                       color: colorScheme.primary,
                                       letterSpacing: 0.6,
@@ -293,7 +294,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                             Text(
                                               isArabic ? 'English' : 'العربية',
                                               style: TextStyle(
-                                                fontSize: 14,
+                                                fontSize: M3FontSize.bodyMedium,
                                                 fontWeight: FontWeight.w600,
                                                 color: colorScheme.onSurface,
                                               ),
@@ -329,7 +330,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                     'D',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: 68,
+                                      fontSize: M3FontSize.displayHero,
                                       fontWeight: FontWeight.w900,
                                       height: 1.0,
                                       color: colorScheme.onPrimary,
@@ -348,7 +349,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                             child: Text(
                               isArabic ? 'مشاركة البيانات' : 'Data Sharing',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: M3FontSize.bodyLarge,
                                 fontWeight: FontWeight.w500,
                                 color: colorScheme.onSurfaceVariant,
                               ),
@@ -370,7 +371,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                     Text(
                                       isArabic ? 'تسجيل الدخول' : 'Login',
                                       style: TextStyle(
-                                        fontSize: 24,
+                                        fontSize: M3FontSize.headlineSmall,
                                         fontWeight: FontWeight.w400,
                                         color: colorScheme.onSurface,
                                       ),
@@ -381,7 +382,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                           ? 'مرحباً بعودتك، يرجى إدخال بياناتك'
                                           : 'Welcome back, please enter your details',
                                       style: TextStyle(
-                                        fontSize: 14,
+                                        fontSize: M3FontSize.bodyMedium,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
@@ -418,7 +419,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                         ],
                                         textDirection: TextDirection.ltr,
                                         style: TextStyle(
-                                          fontSize: 16,
+                                          fontSize: M3FontSize.bodyLarge,
                                           color: colorScheme.onSurface,
                                         ),
                                         decoration: _inputDecoration(
@@ -456,7 +457,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                         textDirection: TextDirection.ltr,
                                         obscureText: _obscurePassword,
                                         style: TextStyle(
-                                          fontSize: 16,
+                                          fontSize: M3FontSize.bodyLarge,
                                           color: colorScheme.onSurface,
                                         ),
                                         decoration: _inputDecoration(
@@ -534,7 +535,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                                       ? 'تذكرني'
                                                       : 'Remember Me',
                                                   style: TextStyle(
-                                                    fontSize: 14,
+                                                    fontSize: M3FontSize.bodyMedium,
                                                     color:
                                                         colorScheme.onSurface,
                                                   ),
@@ -558,7 +559,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                                   ? 'نسيت كلمة المرور؟'
                                                   : 'Forgot Password?',
                                               style: TextStyle(
-                                                fontSize: 14,
+                                                fontSize: M3FontSize.bodyMedium,
                                                 fontWeight: FontWeight.w600,
                                                 color: colorScheme.primary,
                                               ),
@@ -612,7 +613,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                                       ? 'تسجيل الدخول'
                                                       : 'Login',
                                                   style: TextStyle(
-                                                    fontSize: 18,
+                                                    fontSize: M3FontSize.titleMediumPlus,
                                                     color:
                                                         colorScheme.onPrimary,
                                                     fontWeight: FontWeight.w700,
@@ -641,7 +642,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                       : "Don't have an account?",
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: 15,
+                                    fontSize: M3FontSize.bodyMediumLarge,
                                     fontWeight: FontWeight.w600,
                                     color: colorScheme.onSurface,
                                   ),
@@ -653,7 +654,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                       : 'Contact the following number',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: 13,
+                                    fontSize: M3FontSize.labelMediumPlus,
                                     color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
@@ -685,7 +686,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                       Text(
                                         '01211857725',
                                         style: TextStyle(
-                                          fontSize: 15,
+                                          fontSize: M3FontSize.bodyMediumLarge,
                                           fontWeight: FontWeight.w700,
                                           letterSpacing: 1.2,
                                           color: colorScheme.primary,
@@ -706,7 +707,7 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                       isArabic
                                           ? 'التبديل إلى بوابة مدير المنصة (Super Admin)'
                                           : 'Switch to Super Admin Portal',
-                                      style: const TextStyle(fontSize: 12),
+                                      style: const TextStyle(fontSize: M3FontSize.bodySmall),
                                     ),
                                     onPressed: widget.onNavigateToAdmin,
                                   ),

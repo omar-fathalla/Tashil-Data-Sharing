@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
@@ -692,7 +693,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                                     persona.subtitle,
                                     style: theme.textTheme.bodySmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
-                                      fontSize: 11.5,
+                                      fontSize: M3FontSize.labelSmallPlus,
                                     ),
                                   ),
                                 ],

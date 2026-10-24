@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../theme/m3_shape.dart';
 
 /// M3Button adheres strictly to Google Material Design 3 button specifications.
@@ -258,7 +259,7 @@ class M3ActionButtonGroup extends StatelessWidget {
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: fgColor,
                         fontWeight: FontWeight.w700,
-                        fontSize: compact ? 12.5 : 13.0,
+                        fontSize: compact ? M3FontSize.bodySmallPlus : M3FontSize.labelMediumPlus,
                         letterSpacing: 0.15,
                       ),
                     ),
@@ -326,7 +327,7 @@ class M3PageHeader extends StatelessWidget {
                           textAlign: TextAlign.right,
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w800,
-                            fontSize: 18.0,
+                            fontSize: M3FontSize.titleMediumPlus,
                             color: colorScheme.onSurface,
                           ),
                         ),

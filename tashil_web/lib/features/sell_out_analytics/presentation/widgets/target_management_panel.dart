@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -507,7 +508,7 @@ onChanged: m3Legacy<int>((v) {
                                         ),
                                         label: const Text(
                                           'تعبئة الكراتين تلقائياً',
-                                          style: TextStyle(fontSize: 11.5),
+                                          style: TextStyle(fontSize: M3FontSize.labelSmallPlus),
                                         ),
                                       ),
                                   ],
@@ -520,28 +521,28 @@ onChanged: m3Legacy<int>((v) {
                                     Text(
                                       '• القيمة: ${CurrencyFormatter.formatEGP(effectiveRev)}',
                                       style: const TextStyle(
-                                        fontSize: 12.0,
+                                        fontSize: M3FontSize.bodySmall,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                     Text(
                                       '• إجمالي البضاعة: ${CurrencyFormatter.formatNumber(effectiveUnits.round())} كرتونة',
                                       style: const TextStyle(
-                                        fontSize: 12.0,
+                                        fontSize: M3FontSize.bodySmall,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                     Text(
                                       '• الوزن اللوجستي: ${effectiveTons.toStringAsFixed(1)} طن',
                                       style: const TextStyle(
-                                        fontSize: 12.0,
+                                        fontSize: M3FontSize.bodySmall,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                     Text(
                                       '• شامل تأمين المرتجعات: ${CurrencyFormatter.formatNumber(grossUnitsWithBuffer.round())} كرتونة',
                                       style: TextStyle(
-                                        fontSize: 12.0,
+                                        fontSize: M3FontSize.bodySmall,
                                         fontWeight: FontWeight.w700,
                                         color: Colors.teal.shade700,
                                       ),
@@ -1219,7 +1220,7 @@ onChanged: m3Legacy<String>((v) {
                         vertical: 12.0,
                       ),
                       textStyle: const TextStyle(
-                        fontSize: 14.5,
+                        fontSize: M3FontSize.bodyMediumPlus,
                         fontWeight: FontWeight.w700,
                       ),
                       shape: const RoundedRectangleBorder(
@@ -1244,7 +1245,7 @@ onChanged: m3Legacy<String>((v) {
                         vertical: 12.0,
                       ),
                       textStyle: const TextStyle(
-                        fontSize: 14.5,
+                        fontSize: M3FontSize.bodyMediumPlus,
                         fontWeight: FontWeight.w700,
                       ),
                       shape: const RoundedRectangleBorder(
@@ -1263,7 +1264,7 @@ onChanged: m3Legacy<String>((v) {
                         vertical: 12.0,
                       ),
                       textStyle: const TextStyle(
-                        fontSize: 14.5,
+                        fontSize: M3FontSize.bodyMediumPlus,
                         fontWeight: FontWeight.w700,
                       ),
                       shape: const RoundedRectangleBorder(
@@ -1284,7 +1285,7 @@ onChanged: m3Legacy<String>((v) {
                         vertical: 12.0,
                       ),
                       textStyle: const TextStyle(
-                        fontSize: 14.5,
+                        fontSize: M3FontSize.bodyMediumPlus,
                         fontWeight: FontWeight.w700,
                       ),
                       shape: const RoundedRectangleBorder(
@@ -1462,7 +1463,7 @@ onChanged: m3Legacy<String>((v) {
                                               '${item.branchesCount} فرع • ${item.activeSkusCount} صنف',
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w800,
-                                                fontSize: 12.0,
+                                                fontSize: M3FontSize.bodySmall,
                                                 color: colorScheme.primary,
                                               ),
                                             ),
@@ -1536,7 +1537,7 @@ onChanged: m3Legacy<String>((v) {
                                         '${item.achievementRevPct.toStringAsFixed(1)}% (${item.statusAr})',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w800,
-                                          fontSize: 12.0,
+                                          fontSize: M3FontSize.bodySmall,
                                           color: badgeColor,
                                         ),
                                       ),
@@ -1945,7 +1946,7 @@ onChanged: m3Legacy<String>((v) {
           Text(
             label,
             style: TextStyle(
-              fontSize: 12.0,
+              fontSize: M3FontSize.bodySmall,
               fontWeight: FontWeight.w800,
               color: color,
             ),
@@ -1981,7 +1982,7 @@ onChanged: m3Legacy<String>((v) {
         foregroundColor:
             selected ? colorScheme.onPrimary : colorScheme.onSurface,
         textStyle: const TextStyle(
-          fontSize: 13.0,
+          fontSize: M3FontSize.labelMediumPlus,
           fontWeight: FontWeight.w800,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 11.0),
@@ -2165,13 +2166,13 @@ onChanged: m3Legacy<String>((v) {
                           b.branchName,
                           style: const TextStyle(
                             fontWeight: FontWeight.w800,
-                            fontSize: 13.0,
+                            fontSize: M3FontSize.labelMediumPlus,
                           ),
                         ),
                         Text(
                           'كود: ${b.branchCode} • ${b.activeSkusCount} صنف',
                           style: TextStyle(
-                            fontSize: 11.0,
+                            fontSize: M3FontSize.labelSmall,
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -2187,13 +2188,13 @@ onChanged: m3Legacy<String>((v) {
                           '${b.governorate} (${b.regionCode})',
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
-                            fontSize: 12.5,
+                            fontSize: M3FontSize.bodySmallPlus,
                           ),
                         ),
                         Text(
                           'المندوب: ${b.salesRep}',
                           style: TextStyle(
-                            fontSize: 11.0,
+                            fontSize: M3FontSize.labelSmall,
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -2224,13 +2225,13 @@ onChanged: m3Legacy<String>((v) {
                           '${CurrencyFormatter.formatNumber(b.targetUnits.round())} كرتونة',
                           style: const TextStyle(
                             fontWeight: FontWeight.w800,
-                            fontSize: 13.0,
+                            fontSize: M3FontSize.labelMediumPlus,
                           ),
                         ),
                         Text(
                           'شامل المرتجع: ${CurrencyFormatter.formatNumber(b.grossTargetUnits.round())} ك',
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: M3FontSize.tinyPlus,
                             color: Colors.teal.shade700,
                             fontWeight: FontWeight.w700,
                           ),
@@ -2256,13 +2257,13 @@ onChanged: m3Legacy<String>((v) {
                           CurrencyFormatter.formatEGP(b.actualRevenueEgp),
                           style: const TextStyle(
                             fontWeight: FontWeight.w800,
-                            fontSize: 12.5,
+                            fontSize: M3FontSize.bodySmallPlus,
                           ),
                         ),
                         Text(
                           '${CurrencyFormatter.formatNumber(b.actualUnits.round())} كرتونة',
                           style: TextStyle(
-                            fontSize: 11.0,
+                            fontSize: M3FontSize.labelSmall,
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -2278,7 +2279,7 @@ onChanged: m3Legacy<String>((v) {
                           '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(b.varianceRevenueEgp)}',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
-                            fontSize: 12.5,
+                            fontSize: M3FontSize.bodySmallPlus,
                             color: isPositive
                                 ? Colors.green.shade700
                                 : colorScheme.error,
@@ -2287,7 +2288,7 @@ onChanged: m3Legacy<String>((v) {
                         Text(
                           '${b.varianceUnits >= 0 ? '+' : ''}${CurrencyFormatter.formatNumber(b.varianceUnits.round())} كرتونة',
                           style: TextStyle(
-                            fontSize: 11.0,
+                            fontSize: M3FontSize.labelSmall,
                             color: isPositive
                                 ? Colors.green.shade700
                                 : colorScheme.error,
@@ -2310,7 +2311,7 @@ onChanged: m3Legacy<String>((v) {
                         '${b.achievementRevPct.toStringAsFixed(1)}%',
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
-                          fontSize: 12.0,
+                          fontSize: M3FontSize.bodySmall,
                           color: badgeColor,
                         ),
                       ),
@@ -2342,7 +2343,7 @@ onChanged: m3Legacy<String>((v) {
                           label: Text(
                             'أصناف الفرع (${b.skus.length})',
                             style: const TextStyle(
-                              fontSize: 12.0,
+                              fontSize: M3FontSize.bodySmall,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -2738,7 +2739,7 @@ onChanged: m3Legacy<String>((v) {
         ),
         Text(
           'إجمالي الأصناف المطابقة: $matchedCount صنف',
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmallPlus),
         ),
       ],
     );
@@ -2875,7 +2876,7 @@ onChanged: m3Legacy<String>((v) {
                                   s.skuName,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w800,
-                                    fontSize: 12.5,
+                                    fontSize: M3FontSize.bodySmallPlus,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -2894,7 +2895,7 @@ onChanged: m3Legacy<String>((v) {
                               'كود: ${s.itemCode.isNotEmpty ? s.itemCode : "-"} • باركود: ${s.barcode.isNotEmpty ? s.barcode : "-"} • شد $packUnits',
                               style: TextStyle(
                                 fontFamily: 'monospace',
-                                fontSize: 10.5,
+                                fontSize: M3FontSize.tinyPlus,
                                 fontWeight: FontWeight.w700,
                                 color: colorScheme.primary,
                               ),
@@ -2905,7 +2906,7 @@ onChanged: m3Legacy<String>((v) {
                             Text(
                               '${s.subCategory} • شد $packUnits',
                               style: TextStyle(
-                                fontSize: 11.0,
+                                fontSize: M3FontSize.labelSmall,
                                 color: colorScheme.onSurfaceVariant,
                               ),
                               maxLines: 1,
@@ -2926,14 +2927,14 @@ onChanged: m3Legacy<String>((v) {
                       '${s.brand} (${s.sector})',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 12.5,
+                        fontSize: M3FontSize.bodySmallPlus,
                       ),
                     ),
                     if (s.departmentAr.isNotEmpty)
                       Text(
                         s.departmentAr,
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: M3FontSize.tinyPlus,
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -2954,7 +2955,7 @@ onChanged: m3Legacy<String>((v) {
                       Text(
                         'كارتة: ${CurrencyFormatter.formatEGP(s.officialCartonExclVatEgp)}',
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: M3FontSize.tinyPlus,
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -2980,13 +2981,13 @@ onChanged: m3Legacy<String>((v) {
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
                           color: colorScheme.primary,
-                          fontSize: 13.0,
+                          fontSize: M3FontSize.labelMediumPlus,
                         ),
                       ),
                       Text(
                         '${CurrencyFormatter.formatNumber(targetPieces)} قطعة (شد $packUnits)',
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: M3FontSize.tinyPlus,
                           fontWeight: FontWeight.w700,
                           color: Colors.teal.shade800,
                         ),
@@ -3019,13 +3020,13 @@ onChanged: m3Legacy<String>((v) {
                       '${CurrencyFormatter.formatNumber(s.actualUnits.round())} كرتونة (${CurrencyFormatter.formatNumber(actualPieces)} ق)',
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
-                        fontSize: 12.5,
+                        fontSize: M3FontSize.bodySmallPlus,
                       ),
                     ),
                     Text(
                       CurrencyFormatter.formatEGP(s.actualRevenueEgp),
                       style: TextStyle(
-                        fontSize: 11.0,
+                        fontSize: M3FontSize.labelSmall,
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -3041,7 +3042,7 @@ onChanged: m3Legacy<String>((v) {
                       '${s.varianceUnits >= 0 ? '+' : ''}${CurrencyFormatter.formatNumber(s.varianceUnits.round())} كرتونة',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        fontSize: 12.5,
+                        fontSize: M3FontSize.bodySmallPlus,
                         color: isPositive
                             ? Colors.green.shade700
                             : colorScheme.error,
@@ -3050,7 +3051,7 @@ onChanged: m3Legacy<String>((v) {
                     Text(
                       '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(s.varianceRevenueEgp)}',
                       style: TextStyle(
-                        fontSize: 11.0,
+                        fontSize: M3FontSize.labelSmall,
                         color: isPositive
                             ? Colors.green.shade700
                             : colorScheme.error,
@@ -3073,7 +3074,7 @@ onChanged: m3Legacy<String>((v) {
                     '${s.stockStatusAr} (${s.remainingStockCases.round()} ك)',
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
-                      fontSize: 11.5,
+                      fontSize: M3FontSize.labelSmallPlus,
                       color: stockColor,
                     ),
                   ),
@@ -3098,7 +3099,7 @@ onChanged: m3Legacy<String>((v) {
       children: [
         Text(
           'صفحة ${currentPage + 1} من $totalPages (إجمالي $totalItems صنف)',
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: M3FontSize.bodySmallPlus),
         ),
         Row(
           children: [
@@ -3193,7 +3194,7 @@ onChanged: m3Legacy<String>((v) {
                         Text(
                           'مسؤول السلاسل: ${r.kaOfficer}',
                           style: TextStyle(
-                            fontSize: 11.0,
+                            fontSize: M3FontSize.labelSmall,
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -3222,7 +3223,7 @@ onChanged: m3Legacy<String>((v) {
                   DataCell(
                     Text(
                       'MT: ${CurrencyFormatter.formatCompactEGP(r.mtTargetRevenueEgp)} • CC: ${CurrencyFormatter.formatCompactEGP(r.ccTargetRevenueEgp)}',
-                      style: const TextStyle(fontSize: 12.0),
+                      style: const TextStyle(fontSize: M3FontSize.bodySmall),
                     ),
                   ),
                   DataCell(
@@ -3510,7 +3511,7 @@ onChanged: m3Legacy<String>((v) {
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant.withOpacity(0.85),
                         fontWeight: FontWeight.w600,
-                        fontSize: 11.5,
+                        fontSize: M3FontSize.labelSmallPlus,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -3549,7 +3550,7 @@ onChanged: m3Legacy<String>((v) {
                   style: theme.textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: colorScheme.onSurfaceVariant,
-                    fontSize: 12.0,
+                    fontSize: M3FontSize.bodySmall,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -3561,7 +3562,7 @@ onChanged: m3Legacy<String>((v) {
                   '• $subtitleEn',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant.withOpacity(0.7),
-                    fontSize: 11.0,
+                    fontSize: M3FontSize.labelSmall,
                   ),
                 ),
               ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/utils/export_columns.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -474,7 +475,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
             const Expanded(
               child: Text(
                 'دليل البيانات المطلوبة لمحرك CPFR (Sell-In & Sell-Out)',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.titleMediumPlus),
               ),
             ),
           ],
@@ -877,7 +878,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                   'رفع ملف Sell-In هنا',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
-                    fontSize: 14,
+                    fontSize: M3FontSize.bodyMedium,
                   ),
                 ),
               ),
@@ -1643,7 +1644,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                               DataCell(Text(
                                 '${CurrencyFormatter.formatNumber(m.openingStockCases.round())} كرتونة',
                                 style: TextStyle(
-                                  fontSize: 12.0,
+                                  fontSize: M3FontSize.bodySmall,
                                   color: colorScheme.onSurfaceVariant,
                                 ),
                               )),
@@ -1684,7 +1685,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                                     Text(
                                       '${CurrencyFormatter.formatNumber(m.closingStockCases.round())} كرتونة',
                                       style: TextStyle(
-                                        fontSize: 11.0,
+                                        fontSize: M3FontSize.labelSmall,
                                         fontWeight: FontWeight.w600,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
@@ -1983,7 +1984,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
                                     '${item.itemCode.isNotEmpty ? item.itemCode : ""}${item.itemCode.isNotEmpty && item.barcode.isNotEmpty ? " • " : ""}${item.barcode}',
                                     style: TextStyle(
                                       fontFamily: 'monospace',
-                                      fontSize: 10.0,
+                                      fontSize: M3FontSize.tiny,
                                       color: colorScheme.primary,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -2539,7 +2540,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
         label,
         style: TextStyle(
           color: color,
-          fontSize: 12.0,
+          fontSize: M3FontSize.bodySmall,
           fontWeight: FontWeight.w700,
         ),
       ),

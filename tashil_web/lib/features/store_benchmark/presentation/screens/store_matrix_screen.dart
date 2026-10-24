@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
@@ -622,7 +623,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                                           '#${store.rank}',
                                                           style: TextStyle(
                                                             fontWeight: FontWeight.bold,
-                                                            fontSize: 12.0,
+                                                            fontSize: M3FontSize.bodySmall,
                                                             color: store.rank == 1
                                                                 ? colorScheme.onPrimaryContainer
                                                                 : store.rank == 2
@@ -670,7 +671,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                                                       overflow: TextOverflow.ellipsis,
                                                                       style: theme.textTheme.bodySmall?.copyWith(
                                                                         color: colorScheme.onSurfaceVariant,
-                                                                        fontSize: 11.5,
+                                                                        fontSize: M3FontSize.labelSmallPlus,
                                                                       ),
                                                                     ),
                                                                   ),
@@ -692,7 +693,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                                                       overflow: TextOverflow.ellipsis,
                                                                       style: theme.textTheme.bodySmall?.copyWith(
                                                                         color: colorScheme.onSurfaceVariant,
-                                                                        fontSize: 11.5,
+                                                                        fontSize: M3FontSize.labelSmallPlus,
                                                                       ),
                                                                     ),
                                                                   ),
@@ -775,7 +776,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                                           Text(
                                                             '${store.velocityUnitsPerDay.toStringAsFixed(1)} / يوم',
                                                             style: TextStyle(
-                                                              fontSize: 11.5,
+                                                              fontSize: M3FontSize.labelSmallPlus,
                                                               fontWeight: FontWeight.w700,
                                                               color: colorScheme.onSecondaryContainer,
                                                             ),
@@ -845,7 +846,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                         '#${store.rank}',
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 12.0,
+                                          fontSize: M3FontSize.bodySmall,
                                           color: store.rank == 1
                                               ? colorScheme.onPrimaryContainer
                                               : store.rank == 2
@@ -888,7 +889,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                             _getChainDisplayName(store.retailerChain),
                                             style: theme.textTheme.bodySmall?.copyWith(
                                               color: colorScheme.onSurfaceVariant,
-                                              fontSize: 11.0,
+                                              fontSize: M3FontSize.labelSmall,
                                               fontWeight: FontWeight.w500,
                                             ),
                                           ),
@@ -955,7 +956,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                             Text(
                                               '${store.velocityUnitsPerDay.toStringAsFixed(1)} / يوم',
                                               style: TextStyle(
-                                                fontSize: 12.0,
+                                                fontSize: M3FontSize.bodySmall,
                                                 fontWeight: FontWeight.w600,
                                                 color: colorScheme.onSecondaryContainer,
                                               ),
@@ -1033,7 +1034,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                     style: TextStyle(
                       color: onContainerColor,
                       fontWeight: FontWeight.bold,
-                      fontSize: 12.0,
+                      fontSize: M3FontSize.bodySmall,
                     ),
                   ),
                 ),
@@ -1095,7 +1096,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
         style: TextStyle(
           color: fg,
           fontWeight: FontWeight.bold,
-          fontSize: 11.0,
+          fontSize: M3FontSize.labelSmall,
         ),
       ),
     );

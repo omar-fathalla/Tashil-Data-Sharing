@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
@@ -905,11 +906,11 @@ onChanged: m3Legacy<int>((v) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13.0, fontWeight: FontWeight.w600)),
+        Text(label, style: const TextStyle(fontSize: M3FontSize.labelMediumPlus, fontWeight: FontWeight.w600)),
         Text(
           value,
           style: TextStyle(
-            fontSize: isBold ? 14.0 : 13.0,
+            fontSize: isBold ? M3FontSize.bodyMedium : M3FontSize.labelMediumPlus,
             fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
             color: valueColor,
           ),
@@ -1017,7 +1018,7 @@ onChanged: m3Legacy<int>((v) {
                               style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 color: summary.verdictColor,
-                                fontSize: 13.0,
+                                fontSize: M3FontSize.labelMediumPlus,
                               ),
                             ),
                           ),
@@ -1046,17 +1047,17 @@ onChanged: m3Legacy<int>((v) {
                           ),
                           title: Text(
                             exp.campaignTitle,
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: M3FontSize.bodyCompact),
                           ),
                           subtitle: Text(
                             '${exp.category.labelAr} • البراند: ${exp.brandName} • الجهة: ${exp.vendorOrAgency}',
-                            style: const TextStyle(fontSize: 12.0),
+                            style: const TextStyle(fontSize: M3FontSize.bodySmall),
                           ),
                           trailing: Text(
                             CurrencyFormatter.formatEGP(exp.amountEgp),
                             style: TextStyle(
                               fontWeight: FontWeight.w900,
-                              fontSize: 14.0,
+                              fontSize: M3FontSize.bodyMedium,
                               color: colorScheme.primary,
                             ),
                           ),
@@ -1097,15 +1098,15 @@ onChanged: m3Legacy<int>((v) {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(titleAr, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
-          Text(titleEn, style: TextStyle(fontSize: 11.0, color: Colors.grey.shade700)),
+          Text(titleAr, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmallPlus)),
+          Text(titleEn, style: TextStyle(fontSize: M3FontSize.labelSmall, color: Colors.grey.shade700)),
           const SizedBox(height: 6.0),
           Text(
             value,
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18.0, color: color),
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: M3FontSize.titleMediumPlus, color: color),
           ),
           const SizedBox(height: 2.0),
-          Text(sub, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+          Text(sub, style: const TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -1515,7 +1516,7 @@ onChanged: m3Legacy<int>((v) {
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
-                    fontSize: 11.5,
+                    fontSize: M3FontSize.labelSmallPlus,
                   ),
                 ),
               ),
@@ -1529,7 +1530,7 @@ onChanged: m3Legacy<int>((v) {
                 child: Text(
                   badgeText,
                   style: TextStyle(
-                    fontSize: 11.0,
+                    fontSize: M3FontSize.labelSmall,
                     fontWeight: FontWeight.w800,
                     color: accentColor,
                   ),
@@ -1684,7 +1685,7 @@ onChanged: m3Legacy<String>((v) {
                           vertical: 10.0,
                         ),
                         textStyle: const TextStyle(
-                          fontSize: 13.5,
+                          fontSize: M3FontSize.bodyCompact,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -1698,7 +1699,7 @@ onChanged: m3Legacy<String>((v) {
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(0, 44.0),
                           padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 10.0),
-                          textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                          textStyle: const TextStyle(fontSize: M3FontSize.bodyCompact, fontWeight: FontWeight.w700),
                         ),
                         onPressed: _uploading ? null : _pickAndUploadExpenses,
                         icon: _uploading
@@ -1724,7 +1725,7 @@ onChanged: m3Legacy<String>((v) {
                           vertical: 10.0,
                         ),
                         textStyle: const TextStyle(
-                          fontSize: 13.5,
+                          fontSize: M3FontSize.bodyCompact,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -1741,7 +1742,7 @@ onChanged: m3Legacy<String>((v) {
                           vertical: 10.0,
                         ),
                         textStyle: const TextStyle(
-                          fontSize: 13.5,
+                          fontSize: M3FontSize.bodyCompact,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -1758,7 +1759,7 @@ onChanged: m3Legacy<String>((v) {
                           vertical: 10.0,
                         ),
                         textStyle: const TextStyle(
-                          fontSize: 13.5,
+                          fontSize: M3FontSize.bodyCompact,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -1821,7 +1822,7 @@ onChanged: m3Legacy<String>((v) {
                   '${summaries.length} حملات شهرية مجمعة',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
-                    fontSize: 12.0,
+                    fontSize: M3FontSize.bodySmall,
                     color: colorScheme.onPrimaryContainer,
                   ),
                 ),
@@ -1895,11 +1896,11 @@ onChanged: m3Legacy<String>((v) {
                           children: [
                             Text(
                               '${s.monthNameAr} ${s.year}',
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodyCompact),
                             ),
                             Text(
                               '${s.monthNameEn} ${s.year}',
-                              style: TextStyle(fontSize: 11.0, color: colorScheme.onSurfaceVariant),
+                              style: TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant),
                             ),
                           ],
                         ),
@@ -1921,7 +1922,7 @@ onChanged: m3Legacy<String>((v) {
                                 ),
                                 Text(
                                   '${s.activitiesCount} بنود ترويجية',
-                                  style: TextStyle(fontSize: 11.0, color: colorScheme.onSurfaceVariant),
+                                  style: TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant),
                                 ),
                               ],
                             ),
@@ -1939,12 +1940,12 @@ onChanged: m3Legacy<String>((v) {
                               style: const TextStyle(
                                 fontWeight: FontWeight.w900,
                                 color: Color(0xFF7C3AED),
-                                fontSize: 13.5,
+                                fontSize: M3FontSize.bodyCompact,
                               ),
                             ),
                             Text(
                               '${s.spendToSalesRatioPct.toStringAsFixed(1)}% من المبيعات',
-                              style: TextStyle(fontSize: 11.0, color: colorScheme.onSurfaceVariant),
+                              style: TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant),
                             ),
                           ],
                         ),
@@ -1965,12 +1966,12 @@ onChanged: m3Legacy<String>((v) {
                               style: TextStyle(
                                 fontWeight: FontWeight.w900,
                                 color: colorScheme.onSurface,
-                                fontSize: 13.5,
+                                fontSize: M3FontSize.bodyCompact,
                               ),
                             ),
                             Text(
                               'توريد Sell-In: ${CurrencyFormatter.formatEGP(s.currentMonthSellInEgp)}',
-                              style: TextStyle(fontSize: 10.5, color: colorScheme.onSurfaceVariant),
+                              style: TextStyle(fontSize: M3FontSize.tinyPlus, color: colorScheme.onSurfaceVariant),
                             ),
                           ],
                         ),
@@ -1991,7 +1992,7 @@ onChanged: m3Legacy<String>((v) {
                                 '${momPositive ? '+' : ''}${s.momGrowthPct.toStringAsFixed(1)}% MoM',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 11.5,
+                                  fontSize: M3FontSize.labelSmallPlus,
                                   color: momPositive ? const Color(0xFF15803D) : const Color(0xFFDC2626),
                                 ),
                               ),
@@ -2000,7 +2001,7 @@ onChanged: m3Legacy<String>((v) {
                             Text(
                               '${momPositive ? '+' : ''}${CurrencyFormatter.formatEGP(s.momLiftEgp)}',
                               style: TextStyle(
-                                fontSize: 11.5,
+                                fontSize: M3FontSize.labelSmallPlus,
                                 fontWeight: FontWeight.w700,
                                 color: momPositive ? const Color(0xFF15803D) : const Color(0xFFDC2626),
                               ),
@@ -2024,7 +2025,7 @@ onChanged: m3Legacy<String>((v) {
                                 '${yoyPositive ? '+' : ''}${s.yoyGrowthPct.toStringAsFixed(1)}% YoY',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 11.5,
+                                  fontSize: M3FontSize.labelSmallPlus,
                                   color: yoyPositive ? const Color(0xFF0284C7) : const Color(0xFFDC2626),
                                 ),
                               ),
@@ -2033,7 +2034,7 @@ onChanged: m3Legacy<String>((v) {
                             Text(
                               '${yoyPositive ? '+' : ''}${CurrencyFormatter.formatEGP(s.yoyLiftEgp)}',
                               style: TextStyle(
-                                fontSize: 11.5,
+                                fontSize: M3FontSize.labelSmallPlus,
                                 fontWeight: FontWeight.w700,
                                 color: yoyPositive ? const Color(0xFF0284C7) : const Color(0xFFDC2626),
                               ),
@@ -2050,13 +2051,13 @@ onChanged: m3Legacy<String>((v) {
                               '${s.romiMultiple.toStringAsFixed(2)}x',
                               style: TextStyle(
                                 fontWeight: FontWeight.w900,
-                                fontSize: 14.5,
+                                fontSize: M3FontSize.bodyMediumPlus,
                                 color: s.verdictColor,
                               ),
                             ),
                             Text(
                               'ROI ${s.netRoiPct >= 0 ? '+' : ''}${s.netRoiPct.toStringAsFixed(0)}%',
-                              style: TextStyle(fontSize: 11.0, color: colorScheme.onSurfaceVariant),
+                              style: TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant),
                             ),
                           ],
                         ),
@@ -2073,7 +2074,7 @@ onChanged: m3Legacy<String>((v) {
                             s.verdictAr,
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
-                              fontSize: 11.5,
+                              fontSize: M3FontSize.labelSmallPlus,
                               color: s.verdictColor,
                             ),
                           ),
@@ -2205,7 +2206,7 @@ onChanged: m3Legacy<String>((v) {
                               item.category.labelAr,
                               style: TextStyle(
                                 fontWeight: FontWeight.w800,
-                                fontSize: 11.5,
+                                fontSize: M3FontSize.labelSmallPlus,
                                 color: item.category.color,
                               ),
                             ),
@@ -2224,7 +2225,7 @@ onChanged: m3Legacy<String>((v) {
                           item.brandName,
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
-                            fontSize: 12.0,
+                            fontSize: M3FontSize.bodySmall,
                             color: colorScheme.onSecondaryContainer,
                           ),
                         ),
@@ -2241,14 +2242,14 @@ onChanged: m3Legacy<String>((v) {
                               item.campaignTitle,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.0),
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: M3FontSize.labelMediumPlus),
                             ),
                             if (item.notes.isNotEmpty)
                               Text(
                                 item.notes,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 11.0, color: colorScheme.onSurfaceVariant),
+                                style: TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant),
                               ),
                           ],
                         ),
@@ -2257,7 +2258,7 @@ onChanged: m3Legacy<String>((v) {
                     DataCell(
                       Text(
                         item.vendorOrAgency,
-                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                        style: const TextStyle(fontSize: M3FontSize.bodySmallPlus, fontWeight: FontWeight.w600),
                       ),
                     ),
                     DataCell(
@@ -2265,7 +2266,7 @@ onChanged: m3Legacy<String>((v) {
                         CurrencyFormatter.formatEGP(item.amountEgp),
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
-                          fontSize: 13.5,
+                          fontSize: M3FontSize.bodyCompact,
                           color: colorScheme.primary,
                         ),
                       ),
@@ -2382,11 +2383,11 @@ onChanged: m3Legacy<String>((v) {
                                 children: [
                                   Text(
                                     cat.labelAr,
-                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodyCompact),
                                   ),
                                   Text(
                                     cat.labelEn,
-                                    style: TextStyle(fontSize: 11.0, color: colorScheme.onSurfaceVariant),
+                                    style: TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant),
                                   ),
                                 ],
                               ),
@@ -2404,7 +2405,7 @@ onChanged: m3Legacy<String>((v) {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
-                                  fontSize: 16.0,
+                                  fontSize: M3FontSize.bodyLarge,
                                   color: cat.color,
                                 ),
                               ),
@@ -2415,7 +2416,7 @@ onChanged: m3Legacy<String>((v) {
                                 '${sharePct.toStringAsFixed(1)}% (${catItems.length} أنشطة)',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11.5),
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: M3FontSize.labelSmallPlus),
                               ),
                             ),
                           ],

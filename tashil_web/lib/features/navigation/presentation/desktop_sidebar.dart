@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../core/theme/m3_shape.dart';
 import '../../../../core/config/app_version.dart';
 import '../../../../core/network/api_client.dart';
@@ -261,7 +262,7 @@ class DesktopSidebar extends StatelessWidget {
                               dest.badgeCount.toString(),
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: colorScheme.onError,
-                                fontSize: 10.0,
+                                fontSize: M3FontSize.tiny,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),

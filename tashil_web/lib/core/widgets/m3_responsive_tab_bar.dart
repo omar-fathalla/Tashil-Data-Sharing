@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../theme/m3_shape.dart';
 import '../theme/m3_motion.dart';
 
@@ -204,7 +205,7 @@ class M3ResponsiveTabBar<T> extends StatelessWidget {
                       item.label,
                       maxLines: 1,
                       style: TextStyle(
-                        fontSize: 14.0,
+                        fontSize: M3FontSize.bodyMedium,
                         fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
                         color: fgColor,
                       ),

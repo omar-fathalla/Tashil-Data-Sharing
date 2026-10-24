@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../core/widgets/app_icons.dart';
 import '../../../core/theme/m3_spacing.dart';
 import '../../../core/theme/m3_shape.dart';
@@ -419,7 +420,7 @@ class _AppShellState extends State<AppShell> {
                         child: Text(
                           widget.activeTenant.toUpperCase(),
                           style: theme.textTheme.labelSmall?.copyWith(
-                            fontSize: 9.5,
+                            fontSize: M3FontSize.microPlus,
                             fontWeight: FontWeight.w800,
                             color: colorScheme.onPrimaryContainer,
                           ),
@@ -557,7 +558,7 @@ class _AppShellState extends State<AppShell> {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
-                          fontSize: 11.0,
+                          fontSize: M3FontSize.labelSmall,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

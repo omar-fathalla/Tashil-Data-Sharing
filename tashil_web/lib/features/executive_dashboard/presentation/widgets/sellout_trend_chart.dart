@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
@@ -343,7 +344,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 9.5,
+                                      fontSize: M3FontSize.microPlus,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                     maxLines: 1,
@@ -379,7 +380,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: colorScheme.onSurfaceVariant.withOpacity(0.85),
                               fontWeight: FontWeight.bold,
-                              fontSize: 9.5,
+                              fontSize: M3FontSize.microPlus,
                               fontFamily: 'Cairo',
                             ),
                           );
@@ -469,7 +470,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                                       style: theme.textTheme.labelSmall?.copyWith(
                                         color: isHovered ? colorScheme.primary : colorScheme.onSurfaceVariant,
                                         fontWeight: isHovered ? FontWeight.bold : FontWeight.w600,
-                                        fontSize: 10.5,
+                                        fontSize: M3FontSize.tinyPlus,
                                         fontFamily: 'Cairo',
                                       ),
                                     ),
@@ -481,7 +482,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                                               ? colorScheme.primary
                                               : colorScheme.onSurfaceVariant.withOpacity(0.75),
                                           fontWeight: isHovered ? FontWeight.bold : FontWeight.w500,
-                                          fontSize: 9.0,
+                                          fontSize: M3FontSize.micro,
                                         ),
                                       ),
                                   ],
@@ -553,7 +554,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: colorScheme.onInverseSurface.withOpacity(0.95),
                   fontWeight: FontWeight.bold,
-                  fontSize: 10.5,
+                  fontSize: M3FontSize.tinyPlus,
                 ),
               ),
               if (hasDistinctDate)
@@ -561,7 +562,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                   item.date,
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: colorScheme.onInverseSurface.withOpacity(0.72),
-                    fontSize: 9.0,
+                    fontSize: M3FontSize.micro,
                   ),
                 ),
               const SizedBox(height: 5.0),
@@ -603,7 +604,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                                     ? colorScheme.onInverseSurface
                                     : colorScheme.onInverseSurface.withOpacity(0.65),
                                 fontWeight: FontWeight.bold,
-                                fontSize: 10.5,
+                                fontSize: M3FontSize.tinyPlus,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -612,7 +613,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                                 parts.en!,
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onInverseSurface.withOpacity(0.7),
-                                  fontSize: 9.0,
+                                  fontSize: M3FontSize.micro,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -624,7 +625,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                                     ? colorScheme.onInverseSurface.withOpacity(0.95)
                                     : colorScheme.onInverseSurface.withOpacity(0.65),
                                 fontWeight: val > 0 ? FontWeight.w700 : FontWeight.normal,
-                                fontSize: 10.0,
+                                fontSize: M3FontSize.tiny,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -642,7 +643,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: colorScheme.onInverseSurface.withOpacity(0.85),
                     fontWeight: FontWeight.bold,
-                    fontSize: 9.5,
+                    fontSize: M3FontSize.microPlus,
                   ),
                 ),
                 Text(
@@ -650,14 +651,14 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: colorScheme.onInverseSurface,
                     fontWeight: FontWeight.bold,
-                    fontSize: 10.0,
+                    fontSize: M3FontSize.tiny,
                   ),
                 ),
                 Text(
                   '${CurrencyFormatter.formatUnits(item.units)} عبوة',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: colorScheme.onInverseSurface.withOpacity(0.8),
-                    fontSize: 9.5,
+                    fontSize: M3FontSize.microPlus,
                   ),
                 ),
               ] else
@@ -665,7 +666,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                   '${CurrencyFormatter.formatUnits(item.units)} عبوة',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: colorScheme.onInverseSurface.withOpacity(0.8),
-                    fontSize: 10.0,
+                    fontSize: M3FontSize.tiny,
                   ),
                 ),
             ],

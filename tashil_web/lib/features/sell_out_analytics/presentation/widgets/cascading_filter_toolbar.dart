@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/widgets/app_icons.dart';
@@ -659,7 +660,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontFamily: 'Cairo',
                     fontWeight: FontWeight.w700,
-                    fontSize: 11.0,
+                    fontSize: M3FontSize.labelSmall,
                     color: hasDateRange ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
                   ),
                 ),
@@ -724,7 +725,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    fontSize: 11.5,
+                    fontSize: M3FontSize.labelSmallPlus,
                     color: colorScheme.onSecondary,
                   ),
                 ),
@@ -762,7 +763,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    fontSize: 11.0,
+                    fontSize: M3FontSize.labelSmall,
                     color: colorScheme.onPrimary,
                   ),
                 ),
@@ -802,7 +803,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    fontSize: 11.0,
+                    fontSize: M3FontSize.labelSmall,
                     color: colorScheme.onSurface,
                   ),
                 ),

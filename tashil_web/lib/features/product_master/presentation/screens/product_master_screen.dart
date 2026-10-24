@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_states.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
@@ -381,7 +382,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                             'شيتات الأسعار المرفوعة (File Sheets)',
                             style: TextStyle(
                               fontWeight: FontWeight.w900,
-                              fontSize: 16.0,
+                              fontSize: M3FontSize.bodyLarge,
                             ),
                           ),
                           Text(
@@ -476,7 +477,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                                     style: const TextStyle(
                                                       fontWeight:
                                                           FontWeight.w900,
-                                                      fontSize: 13.0,
+                                                      fontSize: M3FontSize.labelMediumPlus,
                                                     ),
                                                   ),
                                                 ),
@@ -499,7 +500,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                                     child: const Text(
                                                       'مفعل حالياً',
                                                       style: TextStyle(
-                                                        fontSize: 10.0,
+                                                        fontSize: M3FontSize.tiny,
                                                         fontWeight:
                                                             FontWeight.w800,
                                                         color:
@@ -628,7 +629,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                         'ملخص مقارنة الشيت الجديد (AI Price Diff Summary)',
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
-                          fontSize: 15.5,
+                          fontSize: M3FontSize.bodyMediumLargePlus,
                         ),
                       ),
                       Text(
@@ -733,7 +734,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w700,
-                                          fontSize: 12.0,
+                                          fontSize: M3FontSize.bodySmall,
                                         ),
                                       ),
                                     ),
@@ -743,7 +744,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                         'صنف جديد (${_currFmt.format(item.newUnitPriceIncl)} ج.م)',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w800,
-                                          fontSize: 11.5,
+                                          fontSize: M3FontSize.labelSmallPlus,
                                           color: badgeColor,
                                         ),
                                       )
@@ -752,7 +753,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                         '${_currFmt.format(item.oldUnitPriceIncl)} ← ${_currFmt.format(item.newUnitPriceIncl)} ج.م (${item.diffPct > 0 ? '+' : ''}${item.diffPct.toStringAsFixed(1)}%)',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w800,
-                                          fontSize: 11.5,
+                                          fontSize: M3FontSize.labelSmallPlus,
                                           color: badgeColor,
                                         ),
                                       ),
@@ -818,14 +819,14 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             _intFmt.format(count),
             style: TextStyle(
               fontWeight: FontWeight.w900,
-              fontSize: 18.0,
+              fontSize: M3FontSize.titleMediumPlus,
               color: color,
             ),
           ),
           Text(
             labelAr,
             style: TextStyle(
-              fontSize: 11.0,
+              fontSize: M3FontSize.labelSmall,
               fontWeight: FontWeight.w700,
               color: cs.onSurface,
             ),
@@ -1028,7 +1029,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
-                    fontSize: 12.5,
+                    fontSize: M3FontSize.bodySmallPlus,
                   ),
                 ),
                 Text(
@@ -1036,7 +1037,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 10.0,
+                    fontSize: M3FontSize.tiny,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -1160,7 +1161,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 Text(
                                   'File Sheets • شيتات الأسعار (${_archivedMasterFiles.length})',
                                   style: TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: M3FontSize.labelSmallPlus,
                                     fontWeight: FontWeight.w800,
                                     color: cs.primary,
                                   ),
@@ -1207,7 +1208,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                   Text(
                                     'ملخص فروق الأسعار: ↑${summary.priceIncreasedCount} ↓${summary.priceDecreasedCount} +${summary.newSkusCount}',
                                     style: const TextStyle(
-                                      fontSize: 11.5,
+                                      fontSize: M3FontSize.labelSmallPlus,
                                       fontWeight: FontWeight.w800,
                                       color: Color(0xFFB45309),
                                     ),
@@ -1317,7 +1318,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           Text(
             label,
             style: TextStyle(
-              fontSize: 11.5,
+              fontSize: M3FontSize.labelSmallPlus,
               fontWeight: FontWeight.w700,
               color: cs.onSurface,
             ),
@@ -1479,7 +1480,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: cs.onSurfaceVariant,
-                            fontSize: 10.5,
+                            fontSize: M3FontSize.tinyPlus,
                           ),
                         ),
                       ),
@@ -1510,7 +1511,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: cs.onSurfaceVariant,
-                  fontSize: 11.5,
+                  fontSize: M3FontSize.labelSmallPlus,
                 ),
               ),
             ],
@@ -1909,7 +1910,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                       style: const TextStyle(
                                         fontFamily: 'monospace',
                                         fontWeight: FontWeight.w800,
-                                        fontSize: 12.0,
+                                        fontSize: M3FontSize.bodySmall,
                                       ),
                                     ),
                                     const SizedBox(width: 4.0),
@@ -1946,7 +1947,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                     overflow: TextOverflow.ellipsis,
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: cs.onSurfaceVariant,
-                                      fontSize: 10.5,
+                                      fontSize: M3FontSize.tinyPlus,
                                     ),
                                   ),
                                 ],
@@ -1982,7 +1983,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                       style: const TextStyle(
                                         fontFamily: 'monospace',
                                         fontWeight: FontWeight.w700,
-                                        fontSize: 12.0,
+                                        fontSize: M3FontSize.bodySmall,
                                       ),
                                     ),
                                   ],
@@ -2049,7 +2050,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 Text(
                                   'كرتونة: ${_currFmt.format(item.netCartonInvoiceCost)}',
                                   style: theme.textTheme.labelSmall?.copyWith(
-                                    fontSize: 10.0,
+                                    fontSize: M3FontSize.tiny,
                                     color: cs.onSurfaceVariant,
                                   ),
                                 ),
@@ -2078,7 +2079,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                   child: Text(
                                     isPromo ? 'عرض (Promo)' : 'عادي (Regular)',
                                     style: TextStyle(
-                                      fontSize: 10.5,
+                                      fontSize: M3FontSize.tinyPlus,
                                       fontWeight: FontWeight.w800,
                                       color: isPromo
                                           ? const Color(0xFFB45309)
@@ -2092,7 +2093,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                       ? 'مسحوب بالسلاسل (${_intFmt.format(item.totalPosUnitsSold)} وحدة)'
                                       : 'غير مسحوب • فرصة توزيع',
                                   style: TextStyle(
-                                    fontSize: 10.0,
+                                    fontSize: M3FontSize.tiny,
                                     fontWeight: FontWeight.w700,
                                     color: item.isActiveInChains
                                         ? const Color(0xFF0284C7)
@@ -2194,7 +2195,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         label: Text(
           label,
           style: TextStyle(
-            fontSize: 11.5,
+            fontSize: M3FontSize.labelSmallPlus,
             fontWeight: FontWeight.w800,
             color: isSelected ? Colors.white : cs.onSurface,
           ),
@@ -2235,7 +2236,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               const SizedBox(width: 6.0),
               const Text(
                 'فلتر سريع لتغيرات الأسعار:',
-                style: TextStyle(fontSize: 12.0, fontWeight: FontWeight.w800),
+                style: TextStyle(fontSize: M3FontSize.bodySmall, fontWeight: FontWeight.w800),
               ),
             ],
           ),
@@ -2284,7 +2285,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               ),
               label: const Text(
                 'تقرير مقارنة الشيت الجديد',
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+                style: TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w800),
               ),
               onPressed: () => _showUploadDiffSummaryDialog(
                 summary,
@@ -2360,7 +2361,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                               ? 'زاد ${item.priceChangePct > 0 ? '+${item.priceChangePct.toStringAsFixed(1)}%' : ''}'
                               : 'قل ${item.priceChangePct != 0 ? '${item.priceChangePct.toStringAsFixed(1)}%' : ''}',
                       style: TextStyle(
-                        fontSize: 9.5,
+                        fontSize: M3FontSize.microPlus,
                         fontWeight: FontWeight.w900,
                         color: isUp
                             ? const Color(0xFFDC2626)
@@ -2379,7 +2380,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           Text(
             'كان: ${_currFmt.format(item.prevUnitPriceInclVat)} ج.م',
             style: theme.textTheme.labelSmall?.copyWith(
-              fontSize: 9.5,
+              fontSize: M3FontSize.microPlus,
               color: cs.onSurfaceVariant,
               decoration: TextDecoration.lineThrough,
             ),
@@ -2395,11 +2396,11 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       children: [
         Text(
           ar,
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.0),
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmall),
         ),
         Text(
           en,
-          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 10.0),
+          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: M3FontSize.tiny),
         ),
       ],
     );
@@ -2417,7 +2418,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       children: [
         Text(
           '$labelAr:',
-          style: const TextStyle(fontSize: 12.0, fontWeight: FontWeight.w700),
+          style: const TextStyle(fontSize: M3FontSize.bodySmall, fontWeight: FontWeight.w700),
         ),
         const SizedBox(width: 6.0),
         DropdownButtonHideUnderline(
@@ -2428,7 +2429,7 @@ options: m3OptionsFromMenuItems<String>(items.entries
                         value: e.key,
                         child: Text(
                           e.value,
-                          style: const TextStyle(fontSize: 12.0),
+                          style: const TextStyle(fontSize: M3FontSize.bodySmall),
                         ),
                       ))
                   .toList()),
@@ -2778,18 +2779,18 @@ onChanged: m3Legacy<ProductMasterItemModel>((val) {
         children: [
           Text(
             titleAr,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmallPlus),
           ),
           Text(
             titleEn,
-            style: TextStyle(fontSize: 10.5, color: cs.onSurfaceVariant),
+            style: TextStyle(fontSize: M3FontSize.tinyPlus, color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 8.0),
           Text(
             value,
             style: TextStyle(
               fontWeight: FontWeight.w900,
-              fontSize: 15.5,
+              fontSize: M3FontSize.bodyMediumLargePlus,
               color: color,
             ),
           ),
@@ -3049,7 +3050,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                 children: [
                   const Text(
                     'بطاقة تعريف الصنف الرسمية (Product ID Card)',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: M3FontSize.bodyLarge),
                   ),
                   Text(
                     'كود الصنف: ${i.itemCode} • الباركود: ${i.barcode}',

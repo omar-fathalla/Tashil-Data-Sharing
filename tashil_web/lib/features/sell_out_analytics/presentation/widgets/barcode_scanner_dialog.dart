@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/m3_shape.dart';
 
@@ -308,7 +309,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                                       _isDetecting ? 'DETECTED' : 'LIVE 60FPS',
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 10.0,
+                                        fontSize: M3FontSize.tiny,
                                         fontWeight: FontWeight.bold,
                                         letterSpacing: 0.5,
                                       ),
@@ -371,7 +372,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                                 color: _isDetecting
                                     ? const Color(0xFF10B981)
                                     : Colors.white,
-                                fontSize: 12.0,
+                                fontSize: M3FontSize.bodySmall,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/utils/export_columns.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -337,7 +338,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     const SizedBox(height: 4.0),
                     Text(
                       'السلسلة: ${file.retailChain.toUpperCase()} • الحركات: ${file.rowsIngested} • القيمة: ${CurrencyFormatter.formatCompactEGP(file.totalRevenue)}',
-                      style: const TextStyle(fontSize: 12.5),
+                      style: const TextStyle(fontSize: M3FontSize.bodySmallPlus),
                     ),
                   ],
                 ),
@@ -345,7 +346,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
               const SizedBox(height: 10.0),
               Text(
                 'ملاحظة: سيتم حذف حركات هذا الشيت فقط من الـ Sell-In وإعادة حساب الأرصدة المتبقية تلقائياً دون المساس ببقية الشهور المرفوعة أو بيانات الـ Sell-Out.',
-                style: TextStyle(fontSize: 12.0, color: cs.onSurfaceVariant),
+                style: TextStyle(fontSize: M3FontSize.bodySmall, color: cs.onSurfaceVariant),
               ),
             ],
           ),
@@ -753,7 +754,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
               Text(
                 labelAr,
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: M3FontSize.labelSmallPlus,
                   fontWeight: FontWeight.w700,
                   color: cs.onSurfaceVariant,
                 ),
@@ -762,7 +763,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
               Text(
                 valueText,
                 style: TextStyle(
-                  fontSize: 15.0,
+                  fontSize: M3FontSize.bodyMediumLarge,
                   fontWeight: FontWeight.w900,
                   color: accentColor,
                 ),
@@ -770,7 +771,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
               Text(
                 subText,
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: M3FontSize.tinyPlus,
                   fontWeight: FontWeight.w600,
                   color: cs.onSurfaceVariant,
                 ),
@@ -913,7 +914,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     child: Text(
                       'اضغط على أي صنف بالجدول لفتح بطاقة الهوية (Product ID Card)',
                       style: TextStyle(
-                        fontSize: 11.0,
+                        fontSize: M3FontSize.labelSmall,
                         fontWeight: FontWeight.w800,
                         color: colorScheme.primary,
                       ),
@@ -1141,7 +1142,7 @@ onChanged: m3Legacy<int>((v) {
                         vertical: 10.0,
                       ),
                       textStyle: const TextStyle(
-                        fontSize: 13.5,
+                        fontSize: M3FontSize.bodyCompact,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1163,7 +1164,7 @@ onChanged: m3Legacy<int>((v) {
                         vertical: 10.0,
                       ),
                       textStyle: const TextStyle(
-                        fontSize: 13.5,
+                        fontSize: M3FontSize.bodyCompact,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1179,7 +1180,7 @@ onChanged: m3Legacy<int>((v) {
                         vertical: 10.0,
                       ),
                       textStyle: const TextStyle(
-                        fontSize: 13.5,
+                        fontSize: M3FontSize.bodyCompact,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1299,7 +1300,7 @@ onChanged: m3Legacy<int>((v) {
                                       child: Text(
                                         r.retailerChain.toUpperCase(),
                                         style: TextStyle(
-                                          fontSize: 10.5,
+                                          fontSize: M3FontSize.tinyPlus,
                                           fontWeight: FontWeight.w800,
                                           color: colorScheme.onPrimaryContainer,
                                         ),
@@ -1311,7 +1312,7 @@ onChanged: m3Legacy<int>((v) {
                                           ? '${r.governorate} • ${r.customerName}'
                                           : r.governorate,
                                       style: TextStyle(
-                                        fontSize: 11.5,
+                                        fontSize: M3FontSize.labelSmallPlus,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
@@ -1340,7 +1341,7 @@ onChanged: m3Legacy<int>((v) {
                                                 r.itemName,
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.w800,
-                                                  fontSize: 12.5,
+                                                  fontSize: M3FontSize.bodySmallPlus,
                                                 ),
                                               ),
                                             ),
@@ -1357,7 +1358,7 @@ onChanged: m3Legacy<int>((v) {
                                             'كود: ${r.itemCode.isNotEmpty ? r.itemCode : "-"} • باركود: ${r.barcode.isNotEmpty ? r.barcode : "-"}',
                                             style: TextStyle(
                                               fontFamily: 'monospace',
-                                              fontSize: 10.5,
+                                              fontSize: M3FontSize.tinyPlus,
                                               fontWeight: FontWeight.w700,
                                               color: colorScheme.primary,
                                             ),
@@ -1376,14 +1377,14 @@ onChanged: m3Legacy<int>((v) {
                                       '${r.brand} • ${r.subCategory}',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w700,
-                                        fontSize: 12.0,
+                                        fontSize: M3FontSize.bodySmall,
                                       ),
                                     ),
                                     if (r.departmentAr.isNotEmpty)
                                       Text(
                                         r.departmentAr,
                                         style: TextStyle(
-                                          fontSize: 10.5,
+                                          fontSize: M3FontSize.tinyPlus,
                                           color: colorScheme.onSurfaceVariant,
                                         ),
                                       ),
@@ -1400,13 +1401,13 @@ onChanged: m3Legacy<int>((v) {
                                       '${CurrencyFormatter.formatNumber(r.netQtyCases.round())} كرتونة',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w800,
-                                        fontSize: 12.5,
+                                        fontSize: M3FontSize.bodySmallPlus,
                                       ),
                                     ),
                                     Text(
                                       '${CurrencyFormatter.formatNumber(unitsSupplied)} قطعة (شد ${r.unitsPerCarton > 0 ? r.unitsPerCarton : 12})',
                                       style: TextStyle(
-                                        fontSize: 10.5,
+                                        fontSize: M3FontSize.tinyPlus,
                                         fontWeight: FontWeight.w700,
                                         color: Colors.teal.shade700,
                                       ),
@@ -1423,14 +1424,14 @@ onChanged: m3Legacy<int>((v) {
                                       'فعلي: ${CurrencyFormatter.formatEGP(actualCasePrice)}',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w800,
-                                        fontSize: 12.0,
+                                        fontSize: M3FontSize.bodySmall,
                                       ),
                                     ),
                                     if (r.officialCartonExclVatEgp > 0)
                                       Text(
                                         'كارتة: ${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp)} (${r.effectiveDiscountPct > 0 ? "خصم ${r.effectiveDiscountPct.toStringAsFixed(1)}%" : r.pricingWaveStatus})',
                                         style: TextStyle(
-                                          fontSize: 10.5,
+                                          fontSize: M3FontSize.tinyPlus,
                                           color: colorScheme.onSurfaceVariant,
                                         ),
                                       ),
@@ -1456,13 +1457,13 @@ onChanged: m3Legacy<int>((v) {
                                       style: TextStyle(
                                         fontWeight: FontWeight.w900,
                                         color: Colors.teal.shade800,
-                                        fontSize: 12.5,
+                                        fontSize: M3FontSize.bodySmallPlus,
                                       ),
                                     ),
                                     Text(
                                       'ضريبة 14%: ${CurrencyFormatter.formatEGP(vatAmount)}',
                                       style: TextStyle(
-                                        fontSize: 10.5,
+                                        fontSize: M3FontSize.tinyPlus,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
@@ -1476,7 +1477,7 @@ onChanged: m3Legacy<int>((v) {
                                       ? r.sourceFilename
                                       : 'Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx',
                                   style: TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: M3FontSize.labelSmallPlus,
                                     color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
@@ -1638,7 +1639,7 @@ onChanged: m3Legacy<int>((v) {
                       'الفترة المتطابقة ($matchedLabel — ${d.matchedMonthsCount > 0 ? d.matchedMonthsCount : 4} أشهر)',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        fontSize: 12.5,
+                        fontSize: M3FontSize.bodySmallPlus,
                         color: !_showFullYtdReconciliation
                             ? colorScheme.onPrimaryContainer
                             : colorScheme.onSurface,
@@ -1652,7 +1653,7 @@ onChanged: m3Legacy<int>((v) {
                       'إجمالي العام شامل التوريدات تحت التصريف (يناير - أكتوبر)',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        fontSize: 12.5,
+                        fontSize: M3FontSize.bodySmallPlus,
                         color: _showFullYtdReconciliation
                             ? colorScheme.onPrimaryContainer
                             : colorScheme.onSurface,
@@ -1683,7 +1684,7 @@ onChanged: m3Legacy<int>((v) {
                           Text(
                             'توريدات تحت التصريف ($pendingLabel): ${CurrencyFormatter.formatNumber(d.pendingSellOutCases.round())} كرتونة (${CurrencyFormatter.formatCompactEGP(d.pendingSellOutValueEgp)}) بانتظار رفع شيت الكاشير',
                             style: TextStyle(
-                              fontSize: 11.5,
+                              fontSize: M3FontSize.labelSmallPlus,
                               fontWeight: FontWeight.w800,
                               color: Colors.amber.shade900,
                             ),
@@ -2024,7 +2025,7 @@ onChanged: m3Legacy<String>((v) {
                                 Text(
                                   'بانتظار شيت كاشير السلسلة',
                                   style: TextStyle(
-                                    fontSize: 10.5,
+                                    fontSize: M3FontSize.tinyPlus,
                                     fontWeight: FontWeight.w700,
                                     color: Colors.amber.shade900,
                                   ),
@@ -2041,7 +2042,7 @@ onChanged: m3Legacy<String>((v) {
                               Text(
                                 '${CurrencyFormatter.formatNumber(m.openingStockCases.round())} كرتونة',
                                 style: TextStyle(
-                                  fontSize: 11.0,
+                                  fontSize: M3FontSize.labelSmall,
                                   color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
@@ -2063,7 +2064,7 @@ onChanged: m3Legacy<String>((v) {
                               Text(
                                 '+${CurrencyFormatter.formatNumber(m.sellInCases.round())} كرتونة (${CurrencyFormatter.formatNumber(m.sellInUnits)} قطعة)',
                                 style: TextStyle(
-                                  fontSize: 10.5,
+                                  fontSize: M3FontSize.tinyPlus,
                                   fontWeight: FontWeight.w700,
                                   color: colorScheme.onSurfaceVariant,
                                 ),
@@ -2072,7 +2073,7 @@ onChanged: m3Legacy<String>((v) {
                                 Text(
                                   'شامل 14%: ${CurrencyFormatter.formatCompactEGP(m.sellInGrossInclVatEgp)}',
                                   style: TextStyle(
-                                    fontSize: 10.0,
+                                    fontSize: M3FontSize.tiny,
                                     color: Colors.teal.shade800,
                                   ),
                                 ),
@@ -2095,7 +2096,7 @@ onChanged: m3Legacy<String>((v) {
                                     Text(
                                       '−${CurrencyFormatter.formatNumber(m.sellOutEstCases.round())} كرتونة (${CurrencyFormatter.formatNumber(m.sellOutUnits)} قطعة)',
                                       style: TextStyle(
-                                        fontSize: 10.5,
+                                        fontSize: M3FontSize.tinyPlus,
                                         fontWeight: FontWeight.w700,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
@@ -2104,7 +2105,7 @@ onChanged: m3Legacy<String>((v) {
                                       Text(
                                         'بتكلفة مصنع: ${CurrencyFormatter.formatCompactEGP(m.sellOutFactoryCostExclVatEgp)}',
                                         style: TextStyle(
-                                          fontSize: 10.0,
+                                          fontSize: M3FontSize.tiny,
                                           color: colorScheme.onSurfaceVariant,
                                         ),
                                       ),
@@ -2113,7 +2114,7 @@ onChanged: m3Legacy<String>((v) {
                               : Text(
                                   'تحت التصريف (Pending POS)',
                                   style: TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: M3FontSize.labelSmallPlus,
                                     fontWeight: FontWeight.w700,
                                     color: Colors.amber.shade900,
                                   ),
@@ -2135,7 +2136,7 @@ onChanged: m3Legacy<String>((v) {
                                     Text(
                                       'هامش السلسلة: ${m.chainGrossMarginPct.toStringAsFixed(1)}%',
                                       style: TextStyle(
-                                        fontSize: 10.5,
+                                        fontSize: M3FontSize.tinyPlus,
                                         fontWeight: FontWeight.w700,
                                         color: Colors.green.shade700,
                                       ),
@@ -2162,7 +2163,7 @@ onChanged: m3Legacy<String>((v) {
                                     Text(
                                       '2025: ${CurrencyFormatter.formatCompactEGP(m.prevYearSellOutValueEgp)}',
                                       style: TextStyle(
-                                        fontSize: 10.5,
+                                        fontSize: M3FontSize.tinyPlus,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
@@ -2198,7 +2199,7 @@ onChanged: m3Legacy<String>((v) {
                                 Text(
                                   '${CurrencyFormatter.formatNumber(m.closingStockCases.round())} كرتونة متبقية',
                                   style: TextStyle(
-                                    fontSize: 11.0,
+                                    fontSize: M3FontSize.labelSmall,
                                     fontWeight: FontWeight.w700,
                                     color: isPositiveClosing
                                         ? colorScheme.onPrimaryContainer
@@ -2221,7 +2222,7 @@ onChanged: m3Legacy<String>((v) {
                           Text(
                             m.stockHealthLabelAr,
                             style: TextStyle(
-                              fontSize: 12.0,
+                              fontSize: M3FontSize.bodySmall,
                               fontWeight: FontWeight.w600,
                               color: m.stockHealthStatus == 'overstock'
                                   ? Colors.orange.shade800
@@ -2390,7 +2391,7 @@ onChanged: m3Legacy<String>((v) {
                               controller: _skuSearchController,
                               decoration: InputDecoration(
                                 hintText: 'بحث بالصنف أو البراند (مثلاً: Maxell, Diva, Dove)...',
-                                hintStyle: TextStyle(fontSize: 13.0, color: colorScheme.onSurfaceVariant),
+                                hintStyle: TextStyle(fontSize: M3FontSize.labelMediumPlus, color: colorScheme.onSurfaceVariant),
                                 prefixIcon: const Icon(Icons.search_rounded, size: 20),
                                 suffixIcon: _skuSearchQuery.isNotEmpty
                                     ? IconButton(
@@ -2433,7 +2434,7 @@ options: m3OptionsFromMenuItems<String>([
                                   value: 'all',
                                   child: Text(
                                     'كل الماركات (All Brands) (${d.inventoryAndPoItems.length})',
-                                    style: const TextStyle(fontSize: 13.0, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(fontSize: M3FontSize.labelMediumPlus, fontWeight: FontWeight.bold),
                                   ),
                                 ),
                                 ...availableBrands.map(
@@ -2441,7 +2442,7 @@ options: m3OptionsFromMenuItems<String>([
                                     value: b,
                                     child: Text(
                                       '$b (${brandItemCounts[b] ?? 0})',
-                                      style: const TextStyle(fontSize: 13.0),
+                                      style: const TextStyle(fontSize: M3FontSize.labelMediumPlus),
                                     ),
                                   ),
                                 ),
@@ -2463,22 +2464,22 @@ leadingIcon: Icons.filter_alt_rounded,
 options: m3OptionsFromMenuItems<String>([
                                 const DropdownMenuItem(
                                   value: 'all',
-                                  child: Text('كل الحالات (All)', style: TextStyle(fontSize: 13.0)),
+                                  child: Text('كل الحالات (All)', style: TextStyle(fontSize: M3FontSize.labelMediumPlus)),
                                 ),
                                 const DropdownMenuItem(
                                   value: 'urgent_replenishment',
                                   child: Text(
                                     '🚨 خطر نفاد عاجل (Urgent)',
-                                    style: TextStyle(fontSize: 13.0, fontWeight: FontWeight.bold, color: Colors.red),
+                                    style: TextStyle(fontSize: M3FontSize.labelMediumPlus, fontWeight: FontWeight.bold, color: Colors.red),
                                   ),
                                 ),
                                 const DropdownMenuItem(
                                   value: 'optimal',
-                                  child: Text('✅ رصيد آمن (Optimal)', style: TextStyle(fontSize: 13.0, color: Colors.teal)),
+                                  child: Text('✅ رصيد آمن (Optimal)', style: TextStyle(fontSize: M3FontSize.labelMediumPlus, color: Colors.teal)),
                                 ),
                                 const DropdownMenuItem(
                                   value: 'overstock',
-                                  child: Text('⚠️ تكدس مخزني (Overstock)', style: TextStyle(fontSize: 13.0, color: Colors.orange)),
+                                  child: Text('⚠️ تكدس مخزني (Overstock)', style: TextStyle(fontSize: M3FontSize.labelMediumPlus, color: Colors.orange)),
                                 ),
                               ]),
 onChanged: m3Legacy<String>((val) {
@@ -2745,7 +2746,7 @@ onChanged: m3Legacy<String>((val) {
                                         'كود: ${item.itemCode.isNotEmpty ? item.itemCode : "-"} • باركود: ${item.barcode.isNotEmpty ? item.barcode : "-"} • شد $packUnits',
                                         style: TextStyle(
                                           fontFamily: 'monospace',
-                                          fontSize: 10.5,
+                                          fontSize: M3FontSize.tinyPlus,
                                           color: colorScheme.primary,
                                           fontWeight: FontWeight.w700,
                                         ),
@@ -2768,7 +2769,7 @@ onChanged: m3Legacy<String>((val) {
                                     Text(
                                       'كرتونة الكارتة: ${CurrencyFormatter.formatEGP(item.officialCartonExclVatEgp)}',
                                       style: TextStyle(
-                                        fontSize: 10.5,
+                                        fontSize: M3FontSize.tinyPlus,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
@@ -2787,7 +2788,7 @@ onChanged: m3Legacy<String>((val) {
                                   Text(
                                     'صافي: ${CurrencyFormatter.formatCompactEGP(item.sellInValueEgp)}',
                                     style: TextStyle(
-                                      fontSize: 11.0,
+                                      fontSize: M3FontSize.labelSmall,
                                       color: colorScheme.primary,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -2807,7 +2808,7 @@ onChanged: m3Legacy<String>((val) {
                                   Text(
                                     'POS: ${CurrencyFormatter.formatCompactEGP(item.sellOutValueEgp)}${item.retailerMarginPct != 0 ? " (هامش ${item.retailerMarginPct.toStringAsFixed(0)}%)" : ""}',
                                     style: TextStyle(
-                                      fontSize: 10.5,
+                                      fontSize: M3FontSize.tinyPlus,
                                       color: Colors.teal.shade700,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -2830,7 +2831,7 @@ onChanged: m3Legacy<String>((val) {
                                   Text(
                                     CurrencyFormatter.formatEGP(stockVal),
                                     style: TextStyle(
-                                      fontSize: 11.0,
+                                      fontSize: M3FontSize.labelSmall,
                                       fontWeight: FontWeight.w700,
                                       color: colorScheme.onSurfaceVariant,
                                     ),
@@ -2868,7 +2869,7 @@ onChanged: m3Legacy<String>((val) {
                                 child: Text(
                                   item.stockStatusAr,
                                   style: TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: M3FontSize.labelSmallPlus,
                                     fontWeight: FontWeight.w800,
                                     color: isUrgent
                                         ? colorScheme.onErrorContainer
@@ -2890,13 +2891,13 @@ onChanged: m3Legacy<String>((val) {
                                           style: TextStyle(
                                             fontWeight: FontWeight.w900,
                                             color: Colors.deepOrange.shade800,
-                                            fontSize: 12.0,
+                                            fontSize: M3FontSize.bodySmall,
                                           ),
                                         ),
                                         Text(
                                           'شامل 14%: ${CurrencyFormatter.formatCompactEGP(poGrossInclVat)}',
                                           style: TextStyle(
-                                            fontSize: 10.5,
+                                            fontSize: M3FontSize.tinyPlus,
                                             fontWeight: FontWeight.w700,
                                             color: Colors.teal.shade800,
                                           ),
@@ -3301,7 +3302,7 @@ onChanged: m3Legacy<int>((v) {
                                         Text(
                                           _formatFileSize(file.fileSizeBytes),
                                           style: TextStyle(
-                                            fontSize: 11.0,
+                                            fontSize: M3FontSize.labelSmall,
                                             color: colorScheme.onSurfaceVariant,
                                           ),
                                         ),
@@ -3324,7 +3325,7 @@ onChanged: m3Legacy<int>((v) {
                                   child: Text(
                                     file.retailChain.toUpperCase(),
                                     style: TextStyle(
-                                      fontSize: 11.0,
+                                      fontSize: M3FontSize.labelSmall,
                                       fontWeight: FontWeight.w800,
                                       color: colorScheme.onPrimaryContainer,
                                     ),
@@ -3375,7 +3376,7 @@ onChanged: m3Legacy<int>((v) {
                                           .replaceAll('T', ' ')
                                       : file.uploadedAt,
                                   style: TextStyle(
-                                    fontSize: 12.0,
+                                    fontSize: M3FontSize.bodySmall,
                                     color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
@@ -3574,7 +3575,7 @@ onChanged: m3Legacy<int>((v) {
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
-                        fontSize: 11.5,
+                        fontSize: M3FontSize.labelSmallPlus,
                       ),
                     ),
                   ],

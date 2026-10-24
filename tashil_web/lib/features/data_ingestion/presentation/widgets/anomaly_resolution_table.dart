@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_spacing.dart';
 
@@ -88,7 +89,7 @@ class AnomalyResolutionTable extends StatelessWidget {
                         'صف $rowNum: $issueType',
                         style: TextStyle(
                           color: badgeColor,
-                          fontSize: 11.0,
+                          fontSize: M3FontSize.labelSmall,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -98,7 +99,7 @@ class AnomalyResolutionTable extends StatelessWidget {
                       child: Text(
                         desc,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 13.0,
+                          fontSize: M3FontSize.labelMediumPlus,
                         ),
                       ),
                     ),

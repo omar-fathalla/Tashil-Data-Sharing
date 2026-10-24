@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
@@ -481,7 +482,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
               subtitle,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
-                fontSize: 11.0,
+                fontSize: M3FontSize.labelSmall,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -569,7 +570,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                             child: Text(
                               'Gemini 1.5 Pro',
                               style: TextStyle(
-                                fontSize: 11.0,
+                                fontSize: M3FontSize.labelSmall,
                                 fontWeight: FontWeight.bold,
                                 color: colorScheme.onTertiaryContainer,
                               ),
@@ -881,7 +882,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                     Text(
                       bName,
                       style: TextStyle(
-                        fontSize: 12.0,
+                        fontSize: M3FontSize.bodySmall,
                         fontWeight: FontWeight.bold,
                         color: colorScheme.onSurface,
                       ),
@@ -919,7 +920,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
               onChanged: (val) => setState(() => _searchQuery = val),
               decoration: InputDecoration(
                 hintText: 'بحث بالصنف أو الكرتونة أو الباركود أو اسم الفرع...',
-                hintStyle: TextStyle(fontSize: 13.0, color: colorScheme.onSurfaceVariant.withOpacity(0.6)),
+                hintStyle: TextStyle(fontSize: M3FontSize.labelMediumPlus, color: colorScheme.onSurfaceVariant.withOpacity(0.6)),
                 prefixIcon: const Icon(Icons.search_rounded, size: 20.0),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
@@ -945,7 +946,7 @@ options: m3OptionsFromMenuItems<String>(_availableBrands.map((b) {
                   value: b,
                   child: Text(
                     b,
-                    style: const TextStyle(fontSize: 12.0),
+                    style: const TextStyle(fontSize: M3FontSize.bodySmall),
                     overflow: TextOverflow.ellipsis,
                   ),
                 );
@@ -964,7 +965,7 @@ options: m3OptionsFromMenuItems<String>(_availableBranches.map((b) {
                   value: b,
                   child: Text(
                     b,
-                    style: const TextStyle(fontSize: 12.0),
+                    style: const TextStyle(fontSize: M3FontSize.bodySmall),
                     overflow: TextOverflow.ellipsis,
                   ),
                 );
@@ -979,9 +980,9 @@ value: _selectedSeverity,
 label: 'مستوى الخطورة',
 expand: true,
 options: m3OptionsFromMenuItems<String>([
-                const DropdownMenuItem(value: 'الكل', child: Text('الكل', style: TextStyle(fontSize: 12.0))),
-                const DropdownMenuItem(value: 'حرج جداً', child: Text('حرج جداً', style: TextStyle(fontSize: 12.0, color: Colors.red))),
-                const DropdownMenuItem(value: 'أولوية مرتفعة', child: Text('أولوية مرتفعة', style: TextStyle(fontSize: 12.0, color: Colors.orange))),
+                const DropdownMenuItem(value: 'الكل', child: Text('الكل', style: TextStyle(fontSize: M3FontSize.bodySmall))),
+                const DropdownMenuItem(value: 'حرج جداً', child: Text('حرج جداً', style: TextStyle(fontSize: M3FontSize.bodySmall, color: Colors.red))),
+                const DropdownMenuItem(value: 'أولوية مرتفعة', child: Text('أولوية مرتفعة', style: TextStyle(fontSize: M3FontSize.bodySmall, color: Colors.orange))),
               ]),
 onChanged: m3Legacy<String>((val) {
                 if (val != null) setState(() => _selectedSeverity = val);
@@ -1122,7 +1123,7 @@ onChanged: m3Legacy<String>((val) {
                 child: Text(
                   '$count',
                   style: TextStyle(
-                    fontSize: 10.5,
+                    fontSize: M3FontSize.tinyPlus,
                     fontWeight: FontWeight.bold,
                     color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
                   ),
@@ -1165,7 +1166,7 @@ onChanged: m3Legacy<String>((val) {
             isCritical ? 'حرج جداً' : 'أولوية مرتفعة',
             style: TextStyle(
               color: isCritical ? colorScheme.onError : colorScheme.onTertiary,
-              fontSize: 10.0,
+              fontSize: M3FontSize.tiny,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1181,7 +1182,7 @@ onChanged: m3Legacy<String>((val) {
             alert.brand,
             style: TextStyle(
               color: colorScheme.onPrimaryContainer,
-              fontSize: 11.0,
+              fontSize: M3FontSize.labelSmall,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1340,7 +1341,7 @@ onChanged: m3Legacy<String>((val) {
                           '${alert.consecutiveDaysOOS} أيام بدون بيع',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
-                            fontSize: 11.0,
+                            fontSize: M3FontSize.labelSmall,
                           ),
                         ),
                       ],
@@ -1359,7 +1360,7 @@ onChanged: m3Legacy<String>((val) {
                           ),
                         );
                       },
-                      child: const Text('أمر توريد سريع', style: TextStyle(fontSize: 12.0)),
+                      child: const Text('أمر توريد سريع', style: TextStyle(fontSize: M3FontSize.bodySmall)),
                     ),
                   ],
                 );
@@ -1470,26 +1471,26 @@ onChanged: m3Legacy<String>((val) {
                           ),
                           child: Text(
                             item.brand,
-                            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: M3FontSize.tinyPlus, fontWeight: FontWeight.bold),
                           ),
                         ),
                         const SizedBox(width: 8.0),
                         Expanded(
                           child: Text(
                             item.skuName,
-                            style: const TextStyle(fontSize: 13.0, fontWeight: FontWeight.w600),
+                            style: const TextStyle(fontSize: M3FontSize.labelMediumPlus, fontWeight: FontWeight.w600),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 8.0),
                         Text(
                           '${item.consecutiveDaysOOS} أيام بدون بيع',
-                          style: TextStyle(fontSize: 12.0, color: colorScheme.onSurfaceVariant),
+                          style: TextStyle(fontSize: M3FontSize.bodySmall, color: colorScheme.onSurfaceVariant),
                         ),
                         const SizedBox(width: 12.0),
                         Text(
                           '- ${CurrencyFormatter.formatEGP(item.estimatedLostDailyCost)}',
-                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: colorScheme.error),
+                          style: TextStyle(fontSize: M3FontSize.bodySmallPlus, fontWeight: FontWeight.bold, color: colorScheme.error),
                         ),
                       ],
                     ),

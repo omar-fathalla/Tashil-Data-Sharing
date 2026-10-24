@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
@@ -685,7 +686,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                                             '${item.itemCode.isNotEmpty ? '[${item.itemCode}] • ' : ''}GTIN: ${item.barcode} | ${item.category}',
                                                             style: theme.textTheme.bodySmall?.copyWith(
                                                               color: colorScheme.onSurfaceVariant,
-                                                              fontSize: 11.0,
+                                                              fontSize: M3FontSize.labelSmall,
                                                             ),
                                                           ),
                                                         ],
@@ -715,7 +716,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                                         style: theme.textTheme.bodySmall?.copyWith(
                                                           color: colorScheme.onSurfaceVariant,
                                                           fontWeight: FontWeight.w700,
-                                                          fontSize: 11.5,
+                                                          fontSize: M3FontSize.labelSmallPlus,
                                                         ),
                                                       ),
                                                     ),
@@ -843,7 +844,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                                           '${item.itemCode.isNotEmpty ? 'كود: ${item.itemCode} | ' : ''}GTIN: ${item.barcode} | ${item.category}${item.unitsPerCarton > 0 ? ' (${item.unitsPerCarton} ش)' : ''}',
                                                           style: theme.textTheme.bodySmall?.copyWith(
                                                             color: colorScheme.onSurfaceVariant,
-                                                            fontSize: 11.0,
+                                                            fontSize: M3FontSize.labelSmall,
                                                           ),
                                                         ),
                                                       ],
@@ -873,7 +874,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                                               _getChainDisplayName(item.retailerChain),
                                                               style: theme.textTheme.bodySmall?.copyWith(
                                                                 color: colorScheme.onSurfaceVariant,
-                                                                fontSize: 11.0,
+                                                                fontSize: M3FontSize.labelSmall,
                                                               ),
                                                             ),
                                                           ],
@@ -898,7 +899,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                                           Text(
                                                             'هامش السلسلة: ${item.retailerMarginPct.toStringAsFixed(1)}%',
                                                             style: theme.textTheme.labelSmall?.copyWith(
-                                                              fontSize: 10.0,
+                                                              fontSize: M3FontSize.tiny,
                                                               color: colorScheme.primary,
                                                             ),
                                                           ),
@@ -922,7 +923,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                                           Text(
                                                             'صافي المصنع: ${item.factoryUnitCost.toStringAsFixed(2)} ج.م',
                                                             style: theme.textTheme.labelSmall?.copyWith(
-                                                              fontSize: 10.0,
+                                                              fontSize: M3FontSize.tiny,
                                                               color: colorScheme.onSurfaceVariant,
                                                             ),
                                                           ),
@@ -1210,7 +1211,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
               style: TextStyle(
                 color: fg,
                 fontWeight: FontWeight.bold,
-                fontSize: 12.0,
+                fontSize: M3FontSize.bodySmall,
               ),
             ),
           ),
@@ -1233,7 +1234,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
           'بدون عرض',
           style: TextStyle(
             color: colorScheme.onSurfaceVariant,
-            fontSize: 11.0,
+            fontSize: M3FontSize.labelSmall,
           ),
         ),
       );
@@ -1257,7 +1258,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
               style: TextStyle(
                 color: colorScheme.onPrimaryContainer,
                 fontWeight: FontWeight.bold,
-                fontSize: 11.0,
+                fontSize: M3FontSize.labelSmall,
               ),
             ),
           ),
@@ -1308,7 +1309,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                         'مؤشر أثر حركة الأسعار على المبيعات الشهرية',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          fontSize: 16.0,
+                          fontSize: M3FontSize.bodyLarge,
                         ),
                       ),
                       const SizedBox(height: 2.0),
@@ -1316,7 +1317,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                         'مقارنة مباشرة بين حركة متوسط الأسعار ونمو الإيرادات الفعلية عبر الشهور',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
-                          fontSize: 12.0,
+                          fontSize: M3FontSize.bodySmall,
                         ),
                       ),
                     ],
@@ -1372,7 +1373,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                             summary.overallVerdict,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              fontSize: 14.0,
+                              fontSize: M3FontSize.bodyMedium,
                               color: colorScheme.onSurface,
                             ),
                           ),
@@ -1457,7 +1458,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                     point.monthLabel,
                                     style: theme.textTheme.titleSmall?.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 13.0,
+                                      fontSize: M3FontSize.labelMediumPlus,
                                     ),
                                   ),
                                 ],
@@ -1475,7 +1476,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                       ? 'مستقر'
                                       : '${isRevUp ? '▲ +' : '▼ '}${point.revenueChangePct.toStringAsFixed(1)}% إيراد',
                                   style: TextStyle(
-                                    fontSize: 11.0,
+                                    fontSize: M3FontSize.labelSmall,
                                     fontWeight: FontWeight.bold,
                                     color: isRevUp
                                         ? colorScheme.onPrimaryContainer
@@ -1496,7 +1497,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                 'متوسط سعر البيع:',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
-                                  fontSize: 12.0,
+                                  fontSize: M3FontSize.bodySmall,
                                 ),
                               ),
                               Row(
@@ -1506,7 +1507,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                     CurrencyFormatter.formatEGP(point.averagePrice, showDecimals: true),
                                     style: theme.textTheme.bodyMedium?.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 13.0,
+                                      fontSize: M3FontSize.labelMediumPlus,
                                     ),
                                   ),
                                   if (point.priceChangePct != 0) ...[
@@ -1514,7 +1515,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                     Text(
                                       '(${isPriceUp ? '+' : ''}${point.priceChangePct.toStringAsFixed(1)}%)',
                                       style: TextStyle(
-                                        fontSize: 11.0,
+                                        fontSize: M3FontSize.labelSmall,
                                         fontWeight: FontWeight.w600,
                                         color: isPriceUp ? colorScheme.tertiary : colorScheme.error,
                                       ),
@@ -1535,14 +1536,14 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                 'إجمالي المبيعات:',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
-                                  fontSize: 12.0,
+                                  fontSize: M3FontSize.bodySmall,
                                 ),
                               ),
                               Text(
                                 CurrencyFormatter.formatEGP(point.totalRevenue),
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 13.0,
+                                  fontSize: M3FontSize.labelMediumPlus,
                                   color: colorScheme.primary,
                                 ),
                               ),
@@ -1563,7 +1564,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                               point.elasticityVerdict,
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
-                                fontSize: 11.0,
+                                fontSize: M3FontSize.labelSmall,
                               ),
                             ),
                           ),
@@ -1670,7 +1671,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: isCompact ? 11.0 : 12.0,
+                                  fontSize: isCompact ? M3FontSize.labelSmall : M3FontSize.bodySmall,
                                   fontWeight: _selectedCategory == chunk[col]
                                       ? FontWeight.w800
                                       : FontWeight.w600,
