@@ -1,0 +1,105 @@
+2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+April (04) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+April (04) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+August (08) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+August (08) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Auto from Sheet | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Auto from Sheet | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Auto from Sheet | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Auto from Sheet | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+February (02) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+February (02) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+January (01) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+January (01) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+July (07) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+July (07) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+June (06) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+June (06) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+March (03) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+March (03) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+May (05) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+May (05) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Month (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+Month (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+Month (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+Month (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Month (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Month (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Month (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+October (10) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+October (10) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Remaining Stock & Reports (Sell-In − Sell-Out) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Remaining Stock & Reports (Sell-In − Sell-Out) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Sell-In Data & Operations | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Sell-In Data & Operations | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+September (09) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+September (09) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Target Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+Target Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+Target Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+Target Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Target Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Target Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Target Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Target Management (Sell-In) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Target Management (Sell-In) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Upload Sell In | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
+Upload Sell In | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
+Upload Sell In | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
+Uploaded Sheets (0) | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
+Uploaded Sheets (0) | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
+Year (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+Year (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+Year (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+إدارة شيتات الإكسيل المرفوعة للـ Sell-In (الرفع التراكمي شهر بشهر) | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
+إدارة شيتات الإكسيل المرفوعة للـ Sell-In (الرفع التراكمي شهر بشهر) | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
+اضغط على زر "Upload Sell In" لرفع شيت الشهر الأول وبدء البناء التراكمي. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+اضغط على زر "Upload Sell In" لرفع شيت الشهر الأول وبدء البناء التراكمي. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+تحديث القائمة | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+تحديث القائمة | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+تحديث القائمة | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+لا توجد شيتات إكسيل مرفوعة في أرشيف الـ Sell-In حالياً. | 15.0 | FontWeight.w500 | ff45464f | 0.15 | 1.5
+لا توجد شيتات إكسيل مرفوعة في أرشيف الـ Sell-In حالياً. | 15.0 | FontWeight.w500 | ff45464f | 0.15 | 1.5
+منظومة التوريد للسلاسل التجارية (Sell-In)، حساب الأرصدة المتبقية (Sell-In − Sell-Out)، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+منظومة التوريد للسلاسل التجارية (Sell-In)، حساب الأرصدة المتبقية (Sell-In − Sell-Out)، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+منظومة التوريد للسلاسل التجارية (Sell-In)، حساب الأرصدة المتبقية (Sell-In − Sell-Out)، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+يمكنك رفع شيت كل شهر بشكل مستقل (يناير، ثم فبراير، ثم مارس... أو شيت مجمع لشهرين معاً في حالة التأخير) وسيقوم النظام بدمج الشهور تراكمياً دون مسح الشهور السابقة. كما يمكنك تعديل (استبدال) أو حذف أي شيت مرفوع في أي وقت. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+يمكنك رفع شيت كل شهر بشكل مستقل (يناير، ثم فبراير، ثم مارس... أو شيت مجمع لشهرين معاً في حالة التأخير) وسيقوم النظام بدمج الشهور تراكمياً دون مسح الشهور السابقة. كما يمكنك تعديل (استبدال) أو حذف أي شيت مرفوع في أي وقت. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+󰃩 | 18.0 | null | ff1565c0 | null | 1.0
+󰉈 | 20.0 | null | ff45464f | null | 1.0
+󰉪 | 20.0 | null | ffffffff | null | 1.0
+󰌞 | 20.0 | null | ff404659 | null | 1.0
+󰌠 | 48.0 | null | ff45464f | null | 1.0
+󰎲 | 20.0 | null | ff45464f | null | 1.0
+ | 18.0 | null | ff45464f | null | 1.0
+ | 18.0 | null | ff45464f | null | 1.0
+ | 18.0 | null | ff45464f | null | 1.0
+ | 24.0 | null | ff45464f | null | 1.0
+ | 24.0 | null | ff45464f | null | 1.0
+ | 24.0 | null | ff45464f | null | 1.0
+ | 24.0 | null | ff304578 | null | 1.0
+ | 20.0 | null | ff45464f | null | 1.0
