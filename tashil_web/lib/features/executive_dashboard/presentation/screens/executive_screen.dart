@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -238,7 +239,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
             children: [
               if (isSelected)
                 Icon(
-                  Icons.check_rounded,
+                  AppIcons.check,
                   size: 18.0,
                   color: chainColor,
                 )
@@ -296,7 +297,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.storefront_rounded, size: 15.0, color: colorScheme.primary),
+            Icon(AppIcons.storeMatrix, size: 15.0, color: colorScheme.primary),
             const SizedBox(width: 6.0),
             Text(
               'Chain: ${activeChain.shortName}',
@@ -307,7 +308,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
             ),
             const SizedBox(width: 4.0),
             Icon(
-              Icons.arrow_drop_down_rounded,
+              AppIcons.dropDown,
               size: 16.0,
               color: colorScheme.onSurfaceVariant,
             ),
@@ -358,7 +359,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
                   children: [
                     if (isSelected)
                       Icon(
-                        Icons.check_rounded,
+                        AppIcons.check,
                         size: 18.0,
                         color: colorScheme.primary,
                       )
@@ -383,7 +384,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.calendar_today_rounded, size: 14.0, color: colorScheme.primary),
+                  Icon(AppIcons.calendarToday, size: 14.0, color: colorScheme.primary),
                   const SizedBox(width: 5.0),
                   Text(
                     'Year: $selectedYear',
@@ -394,7 +395,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
                   ),
                   const SizedBox(width: 3.0),
                   Icon(
-                    Icons.arrow_drop_down_rounded,
+                    AppIcons.dropDown,
                     size: 16.0,
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -432,7 +433,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
                     children: [
                       if (isSelected)
                         Icon(
-                          Icons.check_rounded,
+                          AppIcons.check,
                           size: 18.0,
                           color: colorScheme.primary,
                         )
@@ -463,7 +464,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.calendar_month_rounded, size: 14.0, color: colorScheme.primary),
+                  Icon(AppIcons.calendar, size: 14.0, color: colorScheme.primary),
                   const SizedBox(width: 5.0),
                   Text(
                     'Month: ${activeMonth.shortName}',
@@ -474,7 +475,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> {
                   ),
                   const SizedBox(width: 3.0),
                   Icon(
-                    Icons.arrow_drop_down_rounded,
+                    AppIcons.dropDown,
                     size: 16.0,
                     color: colorScheme.onSurfaceVariant,
                   ),

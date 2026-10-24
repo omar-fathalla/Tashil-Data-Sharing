@@ -79,4 +79,14 @@ class AppIcons {
   static const IconData location = Icons.location_on_rounded;
   static const IconData barcode = Icons.qr_code_2_rounded;
   static const IconData offer = Icons.local_offer_rounded;
+
+  // Executive Dashboard
+  static const IconData calendarToday = Icons.calendar_today_rounded;
+  static const IconData pieChart = Icons.pie_chart_rounded;
+  static const IconData donutChart = Icons.donut_small_rounded;
+  static const IconData filterAlt = Icons.filter_alt_rounded;
+  static const IconData groups = Icons.groups_rounded;
+  static const IconData collapseAll = Icons.unfold_less_rounded;
+  static const IconData expandAll = Icons.unfold_more_rounded;
+  static const IconData premium = Icons.workspace_premium_rounded;
 }

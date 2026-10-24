@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
@@ -243,7 +244,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                         borderRadius: M3Shape.radiusSm,
                       ),
                       child: Icon(
-                        Icons.pie_chart_rounded,
+                        AppIcons.pieChart,
                         size: 20.0,
                         color: colorScheme.primary,
                       ),
@@ -298,7 +299,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.leaderboard_rounded,
+                            AppIcons.leaderboard,
                             size: 15.0,
                             color: colorScheme.onPrimaryContainer,
                           ),
@@ -332,7 +333,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.storefront_rounded,
+                              AppIcons.storeMatrix,
                               size: 15.0,
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -365,7 +366,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.groups_rounded,
+                              AppIcons.groups,
                               size: 15.0,
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -407,8 +408,8 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                             children: [
                               Icon(
                                 _showAll
-                                    ? Icons.unfold_less_rounded
-                                    : Icons.unfold_more_rounded,
+                                    ? AppIcons.collapseAll
+                                    : AppIcons.expandAll,
                                 size: 15.0,
                                 color: colorScheme.primary,
                               ),
@@ -532,7 +533,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    Icons.qr_code_2_rounded,
+                                    AppIcons.barcode,
                                     size: 14.0,
                                     color: colorScheme.onSurfaceVariant,
                                   ),
@@ -565,7 +566,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      Icons.workspace_premium_rounded,
+                                      AppIcons.premium,
                                       size: 15.0,
                                       color: colorScheme.onPrimaryContainer,
                                     ),
@@ -625,7 +626,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    Icons.pie_chart_rounded,
+                                    AppIcons.pieChart,
                                     size: 14.0,
                                     color: isTenant
                                         ? colorScheme.onPrimary
@@ -666,7 +667,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  Icons.payments_rounded,
+                                  AppIcons.money,
                                   size: 14.0,
                                   color: isTenant
                                       ? colorScheme.primary
@@ -796,7 +797,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    Icons.groups_rounded,
+                                    AppIcons.groups,
                                     size: 14.0,
                                     color: colorScheme.onSurfaceVariant,
                                   ),
@@ -840,7 +841,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    Icons.pie_chart_rounded,
+                                    AppIcons.pieChart,
                                     size: 14.0,
                                     color: colorScheme.onSecondaryContainer,
                                   ),
@@ -868,7 +869,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    Icons.payments_rounded,
+                                    AppIcons.money,
                                     size: 14.0,
                                     color: colorScheme.onSurfaceVariant,
                                   ),
@@ -996,7 +997,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                     borderRadius: M3Shape.radiusSm,
                   ),
                   child: Icon(
-                    Icons.category_rounded,
+                    AppIcons.productMaster,
                     size: 20.0,
                     color: colorScheme.primary,
                   ),
@@ -1052,8 +1053,8 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                         children: [
                           Icon(
                             _showAll
-                                ? Icons.unfold_less_rounded
-                                : Icons.unfold_more_rounded,
+                                ? AppIcons.collapseAll
+                                : AppIcons.expandAll,
                             size: 14.0,
                             color: colorScheme.primary,
                           ),
@@ -1087,7 +1088,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.clear_all_rounded, size: 14.0, color: colorScheme.primary),
+                          Icon(AppIcons.clearAll, size: 14.0, color: colorScheme.primary),
                           const SizedBox(width: 4.0),
                           Text(
                             'عرض الكل',
@@ -1132,7 +1133,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          Icons.pie_chart_rounded,
+                          AppIcons.pieChart,
                           size: 13.0,
                           color: colorScheme.onPrimaryContainer,
                         ),
@@ -1173,7 +1174,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          Icons.donut_small_rounded,
+                          AppIcons.donutChart,
                           size: 13.0,
                           color: colorScheme.onSecondaryContainer,
                         ),
@@ -1297,7 +1298,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                       ),
                                     if (isSelected)
                                       Icon(
-                                        Icons.check_circle_rounded,
+                                        AppIcons.success,
                                         size: 16.0,
                                         color: colorScheme.primary,
                                       ),
@@ -1594,7 +1595,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                     borderRadius: M3Shape.radiusSm,
                   ),
                   child: Icon(
-                    Icons.insights_rounded,
+                    AppIcons.insights,
                     size: 20.0,
                     color: colorScheme.primary,
                   ),
@@ -1649,7 +1650,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.filter_alt_rounded, size: 16.0, color: colorScheme.primary),
+                        Icon(AppIcons.filterAlt, size: 16.0, color: colorScheme.primary),
                         const SizedBox(width: 6.0),
                         Text(
                           'أصناف فئة: $selectedCategory (${skusToDisplay.length} صنف)',
@@ -1672,7 +1673,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 2.0),
-                          Icon(Icons.close_rounded, size: 14.0, color: colorScheme.primary),
+                          Icon(AppIcons.close, size: 14.0, color: colorScheme.primary),
                         ],
                       ),
                     ),
@@ -1687,7 +1688,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.inventory_2_rounded, size: 36.0, color: colorScheme.outline),
+                      Icon(AppIcons.units, size: 36.0, color: colorScheme.outline),
                       const SizedBox(height: 8.0),
                       Text(
                         'لا توجد أصناف مسجلة لهذه الفئة حالياً',

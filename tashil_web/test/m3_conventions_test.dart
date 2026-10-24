@@ -124,4 +124,29 @@ void main() {
     }
     expect(bad, isEmpty, reason: bad.join('\n'));
   });
+
+  test('Executive Dashboard uses theme roles, font tokens and AppIcons only', () {
+    final files = Directory('lib/features/executive_dashboard/presentation')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.dart'));
+    final rules = <String, RegExp>{
+      'Color literal': RegExp(r'Color\(0x'),
+      'Material swatch': RegExp(r'(?<![A-Za-z])Colors\.(?!transparent\b|white\b|black\b)[a-z]'),
+      'M3Palette direct': RegExp(r'M3Palette\.'),
+      'numeric fontSize': RegExp(r'fontSize:\s*[0-9]'),
+      'direct Icons.*': RegExp(r'(?<![A-Za-z])Icons\.'),
+    };
+    final violations = <String>[];
+    for (final f in files) {
+      final lines = f.readAsLinesSync();
+      for (var i = 0; i < lines.length; i++) {
+        rules.forEach((name, re) {
+          if (re.hasMatch(lines[i])) violations.add('${f.path}:${i + 1} $name');
+        });
+      }
+    }
+    expect(violations, isEmpty, reason: violations.join('\n'));
+  });
 }
+

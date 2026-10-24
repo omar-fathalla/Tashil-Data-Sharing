@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -177,7 +178,7 @@ class ChainSharePie extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 6.0),
-                Icon(Icons.pie_chart_rounded, size: 20.0, color: colorScheme.primary),
+                Icon(AppIcons.pieChart, size: 20.0, color: colorScheme.primary),
               ],
             ),
             const SizedBox(height: 4.0),
