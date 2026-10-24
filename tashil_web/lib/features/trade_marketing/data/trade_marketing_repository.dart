@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:tashil_web/core/network/backend_http.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
@@ -139,7 +140,9 @@ class ApiTradeMarketingRepository implements TradeMarketingRepository {
 
   Future<http.Response> _guard(Future<http.Response> f) async {
     try {
-      return await f.timeout(_timeout);
+      final r = await f.timeout(_timeout);
+      BackendHttp.onResponseStatus?.call(r.statusCode, r.request?.url ?? Uri());
+      return r;
     } catch (e) {
       throw const TradeMarketingException('تعذر الاتصال بالخادم / Could not reach the server');
     }

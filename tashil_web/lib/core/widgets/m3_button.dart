@@ -122,7 +122,8 @@ class M3Button extends StatelessWidget {
     if (isTonal) {
       return leading == null
           ? FilledButton.tonal(onPressed: action, child: text)
-          : FilledButton.tonalIcon(onPressed: action, icon: leading, label: text);
+          : FilledButton.tonalIcon(
+              onPressed: action, icon: leading, label: text);
     }
     return leading == null
         ? FilledButton(onPressed: action, child: text)
@@ -259,7 +260,9 @@ class M3ActionButtonGroup extends StatelessWidget {
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: fgColor,
                         fontWeight: FontWeight.w700,
-                        fontSize: compact ? M3FontSize.bodySmallPlus : M3FontSize.labelMediumPlus,
+                        fontSize: compact
+                            ? M3FontSize.bodySmallPlus
+                            : M3FontSize.labelMediumPlus,
                         letterSpacing: 0.15,
                       ),
                     ),
@@ -366,63 +369,74 @@ class M3PageHeader extends StatelessWidget {
                 ],
               ],
             )
-          : Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Directionality(
-                        textDirection: TextDirection.rtl,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (leading != null) ...[
-                              leading!,
-                              const SizedBox(width: 10.0),
-                            ],
-                            Flexible(
-                              child: Text(
-                                subtitleAr,
-                                textDirection: TextDirection.rtl,
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: colorScheme.onSurface,
+          : LayoutBuilder(
+              builder: (context, constraints) => Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Directionality(
+                          textDirection: TextDirection.rtl,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (leading != null) ...[
+                                leading!,
+                                const SizedBox(width: 10.0),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  subtitleAr,
+                                  textDirection: TextDirection.rtl,
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: colorScheme.onSurface,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 3.0),
-                      Directionality(
-                        textDirection: TextDirection.ltr,
-                        child: Text(
-                          titleEn,
-                          textDirection: TextDirection.ltr,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.15,
+                            ],
                           ),
                         ),
+                        const SizedBox(height: 3.0),
+                        Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Text(
+                            titleEn,
+                            textDirection: TextDirection.ltr,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.15,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (actions != null) ...[
+                    const SizedBox(width: 16.0),
+                    // Cap the actions so a narrow content area (e.g. ~900px
+                    // window minus the sidebar) cannot overflow the row; a
+                    // scrollable actions widget then scrolls instead.
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: constraints.maxWidth.isFinite
+                            ? constraints.maxWidth * 0.65
+                            : double.infinity,
                       ),
-                    ],
-                  ),
-                ),
-                if (actions != null) ...[
-                  const SizedBox(width: 16.0),
-                  Directionality(
-                    textDirection: TextDirection.rtl,
-                    child: actions!,
-                  ),
+                      child: Directionality(
+                        textDirection: TextDirection.rtl,
+                        child: actions!,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
     );
   }
 }
-

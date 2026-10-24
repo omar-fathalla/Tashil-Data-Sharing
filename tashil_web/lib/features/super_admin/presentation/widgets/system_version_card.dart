@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_card.dart';
-import 'package:http/http.dart' as http;
+import 'package:tashil_web/core/network/backend_http.dart';
 
 import '../../../../core/config/app_version.dart';
 import '../../../../core/network/api_endpoints.dart';
@@ -34,7 +34,7 @@ class _SystemVersionCardState extends State<SystemVersionCard> {
   }
 
   Future<Map<String, dynamic>> _defaultFetch() async {
-    final resp = await http
+    final resp = await BackendHttp
         .get(Uri.parse('${ApiEndpoints.baseUrl}/api/v1/version'))
         .timeout(const Duration(seconds: 6));
     if (resp.statusCode != 200) throw Exception('status ${resp.statusCode}');

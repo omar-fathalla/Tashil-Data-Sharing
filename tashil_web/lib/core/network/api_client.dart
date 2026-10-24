@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:tashil_web/core/network/backend_http.dart';
 import '../../features/cpfr_replenishment/domain/cpfr_models.dart';
 import '../security/zero_trust_digest.dart';
 import '../utils/date_range.dart';
@@ -1946,8 +1947,18 @@ class ApiClient {
   /// instead of seeing an empty dashboard.
   static VoidCallback? onSessionExpired;
 
-  static void reportAuthStatus(int statusCode) {
-    if (statusCode == 401 || statusCode == 403) onSessionExpired?.call();
+  /// 401 = the backend refused the login (expired/invalid token). 403 is a
+  /// normal permission denial (RBAC) and does not end the session. Auth
+  /// endpoints are excluded (a 401 there means wrong credentials).
+  static void reportAuthStatus(int statusCode, [Uri? url]) {
+    if (statusCode != 401) return;
+    if (url != null && url.path.contains('/api/v1/auth/')) return;
+    onSessionExpired?.call();
+  }
+
+  /// Routes every [BackendHttp] response through [reportAuthStatus].
+  static void installSessionGuard() {
+    BackendHttp.onResponseStatus = reportAuthStatus;
   }
   String? lastConnectionError;
 
@@ -2672,7 +2683,7 @@ class ApiClient {
       final uri = Uri.parse(ApiEndpoints.clearData).replace(
         queryParameters: scope == 'all' ? {'scope': 'all'} : null,
       );
-      await http.post(uri, headers: _headers).timeout(const Duration(seconds: 6));
+      await BackendHttp.post(uri, headers: _headers).timeout(const Duration(seconds: 6));
     } catch (e) {
       debugPrint('[ApiClient] Offline clearTenantData applied locally: $e');
     }
@@ -2688,7 +2699,7 @@ class ApiClient {
     invalidateExecutiveKpisCache();
     try {
       final uri = Uri.parse(ApiEndpoints.loadDefaultExcel);
-      final resp = await http
+      final resp = await BackendHttp
           .post(
             uri,
             headers: _headers,
@@ -2760,7 +2771,7 @@ class ApiClient {
     try {
       final uri = Uri.parse(ApiEndpoints.stores);
       final resp =
-          await http.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+          await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
       if (resp.statusCode == 200) {
         final decoded = jsonDecode(resp.body);
         if (decoded is List) {
@@ -2806,7 +2817,7 @@ class ApiClient {
         params['chain'] = chain;
       }
       final uri = Uri.parse(ApiEndpoints.executiveSummary).replace(queryParameters: params);
-      final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 12));
+      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 12));
       if (resp.statusCode == 200) {
         isServerOnline.value = true;
         lastConnectionError = null;
@@ -2815,7 +2826,6 @@ class ApiClient {
         _executiveKpisCache[cacheKey] = rbacModel;
         return rbacModel;
       } else {
-        reportAuthStatus(resp.statusCode);
         failureError = 'HTTP ${resp.statusCode}: ${resp.body}';
       }
     } catch (e) {
@@ -2920,7 +2930,7 @@ class ApiClient {
         'limit': limit.toString(),
         'offset': offset.toString(),
       });
-      final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 60));
+      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 60));
       if (resp.statusCode == 200) {
         isServerOnline.value = true;
         lastConnectionError = null;
@@ -3025,7 +3035,7 @@ class ApiClient {
     Object? failureError;
     try {
       final uri = Uri.parse(ApiEndpoints.oosMonitor);
-      final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
       if (resp.statusCode == 200) {
         isServerOnline.value = true;
         lastConnectionError = null;
@@ -3070,7 +3080,7 @@ class ApiClient {
     Object? failureError;
     try {
       final uri = Uri.parse(ApiEndpoints.oosMonitor);
-      final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
       if (resp.statusCode == 200) {
         isServerOnline.value = true;
         lastConnectionError = null;
@@ -3161,7 +3171,7 @@ class ApiClient {
       }
 
       final uri = Uri.parse(ApiEndpoints.storeMatrix).replace(queryParameters: params.isEmpty ? null : params);
-      final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
       if (resp.statusCode == 200) {
         isServerOnline.value = true;
         lastConnectionError = null;
@@ -3331,7 +3341,7 @@ class ApiClient {
       }
 
       final uri = Uri.parse(ApiEndpoints.pricingCompliance).replace(queryParameters: params.isEmpty ? null : params);
-      final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
       if (resp.statusCode == 200) {
         isServerOnline.value = true;
         lastConnectionError = null;
@@ -3850,7 +3860,7 @@ class ApiClient {
       final uri = Uri.parse(ApiEndpoints.upload).replace(
         queryParameters: queryParams,
       );
-      final resp = await http.post(
+      final resp = await BackendHttp.post(
         uri,
         headers: {
           'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
@@ -4026,7 +4036,7 @@ class ApiClient {
     _stagedLocalArchiveRollback.remove(batchId);
     try {
       final uri = Uri.parse(ApiEndpoints.ingestCommit);
-      final resp = await http.post(
+      final resp = await BackendHttp.post(
         uri,
         headers: {
           'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
@@ -4092,7 +4102,7 @@ class ApiClient {
     }
     try {
       final uri = Uri.parse(ApiEndpoints.ingestDiscard);
-      await http.post(
+      await BackendHttp.post(
         uri,
         headers: {
           'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
@@ -4139,7 +4149,7 @@ class ApiClient {
       final uri = Uri.parse(ApiEndpoints.ingestArchive).replace(
         queryParameters: queryParams.isEmpty ? null : queryParams,
       );
-      final resp = await http.get(
+      final resp = await BackendHttp.get(
         uri,
         headers: {
           'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
@@ -4233,7 +4243,7 @@ class ApiClient {
 
     try {
       final uri = Uri.parse(ApiEndpoints.ingestArchiveDownload(file.id));
-      final resp = await http.get(
+      final resp = await BackendHttp.get(
         uri,
         headers: {
           'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
@@ -4332,7 +4342,7 @@ class ApiClient {
       if (fileName != null && fileName.trim().isNotEmpty && !hasRemainingWithSameFileName) {
         uri = uri.replace(queryParameters: {'file_name': fileName.trim()});
       }
-      final resp = await http.delete(
+      final resp = await BackendHttp.delete(
         uri,
         headers: {
           'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
@@ -7164,7 +7174,7 @@ class ApiClient {
     http.Response resp;
     try {
       final uri = Uri.parse(ApiEndpoints.authLogin);
-      resp = await http.post(
+      resp = await BackendHttp.post(
         uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -7207,7 +7217,7 @@ class ApiClient {
     http.Response? resp;
     try {
       final uri = Uri.parse(ApiEndpoints.authForgotPassword);
-      resp = await http.post(
+      resp = await BackendHttp.post(
         uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'tenant_id': tenantId, 'email': email}),
@@ -7235,7 +7245,7 @@ class ApiClient {
     http.Response? resp;
     try {
       final uri = Uri.parse(ApiEndpoints.authResetPassword);
-      resp = await http.post(
+      resp = await BackendHttp.post(
         uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'token': token, 'new_password': newPassword}),
@@ -7262,7 +7272,7 @@ class ApiClient {
     http.Response? resp;
     try {
       final uri = Uri.parse(ApiEndpoints.authChangePassword);
-      resp = await http.post(
+      resp = await BackendHttp.post(
         uri,
         headers: _headers,
         body: jsonEncode({'old_password': oldPassword, 'new_password': newPassword}),
@@ -7291,7 +7301,7 @@ class ApiClient {
     final cleanSlug = normalizeTenantSlug(slug);
     try {
       final uri = Uri.parse(ApiEndpoints.portalMeta(cleanSlug));
-      final resp = await http.get(uri).timeout(const Duration(seconds: 4));
+      final resp = await BackendHttp.get(uri).timeout(const Duration(seconds: 4));
       if (resp.statusCode == 200) {
         final profile = TenantProfileModel.fromJson(jsonDecode(resp.body) as Map<String, dynamic>);
         registerTenantProfile(profile);
@@ -7318,7 +7328,7 @@ class ApiClient {
         headers['X-Tenant-ID'] = 'system';
         headers['X-Simulated-Role'] = 'super_admin';
       }
-      final resp = await http.get(uri, headers: headers).timeout(const Duration(seconds: 4));
+      final resp = await BackendHttp.get(uri, headers: headers).timeout(const Duration(seconds: 4));
       if (resp.statusCode == 200) {
         final list = (jsonDecode(resp.body) as List<dynamic>)
             .map((e) => TenantProfileModel.fromJson(e as Map<String, dynamic>))
@@ -7351,7 +7361,7 @@ class ApiClient {
       if (currentUser?.isSuperAdmin == true) {
         headers['X-Simulated-Role'] = 'vendor_admin';
       }
-      final resp = await http.get(uri, headers: headers).timeout(const Duration(seconds: 4));
+      final resp = await BackendHttp.get(uri, headers: headers).timeout(const Duration(seconds: 4));
       if (resp.statusCode == 200) {
         final list = (jsonDecode(resp.body) as List<dynamic>)
             .map((e) => RetailChainModel.fromJson(e as Map<String, dynamic>))
@@ -7402,7 +7412,7 @@ class ApiClient {
       if (currentUser?.isSuperAdmin == true) {
         headers['X-Simulated-Role'] = 'vendor_admin';
       }
-      resp = await http.post(
+      resp = await BackendHttp.post(
         uri,
         headers: headers,
         body: jsonEncode({
@@ -7472,7 +7482,7 @@ class ApiClient {
       if (currentUser?.isSuperAdmin == true) {
         headers['X-Simulated-Role'] = 'vendor_admin';
       }
-      resp = await http.put(
+      resp = await BackendHttp.put(
         uri,
         headers: headers,
         body: jsonEncode({
@@ -7538,7 +7548,7 @@ class ApiClient {
       if (currentUser?.isSuperAdmin == true) {
         headers['X-Simulated-Role'] = 'vendor_admin';
       }
-      resp = await http.delete(uri, headers: headers).timeout(const Duration(seconds: 4));
+      resp = await BackendHttp.delete(uri, headers: headers).timeout(const Duration(seconds: 4));
     } catch (e) {
       debugPrint('[ApiClient] Fallback deleteRetailChain ($cleanTenant): $e');
     }
@@ -7583,7 +7593,7 @@ class ApiClient {
         headers['X-Tenant-ID'] = 'system';
         headers['X-Simulated-Role'] = 'super_admin';
       }
-      resp = await http.post(
+      resp = await BackendHttp.post(
         uri,
         headers: headers,
         body: jsonEncode({
@@ -7663,7 +7673,7 @@ class ApiClient {
         headers['X-Tenant-ID'] = 'system';
         headers['X-Simulated-Role'] = 'super_admin';
       }
-      resp = await http.put(
+      resp = await BackendHttp.put(
         uri,
         headers: headers,
         body: jsonEncode({
@@ -7732,7 +7742,7 @@ class ApiClient {
         headers['X-Tenant-ID'] = 'system';
         headers['X-Simulated-Role'] = 'super_admin';
       }
-      resp = await http.delete(uri, headers: headers).timeout(const Duration(seconds: 4));
+      resp = await BackendHttp.delete(uri, headers: headers).timeout(const Duration(seconds: 4));
     } catch (e) {
       debugPrint('[ApiClient] Fallback deleteTenant: $e');
     }
@@ -7763,7 +7773,7 @@ class ApiClient {
         headers['X-Tenant-ID'] = 'system';
         headers['X-Simulated-Role'] = 'super_admin';
       }
-      resp = await http.post(
+      resp = await BackendHttp.post(
         uri,
         headers: headers,
         body: jsonEncode({'new_password': newPassword ?? ''}),
@@ -7943,7 +7953,7 @@ class ApiClient {
       final uri = Uri.parse(ApiEndpoints.auditLogs).replace(
         queryParameters: params.isEmpty ? null : params,
       );
-      final resp = await http
+      final resp = await BackendHttp
           .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 4));
       if (resp.statusCode == 200) {
@@ -8028,7 +8038,7 @@ class ApiClient {
 
     try {
       final uri = Uri.parse(ApiEndpoints.auditLogs);
-      final resp = await http
+      final resp = await BackendHttp
           .post(
             uri,
             headers: _headers,
@@ -8071,7 +8081,7 @@ class ApiClient {
       queryParameters: queryParams.isEmpty ? null : queryParams,
     );
     try {
-      final resp = await http
+      final resp = await BackendHttp
           .post(primaryUri, headers: _headers)
           .timeout(const Duration(seconds: 20));
       if (resp.statusCode == 200) {
@@ -8088,7 +8098,7 @@ class ApiClient {
               .replace(
         queryParameters: queryParams.isEmpty ? null : queryParams,
       );
-      final resp = await http
+      final resp = await BackendHttp
           .post(fallbackUri, headers: _headers)
           .timeout(const Duration(seconds: 20));
       if (resp.statusCode == 200) {
@@ -8170,7 +8180,7 @@ class ApiClient {
           filename: filename,
         ),
       );
-      final streamed = await req.send().timeout(const Duration(seconds: 60));
+      final streamed = await BackendHttp.send(req).timeout(const Duration(seconds: 60));
       final resp = await http.Response.fromStream(streamed);
       if (resp.statusCode == 200) {
         final jsonMap = jsonDecode(resp.body) as Map<String, dynamic>;
@@ -8236,7 +8246,7 @@ class ApiClient {
     try {
       final primaryUri = Uri.parse(ApiEndpoints.cpfrDashboard)
           .replace(queryParameters: queryParams);
-      final resp = await http
+      final resp = await BackendHttp
           .get(primaryUri, headers: _headers)
           .timeout(const Duration(seconds: 12));
       if (resp.statusCode == 200) {
@@ -8251,7 +8261,7 @@ class ApiClient {
     try {
       final cloudRunUri = Uri.parse('$_cloudRunBaseUrl/api/v1/analytics/cpfr')
           .replace(queryParameters: queryParams);
-      final resp = await http
+      final resp = await BackendHttp
           .get(cloudRunUri, headers: _headers)
           .timeout(const Duration(seconds: 12));
       if (resp.statusCode == 200) {
@@ -8715,6 +8725,7 @@ class ApiClient {
     int limit = 250,
     int offset = 0,
   }) async {
+    Object? failure;
     try {
       final params = <String, String>{
         'limit': limit.toString(),
@@ -8743,7 +8754,7 @@ class ApiClient {
       }
 
       final uri = Uri.parse(ApiEndpoints.sellInRecords).replace(queryParameters: params);
-      final response = await http
+      final response = await BackendHttp
           .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 60));
 
@@ -8751,7 +8762,14 @@ class ApiClient {
         final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
         return SellInExplorerResponse.fromJson(data);
       }
-    } catch (_) {}
+      failure = 'HTTP ${response.statusCode}';
+    } catch (e) {
+      failure = e;
+    }
+    if (!allowMockFallback) {
+      throw ServerConnectionException(
+          'تعذر تحميل بيانات الـ Sell-In من الخادم.', failure);
+    }
     return const SellInExplorerResponse(
       records: [],
       totalCount: 0,
@@ -8779,7 +8797,7 @@ class ApiClient {
         params['year'] = year.toString();
       }
       final uri = Uri.parse(ApiEndpoints.targets).replace(queryParameters: params);
-      final response = await http
+      final response = await BackendHttp
           .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 10));
 
@@ -8817,7 +8835,7 @@ class ApiClient {
       'target_units': targetUnits,
       'notes': notes,
     });
-    final response = await http
+    final response = await BackendHttp
         .post(uri, headers: _headers, body: body)
         .timeout(const Duration(seconds: 12));
 
@@ -8837,7 +8855,7 @@ class ApiClient {
       'id': id,
       'target_type': targetType,
     });
-    final response = await http
+    final response = await BackendHttp
         .delete(uri, headers: _headers)
         .timeout(const Duration(seconds: 10));
 
@@ -8877,7 +8895,7 @@ class ApiClient {
       ),
     );
 
-    final streamed = await request.send().timeout(const Duration(seconds: 25));
+    final streamed = await BackendHttp.send(request).timeout(const Duration(seconds: 25));
     final response = await http.Response.fromStream(streamed);
     if (response.statusCode == 200) {
       final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
@@ -8975,7 +8993,7 @@ class ApiClient {
       final uri = Uri.parse(ApiEndpoints.productMaster).replace(
         queryParameters: params.isEmpty ? null : params,
       );
-      final response = await http
+      final response = await BackendHttp
           .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 10));
 
@@ -9061,7 +9079,7 @@ class ApiClient {
     final cleanSlug = normalizeDataTenantSlug(tenantId);
     try {
       final uri = Uri.parse(ApiEndpoints.productMasterItem);
-      final response = await http
+      final response = await BackendHttp
           .put(
             uri,
             headers: _headers,
@@ -9182,7 +9200,7 @@ class ApiClient {
         ),
       );
 
-      final streamed = await request.send().timeout(const Duration(seconds: 30));
+      final streamed = await BackendHttp.send(request).timeout(const Duration(seconds: 30));
       final response = await http.Response.fromStream(streamed);
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
@@ -9999,7 +10017,7 @@ class ApiClient {
     list.insert(0, item);
 
     try {
-      final resp = await http
+      final resp = await BackendHttp
           .post(
             Uri.parse(ApiEndpoints.customCompetitorSkus),
             headers: _headers,
@@ -10056,7 +10074,7 @@ class ApiClient {
     final serverId = _customCompetitorServerIds[barcode];
     if (serverId == null) return; // memory-only item (never persisted)
     try {
-      final resp = await http
+      final resp = await BackendHttp
           .delete(Uri.parse(ApiEndpoints.customCompetitorSku(serverId)), headers: _headers)
           .timeout(const Duration(seconds: 10));
       if (resp.statusCode != 200 && resp.statusCode != 404) {
@@ -10079,7 +10097,7 @@ class ApiClient {
       }
       final uri = Uri.parse(ApiEndpoints.customCompetitorSkus)
           .replace(queryParameters: params.isEmpty ? null : params);
-      final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 6));
+      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 6));
       if (resp.statusCode != 200) return;
       final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
       final rows = (data['custom_skus'] as List?) ?? const [];

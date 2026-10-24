@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/m3_states.dart';
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_text_variants.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
@@ -51,6 +52,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
   int _selectedMonth = 0; // 0 = All Months
   String _searchQuery = '';
   bool _isLoading = true;
+  String? _loadError;
   bool _isUploading = false;
   SellInExplorerResponse _data = const SellInExplorerResponse(
     records: [],
@@ -163,7 +165,10 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     ));
     if (loaded case Failure(:final error)) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _loadError = error.toString();
+        });
         M3Feedback.showError(context, 'تعذر تحميل بيانات الـ Sell-In: $error');
       }
       return;
@@ -173,6 +178,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
       setState(() {
         _data = res;
         _isLoading = false;
+        _loadError = null;
       });
     }
   }
@@ -713,6 +719,14 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
               _buildRemainingStockAndReportsTab(context, theme, colorScheme)
             else if (_activeTab == 3)
               _buildUploadedSellInSheetsTab(context, theme, colorScheme)
+            else if (!_isLoading && _loadError != null && _data.records.isEmpty)
+              M3ErrorState(
+                key: const ValueKey('sell_in_error_state'),
+                title: 'Could not load Sell-In data',
+                message: _loadError,
+                retryLabel: 'Retry',
+                onRetry: _loadSellInRecords,
+              )
             else
               _buildSellInExplorerTab(context, theme, colorScheme),
           ],

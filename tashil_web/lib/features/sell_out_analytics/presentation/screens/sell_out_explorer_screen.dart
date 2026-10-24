@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/m3_states.dart';
 import 'dart:math' as math;
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
@@ -64,6 +65,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
   int _selectedMonth = 0; // 0 = All Months (كل الشهور), 1..12 = Jan..Dec
   String searchQuery = '';
   bool isLoading = true;
+  String? _loadError;
   bool _isUploading = false;
   String? _replacingFileId;
   List<SellOutRecordModel> records = [];
@@ -196,7 +198,10 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     ));
     if (loaded case Failure(:final error)) {
       if (mounted) {
-        setState(() => isLoading = false);
+        setState(() {
+          isLoading = false;
+          _loadError = error.toString();
+        });
         M3Feedback.showError(context, 'تعذر تحميل بيانات الـ Sell-Out: $error');
       }
       return;
@@ -271,6 +276,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
           _chainStores = storesByChain;
         }
         isLoading = false;
+        _loadError = null;
       });
     }
   }
@@ -668,6 +674,17 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
                 key: ValueKey('sell_out_targets_${widget.apiClient.tenantId}'),
                 apiClient: widget.apiClient,
                 targetType: 'sell_out',
+              )
+            else if ((_activeTab == 0 || _activeTab == 1) &&
+                !isLoading &&
+                _loadError != null &&
+                records.isEmpty)
+              M3ErrorState(
+                key: const ValueKey('sell_out_error_state'),
+                title: 'Could not load Sell-Out data',
+                message: _loadError,
+                retryLabel: 'Retry',
+                onRetry: _loadRecords,
               )
             else if (_activeTab == 1)
               _buildPerformanceAndBranchAnalyticsTab(context, theme, colorScheme)

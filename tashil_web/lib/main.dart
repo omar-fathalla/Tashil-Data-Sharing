@@ -53,6 +53,7 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
   void initState() {
     super.initState();
     ApiClient.restoreProvisionedTenantsFromStorage();
+    ApiClient.installSessionGuard();
     ApiClient.onSessionExpired = () {
       if (mounted && !_isLoginMode) _logout();
     };

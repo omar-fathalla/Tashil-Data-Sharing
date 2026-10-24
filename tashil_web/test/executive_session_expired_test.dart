@@ -17,6 +17,7 @@ void main() {
     addTearDown(tester.view.reset);
 
     var expired = 0;
+    ApiClient.installSessionGuard();
     ApiClient.onSessionExpired = () => expired++;
     addTearDown(() => ApiClient.onSessionExpired = null);
 
