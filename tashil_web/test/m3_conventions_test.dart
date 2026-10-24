@@ -77,10 +77,7 @@ void main() {
       'lib/features/oos_monitor/presentation/screens/oos_dashboard_screen.dart',
       'lib/features/pricing_compliance/presentation/screens/pricing_compliance_screen.dart',
       'lib/features/product_master/presentation/screens/product_master_screen.dart',
-      'lib/features/sell_out_analytics/presentation/screens/sell_in_explorer_screen.dart',
-      'lib/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart',
       'lib/features/sell_out_analytics/presentation/widgets/barcode_scanner_dialog.dart',
-      'lib/features/sell_out_analytics/presentation/widgets/target_management_panel.dart',
       'lib/features/sell_out_analytics/presentation/widgets/virtualized_sku_table.dart',
       'lib/features/store_benchmark/presentation/screens/store_matrix_screen.dart',
       'lib/features/super_admin/presentation/screens/super_admin_screen.dart',
@@ -92,7 +89,8 @@ void main() {
       if (!p.endsWith('.dart') || p.startsWith('lib/core/theme/') || legacy.contains(p)) continue;
       final s = f.readAsStringSync();
       for (final m in RegExp(r'TextStyle\(').allMatches(s)) {
-        if (m.start >= 6 && s.substring(m.start - 6, m.start) == 'merge(') continue;
+        // Styles merged onto a textTheme role are bound to the theme.
+        if (RegExp(r'merge\(\s*(const\s+)?$').hasMatch(s.substring(m.start < 20 ? 0 : m.start - 20, m.start))) continue;
         var i = m.end, d = 1;
         while (d > 0 && i < s.length) {
           final ch = s[i];
