@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
@@ -319,7 +320,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
             customWidget: Padding(
               padding: const EdgeInsets.only(top: 8.0),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(4.0),
+                borderRadius: M3Shape.radiusXs,
                 child: LinearProgressIndicator(
                   value: (osaRatePct / 100.0).clamp(0.0, 1.0),
                   minHeight: 6.0,
@@ -337,7 +338,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
             titleEn: 'Total OOS SKUs',
             value: '$totalFilteredSKUs صنف',
             subtitle: '$criticalCount أصناف ذات خطورة حرجة جداً',
-            icon: Icons.inventory_2_outlined,
+            icon: Icons.inventory_2_rounded,
             iconColor: colorScheme.error,
             iconBgColor: colorScheme.errorContainer.withOpacity(0.6),
           ),
@@ -419,7 +420,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
       elevation: 0,
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Padding(
@@ -435,7 +436,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                   padding: const EdgeInsets.all(8.0),
                   decoration: BoxDecoration(
                     color: iconBgColor,
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Icon(icon, color: iconColor, size: 20.0),
                 ),
@@ -524,7 +525,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
       elevation: 0,
       color: colorScheme.primaryContainer.withOpacity(0.2),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: M3Shape.radiusLg,
         side: BorderSide(color: colorScheme.primary.withOpacity(0.3), width: 1.2),
       ),
       child: Padding(
@@ -539,14 +540,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                   padding: const EdgeInsets.all(10.0),
                   decoration: BoxDecoration(
                     color: colorScheme.primary,
-                    borderRadius: BorderRadius.circular(12.0),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.primary.withOpacity(0.3),
-                        blurRadius: 8.0,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    borderRadius: M3Shape.radiusMd,
                   ),
                   child: Icon(Icons.auto_awesome_rounded, color: colorScheme.onPrimary, size: 22.0),
                 ),
@@ -569,7 +563,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
                             decoration: BoxDecoration(
                               color: colorScheme.tertiaryContainer,
-                              borderRadius: BorderRadius.circular(6.0),
+                              borderRadius: M3Shape.radiusSm,
                             ),
                             child: Text(
                               'Gemini 1.5 Pro',
@@ -612,7 +606,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                 padding: const EdgeInsets.all(12.0),
                 decoration: BoxDecoration(
                   color: colorScheme.surface,
-                  borderRadius: BorderRadius.circular(12.0),
+                  borderRadius: M3Shape.radiusMd,
                   border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
                 ),
                 child: Row(
@@ -644,7 +638,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                     padding: const EdgeInsets.all(12.0),
                     decoration: BoxDecoration(
                       color: colorScheme.errorContainer.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(14.0),
+                      borderRadius: M3Shape.radiusMd,
                       border: Border.all(color: colorScheme.error.withOpacity(0.2)),
                     ),
                     child: Column(
@@ -691,7 +685,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                     padding: const EdgeInsets.all(12.0),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(14.0),
+                      borderRadius: M3Shape.radiusMd,
                       border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
                     ),
                     child: Column(
@@ -800,7 +794,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: colorScheme.errorContainer.withOpacity(0.35),
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.error.withOpacity(0.4), width: 1.2),
       ),
       child: Column(
@@ -875,13 +869,13 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
                 decoration: BoxDecoration(
                   color: colorScheme.surface,
-                  borderRadius: BorderRadius.circular(8.0),
+                  borderRadius: M3Shape.radiusSm,
                   border: Border.all(color: colorScheme.error.withOpacity(0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.location_on_outlined, size: 14.0, color: colorScheme.error),
+                    Icon(Icons.location_on_rounded, size: 14.0, color: colorScheme.error),
                     const SizedBox(width: 4.0),
                     Text(
                       bName,
@@ -910,7 +904,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
       elevation: 0,
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Padding(
@@ -937,7 +931,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                     : null,
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+                border: const OutlineInputBorder(borderRadius: M3Shape.radiusSm),
               ),
             );
 
@@ -945,11 +939,11 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
               value: _availableBrands.contains(_selectedBrand) ? _selectedBrand : 'الكل',
               isDense: true,
               isExpanded: true,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'الماركة (Brand)',
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+                contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+                border: OutlineInputBorder(borderRadius: M3Shape.radiusSm),
               ),
               items: _availableBrands.map((b) {
                 return DropdownMenuItem<String>(
@@ -970,11 +964,11 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
               value: _availableBranches.contains(_selectedBranch) ? _selectedBranch : 'الكل',
               isDense: true,
               isExpanded: true,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'الفرع (Branch)',
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+                contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+                border: OutlineInputBorder(borderRadius: M3Shape.radiusSm),
               ),
               items: _availableBranches.map((b) {
                 return DropdownMenuItem<String>(
@@ -995,11 +989,11 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
               value: _selectedSeverity,
               isDense: true,
               isExpanded: true,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'مستوى الخطورة',
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+                contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+                border: OutlineInputBorder(borderRadius: M3Shape.radiusSm),
               ),
               items: const [
                 DropdownMenuItem(value: 'الكل', child: Text('الكل', style: TextStyle(fontSize: 12.0))),
@@ -1085,7 +1079,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                         ButtonSegment(
                           value: 0,
                           label: Text('بطاقات التنبيهات'),
-                          icon: Icon(Icons.view_agenda_outlined, size: 16.0),
+                          icon: Icon(Icons.view_agenda_rounded, size: 16.0),
                         ),
                         ButtonSegment(
                           value: 1,
@@ -1140,7 +1134,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 1.5),
                 decoration: BoxDecoration(
                   color: isSelected ? colorScheme.onPrimary : colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(10.0),
+                  borderRadius: M3Shape.radiusSm,
                 ),
                 child: Text(
                   '$count',
@@ -1182,7 +1176,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
           decoration: BoxDecoration(
             color: isCritical ? colorScheme.error : colorScheme.tertiary,
-            borderRadius: BorderRadius.circular(8.0),
+            borderRadius: M3Shape.radiusSm,
           ),
           child: Text(
             isCritical ? 'حرج جداً' : 'أولوية مرتفعة',
@@ -1198,7 +1192,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
           decoration: BoxDecoration(
             color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(8.0),
+            borderRadius: M3Shape.radiusSm,
           ),
           child: Text(
             alert.brand,
@@ -1214,7 +1208,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
           elevation: 0,
           color: colorScheme.surfaceContainerLow,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16.0),
+            borderRadius: M3Shape.radiusLg,
             side: BorderSide(
               color: isCritical ? colorScheme.error.withOpacity(0.3) : colorScheme.outlineVariant.withOpacity(0.5),
             ),
@@ -1236,10 +1230,10 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                             padding: const EdgeInsets.all(8.0),
                             decoration: BoxDecoration(
                               color: isCritical ? colorScheme.errorContainer : colorScheme.tertiaryContainer,
-                              borderRadius: BorderRadius.circular(10.0),
+                              borderRadius: M3Shape.radiusSm,
                             ),
                             child: Icon(
-                              isCritical ? Icons.warning_rounded : Icons.info_outline,
+                              isCritical ? Icons.warning_rounded : Icons.info_outline_rounded,
                               color: isCritical ? colorScheme.error : colorScheme.onTertiaryContainer,
                               size: 20.0,
                             ),
@@ -1308,10 +1302,10 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                       padding: const EdgeInsets.all(10.0),
                       decoration: BoxDecoration(
                         color: isCritical ? colorScheme.errorContainer : colorScheme.tertiaryContainer,
-                        borderRadius: BorderRadius.circular(12.0),
+                        borderRadius: M3Shape.radiusMd,
                       ),
                       child: Icon(
-                        isCritical ? Icons.warning_rounded : Icons.info_outline,
+                        isCritical ? Icons.warning_rounded : Icons.info_outline_rounded,
                         color: isCritical ? colorScheme.error : colorScheme.onTertiaryContainer,
                         size: 24.0,
                       ),
@@ -1412,7 +1406,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
           elevation: 0,
           color: colorScheme.surfaceContainerLow,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16.0),
+            borderRadius: M3Shape.radiusLg,
             side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
           ),
           child: Padding(
@@ -1430,7 +1424,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                           padding: const EdgeInsets.all(8.0),
                           decoration: BoxDecoration(
                             color: colorScheme.tertiaryContainer,
-                            borderRadius: BorderRadius.circular(10.0),
+                            borderRadius: M3Shape.radiusSm,
                           ),
                           child: Icon(Icons.storefront_rounded, color: colorScheme.onTertiaryContainer, size: 20.0),
                         ),
@@ -1489,7 +1483,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
                           decoration: BoxDecoration(
                             color: colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(6.0),
+                            borderRadius: M3Shape.radiusSm,
                           ),
                           child: Text(
                             item.brand,
@@ -1521,7 +1515,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
 
                 const SizedBox(height: 8.0),
                 Align(
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   child: FilledButton.tonalIcon(
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
@@ -1624,7 +1618,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
                   padding: const EdgeInsets.all(12.0),
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: M3Shape.radiusSm,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

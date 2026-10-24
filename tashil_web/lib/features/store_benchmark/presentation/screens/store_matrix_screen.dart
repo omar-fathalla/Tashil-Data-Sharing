@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/m3_dropdown.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/store_benchmark_repository.dart';
@@ -177,7 +179,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
               elevation: 0,
               color: colorScheme.surfaceContainerLow,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16.0),
+                borderRadius: M3Shape.radiusLg,
                 side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
               ),
               child: Padding(
@@ -405,7 +407,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
               elevation: 0,
               color: colorScheme.surfaceContainerLow,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16.0),
+                borderRadius: M3Shape.radiusLg,
                 side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
               ),
               child: Padding(
@@ -447,7 +449,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                     padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                                     decoration: BoxDecoration(
                                       color: colorScheme.primaryContainer.withOpacity(0.4),
-                                      borderRadius: BorderRadius.circular(12.0),
+                                      borderRadius: M3Shape.radiusMd,
                                       border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
                                     ),
                                     child: Row(
@@ -469,7 +471,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                     padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                                     decoration: BoxDecoration(
                                       color: colorScheme.surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(12.0),
+                                      borderRadius: M3Shape.radiusMd,
                                     ),
                                     child: Text(
                                       'الترتيب حسب إجمالي المبيعات تنازلياً',
@@ -510,7 +512,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                   padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                                   decoration: BoxDecoration(
                                     color: colorScheme.primaryContainer.withOpacity(0.4),
-                                    borderRadius: BorderRadius.circular(12.0),
+                                    borderRadius: M3Shape.radiusMd,
                                     border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
                                   ),
                                   child: Row(
@@ -532,7 +534,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                   padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                                   decoration: BoxDecoration(
                                     color: colorScheme.surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(12.0),
+                                    borderRadius: M3Shape.radiusMd,
                                   ),
                                   child: Text(
                                     'الترتيب حسب إجمالي المبيعات تنازلياً',
@@ -591,7 +593,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                             padding: const EdgeInsets.all(14.0),
                                             decoration: BoxDecoration(
                                               color: colorScheme.surface,
-                                              borderRadius: BorderRadius.circular(14.0),
+                                              borderRadius: M3Shape.radiusMd,
                                               border: Border.all(
                                                 color: colorScheme.outlineVariant.withOpacity(0.55),
                                               ),
@@ -678,7 +680,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                                                 mainAxisSize: MainAxisSize.min,
                                                                 children: [
                                                                   Icon(
-                                                                    Icons.location_on_outlined,
+                                                                    Icons.location_on_rounded,
                                                                     size: 13.0,
                                                                     color: colorScheme.outline,
                                                                   ),
@@ -759,7 +761,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                                       ),
                                                       decoration: BoxDecoration(
                                                         color: colorScheme.secondaryContainer.withOpacity(0.5),
-                                                        borderRadius: BorderRadius.circular(8.0),
+                                                        borderRadius: M3Shape.radiusSm,
                                                       ),
                                                       child: Row(
                                                         mainAxisSize: MainAxisSize.min,
@@ -901,7 +903,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.location_on_outlined, size: 16.0, color: colorScheme.outline),
+                                      Icon(Icons.location_on_rounded, size: 16.0, color: colorScheme.outline),
                                       const SizedBox(width: 4.0),
                                       Text(store.region, style: theme.textTheme.bodyMedium),
                                     ],
@@ -939,7 +941,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                                         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
                                         decoration: BoxDecoration(
                                           color: colorScheme.secondaryContainer.withOpacity(0.5),
-                                          borderRadius: BorderRadius.circular(8.0),
+                                          borderRadius: M3Shape.radiusSm,
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
@@ -1001,7 +1003,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
       elevation: 0,
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: M3Shape.radiusLg,
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Padding(
@@ -1016,7 +1018,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                   padding: const EdgeInsets.all(10.0),
                   decoration: BoxDecoration(
                     color: containerColor,
-                    borderRadius: BorderRadius.circular(12.0),
+                    borderRadius: M3Shape.radiusMd,
                   ),
                   child: Icon(icon, color: onContainerColor, size: 22.0),
                 ),
@@ -1024,7 +1026,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
                   decoration: BoxDecoration(
                     color: containerColor.withOpacity(0.75),
-                    borderRadius: BorderRadius.circular(16.0),
+                    borderRadius: M3Shape.radiusLg,
                   ),
                   child: Text(
                     '$storeCount فروع',
@@ -1086,7 +1088,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
       padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: M3Shape.radiusMd,
       ),
       child: Text(
         tier,
@@ -1169,30 +1171,17 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
           ],
         ),
         const SizedBox(height: M3Spacing.xs),
-        Container(
-          height: 40.0,
-          width: isCompact ? double.infinity : null,
-          padding: const EdgeInsets.symmetric(horizontal: 12.0),
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(12.0),
-            border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<T>(
-              value: value,
-              isExpanded: isCompact,
-              isDense: true,
-              borderRadius: BorderRadius.circular(12.0),
-              icon: Icon(Icons.arrow_drop_down_rounded, color: colorScheme.primary),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
+        M3Dropdown<T>(
+          expand: isCompact,
+          value: value,
+          options: [
+            for (final item in items)
+              M3DropdownOption<T>(
+                item.value as T,
+                item.child is Text ? ((item.child as Text).data ?? '') : '${item.value}',
               ),
-              items: items,
-              onChanged: onChanged,
-            ),
-          ),
+          ],
+          onChanged: onChanged,
         ),
       ],
     );
