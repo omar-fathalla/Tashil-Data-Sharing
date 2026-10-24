@@ -356,8 +356,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             return Directionality(
               textDirection: TextDirection.rtl,
               child: AlertDialog(
-                titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-                contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                titlePadding: const EdgeInsetsDirectional.fromSTEB(20, 18, 20, 8),
+                contentPadding: const EdgeInsetsDirectional.fromSTEB(20, 8, 20, 16),
                 title: Row(
                   children: [
                     Container(
@@ -946,7 +946,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 12.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(24.0, 20.0, 24.0, 12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -1547,7 +1547,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         : filtered.sublist(startIdx, endIdx);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24.0, 8.0, 24.0, 32.0),
+      padding: const EdgeInsetsDirectional.fromSTEB(24.0, 8.0, 24.0, 32.0),
       children: [
         // Search & Filter Bar
         Container(
@@ -2564,7 +2564,7 @@ onChanged: m3Legacy<String>(onChanged),
         : 0.0;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24.0, 12.0, 24.0, 32.0),
+      padding: const EdgeInsetsDirectional.fromSTEB(24.0, 12.0, 24.0, 32.0),
       children: [
         Container(
           padding: const EdgeInsets.all(20.0),
@@ -2809,7 +2809,7 @@ onChanged: m3Legacy<String>(onChanged),
     ProductMasterSummaryModel summary,
   ) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24.0, 12.0, 24.0, 32.0),
+      padding: const EdgeInsetsDirectional.fromSTEB(24.0, 12.0, 24.0, 32.0),
       children: [
         Container(
           padding: const EdgeInsets.all(24.0),

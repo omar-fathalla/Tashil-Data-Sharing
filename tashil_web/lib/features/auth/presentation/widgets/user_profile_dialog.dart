@@ -322,9 +322,9 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
           borderRadius: M3Shape.radiusXl,
           side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
         ),
-        titlePadding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 12.0),
-        contentPadding: const EdgeInsets.fromLTRB(24.0, 8.0, 24.0, 16.0),
-        actionsPadding: const EdgeInsets.fromLTRB(24.0, 8.0, 24.0, 20.0),
+        titlePadding: const EdgeInsetsDirectional.fromSTEB(24.0, 24.0, 24.0, 12.0),
+        contentPadding: const EdgeInsetsDirectional.fromSTEB(24.0, 8.0, 24.0, 16.0),
+        actionsPadding: const EdgeInsetsDirectional.fromSTEB(24.0, 8.0, 24.0, 20.0),
         title: Row(
           children: [
             CircleAvatar(

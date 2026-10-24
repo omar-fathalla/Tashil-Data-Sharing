@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/data/result.dart';
 import '../../../../core/network/api_client.dart';
@@ -1350,7 +1351,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(
+                          padding: const EdgeInsetsDirectional.fromSTEB(
                             18.0,
                             16.0,
                             18.0,
@@ -1803,7 +1804,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                       ),
                       onPressed: () => setState(() => _drillSubTab = 0),
                     ),
-                    const Icon(Icons.arrow_back_ios_new_rounded, size: 13.0),
+                    const Icon(AppIcons.chevronEnd, size: 16.0),
                     ActionChip(
                       avatar:
                           const Icon(Icons.location_city_rounded, size: 16.0),
@@ -1817,7 +1818,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                       onPressed: () => setState(() => _drillSubTab = 0),
                     ),
                     if (activeBranch != null) ...[
-                      const Icon(Icons.arrow_back_ios_new_rounded, size: 13.0),
+                      const Icon(AppIcons.chevronEnd, size: 16.0),
                       ActionChip(
                         avatar: const Icon(
                           Icons.inventory_2_rounded,

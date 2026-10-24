@@ -184,7 +184,7 @@ class DesktopSidebar extends StatelessWidget {
           // Navigation Items
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(12.0, 0.0, 12.0, 12.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 12.0, 12.0),
               itemCount: destinations.length,
               separatorBuilder: (_, __) => const SizedBox(height: 4.0),
               itemBuilder: (context, index) {

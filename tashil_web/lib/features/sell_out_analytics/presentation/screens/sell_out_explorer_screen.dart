@@ -2586,7 +2586,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+                padding: const EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 8.0),
                 child: Row(
                   children: [
                     Icon(Icons.storefront_rounded, color: colorScheme.primary, size: 22.0),
@@ -2719,7 +2719,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
             children: [
               // Header + Period Badge
               Padding(
-                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 10.0),
+                padding: const EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 10.0),
                 child: Wrap(
                   spacing: 12.0,
                   runSpacing: 8.0,

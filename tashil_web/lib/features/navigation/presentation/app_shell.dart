@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/app_icons.dart';
 import '../../../core/theme/m3_spacing.dart';
 import '../../../core/theme/m3_shape.dart';
 import 'package:flutter/services.dart';
@@ -187,7 +188,7 @@ class _AppShellState extends State<AppShell> {
           textDirection: TextDirection.rtl,
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 16.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(16.0, 4.0, 16.0, 16.0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -263,7 +264,7 @@ class _AppShellState extends State<AppShell> {
                                 size: 20.0,
                                 color: colorScheme.primary,
                               )
-                            : const Icon(Icons.chevron_left_rounded, size: 18.0),
+                            : const Icon(AppIcons.chevronEnd, size: 18.0),
                         onTap: () {
                           Navigator.pop(sheetCtx);
                           setState(() => _selectedIndex = dest.index);
@@ -607,7 +608,7 @@ class _AppShellState extends State<AppShell> {
         },
         children: [
               Container(
-                padding: const EdgeInsets.fromLTRB(20.0, 20.0, 20.0, 16.0),
+                padding: const EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 16.0),
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceContainer,
                   border: Border(

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/data/result.dart';
@@ -942,7 +943,7 @@ class _CompetitorComparisonScreenState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.fromLTRB(18.0, 16.0, 18.0, 14.0),
+            padding: const EdgeInsetsDirectional.fromSTEB(18.0, 16.0, 18.0, 14.0),
             decoration: BoxDecoration(
               color: colorScheme.primaryContainer.withValues(alpha: 0.45),
               borderRadius:
@@ -1243,8 +1244,8 @@ class _CompetitorComparisonScreenState
                       ),
                       const SizedBox(width: 4.0),
                       Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 13.0,
+                        AppIcons.chevronEnd,
+                        size: 16.0,
                         color: isSelected
                             ? colorScheme.primary
                             : colorScheme.onSurfaceVariant,
@@ -1894,7 +1895,7 @@ class _CompetitorComparisonScreenState
           // Focused 2-Line Price Trajectory Canvas Chart (Own SKU vs Selected Competitor ONLY)
           Container(
             height: 280.0,
-            padding: const EdgeInsets.fromLTRB(18.0, 24.0, 22.0, 14.0),
+            padding: const EdgeInsetsDirectional.fromSTEB(18.0, 24.0, 22.0, 14.0),
             decoration: BoxDecoration(
               color: colorScheme.surface,
               borderRadius: M3Shape.radiusLg,
