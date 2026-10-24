@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/features/cpfr_replenishment/domain/cpfr_models.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/screens/executive_screen.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/widgets/bento_kpi_grid.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/widgets/market_share_section.dart';
@@ -77,6 +78,18 @@ void main() {
       expect(find.byKey(const ValueKey('kpi_sell_through')), findsOneWidget);
       expect(find.byKey(const ValueKey('stock_per_sku_table')), findsOneWidget);
       expect(find.byKey(const ValueKey('sell_in_vs_out_chart')), findsOneWidget);
+
+      // Stock per SKU table and the monthly chart sit side by side at equal height.
+      final table = tester.getRect(find.byKey(const ValueKey('stock_per_sku_table')));
+      final chart = tester.getRect(find.byKey(const ValueKey('sell_in_vs_out_chart')));
+      if (find.byKey(const ValueKey('sell_in_vs_out_row')).evaluate().isNotEmpty) {
+        expect(chart.top, closeTo(table.top, 1));
+        expect(chart.height, closeTo(table.height, 1));
+        expect(chart.left, greaterThan(table.right - 1));
+      } else {
+        // Narrow: stacked, table first, nothing stretched.
+        expect(chart.top, greaterThanOrEqualTo(table.bottom - 1));
+      }
 
       // The original four KPI cards open the page; market share sits under them,
       // and the older sections (category contribution, trend, Pareto) stay below that.
@@ -277,5 +290,56 @@ void main() {
     expect(find.text('Rank #1 of 4'), findsOneWidget);
     // Compact donut when the card is not stretched to a sibling.
     expect(tester.getSize(find.byKey(const ValueKey('category_donut_Floor cleaner'))).height, closeTo(64, 1));
+  });
+
+  Future<void> pumpSellIn(WidgetTester tester, double width) async {
+    final json = Map<String, dynamic>.from(_cpfrFixture);
+    json['inventory_and_po_items'] = [
+      for (var i = 0; i < 8; i++)
+        {'barcode': 'b$i', 'item_code': 'I$i', 'sku_name': 'Stock SKU $i', 'sell_in_units': 1000 - i * 50, 'sell_out_units': 500, 'estimated_stock_units': 100, 'sell_through_pct': 50.0, 'stock_status': 'optimal'},
+    ];
+    tester.view.physicalSize = Size(width, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: MarketShareSection(
+            kpis: ExecutiveKPIsModel.fromJson(const {}),
+            cpfr: CPFRDashboardModel.fromJson(json),
+            cpfrLoading: false,
+            cpfrError: null,
+            periodMonths: const {1, 2, 3, 4},
+            year: 2026,
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+  }
+
+  for (final width in [1280.0, 1920.0]) {
+    testWidgets('Stock per SKU table and monthly chart are equal height at ${width.toInt()}px', (tester) async {
+      await pumpSellIn(tester, width);
+      expect(tester.takeException(), isNull);
+      final table = tester.getRect(find.byKey(const ValueKey('stock_per_sku_table')));
+      final chart = tester.getRect(find.byKey(const ValueKey('sell_in_vs_out_chart')));
+      expect(chart.top, closeTo(table.top, 1));
+      expect(chart.height, closeTo(table.height, 1));
+      for (var i = 0; i < 8; i++) {
+        expect(find.text('Stock SKU $i'), findsOneWidget);
+      }
+    });
+  }
+
+  testWidgets('Narrow width stacks Stock per SKU above the monthly chart', (tester) async {
+    await pumpSellIn(tester, 700);
+    expect(tester.takeException(), isNull);
+    final table = tester.getRect(find.byKey(const ValueKey('stock_per_sku_table')));
+    final chart = tester.getRect(find.byKey(const ValueKey('sell_in_vs_out_chart')));
+    expect(chart.top, greaterThanOrEqualTo(table.bottom - 1));
+    expect(find.text('Stock SKU 7'), findsOneWidget);
   });
 }

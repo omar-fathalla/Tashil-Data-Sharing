@@ -454,11 +454,16 @@ class _SellInVsSellOut extends StatelessWidget {
         }),
         M3Spacing.gapMD,
         if (wide)
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(flex: 3, child: _StockTable(cpfr: cpfr!)),
-            M3Spacing.gapMD,
-            Expanded(flex: 2, child: _MonthlyBars(months: months)),
-          ])
+          // Equal height: the row takes the taller card's natural height
+          // (usually the table) and the chart stretches to fill it.
+          IntrinsicHeight(
+            key: const ValueKey('sell_in_vs_out_row'),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Expanded(flex: 3, child: _StockTable(cpfr: cpfr!)),
+              M3Spacing.gapMD,
+              Expanded(flex: 2, child: _MonthlyBars(months: months, fill: true)),
+            ]),
+          )
         else ...[
           _StockTable(cpfr: cpfr!),
           M3Spacing.gapMD,
@@ -606,8 +611,11 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _MonthlyBars extends StatelessWidget {
-  const _MonthlyBars({required this.months});
+  const _MonthlyBars({required this.months, this.fill = false});
   final List<ReconciliationMonthModel> months;
+
+  /// When true (wide row), the plot area grows to fill the card's height.
+  final bool fill;
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -626,9 +634,8 @@ class _MonthlyBars extends StatelessWidget {
           M3Spacing.gapXS,
           _Legend([(cs.primary, 'Sell In'), (acc.tealBase, 'Sell Out')]),
           M3Spacing.gapMD,
-          SizedBox(
-            height: chartH + 20.0,
-            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          _plotArea(
+            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
               for (final m in months)
                 Expanded(
                   child: Tooltip(
@@ -646,11 +653,16 @@ class _MonthlyBars extends StatelessWidget {
                   ),
                 ),
             ]),
+            chartH + 20.0,
           ),
         ]),
       ),
     );
   }
+
+  Widget _plotArea(Widget plot, double minH) => fill
+      ? Expanded(child: ConstrainedBox(constraints: BoxConstraints(minHeight: minH), child: plot))
+      : SizedBox(height: minH, child: plot);
 
   Widget _bar(double h, Color c) => Container(
         width: 16.0,
