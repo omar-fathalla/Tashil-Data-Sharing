@@ -89,12 +89,6 @@ void main() {
   });
 
   testWidgets('Sell-In explorer text styles are unchanged', (tester) async {
-    // Sell-In has pre-existing layout overflow / DataTable semantics
-    // assertions at this viewport; they are unrelated to text styles, so
-    // they are collected (not failed on) for this snapshot only.
-    final orig = FlutterError.onError;
-    final ignored = <String>[];
-    FlutterError.onError = (d) => ignored.add(d.exceptionAsString().split('\n').first);
     await _pump(tester, SellInExplorerScreen(apiClient: ApiClient()));
     await _check(tester, 'sell_in_tab0');
     await _tab(tester, 'Remaining Stock & Reports');
@@ -103,8 +97,5 @@ void main() {
     await _check(tester, 'sell_in_targets');
     await _tab(tester, 'Uploaded Sheets');
     await _check(tester, 'sell_in_sheets');
-    FlutterError.onError = orig;
-    // ignore: avoid_print
-    if (ignored.isNotEmpty) print('Sell-In pre-existing framework errors: ${ignored.toSet()}');
   });
 }

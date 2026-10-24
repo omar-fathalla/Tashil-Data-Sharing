@@ -1542,7 +1542,10 @@ onChanged: m3Legacy<int>((v) {
                     size: 22.0,
                   ),
                   const SizedBox(width: 10.0),
-                  Column(
+                  // Flexible lets the long title wrap inside the Wrap run instead of
+                  // overflowing the min-size Row at ~1440px.
+                  Flexible(
+                    child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -1558,6 +1561,7 @@ onChanged: m3Legacy<int>((v) {
                         ),
                       ),
                     ],
+                  ),
                   ),
                 ],
               ),
@@ -2451,58 +2455,40 @@ onChanged: m3Legacy<String>((val) {
                       ),
                       columns: [
                         DataColumn(
-                          label: InkWell(
-                            onTap: () => _onSortSku(0, !_skuSortAscending),
-                            onDoubleTap: () => _onSortSku(0, !_skuSortAscending),
-                            child: const Padding(
+                          label: const Padding(
                               padding: EdgeInsets.symmetric(vertical: 4.0),
                               child: Text('اسم الصنف (SKU)'),
                             ),
-                          ),
                           onSort: (col, asc) => _onSortSku(0, asc),
                         ),
                         DataColumn(
-                          label: InkWell(
-                            onTap: () => _onSortSku(1, !_skuSortAscending),
-                            onDoubleTap: () => _onSortSku(1, !_skuSortAscending),
-                            child: const Padding(
+                          label: const Padding(
                               padding: EdgeInsets.symmetric(vertical: 4.0),
                               child: Text('العلامة / البراند'),
                             ),
-                          ),
                           onSort: (col, asc) => _onSortSku(1, asc),
                         ),
                         DataColumn(
-                          label: InkWell(
-                            onTap: () => _onSortSku(2, !_skuSortAscending),
-                            onDoubleTap: () => _onSortSku(2, !_skuSortAscending),
-                            child: const Padding(
+                          label: const Padding(
                               padding: EdgeInsets.symmetric(vertical: 4.0),
                               child: Text('إجمالي التوريد (Sell-In)'),
                             ),
-                          ),
                           numeric: true,
                           onSort: (col, asc) => _onSortSku(2, asc),
                         ),
                         DataColumn(
-                          label: InkWell(
-                            onTap: () => _onSortSku(3, !_skuSortAscending),
-                            onDoubleTap: () => _onSortSku(3, !_skuSortAscending),
-                            child: const Padding(
+                          label: const Padding(
                               padding: EdgeInsets.symmetric(vertical: 4.0),
                               child: Text('المبيعات الفعلية (Sell-Out)'),
                             ),
-                          ),
                           numeric: true,
                           onSort: (col, asc) => _onSortSku(3, asc),
                         ),
                         DataColumn(
-                          label: Tooltip(
-                            message: 'اضغط أو انقر نقراً مزدوجاً للترتيب بالأعلى أو الأقل',
-                            child: InkWell(
-                              onTap: () => _onSortSku(4, !_skuSortAscending),
-                              onDoubleTap: () => _onSortSku(4, !_skuSortAscending),
-                              child: const Padding(
+                          // Header tap sorts via onSort; a nested Tooltip/InkWell broke the
+                          // DataTable columnHeader semantics tree.
+                          tooltip: 'اضغط أو انقر نقراً مزدوجاً للترتيب بالأعلى أو الأقل',
+                          label: const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 4.0),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -2512,19 +2498,15 @@ onChanged: m3Legacy<String>((val) {
                                     Icon(Icons.swap_vert_rounded, size: 16),
                                   ],
                                 ),
-                              ),
-                            ),
                           ),
                           numeric: true,
                           onSort: (col, asc) => _onSortSku(4, asc),
                         ),
                         DataColumn(
-                          label: Tooltip(
-                            message: 'اضغط أو انقر نقراً مزدوجاً للترتيب حسب أيام التغطية (DOS)',
-                            child: InkWell(
-                              onTap: () => _onSortSku(5, !_skuSortAscending),
-                              onDoubleTap: () => _onSortSku(5, !_skuSortAscending),
-                              child: const Padding(
+                          // Header tap sorts via onSort; a nested Tooltip/InkWell broke the
+                          // DataTable columnHeader semantics tree.
+                          tooltip: 'اضغط أو انقر نقراً مزدوجاً للترتيب حسب أيام التغطية (DOS)',
+                          label: const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 4.0),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -2534,32 +2516,22 @@ onChanged: m3Legacy<String>((val) {
                                     Icon(Icons.swap_vert_rounded, size: 16),
                                   ],
                                 ),
-                              ),
-                            ),
                           ),
                           numeric: true,
                           onSort: (col, asc) => _onSortSku(5, asc),
                         ),
                         DataColumn(
-                          label: InkWell(
-                            onTap: () => _onSortSku(6, !_skuSortAscending),
-                            onDoubleTap: () => _onSortSku(6, !_skuSortAscending),
-                            child: const Padding(
+                          label: const Padding(
                               padding: EdgeInsets.symmetric(vertical: 4.0),
                               child: Text('حالة الرصيد'),
                             ),
-                          ),
                           onSort: (col, asc) => _onSortSku(6, asc),
                         ),
                         DataColumn(
-                          label: InkWell(
-                            onTap: () => _onSortSku(7, !_skuSortAscending),
-                            onDoubleTap: () => _onSortSku(7, !_skuSortAscending),
-                            child: const Padding(
+                          label: const Padding(
                               padding: EdgeInsets.symmetric(vertical: 4.0),
                               child: Text('أمر التوريد المقترح (PO)'),
                             ),
-                          ),
                           numeric: true,
                           onSort: (col, asc) => _onSortSku(7, asc),
                         ),
