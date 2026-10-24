@@ -1021,7 +1021,8 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                               final isEven = idx % 2 == 0;
                               final brandStyle = _getChainBrandStyle(r.retailerChain, colorScheme);
 
-                              return Container(
+                              // RepaintBoundary isolates each row so hover/scroll repaints stay local.
+                              return RepaintBoundary(child: Container(
                                 height: _rowHeight,
                                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                                 decoration: BoxDecoration(
@@ -1098,10 +1099,10 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     ),
                                     SizedBox(
                                       width: colUnitPriceWidth,
-                                      child: Tooltip(
+                                      child: _maybeTooltip(
                                         message: (r.recommendedPrice > 0 || r.factoryUnitCost > 0)
                                             ? 'سعر الكارتة: ${r.recommendedPrice.toStringAsFixed(2)} ج.م • تكلفة المصنع للقطعة: ${r.factoryUnitCost.toStringAsFixed(2)} ج.م • صافي الكرتونة: ${r.netCartonInvoiceCost.toStringAsFixed(2)} ج.م • انحراف السعر: ${r.priceDeltaPct >= 0 ? "+" : ""}${r.priceDeltaPct.toStringAsFixed(1)}%'
-                                            : '${r.unitPrice.toStringAsFixed(2)} EGP',
+                                            : null,
                                         child: Column(
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -1128,10 +1129,10 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     ),
                                     SizedBox(
                                       width: colNetRevenueWidth,
-                                      child: Tooltip(
+                                      child: _maybeTooltip(
                                         message: (r.retailerMarginPct != 0 || r.retailerGrossProfit != 0)
                                             ? 'مجمل ربح السلسلة: ${CurrencyFormatter.formatUnits(r.retailerGrossProfit.round())} ج.م (${r.retailerMarginPct.toStringAsFixed(1)}%) • انحراف السعر: ${r.priceDeltaPct >= 0 ? "+" : ""}${r.priceDeltaPct.toStringAsFixed(1)}%'
-                                            : '${CurrencyFormatter.formatUnits(r.netRevenue.round())} EGP',
+                                            : null,
                                         child: Column(
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -1173,7 +1174,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     ),
                                   ],
                                 ),
-                              );
+                              ));
                             }),
                           ],
                         ),
@@ -1405,3 +1406,8 @@ class ChainBrandStyle {
     required this.displayNameEn,
   });
 }
+
+/// Per-cell tooltips are only built when there is extra detail to show, so a
+/// 50-row page doesn't create 100 Tooltip overlays/listeners for plain values.
+Widget _maybeTooltip({required String? message, required Widget child}) =>
+    message == null ? child : Tooltip(message: message, child: child);
