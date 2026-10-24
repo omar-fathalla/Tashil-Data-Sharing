@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
@@ -952,12 +953,8 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final palette = <Color>[
-      colorScheme.primary,
-      colorScheme.secondary,
-      colorScheme.primary.withOpacity(0.75),
-      colorScheme.secondary.withOpacity(0.75),
-    ];
+    // Categorical series colours come from the theme's chart palette.
+    final palette = M3StatusColors.of(context).chartPalette;
 
     final hasActiveFilter = widget.selectedCategory != null && widget.selectedCategory!.isNotEmpty;
 

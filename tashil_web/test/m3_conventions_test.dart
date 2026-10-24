@@ -41,4 +41,25 @@ void main() {
         .toList();
     expect(bad, isEmpty, reason: bad.join('\n'));
   });
+
+  test('no raw numeric fontSize outside the theme (use M3FontSize / textTheme)', () {
+    final bad = offenders(RegExp(r'fontSize:\s*[\d.]+'))
+        .where((l) => !l.startsWith('lib/core/theme/'))
+        .toList();
+    expect(bad, isEmpty, reason: bad.join('\n'));
+  });
+
+  test('raw Color(0x..) only in theme files or allowlisted identity palettes', () {
+    const allow = [
+      'lib/core/theme/',
+      'lib/core/widgets/data_sharing_logo.dart',
+      'lib/features/sell_out_analytics/presentation/widgets/virtualized_sku_table.dart',
+      'lib/features/sell_out_analytics/presentation/widgets/barcode_scanner_dialog.dart',
+      'lib/features/trade_marketing/domain/trade_marketing_models.dart',
+    ];
+    final bad = offenders(RegExp(r'Color\(0x'))
+        .where((l) => !allow.any(l.startsWith))
+        .toList();
+    expect(bad, isEmpty, reason: bad.join('\n'));
+  });
 }
