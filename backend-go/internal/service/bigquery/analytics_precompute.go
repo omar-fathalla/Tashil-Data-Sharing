@@ -98,6 +98,7 @@ func payloadKey(normTenant string, f CPFRFilter) string {
 // per (tenant, filter, source version) and reused until any source changes.
 // It returns the payload and the source version it was computed at.
 func (c *Client) GetCPFRDashboardCached(ctx context.Context, tenantID string, filter CPFRFilter) (*domain.CPFRDashboardPayload, int64, error) {
+	c.syncChainDiscounts(ctx, tenantID)
 	key := payloadKey(normalizeTenantKey(tenantID), filter)
 	p := &c.precompute
 	v := p.sourceVersion.Load()
@@ -189,6 +190,7 @@ func BuildAnalyticsAggregatesFromPayload(chain string, p *domain.CPFRDashboardPa
 // GetAnalyticsAggregates returns the tenant's materialized layer, recomputing it only when a
 // source changed since the last computation. A fresh computation is mirrored to BigQuery.
 func (c *Client) GetAnalyticsAggregates(ctx context.Context, tenantID string) (*domain.AnalyticsAggregates, error) {
+	c.syncChainDiscounts(ctx, tenantID)
 	norm := normalizeTenantKey(tenantID)
 	p := &c.precompute
 	v := p.sourceVersion.Load()

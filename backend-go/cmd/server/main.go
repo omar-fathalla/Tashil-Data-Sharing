@@ -47,6 +47,8 @@ func main() {
 		bqRepo.WithAggregatesWriter(bqs, "tenant-adeco")
 	}
 	// Per-chain discount profiles (Firestore) feed CPFR cost.
+	// Re-read them on analytics reads (TTL) so all Cloud Run instances converge within ~30s.
+	bqRepo.WithChainDiscountSource(fsRepo, bigquery.DefaultChainDiscountSyncTTL)
 	go func() {
 		tenants, err := fsRepo.ListTenants(context.Background())
 		if err != nil {
