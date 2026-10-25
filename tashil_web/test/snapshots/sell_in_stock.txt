@@ -342,9 +342,12 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 الفترة المتطابقة (يناير - أبريل 2026 — 4 أشهر) | 12.5 | FontWeight.w800 | ff304578 | null | null
 الفرق الفعلي بين سعر بيع الكاشير للمستهلك وتكلفة التوريد الصافية من كارتة الأصناف | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 الفرق الفعلي بين سعر بيع الكاشير للمستهلك وتكلفة التوريد الصافية من كارتة الأصناف | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-الكل (4) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
-الكل (4) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
-الكل (4) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+الكل (4) | 12.0 | FontWeight.w700 | ff404659 | null | null
+الكل (4) | 12.0 | FontWeight.w700 | ff404659 | null | null
+الكل (4) | 12.0 | FontWeight.w700 | ff404659 | null | null
+الكل (4) | 12.0 | FontWeight.w700 | ff404659 | null | null
+الكل (4) | 12.0 | FontWeight.w700 | ff404659 | null | null
+الكل (4) | 12.0 | FontWeight.w700 | ff404659 | null | null
 المبيعات الفعلية (Sell-Out) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 المبيعات الفعلية (Sell-Out) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 المبيعات الفعلية للكاشير (Sell-Out) | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
@@ -367,6 +370,9 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 بانتظار شيت كاشير السلسلة | 10.5 | FontWeight.w700 | ffff6f00 | 0.25 | 1.43
 بحث بالصنف أو البراند (مثلاً: Maxell, Diva, Dove)... | 13.0 | FontWeight.w400 | ff45464f | 0.5 | 1.5
 بحث بالصنف أو البراند (مثلاً: Maxell, Diva, Dove)... | 13.0 | FontWeight.w400 | ff45464f | 0.5 | 1.5
+بيع بأقل من التكلفة / حرق سعر (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+بيع بأقل من التكلفة / حرق سعر (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+بيع بأقل من التكلفة / حرق سعر (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
 تحت التصريف (Pending POS) | 11.5 | FontWeight.w700 | ffff6f00 | 0.25 | 1.43
 تحت التصريف (Pending POS) | 11.5 | FontWeight.w700 | ffff6f00 | 0.25 | 1.43
 تحت التصريف (Pending POS) | 11.5 | FontWeight.w700 | ffff6f00 | 0.25 | 1.43
@@ -483,6 +489,9 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 طلب توريد عاجل (تحت حد الأمان) | 11.5 | FontWeight.w800 | ff93000a | 0.25 | 1.43
 عرض 1 - 4 من إجمالي 4 صنف (25 صنف بالصفحة) | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 عرض 1 - 4 من إجمالي 4 صنف (25 صنف بالصفحة) | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+عروض ترويجية (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+عروض ترويجية (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+عروض ترويجية (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
 فلترة سريعة بالبراند: | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
 فلترة سريعة بالبراند: | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
 كل الحالات (All) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -519,6 +528,12 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 نسبة التصريف وأوامر التوريد (STR %) | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 نمو الكميات المباعة بالقطعة: +0.0% مقارنة بنفس الشهور في عام 2025 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 نمو الكميات المباعة بالقطعة: +0.0% مقارنة بنفس الشهور في عام 2025 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+هامش صحي (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+هامش صحي (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+هامش صحي (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+هامش منخفض (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+هامش منخفض (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+هامش منخفض (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
 يتم تحويل مبيعات الكاشير بالقطعة إلى كراتين بشد الكارتة الحقيقي لكل صنف وحساب ربح السلسلة الفعلي بعد خصم تكلفة المصنع | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 يتم تحويل مبيعات الكاشير بالقطعة إلى كراتين بشد الكارتة الحقيقي لكل صنف وحساب ربح السلسلة الفعلي بعد خصم تكلفة المصنع | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 يكشف لك لكل صنف: كم كرتونة تم توريدها (Sell-In)، وكم كرتونة بيعت فعلياً (Sell-Out)، والرصيد المتبقي الحالي على الرف، وعدد أيام التغطية المتبقية (DOS)، والكمية المقترح توريدها فوراً | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
@@ -532,6 +547,7 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 󰁀 | 20.0 | null | ff2e7d32 | null | 1.0
 󰂭 | 20.0 | null | ff00796b | null | 1.0
 󰃀 | 20.0 | null | ff404659 | null | 1.0
+󰃦 | 18.0 | null | ff1565c0 | null | 1.0
 󰄽 | 20.0 | null | ff45464f | null | 1.0
 󰇼 | 16.0 | null | dd000000 | null | 1.0
 󰇼 | 16.0 | null | dd000000 | null | 1.0
@@ -539,7 +555,9 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 󰇾 | 15.0 | null | ff1565c0 | null | 1.0
 󰈄 | 22.0 | null | ff1565c0 | null | 1.0
 󰉈 | 20.0 | null | ff45464f | null | 1.0
+󰉔 | 18.0 | null | ff1565c0 | null | 1.0
 󰉔 | 20.0 | null | ff6a1b9a | null | 1.0
+󰊠 | 18.0 | null | ff1565c0 | null | 1.0
 󰌞 | 20.0 | null | ff45464f | null | 1.0
 󰎲 | 20.0 | null | ff404659 | null | 1.0
 󰎲 | 20.0 | null | ffe64a19 | null | 1.0
@@ -576,6 +594,7 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
  | 20.0 | null | dd000000 | null | 1.0
  | 20.0 | null | ff45464f | null | 1.0
  | 20.0 | null | ff1565c0 | null | 1.0
+ | 18.0 | null | ff1565c0 | null | 1.0
  | 20.0 | null | dd000000 | null | 1.0
  | 20.0 | null | ff45464f | null | 1.0
  | 24.0 | null | ffe64a19 | null | 1.0

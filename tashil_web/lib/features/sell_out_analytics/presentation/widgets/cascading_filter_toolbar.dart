@@ -8,6 +8,7 @@ import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import 'barcode_scanner_dialog.dart';
+import 'sell_table_shared.dart';
 
 /// CascadingFilterToolbar provides multi-dimensional cascading filter controls
 /// where selecting a chain filters the available stores, and category filters SKUs.
@@ -686,133 +687,22 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
 
     Widget buildUploadSellOutButton({bool expand = false}) {
       if (widget.onUpload == null) return const SizedBox.shrink();
-      final isUp = widget.isUploading;
-      final child = InkWell(
-        key: const ValueKey('upload_sellout_button'),
-        borderRadius: M3Shape.radiusLg,
-        onTap: isUp ? null : widget.onUpload,
-        child: Container(
-          height: 38.0,
-          padding: const EdgeInsets.symmetric(horizontal: 14.0),
-          decoration: BoxDecoration(
-            color: colorScheme.secondary,
-            borderRadius: M3Shape.radiusLg,
-          ),
-          child: Row(
-            mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (isUp)
-                const SizedBox(
-                  width: 14.0,
-                  height: 14.0,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.0,
-                    color: Colors.white,
-                  ),
-                )
-              else
-                Icon(
-                  Icons.upload_file_rounded,
-                  size: 16.0,
-                  color: colorScheme.onSecondary,
-                ),
-              const SizedBox(width: 6.0),
-              Flexible(
-                child: Text(
-                  'Upload Sell-Out',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    fontSize: M3FontSize.labelSmallPlus,
-                    color: colorScheme.onSecondary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+      return SellActionButtons.upload(
+        context,
+        label: 'Upload Sell-Out',
+        onTap: widget.onUpload,
+        isUploading: widget.isUploading,
+        expand: expand,
       );
-      return expand ? Expanded(child: child) : child;
     }
 
     Widget buildPrintPdfButton({bool expand = false}) {
       if (onExportPdf == null) return const SizedBox.shrink();
-      final child = InkWell(
-        key: const ValueKey('export_pdf_button'),
-        borderRadius: M3Shape.radiusLg,
-        onTap: onExportPdf,
-        child: Container(
-          height: 38.0,
-          padding: const EdgeInsets.symmetric(horizontal: 10.0),
-          decoration: BoxDecoration(
-            color: colorScheme.primary,
-            borderRadius: M3Shape.radiusLg,
-          ),
-          child: Row(
-            mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.print_rounded, size: 15.0, color: colorScheme.onPrimary),
-              const SizedBox(width: 5.0),
-              Flexible(
-                child: Text(
-                  'Print PDF',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    fontSize: M3FontSize.labelSmall,
-                    color: colorScheme.onPrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-      return expand ? Expanded(child: child) : child;
+      return SellActionButtons.printPdf(context, onTap: onExportPdf, expand: expand);
     }
 
     Widget buildExportExcelButton({bool expand = false}) {
-      final child = InkWell(
-        key: const ValueKey('export_excel_button'),
-        borderRadius: M3Shape.radiusLg,
-        onTap: onExportExcel,
-        child: Container(
-          height: 38.0,
-          padding: const EdgeInsets.symmetric(horizontal: 10.0),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh,
-            borderRadius: M3Shape.radiusLg,
-            border: Border.all(
-              color: colorScheme.outlineVariant.withOpacity(0.6),
-            ),
-          ),
-          child: Row(
-            mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.file_download_rounded, size: 15.0, color: colorScheme.onSurface),
-              const SizedBox(width: 5.0),
-              Flexible(
-                child: Text(
-                  'Export Excel',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    fontSize: M3FontSize.labelSmall,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-      return expand ? Expanded(child: child) : child;
+      return SellActionButtons.exportExcel(context, onTap: onExportExcel, expand: expand);
     }
 
     return Card(

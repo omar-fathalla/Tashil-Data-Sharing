@@ -36,6 +36,7 @@ class AppIcons {
   static const IconData download = Icons.download_rounded;
   static const IconData uploadFile = Icons.upload_file_rounded;
   static const IconData print = Icons.print_rounded;
+  static const IconData fileDownload = Icons.file_download_rounded;
   static const IconData edit = Icons.edit_rounded;
   static const IconData delete = Icons.delete_rounded;
   static const IconData deleteForever = Icons.delete_forever_rounded;

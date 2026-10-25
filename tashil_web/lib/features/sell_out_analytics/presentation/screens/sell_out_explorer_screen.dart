@@ -25,6 +25,7 @@ import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../cpfr_replenishment/domain/cpfr_models.dart';
 import '../../../product_master/presentation/screens/product_master_screen.dart';
 import '../widgets/cascading_filter_toolbar.dart';
+import '../widgets/sell_table_shared.dart';
 import '../widgets/target_management_panel.dart';
 import '../widgets/virtualized_sku_table.dart';
 
@@ -1088,41 +1089,17 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
               ],
             ),
             const SizedBox(height: 10.0),
-            // Filter Chips: الكل, هامش صحي, هامش منخفض, بيع بأقل من التكلفة / حرق سعر, عروض ترويجية
-            Wrap(
-              spacing: 8.0,
-              runSpacing: 8.0,
-              children: [
-                ChoiceChip(
-                  label: Text('الكل (${allItems.length})'),
-                  selected: _priceMatrixFilter == 'all',
-                  onSelected: (_) => setState(() => _priceMatrixFilter = 'all'),
-                ),
-                ChoiceChip(
-                  avatar: Icon(AppIcons.trendingUp, size: 18.0),
-                  label: Text('هامش صحي ($healthyCount)'),
-                  selected: _priceMatrixFilter == 'healthy',
-                  onSelected: (_) => setState(() => _priceMatrixFilter = 'healthy'),
-                ),
-                ChoiceChip(
-                  avatar: Icon(AppIcons.warning, size: 18.0),
-                  label: Text('هامش منخفض ($lowMarginCount)'),
-                  selected: _priceMatrixFilter == 'low_margin',
-                  onSelected: (_) => setState(() => _priceMatrixFilter = 'low_margin'),
-                ),
-                ChoiceChip(
-                  avatar: Icon(AppIcons.error, size: 18.0),
-                  label: Text('بيع بأقل من التكلفة / حرق سعر ($negMarginCount)'),
-                  selected: _priceMatrixFilter == 'negative_margin',
-                  onSelected: (_) => setState(() => _priceMatrixFilter = 'negative_margin'),
-                ),
-                ChoiceChip(
-                  avatar: Icon(AppIcons.promo, size: 18.0),
-                  label: Text('عروض ترويجية ($promoCount)'),
-                  selected: _priceMatrixFilter == 'promo',
-                  onSelected: (_) => setState(() => _priceMatrixFilter = 'promo'),
-                ),
-              ],
+            // Shared filter chips (same widget as the Sell-In table)
+            SellTableFilterChips(
+              options: SellTableFilterChips.marginOptions(
+                all: allItems.length,
+                healthy: healthyCount,
+                lowMargin: lowMarginCount,
+                negativeMargin: negMarginCount,
+                promo: promoCount,
+              ),
+              selected: _priceMatrixFilter,
+              onSelected: (v) => setState(() => _priceMatrixFilter = v),
             ),
             const SizedBox(height: 12.0),
             LayoutBuilder(

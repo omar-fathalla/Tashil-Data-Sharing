@@ -57,9 +57,9 @@ December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Export Excel | 13.5 | FontWeight.w700 | ff1565c0 | null | null
-Export Excel | 13.5 | FontWeight.w700 | ff1565c0 | null | null
-Export Excel | 13.5 | FontWeight.w700 | ff1565c0 | null | null
+Export Excel | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+Export Excel | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+Export Excel | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
 Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 February (02) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -89,9 +89,9 @@ November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 October (10) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 October (10) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Print PDF | 13.5 | FontWeight.w700 | ff404659 | null | null
-Print PDF | 13.5 | FontWeight.w700 | ff404659 | null | null
-Print PDF | 13.5 | FontWeight.w700 | ff404659 | null | null
+Print PDF | 11.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+Print PDF | 11.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+Print PDF | 11.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
 Remaining Stock & Reports (Sell-In − Sell-Out) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 Remaining Stock & Reports (Sell-In − Sell-Out) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
@@ -109,9 +109,9 @@ Total Net Sell-In (Excl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Total Net Sell-In (Excl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Total Weight (Tons) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Total Weight (Tons) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Upload Sell In | 13.5 | FontWeight.w700 | ffffffff | null | null
-Upload Sell In | 13.5 | FontWeight.w700 | ffffffff | null | null
-Upload Sell In | 13.5 | FontWeight.w700 | ffffffff | null | null
+Upload Sell-In | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+Upload Sell-In | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+Upload Sell-In | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
 Uploaded Sheets (0) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 Uploaded Sheets (0) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
@@ -159,12 +159,12 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 وفق سعر الكرتونة بكارتة الأصناف | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 󰁘 | 20.0 | null | ff1565c0 | null | 1.0
 󰂾 | 18.0 | null | ff455a64 | null | 1.0
-󰃀 | 20.0 | null | ff404659 | null | 1.0
+󰃀 | 15.0 | null | ffffffff | null | 1.0
 󰃡 | 20.0 | null | ffef6c00 | null | 1.0
 󰃫 | 18.0 | null | ff45464f | null | 1.0
 󰄽 | 18.0 | null | ff45464f | null | 1.0
 󰉈 | 20.0 | null | ff45464f | null | 1.0
-󰉪 | 20.0 | null | ffffffff | null | 1.0
+󰉪 | 16.0 | null | ffffffff | null | 1.0
 󰌞 | 20.0 | null | ff45464f | null | 1.0
 󰍞 | 18.0 | null | ff7b1fa2 | null | 1.0
 󰍺 | 20.0 | null | ff303f9f | null | 1.0
@@ -180,8 +180,8 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
  | 24.0 | null | ff45464f | null | 1.0
  | 24.0 | null | ff45464f | null | 1.0
  | 24.0 | null | ff45464f | null | 1.0
- | 20.0 | null | ff1565c0 | null | 1.0
  | 18.0 | null | ff45464f | null | 1.0
+ | 15.0 | null | ff1a1b21 | null | 1.0
  | 20.0 | null | ff00796b | null | 1.0
  | 18.0 | null | ff1565c0 | null | 1.0
  | 20.0 | null | ff404659 | null | 1.0

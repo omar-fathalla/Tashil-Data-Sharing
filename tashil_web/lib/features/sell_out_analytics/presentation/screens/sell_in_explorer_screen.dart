@@ -22,6 +22,7 @@ import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../cpfr_replenishment/domain/cpfr_models.dart';
 import '../../../product_master/presentation/screens/product_master_screen.dart';
 import '../widgets/target_management_panel.dart';
+import '../widgets/sell_table_shared.dart';
 import '../../data/sell_in_explorer_repository.dart';
 
 /// SellInExplorerScreen provides dedicated Supplier Sell-In (توريدات السلاسل):
@@ -73,6 +74,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
   String _skuSearchQuery = '';
   String _selectedSkuBrand = 'all';
   String _skuStockStatusFilter = 'all';
+  String _skuMarginFilter = 'all';
   int _skuSortColumnIndex = 4; // Default to Remaining Stock (Index 4) or DOS (Index 5)
   bool _skuSortAscending = true;
   final int _skuPageSize = 25; // 25 items per page as requested
@@ -1130,56 +1132,13 @@ onChanged: m3Legacy<int>((v) {
                   ),
                 ],
               ),
-              Wrap(
-                spacing: 8.0,
-                runSpacing: 8.0,
-                children: [
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 44.0),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18.0,
-                        vertical: 10.0,
-                      ),
-                      textStyle: M3TextVariants.titleCompactBold,
-                    ),
-                    onPressed: _isUploading ? null : () => _pickAndUploadSellInFile(),
-                    icon: _isUploading
-                        ? const SizedBox(
-                            width: 18.0,
-                            height: 18.0,
-                            child: CircularProgressIndicator(strokeWidth: 2.0),
-                          )
-                        : const Icon(Icons.upload_file_rounded, size: 20.0),
-                    label: const Text('Upload Sell In'),
-                  ),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 44.0),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18.0,
-                        vertical: 10.0,
-                      ),
-                      textStyle: M3TextVariants.titleCompactBold,
-                    ),
-                    onPressed: _handleExportExcel,
-                    icon: const Icon(Icons.download_rounded, size: 20.0),
-                    label: const Text('Export Excel'),
-                  ),
-                  FilledButton.tonalIcon(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 44.0),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18.0,
-                        vertical: 10.0,
-                      ),
-                      textStyle: M3TextVariants.titleCompactBold,
-                    ),
-                    onPressed: _handleExportPdf,
-                    icon: const Icon(Icons.print_rounded, size: 20.0),
-                    label: const Text('Print PDF'),
-                  ),
-                ],
+              SellActionButtons.row(
+                context,
+                uploadLabel: 'Upload Sell-In',
+                onUpload: () => _pickAndUploadSellInFile(),
+                isUploading: _isUploading,
+                onExportPdf: _handleExportPdf,
+                onExportExcel: _handleExportExcel,
               ),
             ],
           ),
@@ -2162,6 +2121,10 @@ onChanged: m3Legacy<String>((v) {
               if (_selectedSkuBrand != 'all' && brandName != _selectedSkuBrand) {
                 return false;
               }
+              // 1b. Margin / promo filter (shared chips with Sell-Out)
+              if (!matchesSellInMarginFilter(item, _skuMarginFilter)) {
+                return false;
+              }
               // 2. Stock status filter
               if (_skuStockStatusFilter != 'all' && item.stockStatus != _skuStockStatusFilter) {
                 return false;
@@ -2415,6 +2378,22 @@ onChanged: m3Legacy<String>((val) {
                             );
                           },
                         ),
+                        const SizedBox(height: 10.0),
+                        SellTableFilterChips(
+                          key: const ValueKey('sell_in_margin_chips'),
+                          options: SellTableFilterChips.marginOptions(
+                            all: d.inventoryAndPoItems.length,
+                            healthy: d.inventoryAndPoItems.where((i) => matchesSellInMarginFilter(i, 'healthy')).length,
+                            lowMargin: d.inventoryAndPoItems.where((i) => matchesSellInMarginFilter(i, 'low_margin')).length,
+                            negativeMargin: d.inventoryAndPoItems.where((i) => matchesSellInMarginFilter(i, 'negative_margin')).length,
+                            promo: d.inventoryAndPoItems.where((i) => matchesSellInMarginFilter(i, 'promo')).length,
+                          ),
+                          selected: _skuMarginFilter,
+                          onSelected: (v) => setState(() {
+                            _skuMarginFilter = v;
+                            _skuCurrentPage = 0;
+                          }),
+                        ),
                         if (availableBrands.isNotEmpty) ...[
                           const SizedBox(height: 10.0),
                           Wrap(
@@ -2429,25 +2408,26 @@ onChanged: m3Legacy<String>((val) {
                                   color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
-                              FilterChip(
-                                selected: _selectedSkuBrand == 'all',
-                                label: Text('الكل (${d.inventoryAndPoItems.length})'),
-                                onSelected: (_) => setState(() {
-                                  _selectedSkuBrand = 'all';
+                              SellTableFilterChips(
+                                key: const ValueKey('sell_in_brand_chips'),
+                                options: [
+                                  SellTableFilterOption(
+                                    value: 'all',
+                                    label: 'الكل',
+                                    count: d.inventoryAndPoItems.length,
+                                  ),
+                                  ...availableBrands.take(12).map((b) => SellTableFilterOption(
+                                        value: b,
+                                        label: b,
+                                        count: brandItemCounts[b] ?? 0,
+                                      )),
+                                ],
+                                selected: _selectedSkuBrand,
+                                onSelected: (v) => setState(() {
+                                  _selectedSkuBrand = (v == _selectedSkuBrand) ? 'all' : v;
                                   _skuCurrentPage = 0;
                                 }),
                               ),
-                              ...availableBrands.take(12).map((b) {
-                                final isSelected = _selectedSkuBrand == b;
-                                return FilterChip(
-                                  selected: isSelected,
-                                  label: Text('$b (${brandItemCounts[b] ?? 0})'),
-                                  onSelected: (_) => setState(() {
-                                    _selectedSkuBrand = isSelected ? 'all' : b;
-                                    _skuCurrentPage = 0;
-                                  }),
-                                );
-                              }),
                             ],
                           ),
                         ],
@@ -3419,5 +3399,26 @@ onChanged: m3Legacy<int>((v) {
         ],
       ),
     );
+  }
+}
+
+
+/// Margin / promo filter for Sell-In SKU rows. Margin filters only match rows
+/// that have a real basis (sell-out units and a factory cost); no data is
+/// inferred for rows without one.
+bool matchesSellInMarginFilter(SKUBranchInventoryModel i, String filter) {
+  final hasBasis = i.sellOutUnits > 0 && i.factoryCartonCost > 0;
+  switch (filter) {
+    case 'healthy':
+      return hasBasis && i.retailerMarginPct >= 10.0;
+    case 'low_margin':
+      return hasBasis && i.retailerMarginPct >= 0.0 && i.retailerMarginPct < 10.0;
+    case 'negative_margin':
+      return hasBasis && (i.retailerMarginPct < 0.0 || i.chainGrossMarginEgp < 0.0);
+    case 'promo':
+      return i.itemType == 'عرض';
+    case 'all':
+    default:
+      return true;
   }
 }
