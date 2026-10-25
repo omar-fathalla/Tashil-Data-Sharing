@@ -9,6 +9,8 @@ import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../../../core/network/api_client.dart';
 import '../../data/product_master_repository.dart';
+import '../../data/chain_discount_repository.dart';
+import '../widgets/chain_discount_profiles_card.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
 
@@ -86,6 +88,14 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   final TextEditingController _calcExtraDiscCtrl = TextEditingController(text: '0.0');
   final TextEditingController _calcRetailPriceCtrl = TextEditingController(text: '0.0');
 
+  // Per-chain discount profiles (Firestore via backend). '' = no chain (defaults 10% / 0%).
+  late final ChainDiscountRepository _chainDiscRepo = ChainDiscountRepository(widget.apiClient);
+  List<ChainDiscountProfileModel> _chainProfiles = const [];
+  bool _chainProfilesLoading = false;
+  bool _chainProfilesSaving = false;
+  String? _chainProfilesError;
+  String _calcChain = '';
+
   @override
   void initState() {
     super.initState();
@@ -95,6 +105,69 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       _searchController.text = widget.initialSearchQuery!.trim();
     }
     _loadData();
+    _loadChainProfiles();
+  }
+
+  Future<void> _loadChainProfiles() async {
+    setState(() {
+      _chainProfilesLoading = true;
+      _chainProfilesError = null;
+    });
+    try {
+      final list = await _chainDiscRepo.load();
+      if (!mounted) return;
+      setState(() => _chainProfiles = list);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _chainProfilesError = e.toString());
+    } finally {
+      if (mounted) setState(() => _chainProfilesLoading = false);
+    }
+  }
+
+  Future<void> _saveChainProfiles(List<ChainDiscountProfileModel> next) async {
+    setState(() {
+      _chainProfilesSaving = true;
+      _chainProfilesError = null;
+    });
+    try {
+      final saved = await _chainDiscRepo.save(next);
+      if (!mounted) return;
+      setState(() {
+        _chainProfiles = saved;
+        if (_calcChain.isNotEmpty &&
+            !saved.any((p) => ChainDiscountProfileModel.key(p.chain) == ChainDiscountProfileModel.key(_calcChain))) {
+          _calcChain = '';
+        }
+        _applyCalcChainDiscounts();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _chainProfilesError = e.toString());
+    } finally {
+      if (mounted) setState(() => _chainProfilesSaving = false);
+    }
+  }
+
+  /// Prefills the calculator's two discount fields from the selected chain (or the 10% / 0% defaults).
+  void _applyCalcChainDiscounts() {
+    if (_calcChain.isEmpty) {
+      if (_calcSelectedSku == null) {
+        _calcInvoiceDiscCtrl.text = kDefaultInvoiceDiscountPct.toStringAsFixed(1);
+        _calcExtraDiscCtrl.text = kDefaultAdditionalDiscountPct.toStringAsFixed(1);
+      } else {
+        _calcInvoiceDiscCtrl.text = _calcSelectedSku!.invoiceDiscountPct.toStringAsFixed(1);
+        _calcExtraDiscCtrl.text = _calcSelectedSku!.extraDiscountPct.toStringAsFixed(1);
+      }
+      return;
+    }
+    for (final p in _chainProfiles) {
+      if (ChainDiscountProfileModel.key(p.chain) == ChainDiscountProfileModel.key(_calcChain)) {
+        _calcInvoiceDiscCtrl.text = p.invoiceDiscountPct.toStringAsFixed(1);
+        _calcExtraDiscCtrl.text = p.additionalDiscountPct.toStringAsFixed(1);
+        return;
+      }
+    }
   }
 
   @override
@@ -175,6 +248,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     _calcSelectedSku = sku;
     _calcInvoiceDiscCtrl.text = sku.invoiceDiscountPct.toStringAsFixed(1);
     _calcExtraDiscCtrl.text = sku.extraDiscountPct.toStringAsFixed(1);
+    if (_calcChain.isNotEmpty) _applyCalcChainDiscounts();
     final suggestedShelf = sku.unitPriceInclVat > 0
         ? (sku.unitPriceInclVat * 1.12)
         : 25.0;
@@ -2568,6 +2642,14 @@ onChanged: m3Legacy<String>(onChanged),
     return ListView(
       padding: const EdgeInsetsDirectional.fromSTEB(24.0, 12.0, 24.0, 32.0),
       children: [
+        ChainDiscountProfilesCard(
+          profiles: _chainProfiles,
+          loading: _chainProfilesLoading,
+          saving: _chainProfilesSaving,
+          error: _chainProfilesError,
+          onSave: _saveChainProfiles,
+        ),
+        const SizedBox(height: 16.0),
         Container(
           padding: const EdgeInsets.all(20.0),
           decoration: BoxDecoration(
@@ -2623,6 +2705,25 @@ onChanged: m3Legacy<String>(onChanged),
                     label: const Text('تصدير أمر التوريد Excel (CSV)'),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16.0),
+              M3Dropdown<String>(
+                key: const ValueKey('calc_chain_dropdown'),
+                value: _calcChain,
+                label: 'السلسلة (تملأ الخصمين تلقائياً)',
+                expand: true,
+                options: [
+                  const M3DropdownOption('', 'بدون سلسلة — 10% / 0%'),
+                  for (final p in _chainProfiles)
+                    M3DropdownOption(
+                      p.chain,
+                      '${p.chain} — ${p.invoiceDiscountPct}% / ${p.additionalDiscountPct}%',
+                    ),
+                ],
+                onChanged: (v) => setState(() {
+                  _calcChain = v;
+                  _applyCalcChainDiscounts();
+                }),
               ),
               const SizedBox(height: 16.0),
               M3Dropdown<ProductMasterItemModel>(

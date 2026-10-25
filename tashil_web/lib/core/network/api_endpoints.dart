@@ -43,6 +43,7 @@ class ApiEndpoints {
   static String get productMaster => '$baseUrl/api/v1/product-master';
   static String get productMasterItem => '$baseUrl/api/v1/product-master/item';
   static String get productMasterUpload => '$baseUrl/api/v1/product-master/upload';
+  static String get productMasterChainDiscounts => '$baseUrl/api/v1/product-master/chain-discounts';
   static String get stores => '$baseUrl/api/v1/stores';
   static String get tenants => '$baseUrl/api/v1/tenants';
   static String get batches => '$baseUrl/api/v1/batches';
