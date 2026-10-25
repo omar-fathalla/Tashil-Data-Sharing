@@ -10,10 +10,11 @@ class SellInExplorerQuery {
   final int? month;
   final String query;
   final int limit;
+  final int offset;
 
-  const SellInExplorerQuery({this.chain, this.year, this.month, this.query = '', this.limit = 250});
+  const SellInExplorerQuery({this.chain, this.year, this.month, this.query = '', this.limit = 250, this.offset = 0});
 
-  List<Object?> get parts => [chain, year, month, query, limit];
+  List<Object?> get parts => [chain, year, month, query, limit, offset];
 }
 
 /// Repository for Sell-In explorer records. Caches per filter combo (tenant/role aware);
@@ -41,6 +42,7 @@ class SellInExplorerRepository {
             month: q.month,
             query: q.query,
             limit: q.limit,
+            offset: q.offset,
           ),
         ));
   }

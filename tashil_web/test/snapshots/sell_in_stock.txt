@@ -299,6 +299,8 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 التالي | 14.0 | FontWeight.w600 | 611a1b21 | 0.1 | null
 التالي | 14.0 | FontWeight.w600 | 611a1b21 | 0.1 | null
 التالي | 14.0 | FontWeight.w600 | 611a1b21 | 0.1 | null
+التكلفة بتيجي من شيت الكاشير أو كارتة الأصناف فقط، من غير أي تقدير. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+التكلفة بتيجي من شيت الكاشير أو كارتة الأصناف فقط، من غير أي تقدير. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 الربط الثلاثي الذكي (Sell-In × Sell-Out × كارتة الأصناف Product Master) | 13.0 | FontWeight.w900 | ff45464f | 0.1 | 1.43
 الربط الثلاثي الذكي (Sell-In × Sell-Out × كارتة الأصناف Product Master) | 13.0 | FontWeight.w900 | ff45464f | 0.1 | 1.43
 الرصيد المتبقي (Stock) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
@@ -494,6 +496,9 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 عروض ترويجية (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
 فلترة سريعة بالبراند: | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
 فلترة سريعة بالبراند: | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+كل الأصناف المباعة ليها سعر تكلفة حقيقي | 13.0 | FontWeight.w800 | ff45464f | 0.1 | 1.43
+كل الأصناف المباعة ليها سعر تكلفة حقيقي | 13.0 | FontWeight.w800 | ff45464f | 0.1 | 1.43
+كل الأصناف المباعة ليها سعر تكلفة حقيقي | 13.0 | FontWeight.w800 | ff45464f | 0.1 | 1.43
 كل الحالات (All) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كل الحالات (All) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كل الماركات (All Brands) (4) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -593,6 +598,7 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
  | 15.0 | null | ff1565c0 | null | 1.0
  | 20.0 | null | dd000000 | null | 1.0
  | 20.0 | null | ff45464f | null | 1.0
+ | 24.0 | null | ff3c6939 | null | 1.0
  | 20.0 | null | ff1565c0 | null | 1.0
  | 18.0 | null | ff1565c0 | null | 1.0
  | 20.0 | null | dd000000 | null | 1.0

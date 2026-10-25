@@ -25,6 +25,12 @@ class ReconciliationMonthModel {
   final double sellOutValueEgp;
   final double sellOutFactoryCostExclVatEgp;
   final double sellOutFactoryCostInclVatEgp;
+
+  /// POS sales that have a real factory cost (basis of the chain margin).
+  final double sellOutValueWithCostEgp;
+
+  /// POS sales with no real factory cost — excluded from cost / margin.
+  final double sellOutMissingCostValueEgp;
   final double chainGrossMarginEgp;
   final double chainGrossMarginPct;
   final double monthlyNetCases;
@@ -62,6 +68,8 @@ class ReconciliationMonthModel {
     required this.sellOutValueEgp,
     this.sellOutFactoryCostExclVatEgp = 0.0,
     this.sellOutFactoryCostInclVatEgp = 0.0,
+    this.sellOutValueWithCostEgp = 0.0,
+    this.sellOutMissingCostValueEgp = 0.0,
     this.chainGrossMarginEgp = 0.0,
     this.chainGrossMarginPct = 0.0,
     this.monthlyNetCases = 0.0,
@@ -116,6 +124,10 @@ class ReconciliationMonthModel {
           (json['sell_out_factory_cost_excl_vat_egp'] as num?)?.toDouble() ?? 0.0,
       sellOutFactoryCostInclVatEgp:
           (json['sell_out_factory_cost_incl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      sellOutValueWithCostEgp:
+          (json['sell_out_value_with_cost_egp'] as num?)?.toDouble() ?? 0.0,
+      sellOutMissingCostValueEgp:
+          (json['sell_out_missing_cost_value_egp'] as num?)?.toDouble() ?? 0.0,
       chainGrossMarginEgp:
           (json['chain_gross_margin_egp'] as num?)?.toDouble() ?? 0.0,
       chainGrossMarginPct:
@@ -180,6 +192,9 @@ class SKUBranchInventoryModel {
   final double sellOutValueEgp;
   final double sellOutFactoryCostEgp;
   final double chainGrossMarginEgp;
+
+  /// True when the item has no real factory cost: cost and margin must show "—".
+  final bool factoryCostMissing;
   final double returnCases;
   final double returnValueEgp;
   final double estimatedStockCases;
@@ -231,6 +246,7 @@ class SKUBranchInventoryModel {
     required this.sellOutValueEgp,
     this.sellOutFactoryCostEgp = 0.0,
     this.chainGrossMarginEgp = 0.0,
+    this.factoryCostMissing = false,
     required this.returnCases,
     required this.returnValueEgp,
     required this.estimatedStockCases,
@@ -307,6 +323,7 @@ class SKUBranchInventoryModel {
           (json['sell_out_factory_cost_egp'] as num?)?.toDouble() ?? 0.0,
       chainGrossMarginEgp:
           (json['chain_gross_margin_egp'] as num?)?.toDouble() ?? 0.0,
+      factoryCostMissing: json['factory_cost_missing'] as bool? ?? false,
       returnCases: (json['return_cases'] as num?)?.toDouble() ?? 0.0,
       returnValueEgp: (json['return_value_egp'] as num?)?.toDouble() ?? 0.0,
       estimatedStockCases: estStockC,
@@ -657,6 +674,10 @@ class CPFRDashboardModel {
   final double matchedSellThroughPct;
   final double matchedChainGrossMarginEgp;
   final double matchedChainGrossMarginPct;
+  final double matchedSellOutValueWithCostEgp;
+  final double matchedMissingCostSellOutEgp;
+  final int matchedMissingCostSellOutUnits;
+  final List<MissingCostItemModel> missingCostItems;
   final double matchedYoyUnitsGrowthPct;
   final double matchedYoyValueGrowthPct;
   final int pendingSellOutMonthsCount;
@@ -721,6 +742,10 @@ class CPFRDashboardModel {
     this.matchedSellThroughPct = 0.0,
     this.matchedChainGrossMarginEgp = 0.0,
     this.matchedChainGrossMarginPct = 0.0,
+    this.matchedSellOutValueWithCostEgp = 0.0,
+    this.matchedMissingCostSellOutEgp = 0.0,
+    this.matchedMissingCostSellOutUnits = 0,
+    this.missingCostItems = const [],
     this.matchedYoyUnitsGrowthPct = 0.0,
     this.matchedYoyValueGrowthPct = 0.0,
     this.pendingSellOutMonthsCount = 0,
@@ -837,6 +862,16 @@ class CPFRDashboardModel {
           (json['matched_chain_gross_margin_egp'] as num?)?.toDouble() ?? 0.0,
       matchedChainGrossMarginPct:
           (json['matched_chain_gross_margin_pct'] as num?)?.toDouble() ?? 0.0,
+      matchedSellOutValueWithCostEgp:
+          (json['matched_sell_out_value_with_cost_egp'] as num?)?.toDouble() ?? 0.0,
+      matchedMissingCostSellOutEgp:
+          (json['matched_missing_cost_sell_out_egp'] as num?)?.toDouble() ?? 0.0,
+      matchedMissingCostSellOutUnits:
+          (json['matched_missing_cost_sell_out_units'] as num?)?.toInt() ?? 0,
+      missingCostItems: (json['missing_cost_items'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(MissingCostItemModel.fromJson)
+          .toList(),
       matchedYoyUnitsGrowthPct:
           (json['matched_yoy_units_growth_pct'] as num?)?.toDouble() ?? 0.0,
       matchedYoyValueGrowthPct:
@@ -870,6 +905,49 @@ class CPFRDashboardModel {
           .map(SalesRepScorecardModel.fromJson)
           .toList(),
       promoAndReturns: PromoAndReturnSummaryModel.fromJson(promoRaw),
+    );
+  }
+}
+
+/// A Sell-Out item with no real factory cost (not in the Sell-Out sheet and not
+/// priced in the product master). Its cost/margin are left empty, never guessed.
+class MissingCostItemModel {
+  final String itemCode;
+  final String barcode;
+  final String skuName;
+  final List<String> chains;
+  final int unitsSold;
+  final double salesValueEgp;
+  final String reason;
+  final String reasonAr;
+  final String masterItemCode;
+  final String masterName;
+
+  const MissingCostItemModel({
+    this.itemCode = '',
+    this.barcode = '',
+    this.skuName = '',
+    this.chains = const [],
+    this.unitsSold = 0,
+    this.salesValueEgp = 0.0,
+    this.reason = '',
+    this.reasonAr = '',
+    this.masterItemCode = '',
+    this.masterName = '',
+  });
+
+  factory MissingCostItemModel.fromJson(Map<String, dynamic> json) {
+    return MissingCostItemModel(
+      itemCode: json['item_code'] as String? ?? '',
+      barcode: json['barcode'] as String? ?? '',
+      skuName: json['sku_name'] as String? ?? '',
+      chains: (json['chains'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
+      unitsSold: (json['units_sold'] as num?)?.toInt() ?? 0,
+      salesValueEgp: (json['sales_value_egp'] as num?)?.toDouble() ?? 0.0,
+      reason: json['reason'] as String? ?? '',
+      reasonAr: json['reason_ar'] as String? ?? '',
+      masterItemCode: json['master_item_code'] as String? ?? '',
+      masterName: json['master_name'] as String? ?? '',
     );
   }
 }

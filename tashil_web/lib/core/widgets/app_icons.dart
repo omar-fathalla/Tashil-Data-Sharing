@@ -54,6 +54,8 @@ class AppIcons {
   static const IconData dropDown = Icons.arrow_drop_down_rounded;
   static const IconData arrowUp = Icons.arrow_upward_rounded;
   static const IconData arrowDown = Icons.arrow_downward_rounded;
+  static const IconData tag = Icons.tag_rounded;
+  static const IconData arrowForward = Icons.arrow_forward_rounded;
   static const IconData trendingUp = Icons.trending_up_rounded;
   static const IconData trendingDown = Icons.trending_down_rounded;
   static const IconData promo = Icons.redeem_rounded;

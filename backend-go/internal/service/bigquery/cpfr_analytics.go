@@ -212,6 +212,11 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	sellOutByYMCases := make(map[ymKey]float64)
 	sellOutByYMFactoryCostExcl := make(map[ymKey]float64)
 	sellOutByYMFactoryCostIncl := make(map[ymKey]float64)
+	// POS sales that have a REAL factory cost (sheet or product master) vs. sales with no real cost.
+	sellOutByYMRevWithCost := make(map[ymKey]float64)
+	sellOutByYMMissingCostRev := make(map[ymKey]float64)
+	sellOutByYMMissingCostUnits := make(map[ymKey]int)
+	missingCostAcc := make(map[string]*domain.MissingCostItem)
 	allYearsSellOutByYMRev := make(map[ymKey]float64)
 	allYearsSellOutByYMUnits := make(map[ymKey]int)
 	sellOutByMonthRev := make(map[int]float64)
@@ -228,6 +233,8 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		posRev          float64
 		factoryCostExcl float64
 		factoryCostIncl float64
+		posRevWithCost  float64
+		missingCostRev  float64
 	}
 	realSellOutByFam := make(map[string]*realSellOutSKUAcc)
 	realSellOutByFamRegion := make(map[string]*realSellOutSKUAcc)
@@ -319,16 +326,15 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			eqCases := float64(r.QuantitySold) / float64(upc)
 			sellOutByYMCases[ym] += eqCases
 
-			unitCostIncl := r.FactoryUnitCost
-			if unitCostIncl <= 0 && pmOk {
-				if pm.NetUnitInvoiceCost > 0 {
-					unitCostIncl = pm.NetUnitInvoiceCost
-				} else if pm.UnitPriceInclVAT > 0 {
-					unitCostIncl = pm.UnitPriceInclVAT * 0.90
-				}
-			}
-			if unitCostIncl <= 0 && r.QuantitySold > 0 && r.NetRevenue > 0 {
-				unitCostIncl = (r.NetRevenue / float64(r.QuantitySold)) * 0.78
+			// Only REAL cost sources are used. No guessing from the selling price.
+			unitCostIncl, _, missingReason := resolveRealFactoryUnitCost(r.FactoryUnitCost, pm, pmOk)
+			hasRealCost := unitCostIncl > 0
+			if !hasRealCost {
+				sellOutByYMMissingCostRev[ym] += r.NetRevenue
+				sellOutByYMMissingCostUnits[ym] += r.QuantitySold
+				accumulateMissingCostItem(missingCostAcc, r.ItemCode, r.Barcode, r.SKUName, recChain, missingReason, pm, pmOk, r.QuantitySold, r.NetRevenue)
+			} else {
+				sellOutByYMRevWithCost[ym] += r.NetRevenue
 			}
 			vatRate := 0.14
 			if pmOk && pm.VATRate > 0 {
@@ -357,6 +363,11 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			famAcc.posRev += r.NetRevenue
 			famAcc.factoryCostExcl += costExcl
 			famAcc.factoryCostIncl += costIncl
+			if hasRealCost {
+				famAcc.posRevWithCost += r.NetRevenue
+			} else {
+				famAcc.missingCostRev += r.NetRevenue
+			}
 
 			regFamKey := famKey + "|" + rCode
 			regAcc, exists := realSellOutByFamRegion[regFamKey]
@@ -369,6 +380,11 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			regAcc.posRev += r.NetRevenue
 			regAcc.factoryCostExcl += costExcl
 			regAcc.factoryCostIncl += costIncl
+			if hasRealCost {
+				regAcc.posRevWithCost += r.NetRevenue
+			} else {
+				regAcc.missingCostRev += r.NetRevenue
+			}
 
 			sellOutByMonthRev[m] += r.NetRevenue
 			sellOutByMonthUnits[m] += r.QuantitySold
@@ -999,6 +1015,8 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	var matchedSellOutUnits int
 	var matchedSellOutCases, matchedSellOutPOSVal, matchedSellOutFactoryCostIncl, matchedSellOutFactoryCostExcl float64
 	var matchedPrevYearUnits int
+	var matchedSellOutValWithCost, matchedSellOutMissingCostVal float64
+	var matchedSellOutMissingCostUnits int
 	var matchedPrevYearVal float64
 
 	var pendingMonthsCount int
@@ -1015,6 +1033,8 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		var sellOutUnits int
 		var sellOutEstCases float64
 		var sellOutFactoryCostExcl, sellOutFactoryCostIncl float64
+		var sellOutValWithCost, sellOutMissingCostVal float64
+		var sellOutMissingCostUnits int
 		hasActualSellOut := false
 
 		if useRealSellOutReconciliation {
@@ -1023,6 +1043,9 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			sellOutEstCases = round2(sellOutByYMCases[ym])
 			sellOutFactoryCostExcl = round2(sellOutByYMFactoryCostExcl[ym])
 			sellOutFactoryCostIncl = round2(sellOutByYMFactoryCostIncl[ym])
+			sellOutValWithCost = round2(sellOutByYMRevWithCost[ym])
+			sellOutMissingCostVal = round2(sellOutByYMMissingCostRev[ym])
+			sellOutMissingCostUnits = sellOutByYMMissingCostUnits[ym]
 			hasActualSellOut = sellOutVal > 0 || sellOutUnits > 0
 			if sellOutEstCases <= 0 && sellOutUnits > 0 {
 				sellOutEstCases = round2(float64(sellOutUnits) / 12.0)
@@ -1037,6 +1060,7 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			sellOutEstCases = round2(ma.sellInCases * ratio)
 			sellOutFactoryCostExcl = round2(sellOutVal * 0.78)
 			sellOutFactoryCostIncl = round2(sellOutFactoryCostExcl * 1.14)
+			sellOutValWithCost = sellOutVal
 			hasActualSellOut = sellOutVal > 0
 		}
 
@@ -1078,9 +1102,10 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 
 		chainMarginEGP := 0.0
 		chainMarginPct := 0.0
-		if sellOutVal > 0 && sellOutFactoryCostIncl > 0 {
-			chainMarginEGP = round2(math.Max(0, sellOutVal-sellOutFactoryCostIncl))
-			chainMarginPct = round2((chainMarginEGP / sellOutVal) * 100.0)
+		// Margin only over sales that have a real factory cost; sales without cost are excluded.
+		if sellOutValWithCost > 0 && sellOutFactoryCostIncl > 0 {
+			chainMarginEGP = round2(sellOutValWithCost - sellOutFactoryCostIncl) // may be negative (real loss)
+			chainMarginPct = round2((chainMarginEGP / sellOutValWithCost) * 100.0)
 		}
 
 		prevYM := ymKey{year: yr - 1, month: m}
@@ -1105,6 +1130,9 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			matchedSellOutPOSVal += sellOutVal
 			matchedSellOutFactoryCostIncl += sellOutFactoryCostIncl
 			matchedSellOutFactoryCostExcl += sellOutFactoryCostExcl
+			matchedSellOutValWithCost += sellOutValWithCost
+			matchedSellOutMissingCostVal += sellOutMissingCostVal
+			matchedSellOutMissingCostUnits += sellOutMissingCostUnits
 			matchedPrevYearUnits += prevUnits
 			matchedPrevYearVal += prevVal
 		} else if sellInCases > 0 || sellInVal > 0 {
@@ -1163,6 +1191,9 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			SellOutFactoryCostInclVATEGP: sellOutFactoryCostIncl,
 			ChainGrossMarginEGP:          chainMarginEGP,
 			ChainGrossMarginPct:          chainMarginPct,
+			SellOutValueWithCostEGP:      sellOutValWithCost,
+			SellOutMissingCostValueEGP:   sellOutMissingCostVal,
+			SellOutMissingCostUnits:      sellOutMissingCostUnits,
 			MonthlyNetCases:              monthlyNetCases,
 			MonthlyNetValueEGP:           monthlyNetVal,
 			ClosingStockCases:            closingCases,
@@ -1210,10 +1241,12 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	if matchedSellInCases > 0 {
 		matchedSTR = round2((matchedSellOutCases / matchedSellInCases) * 100.0)
 	}
-	matchedChainMarginEGP := round2(math.Max(0, matchedSellOutPOSVal-matchedSellOutFactoryCostIncl))
+	// Chain margin is computed only over POS sales with a real factory cost.
+	matchedChainMarginEGP := 0.0
 	matchedChainMarginPct := 0.0
-	if matchedSellOutPOSVal > 0 {
-		matchedChainMarginPct = round2((matchedChainMarginEGP / matchedSellOutPOSVal) * 100.0)
+	if matchedSellOutValWithCost > 0 && matchedSellOutFactoryCostIncl > 0 {
+		matchedChainMarginEGP = round2(matchedSellOutValWithCost - matchedSellOutFactoryCostIncl) // may be negative (real loss)
+		matchedChainMarginPct = round2((matchedChainMarginEGP / matchedSellOutValWithCost) * 100.0)
 	}
 	matchedYoYUnitsGrowth := 0.0
 	if matchedPrevYearUnits > 0 {
@@ -1455,6 +1488,7 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		var sellOutCases float64
 		var sellOutPOSVal float64
 		var sellOutFactoryCost float64
+		var sellOutPOSValWithCost, sellOutMissingCostVal float64
 
 		if useRealSellOutReconciliation {
 			// Allocate real Cashier Sell-Out for this canonical family across regions proportional to matched supply share
@@ -1471,24 +1505,32 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 				sellOutCases = round2(regAcc.cases * shareInReg)
 				sellOutPOSVal = round2(regAcc.posRev * shareInReg)
 				sellOutFactoryCost = round2(regAcc.factoryCostIncl * shareInReg)
+				sellOutPOSValWithCost = round2(regAcc.posRevWithCost * shareInReg)
+				sellOutMissingCostVal = round2(regAcc.missingCostRev * shareInReg)
 			} else if famAcc != nil && famMatchedCases > 0 && sia.matchedSellInCases > 0 {
 				shareInFam := sia.matchedSellInCases / famMatchedCases
 				sellOutUnits = int(math.Round(float64(famAcc.units) * shareInFam))
 				sellOutCases = round2(famAcc.cases * shareInFam)
 				sellOutPOSVal = round2(famAcc.posRev * shareInFam)
 				sellOutFactoryCost = round2(famAcc.factoryCostIncl * shareInFam)
+				sellOutPOSValWithCost = round2(famAcc.posRevWithCost * shareInFam)
+				sellOutMissingCostVal = round2(famAcc.missingCostRev * shareInFam)
 			} else if regAcc != nil && regTotalCases > 0 && famMatchedCases == 0 {
 				shareInReg := sia.sellInCases / regTotalCases
 				sellOutUnits = int(math.Round(float64(regAcc.units) * shareInReg))
 				sellOutCases = round2(regAcc.cases * shareInReg)
 				sellOutPOSVal = round2(regAcc.posRev * shareInReg)
 				sellOutFactoryCost = round2(regAcc.factoryCostIncl * shareInReg)
+				sellOutPOSValWithCost = round2(regAcc.posRevWithCost * shareInReg)
+				sellOutMissingCostVal = round2(regAcc.missingCostRev * shareInReg)
 			} else if famAcc != nil && famTotalCases > 0 && famMatchedCases == 0 {
 				shareInFam := sia.sellInCases / famTotalCases
 				sellOutUnits = int(math.Round(float64(famAcc.units) * shareInFam))
 				sellOutCases = round2(famAcc.cases * shareInFam)
 				sellOutPOSVal = round2(famAcc.posRev * shareInFam)
 				sellOutFactoryCost = round2(famAcc.factoryCostIncl * shareInFam)
+				sellOutPOSValWithCost = round2(famAcc.posRevWithCost * shareInFam)
+				sellOutMissingCostVal = round2(famAcc.missingCostRev * shareInFam)
 			}
 		} else {
 			sellThroughFactor := 0.918
@@ -1496,7 +1538,9 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			sellOutUnits = int(math.Round(sellOutCases * float64(upc)))
 			sellOutPOSVal = round2(sellOutCases * poCasePriceIncl * 1.18)
 			sellOutFactoryCost = round2(sellOutCases * poCasePriceIncl)
+			sellOutPOSValWithCost = sellOutPOSVal
 		}
+		factoryCostMissing := sellOutPOSVal > 0 && sellOutFactoryCost <= 0
 
 		matchedRemCases := round2(math.Max(0, matchedNetSupplyCases-sellOutCases))
 		matchedRemVal := round2(matchedRemCases * poCasePriceExcl)
@@ -1584,9 +1628,9 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		chainMarginEGP := 0.0
 		if sellOutUnits > 0 && sellOutPOSVal > 0 {
 			avgRetailPOS = round2(sellOutPOSVal / float64(sellOutUnits))
-			if sellOutFactoryCost > 0 {
-				chainMarginEGP = round2(math.Max(0, sellOutPOSVal-sellOutFactoryCost))
-				retailMarginPct = round2((chainMarginEGP / sellOutPOSVal) * 100.0)
+			if sellOutFactoryCost > 0 && sellOutPOSValWithCost > 0 {
+				chainMarginEGP = round2(sellOutPOSValWithCost - sellOutFactoryCost) // may be negative (real loss)
+				retailMarginPct = round2((chainMarginEGP / sellOutPOSValWithCost) * 100.0)
 			}
 		}
 
@@ -1622,6 +1666,8 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			SellOutValueEGP:           sellOutPOSVal,
 			SellOutFactoryCostEGP:     sellOutFactoryCost,
 			ChainGrossMarginEGP:       chainMarginEGP,
+			FactoryCostMissing:        factoryCostMissing,
+			SellOutMissingCostValueEGP: sellOutMissingCostVal,
 			ReturnCases:               round2(sia.retCases),
 			ReturnValueEGP:            round2(sia.retEGP),
 			EstimatedStockCases:       estStockCases,
@@ -1720,6 +1766,10 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		MatchedSellThroughPct:           matchedSTR,
 		MatchedChainGrossMarginEGP:      matchedChainMarginEGP,
 		MatchedChainGrossMarginPct:      matchedChainMarginPct,
+		MatchedSellOutValueWithCostEGP:  round2(matchedSellOutValWithCost),
+		MatchedMissingCostSellOutEGP:    round2(matchedSellOutMissingCostVal),
+		MatchedMissingCostSellOutUnits:  matchedSellOutMissingCostUnits,
+		MissingCostItems:                finalizeMissingCostItems(missingCostAcc),
 		MatchedYoYUnitsGrowthPct:        matchedYoYUnitsGrowth,
 		MatchedYoYValueGrowthPct:        matchedYoYValGrowth,
 		PendingSellOutMonthsCount:       pendingMonthsCount,

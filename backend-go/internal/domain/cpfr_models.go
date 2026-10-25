@@ -93,6 +93,9 @@ type ReconciliationMonthItem struct {
 	SellOutFactoryCostInclVATEGP float64 `json:"sell_out_factory_cost_incl_vat_egp"` // تكلفة مبيعات الكاشير بسعر المصنع شامل الضريبة والخصم
 	ChainGrossMarginEGP  float64 `json:"chain_gross_margin_egp"`  // ربح السلسلة المحقق (SellOutValueEGP - SellOutFactoryCostInclVATEGP)
 	ChainGrossMarginPct  float64 `json:"chain_gross_margin_pct"`  // هامش ربح السلسلة %
+	SellOutValueWithCostEGP    float64 `json:"sell_out_value_with_cost_egp"`     // مبيعات الكاشير التي لها تكلفة مصنع حقيقية (أساس حساب الربح)
+	SellOutMissingCostValueEGP float64 `json:"sell_out_missing_cost_value_egp"`  // مبيعات بدون تكلفة حقيقية (مستبعدة من الربح)
+	SellOutMissingCostUnits    int     `json:"sell_out_missing_cost_units"`      // قطع مباعة بدون تكلفة حقيقية
 	MonthlyNetCases      float64 `json:"monthly_net_cases"`       // صافي حركة الشهر بالكرتونة (Sell-In - Sell-Out)
 	MonthlyNetValueEGP   float64 `json:"monthly_net_value_egp"`   // صافي حركة الشهر بالجنيه (Sell-In - Sell-Out)
 	ClosingStockCases    float64 `json:"closing_stock_cases"`     // الرصيد المتبقي التراكمي آخر الشهر بالكرتونة
@@ -142,6 +145,8 @@ type SKUBranchInventoryItem struct {
 	SellOutValueEGP        float64 `json:"sell_out_value_egp"`        // قيمة المبيعات الفعلية للكاشير بسعر المستهلك
 	SellOutFactoryCostEGP  float64 `json:"sell_out_factory_cost_egp"` // تكلفة المبيعات الفعلية بسعر المصنع
 	ChainGrossMarginEGP    float64 `json:"chain_gross_margin_egp"`    // ربح السلسلة على الصنف بالجنيه
+	FactoryCostMissing     bool    `json:"factory_cost_missing"`      // لا توجد تكلفة مصنع حقيقية: التكلفة والربح فارغان
+	SellOutMissingCostValueEGP float64 `json:"sell_out_missing_cost_value_egp"` // جزء المبيعات بدون تكلفة حقيقية
 	ReturnCases            float64 `json:"return_cases"`              // المرتجعات بالكرتونة
 	ReturnValueEGP         float64 `json:"return_value_egp"`          // قيمة المرتجعات
 	EstimatedStockCases    float64 `json:"estimated_stock_cases"`     // الرصيد الدفتري الحقيقي بالكرتونة
@@ -300,6 +305,10 @@ type CPFRDashboardPayload struct {
 	MatchedSellThroughPct           float64 `json:"matched_sell_through_pct"`             // نسبة التصريف الحقيقية بالكرتونة %
 	MatchedChainGrossMarginEGP      float64 `json:"matched_chain_gross_margin_egp"`       // إجمالي ربح السلسلة المحقق (POS - Factory Cost)
 	MatchedChainGrossMarginPct      float64 `json:"matched_chain_gross_margin_pct"`       // متوسط هامش ربح السلسلة المحقق %
+	MatchedSellOutValueWithCostEGP  float64 `json:"matched_sell_out_value_with_cost_egp"` // مبيعات الكاشير التي لها تكلفة حقيقية (أساس الربح)
+	MatchedMissingCostSellOutEGP    float64 `json:"matched_missing_cost_sell_out_egp"`    // مبيعات مستبعدة من الربح لعدم وجود تكلفة حقيقية
+	MatchedMissingCostSellOutUnits  int     `json:"matched_missing_cost_sell_out_units"`
+	MissingCostItems                []MissingCostItem `json:"missing_cost_items"`    // أصناف بدون سعر/تكلفة حقيقية مطلوبة من أدكو
 	MatchedYoYUnitsGrowthPct        float64 `json:"matched_yoy_units_growth_pct"`         // نمو مبيعات القطع 2026 مقابل 2025 لنفس الأشهر %
 	MatchedYoYValueGrowthPct        float64 `json:"matched_yoy_value_growth_pct"`         // نمو مبيعات القيمة 2026 مقابل 2025 لنفس الأشهر %
 	PendingSellOutMonthsCount       int     `json:"pending_sell_out_months_count"`        // عدد أشهر التوريد بانتظار شيت الكاشير (e.g. 2: Sep-Oct)
@@ -609,3 +618,18 @@ func InferBrandFromItemName(itemName, subCategory string) string {
 
 
 
+
+// MissingCostItem is a Sell-Out item with no real factory cost (not in the Sell-Out sheet
+// and not resolvable from the product master). Its cost and margin are left empty.
+type MissingCostItem struct {
+	ItemCode        string   `json:"item_code"`
+	Barcode         string   `json:"barcode"`
+	SKUName         string   `json:"sku_name"`
+	Chains          []string `json:"chains"`
+	UnitsSold       int      `json:"units_sold"`
+	SalesValueEGP   float64  `json:"sales_value_egp"`
+	Reason          string   `json:"reason"`    // not_in_master | no_price_in_master
+	ReasonAr        string   `json:"reason_ar"`
+	MasterItemCode  string   `json:"master_item_code,omitempty"`
+	MasterName      string   `json:"master_name,omitempty"`
+}

@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:tashil_web/core/widgets/m3_states.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:tashil_web/core/theme/m3_text_variants.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
@@ -15,6 +17,7 @@ import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
+import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_responsive_tab_bar.dart';
@@ -51,6 +54,9 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
   String _selectedChain = 'all';
   int _selectedYear = 2026; // Default to 2026
   int _selectedMonth = 0; // 0 = All Months
+  static const int _pageSize = 25;
+  List<SellInRecordItem> _records = const []; // accumulated rows (infinite scroll)
+  bool _isLoadingMore = false;
   String _searchQuery = '';
   bool _isLoading = true;
   String? _loadError;
@@ -94,6 +100,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
   late SellInExplorerRepository _repo;
 
   late final ScrollController _recordsTableScrollController;
+  late final ScrollController _recordsListScrollController;
   late final ScrollController _monthlyLedgerScrollController;
   late final ScrollController _skuStockScrollController;
   late final ScrollController _archiveSheetsScrollController;
@@ -103,6 +110,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     super.initState();
     _skuSearchController = TextEditingController();
     _recordsTableScrollController = ScrollController();
+    _recordsListScrollController = ScrollController();
     _monthlyLedgerScrollController = ScrollController();
     _skuStockScrollController = ScrollController();
     _archiveSheetsScrollController = ScrollController();
@@ -115,6 +123,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
   void dispose() {
     _skuSearchController.dispose();
     _recordsTableScrollController.dispose();
+    _recordsListScrollController.dispose();
     _monthlyLedgerScrollController.dispose();
     _skuStockScrollController.dispose();
     _archiveSheetsScrollController.dispose();
@@ -156,19 +165,31 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     ]);
   }
 
+  SellInExplorerQuery _sellInQuery({int page = 0, int? limit}) => SellInExplorerQuery(
+        chain: _selectedChain == 'all' ? null : _selectedChain,
+        year: _selectedYear > 0 ? _selectedYear : null,
+        month: _selectedMonth > 0 ? _selectedMonth : null,
+        query: _searchQuery,
+        limit: limit ?? _pageSize,
+        offset: limit == null ? page * _pageSize : 0,
+      );
+
+  bool _sellInExhausted = false;
+  bool get _hasMoreSellIn => !_sellInExhausted && _records.length < _data.totalCount;
+  int _sellInGeneration = 0; // bumps on every filter reset to drop stale appends
+
+  /// Loads the first 25 rows (any filter change resets here) and prefetches
+  /// the next batch into the repository cache.
   Future<void> _loadSellInRecords() async {
+    final gen = ++_sellInGeneration;
     if (mounted) setState(() => _isLoading = true);
-    final loaded = await _repo.load(SellInExplorerQuery(
-      chain: _selectedChain == 'all' ? null : _selectedChain,
-      year: _selectedYear > 0 ? _selectedYear : null,
-      month: _selectedMonth > 0 ? _selectedMonth : null,
-      query: _searchQuery,
-      limit: 250,
-    ));
+    final loaded = await _repo.load(_sellInQuery());
+    if (gen != _sellInGeneration) return;
     if (loaded case Failure(:final error)) {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _isLoadingMore = false;
           _loadError = error.toString();
         });
         M3Feedback.showError(context, 'تعذر تحميل بيانات الـ Sell-In: $error');
@@ -179,10 +200,52 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     if (mounted) {
       setState(() {
         _data = res;
+        _records = List.of(res.records);
+        _sellInExhausted = false;
         _isLoading = false;
+        _isLoadingMore = false;
         _loadError = null;
       });
+      if (_recordsListScrollController.hasClients) {
+        _recordsListScrollController.jumpTo(0);
+      }
     }
+    if (_pageSize < res.totalCount) {
+      unawaited(_repo.load(_sellInQuery(page: 1)));
+    }
+  }
+
+  /// Appends the next 25 rows (usually already prefetched), then prefetches
+  /// the batch after it.
+  Future<void> _loadMoreSellInRecords() async {
+    if (!mounted || _isLoading || _isLoadingMore || !_hasMoreSellIn) return;
+    final gen = _sellInGeneration;
+    final page = (_records.length + _pageSize - 1) ~/ _pageSize;
+    setState(() => _isLoadingMore = true);
+    final loaded = await _repo.load(_sellInQuery(page: page));
+    if (!mounted || gen != _sellInGeneration) return;
+    final res = loaded.valueOrNull;
+    if (res == null || res.records.isEmpty) {
+      setState(() {
+        _isLoadingMore = false;
+        // Stop asking on failure/empty batch so we don't loop.
+        _sellInExhausted = true;
+      });
+      return;
+    }
+    setState(() {
+      _records = [..._records, ...res.records];
+      _isLoadingMore = false;
+    });
+    if ((page + 1) * _pageSize < _data.totalCount) {
+      unawaited(_repo.load(_sellInQuery(page: page + 1)));
+    }
+  }
+
+  /// Rows for exports: same 250-row scope the table used before paging.
+  Future<List<SellInRecordItem>> _exportRecords() async {
+    final loaded = await _repo.load(_sellInQuery(limit: 250));
+    return loaded.valueOrNull?.records ?? _records;
   }
 
   Future<void> _loadStockReconciliationReport() async {
@@ -458,7 +521,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     }
   }
 
-  void _handleExportExcel() {
+  Future<void> _handleExportExcel() async {
     if (widget.apiClient.currentUser?.canExportFinancials == false) {
       M3Feedback.showError(
         context,
@@ -466,7 +529,8 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
       );
       return;
     }
-    final records = _data.records;
+    final records = await _exportRecords();
+    if (!mounted) return;
     const headers = ExportColumns.sellInRecords;
     final rows = records
         .map(
@@ -508,7 +572,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     );
   }
 
-  void _handleExportPdf() {
+  Future<void> _handleExportPdf() async {
     if (widget.apiClient.currentUser?.canExportFinancials == false) {
       M3Feedback.showError(
         context,
@@ -516,7 +580,8 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
       );
       return;
     }
-    final records = _data.records;
+    final records = await _exportRecords();
+    if (!mounted) return;
     final headers = [
       'الفترة',
       'السلسلة',
@@ -721,7 +786,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
               _buildRemainingStockAndReportsTab(context, theme, colorScheme)
             else if (_activeTab == 3)
               _buildUploadedSellInSheetsTab(context, theme, colorScheme)
-            else if (!_isLoading && _loadError != null && _data.records.isEmpty)
+            else if (!_isLoading && _loadError != null && _records.isEmpty)
               M3ErrorState(
                 key: const ValueKey('sell_in_error_state'),
                 title: 'Could not load Sell-In data',
@@ -735,6 +800,366 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
         ),
       ),
     );
+  }
+
+
+  // Fixed column widths for the virtualized Sell-In records table (RTL order).
+  static const List<double> _sellInColWidths = [
+    120, 230, 332, 220, 150, 170, 230, 160, 180, 110, 120,
+  ];
+  static const List<bool> _sellInColNumeric = [
+    false, false, false, false, false, true, true, true, true, true, false,
+  ];
+
+  Widget _sellInCell(int i, Widget child) => SizedBox(
+        width: _sellInColWidths[i],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+          child: Align(
+            alignment: _sellInColNumeric[i]
+                ? AlignmentDirectional.centerEnd
+                : AlignmentDirectional.centerStart,
+            child: child,
+          ),
+        ),
+      );
+
+  /// Header row + ListView.builder: only rows on screen are built. Rows are
+  /// appended 25 at a time as the user nears the end of the list.
+  Widget _buildVirtualSellInTable(BuildContext context, ColorScheme colorScheme) {
+    final theme = Theme.of(context);
+    final totalWidth = _sellInColWidths.fold<double>(0, (a, b) => a + b);
+    final headers = <Widget>[
+      Text('الفترة'),
+      Text('السلسلة / الفرع'),
+      Text('اسم الصنف وهوية الكارتة'),
+      Text('العلامة / القسم'),
+      Text('مندوب المبيعات'),
+      Text('كرتونة / القطعة'),
+      _twoLineHeader(context, 'سعر الكرتونة', 'فعلي vs كرتونة'),
+      _twoLineHeader(context, 'صافي التوريد', 'غير شامل الضريبة'),
+      _twoLineHeader(context, 'الإجمالي', '14% ضريبة'),
+      Text('الوزن (Tons)'),
+      Text('الشيت المصدري (Sheet)'),
+    ];
+    final records = _records;
+    return SizedBox(
+      width: totalWidth,
+      height: 600.0,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            constraints: const BoxConstraints(minHeight: 56.0),
+            color: colorScheme.surfaceContainerHigh.withOpacity(0.5),
+            child: DefaultTextStyle.merge(
+              style: theme.dataTableTheme.headingTextStyle ?? theme.textTheme.titleSmall,
+              child: Row(
+                children: [
+                  for (var i = 0; i < headers.length; i++) _sellInCell(i, headers[i]),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: DefaultTextStyle.merge(
+              style: theme.dataTableTheme.dataTextStyle ?? theme.textTheme.bodyMedium,
+              child: ListView.builder(
+                controller: _recordsListScrollController,
+                itemCount: records.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == records.length) {
+                    return _buildSellInListFooter(theme, colorScheme);
+                  }
+                  final cells = _sellInRowCells(context, colorScheme, records[index]);
+                  return Container(
+                    constraints: const BoxConstraints(minHeight: 48.0),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: theme.dividerColor),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        for (var i = 0; i < cells.length; i++) _sellInCell(i, cells[i]),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSellInListFooter(ThemeData theme, ColorScheme colorScheme) {
+    if (_hasMoreSellIn) {
+      // Footer is built only when it is (nearly) on screen: fetch next batch.
+      if (!_isLoadingMore) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _loadMoreSellInRecords());
+      }
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Center(
+          child: SizedBox(
+            width: 24.0,
+            height: 24.0,
+            child: CircularProgressIndicator(strokeWidth: 2.5),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Center(
+        child: Text(
+          'تم تحميل كل الحركات (${CurrencyFormatter.formatNumber(_data.totalCount)} حركة)',
+          style: theme.textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+      ),
+    );
+  }
+
+  static Widget _c(Widget w) => w;
+
+  List<Widget> _sellInRowCells(BuildContext context, ColorScheme colorScheme, SellInRecordItem r) {
+    final hasIdCard = r.itemCode.isNotEmpty || r.barcode.isNotEmpty;
+    final unitsSupplied = r.totalUnitsSupplied > 0
+        ? r.totalUnitsSupplied
+        : (r.netQtyCases * (r.unitsPerCarton > 0 ? r.unitsPerCarton : 12)).round();
+    final grossInclVat = r.grossValueInclVatEgp > 0
+        ? r.grossValueInclVatEgp
+        : r.netValueEgp * 1.14;
+    final vatAmount = r.vatAmountEgp > 0
+        ? r.vatAmountEgp
+        : r.netValueEgp * 0.14;
+    final actualCasePrice = r.actualCasePriceExclEgp > 0
+        ? r.actualCasePriceExclEgp
+        : (r.netQtyCases > 0 ? r.netValueEgp / r.netQtyCases : 0.0);
+
+    return [
+        _c(
+          Text(
+            '${r.monthAr.isNotEmpty ? r.monthAr : r.monthNum} ${r.year}',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        _c(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 2.0,
+                ),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withOpacity(0.6),
+                  borderRadius: M3Shape.radiusFull,
+                ),
+                child: Text(
+                  _chainNameAr(r.retailerChain),
+                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.tinyPlus,                                           fontWeight: FontWeight.w800,                                           color: colorScheme.onPrimaryContainer,                                         )),
+                ),
+              ),
+              const SizedBox(width: 8.0),
+              Text(
+                r.governorate,
+                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.labelSmallPlus,                                         color: colorScheme.onSurfaceVariant,                                       )),
+              ),
+            ],
+          ),
+        ),
+        _c(
+          InkWell(
+            borderRadius: M3Shape.radiusSm,
+            onTap: () => _openProductIdCard(
+              itemCode: r.itemCode,
+              barcode: r.barcode,
+              skuName: r.itemName,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: SizedBox(
+                width: 300.0,
+                child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.badge_rounded,
+                        size: 15.0,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 4.0),
+                      Flexible(
+                        child: Text(
+                          r.itemName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                                   fontWeight: FontWeight.w800,                                                   fontSize: M3FontSize.bodySmallPlus,                                                 )),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (hasIdCard) ...[
+                    _HoverCopyCode(
+                      icon: AppIcons.tag,
+                      label: 'كود',
+                      value: r.itemCode,
+                    ),
+                    _HoverCopyCode(
+                      icon: AppIcons.barcode,
+                      label: 'Barcode',
+                      value: r.barcode,
+                    ),
+                  ],
+                ],
+              ),
+              ),
+            ),
+          ),
+        ),
+        _c(
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${r.brand} • ${r.subCategory}',
+                style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontWeight: FontWeight.w700,                                         fontSize: M3FontSize.bodySmall,                                       )),
+              ),
+              if (r.departmentAr.isNotEmpty)
+                Text(
+                  r.departmentAr,
+                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.tinyPlus,                                           color: colorScheme.onSurfaceVariant,                                         )),
+                ),
+            ],
+          ),
+        ),
+        _c(Text(r.salesRep)),
+        _c(
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${CurrencyFormatter.formatNumber(r.netQtyCases.round())} كرتونة',
+                style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontWeight: FontWeight.w800,                                         fontSize: M3FontSize.bodySmallPlus,                                       )),
+              ),
+              Text(
+                '${CurrencyFormatter.formatNumber(unitsSupplied)} قطعة (شد ${r.unitsPerCarton > 0 ? r.unitsPerCarton : 12})',
+                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.tinyPlus,                                         fontWeight: FontWeight.w700,                                         color: M3StatusColors.of(context).accents.teal,                                       )),
+              ),
+            ],
+          ),
+        ),
+        _c(
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                'فعلي: ${CurrencyFormatter.formatEGP(actualCasePrice)}',
+                style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontWeight: FontWeight.w800,                                         fontSize: M3FontSize.bodySmall,                                       )),
+              ),
+              if (r.officialCartonExclVatEgp > 0)
+                Text(
+                  r.effectiveDiscountPct > 0
+                      ? 'كارتة: ${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp)} (خصم ${r.effectiveDiscountPct.toStringAsFixed(1)}%)'
+                      : 'كارتة: ${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp)}',
+                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.tinyPlus,                                           color: colorScheme.onSurfaceVariant,                                         )),
+                ),
+              if (r.officialCartonExclVatEgp > 0 &&
+                  r.effectiveDiscountPct <= 0 &&
+                  r.pricingWaveStatus.isNotEmpty)
+                Text(
+                  r.pricingWaveStatus,
+                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.tinyPlus, fontWeight: FontWeight.w200,                                           color: colorScheme.onSurfaceVariant,                                         )),
+                ),
+            ],
+          ),
+        ),
+        _c(
+          Text(
+            CurrencyFormatter.formatEGP(r.netValueEgp),
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: colorScheme.primary,
+            ),
+          ),
+        ),
+        _c(
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                CurrencyFormatter.formatEGP(grossInclVat),
+                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontWeight: FontWeight.w900,                                         color: M3StatusColors.of(context).accents.tealStrong,                                         fontSize: M3FontSize.bodySmallPlus,                                       )),
+              ),
+              Text(
+                'ضريبة 14%: ${CurrencyFormatter.formatEGP(vatAmount)}',
+                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.tinyPlus,                                         color: colorScheme.onSurfaceVariant,                                       )),
+              ),
+            ],
+          ),
+        ),
+        _c(Text('${r.weightTons.toStringAsFixed(2)} طن')),
+        _c(
+          Tooltip(
+            message: r.sourceFilename.isNotEmpty
+                ? r.sourceFilename
+                : 'Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx',
+            child: Text(
+              _sheetShortName(r.sourceFilename.isNotEmpty
+                  ? r.sourceFilename
+                  : 'Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx'),
+              style: M3TextVariants.denseLabel.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
+          ),
+        ),
+      ];
+  }
+
+  Widget _twoLineHeader(BuildContext context, String title, String subtitle) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(title),
+        Text(
+          subtitle,
+          style: theme.textTheme.labelSmall?.copyWith(
+            fontWeight: FontWeight.w100,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// First word of a sheet file name (split on _ - space .), max 8 chars.
+  String _sheetShortName(String name) {
+    final first = name.trim().split(RegExp(r'[_\-\s.]+')).firstWhere(
+          (w) => w.isNotEmpty,
+          orElse: () => name,
+        );
+    return first.length > 8 ? '${first.substring(0, 8)}…' : first;
+  }
+
+  String _chainNameAr(String chain) {
+    final c = chain.toLowerCase();
+    if (c.contains('fathalla') || chain.contains('فتح الله')) return 'فتح الله';
+    if (c.contains('gomla') || chain.contains('جملة')) return 'جملة ماركت';
+    if (c.contains('carrefour') || chain.contains('كارفور')) return 'كارفور';
+    return chain;
   }
 
   Widget _buildWaterfallMetricPill(
@@ -925,10 +1350,10 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                 ],
               ),
               const SizedBox(height: 10.0),
-              Wrap(
-                spacing: 10.0,
-                runSpacing: 10.0,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   _buildWaterfallMetricPill(
                     context,
@@ -938,25 +1363,30 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     accentColor: M3StatusColors.of(context).accents.neutral,
                     icon: Icons.price_check_rounded,
                   ),
+                  const SizedBox(width: 10.0),
                   Icon(
                     Icons.remove_circle_outline_rounded,
                     size: 18.0,
                     color: colorScheme.onSurfaceVariant,
                   ),
+                  const SizedBox(width: 10.0),
                   _buildWaterfallMetricPill(
                     context,
                     labelAr: '2. إجمالي الخصم التجاري الممنوح للسلسلة',
                     valueText:
                         '${CurrencyFormatter.formatCompactEGP(discountGranted)} (${discountPct.toStringAsFixed(1)}%)',
-                    subText: 'خصم فاتورة + خصم إضافي (10% + 5%)',
+                    subText:
+                        'خصم فعلي محسوب من الفرق بين السعر الرسمي وصافي الفاتورة: ${discountPct.toStringAsFixed(1)}%',
                     accentColor: M3StatusColors.of(context).accents.alert,
                     icon: Icons.discount_rounded,
                   ),
+                  const SizedBox(width: 10.0),
                   Icon(
                     Icons.drag_handle_rounded,
                     size: 18.0,
                     color: colorScheme.onSurfaceVariant,
                   ),
+                  const SizedBox(width: 10.0),
                   _buildWaterfallMetricPill(
                     context,
                     labelAr: '3. صافي التوريد الفعلي (غير شامل الضريبة)',
@@ -966,11 +1396,13 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     accentColor: colorScheme.primary,
                     icon: Icons.local_shipping_rounded,
                   ),
+                  const SizedBox(width: 10.0),
                   Icon(
                     Icons.add_circle_outline_rounded,
                     size: 18.0,
                     color: colorScheme.onSurfaceVariant,
                   ),
+                  const SizedBox(width: 10.0),
                   _buildWaterfallMetricPill(
                     context,
                     labelAr: '4. ضريبة القيمة المضافة (14% VAT)',
@@ -979,11 +1411,13 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     accentColor: M3StatusColors.of(context).accents.purple,
                     icon: Icons.percent_rounded,
                   ),
+                  const SizedBox(width: 10.0),
                   Icon(
-                    Icons.arrow_back_rounded,
+                    AppIcons.arrowForward,
                     size: 18.0,
                     color: colorScheme.onSurfaceVariant,
                   ),
+                  const SizedBox(width: 10.0),
                   _buildWaterfallMetricPill(
                     context,
                     labelAr: '5. إجمالي الفواتير (شامل ضريبة 14%)',
@@ -993,6 +1427,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                     icon: Icons.account_balance_wallet_rounded,
                   ),
                 ],
+                ),
               ),
             ],
           ),
@@ -1160,7 +1595,7 @@ onChanged: m3Legacy<int>((v) {
                   padding: EdgeInsets.all(48.0),
                   child: Center(child: CircularProgressIndicator()),
                 )
-              : _data.records.isEmpty
+              : _records.isEmpty
                   ? Padding(
                       padding: const EdgeInsets.all(48.0),
                       child: Center(
@@ -1176,222 +1611,7 @@ onChanged: m3Legacy<int>((v) {
                       controller: _recordsTableScrollController,
                       showSwipeHint: true,
                       padding: const EdgeInsets.all(16.0),
-                      child: DataTable(
-                        headingRowColor: WidgetStatePropertyAll(
-                          colorScheme.surfaceContainerHigh.withOpacity(0.5),
-                        ),
-                        columns: const [
-                          DataColumn(label: Text('الفترة (Period)')),
-                          DataColumn(label: Text('السلسلة / الفرع')),
-                          DataColumn(label: Text('اسم الصنف وهوية الكارتة (SKU / ID Card)')),
-                          DataColumn(label: Text('العلامة / القسم')),
-                          DataColumn(label: Text('مندوب المبيعات')),
-                          DataColumn(
-                            numeric: true,
-                            label: Text('الشد والكمية (كرتونة / قطعة)'),
-                          ),
-                          DataColumn(
-                            numeric: true,
-                            label: Text('سعر الكرتونة (فعلي vs كارتة)'),
-                          ),
-                          DataColumn(
-                            numeric: true,
-                            label: Text('صافي التوريد (غير شامل الضريبة)'),
-                          ),
-                          DataColumn(
-                            numeric: true,
-                            label: Text('الإجمالي شامل 14% ضريبة'),
-                          ),
-                          DataColumn(
-                            numeric: true,
-                            label: Text('الوزن (Tons)'),
-                          ),
-                          DataColumn(
-                            label: Text('الشيت المصدري (Sheet)'),
-                          ),
-                        ],
-                        rows: _data.records.map((r) {
-                          final hasIdCard = r.itemCode.isNotEmpty || r.barcode.isNotEmpty;
-                          final unitsSupplied = r.totalUnitsSupplied > 0
-                              ? r.totalUnitsSupplied
-                              : (r.netQtyCases * (r.unitsPerCarton > 0 ? r.unitsPerCarton : 12)).round();
-                          final grossInclVat = r.grossValueInclVatEgp > 0
-                              ? r.grossValueInclVatEgp
-                              : r.netValueEgp * 1.14;
-                          final vatAmount = r.vatAmountEgp > 0
-                              ? r.vatAmountEgp
-                              : r.netValueEgp * 0.14;
-                          final actualCasePrice = r.actualCasePriceExclEgp > 0
-                              ? r.actualCasePriceExclEgp
-                              : (r.netQtyCases > 0 ? r.netValueEgp / r.netQtyCases : 0.0);
-
-                          return DataRow(
-                            cells: [
-                              DataCell(
-                                Text(
-                                  '${r.monthAr.isNotEmpty ? r.monthAr : r.monthNum} ${r.year}',
-                                  style: const TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              DataCell(
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8.0,
-                                        vertical: 2.0,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: colorScheme.primaryContainer.withOpacity(0.6),
-                                        borderRadius: M3Shape.radiusFull,
-                                      ),
-                                      child: Text(
-                                        r.retailerChain.toUpperCase(),
-                                        style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.tinyPlus,                                           fontWeight: FontWeight.w800,                                           color: colorScheme.onPrimaryContainer,                                         )),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2.0),
-                                    Text(
-                                      r.customerName.isNotEmpty
-                                          ? '${r.governorate} • ${r.customerName}'
-                                          : r.governorate,
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.labelSmallPlus,                                         color: colorScheme.onSurfaceVariant,                                       )),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              DataCell(
-                                InkWell(
-                                  borderRadius: M3Shape.radiusSm,
-                                  onTap: () => _openProductIdCard(
-                                    itemCode: r.itemCode,
-                                    barcode: r.barcode,
-                                    skuName: r.itemName,
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 4.0),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Flexible(
-                                              child: Text(
-                                                r.itemName,
-                                                style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                                   fontWeight: FontWeight.w800,                                                   fontSize: M3FontSize.bodySmallPlus,                                                 )),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 4.0),
-                                            Icon(
-                                              Icons.badge_rounded,
-                                              size: 15.0,
-                                              color: colorScheme.primary,
-                                            ),
-                                          ],
-                                        ),
-                                        if (hasIdCard)
-                                          Text(
-                                            'كود: ${r.itemCode.isNotEmpty ? r.itemCode : "-"} • باركود: ${r.barcode.isNotEmpty ? r.barcode : "-"}',
-                                            style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                               fontFamily: 'monospace',                                               fontSize: M3FontSize.tinyPlus,                                               fontWeight: FontWeight.w700,                                               color: colorScheme.primary,                                             )),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '${r.brand} • ${r.subCategory}',
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontWeight: FontWeight.w700,                                         fontSize: M3FontSize.bodySmall,                                       )),
-                                    ),
-                                    if (r.departmentAr.isNotEmpty)
-                                      Text(
-                                        r.departmentAr,
-                                        style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.tinyPlus,                                           color: colorScheme.onSurfaceVariant,                                         )),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              DataCell(Text(r.salesRep)),
-                              DataCell(
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      '${CurrencyFormatter.formatNumber(r.netQtyCases.round())} كرتونة',
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontWeight: FontWeight.w800,                                         fontSize: M3FontSize.bodySmallPlus,                                       )),
-                                    ),
-                                    Text(
-                                      '${CurrencyFormatter.formatNumber(unitsSupplied)} قطعة (شد ${r.unitsPerCarton > 0 ? r.unitsPerCarton : 12})',
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.tinyPlus,                                         fontWeight: FontWeight.w700,                                         color: M3StatusColors.of(context).accents.teal,                                       )),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              DataCell(
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      'فعلي: ${CurrencyFormatter.formatEGP(actualCasePrice)}',
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontWeight: FontWeight.w800,                                         fontSize: M3FontSize.bodySmall,                                       )),
-                                    ),
-                                    if (r.officialCartonExclVatEgp > 0)
-                                      Text(
-                                        'كارتة: ${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp)} (${r.effectiveDiscountPct > 0 ? "خصم ${r.effectiveDiscountPct.toStringAsFixed(1)}%" : r.pricingWaveStatus})',
-                                        style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.tinyPlus,                                           color: colorScheme.onSurfaceVariant,                                         )),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              DataCell(
-                                Text(
-                                  CurrencyFormatter.formatEGP(r.netValueEgp),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: colorScheme.primary,
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      CurrencyFormatter.formatEGP(grossInclVat),
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontWeight: FontWeight.w900,                                         color: M3StatusColors.of(context).accents.tealStrong,                                         fontSize: M3FontSize.bodySmallPlus,                                       )),
-                                    ),
-                                    Text(
-                                      'ضريبة 14%: ${CurrencyFormatter.formatEGP(vatAmount)}',
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.tinyPlus,                                         color: colorScheme.onSurfaceVariant,                                       )),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              DataCell(Text('${r.weightTons.toStringAsFixed(2)} طن')),
-                              DataCell(
-                                Text(
-                                  r.sourceFilename.isNotEmpty
-                                      ? r.sourceFilename
-                                      : 'Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx',
-                                  style: M3TextVariants.denseLabel.copyWith(color: colorScheme.onSurfaceVariant),
-                                ),
-                              ),
-                            ],
-                          );
-                        }).toList(),
-                      ),
+                      child: _buildVirtualSellInTable(context, colorScheme),
                     ),
         ),
       ],
@@ -1663,12 +1883,19 @@ onChanged: m3Legacy<int>((v) {
               context,
               titleAr: 'ربح السلسلة المحقق وهامش الربح الفعلي (Retailer Gross Margin)',
               titleEn: 'Chain POS Revenue − Factory Cost Excl. VAT',
-              value:
-                  '${CurrencyFormatter.formatCompactEGP(d.matchedChainGrossMarginEgp)} (هامش ${d.matchedChainGrossMarginPct.toStringAsFixed(1)}%)',
-              subtitle:
-                  'الفرق الفعلي بين سعر بيع الكاشير للمستهلك وتكلفة التوريد الصافية من كارتة الأصناف',
+              value: d.matchedSellOutPosValueEgp > 0 && d.matchedSellOutValueWithCostEgp <= 0
+                  ? '—'
+                  : d.matchedChainGrossMarginEgp < 0
+                      ? 'خسارة −${CurrencyFormatter.formatCompactEGP(d.matchedChainGrossMarginEgp.abs())} (هامش −${d.matchedChainGrossMarginPct.abs().toStringAsFixed(1)}%)'
+                      : '${CurrencyFormatter.formatCompactEGP(d.matchedChainGrossMarginEgp)} (هامش ${d.matchedChainGrossMarginPct.toStringAsFixed(1)}%)',
+              subtitle: d.matchedMissingCostSellOutEgp > 0
+                  ? 'محسوب على المبيعات اللي ليها تكلفة حقيقية فقط • مستبعد ${CurrencyFormatter.formatCompactEGP(d.matchedMissingCostSellOutEgp)} مبيعات بدون سعر تكلفة'
+                  : 'الفرق الفعلي بين سعر بيع الكاشير للمستهلك وتكلفة التوريد الصافية من كارتة الأصناف',
               icon: Icons.paid_rounded,
-              color: M3StatusColors.of(context).accents.positiveStrong,
+              // A real loss (negative profit) is shown in the theme error colour.
+              color: d.matchedChainGrossMarginEgp < 0
+                  ? Theme.of(context).colorScheme.error
+                  : M3StatusColors.of(context).accents.positiveStrong,
             );
             final yoySign = d.matchedYoyValueGrowthPct >= 0 ? '+' : '';
             final yoyUnitsSign = d.matchedYoyUnitsGrowthPct >= 0 ? '+' : '';
@@ -1701,6 +1928,11 @@ onChanged: m3Legacy<int>((v) {
             );
           },
         ),
+
+        M3Spacing.gapSM,
+
+        // 1.C Items with no real factory cost (needed from Adeco) — never estimated.
+        _buildMissingCostSection(context, colorScheme, d),
 
         M3Spacing.gapMD,
 
@@ -1994,20 +2226,24 @@ onChanged: m3Legacy<String>((v) {
                                 ),
                         ),
                         DataCell(
-                          m.hasActualSellOut
+                          m.hasActualSellOut && m.sellOutFactoryCostInclVatEgp > 0
                               ? Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      CurrencyFormatter.formatEGP(m.chainGrossMarginEgp),
+                                      m.chainGrossMarginEgp < 0
+                                          ? '−${CurrencyFormatter.formatEGP(m.chainGrossMarginEgp.abs())}'
+                                          : CurrencyFormatter.formatEGP(m.chainGrossMarginEgp),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w800,
-                                        color: M3StatusColors.of(context).accents.positiveStrong,
+                                        color: m.chainGrossMarginEgp < 0
+                                            ? colorScheme.error
+                                            : M3StatusColors.of(context).accents.positiveStrong,
                                       ),
                                     ),
                                     Text(
-                                      'هامش السلسلة: ${m.chainGrossMarginPct.toStringAsFixed(1)}%',
+                                      'هامش السلسلة: ${m.chainGrossMarginPct < 0 ? '−' : ''}${m.chainGrossMarginPct.abs().toStringAsFixed(1)}%',
                                       style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.tinyPlus,                                         fontWeight: FontWeight.w700,                                         color: M3StatusColors.of(context).accents.positive,                                       )),
                                     ),
                                   ],
@@ -3266,6 +3502,143 @@ onChanged: m3Legacy<int>((v) {
     );
   }
 
+  void _exportMissingCostItems(List<MissingCostItemModel> items) {
+    final headers = <String>[
+      'كود الصنف',
+      'الباركود',
+      'اسم الصنف',
+      'السلاسل',
+      'القطع المباعة',
+      'قيمة المبيعات (ج.م)',
+      'السبب',
+      'كود الكارتة',
+      'اسم الكارتة',
+      'سعر القطعة من أدكو (مطلوب)',
+      'شد الكرتونة (مطلوب)',
+    ];
+    final rows = items
+        .map((i) => <dynamic>[
+              i.itemCode,
+              i.barcode,
+              i.skuName,
+              i.chains.join(' / '),
+              i.unitsSold,
+              i.salesValueEgp.toStringAsFixed(2),
+              i.reasonAr,
+              i.masterItemCode,
+              i.masterName,
+              '',
+              '',
+            ])
+        .toList();
+    final csvData = ExcelExportService.generateCsv(headers: headers, rows: rows);
+    ExcelExportService.downloadCsv(
+      'tashil_missing_cost_items_${DateTime.now().millisecondsSinceEpoch}.csv',
+      csvData,
+    );
+    M3Feedback.showSuccess(context, 'تم تصدير ${items.length} صنف بدون سعر تكلفة');
+  }
+
+  /// Flagged list of Sell-Out items with no real factory cost. Their cost and
+  /// margin show "—" and are excluded from the totals until Adeco sends prices.
+  Widget _buildMissingCostSection(
+    BuildContext context,
+    ColorScheme colorScheme,
+    CPFRDashboardModel d,
+  ) {
+    final status = M3StatusColors.of(context);
+    final theme = Theme.of(context);
+    final items = d.missingCostItems;
+    final totalValue = items.fold<double>(0.0, (s, i) => s + i.salesValueEgp);
+    final totalUnits = items.fold<int>(0, (s, i) => s + i.unitsSold);
+    final hasItems = items.isNotEmpty;
+    final fg = hasItems ? status.onWarningContainer : colorScheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.all(14.0),
+      decoration: BoxDecoration(
+        color: hasItems ? status.warningContainer : colorScheme.surfaceContainerLow,
+        borderRadius: M3Shape.radiusLg,
+        border: Border.all(
+          color: hasItems ? status.warning : colorScheme.outlineVariant.withOpacity(0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(hasItems ? AppIcons.warning : AppIcons.success, color: hasItems ? status.warning : status.success),
+              const SizedBox(width: 8.0),
+              Expanded(
+                child: Text(
+                  hasItems
+                      ? 'أصناف بدون سعر تكلفة حقيقي (${items.length} صنف) — مطلوب أسعارها من أدكو'
+                      : 'كل الأصناف المباعة ليها سعر تكلفة حقيقي',
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800, color: fg),
+                ),
+              ),
+              if (hasItems)
+                M3Button.tonal(
+                  label: 'تصدير Excel لأدكو',
+                  icon: AppIcons.fileDownload,
+                  onPressed: () => _exportMissingCostItems(items),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6.0),
+          Text(
+            hasItems
+                ? 'مفيش تقدير: التكلفة والربح لهذه الأصناف فاضيين (—) ومستبعدين من الإجماليات. مبيعاتها ${CurrencyFormatter.formatCompactEGP(totalValue)} (${CurrencyFormatter.formatNumber(totalUnits)} قطعة).'
+                : 'التكلفة بتيجي من شيت الكاشير أو كارتة الأصناف فقط، من غير أي تقدير.',
+            style: theme.textTheme.bodySmall?.copyWith(color: fg),
+          ),
+          if (hasItems) ...[
+            const SizedBox(height: 10.0),
+            TableScrollContainer(
+              child: DataTable(
+                headingRowHeight: 40.0,
+                dataRowMinHeight: 40.0,
+                dataRowMaxHeight: 56.0,
+                columns: const [
+                  DataColumn(label: Text('الصنف')),
+                  DataColumn(label: Text('الكود / الباركود')),
+                  DataColumn(label: Text('السلاسل')),
+                  DataColumn(label: Text('القطع'), numeric: true),
+                  DataColumn(label: Text('المبيعات'), numeric: true),
+                  DataColumn(label: Text('التكلفة / الربح')),
+                  DataColumn(label: Text('السبب')),
+                ],
+                rows: items
+                    .take(50)
+                    .map((i) => DataRow(cells: [
+                          DataCell(Text(i.skuName)),
+                          DataCell(Text(
+                            [i.itemCode, i.barcode].where((e) => e.isNotEmpty).join(' • '),
+                            textDirection: TextDirection.ltr,
+                          )),
+                          DataCell(Text(i.chains.join('، '))),
+                          DataCell(Text(CurrencyFormatter.formatNumber(i.unitsSold))),
+                          DataCell(Text(CurrencyFormatter.formatEGP(i.salesValueEgp))),
+                          const DataCell(Text('—')),
+                          DataCell(Text(i.reasonAr)),
+                        ]))
+                    .toList(),
+              ),
+            ),
+            if (items.length > 50)
+              Padding(
+                padding: const EdgeInsets.only(top: 6.0),
+                child: Text(
+                  'معروض أعلى 50 صنف حسب المبيعات — القائمة الكاملة في ملف Excel',
+                  style: theme.textTheme.bodySmall?.copyWith(color: fg),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildFourCardResponsiveLayout(
     double maxWidth,
     Widget card1,
@@ -3407,7 +3780,7 @@ onChanged: m3Legacy<int>((v) {
 /// that have a real basis (sell-out units and a factory cost); no data is
 /// inferred for rows without one.
 bool matchesSellInMarginFilter(SKUBranchInventoryModel i, String filter) {
-  final hasBasis = i.sellOutUnits > 0 && i.factoryCartonCost > 0;
+  final hasBasis = i.sellOutUnits > 0 && i.factoryCartonCost > 0 && !i.factoryCostMissing;
   switch (filter) {
     case 'healthy':
       return hasBasis && i.retailerMarginPct >= 10.0;
@@ -3420,5 +3793,73 @@ bool matchesSellInMarginFilter(SKUBranchInventoryModel i, String filter) {
     case 'all':
     default:
       return true;
+  }
+}
+
+
+/// One code line (icon on the reading-start side, label, value). Hovering the
+/// line reveals a copy action; clicking it copies the value.
+class _HoverCopyCode extends StatefulWidget {
+  const _HoverCopyCode({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  State<_HoverCopyCode> createState() => _HoverCopyCodeState();
+}
+
+class _HoverCopyCodeState extends State<_HoverCopyCode> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final hasValue = widget.value.isNotEmpty;
+    final style = Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(
+          fontFamily: 'monospace',
+          fontSize: M3FontSize.tinyPlus,
+          fontWeight: FontWeight.w700,
+          color: cs.primary,
+        ));
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      cursor: hasValue ? SystemMouseCursors.click : MouseCursor.defer,
+      child: GestureDetector(
+        onTap: hasValue
+            ? () {
+                Clipboard.setData(ClipboardData(text: widget.value));
+                M3Feedback.showSuccess(context, 'تم نسخ ${widget.label}');
+              }
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 1.0),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(widget.icon, size: 12.0, color: cs.primary),
+              const SizedBox(width: 4.0),
+              Text(
+                '${widget.label}: ${hasValue ? widget.value : "-"}',
+                style: style,
+              ),
+              if (hasValue && _hover) ...[
+                const SizedBox(width: 4.0),
+                Tooltip(
+                  message: 'نسخ',
+                  child: Icon(AppIcons.copy, size: 12.0, color: cs.primary),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
