@@ -48,6 +48,8 @@ type Sink interface {
 	WriteSellIn(ctx context.Context, meta Meta, records []domain.SellInRecord) *Result
 	WriteProductMaster(ctx context.Context, meta Meta, summary *domain.ProductMasterSummaryResponse) *Result
 	DeleteBatch(ctx context.Context, kind Kind, meta Meta) *Result
+	// DeleteTenant removes every row of one tenant from the kind's table (clear-tenant endpoint).
+	DeleteTenant(ctx context.Context, kind Kind, tenantID string) *Result
 }
 
 // Config controls the BigQuery sink.
@@ -88,6 +90,9 @@ func (Noop) WriteProductMaster(context.Context, Meta, *domain.ProductMasterSumma
 	return &Result{Status: StatusDisabled}
 }
 func (Noop) DeleteBatch(context.Context, Kind, Meta) *Result { return &Result{Status: StatusDisabled} }
+func (Noop) DeleteTenant(context.Context, Kind, string) *Result {
+	return &Result{Status: StatusDisabled}
+}
 
 // broken is returned when the sink is enabled but the client could not be created: every write fails loudly.
 type broken struct{ err error }
@@ -107,6 +112,9 @@ func (b broken) WriteProductMaster(context.Context, Meta, *domain.ProductMasterS
 	return b.fail(TableProductMaster)
 }
 func (b broken) DeleteBatch(_ context.Context, k Kind, _ Meta) *Result {
+	return b.fail(TableForKind(k).Name)
+}
+func (b broken) DeleteTenant(_ context.Context, k Kind, _ string) *Result {
 	return b.fail(TableForKind(k).Name)
 }
 
@@ -171,6 +179,32 @@ func (s *BigQuerySink) DeleteBatch(ctx context.Context, kind Kind, meta Meta) *R
 		return s.runQuery(ctx, sql, baseParams(meta))
 	}()
 	s.finish(ctx, res, err, start, kind, "delete", meta)
+	return res
+}
+
+// DeleteTenantSQL is the statement used by DeleteTenant; it is always scoped to one tenant.
+func DeleteTenantSQL(tableRef string) string {
+	return "DELETE FROM " + tableRef + " WHERE tenant_id = @tenant_id"
+}
+
+// DeleteTenant removes every row of one tenant. An empty or wildcard tenant is refused.
+func (s *BigQuerySink) DeleteTenant(ctx context.Context, kind Kind, tenantID string) *Result {
+	start := time.Now()
+	spec := TableForKind(kind)
+	res := &Result{Status: StatusOK, Table: spec.Name}
+	clean := strings.ToLower(strings.TrimSpace(tenantID))
+	if clean == "" || clean == "all" || clean == "*" {
+		res.Status = StatusSkipped
+		return res
+	}
+	meta := Meta{TenantID: NormalizeTenant(tenantID)}
+	err := func() error {
+		if err := s.ensureTable(ctx, spec); err != nil {
+			return err
+		}
+		return s.runQuery(ctx, DeleteTenantSQL(s.ref(spec.Name)), []bigquery.QueryParameter{{Name: "tenant_id", Value: meta.TenantID}})
+	}()
+	s.finish(ctx, res, err, start, kind, "delete_tenant", meta)
 	return res
 }
 

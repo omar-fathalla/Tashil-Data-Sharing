@@ -2,6 +2,8 @@ package firestore
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"time"
@@ -56,7 +58,10 @@ func (c *Client) GetDataVersion(ctx context.Context, tenantID, kind string) (str
 func (c *Client) BumpDataVersion(ctx context.Context, tenantID, kind string) (string, error) {
 	id := dataVersionDocID(tenantID, kind)
 	now := time.Now().UTC()
-	v := strconv.FormatInt(now.UnixNano(), 10)
+	// The random suffix keeps two bumps in the same clock tick (coarse clocks, or two instances) distinct.
+	suffix := make([]byte, 4)
+	_, _ = rand.Read(suffix)
+	v := strconv.FormatInt(now.UnixNano(), 10) + "-" + hex.EncodeToString(suffix)
 	if c.fsClient != nil {
 		if _, err := c.fsClient.Collection(dataVersionsCollection).Doc(id).Set(ctx, dataVersionDoc{Version: v, UpdatedAt: now}); err != nil {
 			return "", fmt.Errorf("firestore bump data version: %w", err)

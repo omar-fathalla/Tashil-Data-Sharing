@@ -52,6 +52,13 @@ func (f *fakeSink) DeleteBatch(_ context.Context, k bqsink.Kind, m bqsink.Meta) 
 	return f.res(bqsink.TableForKind(k).Name, 0)
 }
 
+func (f *fakeSink) DeleteTenant(_ context.Context, k bqsink.Kind, tenant string) *bqsink.Result {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.deletes = append(f.deletes, bqsink.Meta{TenantID: tenant})
+	return f.res(bqsink.TableForKind(k).Name, 0)
+}
+
 func newTestProcessor(t *testing.T, dir string) *Processor {
 	t.Helper()
 	agent := gemini.NewAgent("", "gemini-3.8-flash", true)

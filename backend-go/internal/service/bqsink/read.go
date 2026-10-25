@@ -81,3 +81,69 @@ func (s *BigQuerySink) ReadSellIn(ctx context.Context, tenantID string) ([]domai
 	}
 	return out, nil
 }
+
+// SellOutReadSQL (tableRef already back-quoted) loads every sell-out row of one tenant in a stable order.
+func SellOutReadSQL(tableRef string) string {
+	return "SELECT * FROM " + tableRef + " WHERE tenant_id = @tenant_id ORDER BY ingested_at, record_id"
+}
+
+// rowToJSONMap drops sink-only meta columns and renders timestamps so the row can be JSON-decoded
+// into a domain struct (tenant_id and ingested_at are kept: they exist on the structs too).
+func rowToJSONMap(row map[string]bigquery.Value) map[string]interface{} {
+	m := make(map[string]interface{}, len(row))
+	for k, v := range row {
+		switch k {
+		case ColBatchID, ColArchiveID, ColSourceFile, ColPartitionDate, ColPeriodMonth, ColChainKey:
+			continue
+		}
+		if t, ok := v.(time.Time); ok {
+			m[k] = t.UTC().Format(time.RFC3339Nano)
+			continue
+		}
+		m[k] = v
+	}
+	return m
+}
+
+// DecodeSellOutRow converts one sell_out_facts row back to a domain fact.
+func DecodeSellOutRow(row map[string]bigquery.Value) (domain.SellOutFact, error) {
+	b, err := json.Marshal(rowToJSONMap(row))
+	if err != nil {
+		return domain.SellOutFact{}, err
+	}
+	var f domain.SellOutFact
+	if err := json.Unmarshal(b, &f); err != nil {
+		return domain.SellOutFact{}, fmt.Errorf("decode sell_out row: %w", err)
+	}
+	return f, nil
+}
+
+// ReadSellOut loads all durable sell-out facts of a tenant. A missing table reads as zero rows.
+func (s *BigQuerySink) ReadSellOut(ctx context.Context, tenantID string) ([]domain.SellOutFact, error) {
+	q := s.client.Query(SellOutReadSQL(s.ref(TableSellOut)))
+	q.Parameters = []bigquery.QueryParameter{{Name: "tenant_id", Value: NormalizeTenant(tenantID)}}
+	it, err := q.Read(ctx)
+	if err != nil {
+		if strings.Contains(err.Error(), "notFound") || strings.Contains(err.Error(), "Not found: Table") {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read sell_out_facts: %w", err)
+	}
+	var out []domain.SellOutFact
+	for {
+		var row map[string]bigquery.Value
+		err := it.Next(&row)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read sell_out_facts: %w", err)
+		}
+		f, err := DecodeSellOutRow(row)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, nil
+}

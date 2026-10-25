@@ -50,3 +50,40 @@ func TestSellInReadSQLFiltersTenantAndKeepsUploadOrder(t *testing.T) {
 		t.Fatalf("double back-quotes: %s", sql)
 	}
 }
+
+func TestSellOutRowRoundTrip(t *testing.T) {
+	now := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
+	in := domain.SellOutFact{RecordID: "fact_x", TenantID: "tenant-adeco", RetailerChain: "fathalla", StoreID: "s1", StoreName: "فرع 1",
+		ItemCode: "FGCL-0550-0001", Barcode: "6223000236024", SKUName: "كلوريل", IsOwnBrand: true, UnitsPerCarton: 12,
+		QuantitySold: 7, CartonsSold: 0.58, NetRevenue: 110.6, UnitPrice: 15.8, TransactionDate: "2026-03-14",
+		IngestionBatchID: "batch_1", IngestedAt: now}
+	plan := PlanSellOut(Meta{TenantID: "adeco", BatchID: "b9", SourceFile: "2026 out.xlsx"}, []domain.SellOutFact{in}, ModeReplacePeriods, now)
+	row := map[string]bigquery.Value{}
+	for k, v := range plan.Rows[0] {
+		row[k] = v
+	}
+	row[ColIngestedAt] = now
+	out, err := DecodeSellOutRow(row)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != in {
+		t.Fatalf("round trip mismatch:\n in=%+v\nout=%+v", in, out)
+	}
+}
+
+func TestDeleteTenantIsAlwaysTenantScoped(t *testing.T) {
+	sql := DeleteTenantSQL("`p.d.sell_out_facts`")
+	if sql != "DELETE FROM `p.d.sell_out_facts` WHERE tenant_id = @tenant_id" {
+		t.Fatalf("unexpected sql: %s", sql)
+	}
+	s := &BigQuerySink{}
+	for _, tenant := range []string{"", "all", "*", " ALL "} {
+		if res := s.DeleteTenant(nil, KindSellOut, tenant); res.Status != StatusSkipped {
+			t.Fatalf("tenant %q must be refused, got %+v", tenant, res)
+		}
+	}
+	if res := (Noop{}).DeleteTenant(nil, KindSellIn, "tenant-adeco"); res.Status != StatusDisabled {
+		t.Fatalf("noop: %+v", res)
+	}
+}

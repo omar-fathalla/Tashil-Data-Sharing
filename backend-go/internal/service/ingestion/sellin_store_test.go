@@ -131,7 +131,7 @@ func TestSellInDeleteConvergesToEmpty(t *testing.T) {
 	table.mu.Lock()
 	table.rows = nil
 	table.mu.Unlock()
-	a.sinkDeleteArchived(ctx, &ArchivedFile{ID: "x", TenantID: "tenant-adeco", FileName: "Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx", FileType: "sell-in"})
+	a.sinkDeleteArchived(ctx, &ArchivedFile{ID: "x", BatchID: "b1", TenantID: "tenant-adeco", FileName: "Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx", FileType: "sell_in"})
 	if changed, err := b.SyncSellInFromStore(ctx, "tenant-adeco", false); err != nil || !changed {
 		t.Fatalf("B should apply the delete: changed=%v err=%v", changed, err)
 	}

@@ -1,4 +1,4 @@
-// Command sellinverify checks that the durable Sell-In rows in BigQuery match what the server builds
+// Command sellinverify checks that the durable Sell-In and Sell-Out rows in BigQuery match what the server builds
 // in memory from the upload archive, and that loading them back (the multi-instance path) yields the
 // same totals. Read-only against BigQuery.
 //
@@ -39,6 +39,25 @@ func totals(recs []domain.SellInRecord) map[string]*tot {
 		m[k].value += r.NetValueEGP
 		m[k].qty += r.NetQtyCases
 		m[k].official += r.OfficialListValueExclEGP
+	}
+	return m
+}
+
+func sellOutTotals(facts []domain.SellOutFact) map[string]*tot {
+	m := map[string]*tot{}
+	for _, f := range facts {
+		month := f.TransactionDate
+		if len(month) >= 7 {
+			month = month[:7]
+		}
+		k := f.RetailerChain + "|" + month
+		if m[k] == nil {
+			m[k] = &tot{}
+		}
+		m[k].n++
+		m[k].value += f.NetRevenue
+		m[k].qty += float64(f.QuantitySold)
+		m[k].official += f.TotalFactoryCost
 	}
 	return m
 }
@@ -121,6 +140,19 @@ func main() {
 	}
 	reloaded := bqRepo.SellInRecordsSnapshot("tenant-adeco")
 	ok2 := compare("A = in-memory archive replay, B = memory after reload from BigQuery (re-enriched)", totals(mem), totals(reloaded))
+	// Sell-Out: archive replay vs BigQuery sell_out_facts vs memory after reload.
+	memOut := bqRepo.SellOutFactsSnapshot("tenant-adeco")
+	durableOut, err := bqs.ReadSellOut(ctx, "tenant-adeco")
+	if err != nil {
+		log.Fatal(err)
+	}
+	ok3 := compare("SELL-OUT A = in-memory archive replay, B = BigQuery sell_out_facts (raw); qty = units, official = factory cost", sellOutTotals(memOut), sellOutTotals(durableOut))
+	p.WithSellOutStore(bqs, nil)
+	if _, err := p.SyncSellOutFromStore(ctx, "tenant-adeco", true); err != nil {
+		log.Fatal(err)
+	}
+	ok4 := compare("SELL-OUT A = in-memory archive replay, B = memory after reload from BigQuery", sellOutTotals(memOut), sellOutTotals(bqRepo.SellOutFactsSnapshot("tenant-adeco")))
+	ok2 = ok2 && ok3 && ok4
 	if ok1 && ok2 {
 		fmt.Println("\nRESULT: MATCH")
 		return

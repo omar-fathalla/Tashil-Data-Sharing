@@ -46,6 +46,7 @@ func (p *Processor) sinkSellOut(ctx context.Context, meta bqsink.Meta, facts []d
 	defer cancel()
 	res := p.sink.WriteSellOut(c, meta, facts, mode)
 	logSinkFailure("sell-out", meta, res)
+	p.noteSellOutWritten(ctx, meta.TenantID, res)
 	return res
 }
 
@@ -86,8 +87,11 @@ func (p *Processor) sinkDeleteArchived(ctx context.Context, entry *ArchivedFile)
 	c, cancel := sinkCtx(ctx)
 	defer cancel()
 	res := p.sink.DeleteBatch(c, kind, meta)
-	if kind == bqsink.KindSellIn {
+	switch kind {
+	case bqsink.KindSellIn:
 		p.noteSellInWritten(ctx, meta.TenantID, res)
+	case bqsink.KindSellOut:
+		p.noteSellOutWritten(ctx, meta.TenantID, res)
 	}
 	if res.Failed() {
 		log.Printf("ERROR [ingestion] archive %s deleted from portal but its BigQuery rows were NOT removed: %s", entry.ID, res.Error)
