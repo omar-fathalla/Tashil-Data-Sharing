@@ -1,0 +1,122 @@
+# Production deploy on every push to main (backend → Cloud Run, web → Firebase Hosting).
+#
+# Auth: Workload Identity Federation, no JSON keys. The provider only accepts tokens from
+# omar-fathalla/Tashil-Data-Sharing on refs/heads/main, impersonating tashil-gh-deployer.
+#
+# Web version: CI never commits back to main (that would re-trigger this workflow). The version
+# shown in the sidebar is computed as  <tashil_web/deploy_version.txt> + <github.run_number>,
+# so it keeps increasing from the last manual deploy (v22). See docs/DEPLOY.md.
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: tashil-data-sharing
+  REGION: europe-west1
+  SERVICE: tashil-backend
+  WIF_PROVIDER: projects/564362209163/locations/global/workloadIdentityPools/github/providers/github
+  DEPLOYER_SA: tashil-gh-deployer@tashil-data-sharing.iam.gserviceaccount.com
+  FLUTTER_VERSION: "3.41.2"
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend-go/go.mod
+          cache-dependency-path: backend-go/go.sum
+      - name: go vet
+        run: go vet ./...
+      - name: go test
+        run: go test ./... -count=1 -timeout 20m
+
+  test-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tashil_web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: flutter analyze
+        run: flutter analyze
+      - name: flutter test
+        run: flutter test
+
+  deploy-backend:
+    needs: [test-backend, test-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Record git commit for /api/v1/version
+        run: echo "${GITHUB_SHA}" > backend-go/data/build_commit.txt
+      - name: Deploy to Cloud Run (from source, existing settings and env vars are kept)
+        working-directory: backend-go
+        run: |
+          gcloud run deploy "$SERVICE" --source . \
+            --region "$REGION" --project "$PROJECT_ID" --quiet
+      - name: Smoke check
+        run: |
+          url="$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT_ID" --format='value(status.url)')"
+          curl -fsS --retry 5 --retry-delay 10 "$url/api/v1/version"
+
+  deploy-web:
+    needs: [deploy-backend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Compute web version
+        id: ver
+        run: |
+          base="$(tr -dc '0-9' < tashil_web/deploy_version.txt)"
+          echo "version=$(( ${base:-0} + GITHUB_RUN_NUMBER ))" >> "$GITHUB_OUTPUT"
+      - name: Build web
+        working-directory: tashil_web
+        run: |
+          flutter pub get
+          flutter build web --release --dart-define=APP_VERSION="${{ steps.ver.outputs.version }}"
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+      - name: Deploy to Firebase Hosting
+        run: npx --yes firebase-tools@14 deploy --only hosting --project "$PROJECT_ID" --non-interactive
+      - name: Summary
+        run: echo "Deployed web v${{ steps.ver.outputs.version }} (commit ${GITHUB_SHA::7})" >> "$GITHUB_STEP_SUMMARY"
