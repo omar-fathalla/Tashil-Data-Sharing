@@ -19,6 +19,7 @@ import '../../pricing_compliance/presentation/screens/pricing_compliance_screen.
 import '../../store_benchmark/presentation/screens/store_matrix_screen.dart';
 import '../../cpfr_replenishment/presentation/screens/cpfr_dashboard_screen.dart';
 import '../../product_master/presentation/screens/product_master_screen.dart';
+import '../../data_quality/presentation/screens/data_quality_screen.dart';
 import '../../trade_marketing/presentation/screens/trade_marketing_roi_screen.dart';
 import 'desktop_sidebar.dart';
 
@@ -153,6 +154,14 @@ class _AppShellState extends State<AppShell> {
       shortLabel: 'Master',
       icon: Icons.qr_code_2_rounded,
       selectedIcon: Icons.qr_code_2_rounded,
+    ),
+    _NavDestinationSpec(
+      index: 11,
+      labelEn: 'Data Errors',
+      labelAr: 'الأخطاء',
+      shortLabel: 'Errors',
+      icon: AppIcons.dataQuality,
+      selectedIcon: AppIcons.dataQuality,
     ),
   ];
 
@@ -329,6 +338,10 @@ class _AppShellState extends State<AppShell> {
       ),
       ProductMasterScreen(
         key: ValueKey('product_master_$stateKey'),
+        apiClient: widget.apiClient,
+      ),
+      DataQualityScreen(
+        key: ValueKey('data_quality_$stateKey'),
         apiClient: widget.apiClient,
       ),
     ];

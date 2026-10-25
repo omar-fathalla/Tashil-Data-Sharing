@@ -1,0 +1,76 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/features/data_quality/data/data_quality_repository.dart';
+import 'package:tashil_web/features/data_quality/presentation/screens/data_quality_screen.dart';
+
+class _FakeSource implements DataQualityDataSource {
+  DataQualitySummary sum;
+  List<DataQualityIssue> list;
+  final List<String> calls = [];
+  _FakeSource(this.sum, this.list);
+
+  @override
+  Future<DataQualitySummary> summary() async => sum;
+
+  @override
+  Future<List<DataQualityIssue>> issues(DataQualityFilter f) async {
+    calls.add('issues:${f.status}');
+    return list;
+  }
+
+  @override
+  Future<DataQualityIssue> updateStatus(String id, String status, String reason) async {
+    calls.add('patch:$id:$status:$reason');
+    return list.first;
+  }
+}
+
+const _dup = DataQualityIssue(
+  id: 'a1', source: 'product_master', type: 'duplicate_barcode', typeLabel: 'باركود مكرر',
+  severity: kDqCritical, row: 299, itemCode: 'FGHC-0700-0214', barcode: '6223000233436', status: kDqOpen,
+);
+
+DataQualitySummary _s(int open, double pct, DateTime at) => DataQualitySummary(
+      types: [
+        DataQualityTypeSummary(source: 'product_master', type: 'duplicate_barcode', typeLabel: 'باركود مكرر',
+            severity: kDqCritical, total: 45, open: open, impactEgp: 1000),
+      ],
+      totalRows: 389, criticalRows: 38, cleanlinessPct: pct, open: open, updatedAt: at,
+    );
+
+void main() {
+  testWidgets('shows summary + table, ignore needs a reason, auto-refreshes on new version', (tester) async {
+    tester.view.physicalSize = const Size(1500, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final src = _FakeSource(_s(68, 90.23, DateTime.utc(2026, 10, 25, 9)), [_dup]);
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(body: DataQualityScreen(dataSource: src, pollInterval: const Duration(seconds: 1))),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('90.2%'), findsOneWidget);
+    expect(find.text('FGHC-0700-0214'), findsOneWidget);
+    expect(src.calls.first, 'issues:'); // default = open only
+
+    await tester.tap(find.byKey(const ValueKey('dq_status_a1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('dq_status_save')));
+    await tester.pumpAndSettle();
+    expect(find.text('السبب مطلوب عند التجاهل'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('dq_status_reason')), 'عرض بنفس الباركود');
+    await tester.tap(find.byKey(const ValueKey('dq_status_save')));
+    await tester.pumpAndSettle();
+    expect(src.calls, contains('patch:a1:$kDqIgnored:عرض بنفس الباركود'));
+
+    // backend re-ran checks: issue auto-resolved, page refreshes without a manual reload
+    src.sum = _s(66, 91.0, DateTime.utc(2026, 10, 25, 10));
+    src.list = const [];
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(find.text('91.0%'), findsOneWidget);
+    expect(find.byKey(const ValueKey('dq_empty')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox()); // dispose timer
+  });
+}

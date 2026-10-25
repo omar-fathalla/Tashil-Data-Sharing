@@ -1,3 +1,4 @@
+import '../../../core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../core/theme/m3_shape.dart';
@@ -104,6 +105,12 @@ class DesktopSidebar extends StatelessWidget {
         selectedIcon: Icons.qr_code_2_rounded,
         label: 'Product Master',
         labelAr: 'كارتة الأصناف',
+      ),
+      _NavDestination(
+        icon: AppIcons.dataQuality,
+        selectedIcon: AppIcons.dataQuality,
+        label: 'Errors',
+        labelAr: 'الأخطاء',
       ),
     ];
 
