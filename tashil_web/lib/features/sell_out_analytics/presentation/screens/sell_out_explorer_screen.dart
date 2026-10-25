@@ -731,16 +731,6 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
     final double totalCartonsSold = _recordsSummary.totalCartonsSold > 0
         ? _recordsSummary.totalCartonsSold
         : records.fold<double>(0.0, (acc, r) => acc + r.cartonsSold);
-    final double totalFactoryCost = _recordsSummary.totalFactoryCost > 0
-        ? _recordsSummary.totalFactoryCost
-        : records.fold<double>(0.0, (acc, r) => acc + r.totalFactoryCost);
-    final double totalGrossProfit = _recordsSummary.totalRetailerGrossProfit != 0
-        ? _recordsSummary.totalRetailerGrossProfit
-        : records.fold<double>(0.0, (acc, r) => acc + r.retailerGrossProfit);
-    final double avgMarginPct = _recordsSummary.avgRetailerMarginPct != 0
-        ? _recordsSummary.avgRetailerMarginPct
-        : (totalNetRevenue > 0 && totalGrossProfit != 0 ? (totalGrossProfit / totalNetRevenue) * 100.0 : 0.0);
-    final int totalTransactionsCount = _recordsSummary.totalCount > 0 ? _recordsSummary.totalCount : records.length;
     final int activeStoresCount = _recordsSummary.activeStoresCount > 0
         ? _recordsSummary.activeStoresCount
         : (_branchChartItems.isNotEmpty ? _branchChartItems.length : fallbackStores);
@@ -749,20 +739,6 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
         : (!hasSubFilters && _branchChartItems.length >= 30 && fallbackSkus < 100 ? 285 : fallbackSkus);
     final double avgBranchRevenue = activeStoresCount > 0 ? (totalNetRevenue / activeStoresCount) : 0.0;
 
-    final String topBranchRaw = _recordsSummary.topBranchName.isNotEmpty
-        ? _recordsSummary.topBranchName
-        : (_branchChartItems.isNotEmpty ? _branchChartItems.first.storeName : '—');
-    final String shortTopBranch = topBranchRaw
-        .replaceFirst('فرع فتح الله - ', '')
-        .replaceFirst('فتح الله جملة ماركت - ', '')
-        .replaceFirst('فتح الله - ', '');
-
-    final String yearBadgeAr = selectedDateRange != null
-        ? 'الفترة: ${_formatDate(selectedDateRange!.start)} إلى ${_formatDate(selectedDateRange!.end)}'
-        : (_selectedYear > 0 ? 'سنة $_selectedYear' : 'كل السنوات (2025–2026)');
-    final String dateSpanAr = (_recordsSummary.minDate.isNotEmpty && _recordsSummary.maxDate.isNotEmpty)
-        ? ' (${_recordsSummary.minDate} -> ${_recordsSummary.maxDate})'
-        : '';
 
     String yoySubtitleSuffix = '';
     if (_selectedYear == 2026 && _prevYearTotalChainRevenue > 0 && totalNetRevenue > 0) {
@@ -771,9 +747,6 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
       yoySubtitleSuffix = ' • نمو $sign${yoyPct.toStringAsFixed(1)}% عن 2025';
     }
 
-    final String cartonsSubtitle = totalCartonsSold > 0
-        ? ' (${CurrencyFormatter.formatNumber(totalCartonsSold.round())} كرتونة بالشد الفعلي)'
-        : '';
     final String shortYearAr = selectedDateRange != null
         ? '${_formatDate(selectedDateRange!.start)} – ${_formatDate(selectedDateRange!.end)}'
         : (_selectedYear > 0 ? 'سنة $_selectedYear' : '2025–2026');
@@ -2463,20 +2436,20 @@ onChanged: m3Legacy<String>((v) {
                           onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'all'),
                         ),
                         ChoiceChip(
-                          avatar: Icon(AppIcons.trendingUp, size: 18.0),
+                          avatar: const Icon(AppIcons.trendingUp, size: 18.0),
                   label: Text('فروع صاعدة ($growingBranchesCount)'),
                           selected: _perfGrowthStatusFilter == 'growing',
                           onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'growing'),
                         ),
                         ChoiceChip(
-                          avatar: Icon(AppIcons.trendingDown, size: 18.0),
+                          avatar: const Icon(AppIcons.trendingDown, size: 18.0),
                   label: Text('تحتاج تنشيط ($decliningBranchesCount)'),
                           selected: _perfGrowthStatusFilter == 'declining',
                           onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'declining'),
                         ),
                         if (newBranchesCount > 0)
                           ChoiceChip(
-                            avatar: Icon(AppIcons.newItem, size: 18.0),
+                            avatar: const Icon(AppIcons.newItem, size: 18.0),
                   label: Text('فروع جديدة ($newBranchesCount)'),
                             selected: _perfGrowthStatusFilter == 'new_branch',
                             onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'new_branch'),

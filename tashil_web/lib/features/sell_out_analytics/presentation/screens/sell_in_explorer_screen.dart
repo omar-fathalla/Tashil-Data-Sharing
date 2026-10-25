@@ -830,17 +830,17 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
     final theme = Theme.of(context);
     final totalWidth = _sellInColWidths.fold<double>(0, (a, b) => a + b);
     final headers = <Widget>[
-      Text('الفترة'),
-      Text('السلسلة / الفرع'),
-      Text('اسم الصنف وهوية الكارتة'),
-      Text('العلامة / القسم'),
-      Text('مندوب المبيعات'),
-      Text('كرتونة / القطعة'),
+      const Text('الفترة'),
+      const Text('السلسلة / الفرع'),
+      const Text('اسم الصنف وهوية الكارتة'),
+      const Text('العلامة / القسم'),
+      const Text('مندوب المبيعات'),
+      const Text('كرتونة / القطعة'),
       _twoLineHeader(context, 'سعر الكرتونة', 'فعلي vs كرتونة'),
       _twoLineHeader(context, 'صافي التوريد', 'غير شامل الضريبة'),
       _twoLineHeader(context, 'الإجمالي', '14% ضريبة'),
-      Text('الوزن (Tons)'),
-      Text('الشيت المصدري (Sheet)'),
+      const Text('الوزن (Tons)'),
+      const Text('الشيت المصدري (Sheet)'),
     ];
     final records = _records;
     return SizedBox(
