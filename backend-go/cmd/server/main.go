@@ -15,6 +15,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/handlers"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
+	"github.com/tashil/data-sharing/backend/internal/service/dataquality"
 	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
@@ -38,6 +39,13 @@ func main() {
 		archDir = "data/archive"
 	}
 	ingestProcessor := ingestion.NewProcessor(geminiAgent, bqRepo, fsRepo).WithArchiveDir(archDir)
+	// Data-quality ("الأخطاء") checks: re-run on every Product Master upload and any source change.
+	dqService := dataquality.NewService(fsRepo, bqRepo).WithMaster(bqRepo)
+	ingestProcessor.WithProductMasterHook(func(tenantID, filename string, raw []byte) {
+		dqService.SetProductMasterFile(tenantID, filename, raw)
+		dqService.OnSourceChanged()
+	})
+	bqRepo.OnSourceChange(dqService.OnSourceChanged)
 
 	// Durable BigQuery persistence of uploaded sheets (off unless BIGQUERY_SINK_ENABLED=true)
 	sink := bqsink.New(context.Background(), bqsink.ConfigFromEnv(cfg.ProjectID, cfg.BigQueryDataset))
@@ -111,6 +119,7 @@ func main() {
 	tradeMarketingHandler := handlers.NewTradeMarketingHandler(fsRepo, fsRepo).WithSalesSource(bqRepo)
 	competitorHandler := handlers.NewCompetitorHandler(fsRepo, fsRepo)
 	chainDiscountHandler := handlers.NewChainDiscountHandler(fsRepo, fsRepo, bqRepo)
+	dataQualityHandler := handlers.NewDataQualityHandler(dqService, fsRepo)
 
 	// 5. Setup Mux Router (Go 1.22+ method + path patterns)
 	mux := http.NewServeMux()
@@ -172,6 +181,9 @@ func main() {
 	mux.HandleFunc("GET /api/v1/analytics/pricing-compliance", analyticsHandler.HandlePricingCompliance)
 	mux.HandleFunc("GET /api/v1/analytics/cpfr", analyticsHandler.HandleCPFRDashboard)
 	mux.HandleFunc("GET /api/v1/analytics/aggregates", analyticsHandler.HandleGetAnalyticsAggregates)
+	mux.HandleFunc("GET /api/v1/data-quality/issues", dataQualityHandler.HandleListIssues)
+	mux.HandleFunc("PATCH /api/v1/data-quality/issues/{id}", dataQualityHandler.HandlePatchStatus)
+	mux.HandleFunc("GET /api/v1/data-quality/summary", dataQualityHandler.HandleSummary)
 	mux.HandleFunc("GET /api/v1/analytics/oos-monitor", oosHandler.HandleOOSMonitor)
 	mux.HandleFunc("GET /api/v1/stores", storeHandler.HandleGetStores)
 	mux.HandleFunc("GET /api/v1/tenants", storeHandler.HandleGetTenants)
