@@ -93,6 +93,9 @@ type Client struct {
 	cdProfiles map[string]domain.ChainDiscountProfiles
 	dqMu       sync.RWMutex
 	dqStates   map[string]domain.DataQualityState
+
+	dvMu         sync.Mutex
+	dataVersions map[string]string
 }
 
 // NewClient constructs the Firestore repository with initial seeded entities and live Cloud Firestore sync.
