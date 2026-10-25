@@ -20,6 +20,7 @@ class AppIcons {
   static const IconData cpfr = Icons.warehouse_rounded;
   static const IconData upload = Icons.cloud_upload_rounded;
   static const IconData productMaster = Icons.category_rounded;
+  static const IconData dataQuality = Icons.rule_rounded;
   static const IconData superAdmin = Icons.admin_panel_settings_rounded;
   static const IconData analytics = Icons.analytics_rounded;
   static const IconData insights = Icons.insights_rounded;
