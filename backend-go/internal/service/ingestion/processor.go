@@ -100,6 +100,7 @@ type Processor struct {
 	archivedFiles map[string]*ArchivedFile
 	archivedBytes map[string][]byte
 	sink          bqsink.Sink
+	sellIn        *sellInStore
 	replaying     atomic.Bool
 	snap          snapshotConfig
 }

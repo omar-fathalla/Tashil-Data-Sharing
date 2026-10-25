@@ -45,6 +45,8 @@ func main() {
 	// Precomputed analytics layer: mirrored to agg_* tables when the BigQuery sink is enabled.
 	if bqs, ok := sink.(*bqsink.BigQuerySink); ok {
 		bqRepo.WithAggregatesWriter(bqs, "tenant-adeco")
+		// BigQuery is the source of truth for Sell-In: instances reload when data_versions changes.
+		ingestProcessor.WithSellInStore(bqs, fsRepo)
 	}
 	// Per-chain discount profiles (Firestore) feed CPFR cost.
 	// Re-read them on analytics reads (TTL) so all Cloud Run instances converge within ~30s.
@@ -93,6 +95,12 @@ func main() {
 		} else {
 			log.Printf("[Tashil Cloud Run] Data ready via %s in %s. Only user-uploaded files are active.", mode, time.Since(bootStart).Round(time.Millisecond))
 		}
+		// Converge on the durable Sell-In rows (BigQuery) before serving, then keep polling for changes.
+		sellInTenants := []string{"tenant-adeco"}
+		if _, err := ingestProcessor.SyncSellInFromStore(context.Background(), "tenant-adeco", true); err != nil {
+			log.Printf("WARN [sell-in-store] startup load from BigQuery failed; serving archive-replayed Sell-In: %v", err)
+		}
+		go ingestProcessor.RunSellInSync(context.Background(), sellInTenants, ingestion.DefaultSellInSyncInterval)
 	}
 
 	// 4. Initialize Handlers and Auth Middleware

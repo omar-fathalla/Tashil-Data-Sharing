@@ -91,6 +91,9 @@ type Client struct {
 	// Per-tenant chain discount profiles (see chain_discounts.go)
 	cdMu       sync.RWMutex
 	cdProfiles map[string]domain.ChainDiscountProfiles
+
+	dvMu         sync.Mutex
+	dataVersions map[string]string
 }
 
 // NewClient constructs the Firestore repository with initial seeded entities and live Cloud Firestore sync.
