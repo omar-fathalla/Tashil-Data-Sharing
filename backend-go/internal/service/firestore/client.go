@@ -91,6 +91,8 @@ type Client struct {
 	// Per-tenant chain discount profiles (see chain_discounts.go)
 	cdMu       sync.RWMutex
 	cdProfiles map[string]domain.ChainDiscountProfiles
+	dqMu       sync.RWMutex
+	dqStates   map[string]domain.DataQualityState
 
 	dvMu         sync.Mutex
 	dataVersions map[string]string

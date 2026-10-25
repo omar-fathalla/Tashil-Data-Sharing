@@ -34,6 +34,8 @@ type precomputeStore struct {
 	writer     AggregatesWriter
 	tenants    []string
 	timer      *time.Timer
+	listenMu   sync.Mutex
+	listeners  []func()
 }
 
 const maxCachedPayloads = 64
@@ -46,6 +48,19 @@ var recomputeDelay = 3 * time.Second
 func (c *Client) bumpSourceVersion() {
 	c.precompute.sourceVersion.Add(1)
 	c.scheduleRecompute()
+	c.precompute.listenMu.Lock()
+	ls := append([]func(){}, c.precompute.listeners...)
+	c.precompute.listenMu.Unlock()
+	for _, l := range ls {
+		l() // listeners must not block (e.g. schedule a debounced job)
+	}
+}
+
+// OnSourceChange registers a non-blocking callback run on every source change.
+func (c *Client) OnSourceChange(f func()) {
+	c.precompute.listenMu.Lock()
+	c.precompute.listeners = append(c.precompute.listeners, f)
+	c.precompute.listenMu.Unlock()
 }
 
 // AnalyticsSourceVersion is the current source version.

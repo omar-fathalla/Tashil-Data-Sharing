@@ -94,3 +94,10 @@ func (p *Processor) sinkDeleteArchived(ctx context.Context, entry *ArchivedFile)
 	}
 	return res
 }
+
+// WithProductMasterHook is called with every successfully ingested (non-dry-run) Product Master
+// file, including archive replay at startup.
+func (p *Processor) WithProductMasterHook(f func(tenantID, filename string, raw []byte)) *Processor {
+	p.onProductMaster = f
+	return p
+}

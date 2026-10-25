@@ -103,6 +103,8 @@ type Processor struct {
 	sellIn        *sellInStore
 	replaying     atomic.Bool
 	snap          snapshotConfig
+
+	onProductMaster func(tenantID, filename string, raw []byte)
 }
 
 // NewProcessor constructs a new ingestion processor.
@@ -1102,6 +1104,9 @@ func (p *Processor) ProcessProductMaster(ctx context.Context, tenantID, filename
 		0,
 	)
 
+	if !dryRun && p.onProductMaster != nil {
+		p.onProductMaster(tenantID, filename, fileBytes)
+	}
 	if sheetName == "" {
 		sheetName = "تحديث 01-08-2026"
 	}

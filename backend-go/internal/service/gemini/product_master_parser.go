@@ -497,3 +497,9 @@ func extractFirstSheetName(rawContent []byte) string {
 	}
 	return ""
 }
+
+// MapProductMasterHeaderColumns exposes the Product Master header → column mapping
+// (logical key → column index, -1 when absent) for data-quality checks.
+func MapProductMasterHeaderColumns(headers []string) map[string]int {
+	return mapProductMasterColumns(headers)
+}
