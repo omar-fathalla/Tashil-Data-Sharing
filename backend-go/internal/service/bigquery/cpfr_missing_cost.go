@@ -30,28 +30,41 @@ func missingCostReasonAr(reason string) string {
 	return "بدون تكلفة حقيقية"
 }
 
-// resolveRealFactoryUnitCost returns the per-piece factory cost incl. VAT from REAL sources only:
-//  1. the cost written in the Sell-Out sheet,
-//  2. the product master net invoice cost (list price incl. VAT minus the invoice discount),
-//  3. the product master list price incl. VAT minus the standard 10% invoice discount
-//     (still master-based, used only when the master row has no net cost computed).
+// additionalDiscountPct is the extra (contract) discount on top of the invoice discount.
+// Mohamed set it to ZERO: the master column "نسبه الخصم الاضافية" is empty for all items.
+// Cost per piece = net unit price after invoice discount × (1 − additionalDiscountPct) × qty.
+const additionalDiscountPct = 0.0
+
+// defaultInvoiceDiscountPct is the standard Adeco invoice discount.
+const defaultInvoiceDiscountPct = 0.10
+
+// resolveRealFactoryUnitCost returns the per-piece factory cost incl. VAT from REAL sources only.
+// Priority (confirmed by Mohamed):
+//  1. PRIMARY: product master "سعر القطعه بعد خصم الفاتورة" (NetUnitInvoiceCost, incl. VAT,
+//     after the 10% invoice discount) × (1 − additionalDiscountPct);
+//  2. master list price incl. VAT × (1 − 10%) × (1 − additionalDiscountPct) when the master
+//     row has no net price computed;
+//  3. the cost written in the Sell-Out sheet, ONLY when the item is not matched in the master.
 //
 // There is NO guess from the selling price. When nothing real exists it returns 0 and a reason.
 // Accepted assumption: the Aug-2026 master price applies to Jan–Apr 2026 as well.
 func resolveRealFactoryUnitCost(sheetCost float64, pm domain.ProductMasterItem, pmOk bool) (float64, string, string) {
+	if pmOk {
+		if pm.NetUnitInvoiceCost > 0 {
+			return pm.NetUnitInvoiceCost * (1.0 - additionalDiscountPct), costSourceMasterNetInvoice, ""
+		}
+		if pm.UnitPriceInclVAT > 0 {
+			return pm.UnitPriceInclVAT * (1.0 - defaultInvoiceDiscountPct) * (1.0 - additionalDiscountPct), costSourceMasterListLessDisc, ""
+		}
+		if sheetCost > 0 {
+			return sheetCost, costSourceSellOutSheet, ""
+		}
+		return 0, "", missingCostReasonNoPriceInMaster
+	}
 	if sheetCost > 0 {
 		return sheetCost, costSourceSellOutSheet, ""
 	}
-	if !pmOk {
-		return 0, "", missingCostReasonNotInMaster
-	}
-	if pm.NetUnitInvoiceCost > 0 {
-		return pm.NetUnitInvoiceCost, costSourceMasterNetInvoice, ""
-	}
-	if pm.UnitPriceInclVAT > 0 {
-		return pm.UnitPriceInclVAT * 0.90, costSourceMasterListLessDisc, ""
-	}
-	return 0, "", missingCostReasonNoPriceInMaster
+	return 0, "", missingCostReasonNotInMaster
 }
 
 func missingCostKey(itemCode, barcode, name string) string {

@@ -8,8 +8,14 @@ import (
 
 func TestResolveRealFactoryUnitCostNoGuessing(t *testing.T) {
 	pm := domain.ProductMasterItem{NetUnitInvoiceCost: 50, UnitPriceInclVAT: 60}
-	if c, src, _ := resolveRealFactoryUnitCost(40, pm, true); c != 40 || src != costSourceSellOutSheet {
-		t.Fatalf("sheet cost should win, got %v %s", c, src)
+	if c, src, _ := resolveRealFactoryUnitCost(40, pm, true); c != 50 || src != costSourceMasterNetInvoice {
+		t.Fatalf("master net price is primary, got %v %s", c, src)
+	}
+	if c, src, _ := resolveRealFactoryUnitCost(40, domain.ProductMasterItem{}, false); c != 40 || src != costSourceSellOutSheet {
+		t.Fatalf("sheet cost only when not in master, got %v %s", c, src)
+	}
+	if additionalDiscountPct != 0 {
+		t.Fatalf("additional discount must be zero")
 	}
 	if c, src, _ := resolveRealFactoryUnitCost(0, pm, true); c != 50 || src != costSourceMasterNetInvoice {
 		t.Fatalf("master net cost expected, got %v %s", c, src)

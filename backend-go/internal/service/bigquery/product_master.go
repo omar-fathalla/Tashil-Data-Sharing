@@ -1108,10 +1108,7 @@ func (c *Client) lookupProductMasterFullLocked(tenantID, itemCode, barcode, skuN
 			if disc > 1.0 {
 				disc = disc / 100.0
 			}
-			extra := it.ExtraDiscountPct
-			if extra > 1.0 {
-				extra = extra / 100.0
-			}
+			extra := additionalDiscountPct // set to zero by Mohamed
 			expectedNetExcl := it.CartonPriceExclVAT * (1.0 - disc) * (1.0 - extra)
 			relDiffNet := math.Abs(actualCasePriceExclVAT-expectedNetExcl) / expectedNetExcl
 			relDiffList := math.Abs(actualCasePriceExclVAT-it.CartonPriceExclVAT) / it.CartonPriceExclVAT
@@ -1284,12 +1281,8 @@ func (c *Client) enrichSellInRecordLocked(r *domain.SellInRecord) {
 		if discPct > 0 && discPct <= 1.0 {
 			discPct = math.Round(discPct*10000) / 100
 		}
-		extraPct := pm.ExtraDiscountPct
-		if extraPct > 0 && extraPct <= 1.0 {
-			extraPct = math.Round(extraPct*10000) / 100
-		}
 		r.InvoiceDiscountPct = discPct
-		r.ExtraDiscountPct = extraPct
+		r.ExtraDiscountPct = additionalDiscountPct * 100 // set to zero by Mohamed
 		r.VATRate = pm.VATRate
 		if r.VATRate <= 0 {
 			r.VATRate = 0.14
@@ -1751,7 +1744,7 @@ func (c *Client) UpsertProductMasterItem(ctx context.Context, tenantID string, i
 	}
 	item.CartonPriceExclVAT = math.Round(item.UnitPriceExclVAT*float64(item.UnitsPerCarton)*100) / 100
 	item.CartonPriceInclVAT = math.Round(item.UnitPriceInclVAT*float64(item.UnitsPerCarton)*100) / 100
-	item.NetUnitInvoiceCost = math.Round(item.UnitPriceInclVAT*(1.0-item.InvoiceDiscountPct)*(1.0-item.ExtraDiscountPct)*1000) / 1000
+	item.NetUnitInvoiceCost = math.Round(item.UnitPriceInclVAT*(1.0-item.InvoiceDiscountPct)*(1.0-additionalDiscountPct)*1000) / 1000
 	item.NetCartonInvoiceCost = math.Round(item.NetUnitInvoiceCost*float64(item.UnitsPerCarton)*100) / 100
 	if item.Category == "" {
 		item.Category = domain.InferCategoryFromItemCodeAndName(item.ItemCodePrefix, item.OfficialName)
