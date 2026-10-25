@@ -9,12 +9,54 @@ class M3ResponsiveTabItem<T> {
   final IconData icon;
   final IconData? selectedIcon;
 
+  /// Optional thin second line under [label] (two-line tab).
+  final String? subtitle;
+
   const M3ResponsiveTabItem({
     required this.value,
     required this.label,
     required this.icon,
     this.selectedIcon,
+    this.subtitle,
   });
+}
+
+/// Shared two-line tab label: main title (normal weight) with a small thin
+/// subtitle directly below. Same styling/alignment for every tab.
+class M3TwoLineTabLabel extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Color color;
+
+  const M3TwoLineTabLabel({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          title,
+          maxLines: 1,
+          textAlign: TextAlign.center,
+          style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w400, color: color),
+        ),
+        Text(
+          subtitle,
+          maxLines: 1,
+          textAlign: TextAlign.center,
+          style: textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w300, color: color),
+        ),
+      ],
+    );
+  }
 }
 
 /// A 100% responsive Material Design 3 Large Connected Segmented Tab Bar.
@@ -201,6 +243,13 @@ class M3ResponsiveTabBar<T> extends StatelessWidget {
                       color: fgColor,
                     ),
                     const SizedBox(width: 8.0),
+                    if (item.subtitle != null)
+                      M3TwoLineTabLabel(
+                        title: item.label,
+                        subtitle: item.subtitle!,
+                        color: fgColor,
+                      )
+                    else
                     Text(
                       item.label,
                       maxLines: 1,

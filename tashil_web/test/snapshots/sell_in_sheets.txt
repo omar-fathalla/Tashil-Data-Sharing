@@ -1,3 +1,5 @@
+(0) | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
+(0) | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
 2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -14,6 +16,8 @@ Auto from Sheet | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Auto from Sheet | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Data & Operation | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+Data & Operation | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -45,13 +49,17 @@ November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 October (10) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 October (10) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Remaining Stock & Reports (Sell-In − Sell-Out) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Remaining Stock & Reports (Sell-In − Sell-Out) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Remaining Stock and Reorder | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+Remaining Stock and Reorder | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+Sell In | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Sell In | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Sell In | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Sell In | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Sell In · Sell Out | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Sell In · Sell Out | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
 Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
 Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
 Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-In Data & Operations | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Sell-In Data & Operations | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 September (09) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 September (09) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Target Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
@@ -61,13 +69,13 @@ Target Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Target Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Target Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Target Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Target Management (Sell-In) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Target Management (Sell-In) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Target Management | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+Target Management | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 Upload Sell In | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
 Upload Sell In | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
 Upload Sell In | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
-Uploaded Sheets (0) | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
-Uploaded Sheets (0) | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
+Uploaded Sheets | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
+Uploaded Sheets | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
 Year (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 Year (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 Year (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null

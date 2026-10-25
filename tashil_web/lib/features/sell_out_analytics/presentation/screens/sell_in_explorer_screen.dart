@@ -737,31 +737,36 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
             // Top Tab Switcher: 100% Responsive Full-Width MD3 Large Tab Bar (4 Symmetrical Tabs)
             M3ResponsiveTabBar<int>(
               textDirection: TextDirection.ltr,
+              height: 60.0,
               selectedValue: _activeTab,
               items: [
                 const M3ResponsiveTabItem<int>(
                   value: 0,
                   icon: Icons.local_shipping_rounded,
                   selectedIcon: Icons.local_shipping_rounded,
-                  label: 'Sell-In Data & Operations',
+                  label: 'Sell In',
+                  subtitle: 'Data & Operation',
                 ),
                 const M3ResponsiveTabItem<int>(
                   value: 1,
                   icon: Icons.warehouse_rounded,
                   selectedIcon: Icons.warehouse_rounded,
-                  label: 'Remaining Stock & Reports (Sell-In − Sell-Out)',
+                  label: 'Sell In · Sell Out',
+                  subtitle: 'Remaining Stock and Reorder',
                 ),
                 const M3ResponsiveTabItem<int>(
                   value: 2,
                   icon: Icons.track_changes_rounded,
                   selectedIcon: Icons.track_changes_rounded,
-                  label: 'Target Management (Sell-In)',
+                  label: 'Sell In',
+                  subtitle: 'Target Management',
                 ),
                 M3ResponsiveTabItem<int>(
                   value: 3,
                   icon: Icons.folder_copy_rounded,
                   selectedIcon: Icons.folder_copy_rounded,
-                  label: 'Uploaded Sheets (${_archivedSellInFiles.length})',
+                  label: 'Uploaded Sheets',
+                  subtitle: '(${_archivedSellInFiles.length})',
                 ),
               ],
               onChanged: (next) {

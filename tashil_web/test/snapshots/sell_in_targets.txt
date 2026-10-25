@@ -1,3 +1,5 @@
+(0) | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+(0) | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 +0 ج.م | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 +0 ج.م | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 0 ج.م | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
@@ -30,6 +32,8 @@ Carrefour (كارفور) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Carrefour (كارفور) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Comprehensive Target Sell-In | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 Comprehensive Target Sell-In | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
+Data & Operation | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+Data & Operation | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 El Wakala (الوكالة) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 El Wakala (الوكالة) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Excel Template | 14.5 | FontWeight.w700 | ff1565c0 | null | null
@@ -41,8 +45,8 @@ Gomla Market (جملة ماركت) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | n
 Gomla Market (جملة ماركت) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Overall Achievement % | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 Overall Achievement % | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
-Remaining Stock & Reports (Sell-In − Sell-Out) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Remaining Stock & Reports (Sell-In − Sell-Out) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Remaining Stock and Reorder | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+Remaining Stock and Reorder | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 Retail Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 Retail Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 Retail Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
@@ -50,15 +54,19 @@ Retail Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Retail Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Retail Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Retail Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Sell In | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
+Sell In | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
+Sell In | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Sell In | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Sell In · Sell Out | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Sell In · Sell Out | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
 Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
 Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
 Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-In Data & Operations | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Sell-In Data & Operations | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 Spinneys (سبينيس) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Spinneys (سبينيس) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Target Management (Sell-In) | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
-Target Management (Sell-In) | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
+Target Management | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
+Target Management | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
 Target Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 Target Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 Target Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
@@ -69,8 +77,8 @@ Target Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Upload Target Excel | 14.5 | FontWeight.w700 | ff404659 | null | null
 Upload Target Excel | 14.5 | FontWeight.w700 | ff404659 | null | null
 Upload Target Excel | 14.5 | FontWeight.w700 | ff404659 | null | null
-Uploaded Sheets (0) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Uploaded Sheets (0) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Uploaded Sheets | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Uploaded Sheets | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
 Variance & Scope Coverage | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 Variance & Scope Coverage | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 إجمالي مستهدف التوريد الشامل | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43

@@ -1,3 +1,5 @@
+(0) | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+(0) | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 + التوريد الشهري (صافي وشامل 14%) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 + التوريد الشهري (صافي وشامل 14%) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 +0.0% نمو قيمة | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
@@ -213,6 +215,8 @@ Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Data & Operation | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+Data & Operation | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Export Stock Excel | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
@@ -241,15 +245,19 @@ Print Stock PDF | 14.0 | FontWeight.w600 | ff404659 | 0.1 | null
 Print Stock PDF | 14.0 | FontWeight.w600 | ff404659 | 0.1 | null
 Real Sell-Through % & Suggested PO | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Real Sell-Through % & Suggested PO | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Remaining Stock & Reports (Sell-In − Sell-Out) | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
-Remaining Stock & Reports (Sell-In − Sell-Out) | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
 Remaining Stock (Sell-In − Sell-Out) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Remaining Stock (Sell-In − Sell-Out) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Remaining Stock and Reorder | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
+Remaining Stock and Reorder | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
+Sell In | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Sell In | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Sell In | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Sell In | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Sell In · Sell Out | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
+Sell In · Sell Out | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
 Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
 Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
 Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-In Data & Operations | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Sell-In Data & Operations | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 Stock Status | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 Stock Status | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 Stock Status | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
@@ -259,10 +267,10 @@ Stock Status | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Stock Status | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Supplied Stock (Excl. & Incl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Supplied Stock (Excl. & Incl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Target Management (Sell-In) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Target Management (Sell-In) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Uploaded Sheets (0) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Uploaded Sheets (0) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Target Management | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+Target Management | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+Uploaded Sheets | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Uploaded Sheets | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
 Urgent Replenishment | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Urgent Replenishment | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
