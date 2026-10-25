@@ -724,7 +724,15 @@ func (h *AnalyticsHandler) HandleCPFRDashboard(w http.ResponseWriter, r *http.Re
 		SafetyStockDays: safetyDays,
 	}
 
-	payload, err := h.bqRepo.GetCPFRDashboard(r.Context(), tenantID, filter)
+	var payload *domain.CPFRDashboardPayload
+	if cached, ok := h.bqRepo.(precomputedAnalytics); ok {
+		// Served from the precomputed layer; recomputed only when a source changed.
+		var version int64
+		payload, version, err = cached.GetCPFRDashboardCached(r.Context(), tenantID, filter)
+		w.Header().Set("X-Analytics-Version", strconv.FormatInt(version, 10))
+	} else {
+		payload, err = h.bqRepo.GetCPFRDashboard(r.Context(), tenantID, filter)
+	}
 	if err != nil {
 		http.Error(w, `{"error":"failed to compute CPFR dashboard"}`, http.StatusInternalServerError)
 		return

@@ -40,7 +40,26 @@ func main() {
 	ingestProcessor := ingestion.NewProcessor(geminiAgent, bqRepo, fsRepo).WithArchiveDir(archDir)
 
 	// Durable BigQuery persistence of uploaded sheets (off unless BIGQUERY_SINK_ENABLED=true)
-	ingestProcessor.WithSink(bqsink.New(context.Background(), bqsink.ConfigFromEnv(cfg.ProjectID, cfg.BigQueryDataset)))
+	sink := bqsink.New(context.Background(), bqsink.ConfigFromEnv(cfg.ProjectID, cfg.BigQueryDataset))
+	ingestProcessor.WithSink(sink)
+	// Precomputed analytics layer: mirrored to agg_* tables when the BigQuery sink is enabled.
+	if bqs, ok := sink.(*bqsink.BigQuerySink); ok {
+		bqRepo.WithAggregatesWriter(bqs, "tenant-adeco")
+	}
+	// Per-chain discount profiles (Firestore) feed CPFR cost.
+	go func() {
+		tenants, err := fsRepo.ListTenants(context.Background())
+		if err != nil {
+			log.Printf("[chain-discounts] list tenants failed: %v", err)
+			return
+		}
+		for _, t := range tenants {
+			if d, err := fsRepo.GetChainDiscountProfiles(context.Background(), t.ID); err == nil && len(d.Profiles) > 0 {
+				bqRepo.SetChainDiscountProfiles(t.ID, d.Profiles)
+				log.Printf("[chain-discounts] tenant=%s loaded %d profile(s)", t.ID, len(d.Profiles))
+			}
+		}
+	}()
 
 	// Inputs whose contents feed the replayed in-memory state; any change invalidates the startup snapshot.
 	pmDir := os.Getenv("TASHIL_PRODUCT_MASTER_DIR")
@@ -89,6 +108,7 @@ func main() {
 	auditHandler := handlers.NewAuditHandler(fsRepo)
 	tradeMarketingHandler := handlers.NewTradeMarketingHandler(fsRepo, fsRepo).WithSalesSource(bqRepo)
 	competitorHandler := handlers.NewCompetitorHandler(fsRepo, fsRepo)
+	chainDiscountHandler := handlers.NewChainDiscountHandler(fsRepo, fsRepo, bqRepo)
 
 	// 5. Setup Mux Router (Go 1.22+ method + path patterns)
 	mux := http.NewServeMux()
@@ -136,6 +156,8 @@ func main() {
 	mux.HandleFunc("PUT /api/v1/product-master/item", analyticsHandler.HandleUpdateProductMasterItem)
 	mux.HandleFunc("POST /api/v1/product-master/item", analyticsHandler.HandleUpdateProductMasterItem)
 	mux.HandleFunc("POST /api/v1/product-master/upload", uploadHandler.HandleUploadProductMaster)
+	mux.HandleFunc("GET /api/v1/product-master/chain-discounts", chainDiscountHandler.HandleGet)
+	mux.HandleFunc("PUT /api/v1/product-master/chain-discounts", chainDiscountHandler.HandlePut)
 	mux.HandleFunc("GET /api/v1/analytics/executive-summary", analyticsHandler.HandleExecutiveSummary)
 	mux.HandleFunc("GET /api/v1/analytics/executive", analyticsHandler.HandleExecutiveSummary)
 	mux.HandleFunc("GET /api/v1/analytics/records", analyticsHandler.HandleRecords)
@@ -147,6 +169,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/analytics/store-matrix", analyticsHandler.HandleStoreMatrix)
 	mux.HandleFunc("GET /api/v1/analytics/pricing-compliance", analyticsHandler.HandlePricingCompliance)
 	mux.HandleFunc("GET /api/v1/analytics/cpfr", analyticsHandler.HandleCPFRDashboard)
+	mux.HandleFunc("GET /api/v1/analytics/aggregates", analyticsHandler.HandleGetAnalyticsAggregates)
 	mux.HandleFunc("GET /api/v1/analytics/oos-monitor", oosHandler.HandleOOSMonitor)
 	mux.HandleFunc("GET /api/v1/stores", storeHandler.HandleGetStores)
 	mux.HandleFunc("GET /api/v1/tenants", storeHandler.HandleGetTenants)

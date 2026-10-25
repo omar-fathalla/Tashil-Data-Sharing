@@ -87,6 +87,10 @@ type Client struct {
 
 	ccMu   sync.RWMutex
 	ccSkus map[string]domain.CustomCompetitorSku
+
+	// Per-tenant chain discount profiles (see chain_discounts.go)
+	cdMu       sync.RWMutex
+	cdProfiles map[string]domain.ChainDiscountProfiles
 }
 
 // NewClient constructs the Firestore repository with initial seeded entities and live Cloud Firestore sync.

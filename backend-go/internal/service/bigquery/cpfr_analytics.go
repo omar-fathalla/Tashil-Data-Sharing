@@ -16,6 +16,7 @@ import (
 func (c *Client) SetSellInRecords(ctx context.Context, tenantID, filename string, records []domain.SellInRecord) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.bumpSourceVersion()
 
 	if c.sellInRecords == nil {
 		c.sellInRecords = make(map[string][]domain.SellInRecord)
@@ -327,7 +328,8 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			sellOutByYMCases[ym] += eqCases
 
 			// Only REAL cost sources are used. No guessing from the selling price.
-			unitCostIncl, _, missingReason := resolveRealFactoryUnitCost(r.FactoryUnitCost, pm, pmOk)
+			prof, hasProf := c.chainDiscountProfile(normTenant, recChain)
+			unitCostIncl, _, missingReason := resolveFactoryUnitCostForChain(r.FactoryUnitCost, pm, pmOk, prof, hasProf)
 			hasRealCost := unitCostIncl > 0
 			if !hasRealCost {
 				sellOutByYMMissingCostRev[ym] += r.NetRevenue

@@ -264,6 +264,7 @@ func (c *Client) inferChainUnitPriceAndTonsLocked(normTenant, targetType, chain 
 func (c *Client) UpsertTarget(ctx context.Context, tenantID string, target domain.TargetRecord) (*domain.TargetRecord, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.bumpSourceVersion()
 
 	normTenant := normalizeTenantKey(tenantID)
 	tType := strings.ToLower(strings.TrimSpace(target.TargetType))
@@ -347,6 +348,7 @@ func (c *Client) UpsertTarget(ctx context.Context, tenantID string, target domai
 func (c *Client) DeleteTarget(ctx context.Context, tenantID, targetID string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.bumpSourceVersion()
 
 	normTenant := normalizeTenantKey(tenantID)
 	existing := c.targets[normTenant]

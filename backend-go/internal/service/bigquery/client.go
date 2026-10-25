@@ -148,9 +148,14 @@ type Client struct {
 
 	kpiCacheMu sync.RWMutex
 	kpiCache   map[string]*domain.ExecutiveKPIs
+
+	// Per-chain discount profiles (chain_discounts.go) and precomputed analytics (analytics_precompute.go).
+	chainDisc  chainDiscountStore
+	precompute precomputeStore
 }
 
 func (c *Client) invalidateKPICache() {
+	c.bumpSourceVersion()
 	c.kpiCacheMu.Lock()
 	c.kpiCache = make(map[string]*domain.ExecutiveKPIs)
 	c.kpiCacheMu.Unlock()
@@ -837,6 +842,7 @@ func (c *Client) ensureTenantSeeded(tenantID string) {
 			return // already seeded
 		}
 	}
+	c.bumpSourceVersion()
 
 	now := time.Now()
 	brandPrefix := formatBrandPrefix(slug)
@@ -1373,6 +1379,7 @@ func (c *Client) ClearTenantData(ctx context.Context, tenantID string) error {
 func (c *Client) RemoveSellInRecords(ctx context.Context, tenantID string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.bumpSourceVersion()
 	slug := normalizeBQTenantSlug(tenantID)
 	delete(c.sellInRecords, slug)
 	delete(c.sellInRecords, "tenant-"+slug)
@@ -1384,6 +1391,7 @@ func (c *Client) RemoveSellInRecords(ctx context.Context, tenantID string) error
 func (c *Client) RemoveSellInFileRecords(ctx context.Context, tenantID, batchID, filename, chain string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.bumpSourceVersion()
 
 	normTenant := normalizeTenantKey(tenantID)
 	existing := c.sellInRecords[normTenant]
