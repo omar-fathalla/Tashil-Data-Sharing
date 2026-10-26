@@ -174,6 +174,11 @@ func TestComprehensiveSellInTargetBreakdown(t *testing.T) {
 	if err := json.Unmarshal(wRecs.Body.Bytes(), &recResp); err != nil {
 		t.Fatalf("failed to decode PaginatedSellInRecordsResponse: %v", err)
 	}
+	if len(cleanBytes) == 0 {
+		// The Sell-In plan workbook is a local-only fixture (not in CI), so there are no Sell-In records to build the waterfall from.
+		t.Logf("skipping Sell-In records waterfall check: workbook not present at %s", DefaultAdcoSellInCleanPath)
+		return
+	}
 	if recResp.TotalGrossInclVATEGP <= recResp.TotalValueEGP || recResp.TotalVAT14EGP <= 0 || recResp.TotalUnitsPieces <= 0 {
 		t.Errorf("expected populated Tax & Discount Waterfall in Sell-In records response, got Net=%.2f VAT=%.2f Gross=%.2f Pieces=%d MatchedSKUs=%d",
 			recResp.TotalValueEGP, recResp.TotalVAT14EGP, recResp.TotalGrossInclVATEGP, recResp.TotalUnitsPieces, recResp.MatchedCatalogSKUsCount)
