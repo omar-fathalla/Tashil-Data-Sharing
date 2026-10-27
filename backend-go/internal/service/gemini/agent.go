@@ -64,21 +64,26 @@ type Client struct {
 	useMock    bool
 }
 
-// NewAgent creates a new Gemini AI Ingestion Agent configured to the highest standard (gemini-1.5-pro).
+// DefaultModel is the base model used when no model name is configured.
+const DefaultModel = "gemini-pro-latest"
+
+// NewAgent creates a new Gemini AI Ingestion Agent. model is the Tier 1 model
+// (file reading / column matching) and is used as-is, including Flash models.
 func NewAgent(apiKey, model string, useMock bool) *Client {
-	if model == "" || strings.Contains(strings.ToLower(model), "flash") {
-		model = "gemini-1.5-pro"
+	model = strings.TrimSpace(model)
+	if model == "" {
+		model = DefaultModel
 	}
 	return &Client{
 		apiKey:     apiKey,
 		model:      model,
-		tier2Model: "gemini-1.5-pro",
+		tier2Model: DefaultModel,
 		httpClient: &http.Client{Timeout: 90 * time.Second},
 		useMock:    useMock || apiKey == "",
 	}
 }
 
-// WithTier2Model configures the deep-reasoning model (default: gemini-1.5-pro).
+// WithTier2Model configures the deep-reasoning model (default: gemini-pro-latest).
 func (c *Client) WithTier2Model(tier2Model string) *Client {
 	if strings.TrimSpace(tier2Model) != "" {
 		c.tier2Model = strings.TrimSpace(tier2Model)
@@ -116,19 +121,26 @@ type geminiResponse struct {
 	} `json:"candidates"`
 }
 
-func applyTierMetadata(payload *domain.NormalizedRetailIngestionPayload, _ string) {
+// Model returns the configured Tier 1 model name.
+func (c *Client) Model() string { return c.model }
+
+// Tier2Model returns the configured Tier 2 model name.
+func (c *Client) Tier2Model() string { return c.tier2Model }
+
+func applyTierMetadata(payload *domain.NormalizedRetailIngestionPayload, tier, model string) {
 	if payload == nil {
 		return
 	}
-	payload.AiTierUsed = "tier2"
-	payload.AiModelUsed = "gemini-1.5-pro"
-	payload.Tier2Escalated = true
+	payload.AiTierUsed = tier
+	payload.AiModelUsed = model
+	payload.Tier2Escalated = tier == "tier2"
 	if payload.ConfidenceScore < 0.996 {
 		payload.ConfidenceScore = 0.996
 	}
 }
 
-// AnalyzeAndNormalize dispatches the file through the Gemini 1.5 Pro (gemini-1.5-pro) deep-reasoning engine.
+// AnalyzeAndNormalize uses the Tier 1 model by default and the Tier 2 model when
+// tier2 is requested or the Tier 1 call fails.
 func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawContent []byte) (*domain.NormalizedRetailIngestionPayload, error) {
 	requestedTier := GetRequestedTier(ctx)
 
@@ -137,31 +149,35 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 		if err != nil {
 			return nil, err
 		}
-		applyTierMetadata(payload, requestedTier)
+		applyTierMetadata(payload, "tier2", c.tier2Model)
 		return payload, nil
 	}
 
 	if fullPayload, ok := parseFullTabularPayload(filename, rawContent); ok {
-		applyTierMetadata(fullPayload, requestedTier)
+		applyTierMetadata(fullPayload, "tier2", c.tier2Model)
 		return fullPayload, nil
 	}
 
-	activeModel := c.tier2Model
-	if activeModel == "" {
-		activeModel = "gemini-1.5-pro"
+	tier, activeModel := "tier1", c.model
+	if requestedTier == "tier2" {
+		tier, activeModel = "tier2", c.tier2Model
 	}
 
 	payload, err := c.invokeGeminiAPI(ctx, activeModel, filename, rawContent, 32000, 0.05)
+	if (err != nil || payload == nil) && tier == "tier1" && c.tier2Model != "" && c.tier2Model != c.model {
+		tier, activeModel = "tier2", c.tier2Model
+		payload, err = c.invokeGeminiAPI(ctx, activeModel, filename, rawContent, 32000, 0.05)
+	}
 	if err != nil || payload == nil {
 		fallbackPayload, mErr := c.mockAnalyze(filename, rawContent)
 		if mErr != nil {
 			return nil, mErr
 		}
-		applyTierMetadata(fallbackPayload, "tier2")
+		applyTierMetadata(fallbackPayload, tier, activeModel)
 		return fallbackPayload, nil
 	}
 
-	applyTierMetadata(payload, "tier2")
+	applyTierMetadata(payload, tier, activeModel)
 	return payload, nil
 }
 

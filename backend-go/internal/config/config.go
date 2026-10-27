@@ -26,8 +26,8 @@ func Load() *Config {
 	dataset := getEnv("BIGQUERY_DATASET", "tashil_analytics")
 	firestoreDB := getEnv("FIRESTORE_DATABASE", "(default)")
 	geminiKey := getEnv("GEMINI_API_KEY", "")
-	geminiModel := getEnv("GEMINI_MODEL", "gemini-1.5-pro")
-	geminiTier2Model := getEnv("GEMINI_TIER2_MODEL", "gemini-1.5-pro")
+	geminiModel := getEnv("GEMINI_MODEL", "gemini-pro-latest")
+	geminiTier2Model := getEnv("GEMINI_TIER2_MODEL", "gemini-pro-latest")
 	jwtSecret := getEnv("JWT_SECRET", "tashil-enterprise-secret-key-adeco-2026")
 	env := getEnv("ENVIRONMENT", "development")
 
