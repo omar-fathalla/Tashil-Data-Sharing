@@ -86,7 +86,8 @@ jobs:
         working-directory: backend-go
         run: |
           gcloud run deploy "$SERVICE" --source . \
-            --region "$REGION" --project "$PROJECT_ID" --quiet
+            --region "$REGION" --project "$PROJECT_ID" --quiet \
+            --update-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest
       - name: Smoke check
         run: |
           url="$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT_ID" --format='value(status.url)')"
