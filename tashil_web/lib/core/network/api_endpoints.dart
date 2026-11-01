@@ -34,6 +34,7 @@ class ApiEndpoints {
   static String get executiveSummary => '$baseUrl/api/v1/analytics/executive-summary';
   static String get records => '$baseUrl/api/v1/analytics/records';
   static String get sellInRecords => '$baseUrl/api/v1/analytics/sell-in-records';
+  static String get sellInMonthly => '$baseUrl/api/v1/analytics/sell-in-monthly';
   static String get targets => '$baseUrl/api/v1/analytics/targets';
   static String get targetsUpload => '$baseUrl/api/v1/analytics/targets/upload';
   static String get storeMatrix => '$baseUrl/api/v1/analytics/store-matrix';

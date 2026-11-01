@@ -8853,6 +8853,33 @@ class ApiClient {
     );
   }
 
+  /// Net Sell-In (EGP) per chain and month: `{chain(lowercase): {'YYYY-MM': value}}`.
+  /// Used to draw Sell-In next to Sell-Out in the monthly trend chart. Throws on failure.
+  Future<Map<String, Map<String, double>>> getSellInMonthlyByChain({
+    String? chain,
+    int? year,
+  }) async {
+    final params = <String, String>{};
+    if (chain != null && chain.isNotEmpty && chain != 'all') params['chain'] = chain;
+    if (year != null && year > 0) params['year'] = year.toString();
+    final uri = Uri.parse(ApiEndpoints.sellInMonthly).replace(queryParameters: params);
+    final response = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 30));
+    if (response.statusCode != 200) {
+      throw ServerConnectionException('تعذر تحميل Sell-In الشهري.', 'HTTP ${response.statusCode}');
+    }
+    final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    final out = <String, Map<String, double>>{};
+    for (final p in (data['points'] as List? ?? const [])) {
+      if (p is! Map) continue;
+      final ch = (p['retailer_chain'] ?? '').toString().trim().toLowerCase();
+      final mk = (p['month_key'] ?? '').toString().trim();
+      final v = (p['net_value_egp'] as num?)?.toDouble();
+      if (ch.isEmpty || mk.isEmpty || v == null) continue;
+      out.putIfAbsent(ch, () => <String, double>{})[mk] = v;
+    }
+    return out;
+  }
+
   /// Fetches Sell-Out or Sell-In Targets summary and Actual vs. Target comparisons.
   Future<TargetsSummaryModel> getTargetsSummary({
     required String targetType,
