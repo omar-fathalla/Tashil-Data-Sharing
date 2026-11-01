@@ -3917,11 +3917,15 @@ class ApiClient {
           if (periodDate != null && periodDate.isNotEmpty)
             'X-Period-Date': _asciiSafeHeader(periodDate),
           'Content-Type': 'application/octet-stream',
+          BackendHttp.asyncJobHeader: '1',
           if (currentUser != null && currentUser!.role.isNotEmpty)
             'X-Simulated-Role': _asciiSafeHeader(currentUser!.role),
         },
         body: bytes,
-      ).timeout(const Duration(seconds: 120));
+      ).timeout(const Duration(seconds: 120)).then((r) => BackendHttp.awaitJob(r, headers: {
+            'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
+            'X-Tenant-ID': _asciiSafeHeader(effectiveTenant),
+          }));
 
       if (resp.statusCode == 200) {
         final decoded = jsonDecode(resp.body) as Map<String, dynamic>;
@@ -8240,8 +8244,11 @@ class ApiClient {
           filename: filename,
         ),
       );
-      final streamed = await BackendHttp.send(req).timeout(const Duration(seconds: 60));
-      final resp = await http.Response.fromStream(streamed);
+      req.headers[BackendHttp.asyncJobHeader] = '1';
+      final streamed = await BackendHttp.send(req).timeout(const Duration(seconds: 120));
+      final resp = await BackendHttp.awaitJob(
+          await http.Response.fromStream(streamed),
+          headers: _headers);
       if (resp.statusCode == 200) {
         final jsonMap = jsonDecode(resp.body) as Map<String, dynamic>;
         final model = IngestionResultModel.fromJson(jsonMap);
@@ -9266,8 +9273,11 @@ class ApiClient {
         ),
       );
 
-      final streamed = await BackendHttp.send(request).timeout(const Duration(seconds: 30));
-      final response = await http.Response.fromStream(streamed);
+      request.headers[BackendHttp.asyncJobHeader] = '1';
+      final streamed = await BackendHttp.send(request).timeout(const Duration(seconds: 120));
+      final response = await BackendHttp.awaitJob(
+          await http.Response.fromStream(streamed),
+          headers: _headers);
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
         final resultJson = data['result'] as Map<String, dynamic>? ?? data;

@@ -804,7 +804,7 @@ func discoverColumnIndices(headers []string) (discoveredColumns, bool) {
 		"صافي كمية المبيعات", "صافى كمية المبيعات", "صافي كمية", "صافى كمية", "كمية المبيعات", "الكمية المباعة", "الكمية", "عدد الوحدات", "الوحدات المباعة", "مبيعات بالقطعة", "كمية", "الوحدات",
 	}
 	revCands := []string{
-		"net val egp", "net amount", "net revenue", "revenue", "sales amount", "sales value", "sales val", "total sales", "amount", "net sales", "value",
+		"net val egp", "net amount", "net revenue", "revenue", "sales amount", "sales value", "sales val", "total sales", "extended price", "ext price", "extended amount", "line total", "amount", "net sales", "value",
 		"صافي قيمة المبيعات", "صافى قيمة المبيعات", "صافي قيمة", "صافى قيمة", "قيمة المبيعات", "صافي المبيعات", "إجمالي المبيعات", "اجمالي المبيعات", "صافي القيمة", "القيمة", "الإيراد", "المبيعات", "قيمة",
 	}
 	storeNameCands := []string{

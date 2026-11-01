@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -69,6 +70,17 @@ type snapshotConfig struct {
 	extraFile []string
 	buildID   string
 	disabled  bool
+	// applied holds archive workbook base names whose data this instance has loaded. Once tracking is on,
+	// a snapshot only lists those files, so uploads handled by OTHER instances are replayed on the next
+	// boot instead of being assumed present.
+	applied  sync.Map
+	tracking atomic.Bool
+}
+
+func (p *Processor) markArchiveApplied(path string) {
+	if path != "" {
+		p.snap.applied.Store(filepath.Base(path), true)
+	}
 }
 
 var (
@@ -80,7 +92,7 @@ var (
 // Bump it whenever a change to the ingestion parsers or the in-memory models would make
 // an existing snapshot produce different data. Unrelated deploys keep the snapshot valid,
 // so a new build no longer forces a multi-minute full archive replay.
-const SnapshotParserVersion = "parser-2026-11-01-wide-header-ai-mapping"
+const SnapshotParserVersion = "parser-2026-11-01b-extended-price"
 
 // currentBuildID returns the snapshot compatibility key (schema + parser version), not a
 // hash of the binary, so the snapshot survives deploys that do not change parsing.
@@ -142,7 +154,7 @@ func (p *Processor) buildManifest() ([]ManifestEntry, error) {
 				return err
 			}
 			if d.IsDir() {
-				if d.Name() == snapshotDirName {
+				if d.Name() == snapshotDirName || d.Name() == "_jobs" {
 					return fs.SkipDir
 				}
 				return nil
@@ -212,6 +224,18 @@ func (p *Processor) WriteSnapshot() error {
 	if !reflect.DeepEqual(before, after) {
 		return errors.New("snapshot skipped: archive changed while capturing state")
 	}
+	if p.snap.tracking.Load() {
+		kept := after[:0:0]
+		for _, e := range after {
+			if strings.HasPrefix(e.Path, "archive:") && !isArchiveMetadataPath(e.Path) {
+				if _, ok := p.snap.applied.Load(filepath.Base(e.Path)); !ok {
+					continue
+				}
+			}
+			kept = append(kept, e)
+		}
+		after = kept
+	}
 	env := snapshotEnvelope{
 		SchemaVersion: SnapshotSchemaVersion,
 		BuildID:       p.buildID(),
@@ -280,58 +304,128 @@ func (p *Processor) ScheduleSnapshot() {
 
 // loadSnapshot restores state from the snapshot if it is present, intact and current.
 func (p *Processor) loadSnapshot() error {
+	_, err := p.loadSnapshotIncremental()
+	return err
+}
+
+// isArchiveMetadataPath reports manifest paths that hold archive metadata, not uploaded workbooks.
+// They change on every upload (sidecars, legacy index, tombstones) and do not need a data replay.
+func isArchiveMetadataPath(path string) bool {
+	if !strings.HasPrefix(path, "archive:") {
+		return false
+	}
+	rel := strings.TrimPrefix(path, "archive:")
+	base := rel
+	if i := strings.LastIndex(rel, "/"); i >= 0 {
+		base = rel[i+1:]
+	}
+	return base == "index.json" || base == "deleted_tombstones.json" || strings.HasSuffix(base, ".tmp") ||
+		strings.Contains(rel, "/"+archiveSidecarDir+"/") || strings.HasPrefix(rel, "_")
+}
+
+// diffSnapshotManifest compares the snapshot's inputs with the files on disk. It returns the archived
+// workbooks that are new or changed since the snapshot. needFull is true when a workbook was removed or a
+// non-archive input (seed files) changed; those cannot be applied incrementally.
+func diffSnapshotManifest(snap, current []ManifestEntry) (added []string, needFull bool) {
+	snapMap := make(map[string]ManifestEntry, len(snap))
+	for _, e := range snap {
+		snapMap[e.Path] = e
+	}
+	curMap := make(map[string]bool, len(current))
+	for _, e := range current {
+		curMap[e.Path] = true
+		old, ok := snapMap[e.Path]
+		if ok && old == e {
+			continue
+		}
+		if isArchiveMetadataPath(e.Path) {
+			continue
+		}
+		if !strings.HasPrefix(e.Path, "archive:") {
+			return nil, true
+		}
+		added = append(added, strings.TrimPrefix(e.Path, "archive:"))
+	}
+	for _, e := range snap {
+		if !curMap[e.Path] && !isArchiveMetadataPath(e.Path) {
+			return nil, true
+		}
+	}
+	return added, false
+}
+
+// loadSnapshotIncremental restores the snapshot and returns the archived workbooks added since it was
+// written; the caller replays only those files.
+func (p *Processor) loadSnapshotIncremental() ([]string, error) {
 	bq, fsr, ok := p.snapshotStores()
 	if !ok {
-		return errors.New("snapshot not supported")
+		return nil, errors.New("snapshot not supported")
 	}
 	f, err := os.Open(p.SnapshotPath())
 	if err != nil {
-		return fmt.Errorf("no snapshot: %w", err)
+		return nil, fmt.Errorf("no snapshot: %w", err)
 	}
 	defer f.Close()
 	zr, err := gzip.NewReader(f)
 	if err != nil {
-		return fmt.Errorf("snapshot corrupt: %w", err)
+		return nil, fmt.Errorf("snapshot corrupt: %w", err)
 	}
 	var env snapshotEnvelope
 	if err := json.NewDecoder(zr).Decode(&env); err != nil {
-		return fmt.Errorf("snapshot corrupt: %w", err)
+		return nil, fmt.Errorf("snapshot corrupt: %w", err)
 	}
 	if _, err := io.Copy(io.Discard, zr); err != nil {
-		return fmt.Errorf("snapshot corrupt: %w", err)
+		return nil, fmt.Errorf("snapshot corrupt: %w", err)
 	}
 	if env.SchemaVersion != SnapshotSchemaVersion {
-		return fmt.Errorf("snapshot schema %d != %d", env.SchemaVersion, SnapshotSchemaVersion)
+		return nil, fmt.Errorf("snapshot schema %d != %d", env.SchemaVersion, SnapshotSchemaVersion)
 	}
 	if env.BuildID == "" || env.BuildID != p.buildID() {
-		return errors.New("snapshot was written by a different server build")
+		return nil, errors.New("snapshot was written by a different server build")
 	}
 	current, err := p.buildManifest()
 	if err != nil {
-		return fmt.Errorf("snapshot manifest: %w", err)
+		return nil, fmt.Errorf("snapshot manifest: %w", err)
 	}
-	if !reflect.DeepEqual(env.Manifest, current) {
-		return fmt.Errorf("snapshot stale: archive files changed (%d in snapshot, %d on disk)", len(env.Manifest), len(current))
+	added, needFull := diffSnapshotManifest(env.Manifest, current)
+	if needFull {
+		return nil, fmt.Errorf("snapshot stale: archive files changed (%d in snapshot, %d on disk)", len(env.Manifest), len(current))
 	}
 	if len(env.BigQuery) == 0 || len(env.Firestore) == 0 {
-		return errors.New("snapshot corrupt: missing sections")
+		return nil, errors.New("snapshot corrupt: missing sections")
 	}
 	if err := fsr.ImportSnapshot(env.Firestore); err != nil {
-		return err
+		return nil, err
 	}
 	if err := bq.ImportSnapshot(env.BigQuery); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	for _, e := range env.Manifest {
+		if strings.HasPrefix(e.Path, "archive:") && !isArchiveMetadataPath(e.Path) {
+			p.markArchiveApplied(e.Path)
+		}
+	}
+	return added, nil
 }
 
 // RestoreOrReplay loads the startup snapshot when valid; otherwise it performs
 // the full archive replay and writes a fresh snapshot. It returns which path was used.
 func (p *Processor) RestoreOrReplay(ctx context.Context) (string, error) {
+	p.snap.tracking.Store(true)
 	start := time.Now()
-	if err := p.loadSnapshot(); err == nil {
+	if added, err := p.loadSnapshotIncremental(); err == nil {
 		log.Printf("[Tashil Snapshot] Startup restored from snapshot %s in %s", p.SnapshotPath(), time.Since(start).Round(time.Millisecond))
-		return "snapshot", nil
+		if len(added) == 0 {
+			return "snapshot", nil
+		}
+		// Apply only the uploads made since the snapshot instead of replaying the whole archive.
+		incStart := time.Now()
+		rerr := p.replayArchivedPaths(ctx, added)
+		log.Printf("[Tashil Snapshot] Incremental replay of %d new archive file(s) took %s", len(added), time.Since(incStart).Round(time.Millisecond))
+		if rerr == nil {
+			p.ScheduleSnapshot()
+		}
+		return "snapshot+incremental", rerr
 	} else {
 		log.Printf("[Tashil Snapshot] Snapshot not used (%v); falling back to full archive replay", err)
 	}

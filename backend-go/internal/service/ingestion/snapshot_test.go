@@ -139,18 +139,27 @@ func TestSnapshotRejectedWhenArchiveChanged(t *testing.T) {
 	if err := p.WriteSnapshot(); err != nil {
 		t.Fatal(err)
 	}
-	// New upload after the snapshot -> stale.
+	// New upload and metadata churn after the snapshot -> restored, only the new workbook to apply.
 	writeArchiveFile(t, dir, "new_upload.xlsx", "more")
+	writeArchiveFile(t, dir, "index.json", "[]")
+	writeArchiveFile(t, dir, "entries/x.json", "{}")
 	p2, _, _ := newSnapshotTestProcessor(t, dir)
-	if err := p2.loadSnapshot(); err == nil || !strings.Contains(err.Error(), "stale") {
-		t.Fatalf("expected stale error after new file, got %v", err)
+	added, err := p2.loadSnapshotIncremental()
+	if err != nil || len(added) != 1 || added[0] != "tenant-a/new_upload.xlsx" {
+		t.Fatalf("expected incremental restore with one new file, got %v %v", added, err)
 	}
-	// Modified file contents (same name) -> stale.
-	_ = os.Remove(filepath.Join(dir, "tenant-a", "new_upload.xlsx"))
+	// Modified file contents (same name) -> applied incrementally too.
 	future := time.Now().Add(time.Hour)
 	_ = os.Chtimes(filepath.Join(dir, "tenant-a", "sales.xlsx"), future, future)
-	if err := p2.loadSnapshot(); err == nil || !strings.Contains(err.Error(), "stale") {
-		t.Fatalf("expected stale error after modified file, got %v", err)
+	p3, _, _ := newSnapshotTestProcessor(t, dir)
+	if added, err := p3.loadSnapshotIncremental(); err != nil || len(added) != 2 {
+		t.Fatalf("expected 2 files to apply, got %v %v", added, err)
+	}
+	// A deleted workbook cannot be applied incrementally -> stale.
+	_ = os.Remove(filepath.Join(dir, "tenant-a", "sales.xlsx"))
+	p4, _, _ := newSnapshotTestProcessor(t, dir)
+	if err := p4.loadSnapshot(); err == nil || !strings.Contains(err.Error(), "stale") {
+		t.Fatalf("expected stale error after removed file, got %v", err)
 	}
 }
 
