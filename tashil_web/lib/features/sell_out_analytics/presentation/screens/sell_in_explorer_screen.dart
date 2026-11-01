@@ -19,6 +19,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/widgets/app_icons.dart';
+import '../../../../core/widgets/archive_actions_group.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_responsive_tab_bar.dart';
@@ -845,7 +846,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
       _twoLineHeader(context, 'سعر الكرتونة', 'فعلي vs كرتونة'),
       _twoLineHeader(context, 'صافي التوريد', 'غير شامل الضريبة'),
       _twoLineHeader(context, 'الإجمالي', '14% ضريبة'),
-      const Text('الوزن (Tons)'),
+      const Text('Tons'),
       const Text('الشيت المصدري (Sheet)'),
     ];
     final records = _records;
@@ -3292,22 +3293,22 @@ onChanged: m3Legacy<int>((v) {
                           colorScheme.surfaceContainerHigh.withOpacity(0.5),
                         ),
                         columns: const [
-                          DataColumn(label: Text('اسم شيت الإكسيل (Excel File)')),
-                          DataColumn(label: Text('السلسلة (Chain)')),
-                          DataColumn(label: Text('الشهور المغطاة (Period)')),
-                          DataColumn(label: Text('عدد الحركات'), numeric: true),
+                          DataColumn(label: Text('Excel File')),
+                          DataColumn(label: Text('Chain')),
+                          DataColumn(label: Text('Period')),
+                          DataColumn(label: Text('Transactions'), numeric: true),
                           DataColumn(
-                            label: Text('إجمالي الكراتين (Cases)'),
+                            label: Text('Cases'),
                             numeric: true,
                           ),
                           DataColumn(
-                            label: Text('صافي التوريد (Net Sell-In EGP)'),
+                            label: Text('Net Sell-In (EGP)'),
                             numeric: true,
                           ),
-                          DataColumn(label: Text('الوزن (Tons)'), numeric: true),
-                          DataColumn(label: Text('تاريخ الرفع')),
+                          DataColumn(label: Text('Tons'), numeric: true),
+                          DataColumn(label: Text('Upload Date')),
                           DataColumn(
-                            label: Text('إجراءات التحكم (تعديل / تحميل / حذف)'),
+                            label: Text('Actions'),
                           ),
                         ],
                         rows: _archivedSellInFiles.map((file) {
@@ -3414,80 +3415,19 @@ onChanged: m3Legacy<int>((v) {
                                 ),
                               ),
                               DataCell(
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // 1. Replace / Edit Sheet Button
-                                    OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        visualDensity: VisualDensity.compact,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10.0,
-                                          vertical: 6.0,
-                                        ),
-                                      ),
-                                      onPressed: (isDeleting || isReplacing || _isUploading)
-                                          ? null
-                                          : () => _pickAndUploadSellInFile(
-                                                replaceArchiveId: file.id,
-                                                forceChain: file.retailChain,
-                                              ),
-                                      icon: isReplacing
-                                          ? const SizedBox(
-                                              width: 14.0,
-                                              height: 14.0,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2.0,
-                                              ),
-                                            )
-                                          : const Icon(
-                                              Icons.edit_note_rounded,
-                                              size: 16.0,
-                                            ),
-                                      label: const Text('تعديل / استبدال'),
-                                    ),
-                                    const SizedBox(width: 6.0),
-                                    // 2. Download Original Excel Sheet Button
-                                    IconButton.outlined(
-                                      tooltip: 'تحميل ملف الإكسيل الأصلي',
-                                      visualDensity: VisualDensity.compact,
-                                      onPressed: () => _handleDownloadSellInSheet(file),
-                                      icon: const Icon(
-                                        Icons.download_rounded,
-                                        size: 18.0,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6.0),
-                                    // 3. Delete Sheet Button
-                                    FilledButton.tonalIcon(
-                                      style: FilledButton.styleFrom(
-                                        visualDensity: VisualDensity.compact,
-                                        backgroundColor:
-                                            colorScheme.errorContainer.withOpacity(0.8),
-                                        foregroundColor: colorScheme.onErrorContainer,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10.0,
-                                          vertical: 6.0,
-                                        ),
-                                      ),
-                                      onPressed: (isDeleting || isReplacing)
-                                          ? null
-                                          : () => _confirmAndDeleteSellInSheet(file),
-                                      icon: isDeleting
-                                          ? const SizedBox(
-                                              width: 14.0,
-                                              height: 14.0,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2.0,
-                                              ),
-                                            )
-                                          : const Icon(
-                                              Icons.delete_outline_rounded,
-                                              size: 16.0,
-                                            ),
-                                      label: const Text('حذف (Delete)'),
-                                    ),
-                                  ],
+                                ArchiveActionsGroup(
+                                  isEditing: isReplacing,
+                                  isDeleting: isDeleting,
+                                  onEdit: (isDeleting || isReplacing || _isUploading)
+                                      ? null
+                                      : () => _pickAndUploadSellInFile(
+                                            replaceArchiveId: file.id,
+                                            forceChain: file.retailChain,
+                                          ),
+                                  onDownload: () => _handleDownloadSellInSheet(file),
+                                  onDelete: (isDeleting || isReplacing)
+                                      ? null
+                                      : () => _confirmAndDeleteSellInSheet(file),
                                 ),
                               ),
                             ],

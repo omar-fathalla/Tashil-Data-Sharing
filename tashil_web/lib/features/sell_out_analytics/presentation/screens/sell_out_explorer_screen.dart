@@ -19,6 +19,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/widgets/app_icons.dart';
+import '../../../../core/widgets/archive_actions_group.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_responsive_tab_bar.dart';
@@ -2107,7 +2108,7 @@ onChanged: m3Legacy<int>((v) {
                     width: 175.0,
                     child: M3Dropdown<String>(
 value: _perfChain,
-label: 'السلسلة (Chain)',
+label: 'Chain',
 leadingIcon: Icons.storefront_rounded,
 expand: true,
 options: m3OptionsFromMenuItems<String>([
@@ -2963,14 +2964,14 @@ onChanged: m3Legacy<int>((v) {
                           colorScheme.surfaceContainerHigh.withOpacity(0.5),
                         ),
                         columns: const [
-                          DataColumn(label: Text('اسم شيت الإكسيل (Excel File)')),
-                          DataColumn(label: Text('السلسلة (Chain)')),
-                          DataColumn(label: Text('الشهور المغطاة (Period)')),
-                          DataColumn(label: Text('عدد الحركات'), numeric: true),
-                          DataColumn(label: Text('إجمالي القطع المباعة'), numeric: true),
-                          DataColumn(label: Text('صافي المبيعات (Net Sell-Out EGP)'), numeric: true),
-                          DataColumn(label: Text('تاريخ الرفع')),
-                          DataColumn(label: Text('إجراءات التحكم (تعديل / تحميل / حذف)')),
+                          DataColumn(label: Text('Excel File')),
+                          DataColumn(label: Text('Chain')),
+                          DataColumn(label: Text('Period')),
+                          DataColumn(label: Text('Transactions'), numeric: true),
+                          DataColumn(label: Text('Units Sold'), numeric: true),
+                          DataColumn(label: Text('Net Sell-Out (EGP)'), numeric: true),
+                          DataColumn(label: Text('Upload Date')),
+                          DataColumn(label: Text('Actions')),
                         ],
                         rows: _archivedSellOutFiles.map((file) {
                           final isDeleting = _deletingFileId == file.id;
@@ -3060,61 +3061,19 @@ onChanged: m3Legacy<int>((v) {
                                 ),
                               ),
                               DataCell(
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // 1. Replace / Edit Sheet Button
-                                    OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        visualDensity: VisualDensity.compact,
-                                        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
-                                      ),
-                                      onPressed: (isDeleting || isReplacing || _isUploading)
-                                          ? null
-                                          : () => _pickAndUploadSellOutFile(
-                                                replaceArchiveId: file.id,
-                                                forceChain: file.retailChain,
-                                              ),
-                                      icon: isReplacing
-                                          ? const SizedBox(
-                                              width: 14.0,
-                                              height: 14.0,
-                                              child: CircularProgressIndicator(strokeWidth: 2.0),
-                                            )
-                                          : const Icon(Icons.edit_note_rounded, size: 16.0),
-                                      label: const Text('تعديل / استبدال'),
-                                    ),
-                                    const SizedBox(width: 6.0),
-                                    // 2. Download Original Excel Sheet Button
-                                    IconButton.outlined(
-                                      tooltip: 'تحميل ملف الإكسيل الأصلي',
-                                      visualDensity: VisualDensity.compact,
-                                      onPressed: () => _handleDownloadSellOutSheet(file),
-                                      icon: const Icon(Icons.download_rounded, size: 18.0),
-                                    ),
-                                    const SizedBox(width: 6.0),
-                                    // 3. Delete Sheet Button
-                                    IconButton.outlined(
-                                      tooltip: 'حذف الشيت من المنظومة',
-                                      visualDensity: VisualDensity.compact,
-                                      style: IconButton.styleFrom(
-                                        foregroundColor: colorScheme.error,
-                                        side: BorderSide(
-                                          color: colorScheme.error.withOpacity(0.5),
-                                        ),
-                                      ),
-                                      onPressed: (isDeleting || isReplacing || _isUploading)
-                                          ? null
-                                          : () => _confirmAndDeleteSellOutSheet(file),
-                                      icon: isDeleting
-                                          ? const SizedBox(
-                                              width: 14.0,
-                                              height: 14.0,
-                                              child: CircularProgressIndicator(strokeWidth: 2.0),
-                                            )
-                                          : const Icon(Icons.delete_outline_rounded, size: 18.0),
-                                    ),
-                                  ],
+                                ArchiveActionsGroup(
+                                  isEditing: isReplacing,
+                                  isDeleting: isDeleting,
+                                  onEdit: (isDeleting || isReplacing || _isUploading)
+                                      ? null
+                                      : () => _pickAndUploadSellOutFile(
+                                            replaceArchiveId: file.id,
+                                            forceChain: file.retailChain,
+                                          ),
+                                  onDownload: () => _handleDownloadSellOutSheet(file),
+                                  onDelete: (isDeleting || isReplacing || _isUploading)
+                                      ? null
+                                      : () => _confirmAndDeleteSellOutSheet(file),
                                 ),
                               ),
                             ],
