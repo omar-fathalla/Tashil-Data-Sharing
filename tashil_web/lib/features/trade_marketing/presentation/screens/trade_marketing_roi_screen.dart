@@ -18,6 +18,7 @@ import '../../../../core/widgets/table_scroll_container.dart';
 import '../../data/cached_trade_marketing_repository.dart';
 import '../../data/trade_marketing_repository.dart';
 import '../../domain/trade_marketing_models.dart';
+import '../../../../core/data/data_refresh_mixin.dart';
 
 /// TradeMarketingRoiScreen is a dedicated enterprise system for tracking
 /// Trade Marketing & Promotional Expenses (الفلورات، الدعاية، الإعلانات، الهدايا، الإيفنتات)
@@ -39,7 +40,12 @@ class TradeMarketingRoiScreen extends StatefulWidget {
   State<TradeMarketingRoiScreen> createState() => _TradeMarketingRoiScreenState();
 }
 
-class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> {
+class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with DataRefreshMixin<TradeMarketingRoiScreen> {
+  @override
+  void onBackendDataChanged() {
+    _reload();
+  }
+
   // 0: ROI & Sales Growth Matrix, 1: Campaigns & Expense Ledger, 2: Category & Brand Analytics
   int _activeTab = 0;
 

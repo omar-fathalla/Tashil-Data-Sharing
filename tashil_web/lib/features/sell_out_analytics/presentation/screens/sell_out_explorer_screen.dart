@@ -30,6 +30,7 @@ import '../widgets/cascading_filter_toolbar.dart';
 import '../widgets/sell_table_shared.dart';
 import '../widgets/target_management_panel.dart';
 import '../widgets/virtualized_sku_table.dart';
+import '../../../../core/data/data_refresh_mixin.dart';
 
 /// SellOutExplorerScreen provides comprehensive retailer Sell-Out analytics:
 /// - Tab 0: Sell-Out Data & Operations (Transactions Table, 4 KPI cards, Upload & Export Actions)
@@ -52,7 +53,12 @@ class SellOutExplorerScreen extends StatefulWidget {
   State<SellOutExplorerScreen> createState() => _SellOutExplorerScreenState();
 }
 
-class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> {
+class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with DataRefreshMixin<SellOutExplorerScreen> {
+  @override
+  void onBackendDataChanged() {
+    _loadAllData();
+  }
+
   // Active Tab Index
   // 0: Sell-Out Data & Operations
   // 1: Performance & Branch Analytics

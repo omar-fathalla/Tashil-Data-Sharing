@@ -1,6 +1,9 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
+import 'http_swr_cache.dart';
 
 /// Single entry point for every backend HTTP call.
 ///
@@ -18,27 +21,42 @@ class BackendHttp {
     return r;
   }
 
-  static Future<http.Response> get(Uri url, {Map<String, String>? headers}) async =>
-      _note(await http.get(url, headers: headers), url);
+  /// Stale-while-revalidate cache for backend GET reads (see [HttpSwrCache]).
+  static final HttpSwrCache cache = HttpSwrCache();
+
+  /// Bumped whenever cached backend data is known to have changed (a background
+  /// revalidation got new content, or this client made a successful write).
+  /// Data screens listen to it to refresh silently.
+  static ValueNotifier<int> get dataRevision => cache.revision;
+
+  static Future<http.Response> get(Uri url, {Map<String, String>? headers}) =>
+      cache.get(url, headers, (h) async => _note(await http.get(url, headers: h), url));
+
+  static T _mutated<T extends http.BaseResponse>(T r) {
+    if (r.statusCode >= 200 && r.statusCode < 300) cache.invalidateAll();
+    return r;
+  }
 
   static Future<http.Response> post(Uri url,
           {Map<String, String>? headers, Object? body}) async =>
-      _note(await http.post(url, headers: headers, body: body), url);
+      _mutated(_note(await http.post(url, headers: headers, body: body), url));
 
   static Future<http.Response> put(Uri url,
           {Map<String, String>? headers, Object? body}) async =>
-      _note(await http.put(url, headers: headers, body: body), url);
+      _mutated(_note(await http.put(url, headers: headers, body: body), url));
 
   static Future<http.Response> patch(Uri url,
           {Map<String, String>? headers, Object? body}) async =>
-      _note(await http.patch(url, headers: headers, body: body), url);
+      _mutated(_note(await http.patch(url, headers: headers, body: body), url));
 
   static Future<http.Response> delete(Uri url,
           {Map<String, String>? headers, Object? body}) async =>
-      _note(await http.delete(url, headers: headers, body: body), url);
+      _mutated(_note(await http.delete(url, headers: headers, body: body), url));
 
   static Future<http.StreamedResponse> send(http.BaseRequest request) async =>
-      _note(await request.send(), request.url);
+      request.method == 'GET'
+          ? _note(await request.send(), request.url)
+          : _mutated(_note(await request.send(), request.url));
 
   /// Header that asks the backend to run a large ingest as a background job.
   static const asyncJobHeader = 'X-Tashil-Async';

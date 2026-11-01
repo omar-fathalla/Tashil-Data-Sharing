@@ -13,6 +13,7 @@ import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../widgets/ai_analysis_progress_card.dart';
 import '../widgets/anomaly_resolution_table.dart';
 import '../widgets/dropzone_file_picker.dart';
+import '../../../../core/data/data_refresh_mixin.dart';
 
 /// UploadPortalScreen serves as the entry point for uploading retail files
 /// and managing the retail-chain-organized Excel/CSV archive.
@@ -28,7 +29,12 @@ class UploadPortalScreen extends StatefulWidget {
   State<UploadPortalScreen> createState() => _UploadPortalScreenState();
 }
 
-class _UploadPortalScreenState extends State<UploadPortalScreen> {
+class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefreshMixin<UploadPortalScreen> {
+  @override
+  void onBackendDataChanged() {
+    _loadArchive();
+  }
+
   bool isProcessing = false;
   bool isCommitting = false;
   IngestionResultModel? result;

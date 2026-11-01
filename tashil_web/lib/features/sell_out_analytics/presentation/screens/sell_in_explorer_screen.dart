@@ -29,6 +29,7 @@ import '../../../product_master/presentation/screens/product_master_screen.dart'
 import '../widgets/target_management_panel.dart';
 import '../widgets/sell_table_shared.dart';
 import '../../data/sell_in_explorer_repository.dart';
+import '../../../../core/data/data_refresh_mixin.dart';
 
 /// SellInExplorerScreen provides dedicated Supplier Sell-In (توريدات السلاسل):
 /// - Tab 0: بيانات وحركات الـ Sell-In (Sell-In Explorer Table, KPIs, Filters, Upload/Export)
@@ -51,7 +52,12 @@ class SellInExplorerScreen extends StatefulWidget {
   State<SellInExplorerScreen> createState() => _SellInExplorerScreenState();
 }
 
-class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
+class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRefreshMixin<SellInExplorerScreen> {
+  @override
+  void onBackendDataChanged() {
+    _loadAllData();
+  }
+
   int _activeTab = 0; // 0: Sell-In Explorer, 1: Remaining Stock & Reports, 2: Sell-In Targets, 3: Uploaded Sell-In Sheets Archive
   String _selectedChain = 'all';
   int _selectedYear = 2026; // Default to 2026

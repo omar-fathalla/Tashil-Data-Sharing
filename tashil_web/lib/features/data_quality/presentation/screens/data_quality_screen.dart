@@ -7,6 +7,7 @@ import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../data/data_quality_repository.dart';
+import '../../../../core/data/data_refresh_mixin.dart';
 
 String _egp(double v) {
   final s = v.abs().round().toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
@@ -34,7 +35,12 @@ class DataQualityScreen extends StatefulWidget {
   State<DataQualityScreen> createState() => _DataQualityScreenState();
 }
 
-class _DataQualityScreenState extends State<DataQualityScreen> {
+class _DataQualityScreenState extends State<DataQualityScreen> with DataRefreshMixin<DataQualityScreen> {
+  @override
+  void onBackendDataChanged() {
+    _load();
+  }
+
   late final DataQualityDataSource _repo = widget.dataSource ?? DataQualityRepository(widget.apiClient!);
   DataQualitySummary _summary = const DataQualitySummary();
   List<DataQualityIssue> _issues = const [];
