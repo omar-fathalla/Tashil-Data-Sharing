@@ -132,7 +132,14 @@ func (p *Processor) syncArchiveFromDisk(normTenant string, force bool) {
 		if item == nil || item.ID == "" || item.TenantID != normTenant {
 			continue
 		}
-		if _, ok := p.archivedFiles[item.ID]; ok {
+		if cur, ok := p.archivedFiles[item.ID]; ok {
+			// Another instance re-saved this entry (e.g. a re-upload of the same file): take its metadata
+			// and drop cached bytes so the new workbook is read from disk.
+			if item.UploadedAt > cur.UploadedAt || item.BatchID != cur.BatchID && item.UploadedAt >= cur.UploadedAt {
+				copyItem := *item
+				p.archivedFiles[item.ID] = &copyItem
+				delete(p.archivedBytes, item.ID)
+			}
 			continue
 		}
 		if p.fsRepo != nil && p.fsRepo.IsArchiveDeleted(item.TenantID, item.ID, item.FileName) {

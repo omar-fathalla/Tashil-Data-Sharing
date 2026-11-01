@@ -215,7 +215,7 @@ func main() {
 	mux.HandleFunc("DELETE /api/v1/competitors/custom-skus/{id}", competitorHandler.HandleDeleteCustomSku)
 
 	// 6. Wrap Middleware Chain: CORS -> Data-ready gate -> Auth -> Snapshot hook -> Router
-	protectedHandler := authMiddleware.Handler(snapshotOnMutation(mux, ingestProcessor))
+	protectedHandler := authMiddleware.Handler(newAsyncJobs(archDir).wrap(snapshotOnMutation(mux, ingestProcessor)))
 	corsHandler := middleware.CORS(waitForData(protectedHandler, dataReady))
 
 	server := &http.Server{

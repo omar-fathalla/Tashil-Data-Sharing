@@ -325,6 +325,9 @@ func (p *Processor) SaveArchivedFile(
 	totalRevenue float64,
 	extraMetrics ...float64,
 ) *ArchivedFile {
+	// Pick up entries saved by other instances first, so a re-upload of the same file reuses its
+	// archive entry instead of creating a duplicate.
+	p.syncArchiveFromDisk(normalizeArchiveTenantID(tenantID), true)
 	p.archiveMu.Lock()
 	defer p.archiveMu.Unlock()
 
@@ -446,8 +449,10 @@ func (p *Processor) SaveArchivedFile(
 		_ = p.fsRepo.UnmarkArchiveDeleted(context.Background(), normTenant, archiveID, filename)
 	}
 
+	// Only this upload's sidecar is written. index.json is legacy (read-only on upload): rewriting it from
+	// several Cloud Run instances caused GCS generation conflicts and lost entries.
 	p.writeArchiveSidecarLocked(entry)
-	p.persistTenantArchiveIndexLocked(normTenant)
+	p.markArchiveApplied(storagePath)
 	copyEntry := *entry
 	return &copyEntry
 }
@@ -478,6 +483,8 @@ func (p *Processor) UpdateArchivedFileByBatch(batchID, retailChain, targetYear, 
 							_ = os.Remove(other.StoragePath)
 						}
 						p.removeArchiveSidecarLocked(other)
+						// A legacy index.json row would bring the replaced entry back on reload.
+						p.appendDiskTombstoneLocked(other.TenantID, otherID, "")
 						delete(p.archivedFiles, otherID)
 						delete(p.archivedBytes, otherID)
 					}
@@ -491,7 +498,6 @@ func (p *Processor) UpdateArchivedFileByBatch(batchID, retailChain, targetYear, 
 			}
 			entry.UploadedAt = time.Now().UTC().Format(time.RFC3339Nano)
 			p.writeArchiveSidecarLocked(entry)
-			p.persistTenantArchiveIndexLocked(entry.TenantID)
 			copyEntry := *entry
 			return &copyEntry
 		}
@@ -530,7 +536,7 @@ func (p *Processor) RemoveArchivedFileByBatch(batchID string, prevEntry *Archive
 				delete(p.archivedFiles, id)
 				delete(p.archivedBytes, id)
 			}
-			p.persistTenantArchiveIndexLocked(tenantID)
+			_ = tenantID
 			break
 		}
 	}
@@ -961,6 +967,56 @@ func (p *Processor) replayArchivedFiles(ctx context.Context, writeSink bool) err
 		return files[i].UploadedAt < files[j].UploadedAt
 	})
 
+	p.replayFiles(ctx, files, writeSink)
+	return nil
+}
+
+// replayArchivedPaths replays only the archived workbooks at the given archive-relative paths
+// (as recorded in the snapshot manifest), in the same order rules as a full replay.
+func (p *Processor) replayArchivedPaths(ctx context.Context, relPaths []string) error {
+	p.replaying.Store(true)
+	defer p.replaying.Store(false)
+	want := make(map[string]bool, len(relPaths))
+	for _, r := range relPaths {
+		want[filepath.Base(r)] = true
+	}
+	p.archiveMu.Lock()
+	p.loadDiskArchiveLocked()
+	var files []*ArchivedFile
+	for _, f := range p.archivedFiles {
+		if f.StoragePath != "" && want[filepath.Base(f.StoragePath)] {
+			files = append(files, f)
+		}
+	}
+	p.archiveMu.Unlock()
+	sortArchiveReplayOrder(files)
+	p.replayFiles(ctx, files, false)
+	return nil
+}
+
+func sortArchiveReplayOrder(files []*ArchivedFile) {
+	typePriority := func(f *ArchivedFile) int {
+		if isProductMasterArchiveEntry(f) {
+			return 0
+		}
+		if isSellInArchiveEntry(f) {
+			return 2
+		}
+		return 1
+	}
+	sort.Slice(files, func(i, j int) bool {
+		pi, pj := typePriority(files[i]), typePriority(files[j])
+		if pi != pj {
+			return pi < pj
+		}
+		if files[i].UploadedAt == files[j].UploadedAt {
+			return files[i].ID < files[j].ID
+		}
+		return files[i].UploadedAt < files[j].UploadedAt
+	})
+}
+
+func (p *Processor) replayFiles(ctx context.Context, files []*ArchivedFile, writeSink bool) {
 	for _, f := range files {
 		p.archiveMu.RLock()
 		raw := p.archivedBytes[f.ID]
@@ -994,13 +1050,12 @@ func (p *Processor) replayArchivedFiles(ctx context.Context, writeSink bool) err
 			// Replays re-read already accepted uploads: no Gemini calls, and validation only logs.
 			_, _ = p.ProcessUpload(gemini.WithReplay(ctx), f.TenantID, f.FileName, raw, f.RetailChain)
 		}
+		p.markArchiveApplied(f.StoragePath)
 		// Release the parsed workbook before the next one so peak memory stays near one file.
 		raw = nil
 		runtime.GC()
 		debug.FreeOSMemory()
 	}
-
-	return nil
 }
 
 

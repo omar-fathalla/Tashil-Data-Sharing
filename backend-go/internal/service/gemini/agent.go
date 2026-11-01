@@ -71,6 +71,9 @@ const DefaultModel = "gemini-pro-latest"
 // NewAgent creates a new Gemini AI Ingestion Agent. model is the Tier 1 model
 // (file reading / column matching) and is used as-is, including Flash models.
 func NewAgent(apiKey, model string, useMock bool) *Client {
+	// Secret Manager values often end with a newline; Go rejects such header values
+	// before any network call, which surfaced as an instant "request failed".
+	apiKey = strings.TrimSpace(apiKey)
 	model = strings.TrimSpace(model)
 	if model == "" {
 		model = DefaultModel

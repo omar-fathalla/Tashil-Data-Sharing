@@ -128,7 +128,7 @@ func (c *Client) callGeminiForMapping(ctx context.Context, model, prompt string)
 	req.Header.Set("x-goog-api-key", c.apiKey)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("gemini mapping request failed")
+		return "", fmt.Errorf("gemini mapping request failed: %s", c.redact(err.Error()))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -513,4 +513,12 @@ func (c *Client) analyzeWithAIMapping(ctx context.Context, filename string, rawC
 	payload.MappingConfidence = plan.Confidence
 	payload.AiTierUsed, payload.AiModelUsed, payload.Tier2Escalated = tier, model, tier == "tier2"
 	return payload, true
+}
+
+// redact strips the API key from an error string before it is logged.
+func (c *Client) redact(msg string) string {
+	if c.apiKey != "" {
+		msg = strings.ReplaceAll(msg, c.apiKey, "[redacted]")
+	}
+	return msg
 }
