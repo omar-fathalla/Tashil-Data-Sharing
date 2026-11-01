@@ -1331,13 +1331,6 @@ Brand Filter (الماركة) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Brand Filter (الماركة) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Brand Filter (الماركة) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Brand Filter (الماركة) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Export Excel | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
 Export Excel | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
 Export Excel | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
@@ -1524,6 +1517,13 @@ Uploaded Sheets (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 اسم الفرع / نقطة البيع | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 الترتيب | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 الترتيب | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+السلسلة (Chain) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السلسلة (Chain) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السلسلة (Chain) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السلسلة (Chain) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السلسلة (Chain) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السلسلة (Chain) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السلسلة (Chain) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 السلسلة التجارية | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 السلسلة التجارية | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 السنة (Year) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null

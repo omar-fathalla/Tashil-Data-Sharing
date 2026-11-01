@@ -2114,7 +2114,7 @@ onChanged: m3Legacy<int>((v) {
                     width: 175.0,
                     child: M3Dropdown<String>(
 value: _perfChain,
-label: 'Chain',
+label: 'السلسلة (Chain)',
 leadingIcon: Icons.storefront_rounded,
 expand: true,
 options: m3OptionsFromMenuItems<String>([

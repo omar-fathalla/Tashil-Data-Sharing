@@ -852,7 +852,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       _twoLineHeader(context, 'سعر الكرتونة', 'فعلي vs كرتونة'),
       _twoLineHeader(context, 'صافي التوريد', 'غير شامل الضريبة'),
       _twoLineHeader(context, 'الإجمالي', '14% ضريبة'),
-      const Text('Tons'),
+      const Text('الوزن (Tons)'),
       const Text('الشيت المصدري (Sheet)'),
     ];
     final records = _records;
