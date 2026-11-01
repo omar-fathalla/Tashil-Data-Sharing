@@ -183,6 +183,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
 
     final effectiveChain = selectedChain == 'all' ? null : selectedChain;
     _loadCpfr();
+    _loadSellInMonthly();
     final cached = _repo.peekFresh(
           period: selectedPeriod,
           startDate: startDate,
@@ -235,6 +236,26 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
         }
       }
     });
+  }
+
+  int _sellInMonthlyRequestId = 0;
+  Map<String, Map<String, double>>? _sellInMonthly;
+
+  /// Sell-In monthly totals per chain for the trend chart's second line. Failures only hide
+  /// the Sell-In lines; the Sell-Out chart still renders.
+  Future<void> _loadSellInMonthly() async {
+    final id = ++_sellInMonthlyRequestId;
+    try {
+      final res = await widget.apiClient.getSellInMonthlyByChain(
+        chain: selectedChain,
+        year: selectedYear,
+      );
+      if (!mounted || id != _sellInMonthlyRequestId) return;
+      setState(() => _sellInMonthly = res);
+    } catch (_) {
+      if (!mounted || id != _sellInMonthlyRequestId) return;
+      setState(() => _sellInMonthly = null);
+    }
   }
 
   Future<void> _loadCpfr() async {
@@ -655,7 +676,10 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
                             ),
 
                             // Full-width Monthly Sell-Out Trend Chart (100% width for all 12 months)
-                            SelloutTrendChart(trends: kpis!.dailyTrends),
+                            SelloutTrendChart(
+                              trends: kpis!.dailyTrends,
+                              sellInByChain: _sellInMonthly,
+                            ),
 
                             M3Spacing.gapMD,
 

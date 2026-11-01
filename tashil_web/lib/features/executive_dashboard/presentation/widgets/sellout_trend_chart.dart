@@ -13,9 +13,14 @@ import 'chain_share_pie.dart';
 class SelloutTrendChart extends StatefulWidget {
   final List<DailyTrendItem> trends;
 
+  /// Optional net Sell-In (EGP) per chain (lowercase code) and month key (`YYYY-MM`).
+  /// When present, each chain gets a dashed Sell-In line next to its solid Sell-Out line.
+  final Map<String, Map<String, double>>? sellInByChain;
+
   const SelloutTrendChart({
     super.key,
     required this.trends,
+    this.sellInByChain,
   });
 
   @override
@@ -30,7 +35,13 @@ class _ChainSeriesData {
   final List<double> growthPcts;
   final double totalRevenue;
 
+  /// Sell-In per month (null = no Sell-In data for that month).
+  final List<double?> sellInValues;
+
+  bool get hasSellIn => sellInValues.any((v) => v != null);
+
   const _ChainSeriesData({
+    this.sellInValues = const [],
     required this.chainCode,
     required this.displayName,
     required this.color,
@@ -144,6 +155,29 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
     return validTrends;
   }
 
+  static String _monthKeyOf(DailyTrendItem t) {
+    final mk = t.monthKey.trim();
+    if (mk.length >= 7) return mk.substring(0, 7);
+    final d = t.date.trim();
+    return d.length >= 7 ? d.substring(0, 7) : d;
+  }
+
+  /// Sell-In values aligned with [trends] for one chain code, or for all chains when null.
+  List<double?> _sellInFor(String? chainCode, List<DailyTrendItem> trends) {
+    final src = widget.sellInByChain;
+    if (src == null || src.isEmpty) return const [];
+    return trends.map((t) {
+      final mk = _monthKeyOf(t);
+      if (chainCode != null) return src[chainCode.toLowerCase()]?[mk];
+      double? sum;
+      for (final m in src.values) {
+        final v = m[mk];
+        if (v != null) sum = (sum ?? 0.0) + v;
+      }
+      return sum;
+    }).toList();
+  }
+
   List<_ChainSeriesData> _extractSeries(List<DailyTrendItem> effectiveTrends, ColorScheme colorScheme) {
     final chainTotals = <String, double>{};
     for (final t in effectiveTrends) {
@@ -169,6 +203,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
           values: effectiveTrends.map((e) => e.revenue).toList(),
           growthPcts: List<double>.filled(effectiveTrends.length, 0.0),
           totalRevenue: totalRev,
+          sellInValues: _sellInFor(null, effectiveTrends),
         ),
       ];
     }
@@ -220,6 +255,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
         values: values,
         growthPcts: growths,
         totalRevenue: chainTotals[code] ?? 0.0,
+        sellInValues: _sellInFor(code, effectiveTrends),
       );
     }).toList();
   }
@@ -248,7 +284,11 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
       for (final v in s.values) {
         if (v > maxVal) maxVal = v;
       }
+      for (final v in s.sellInValues) {
+        if (v != null && v > maxVal) maxVal = v;
+      }
     }
+    final showSellIn = seriesList.any((s) => s.hasSellIn);
     if (maxVal <= 0) {
       maxVal = effectiveTrends.map((e) => e.revenue).fold<double>(0.0, math.max);
     }
@@ -279,7 +319,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                     ),
                     const SizedBox(height: 2.0),
                     Text(
-                      'Monthly Sell-Out Trend',
+                      showSellIn ? 'Monthly Sell-Out & Sell-In Trend' : 'Monthly Sell-Out Trend',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: colorScheme.primary,
                         fontWeight: FontWeight.w700,
@@ -303,7 +343,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                 Wrap(
                   spacing: 6.0,
                   runSpacing: 6.0,
-                  children: seriesList.map((series) {
+                  children: seriesList.map<Widget>((series) {
                     final parts = ChainSharePie.splitBilingualLabel(series.displayName);
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
@@ -355,7 +395,13 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                         ],
                       ),
                     );
-                  }).toList(),
+                  }).toList()
+                    ..addAll(showSellIn
+                        ? [
+                            _lineStyleKey(theme, 'Sell-Out', dashed: false),
+                            _lineStyleKey(theme, 'Sell-In', dashed: true),
+                          ]
+                        : const <Widget>[]),
                 ),
               ],
             ),
@@ -503,6 +549,36 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
     );
   }
 
+  /// Legend key showing the line style used for Sell-Out (solid) or Sell-In (dashed).
+  Widget _lineStyleKey(ThemeData theme, String label, {required bool dashed}) {
+    final colorScheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: M3Shape.radiusLg,
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CustomPaint(
+            size: const Size(22.0, 10.0),
+            painter: _LineKeyPainter(color: colorScheme.onSurfaceVariant, dashed: dashed),
+          ),
+          const SizedBox(width: 6.0),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHoverIndicator(
     double width,
     double height,
@@ -514,6 +590,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
   ) {
     final idx = hoveredIndex!;
     final item = effectiveTrends[idx];
+    final showSellIn = seriesList.any((s) => s.hasSellIn);
     final count = effectiveTrends.length;
     final stepX = width / count;
     final x = (idx + 0.5) * stepX;
@@ -572,9 +649,13 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                 final growthStr = (val > 0 && growth != 0.0)
                     ? ' (\u200E${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(1)}%\u200E)'
                     : '';
-                final valueLabel = val > 0
+                final sellOutText = val > 0
                     ? '${CurrencyFormatter.formatEGP(val)}$growthStr'
                     : 'لم تُرفع بيانات بعد';
+                final valueLabel = showSellIn ? 'Sell-Out: $sellOutText' : sellOutText;
+                final sellIn = idx < s.sellInValues.length ? s.sellInValues[idx] : null;
+                final sellInLabel =
+                    'Sell-In: ${sellIn != null ? CurrencyFormatter.formatEGP(sellIn) : 'لا توجد بيانات'}';
                 final parts = ChainSharePie.splitBilingualLabel(s.displayName);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 5.0),
@@ -629,6 +710,18 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
+                            if (showSellIn)
+                              Text(
+                                sellInLabel,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: sellIn != null
+                                      ? colorScheme.onInverseSurface.withOpacity(0.9)
+                                      : colorScheme.onInverseSurface.withOpacity(0.6),
+                                  fontWeight: sellIn != null ? FontWeight.w600 : FontWeight.normal,
+                                  fontSize: M3FontSize.tiny,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                           ],
                         ),
                       ),
@@ -736,6 +829,20 @@ class _TrendChartPainter extends CustomPainter {
         canvas.drawCircle(pt, 12.0, glowPaint);
         canvas.drawCircle(pt, 6.5, dotBgPaint);
         canvas.drawCircle(pt, 5.0, dotPaint);
+      }
+      for (int sIdx = 0; sIdx < seriesList.length; sIdx++) {
+        final series = seriesList[sIdx];
+        final v = series.sellInValues.isNotEmpty ? series.sellInValues.first : null;
+        if (v == null || v <= 0) continue;
+        final offsetX = (sIdx - (seriesList.length - 1) / 2.0) * 28.0 + 12.0;
+        final pt = Offset((centerX + offsetX).clamp(24.0, size.width - 24.0),
+            baselineY - (v / maxVal * usableHeight));
+        _drawDashedPath(canvas, Path()..moveTo(0, pt.dy)..lineTo(size.width, pt.dy),
+            Paint()
+              ..color = series.color.withOpacity(0.3)
+              ..strokeWidth = 1.5
+              ..style = PaintingStyle.stroke);
+        _drawSellInDot(canvas, pt, series.color, true);
       }
       return;
     }
@@ -847,8 +954,101 @@ class _TrendChartPainter extends CustomPainter {
         canvas.drawCircle(p, (isHovered || isSingleActive) ? 4.2 : 2.8, dotPaint);
       }
     }
+
+    for (final series in seriesList) {
+      _paintSellIn(canvas, series, stepX, baselineY, usableHeight);
+    }
+  }
+
+  /// Dashed Sell-In curve in the chain's color, with hollow dots. Months without
+  /// Sell-In data are skipped (the line joins the months that have data).
+  void _paintSellIn(Canvas canvas, _ChainSeriesData series, double stepX, double baselineY,
+      double usableHeight) {
+    final pts = <Offset>[];
+    final idxs = <int>[];
+    for (int i = 0; i < pointCount && i < series.sellInValues.length; i++) {
+      final v = series.sellInValues[i];
+      if (v == null || v <= 0) continue;
+      pts.add(Offset((i + 0.5) * stepX, baselineY - (v / maxVal * usableHeight)));
+      idxs.add(i);
+    }
+    if (pts.isEmpty) return;
+    if (pts.length > 1) {
+      final path = Path()..moveTo(pts.first.dx, pts.first.dy);
+      for (int i = 0; i < pts.length - 1; i++) {
+        final p0 = pts[i];
+        final p1 = pts[i + 1];
+        final cx = p0.dx + (p1.dx - p0.dx) / 2.0;
+        path.cubicTo(cx, p0.dy, cx, p1.dy, p1.dx, p1.dy);
+      }
+      _drawDashedPath(
+        canvas,
+        path,
+        Paint()
+          ..color = series.color.withOpacity(0.9)
+          ..strokeWidth = 2.2
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+    for (int k = 0; k < pts.length; k++) {
+      _drawSellInDot(canvas, pts[k], series.color, hoveredIndex == idxs[k]);
+    }
+  }
+
+  void _drawSellInDot(Canvas canvas, Offset p, Color color, bool emphasized) {
+    canvas.drawCircle(p, emphasized ? 5.0 : 3.6, Paint()..color = surfaceColor);
+    canvas.drawCircle(
+      p,
+      emphasized ? 5.0 : 3.6,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = emphasized ? 2.2 : 1.6,
+    );
+  }
+
+  static void _drawDashedPath(Canvas canvas, Path path, Paint paint,
+      {double dash = 7.0, double gap = 5.0}) {
+    for (final metric in path.computeMetrics()) {
+      double d = 0.0;
+      while (d < metric.length) {
+        final end = math.min(d + dash, metric.length);
+        canvas.drawPath(metric.extractPath(d, end), paint);
+        d = end + gap;
+      }
+    }
   }
 
   @override
   bool shouldRepaint(covariant _TrendChartPainter oldDelegate) => true;
+}
+
+class _LineKeyPainter extends CustomPainter {
+  final Color color;
+  final bool dashed;
+
+  const _LineKeyPainter({required this.color, required this.dashed});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = dashed ? 2.0 : 3.0
+      ..strokeCap = StrokeCap.round;
+    final y = size.height / 2.0;
+    if (!dashed) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+      return;
+    }
+    double x = 0.0;
+    while (x < size.width) {
+      canvas.drawLine(Offset(x, y), Offset(math.min(x + 5.0, size.width), y), paint);
+      x += 8.0;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LineKeyPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.dashed != dashed;
 }
