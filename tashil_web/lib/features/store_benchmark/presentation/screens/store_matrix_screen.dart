@@ -12,6 +12,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
+import '../../../../core/data/data_refresh_mixin.dart';
 
 /// StoreMatrixScreen displays store benchmarking across Egyptian retail regions,
 /// tier categorization (Tier A/B/C), and sales velocity metrics.
@@ -31,7 +32,12 @@ class StoreMatrixScreen extends StatefulWidget {
   State<StoreMatrixScreen> createState() => _StoreMatrixScreenState();
 }
 
-class _StoreMatrixScreenState extends State<StoreMatrixScreen> {
+class _StoreMatrixScreenState extends State<StoreMatrixScreen> with DataRefreshMixin<StoreMatrixScreen> {
+  @override
+  void onBackendDataChanged() {
+    _loadStoreMatrix();
+  }
+
   bool _isLoading = true;
   late StoreBenchmarkRepository _repo;
   String _selectedRegion = 'الكل';

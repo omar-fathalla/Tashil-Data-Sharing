@@ -8,6 +8,7 @@ import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/data/data_refresh_mixin.dart';
 
 /// OOSDashboardScreen provides real-time alerting for out-of-stock items across retail chains,
 /// powered by Gemini AI Root-Cause Intelligence and Brand/Branch breakdown analytics.
@@ -23,7 +24,12 @@ class OOSDashboardScreen extends StatefulWidget {
   State<OOSDashboardScreen> createState() => _OOSDashboardScreenState();
 }
 
-class _OOSDashboardScreenState extends State<OOSDashboardScreen> {
+class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefreshMixin<OOSDashboardScreen> {
+  @override
+  void onBackendDataChanged() {
+    _loadAlerts();
+  }
+
   bool isLoading = true;
   OOSMonitorResponseModel? _monitorReport;
   List<OOSAlertModel> alerts = [];

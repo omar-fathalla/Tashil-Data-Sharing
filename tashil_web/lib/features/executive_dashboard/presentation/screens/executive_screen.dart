@@ -14,6 +14,7 @@ import '../widgets/pareto_category_section.dart';
 import '../widgets/sellout_trend_chart.dart';
 import '../widgets/market_share_section.dart';
 import '../../../cpfr_replenishment/domain/cpfr_models.dart';
+import '../../../../core/data/data_refresh_mixin.dart';
 
 /// ExecutiveScreen is the primary executive management overview.
 class ExecutiveScreen extends StatefulWidget {
@@ -32,7 +33,12 @@ class ExecutiveScreen extends StatefulWidget {
   State<ExecutiveScreen> createState() => _ExecutiveScreenState();
 }
 
-class _ExecutiveScreenState extends State<ExecutiveScreen> {
+class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin<ExecutiveScreen> {
+  @override
+  void onBackendDataChanged() {
+    _loadData();
+  }
+
   String selectedPeriod = 'YTD';
   int selectedYear = 2026;
   int selectedMonth = 0;

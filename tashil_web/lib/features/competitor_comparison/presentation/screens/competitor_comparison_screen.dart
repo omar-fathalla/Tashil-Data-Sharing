@@ -11,6 +11,7 @@ import '../../data/competitor_comparison_repository.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/data/data_refresh_mixin.dart';
 
 /// CompetitorComparisonScreen (Compare)
 /// Material Design 3 1-vs-1 Focused Competitive Intelligence Experience:
@@ -36,8 +37,12 @@ class CompetitorComparisonScreen extends StatefulWidget {
       _CompetitorComparisonScreenState();
 }
 
-class _CompetitorComparisonScreenState
-    extends State<CompetitorComparisonScreen> {
+class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen> with DataRefreshMixin<CompetitorComparisonScreen> {
+  @override
+  void onBackendDataChanged() {
+    _loadCompetitiveData();
+  }
+
   bool _isLoading = true;
   late CompetitorComparisonRepository _repo;
   List<OwnSkuCompetitiveGroupModel> _allGroups = [];

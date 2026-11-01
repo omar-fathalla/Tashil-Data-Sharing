@@ -12,6 +12,7 @@ import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../product_master/presentation/screens/product_master_screen.dart';
+import '../../../../core/data/data_refresh_mixin.dart';
 
 /// PricingComplianceScreen monitors SKU-level price compliance against Recommended Retail Price (RRP)
 /// and measures promotional uplift percentages across retail chains.
@@ -27,7 +28,12 @@ class PricingComplianceScreen extends StatefulWidget {
   State<PricingComplianceScreen> createState() => _PricingComplianceScreenState();
 }
 
-class _PricingComplianceScreenState extends State<PricingComplianceScreen> {
+class _PricingComplianceScreenState extends State<PricingComplianceScreen> with DataRefreshMixin<PricingComplianceScreen> {
+  @override
+  void onBackendDataChanged() {
+    _loadPricingCompliance();
+  }
+
   bool _isLoading = true;
   String _selectedFilter = 'الكل';
   String _selectedCategory = 'الكل';

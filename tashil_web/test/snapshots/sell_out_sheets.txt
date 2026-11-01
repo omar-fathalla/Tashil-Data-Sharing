@@ -72,6 +72,8 @@
 9,537,095 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
 9,537,095 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
 9,537,095 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
+Actions | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+Actions | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 April (04) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 April (04) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 August (08) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -88,10 +90,41 @@ Book1 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
 Book1 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
 Book6 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
 Book6 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
+Chain | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+Chain | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
+Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
+Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
+Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
+Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
+Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
+Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
+Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
+Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
+Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
+Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
 El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Excel File | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+Excel File | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 FATHALLA | 11.0 | FontWeight.w800 | ff304578 | 0.25 | 1.43
 FATHALLA | 11.0 | FontWeight.w800 | ff304578 | 0.25 | 1.43
 Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -119,12 +152,16 @@ Month (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Month (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Month (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Month (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Net Sell-Out (EGP) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+Net Sell-Out (EGP) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 October (10) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 October (10) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Performance & Branch Analytics | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 Performance & Branch Analytics | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Period | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+Period | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 Sell-Out Analytics, Branch Performance & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
 Sell-Out Analytics, Branch Performance & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
 Sell-Out Analytics, Branch Performance & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
@@ -141,6 +178,12 @@ Target Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Target Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Target Management (Sell-Out) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 Target Management (Sell-Out) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Transactions | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+Transactions | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+Units Sold | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+Units Sold | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+Upload Date | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+Upload Date | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 Upload Sell Out | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
 Upload Sell Out | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
 Upload Sell Out | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
@@ -153,40 +196,15 @@ Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-إجراءات التحكم (تعديل / تحميل / حذف) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-إجراءات التحكم (تعديل / تحميل / حذف) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-إجمالي القطع المباعة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-إجمالي القطع المباعة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 إدارة شيتات الإكسيل المرفوعة للـ Sell-Out (الرفع التراكمي شهر بشهر) | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
 إدارة شيتات الإكسيل المرفوعة للـ Sell-Out (الرفع التراكمي شهر بشهر) | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
 اسحب أو تحرك: | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 اسحب أو تحرك: | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-اسم شيت الإكسيل (Excel File) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-اسم شيت الإكسيل (Excel File) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-السلسلة (Chain) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-السلسلة (Chain) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-الشهور المغطاة (Period) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-الشهور المغطاة (Period) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-تاريخ الرفع | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-تاريخ الرفع | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 تحديث القائمة | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
 تحديث القائمة | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
 تحديث القائمة | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-تعديل / استبدال | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-تعديل / استبدال | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-تعديل / استبدال | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-تعديل / استبدال | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-تعديل / استبدال | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-تعديل / استبدال | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-تعديل / استبدال | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-تعديل / استبدال | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-تعديل / استبدال | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
 شمال | 11.0 | FontWeight.w700 | ff1d1b20 | 0.5 | 1.45
 شمال | 11.0 | FontWeight.w700 | ff1d1b20 | 0.5 | 1.45
-صافي المبيعات (Net Sell-Out EGP) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-صافي المبيعات (Net Sell-Out EGP) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-عدد الحركات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-عدد الحركات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 منظومة مبيعات التجزئة (Sell-Out)، تحليلات باريتو وأداء الفروع، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
 منظومة مبيعات التجزئة (Sell-Out)، تحليلات باريتو وأداء الفروع، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
 منظومة مبيعات التجزئة (Sell-Out)، تحليلات باريتو وأداء الفروع، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
@@ -199,9 +217,6 @@ Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 󰇾 | 15.0 | null | ff1565c0 | null | 1.0
 󰉈 | 20.0 | null | ff45464f | null | 1.0
 󰉪 | 20.0 | null | ffffffff | null | 1.0
-󰌏 | 16.0 | null | ff1565c0 | null | 1.0
-󰌏 | 16.0 | null | ff1565c0 | null | 1.0
-󰌏 | 16.0 | null | ff1565c0 | null | 1.0
 󰌞 | 20.0 | null | ff404659 | null | 1.0
  | 14.0 | null | ff1a1b21 | null | 1.0
  | 18.0 | null | ff45464f | null | 1.0
@@ -212,13 +227,16 @@ Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
  | 24.0 | null | ff45464f | null | 1.0
  | 14.0 | null | ff1a1b21 | null | 1.0
  | 24.0 | null | ff304578 | null | 1.0
- | 18.0 | null | ffba1a1a | null | 1.0
- | 18.0 | null | ffba1a1a | null | 1.0
- | 18.0 | null | ffba1a1a | null | 1.0
+ | 16.0 | null | ffba1a1a | null | 1.0
+ | 16.0 | null | ffba1a1a | null | 1.0
+ | 16.0 | null | ffba1a1a | null | 1.0
  | 20.0 | null | ff388e3c | null | 1.0
  | 20.0 | null | ff388e3c | null | 1.0
  | 20.0 | null | ff388e3c | null | 1.0
- | 18.0 | null | ff45464f | null | 1.0
- | 18.0 | null | ff45464f | null | 1.0
- | 18.0 | null | ff45464f | null | 1.0
+ | 16.0 | null | ff1565c0 | null | 1.0
+ | 16.0 | null | ff1565c0 | null | 1.0
+ | 16.0 | null | ff1565c0 | null | 1.0
+ | 16.0 | null | ff1565c0 | null | 1.0
+ | 16.0 | null | ff1565c0 | null | 1.0
+ | 16.0 | null | ff1565c0 | null | 1.0
  | 20.0 | null | ff45464f | null | 1.0

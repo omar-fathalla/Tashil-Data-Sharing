@@ -1,3 +1,5 @@
+import '../network/backend_http.dart';
+
 /// Simple in-memory TTL cache keyed by string. Use [key] to build tenant-aware keys
 /// so data never leaks across tenants on the same browser session.
 class CacheStore {
@@ -39,10 +41,29 @@ class CacheStore {
     return v;
   }
 
+  /// Called on every explicit invalidation (forceRefresh, after writes) so lower cache
+  /// layers (the HTTP stale-while-revalidate cache) refetch too.
+  void Function()? onInvalidate = BackendHttp.cache.clear;
+
   bool contains(String key) => get<Object?>(key) != null;
-  void invalidate(String key) => _entries.remove(key);
-  void invalidatePrefix(String prefix) => _entries.removeWhere((k, _) => k.startsWith(prefix));
-  void clear() => _entries.clear();
+  void invalidate(String key) {
+    _entries.remove(key);
+    onInvalidate?.call();
+  }
+
+  void invalidatePrefix(String prefix) {
+    _entries.removeWhere((k, _) => k.startsWith(prefix));
+    onInvalidate?.call();
+  }
+
+  void clear() {
+    _entries.clear();
+    onInvalidate?.call();
+  }
+
+  /// Drops parsed entries only, keeping lower cache layers (used when those layers
+  /// already hold the fresh data).
+  void clearLocal() => _entries.clear();
   int get length => _entries.length;
 }
 

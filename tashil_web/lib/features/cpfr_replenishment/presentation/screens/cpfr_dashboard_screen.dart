@@ -15,6 +15,7 @@ import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 import '../../domain/cpfr_models.dart';
+import '../../../../core/data/data_refresh_mixin.dart';
 
 /// CPFRDashboardScreen implements the multi-company, multi-chain
 /// Collaborative Planning, Forecasting & Replenishment (CPFR) system:
@@ -34,7 +35,12 @@ class CPFRDashboardScreen extends StatefulWidget {
   State<CPFRDashboardScreen> createState() => _CPFRDashboardScreenState();
 }
 
-class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> {
+class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefreshMixin<CPFRDashboardScreen> {
+  @override
+  void onBackendDataChanged() {
+    _initChainsAndLoadDashboard();
+  }
+
   int _activeTab =
       0; // 0: Reconciliation, 1: Stock & PO, 2: Forecast & Promos, 3: Sales Team
   bool _isLoading = true;

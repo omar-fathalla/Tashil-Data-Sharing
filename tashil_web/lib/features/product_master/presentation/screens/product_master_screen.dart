@@ -13,6 +13,7 @@ import '../../data/chain_discount_repository.dart';
 import '../widgets/chain_discount_profiles_card.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
+import '../../../../core/data/data_refresh_mixin.dart';
 
 /// Adeco Canonical Product Master & Official Price List Screen (`كارتة الأصناف والأسعار`).
 /// Provides:
@@ -57,7 +58,12 @@ class ProductMasterScreen extends StatefulWidget {
 }
 
 class _ProductMasterScreenState extends State<ProductMasterScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, DataRefreshMixin<ProductMasterScreen> {
+  @override
+  void onBackendDataChanged() {
+    _loadData();
+  }
+
   late final TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   final NumberFormat _currFmt = NumberFormat('#,##0.00', 'en_US');
