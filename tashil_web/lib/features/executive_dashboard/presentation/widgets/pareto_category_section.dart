@@ -148,19 +148,19 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
       return 'بروكتر آند جامبل مصر (P&G)';
     }
     if (clean.contains('بروكر')) {
-      return 'بروكتر آند جامبل (حساب 2)';
+      return 'بروكتر آند جامبل';
     }
     if (clean.contains('ارما التجارية') || clean.contains('أرما التجارية')) {
       return 'أرما التجارية - منظفات (Arma)';
     }
     if (clean.contains('329')) {
-      return 'أرما للصناعات (حساب 329)';
+      return 'أرما للصناعات';
     }
     if (clean.contains('ارما منظفات') || clean.contains('أرما منظفات')) {
       return 'أرما للمنظفات والعناية المنزلية';
     }
     if (clean.contains('311')) {
-      return 'هنكل - برسيل (حساب 311)';
+      return 'هنكل - برسيل';
     }
     if (clean.contains('هنكل برسيل')) {
       return 'هنكل - برسيل مصر (Henkel)';
@@ -262,7 +262,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                           ),
                           const SizedBox(height: 1.0),
                           Text(
-                            'Market Share vs. Competitors',
+                            'Market Share vs Competitors',
                             style: theme.textTheme.labelMedium?.copyWith(
                               color: colorScheme.primary,
                               fontWeight: FontWeight.w700,
@@ -270,7 +270,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                           ),
                           const SizedBox(height: 2.0),
                           Text(
-                            'الحصة السوقية لشركة أديكو مقارنة بالموردين المنافسين عبر كافة المجموعات',
+                            'حصتنا مقارنة بالمنافسين في كل الفئات',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -306,7 +306,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                           const SizedBox(width: 5.0),
                           Flexible(
                             child: Text(
-                              'حصة أديكو السوقية: ${widget.tenantMarketSharePct.toStringAsFixed(2)}% (#$adecoRank)',
+                              'حصتنا السوقية ${widget.tenantMarketSharePct.toStringAsFixed(2)}% (المركز #$adecoRank)',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelMedium?.copyWith(
@@ -373,7 +373,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                             const SizedBox(width: 5.0),
                             Flexible(
                               child: Text(
-                                '${widget.competitorsCount} مورد منافس',
+                                '${widget.competitorsCount} منافس',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.labelMedium?.copyWith(
@@ -416,8 +416,8 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               const SizedBox(width: 5.0),
                               Text(
                                 _showAll
-                                    ? 'عرض أهم 8 موردين'
-                                    : 'عرض كافة الموردين (${widget.supplierShares.length})',
+                                    ? 'أهم 8 موردين'
+                                    : 'كل الموردين (${widget.supplierShares.length})',
                                 style: theme.textTheme.labelMedium?.copyWith(
                                   color: colorScheme.primary,
                                   fontWeight: FontWeight.bold,
@@ -540,7 +540,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                   const SizedBox(width: 5.0),
                                   Flexible(
                                     child: Text(
-                                      '${sup.skuCount} باركود',
+                                      '${sup.skuCount} صنف',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: theme.textTheme.labelSmall?.copyWith(
@@ -578,8 +578,8 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                         children: [
                                           Text(
                                             rank == 1
-                                                ? 'الشركة الرائدة (#1)'
-                                                : 'المركز التنافسي (#$rank)',
+                                                ? 'الأولى في السوق'
+                                                : 'المركز #$rank',
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: theme.textTheme.labelSmall?.copyWith(
@@ -588,9 +588,8 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                               fontSize: M3FontSize.labelSmall,
                                             ),
                                           ),
-                                          if (rank == 1)
                                             Text(
-                                              'Market Leader',
+                                              rank == 1 ? 'Market leader' : 'Rank #$rank',
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: theme.textTheme.labelSmall?.copyWith(
@@ -776,7 +775,7 @@ year2023: false,
                               ),
                             ),
                             Text(
-                              'باقي الموردين والمنافسين ${remainingCount > 0 ? '($remainingCount مورد آخر)' : ''}',
+                              'موردون آخرون${remainingCount > 0 ? ' ($remainingCount)' : ''}',
                               style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: colorScheme.onSurface,
@@ -804,7 +803,7 @@ year2023: false,
                                   ),
                                   const SizedBox(width: 5.0),
                                   Text(
-                                    'تغطية باقي السوق',
+                                    'باقي السوق',
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.w600,
@@ -816,7 +815,7 @@ year2023: false,
                             ),
                             if (widget.supplierShares.length > 8)
                               Text(
-                                '(انقر لعرض الكل)',
+                                'عرض الكل',
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: colorScheme.primary,
                                   fontWeight: FontWeight.bold,
@@ -1010,7 +1009,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'مساهمة الفئات والمجموعات السلعية',
+                        'مساهمة الفئات',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -1025,7 +1024,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                       ),
                       const SizedBox(height: 2.0),
                       Text(
-                        'توزيع الإيرادات والحصة السوقية داخل كل مجموعة رئيسية',
+                        'المبيعات والحصة السوقية لكل فئة',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -1063,8 +1062,8 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                           const SizedBox(width: 4.0),
                           Text(
                             _showAll
-                                ? 'أهم 10 فقط'
-                                : 'كافة الفئات (${widget.categories.length})',
+                                ? 'أهم 10'
+                                : 'كل الفئات (${widget.categories.length})',
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: colorScheme.primary,
                               fontWeight: FontWeight.bold,
@@ -1141,7 +1140,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                         ),
                       ),
                       Text(
-                        'حصة الشركة من السوق',
+                        'حصتنا السوقية %',
                         style: theme.textTheme.labelMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: colorScheme.onSurface,
@@ -1154,7 +1153,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                           borderRadius: M3Shape.radiusSm,
                         ),
                         child: Text(
-                          'حصتنا بالسوق %',
+                          'حصتنا السوقية %',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.onPrimaryContainer,
                             fontWeight: FontWeight.bold,
@@ -1182,7 +1181,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                         ),
                       ),
                       Text(
-                        'المساهمة في مبيعات الشركة',
+                        '% من مبيعاتنا',
                         style: theme.textTheme.labelMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: colorScheme.onSurface,
@@ -1290,7 +1289,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                           borderRadius: M3Shape.radiusSm,
                                         ),
                                         child: Text(
-                                          'حصتنا بالسوق: ${cat.tenantCategorySharePct.toStringAsFixed(1)}%',
+                                          'حصتنا السوقية ${cat.tenantCategorySharePct.toStringAsFixed(1)}%',
                                           style: theme.textTheme.labelSmall?.copyWith(
                                             color: colorScheme.onPrimaryContainer,
                                             fontWeight: FontWeight.bold,
@@ -1322,7 +1321,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                   ),
                                   const SizedBox(width: 4.0),
                                   Text(
-                                    'من مبيعاتنا',
+                                    '% من مبيعاتنا',
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
                                       fontSize: M3FontSize.tiny,
@@ -1350,7 +1349,7 @@ year2023: false,
                               Flexible(
                                 child: Text(
                                   cat.categoryMarketRevenue > 0
-                                      ? '${CurrencyFormatter.formatCompactEGP(cat.totalRevenue)} مبيعاتنا من إجمالي ${CurrencyFormatter.formatCompactEGP(cat.categoryMarketRevenue)} بالسوق'
+                                      ? '${CurrencyFormatter.formatCompactEGP(cat.totalRevenue)} من إجمالي سوق ${CurrencyFormatter.formatCompactEGP(cat.categoryMarketRevenue)}'
                                       : '${CurrencyFormatter.formatCompactEGP(cat.totalRevenue)} مبيعاتنا',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
@@ -1361,7 +1360,7 @@ year2023: false,
                               ),
                               const SizedBox(width: 8.0),
                               Text(
-                                '${CurrencyFormatter.formatUnits(cat.totalUnits)} عبوة',
+                                '${CurrencyFormatter.formatUnits(cat.totalUnits)} وحدة',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                   fontSize: M3FontSize.labelSmallPlus,
@@ -1412,7 +1411,7 @@ year2023: false,
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
                                     Text(
-                                      'باقي الفئات الأخرى ${remainingCount > 0 ? '($remainingCount فئات أخرى)' : ''}',
+                                      'فئات أخرى${remainingCount > 0 ? ' ($remainingCount)' : ''}',
                                       style: theme.textTheme.bodyMedium?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: colorScheme.onSurface,
@@ -1429,7 +1428,7 @@ year2023: false,
                                         borderRadius: M3Shape.radiusSm,
                                       ),
                                       child: Text(
-                                        'فئات إضافية',
+                                        'فئات أخرى',
                                         style: theme.textTheme.labelSmall?.copyWith(
                                           color: colorScheme.onSurfaceVariant,
                                           fontSize: M3FontSize.tinyPlus,
@@ -1438,7 +1437,7 @@ year2023: false,
                                     ),
                                     if (widget.categories.length > 10)
                                       Text(
-                                        '(انقر لعرض الكل)',
+                                        'عرض الكل',
                                         style: theme.textTheme.labelSmall?.copyWith(
                                           color: colorScheme.primary,
                                           fontWeight: FontWeight.bold,
@@ -1463,7 +1462,7 @@ year2023: false,
                                   ),
                                   const SizedBox(width: 4.0),
                                   Text(
-                                    'من مبيعاتنا',
+                                    '% من مبيعاتنا',
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
                                       fontSize: M3FontSize.tiny,
@@ -1501,7 +1500,7 @@ year2023: false,
                               ),
                               const SizedBox(width: 8.0),
                               Text(
-                                '${CurrencyFormatter.formatUnits(remainingUnits)} عبوة',
+                                '${CurrencyFormatter.formatUnits(remainingUnits)} وحدة',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                   fontSize: M3FontSize.labelSmallPlus,
@@ -1610,7 +1609,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'الأصناف القائدة للمبيعات (باريتو 80/20)',
+                        'الأصناف الأعلى مبيعًا (80/20)',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -1621,7 +1620,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                         children: [
                           Flexible(
                             child: Text(
-                            'Pareto 80/20 Power SKUs',
+                            'Top SKUs (Pareto 80/20)',
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.labelMedium?.copyWith(
                               color: colorScheme.primary,
@@ -1641,8 +1640,8 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                       const SizedBox(height: 2.0),
                       Text(
                         isFiltered
-                            ? 'الأصناف المحركة لـ 80% من مبيعات ($selectedCategory) سهم تراكمي'
-                            : 'الأصناف المحركة لـ 80% من إجمالي المبيعات (سهم تراكمي %)',
+                            ? 'الأصناف التي تحقق 80% من مبيعات $selectedCategory'
+                            : 'الأصناف التي تحقق 80% من المبيعات',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -1672,7 +1671,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                         Icon(AppIcons.filterAlt, size: 16.0, color: colorScheme.primary),
                         const SizedBox(width: 6.0),
                         Text(
-                          'أصناف فئة: $selectedCategory (${skusToDisplay.length} صنف)',
+                          '$selectedCategory · ${skusToDisplay.length} صنف',
                           style: theme.textTheme.labelMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: colorScheme.onPrimaryContainer,
@@ -1685,7 +1684,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                       child: Row(
                         children: [
                           Text(
-                            'عرض كافة الفئات',
+                            'عرض كل الفئات',
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: colorScheme.primary,
                               fontWeight: FontWeight.bold,
@@ -1710,7 +1709,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                       Icon(AppIcons.units, size: 36.0, color: colorScheme.outline),
                       const SizedBox(height: 8.0),
                       Text(
-                        'لا توجد أصناف مسجلة لهذه الفئة حالياً',
+                        'لا توجد أصناف في هذه الفئة',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -1718,7 +1717,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                       const SizedBox(height: 8.0),
                       FilledButton.tonal(
                         onPressed: onClearCategory,
-                        child: const Text('Show All'),
+                        child: const Text('عرض الكل'),
                       ),
                     ],
                   ),
@@ -1776,7 +1775,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                         borderRadius: M3Shape.radiusSm,
                                       ),
                                       child: Text(
-                                        isClassA ? 'فئة A • 80%' : 'فئة B/C',
+                                        isClassA ? 'تصنيف A' : 'تصنيف B/C',
                                         style: theme.textTheme.labelSmall?.copyWith(
                                           color: isClassA
                                               ? colorScheme.onPrimaryContainer
@@ -1790,7 +1789,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4.0),
                                 Text(
-                                  '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود: ${sku.itemCode} • " : ""}باركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
+                                  '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود الصنف: ${sku.itemCode} • " : ""}الباركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                     fontSize: M3FontSize.labelSmall,
@@ -1800,7 +1799,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 2.0),
                                 Text(
-                                  'حصة: ${sku.revenueSharePct.toStringAsFixed(1)}% • تراكمي: ${sku.cumulativeSharePct.toStringAsFixed(1)}%',
+                                  'الحصة ${sku.revenueSharePct.toStringAsFixed(1)}% • التراكمي ${sku.cumulativeSharePct.toStringAsFixed(1)}%',
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.onSurface,
@@ -1830,7 +1829,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 3.0),
                                       Text(
-                                        '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود: ${sku.itemCode} • " : ""}باركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
+                                        '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود الصنف: ${sku.itemCode} • " : ""}الباركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
                                         style: theme.textTheme.bodySmall?.copyWith(
                                           color: colorScheme.onSurfaceVariant,
                                           fontSize: M3FontSize.labelSmall,
@@ -1850,7 +1849,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
-                                        'حصة: ${sku.revenueSharePct.toStringAsFixed(1)}%',
+                                        'الحصة ${sku.revenueSharePct.toStringAsFixed(1)}%',
                                         style: theme.textTheme.labelMedium?.copyWith(
                                           fontWeight: FontWeight.bold,
                                           color: colorScheme.onSurface,
@@ -1859,7 +1858,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 2.0),
                                       Text(
-                                        'تراكمي: ${sku.cumulativeSharePct.toStringAsFixed(1)}%',
+                                        'التراكمي ${sku.cumulativeSharePct.toStringAsFixed(1)}%',
                                         style: theme.textTheme.labelSmall?.copyWith(
                                           color: colorScheme.onSurfaceVariant,
                                           fontSize: M3FontSize.tinyPlus,
@@ -1883,7 +1882,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                     borderRadius: M3Shape.radiusSm,
                                   ),
                                   child: Text(
-                                    isClassA ? 'فئة A • 80% من المبيعات' : 'فئة B/C',
+                                    isClassA ? 'تصنيف A' : 'تصنيف B/C',
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: isClassA
                                           ? colorScheme.onPrimaryContainer

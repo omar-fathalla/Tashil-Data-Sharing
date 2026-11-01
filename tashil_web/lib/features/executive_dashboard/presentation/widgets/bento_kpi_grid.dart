@@ -45,14 +45,14 @@ class BentoKpiGrid extends StatelessWidget {
     if (activeChains.isNotEmpty) {
       final names = activeChains.map(_shortChainNameAr).toList();
       if (names.length == 1) {
-        return 'فروع ${names.first} المستنتجة تلقائياً من الإكسيل';
+        return 'فروع ${names.first} من الملف المرفوع';
       }
-      return 'فروع ${names.join(' • ')} المستنتجة من الإكسيل';
+      return 'فروع ${names.join(' • ')} من الملفات المرفوعة';
     }
     if (kpis.activeStoresCount == 0) {
       return 'لا توجد فروع نشطة في هذه الفترة';
     }
-    return 'فروع السلاسل النشطة في الفترة المحددة';
+    return 'الفروع النشطة في الفترة المحددة';
   }
 
   @override
@@ -78,15 +78,15 @@ class BentoKpiGrid extends StatelessWidget {
             SizedBox(
               width: cardWidth,
               child: KpiCard(
-                title: 'إجمالي مبيعات التجزئة',
-                titleEn: 'Total Retail Sell-Out',
+                title: 'إجمالي Sell-Out',
+                titleEn: 'Total Sell-Out (EGP)',
                 value: CurrencyFormatter.formatCompactEGP(kpis.totalRevenue),
                 subtitle: CurrencyFormatter.formatEGP(kpis.totalRevenue),
                 icon: AppIcons.money,
                 growthPct: kpis.revenueGrowthPct,
-                badgeLabel: '${_formatSignedPctValue(kpis.revenueMomPct)} شهري',
+                badgeLabel: '${_formatSignedPctValue(kpis.revenueMomPct)} مقارنة بالشهر السابق',
                 badgeLabelEn: 'MoM',
-                secondaryBadgeLabel: '${_formatSignedPctValue(kpis.revenueYoyPct)} سنوي',
+                secondaryBadgeLabel: '${_formatSignedPctValue(kpis.revenueYoyPct)} مقارنة بالعام السابق',
                 secondaryBadgeLabelEn: 'YoY',
                 isPositive: kpis.revenueMomPct >= 0,
               ),
@@ -97,12 +97,12 @@ class BentoKpiGrid extends StatelessWidget {
                 title: 'إجمالي الوحدات المباعة',
                 titleEn: 'Total Units Sold',
                 value: CurrencyFormatter.formatCompactUnits(kpis.totalUnitsSold),
-                subtitle: '${CurrencyFormatter.formatUnits(kpis.totalUnitsSold)} عبوة',
+                subtitle: '${CurrencyFormatter.formatUnits(kpis.totalUnitsSold)} وحدة',
                 icon: AppIcons.units,
                 growthPct: kpis.unitsGrowthPct,
-                badgeLabel: '${_formatSignedPctValue(kpis.unitsMomPct)} شهري',
+                badgeLabel: '${_formatSignedPctValue(kpis.unitsMomPct)} مقارنة بالشهر السابق',
                 badgeLabelEn: 'MoM',
-                secondaryBadgeLabel: '${_formatSignedPctValue(kpis.unitsYoyPct)} سنوي',
+                secondaryBadgeLabel: '${_formatSignedPctValue(kpis.unitsYoyPct)} مقارنة بالعام السابق',
                 secondaryBadgeLabelEn: 'YoY',
                 isPositive: kpis.unitsMomPct >= 0,
               ),
@@ -110,19 +110,19 @@ class BentoKpiGrid extends StatelessWidget {
             SizedBox(
               width: cardWidth,
               child: KpiCard(
-                title: 'الفروع النشطة المغطاة',
-                titleEn: 'Active Covered Branches',
-                value: '${kpis.activeStoresCount} فرع',
+                title: 'الفروع النشطة',
+                titleEn: 'Active Stores',
+                value: '${kpis.activeStoresCount} ${kpis.activeStoresCount >= 3 && kpis.activeStoresCount <= 10 ? 'فروع' : 'فرع'}',
                 subtitle: _buildActiveBranchesSubtitle(),
                 icon: AppIcons.store,
                 growthPct: 0.0,
-                badgeLabel: kpis.activeStoresCount > 0 ? 'تغطية 100%' : 'تم التصفير (0 فرع)',
+                badgeLabel: kpis.activeStoresCount > 0 ? 'نشطة' : 'لا توجد فروع نشطة',
                 badgeLabelEn: kpis.activeStoresCount > 0 ? '100% Coverage' : '0 Branches',
                 secondaryBadgeLabel: kpis.tenantMarketSharePct > 0
-                    ? 'الحصة السوقية: ${kpis.tenantMarketSharePct.toStringAsFixed(2)}% • ${kpis.totalSkusCount} صنف'
+                    ? 'الحصة السوقية ${kpis.tenantMarketSharePct.toStringAsFixed(2)}% • ${kpis.totalSkusCount} صنف'
                     : null,
                 secondaryBadgeLabelEn: kpis.tenantMarketSharePct > 0
-                    ? 'Market Share • ${kpis.totalSkusCount} SKUs'
+                    ? 'Market share • ${kpis.totalSkusCount} SKUs'
                     : null,
                 isPositive: true,
                 usePrimaryBadge: true,
@@ -131,16 +131,16 @@ class BentoKpiGrid extends StatelessWidget {
             SizedBox(
               width: cardWidth,
               child: KpiCard(
-                title: 'نسبة النواقص',
-                titleEn: 'Out-of-Stock Rate (OOS Rate)',
+                title: 'نسبة نفاد المخزون (OOS)',
+                titleEn: 'OOS Rate',
                 value: '${kpis.oosRatePct.toStringAsFixed(1)}%',
-                subtitle: 'خسارة تقديرية: ${CurrencyFormatter.formatCompactEGP(kpis.estimatedLostRevenue)}',
+                subtitle: 'المبيعات المفقودة (تقديري): ${CurrencyFormatter.formatCompactEGP(kpis.estimatedLostRevenue)}',
                 icon: AppIcons.warning,
                 growthPct: -kpis.oosRatePct,
-                badgeLabel: 'توافر الرفوف: ${kpis.osaRatePct.toStringAsFixed(1)}%',
-                badgeLabelEn: 'On-Shelf Availability (OSA)',
-                secondaryBadgeLabel: 'نسبة النواقص: ${kpis.oosRatePct.toStringAsFixed(1)}% • ${kpis.totalOOSIncidents} صنف ناقص',
-                secondaryBadgeLabelEn: 'OOS Rate • ${kpis.totalOOSIncidents} OOS Incidents',
+                badgeLabel: 'التوفر على الرف (OSA) ${kpis.osaRatePct.toStringAsFixed(1)}%',
+                badgeLabelEn: 'OSA ${kpis.osaRatePct.toStringAsFixed(1)}%',
+                secondaryBadgeLabel: 'نفاد المخزون ${kpis.oosRatePct.toStringAsFixed(1)}% • ${kpis.totalOOSIncidents} حالة نفاد',
+                secondaryBadgeLabelEn: 'OOS rate • ${kpis.totalOOSIncidents} OOS cases',
                 isPositive: false,
                 isAlert: true,
               ),

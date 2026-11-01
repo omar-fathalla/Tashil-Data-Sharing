@@ -60,7 +60,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
   late ExecutiveDashboardRepository _repo;
 
   static const List<({int number, String shortName, String fullName})> _months = [
-    (number: 0, shortName: 'All', fullName: 'All Months'),
+    (number: 0, shortName: 'All', fullName: 'كل الشهور'),
     (number: 1, shortName: 'Jan', fullName: 'January'),
     (number: 2, shortName: 'Feb', fullName: 'February'),
     (number: 3, shortName: 'Mar', fullName: 'March'),
@@ -79,7 +79,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
 
   List<({String code, String shortName, String fullName})> get _availableChains {
     final list = <({String code, String shortName, String fullName})>[
-      (code: 'all', shortName: 'All', fullName: 'All Chains (كل السلاسل)'),
+      (code: 'all', shortName: 'All', fullName: 'كل السلاسل'),
     ];
 
     final items = (kpis?.availableChains.isNotEmpty == true)
@@ -218,8 +218,9 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
         isLoading = false;
         loadError = error.toString();
       });
+      debugPrint('Executive dashboard load failed: $error');
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text('تعذر تحميل مؤشرات الأداء: $error')),
+        const SnackBar(content: Text('تعذّر تحميل المؤشرات. حاول مرة أخرى.')),
       );
       return;
     }
@@ -306,9 +307,9 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
         SegmentedButton<String>(
           key: const ValueKey('executive_period_segmented'),
           segments: const [
-            ButtonSegment(value: 'monthly', label: Text('Monthly')),
-            ButtonSegment(value: 'quarterly', label: Text('Quarterly')),
-            ButtonSegment(value: 'yearly', label: Text('Yearly')),
+            ButtonSegment(value: 'monthly', label: Text('شهري')),
+            ButtonSegment(value: 'quarterly', label: Text('ربع سنوي')),
+            ButtonSegment(value: 'yearly', label: Text('سنوي')),
           ],
           selected: {_periodMode},
           showSelectedIcon: false,
@@ -355,7 +356,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
 
     return _menuFilter<String>(
       key: const ValueKey('executive_chain_dropdown'),
-      tooltip: 'Filter by Retail Chain',
+      tooltip: 'تصفية حسب السلسلة',
       onSelected: (chainCode) {
         setState(() => selectedChain = chainCode);
         _loadData();
@@ -469,7 +470,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
           key: const ValueKey('executive_year_segmented'),
           segments: [
             for (final y in _years)
-              ButtonSegment<int>(value: y, label: Text('$y'), tooltip: 'Year $y'),
+              ButtonSegment<int>(value: y, label: Text('$y'), tooltip: 'سنة $y'),
           ],
           selected: {selectedYear},
           showSelectedIcon: false,
@@ -501,7 +502,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
           // Month Dropdown Button Segment
           _menuFilter<int>(
             key: const ValueKey('executive_month_dropdown'),
-            tooltip: 'Select Month',
+            tooltip: 'اختر الشهر',
             minWidth: 220.0,
             onSelected: (month) {
               setState(() {
@@ -622,7 +623,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
             // Top Bar: Unified M3 Left English Title + Right Arabic Subtitle + Filter Controls
             M3PageHeader(
               titleEn: 'Executive Dashboard',
-              subtitleAr: 'مؤشرات الأداء المالي والبيعي الفوري لسلاسل التجزئة المصرية',
+              subtitleAr: 'أداء المبيعات في سلاسل التجزئة',
               actions: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -706,7 +707,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
                               Icon(AppIcons.error, size: 40.0, color: Theme.of(context).colorScheme.error),
                               M3Spacing.gapSM,
                               Text(
-                                loadError == null ? 'No data to display' : 'Could not load dashboard data',
+                                loadError == null ? 'لا توجد بيانات لهذه الفترة' : 'تعذّر تحميل البيانات',
                                 style: Theme.of(context).textTheme.titleMedium,
                                 textAlign: TextAlign.center,
                               ),
@@ -718,7 +719,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
                                   _loadData();
                                 },
                                 icon: const Icon(AppIcons.refresh),
-                                label: const Text('Retry'),
+                                label: const Text('إعادة المحاولة'),
                               ),
                             ],
                           ),

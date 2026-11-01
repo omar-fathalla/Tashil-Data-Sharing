@@ -98,17 +98,17 @@ void main() {
       final categoryTop = tester.getTopLeft(find.text('Category Contribution').first).dy;
       expect(kpiTop, lessThan(shareTop));
       expect(shareTop, lessThan(categoryTop));
-      expect(find.text('Total Retail Sell-Out'), findsOneWidget);
+      expect(find.text('Total Sell-Out (EGP)'), findsOneWidget);
       expect(find.text('Total Units Sold'), findsOneWidget);
-      expect(find.text('Active Covered Branches'), findsOneWidget);
-      expect(find.text('Out-of-Stock Rate (OOS Rate)'), findsOneWidget);
+      expect(find.text('Active Stores'), findsOneWidget);
+      expect(find.text('OOS Rate'), findsOneWidget);
     });
   }
 
   testWidgets('Period segmented switches to quarterly and shows Q1–Q4', (tester) async {
     await _pumpAt(tester, 1280);
     expect(find.byKey(const ValueKey('executive_quarter_segmented')), findsNothing);
-    await tester.tap(find.text('Quarterly'));
+    await tester.tap(find.text('ربع سنوي'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('executive_quarter_segmented')), findsOneWidget);
     await tester.tap(find.text('Q2'));
@@ -256,8 +256,8 @@ void main() {
       expect(find.text('Test SKU 5'), findsOneWidget);
       expect(find.text('Rank #1 of 14'), findsOneWidget);
       expect(find.text('Competitor Floor cleaner 0'), findsOneWidget);
-      expect(find.text('This SKU'), findsOneWidget);
-      expect(find.text('Our other SKUs'), findsOneWidget);
+      expect(find.text('هذا الصنف'), findsOneWidget);
+      expect(find.text('أصنافنا الأخرى'), findsOneWidget);
       expect(find.text('Competitors'), findsWidgets);
       final donut = tester.getSize(find.byKey(const ValueKey('category_donut_Floor cleaner')));
       expect(donut.height, greaterThan(64));
@@ -284,8 +284,8 @@ void main() {
     final cat = tester.getRect(find.byKey(const ValueKey('share_per_category_card')));
     expect(cat.top, greaterThanOrEqualTo(sku.bottom - 1));
     expect(sku.width, closeTo(cat.width, 1));
-    expect(find.text('Share per SKU'), findsOneWidget);
-    expect(find.text('Share per Category'), findsOneWidget);
+    expect(find.text('الحصة حسب الصنف'), findsOneWidget);
+    expect(find.text('الحصة حسب الفئة'), findsOneWidget);
     expect(find.text('Test SKU 5'), findsOneWidget);
     expect(find.text('Rank #1 of 4'), findsOneWidget);
     // Compact donut when the card is not stretched to a sibling.

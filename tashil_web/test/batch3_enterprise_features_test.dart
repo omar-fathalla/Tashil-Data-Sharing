@@ -97,16 +97,16 @@ void main() {
         ),
       );
 
-      expect(find.text('+14.8% شهري'), findsOneWidget);
+      expect(find.text('+14.8% مقارنة بالشهر السابق'), findsOneWidget);
       expect(find.text('MoM'), findsNWidgets(2));
-      expect(find.text('+24.5% سنوي'), findsOneWidget);
+      expect(find.text('+24.5% مقارنة بالعام السابق'), findsOneWidget);
       expect(find.text('YoY'), findsNWidgets(2));
-      expect(find.text('+9.2% شهري'), findsOneWidget);
-      expect(find.text('+16.4% سنوي'), findsOneWidget);
-      expect(find.text('توافر الرفوف: 96.8%'), findsOneWidget);
-      expect(find.text('On-Shelf Availability (OSA)'), findsOneWidget);
-      expect(find.textContaining('نسبة النواقص: 3.2%'), findsOneWidget);
-      expect(find.textContaining('OOS Rate •'), findsOneWidget);
+      expect(find.text('+9.2% مقارنة بالشهر السابق'), findsOneWidget);
+      expect(find.text('+16.4% مقارنة بالعام السابق'), findsOneWidget);
+      expect(find.text('التوفر على الرف (OSA) 96.8%'), findsOneWidget);
+      expect(find.textContaining('OSA '), findsWidgets);
+      expect(find.textContaining('نفاد المخزون 3.2%'), findsOneWidget);
+      expect(find.textContaining('OOS rate •'), findsOneWidget);
     });
 
     testWidgets('ParetoCategorySection renders Category Contribution and Pareto 80/20 cards and handles empty lists', (WidgetTester tester) async {
@@ -139,8 +139,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Category Contribution'), findsOneWidget);
-      expect(find.text('Pareto 80/20 Power SKUs'), findsOneWidget);
-      expect(find.text('توزيع الإيرادات والحصة السوقية داخل كل مجموعة رئيسية'), findsOneWidget);
+      expect(find.text('Top SKUs (Pareto 80/20)'), findsOneWidget);
+      expect(find.text('المبيعات والحصة السوقية لكل فئة'), findsOneWidget);
       // Exclude the new Market Share section above, which also lists categories.
       final inNewSection = find.descendant(
         of: find.byKey(const ValueKey('market_share_section')),
@@ -161,17 +161,17 @@ void main() {
       await tester.tap(existingCat);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('أصناف فئة: زيوت طعام'), findsOneWidget);
-      expect(find.text('عرض كافة الفئات'), findsOneWidget);
+      expect(find.textContaining('زيوت طعام · '), findsOneWidget);
+      expect(find.text('عرض كل الفئات'), findsOneWidget);
       expect(find.text('عرض الكل'), findsOneWidget);
 
       // Tap clear to reset back to global Pareto SKUs
-      await tester.tap(find.text('عرض كافة الفئات'));
+      await tester.tap(find.text('عرض كل الفئات'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('أصناف فئة:'), findsNothing);
-      expect(find.text('فئة A • 80% من المبيعات'), findsNWidgets(3));
-      expect(find.text('فئة B/C'), findsNWidgets(2));
+      expect(find.text('تصنيف A'), findsNWidgets(3));
+      expect(find.text('تصنيف B/C'), findsNWidgets(2));
     });
 
     testWidgets('OOSDashboardScreen renders On-Shelf Availability (مؤشر التوافر على الرفوف OSA%) summary card', (WidgetTester tester) async {
