@@ -220,6 +220,11 @@ func (f *fakeAggWriter) WriteAnalyticsAggregates(_ context.Context, a *domain.An
 	return nil
 }
 
+// backgroundComputeWait bounds one full aggregates compute over the seeded dataset. It is not a race:
+// a single compute (4 chains) measured 7.7s on an M-series Mac, and the CI runner runs it 2-3x slower
+// while other package tests run in parallel, so the old 20s wait failed intermittently.
+const backgroundComputeWait = 90 * time.Second
+
 func TestPrecomputedLayerRecomputesInBackgroundAndMirrors(t *testing.T) {
 	c := newSeededTestClient(t)
 	old := recomputeDelay
@@ -230,7 +235,7 @@ func TestPrecomputedLayerRecomputesInBackgroundAndMirrors(t *testing.T) {
 	var first *domain.AnalyticsAggregates
 	select {
 	case first = <-w.got:
-	case <-time.After(20 * time.Second):
+	case <-time.After(backgroundComputeWait):
 		t.Fatal("no background compute after attaching writer")
 	}
 	c.SetChainDiscountProfiles("tenant-adeco", []domain.ChainDiscountProfile{{Chain: "x", InvoiceDiscountPct: 5}})
@@ -239,7 +244,7 @@ func TestPrecomputedLayerRecomputesInBackgroundAndMirrors(t *testing.T) {
 		if a.Version <= first.Version {
 			t.Fatalf("expected newer version mirrored, got %d after %d", a.Version, first.Version)
 		}
-	case <-time.After(20 * time.Second):
+	case <-time.After(backgroundComputeWait):
 		t.Fatal("no background recompute after source change")
 	}
 }
