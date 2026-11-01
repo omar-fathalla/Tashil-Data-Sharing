@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"time"
@@ -231,12 +233,8 @@ func (p *Processor) loadDiskArchiveLocked() {
 			if p.fsRepo != nil && p.fsRepo.IsArchiveDeleted(item.TenantID, item.ID, item.FileName) {
 				continue
 			}
+			// Bytes are read lazily from disk (archivedBytesLocked) instead of pinning every workbook in memory.
 			p.archivedFiles[item.ID] = item
-			if item.StoragePath != "" {
-				if b, err := os.ReadFile(item.StoragePath); err == nil && len(b) > 0 {
-					p.archivedBytes[item.ID] = b
-				}
-			}
 		}
 	}
 }
@@ -303,7 +301,7 @@ func (p *Processor) SnapshotExistingArchivedFile(tenantID, retailChain, filename
 			strings.EqualFold(entry.FileName, filename) {
 			copyEntry := *entry
 			var bCopy []byte
-			if raw, ok := p.archivedBytes[id]; ok && len(raw) > 0 {
+			if raw := p.archivedBytesLocked(id); len(raw) > 0 {
 				bCopy = make([]byte, len(raw))
 				copy(bCopy, raw)
 			}
@@ -379,7 +377,7 @@ func (p *Processor) SaveArchivedFile(
 			if fileType == "product_master" {
 				// Only reuse existing entry for Product Master if raw bytes are identical (e.g., startup replay);
 				// otherwise create a new versioned entry so deleting it rolls back to the prior sheet version.
-				if bytes.Equal(p.archivedBytes[id], fileBytes) {
+				if bytes.Equal(p.archivedBytesLocked(id), fileBytes) {
 					existingID = id
 					existingUploadedAt = entry.UploadedAt
 					break
@@ -976,11 +974,9 @@ func (p *Processor) replayArchivedFiles(ctx context.Context, writeSink bool) err
 					targetPath = alt
 				}
 			}
+			// Read from disk for this file only; do not pin every archived workbook in memory during a replay.
 			if b, err := os.ReadFile(targetPath); err == nil && len(b) > 0 {
 				raw = b
-				p.archiveMu.Lock()
-				p.archivedBytes[f.ID] = b
-				p.archiveMu.Unlock()
 			}
 		}
 		if len(raw) == 0 {
@@ -995,10 +991,36 @@ func (p *Processor) replayArchivedFiles(ctx context.Context, writeSink bool) err
 		} else if isSellInArchiveEntry(f) {
 			_, _ = p.ProcessSellInPlan(ctx, f.TenantID, f.FileName, raw, false, f.RetailChain)
 		} else {
-			_, _ = p.ProcessUpload(ctx, f.TenantID, f.FileName, raw, f.RetailChain)
+			// Replays re-read already accepted uploads: no Gemini calls, and validation only logs.
+			_, _ = p.ProcessUpload(gemini.WithReplay(ctx), f.TenantID, f.FileName, raw, f.RetailChain)
 		}
+		// Release the parsed workbook before the next one so peak memory stays near one file.
+		raw = nil
+		runtime.GC()
+		debug.FreeOSMemory()
 	}
 
 	return nil
 }
 
+
+// archivedBytesLocked returns an archived file's bytes from the in-memory cache, or
+// reads them from disk when they are not cached. Caller holds archiveMu.
+func (p *Processor) archivedBytesLocked(id string) []byte {
+	if raw, ok := p.archivedBytes[id]; ok && len(raw) > 0 {
+		return raw
+	}
+	entry, ok := p.archivedFiles[id]
+	if !ok || entry == nil || entry.StoragePath == "" {
+		return nil
+	}
+	targetPath := entry.StoragePath
+	if _, err := os.Stat(targetPath); os.IsNotExist(err) && p.archiveDir != "" {
+		targetPath = filepath.Join(p.archiveDir, entry.TenantID, filepath.Base(entry.StoragePath))
+	}
+	b, err := os.ReadFile(targetPath)
+	if err != nil {
+		return nil
+	}
+	return b
+}

@@ -1949,6 +1949,16 @@ class UploadedFilesArchiveResponse {
   }
 }
 
+/// Thrown when the backend rejected an upload after validating its totals.
+class UploadRejectedException implements Exception {
+  final String message;
+
+  UploadRejectedException(this.message);
+
+  @override
+  String toString() => message;
+}
+
 /// Thrown when the backend server is unreachable, offline, or returns an error,
 /// strictly preventing the display of fake or fabricated mock data.
 class ServerConnectionException implements Exception {
@@ -3933,6 +3943,20 @@ class ApiClient {
         );
         return model;
       }
+      if (resp.statusCode == 422) {
+        // The backend validated the sheet and refused to save it: surface the
+        // reason instead of falling back to a locally parsed result.
+        String message = 'تعذّر قراءة الملف بشكل صحيح ولم يتم حفظه';
+        try {
+          final body = jsonDecode(resp.body);
+          if (body is Map && body['message'] is String && (body['message'] as String).isNotEmpty) {
+            message = body['message'] as String;
+          }
+        } catch (_) {}
+        throw UploadRejectedException(message);
+      }
+    } on UploadRejectedException {
+      rethrow;
     } catch (e) {
       debugPrint('[ApiClient] Fallback to mock ingestion result: $e');
     }
