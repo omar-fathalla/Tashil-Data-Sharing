@@ -2887,7 +2887,7 @@ class ApiClient {
       isServerOnline.value = false;
       lastConnectionError = failureError.toString();
       throw ServerConnectionException(
-        'تعذر الاتصال بخادم التحليلات وقواعد البيانات (Port 8080). تم إيقاف عرض البيانات منعاً لإظهار أي أرقام غير حقيقية.',
+        'تعذّر تحميل البيانات من الخادم. حاول مرة أخرى بعد قليل.',
         failureError,
       );
     }
@@ -2976,7 +2976,7 @@ class ApiClient {
         'limit': limit.toString(),
         'offset': offset.toString(),
       });
-      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 60));
+      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 180));
       if (resp.statusCode == 200) {
         isServerOnline.value = true;
         lastConnectionError = null;
@@ -3029,7 +3029,7 @@ class ApiClient {
       isServerOnline.value = false;
       lastConnectionError = failureError.toString();
       throw ServerConnectionException(
-        'تعذر الاتصال بخادم التحليلات وقواعد البيانات (Port 8080). تم إيقاف عرض البيانات منعاً لإظهار أي أرقام غير حقيقية.',
+        'تعذّر تحميل البيانات من الخادم. حاول مرة أخرى بعد قليل.',
         failureError,
       );
     }
@@ -3104,7 +3104,7 @@ class ApiClient {
       isServerOnline.value = false;
       lastConnectionError = failureError.toString();
       throw ServerConnectionException(
-        'تعذر الاتصال بخادم التحليلات وقواعد البيانات (Port 8080).',
+        'تعذّر تحميل البيانات من الخادم. حاول مرة أخرى بعد قليل.',
         failureError,
       );
     }
@@ -3160,7 +3160,7 @@ class ApiClient {
       isServerOnline.value = false;
       lastConnectionError = failureError.toString();
       throw ServerConnectionException(
-        'تعذر الاتصال بخادم التحليلات وقواعد البيانات (Port 8080).',
+        'تعذّر تحميل البيانات من الخادم. حاول مرة أخرى بعد قليل.',
         failureError,
       );
     }
@@ -3245,7 +3245,7 @@ class ApiClient {
         isServerOnline.value = false;
         lastConnectionError = e.toString();
         throw ServerConnectionException(
-          'تعذر الاتصال بخادم التحليلات وقواعد البيانات (Port 8080).',
+          'تعذّر تحميل البيانات من الخادم. حاول مرة أخرى بعد قليل.',
           e,
         );
       }
@@ -3496,7 +3496,7 @@ class ApiClient {
         isServerOnline.value = false;
         lastConnectionError = e.toString();
         throw ServerConnectionException(
-          'تعذر الاتصال بخادم التحليلات وقواعد البيانات (Port 8080).',
+          'تعذّر تحميل البيانات من الخادم. حاول مرة أخرى بعد قليل.',
           e,
         );
       }
@@ -9109,7 +9109,7 @@ class ApiClient {
         isServerOnline.value = false;
         lastConnectionError = e.toString();
         throw ServerConnectionException(
-          'تعذر الاتصال بخادم كارتة الأصناف والأسعار (Port 8080).',
+          'تعذّر تحميل كارتة الأصناف والأسعار. حاول مرة أخرى بعد قليل.',
           e,
         );
       }
