@@ -56,19 +56,19 @@ void main() {
       ),
     );
 
-    expect(find.text('إجمالي مبيعات التجزئة'), findsOneWidget);
-    expect(find.text('Total Retail Sell-Out'), findsOneWidget);
+    expect(find.text('إجمالي Sell-Out'), findsOneWidget);
+    expect(find.text('Total Sell-Out (EGP)'), findsOneWidget);
     expect(find.text('إجمالي الوحدات المباعة'), findsOneWidget);
     expect(find.text('Total Units Sold'), findsOneWidget);
-    expect(find.text('الفروع النشطة المغطاة'), findsOneWidget);
-    expect(find.text('Active Covered Branches'), findsOneWidget);
-    expect(find.text('نسبة النواقص'), findsOneWidget);
-    expect(find.text('Out-of-Stock Rate (OOS Rate)'), findsOneWidget);
+    expect(find.text('الفروع النشطة'), findsOneWidget);
+    expect(find.text('Active Stores'), findsOneWidget);
+    expect(find.text('نسبة نفاد المخزون (OOS)'), findsOneWidget);
+    expect(find.text('OOS Rate'), findsOneWidget);
 
     expect(find.text('16 فرع'), findsOneWidget);
     expect(find.text('4.2%'), findsOneWidget);
     // Multi-chain subtitle
-    expect(find.text('فروع كارفور • أسواق فتح الله المستنتجة من الإكسيل'), findsOneWidget);
+    expect(find.text('فروع كارفور • أسواق فتح الله من الملفات المرفوعة'), findsOneWidget);
   });
 
   testWidgets('BentoKpiGrid formats negative MoM/YoY without +- and shows single-chain dynamic subtitle', (WidgetTester tester) async {
@@ -111,15 +111,15 @@ void main() {
     );
 
     // Must format negative percentages cleanly without '+-' with Arabic on Line 1 and English on Line 2
-    expect(find.text('-16.0% شهري'), findsOneWidget);
+    expect(find.text('-16.0% مقارنة بالشهر السابق'), findsOneWidget);
     expect(find.text('MoM'), findsWidgets);
-    expect(find.text('-4.5% سنوي'), findsOneWidget);
+    expect(find.text('-4.5% مقارنة بالعام السابق'), findsOneWidget);
     expect(find.text('YoY'), findsWidgets);
-    expect(find.text('-8.2% شهري'), findsOneWidget);
+    expect(find.text('-8.2% مقارنة بالشهر السابق'), findsOneWidget);
     expect(find.textContaining('+-'), findsNothing);
 
     // Dynamic single-chain subtitle for Gomla Market (not hardcoded Fathalla)
-    expect(find.text('فروع جملة ماركت المستنتجة تلقائياً من الإكسيل'), findsOneWidget);
+    expect(find.text('فروع جملة ماركت من الملف المرفوع'), findsOneWidget);
     expect(find.textContaining('فروع فتح الله'), findsNothing);
   });
 
@@ -135,8 +135,8 @@ void main() {
       ),
     );
 
-    expect(find.text('الحصص البيعية للسلاسل'), findsOneWidget);
-    expect(find.text('Chain Market Share'), findsOneWidget);
+    expect(find.text('حصة كل سلسلة من المبيعات'), findsOneWidget);
+    expect(find.text('Sales by Chain'), findsOneWidget);
     expect(find.text('كارفور'), findsOneWidget);
     expect(find.text('Carrefour'), findsOneWidget);
     expect(find.text('فتح الله'), findsOneWidget);
@@ -172,12 +172,12 @@ void main() {
     expect(find.byKey(const ValueKey('executive_year_segmented')), findsOneWidget);
     expect(find.byKey(const ValueKey('executive_month_dropdown')), findsOneWidget);
 
-    // Open Month dropdown and choose 'All Months'
+    // Open Month dropdown and choose 'كل الشهور'
     await tester.tap(find.byKey(const ValueKey('executive_month_dropdown')));
     await tester.pumpAndSettle();
 
-    expect(find.text('All Months'), findsOneWidget);
-    await tester.tap(find.text('All Months'));
+    expect(find.text('كل الشهور'), findsOneWidget);
+    await tester.tap(find.text('كل الشهور'));
     await tester.pumpAndSettle();
 
     expect(find.text('Month: All'), findsOneWidget);
@@ -439,7 +439,7 @@ void main() {
     await tester.ensureVisible(monthDropdown);
     await tester.tap(monthDropdown);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('All Months'));
+    await tester.tap(find.text('كل الشهور'));
     await tester.pumpAndSettle();
     expect(find.text('Month: All'), findsOneWidget);
   });
@@ -505,8 +505,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('منحنى نمو المبيعات الشهري حسب السلاسل'), findsOneWidget);
-    expect(find.text('Sell-Out Trend'), findsOneWidget);
+    expect(find.text('اتجاه Sell-Out الشهري'), findsOneWidget);
+    expect(find.text('Monthly Sell-Out Trend'), findsOneWidget);
     expect(find.text('أسواق فتح الله'), findsOneWidget);
     expect(find.text('Fathalla Market'), findsOneWidget);
     expect(find.text('جملة ماركت'), findsOneWidget);
@@ -641,11 +641,11 @@ void main() {
 
     // Verify ParetoCategorySection cards also render Arabic on Line 1 and English on Line 2
     expect(find.text('الحصة السوقية مقارنة بالمنافسين'), findsOneWidget);
-    expect(find.text('Market Share vs. Competitors'), findsOneWidget);
-    expect(find.text('مساهمة الفئات والمجموعات السلعية'), findsOneWidget);
+    expect(find.text('Market Share vs Competitors'), findsOneWidget);
+    expect(find.text('مساهمة الفئات'), findsOneWidget);
     expect(find.text('Category Contribution'), findsOneWidget);
-    expect(find.text('الأصناف القائدة للمبيعات (باريتو 80/20)'), findsOneWidget);
-    expect(find.text('Pareto 80/20 Power SKUs'), findsOneWidget);
+    expect(find.text('الأصناف الأعلى مبيعًا (80/20)'), findsOneWidget);
+    expect(find.text('Top SKUs (Pareto 80/20)'), findsOneWidget);
   });
 
   testWidgets('ChainSharePie.splitBilingualLabel handles edge cases and SelloutTrendChart renders all 12 months at full width', (WidgetTester tester) async {

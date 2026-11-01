@@ -131,14 +131,14 @@ class ChainSharePie extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'الحصص البيعية للسلاسل',
+                        'حصة كل سلسلة من المبيعات',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 2.0),
                       Text(
-                        'Chain Market Share',
+                        'Sales by Chain',
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: colorScheme.primary,
                           fontWeight: FontWeight.w700,
@@ -183,7 +183,7 @@ class ChainSharePie extends StatelessWidget {
             ),
             const SizedBox(height: 4.0),
             Text(
-              'توزيع إيرادات مبيعات التجزئة وحجم الاستهلاك للسلاسل التي تحتوي على بيانات في الفترة المحددة',
+              'توزيع Sell-Out (قيمة ووحدات) حسب السلسلة',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -263,7 +263,7 @@ class ChainSharePie extends StatelessWidget {
                           ],
                           const SizedBox(height: 2.0),
                           Text(
-                            '${CurrencyFormatter.formatUnits(item.totalUnits)} عبوة مباعة',
+                            '${CurrencyFormatter.formatUnits(item.totalUnits)} وحدة',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                               fontSize: M3FontSize.labelSmall,

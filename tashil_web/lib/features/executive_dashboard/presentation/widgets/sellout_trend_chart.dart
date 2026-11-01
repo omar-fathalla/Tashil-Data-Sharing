@@ -78,12 +78,12 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
     if (amount >= 1000000) {
       final inM = amount / 1000000.0;
       if (inM >= 10 || inM == inM.roundToDouble()) {
-        return '${inM.toStringAsFixed(inM == inM.roundToDouble() ? 0 : 1)}M ج.م';
+        return '${inM.toStringAsFixed(inM == inM.roundToDouble() ? 0 : 1)}مليون ج.م';
       }
-      return '${inM.toStringAsFixed(1)}M ج.م';
+      return '${inM.toStringAsFixed(1)}مليون ج.م';
     } else if (amount >= 1000) {
       final inK = amount / 1000.0;
-      return '${inK.toStringAsFixed(0)}K ج.م';
+      return '${inK.toStringAsFixed(0)}ألف ج.م';
     }
     return '${amount.round()} ج.م';
   }
@@ -164,7 +164,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
       return [
         _ChainSeriesData(
           chainCode: 'total',
-          displayName: 'إجمالي المبيعات (Total Sell-Out)',
+          displayName: 'الإجمالي',
           color: colorScheme.primary,
           values: effectiveTrends.map((e) => e.revenue).toList(),
           growthPcts: List<double>.filled(effectiveTrends.length, 0.0),
@@ -235,7 +235,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
           width: double.infinity,
           height: 320.0,
           alignment: Alignment.center,
-          child: Text('لا توجد بيانات متاحة للمخطط الزمني في هذه الفترة', style: theme.textTheme.bodyMedium),
+          child: Text('لا توجد بيانات لهذه الفترة', style: theme.textTheme.bodyMedium),
         ),
       );
     }
@@ -270,7 +270,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'منحنى نمو المبيعات الشهري حسب السلاسل',
+                      'اتجاه Sell-Out الشهري',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -279,7 +279,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                     ),
                     const SizedBox(height: 2.0),
                     Text(
-                      'Sell-Out Trend',
+                      'Monthly Sell-Out Trend',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: colorScheme.primary,
                         fontWeight: FontWeight.w700,
@@ -290,7 +290,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                     ),
                     const SizedBox(height: 2.0),
                     Text(
-                      'تتبع المبيعات ونمو الإيرادات شهرياً لكل سلسلة تجارية بلونها المميز',
+                      'المبيعات الشهرية لكل سلسلة',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -574,7 +574,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                     : '';
                 final valueLabel = val > 0
                     ? '${CurrencyFormatter.formatEGP(val)}$growthStr'
-                    : 'لا توجد بيانات مرفوعة';
+                    : 'لم تُرفع بيانات بعد';
                 final parts = ChainSharePie.splitBilingualLabel(s.displayName);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 5.0),
@@ -655,7 +655,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                   ),
                 ),
                 Text(
-                  '${CurrencyFormatter.formatUnits(item.units)} عبوة',
+                  '${CurrencyFormatter.formatUnits(item.units)} وحدة',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: colorScheme.onInverseSurface.withOpacity(0.8),
                     fontSize: M3FontSize.microPlus,
@@ -663,7 +663,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                 ),
               ] else
                 Text(
-                  '${CurrencyFormatter.formatUnits(item.units)} عبوة',
+                  '${CurrencyFormatter.formatUnits(item.units)} وحدة',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: colorScheme.onInverseSurface.withOpacity(0.8),
                     fontSize: M3FontSize.tiny,

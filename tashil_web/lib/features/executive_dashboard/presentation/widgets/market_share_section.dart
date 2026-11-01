@@ -193,20 +193,20 @@ class _SkuShareCard extends StatelessWidget {
           children: [
             _CardHeader(
               icon: AppIcons.analytics,
-              title: 'Share per SKU',
-              subtitle: 'Top SKUs: share of their category revenue vs competitors (100%)',
+              title: 'الحصة حسب الصنف',
+              subtitle: 'حصة أهم الأصناف من مبيعات الفئة',
               count: rows.length,
               badgeKey: const ValueKey('share_per_sku_badge'),
             ),
             M3Spacing.gapSM,
             _Legend([
-              (cs.primary, 'This SKU'),
-              (cs.primaryContainer, 'Our other SKUs'),
+              (cs.primary, 'هذا الصنف'),
+              (cs.primaryContainer, 'أصنافنا الأخرى'),
               (acc.competitor, 'Competitors'),
             ]),
             M3Spacing.gapSM,
             if (rows.isEmpty)
-              const _EmptyNote('No SKU-level category share data for this period.', keyName: 'share_per_sku_empty')
+              const _EmptyNote('لا توجد بيانات حصة للأصناف في هذه الفترة', keyName: 'share_per_sku_empty')
             else
               _GrowingColumn(
                 children: [
@@ -277,14 +277,14 @@ class _CategoryShareCard extends StatelessWidget {
           children: [
             _CardHeader(
               icon: AppIcons.donutChart,
-              title: 'Share per Category',
-              subtitle: 'Our share of each category vs all other suppliers',
+              title: 'الحصة حسب الفئة',
+              subtitle: 'حصتنا في كل فئة',
               count: top.length,
               badgeKey: const ValueKey('share_per_category_badge'),
             ),
             M3Spacing.gapSM,
             if (top.isEmpty)
-              const _EmptyNote('No category market data for this period.', keyName: 'share_per_category_empty')
+              const _EmptyNote('لا توجد بيانات للفئات في هذه الفترة', keyName: 'share_per_category_empty')
             else
               _GrowingGrid(
                 spacing: 12.0,
@@ -384,7 +384,7 @@ class _SellInVsSellOut extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final header = Text('Sell In vs Sell Out',
+    final header = Text('Sell-In vs Sell-Out',
         style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800));
     if (loading && cpfr == null) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -408,8 +408,8 @@ class _SellInVsSellOut extends StatelessWidget {
         header,
         _EmptyNote(
           error != null
-              ? 'Could not load Sell In / Sell Out data.'
-              : 'No months in this period have both Sell In and Sell Out data.',
+              ? 'تعذّر تحميل بيانات Sell-In/Sell-Out'
+              : 'لا توجد شهور بها بيانات Sell-In وSell-Out معًا',
           keyName: 'sell_in_vs_out_empty',
         ),
       ]);
@@ -423,16 +423,16 @@ class _SellInVsSellOut extends StatelessWidget {
     final monthLabel = months.map((m) => m.monthEn.length > 3 ? m.monthEn.substring(0, 3) : m.monthEn).join(', ');
 
     final tiles = [
-      _KpiTile(label: 'Total Sell In (units)', value: _fmtInt(sellIn), color: cs.onSurface),
-      _KpiTile(label: 'Total Sell Out (units)', value: _fmtInt(sellOut), color: cs.onSurface),
+      _KpiTile(label: 'Sell-In (وحدة)', value: _fmtInt(sellIn), color: cs.onSurface),
+      _KpiTile(label: 'Sell-Out (وحدة)', value: _fmtInt(sellOut), color: cs.onSurface),
       _KpiTile(
           key: const ValueKey('kpi_net_accumulation'),
-          label: 'Net accumulation (units)',
+          label: 'تراكم المخزون (وحدة)',
           value: '${net > 0 ? '+' : ''}${_fmtInt(net)}',
           color: acc.orangeBase),
       _KpiTile(
           key: const ValueKey('kpi_sell_through'),
-          label: 'Sell-through',
+          label: 'نسبة التصريف',
           value: _pct(through),
           color: acc.tealBase),
     ];
@@ -442,7 +442,7 @@ class _SellInVsSellOut extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         header,
-        Text('Same SKUs, months with both Sell In and Sell Out: $monthLabel $year',
+        Text('الأصناف والشهور المتطابقة: $monthLabel $year',
             style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         M3Spacing.gapSM,
         LayoutBuilder(builder: (context, c) {
@@ -528,12 +528,12 @@ class _StockTable extends StatelessWidget {
       child: Padding(
         padding: M3Spacing.pMd,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Stock per SKU', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
-          Text('Year to date, units; status from the CPFR stock report',
+          Text('المخزون حسب الصنف', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+          Text('منذ بداية العام (وحدة) · الحالة من تقرير CPFR',
               style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
           M3Spacing.gapSM,
           if (top.isEmpty)
-            const _EmptyNote('No SKU stock data for this period.', keyName: 'stock_per_sku_empty')
+            const _EmptyNote('لا توجد بيانات مخزون لهذه الفترة', keyName: 'stock_per_sku_empty')
           else
             Table(
               columnWidths: const {
@@ -547,7 +547,7 @@ class _StockTable extends StatelessWidget {
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
               children: [
                 TableRow(children: [
-                  for (final h in ['SKU', 'Sell In', 'Sell Out', 'Diff', 'Sell-through', 'Status'])
+                  for (final h in ['الصنف', 'Sell-In', 'Sell-Out', 'الفرق', 'نسبة التصريف', 'الحالة'])
                     Padding(padding: const EdgeInsets.only(bottom: 6.0), child: Text(h, style: label)),
                 ]),
                 for (final r in top)
@@ -629,17 +629,17 @@ class _MonthlyBars extends StatelessWidget {
       child: Padding(
         padding: M3Spacing.pMd,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Sell In vs Sell Out per month (units)',
+          Text('Monthly Sell-In vs Sell-Out (units)',
               style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
           M3Spacing.gapXS,
-          _Legend([(cs.primary, 'Sell In'), (acc.tealBase, 'Sell Out')]),
+          _Legend([(cs.primary, 'Sell-In'), (acc.tealBase, 'Sell-Out')]),
           M3Spacing.gapMD,
           _plotArea(
             Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
               for (final m in months)
                 Expanded(
                   child: Tooltip(
-                    message: '${m.monthEn}: Sell In ${_fmtInt(m.sellInUnits)} · Sell Out ${_fmtInt(m.sellOutUnits)}',
+                    message: '${m.monthEn}: Sell-In ${_fmtInt(m.sellInUnits)} · Sell-Out ${_fmtInt(m.sellOutUnits)}',
                     child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
                       Row(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
                         _bar(m.sellInUnits / maxV * chartH, cs.primary),
