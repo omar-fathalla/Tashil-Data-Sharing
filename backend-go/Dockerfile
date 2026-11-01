@@ -13,7 +13,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags="-w -s" \
-    -o /app/server ./cmd/server/main.go
+    -o /app/server ./cmd/server
 
 # Stage 2: Minimal scratch / distroless runtime
 FROM alpine:3.19
