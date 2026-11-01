@@ -50,8 +50,8 @@
 256,735 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
 256,735 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
 256,735 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-40-Adco -2026.xlsx | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-40-Adco -2026.xlsx | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
+40 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
+40 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
 47,080,999 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
 47,080,999 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
 47,080,999 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
@@ -84,10 +84,10 @@ BEET-ELGOMLA | 11.0 | FontWeight.w800 | ff304578 | 0.25 | 1.43
 BEET-ELGOMLA | 11.0 | FontWeight.w800 | ff304578 | 0.25 | 1.43
 Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Book1 (2).xlsx | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-Book1 (2).xlsx | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-Book6.xlsx | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-Book6.xlsx | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
+Book1 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
+Book1 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
+Book6 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
+Book6 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
 December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null

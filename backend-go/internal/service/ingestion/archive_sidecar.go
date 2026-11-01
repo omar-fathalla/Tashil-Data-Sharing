@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // archiveSidecarDir holds one JSON metadata file per archived upload (<tenantDir>/entries/<archiveID>.json).
@@ -87,4 +88,76 @@ func mergeArchiveSidecars(list []*ArchivedFile, tenantDir string) []*ArchivedFil
 		}
 	}
 	return list
+}
+
+// archiveDiskSyncInterval bounds how often a list call rescans the shared archive mount.
+const archiveDiskSyncInterval = 10 * time.Second
+
+func archiveEntryKind(entry *ArchivedFile) string {
+	if isProductMasterArchiveEntry(entry) {
+		return "product_master"
+	}
+	if isSellInArchiveEntry(entry) {
+		return "sell_in"
+	}
+	return "sell_out"
+}
+
+// syncArchiveFromDisk picks up archive entries written by OTHER Cloud Run instances.
+//
+// Each instance keeps its own in-memory archive map, filled once at startup. The archive directory is a
+// shared GCS mount, so an upload handled by instance A writes its sidecar there, but instances B and C kept
+// listing their startup copy and the new sheet never showed in the tab until a restart. This merges new
+// sidecars (metadata only; bytes are read lazily from StoragePath on download), skips Firestore tombstones,
+// and when the same (tenant, type, chain, file name) exists twice keeps only the newest upload.
+func (p *Processor) syncArchiveFromDisk(normTenant string, force bool) {
+	if p.archiveDir == "" || normTenant == "" {
+		return
+	}
+	now := time.Now().UnixNano()
+	p.archiveMu.RLock()
+	fresh := !force && now-p.lastArchiveDiskSync < int64(archiveDiskSyncInterval)
+	p.archiveMu.RUnlock()
+	if fresh {
+		return
+	}
+
+	tenantDir := filepath.Join(p.archiveDir, normTenant)
+	disk := mergeArchiveSidecars(nil, tenantDir)
+
+	p.archiveMu.Lock()
+	defer p.archiveMu.Unlock()
+	p.lastArchiveDiskSync = now
+	for _, item := range disk {
+		if item == nil || item.ID == "" || item.TenantID != normTenant {
+			continue
+		}
+		if _, ok := p.archivedFiles[item.ID]; ok {
+			continue
+		}
+		if p.fsRepo != nil && p.fsRepo.IsArchiveDeleted(item.TenantID, item.ID, item.FileName) {
+			continue
+		}
+		kind := archiveEntryKind(item)
+		superseded := false
+		for id, other := range p.archivedFiles {
+			if other.TenantID != normTenant || kind == "product_master" ||
+				archiveEntryKind(other) != kind ||
+				!strings.EqualFold(other.RetailChain, item.RetailChain) ||
+				!strings.EqualFold(other.FileName, item.FileName) {
+				continue
+			}
+			if other.UploadedAt >= item.UploadedAt {
+				superseded = true
+				break
+			}
+			delete(p.archivedFiles, id)
+			delete(p.archivedBytes, id)
+		}
+		if superseded {
+			continue
+		}
+		copyItem := *item
+		p.archivedFiles[copyItem.ID] = &copyItem
+	}
 }

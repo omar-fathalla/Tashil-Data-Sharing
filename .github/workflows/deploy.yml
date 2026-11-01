@@ -87,7 +87,8 @@ jobs:
         run: |
           gcloud run deploy "$SERVICE" --source . \
             --region "$REGION" --project "$PROJECT_ID" --quiet \
-            --update-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest
+            --update-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest \
+            --memory=2Gi
       - name: Smoke check
         run: |
           url="$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT_ID" --format='value(status.url)')"

@@ -1,4 +1,5 @@
 import 'package:tashil_web/core/widgets/m3_states.dart';
+import 'package:tashil_web/core/utils/sheet_name_utils.dart';
 import 'dart:math' as math;
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
@@ -2994,9 +2995,12 @@ onChanged: m3Legacy<int>((v) {
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          file.fileName,
-                                          style: const TextStyle(fontWeight: FontWeight.w800),
+                                        Tooltip(
+                                          message: file.fileName,
+                                          child: Text(
+                                            sheetShortName(file.fileName),
+                                            style: const TextStyle(fontWeight: FontWeight.w800),
+                                          ),
                                         ),
                                         Text(
                                           _formatFileSize(file.fileSizeBytes),

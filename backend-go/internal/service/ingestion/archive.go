@@ -540,6 +540,7 @@ func (p *Processor) RemoveArchivedFileByBatch(batchID string, prevEntry *Archive
 
 // ListArchivedFiles returns archived files for the tenant, optionally filtered by retail chain, year, search query, and file type ("sell_out" | "sell_in" | "product_master" | "all").
 func (p *Processor) ListArchivedFiles(ctx context.Context, tenantID, chainFilter, yearFilter, searchQuery string, fileTypeFilters ...string) *ArchiveListResponse {
+	p.syncArchiveFromDisk(normalizeArchiveTenantID(tenantID), false)
 	p.archiveMu.RLock()
 	defer p.archiveMu.RUnlock()
 
