@@ -214,6 +214,23 @@ type NormalizedRetailIngestionPayload struct {
 	AiModelUsed          string                  `json:"ai_model_used,omitempty"`
 	AiTierUsed           string                  `json:"ai_tier_used,omitempty"`
 	Tier2Escalated       bool                    `json:"tier2_escalated,omitempty"`
+	MappingSource        string                  `json:"mapping_source,omitempty"` // "ai" or "deterministic"
+	MappingConfidence    float64                 `json:"mapping_confidence,omitempty"`
+	Validation           *IngestionValidation    `json:"validation,omitempty"`
+}
+
+// IngestionValidation records the pre-save totals check for an upload.
+type IngestionValidation struct {
+	Status          string   `json:"status"` // "ok", "flagged" or "rejected"
+	RecordCount     int      `json:"record_count"`
+	ExtractedUnits  int      `json:"extracted_units"`
+	ExtractedValue  float64  `json:"extracted_value"`
+	SourceUnits     float64  `json:"source_units,omitempty"`
+	SourceValue     float64  `json:"source_value,omitempty"`
+	SheetTotalUnits float64  `json:"sheet_total_units,omitempty"`
+	SheetTotalValue float64  `json:"sheet_total_value,omitempty"`
+	MonthsDetected  []string `json:"months_detected,omitempty"`
+	Issues          []string `json:"issues,omitempty"`
 }
 
 

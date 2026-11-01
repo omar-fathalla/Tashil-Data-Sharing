@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -23,6 +24,11 @@ import (
 )
 
 func main() {
+	// Keep the Go heap well under the 2Gi Cloud Run limit so a full archive replay triggers
+	// garbage collection instead of an out-of-memory kill. GOMEMLIMIT, when set, wins.
+	if os.Getenv("GOMEMLIMIT") == "" {
+		debug.SetMemoryLimit(1536 << 20)
+	}
 	cfg := config.Load()
 	log.Printf("[Tashil Cloud Run] Initializing service on port %s (env: %s, mock: %v)", cfg.Port, cfg.Environment, cfg.UseMockServices)
 

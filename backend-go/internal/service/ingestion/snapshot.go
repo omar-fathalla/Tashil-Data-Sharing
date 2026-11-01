@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,8 +24,8 @@ import (
 // On boot the server used to re-parse every archived workbook (minutes on
 // GCSFuse). After every successful data change we now also write a gzip'd JSON
 // snapshot of the parsed in-memory dataset to <archive dir>/_snapshot/. On the
-// next boot the snapshot is used only if it was written by the same server
-// binary and the archive, product-master and targets files are byte-for-byte
+// next boot the snapshot is used only if it was written with the same schema and
+// parser version (SnapshotParserVersion) and the archive, product-master and targets files are byte-for-byte
 // the same set (name, size, mtime) as when it was taken. In every other case
 // (missing, corrupt, stale, different build) the server falls back to the full
 // Excel replay and then writes a fresh snapshot. The archive itself is never
@@ -78,24 +76,17 @@ var (
 	buildIDVal  string
 )
 
-// currentBuildID returns a hash of the running executable so a snapshot is
-// never reused by a server built from different parsing code.
+// SnapshotParserVersion identifies the parsing/state logic a snapshot was built with.
+// Bump it whenever a change to the ingestion parsers or the in-memory models would make
+// an existing snapshot produce different data. Unrelated deploys keep the snapshot valid,
+// so a new build no longer forces a multi-minute full archive replay.
+const SnapshotParserVersion = "parser-2026-11-01-wide-header-ai-mapping"
+
+// currentBuildID returns the snapshot compatibility key (schema + parser version), not a
+// hash of the binary, so the snapshot survives deploys that do not change parsing.
 func currentBuildID() string {
 	buildIDOnce.Do(func() {
-		exe, err := os.Executable()
-		if err != nil {
-			return
-		}
-		f, err := os.Open(exe)
-		if err != nil {
-			return
-		}
-		defer f.Close()
-		h := sha256.New()
-		if _, err := io.Copy(h, f); err != nil {
-			return
-		}
-		buildIDVal = hex.EncodeToString(h.Sum(nil))
+		buildIDVal = fmt.Sprintf("schema-%d/%s", SnapshotSchemaVersion, SnapshotParserVersion)
 	})
 	return buildIDVal
 }

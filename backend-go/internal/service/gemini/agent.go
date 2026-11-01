@@ -62,6 +62,7 @@ type Client struct {
 	tier2Model string
 	httpClient *http.Client
 	useMock    bool
+	mapper     columnMapper // nil uses the Gemini API; tests inject a stub
 }
 
 // DefaultModel is the base model used when no model name is configured.
@@ -153,7 +154,22 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 		return payload, nil
 	}
 
+	// 1) AI column mapping on a small sample, then deterministic extraction + validation.
+	if !isReplay(ctx) {
+		if payload, ok := c.analyzeWithAIMapping(ctx, filename, rawContent); ok {
+			return payload, nil
+		}
+	}
+
+	// 2) Deterministic readers, validated before anything is saved.
 	if fullPayload, ok := parseFullTabularPayload(filename, rawContent); ok {
+		v := validateExtraction(fullPayload, nil)
+		logValidation(filename, "deterministic", v)
+		if v.Status == "rejected" && !isReplay(ctx) {
+			return nil, validationError(filename, v)
+		}
+		fullPayload.Validation = v
+		fullPayload.MappingSource = "deterministic"
 		applyTierMetadata(fullPayload, "tier2", c.tier2Model)
 		return fullPayload, nil
 	}
@@ -405,4 +421,20 @@ func (c *Client) mockAnalyze(filename string, rawContent []byte) (*domain.Normal
 		AnomaliesDetected:    anomalies,
 		NormalizedRecords:    records,
 	}, nil
+}
+
+const replayKey aiTierContextKey = "archive_replay"
+
+// WithReplay marks an archive replay: already accepted uploads are re-read with the
+// deterministic readers only (no Gemini calls) and validation is logged, not enforced.
+func WithReplay(ctx context.Context) context.Context {
+	return context.WithValue(ctx, replayKey, true)
+}
+
+func isReplay(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	v, _ := ctx.Value(replayKey).(bool)
+	return v
 }
