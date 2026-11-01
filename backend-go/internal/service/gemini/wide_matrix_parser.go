@@ -117,16 +117,25 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 				continue
 			}
 		}
-		sampleRows, err := readWorksheetSampleRows(entry.file, sharedStrings, 3)
+		sampleRows, err := readWorksheetSampleRows(entry.file, sharedStrings, wideMatrixHeaderScanRows+2)
 		if err != nil || len(sampleRows) < 2 {
 			continue
 		}
-		layout, ok := detectWideMatrixHeader(sampleRows[0], "fathalla")
-		if !ok {
+		if _, _, ok := findWideMatrixHeaderRow(sampleRows, "fathalla"); !ok {
 			continue
 		}
 		rows, err := readWorksheetXML(entry.file, sharedStrings)
-		if err != nil || len(rows) < 2 {
+		if err != nil {
+			continue
+		}
+		// Exported pivot details often start with a title row ("Details for Sum of ...") and a blank row
+		// before the real header, so locate the header and drop everything above it.
+		layout, headerIdx, ok := findWideMatrixHeaderRow(rows, "fathalla")
+		if !ok {
+			continue
+		}
+		rows = rows[headerIdx:]
+		if len(rows) < 2 {
 			continue
 		}
 
@@ -207,8 +216,12 @@ func parseWideMatrixCSV(filename string, rows [][]string) (*domain.NormalizedRet
 	if len(rows) < 2 {
 		return nil, false
 	}
-	layout, ok := detectWideMatrixHeader(rows[0], "fathalla")
+	layout, headerIdx, ok := findWideMatrixHeaderRow(rows, "fathalla")
 	if !ok {
+		return nil, false
+	}
+	rows = rows[headerIdx:]
+	if len(rows) < 2 {
 		return nil, false
 	}
 	inferTemporalColumnsFromData(rows, &layout)
@@ -241,6 +254,20 @@ func parseWideMatrixCSV(filename string, rows [][]string) (*domain.NormalizedRet
 	}
 	computeQuickSheetTotals(&primary)
 	return buildPayloadFromWideMatrix(filename, primary, []parsedSheetSummary{primary}, []parsedSheetSummary{primary}, []wbSheetEntry{{name: "Sheet1", state: "visible"}})
+}
+
+// wideMatrixHeaderScanRows is how many leading rows are searched for the wide-matrix header.
+const wideMatrixHeaderScanRows = 10
+
+// findWideMatrixHeaderRow returns the layout and index of the first row (within the first
+// wideMatrixHeaderScanRows rows) that looks like a wide branch-pivot header.
+func findWideMatrixHeaderRow(rows [][]string, retailer string) (wideMatrixLayout, int, bool) {
+	for i := 0; i < len(rows) && i < wideMatrixHeaderScanRows; i++ {
+		if layout, ok := detectWideMatrixHeader(rows[i], retailer); ok {
+			return layout, i, true
+		}
+	}
+	return wideMatrixLayout{}, -1, false
 }
 
 type wbSheetEntry struct {
@@ -698,7 +725,7 @@ func parseSmartMonthToken(raw string) int {
 		{[]string{"يونيه", "يونيو", "حزيران", "june", "jun", "yonyo"}, 6},
 		{[]string{"يوليو", "يوليه", "تموز", "july", "jul", "yolyo"}, 7},
 		{[]string{"اغسطس", "أغسطس", "إغسطس", "آب", "اب", "august", "aug", "aghostos"}, 8},
-		{[]string{"سبتمبر", "أيلول", "ايلول", "september", "sept", "sep"}, 9},
+		{[]string{"سبتمبر", "أيلول", "ايلول", "september", "sept", "sep", "seb"}, 9},
 		{[]string{"اكتوبر", "أكتوبر", "إكتوبر", "تشرين الأول", "تشرين اول", "october", "oct"}, 10},
 		{[]string{"نوفمبر", "تشرين الثاني", "تشرين ثاني", "november", "nov"}, 11},
 		{[]string{"ديسمبر", "كانون الأول", "كانون اول", "december", "dec"}, 12},
