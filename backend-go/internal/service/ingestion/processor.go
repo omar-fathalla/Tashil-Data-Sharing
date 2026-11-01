@@ -106,6 +106,7 @@ type Processor struct {
 	sellOut       *durableSync
 	replaying     atomic.Bool
 	snap          snapshotConfig
+	onRebuilt     func()
 
 	onProductMaster func(tenantID, filename string, raw []byte)
 }

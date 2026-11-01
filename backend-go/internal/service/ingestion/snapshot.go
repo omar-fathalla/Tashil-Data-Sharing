@@ -75,6 +75,55 @@ type snapshotConfig struct {
 	// boot instead of being assumed present.
 	applied  sync.Map
 	tracking atomic.Bool
+	// rebuild, when set, replays the whole archive into separate stores and returns their
+	// exported state, so a full rebuild can run in the background while the old state is served.
+	rebuild func(ctx context.Context) (bq, fs []byte, err error)
+}
+
+// OnRebuilt runs after a background rebuild is swapped in (e.g. re-apply durable rows).
+func (p *Processor) OnRebuilt(fn func()) *Processor {
+	p.onRebuilt = fn
+	return p
+}
+
+// WithBackgroundRebuild registers the off-line full rebuild used when the snapshot is outdated.
+func (p *Processor) WithBackgroundRebuild(fn func(ctx context.Context) (bq, fs []byte, err error)) *Processor {
+	p.snap.rebuild = fn
+	return p
+}
+
+// ImportState replaces the live replayed state (same sections as the startup snapshot).
+func (p *Processor) ImportState(bqRaw, fsRaw []byte) error {
+	bq, fsr, ok := p.snapshotStores()
+	if !ok {
+		return errors.New("snapshot not supported")
+	}
+	if err := fsr.ImportSnapshot(fsRaw); err != nil {
+		return err
+	}
+	return bq.ImportSnapshot(bqRaw)
+}
+
+// loadAnySnapshot imports a snapshot with the current schema regardless of build or archive
+// changes. Used only to serve something immediately while a background rebuild runs.
+func (p *Processor) loadAnySnapshot() error {
+	f, err := os.Open(p.SnapshotPath())
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	zr, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	var env snapshotEnvelope
+	if err := json.NewDecoder(zr).Decode(&env); err != nil {
+		return err
+	}
+	if env.SchemaVersion != SnapshotSchemaVersion || len(env.BigQuery) == 0 || len(env.Firestore) == 0 {
+		return errors.New("snapshot unusable")
+	}
+	return p.ImportState(env.BigQuery, env.Firestore)
 }
 
 func (p *Processor) markArchiveApplied(path string) {
@@ -429,6 +478,13 @@ func (p *Processor) RestoreOrReplay(ctx context.Context) (string, error) {
 	} else {
 		log.Printf("[Tashil Snapshot] Snapshot not used (%v); falling back to full archive replay", err)
 	}
+	if p.snap.rebuild != nil {
+		if err := p.loadAnySnapshot(); err == nil {
+			log.Printf("[Tashil Snapshot] Serving the previous snapshot now; full rebuild runs in the background")
+			go p.runBackgroundRebuild(ctx)
+			return "stale-snapshot+background-rebuild", nil
+		}
+	}
 	// Make sure a partially imported snapshot can never leak into the replayed state.
 	_ = p.bqRepo.ClearTenantData(ctx, "all")
 	_ = p.fsRepo.ClearTenantData(ctx, "all")
@@ -451,4 +507,32 @@ func IsSnapshotMutation(method, path string) bool {
 	return strings.HasPrefix(path, "/api/v1/ingest/") ||
 		strings.HasPrefix(path, "/api/v1/product-master") ||
 		strings.HasPrefix(path, "/api/v1/analytics/targets")
+}
+
+func (p *Processor) runBackgroundRebuild(ctx context.Context) {
+	start := time.Now()
+	bqRaw, fsRaw, err := p.snap.rebuild(ctx)
+	if err != nil {
+		log.Printf("[Tashil Snapshot] Background rebuild failed after %s: %v", time.Since(start).Round(time.Millisecond), err)
+		return
+	}
+	if err := p.ImportState(bqRaw, fsRaw); err != nil {
+		log.Printf("[Tashil Snapshot] Background rebuild import failed: %v", err)
+		return
+	}
+	// Everything on disk at rebuild time is now loaded.
+	if man, err := p.buildManifest(); err == nil {
+		for _, e := range man {
+			if strings.HasPrefix(e.Path, "archive:") && !isArchiveMetadataPath(e.Path) {
+				p.markArchiveApplied(e.Path)
+			}
+		}
+	}
+	log.Printf("[Tashil Snapshot] Background rebuild swapped in after %s", time.Since(start).Round(time.Millisecond))
+	if err := p.WriteSnapshot(); err != nil {
+		log.Printf("[Tashil Snapshot] Could not write snapshot after background rebuild: %v", err)
+	}
+	if p.onRebuilt != nil {
+		p.onRebuilt()
+	}
 }

@@ -96,6 +96,27 @@ func main() {
 		"/app/data/cpfr_seed/Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx",
 	})
 
+	// When the snapshot is outdated (new parser version, or files deleted), serve it right away and
+	// replay the archive into separate in-memory stores in the background, then swap the result in.
+	ingestProcessor.WithBackgroundRebuild(func(ctx context.Context) ([]byte, []byte, error) {
+		tbq := bigquery.NewClient(cfg.ProjectID, cfg.BigQueryDataset, true)
+		tfs := firestore.NewClient(cfg.FirestoreDatabase, true)
+		tp := ingestion.NewProcessor(geminiAgent, tbq, tfs).WithArchiveDir(archDir)
+		_ = tp.ClearTenantData(ctx, "all")
+		if err := tp.ReplayArchivedFilesToDatabase(ctx); err != nil {
+			return nil, nil, err
+		}
+		b, err := tbq.ExportSnapshot()
+		if err != nil {
+			return nil, nil, err
+		}
+		f, err := tfs.ExportSnapshot()
+		return b, f, err
+	}).OnRebuilt(func() {
+		ingestProcessor.SyncDurableFromStore(context.Background(), "tenant-adeco", true)
+		dqService.OnSourceChanged()
+	})
+
 	// Data loading runs after the HTTP server starts listening (see step 7). Until it finishes,
 	// data endpoints wait (up to dataReadyWait) instead of seeing a half-loaded dataset.
 	dataReady := make(chan struct{})
