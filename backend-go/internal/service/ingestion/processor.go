@@ -96,6 +96,8 @@ type Processor struct {
 	stagedMu      sync.RWMutex
 	staged        map[string]*StagedUpload
 	archiveMu     sync.RWMutex
+	// lastArchiveDiskSync throttles syncArchiveFromDisk (unix nanos, guarded by archiveMu).
+	lastArchiveDiskSync int64
 	archiveDir    string
 	archivedFiles map[string]*ArchivedFile
 	archivedBytes map[string][]byte

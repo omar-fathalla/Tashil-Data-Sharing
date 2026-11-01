@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:tashil_web/core/utils/sheet_name_utils.dart';
 import 'package:tashil_web/core/widgets/m3_states.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1122,7 +1123,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
                 ? r.sourceFilename
                 : 'Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx',
             child: Text(
-              _sheetShortName(r.sourceFilename.isNotEmpty
+              sheetShortName(r.sourceFilename.isNotEmpty
                   ? r.sourceFilename
                   : 'Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx'),
               style: M3TextVariants.denseLabel.copyWith(color: colorScheme.onSurfaceVariant),
@@ -1148,15 +1149,6 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> {
         ),
       ],
     );
-  }
-
-  /// First word of a sheet file name (split on _ - space .), max 8 chars.
-  String _sheetShortName(String name) {
-    final first = name.trim().split(RegExp(r'[_\-\s.]+')).firstWhere(
-          (w) => w.isNotEmpty,
-          orElse: () => name,
-        );
-    return first.length > 8 ? '${first.substring(0, 8)}…' : first;
   }
 
   String _chainNameAr(String chain) {
@@ -3342,10 +3334,11 @@ onChanged: m3Legacy<int>((v) {
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          file.fileName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w800,
+                                        Tooltip(
+                                          message: file.fileName,
+                                          child: Text(
+                                            sheetShortName(file.fileName),
+                                            style: const TextStyle(fontWeight: FontWeight.w800),
                                           ),
                                         ),
                                         Text(
