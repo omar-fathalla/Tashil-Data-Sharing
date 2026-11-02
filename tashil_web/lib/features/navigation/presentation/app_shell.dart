@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../core/widgets/app_icons.dart';
+import '../../../core/storage/session_storage.dart';
+import '../app_page_route.dart';
 import '../../../core/theme/m3_spacing.dart';
 import '../../../core/theme/m3_shape.dart';
 import 'package:flutter/services.dart';
@@ -65,6 +67,35 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = AppPageRoute.indexForSlug(
+      AppPageRoute.pageSlugFromPath(SessionStorage.currentBrowserPath()),
+    );
+    // The Navigator may report `/` after the first frame; re-assert the
+    // current page so the address bar (and the next refresh) keep it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      SessionStorage.replaceBrowserUrl(
+        AppPageRoute.pathFor(
+          widget.activeTenant,
+          AppPageRoute.slugForIndex(_selectedIndex),
+        ),
+      );
+    });
+  }
+
+  void _selectPage(int index) {
+    setState(() => _selectedIndex = index);
+    SessionStorage.replaceBrowserUrl(
+      AppPageRoute.pathFor(
+        widget.activeTenant,
+        AppPageRoute.slugForIndex(index),
+      ),
+    );
+  }
 
   static const List<_NavDestinationSpec> _destinations = [
     _NavDestinationSpec(
@@ -268,7 +299,7 @@ class _AppShellState extends State<AppShell> {
                             : const Icon(AppIcons.chevronEnd, size: 18.0),
                         onTap: () {
                           Navigator.pop(sheetCtx);
-                          setState(() => _selectedIndex = dest.index);
+                          _selectPage(dest.index);
                         },
                       ),
                     );
@@ -367,7 +398,7 @@ class _AppShellState extends State<AppShell> {
               // Sidebar sits on the start side (right in RTL).
               DesktopSidebar(
                 selectedIndex: _selectedIndex,
-                onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+                onDestinationSelected: (index) => _selectPage(index),
                 activeTenant: widget.activeTenant,
                 currentUser: widget.apiClient.currentUser,
                 onTenantChanged: widget.onTenantChanged,
@@ -402,7 +433,7 @@ class _AppShellState extends State<AppShell> {
               // Sidebar sits on the start side (right in RTL).
               NavigationRail(
                 selectedIndex: _selectedIndex,
-                onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+                onDestinationSelected: (index) => _selectPage(index),
                 labelType: NavigationRailLabelType.all,
                 backgroundColor: colorScheme.surfaceContainer,
                 leading: Padding(
@@ -608,7 +639,7 @@ class _AppShellState extends State<AppShell> {
           return i < 0 ? null : i;
         }(),
         onDestinationSelected: (pos) {
-          setState(() => _selectedIndex = _destinations[pos].index);
+          _selectPage(_destinations[pos].index);
           Navigator.pop(context);
         },
         children: [
@@ -736,13 +767,13 @@ class _AppShellState extends State<AppShell> {
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           onDestinationSelected: (idx) {
             if (idx == 0) {
-              setState(() => _selectedIndex = 0);
+              _selectPage(0);
             } else if (idx == 1) {
-              setState(() => _selectedIndex = 1);
+              _selectPage(1);
             } else if (idx == 2) {
-              setState(() => _selectedIndex = 5); // Pricing & Promos
+              _selectPage(5); // Pricing & Promos
             } else if (idx == 3) {
-              setState(() => _selectedIndex = 3); // OOS Monitor
+              _selectPage(3); // OOS Monitor
             } else {
               _openMobileModulesSheet();
             }

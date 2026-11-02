@@ -15,3 +15,7 @@ void platformStorageClear() {
 }
 
 void platformUpdateUrl(String path) {}
+
+void platformReplaceUrl(String path) {}
+
+String platformCurrentPath() => '';
