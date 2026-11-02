@@ -1669,3 +1669,23 @@ func (c *Client) computeActualForTargetLocked(normTenant string, t domain.Target
 	}
 	return rev, float64(units)
 }
+
+// EnrichSellInRecords applies the in-memory Sell-In enrichment (chain resolver, product master prices,
+// pieces->cases fix) to rows read elsewhere, e.g. a BigQuery page, exactly as GetSellInRecords does.
+func (c *Client) EnrichSellInRecords(tenantID string, recs []domain.SellInRecord) []domain.SellInRecord {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	normTenant := normalizeTenantKey(tenantID)
+	out := make([]domain.SellInRecord, len(recs))
+	for i, r := range recs {
+		if r.TenantID == "" {
+			r.TenantID = normTenant
+		}
+		c.enrichSellInRecordLocked(&r)
+		if strings.TrimSpace(r.RetailerChain) == "" {
+			r.RetailerChain = "fathalla"
+		}
+		out[i] = r
+	}
+	return out
+}

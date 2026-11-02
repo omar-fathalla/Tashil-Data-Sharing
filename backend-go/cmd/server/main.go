@@ -180,6 +180,10 @@ func main() {
 	// (RECORDS_SOURCE=memory forces the in-memory path).
 	if bqs, ok := sink.(*bqsink.BigQuerySink); ok && os.Getenv("RECORDS_SOURCE") != "memory" {
 		analyticsHandler.WithRecordsQuerier(bqs)
+		// Sell-In totals and monthly groups too (SELLIN_SOURCE=memory forces the in-memory path).
+		if os.Getenv("SELLIN_SOURCE") != "memory" {
+			analyticsHandler.WithSellInTotalsQuerier(bqs)
+		}
 	}
 	oosHandler := handlers.NewOOSHandler(fsRepo).WithBigQueryRepo(bqRepo)
 	storeHandler := handlers.NewStoreHandler(fsRepo)

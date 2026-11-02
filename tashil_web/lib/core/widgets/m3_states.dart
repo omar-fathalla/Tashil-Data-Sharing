@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/m3_spacing.dart';
+import '../theme/m3_shape.dart';
 import 'app_icons.dart';
 
 /// Centered empty state (icon, title, optional message + action).
@@ -82,6 +83,31 @@ class M3LoadingState extends StatelessWidget {
                 style: theme.textTheme.bodyMedium),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Material 3 skeleton placeholder: a rounded surfaceContainerHighest block shown in place of a value
+/// while it loads, so stale numbers are never displayed.
+class M3SkeletonBox extends StatelessWidget {
+  const M3SkeletonBox({super.key, this.width, this.height = 16.0, this.borderRadius});
+
+  final double? width;
+  final double height;
+  final BorderRadius? borderRadius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'جارٍ التحميل',
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: borderRadius ?? M3Shape.radiusSm,
+        ),
       ),
     );
   }

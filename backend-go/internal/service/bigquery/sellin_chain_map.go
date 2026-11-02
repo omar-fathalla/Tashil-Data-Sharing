@@ -99,3 +99,14 @@ func resolveSellInChainFromCustomer(rules []customerChainRule, customer, current
 func ResolveSellInChain(customer, current string) string {
 	return resolveSellInChainFromCustomer(activeCustomerChainRules(), customer, current)
 }
+
+// ActiveSellInChainRules returns the normalized (needle, chain) pairs in match order, so the
+// BigQuery Sell-In totals query resolves chains exactly like the in-memory enrichment.
+func ActiveSellInChainRules() [][2]string {
+	rules := activeCustomerChainRules()
+	out := make([][2]string, len(rules))
+	for i, r := range rules {
+		out[i] = [2]string{r.needle, r.chain}
+	}
+	return out
+}

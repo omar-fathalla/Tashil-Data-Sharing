@@ -19,6 +19,7 @@ import (
 type AnalyticsHandler struct {
 	bqRepo  bigquery.Repository
 	records bqsink.RecordsQuerier
+	sellIn  SellInTotalsQuerier
 }
 
 // NewAnalyticsHandler creates a new AnalyticsHandler.

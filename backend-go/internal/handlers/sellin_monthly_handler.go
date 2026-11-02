@@ -43,6 +43,13 @@ func (h *AnalyticsHandler) HandleSellInMonthly(w http.ResponseWriter, r *http.Re
 			filter.RetailerChain = strings.TrimSpace(claims.AssignedChain)
 		}
 	}
+	if res, ok := h.querySellInTotals(r.Context(), tenantID, filter); ok {
+		setRecordsSource(w, "bigquery")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(SellInMonthlyResponse{Points: sellInMonthlyFromGroups(res.Groups)})
+		return
+	}
+	setRecordsSource(w, "memory")
 	records, _, err := h.bqRepo.GetSellInRecords(r.Context(), tenantID, filter)
 	if err != nil {
 		http.Error(w, `{"error":"failed to query sell-in records"}`, http.StatusInternalServerError)
