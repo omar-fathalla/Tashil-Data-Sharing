@@ -91,6 +91,7 @@ type StagedUpload struct {
 // Processor coordinates parsing, AI normalization, validation, staging, and multi-tenant persistence.
 type Processor struct {
 	geminiAgent   gemini.Agent
+	syncLease     SyncLease // optional: one instance at a time runs the archive sync
 	bqRepo        bigquery.Repository
 	fsRepo        firestore.Repository
 	stagedMu      sync.RWMutex

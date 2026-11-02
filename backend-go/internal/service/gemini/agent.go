@@ -63,6 +63,7 @@ type Client struct {
 	httpClient *http.Client
 	useMock    bool
 	mapper     columnMapper // nil uses the Gemini API; tests inject a stub
+	planCache  mappingPlanCache
 }
 
 // DefaultModel is the base model used when no model name is configured.

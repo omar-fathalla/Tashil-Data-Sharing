@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"os/signal"
 	"runtime/debug"
 	"strings"
@@ -44,7 +45,12 @@ func main() {
 	if archDir == "" {
 		archDir = "data/archive"
 	}
+	// Accepted AI column-mapping plans are stored next to the archive ("_" prefix = metadata, not a workbook),
+	// so re-reading an archived file on any instance reuses them instead of calling Gemini again.
+	geminiAgent.WithMappingPlanDir(filepath.Join(archDir, "_mapping_plans"))
 	ingestProcessor := ingestion.NewProcessor(geminiAgent, bqRepo, fsRepo).WithArchiveDir(archDir)
+	// Only one instance at a time runs the startup archive sync (Firestore lease with TTL).
+	ingestProcessor.WithSyncLease(fsRepo)
 	// Data-quality ("الأخطاء") checks: re-run on every Product Master upload and any source change.
 	dqService := dataquality.NewService(fsRepo, bqRepo).WithMaster(bqRepo)
 	ingestProcessor.WithProductMasterHook(func(tenantID, filename string, raw []byte) {
