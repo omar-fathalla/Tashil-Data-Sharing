@@ -264,12 +264,6 @@ func sellInRow(meta Meta, r *domain.SellInRecord, now time.Time) map[string]inte
 		ck = "fathalla"
 	}
 	yr, mn := r.Year, r.MonthNum
-	if yr <= 0 {
-		yr = 2026
-	}
-	if mn <= 0 || mn > 12 {
-		mn = 1
-	}
 	month := fmt.Sprintf("%04d-%02d", yr, mn)
 	row[ColChainKey] = ck
 	row[ColPeriodMonth] = month
@@ -288,6 +282,7 @@ func PlanSellIn(meta Meta, records []domain.SellInRecord, now time.Time) Plan {
 // StreamSellIn is PlanSellIn with rows built lazily while loading (bounded memory for large files).
 func StreamSellIn(meta Meta, records []domain.SellInRecord, now time.Time) Plan {
 	meta.TenantID = NormalizeTenant(meta.TenantID)
+	records = validSellInPeriods(records)
 	return Plan{Kind: KindSellIn, Meta: meta, Table: SellInSpec(), N: len(records),
 		RowAt:       func(i int) map[string]interface{} { return sellInRow(meta, &records[i], now) },
 		DeleteWhere: archiveDeleteWhere, Params: baseParams(meta)}
@@ -326,4 +321,22 @@ func TableForKind(k Kind) TableSpec {
 	default:
 		return SellOutSpec()
 	}
+}
+
+
+// validSellInPeriods drops records without a real (year, month). SetSellInRecords already rejects
+// them, so this only guards the sink: no row is ever written under an invented 2026-01 period.
+func validSellInPeriods(records []domain.SellInRecord) []domain.SellInRecord {
+	for i := range records {
+		if records[i].Year <= 0 || records[i].MonthNum < 1 || records[i].MonthNum > 12 {
+			out := make([]domain.SellInRecord, 0, len(records))
+			for _, r := range records {
+				if r.Year > 0 && r.MonthNum >= 1 && r.MonthNum <= 12 {
+					out = append(out, r)
+				}
+			}
+			return out
+		}
+	}
+	return records
 }

@@ -115,6 +115,20 @@ func normalizeSellInChainCode(rawChain, fallbackChain string) string {
 // ParseSellInPlanWorkbook parses any Supplier Sell-In & Forecasting workbook (.xlsx or .csv),
 // supporting the Guided Demo Template, the 30-column clean format, and the raw ERP format.
 func ParseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, targetChains ...string) ([]domain.SellInRecord, error) {
+	recs, _, err := ParseSellInPlanWorkbookWithReport(tenantID, filename, rawContent, targetChains...)
+	return recs, err
+}
+
+// ParseSellInPlanWorkbookWithReport is ParseSellInPlanWorkbook plus a normalization report.
+// Months and years are never defaulted: a row whose period cannot be read deterministically makes
+// the whole file fail with an Arabic error (see SellInPeriodError).
+func ParseSellInPlanWorkbookWithReport(tenantID, filename string, rawContent []byte, targetChains ...string) ([]domain.SellInRecord, *SellInParseReport, error) {
+	report := &SellInParseReport{}
+	recs, err := parseSellInPlanWorkbook(tenantID, filename, rawContent, report, targetChains...)
+	return recs, report, err
+}
+
+func parseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, report *SellInParseReport, targetChains ...string) ([]domain.SellInRecord, error) {
 	defaultChain := "fathalla"
 	if len(targetChains) > 0 && strings.TrimSpace(targetChains[0]) != "" {
 		tc := strings.ToLower(strings.TrimSpace(targetChains[0]))
@@ -187,6 +201,11 @@ func ParseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, targe
 		}
 	}
 
+	if hdr := findGPSOPHeaderRow(rows); hdr >= 0 {
+		report.Layout = "gp_sop_export"
+		return parseGPSOPExport(tenantID, filename, rows, hdr, defaultChain, report)
+	}
+
 	headerRow := rows[0]
 	headerJoined := strings.ToLower(strings.Join(headerRow, " | "))
 	isClean30ColFormat := (strings.Contains(headerJoined, "net_qty_cases") ||
@@ -202,14 +221,19 @@ func ParseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, targe
 		return nil, fmt.Errorf("file %s does not match standard single-sheet sell-in columns", filename)
 	}
 
-	defaultYear := inferYearFromText(filename, 2026)
-	defaultMonth := 1
-	if inferredDate := tryParseArabicSheetMonthDate(filename, defaultYear); len(inferredDate) >= 7 {
-		if y, err := strconv.Atoi(inferredDate[:4]); err == nil && y >= 2020 {
-			defaultYear = y
-		}
-		if m, err := strconv.Atoi(inferredDate[5:7]); err == nil && m >= 1 && m <= 12 {
-			defaultMonth = m
+	fileYear, _ := YearFromFilename(filename)
+	periods := newSellInPeriodResolver(fileYear)
+	var rawPlanCols map[string]int
+	if isClean30ColFormat {
+		report.Layout = "clean_30_col"
+	} else if isGuidedTemplateFormat || colMap["item_name"] >= 0 {
+		report.Layout = "guided_template"
+	} else {
+		report.Layout = "raw_plan"
+		var missing []string
+		rawPlanCols, missing = buildRawPlanHeaderMap(headerRow)
+		if len(missing) > 0 {
+			return nil, &SellInLayoutError{Filename: filename, Missing: missing}
 		}
 	}
 
@@ -230,6 +254,7 @@ func ParseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, targe
 			continue
 		}
 
+		periods.startRow()
 		var rec domain.SellInRecord
 		rec.RecordID = fmt.Sprintf("sellin_%s_%d", tenantID, i)
 		rec.TenantID = tenantID
@@ -237,10 +262,11 @@ func ParseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, targe
 		rec.IngestedAt = now
 
 		if isClean30ColFormat {
-			rec.Year = parseIntDefault(getCol(r, 0), defaultYear)
-			rec.MonthNum = parseIntDefault(getCol(r, 1), defaultMonth)
-			rec.MonthEN = strings.TrimSpace(getCol(r, 2))
-			rec.MonthAR = strings.TrimSpace(getCol(r, 3))
+			if y, m, ok := periods.resolve(i+1, getCol(r, 0), getCol(r, 1), getCol(r, 2), ""); ok {
+				rec.Year, rec.MonthNum = y, m
+			}
+			rec.MonthEN = monthNumToEN(rec.MonthNum)
+			rec.MonthAR = ArabicMonthName(rec.MonthNum)
 			rec.PeriodWeek = strings.TrimSpace(getCol(r, 4))
 			rec.RegionCode = strings.TrimSpace(getCol(r, 5))
 			rec.Governorate = strings.TrimSpace(getCol(r, 6))
@@ -268,26 +294,11 @@ func ParseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, targe
 			rec.ExpectedValueEGP = parseFloatDefault(getCol(r, 28), rec.NetValueEGP)
 			rec.TransactionType = strings.TrimSpace(getCol(r, 29))
 		} else if isGuidedTemplateFormat || colMap["item_name"] >= 0 {
-			rec.Year = parseIntDefault(getColByMap(r, colMap, "year"), defaultYear)
-			rawMonthNum := getColByMap(r, colMap, "month_num")
-			rawMonthName := getColByMap(r, colMap, "month_name")
-			if rawMonthNum != "" {
-				rec.MonthNum = parseIntDefault(rawMonthNum, defaultMonth)
+			if y, m, ok := periods.resolve(i+1, getColByMap(r, colMap, "year"), getColByMap(r, colMap, "month_num"), getColByMap(r, colMap, "month_name"), ""); ok {
+				rec.Year, rec.MonthNum = y, m
 			}
-			if rawMonthName != "" {
-				mNum, mAr := normalizeMonthEN(rawMonthName)
-				if rec.MonthNum <= 0 {
-					rec.MonthNum = mNum
-				}
-				rec.MonthAR = mAr
-				rec.MonthEN = monthNumToEN(rec.MonthNum)
-			} else {
-				if rec.MonthNum <= 0 {
-					rec.MonthNum = defaultMonth
-				}
-				rec.MonthEN = monthNumToEN(rec.MonthNum)
-				_, rec.MonthAR = normalizeMonthEN(strconv.Itoa(rec.MonthNum))
-			}
+			rec.MonthEN = monthNumToEN(rec.MonthNum)
+			rec.MonthAR = ArabicMonthName(rec.MonthNum)
 
 			rec.PeriodWeek = strings.TrimSpace(getColByMap(r, colMap, "period_week"))
 			if rec.PeriodWeek == "" {
@@ -367,49 +378,51 @@ func ParseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, targe
 			}
 		} else {
 			// Raw plan 10 aswak.xlsx format
-			rec.RegionCode = strings.TrimSpace(getCol(r, 0))
-			rec.Sector = strings.TrimSpace(getCol(r, 1))
-			rec.SubSector = strings.TrimSpace(getCol(r, 2))
-			rec.Division = strings.TrimSpace(getCol(r, 3))
-			rec.ParentAccountCode = strings.TrimSpace(getCol(r, 4))
-			rec.ParentCustomer = strings.TrimSpace(getCol(r, 5))
-			rec.ItemName = strings.TrimSpace(getCol(r, 6))
-			rec.ItemGroup = strings.TrimSpace(getCol(r, 7))
-			rec.SubCategory = strings.TrimSpace(getCol(r, 8))
-			rec.ProductFamily = strings.TrimSpace(getCol(r, 9))
-			rec.Brand = strings.TrimSpace(getCol(r, 10))
-			rec.PeriodWeek = strings.TrimSpace(getCol(r, 11))
+			rec.RegionCode = strings.TrimSpace(getCol(r, rawPlanCols["region"]))
+			rec.Sector = strings.TrimSpace(getCol(r, rawPlanCols["sector"]))
+			rec.SubSector = strings.TrimSpace(getCol(r, rawPlanCols["sub_sector"]))
+			rec.Division = strings.TrimSpace(getCol(r, rawPlanCols["division"]))
+			rec.ParentAccountCode = strings.TrimSpace(getCol(r, rawPlanCols["parent_account_code"]))
+			rec.ParentCustomer = strings.TrimSpace(getCol(r, rawPlanCols["parent_customer"]))
+			rec.ItemName = strings.TrimSpace(getCol(r, rawPlanCols["item_name"]))
+			rec.ItemGroup = strings.TrimSpace(getCol(r, rawPlanCols["item_group"]))
+			rec.SubCategory = strings.TrimSpace(getCol(r, rawPlanCols["sub_category"]))
+			rec.ProductFamily = strings.TrimSpace(getCol(r, rawPlanCols["product_family"]))
+			rec.Brand = strings.TrimSpace(getCol(r, rawPlanCols["brand"]))
+			rec.PeriodWeek = strings.TrimSpace(getCol(r, rawPlanCols["period_week"]))
 			if rec.PeriodWeek == "" {
 				rec.PeriodWeek = "Full Month"
 			}
-			rec.MonthEN = strings.TrimSpace(getCol(r, 12))
-			rec.MonthNum, rec.MonthAR = normalizeMonthEN(rec.MonthEN)
-			rec.NetQtyCases = parseFloatDefault(getCol(r, 13), 0)
-			rec.NetValueEGP = parseFloatDefault(getCol(r, 14), 0)
-			rec.WeightTons = parseFloatDefault(getCol(r, 15), 0)
-			rec.Governorate = strings.TrimSpace(getCol(r, 16))
+			if y, m, ok := periods.resolve(i+1, getCol(r, rawPlanCols["year"]), "", getCol(r, rawPlanCols["month"]), ""); ok {
+				rec.Year, rec.MonthNum = y, m
+			}
+			rec.MonthEN = monthNumToEN(rec.MonthNum)
+			rec.MonthAR = ArabicMonthName(rec.MonthNum)
+			rec.NetQtyCases = parseFloatDefault(getCol(r, rawPlanCols["net_q"]), 0)
+			rec.NetValueEGP = parseFloatDefault(getCol(r, rawPlanCols["net_v"]), 0)
+			rec.WeightTons = parseFloatDefault(getCol(r, rawPlanCols["ton"]), 0)
+			rec.Governorate = strings.TrimSpace(getCol(r, rawPlanCols["city"]))
 			if rec.Governorate == "" {
 				rec.Governorate = inferGovernorateFromRegion(rec.RegionCode)
 			}
-			rec.CustomerName = strings.TrimSpace(getCol(r, 17))
-			rec.CustomerBranchCode = strings.TrimSpace(getCol(r, 19))
+			rec.CustomerName = strings.TrimSpace(getCol(r, rawPlanCols["customer"]))
+			rec.CustomerBranchCode = strings.TrimSpace(getCol(r, rawPlanCols["branch_code"]))
 			if rec.CustomerBranchCode == "" {
 				rec.CustomerBranchCode = "مجمع الإقليم (Regional)"
 			}
-			rec.SalesRep = strings.TrimSpace(getCol(r, 20))
+			rec.SalesRep = strings.TrimSpace(getCol(r, rawPlanCols["sales_rep"]))
 			if rec.SalesRep == "" {
 				rec.SalesRep = "توزيع مركزي (Central KA)"
 			}
-			rec.PromotionType = strings.TrimSpace(getCol(r, 21))
+			rec.PromotionType = strings.TrimSpace(getCol(r, rawPlanCols["promotion"]))
 			if rec.PromotionType == "" {
 				rec.PromotionType = "عادي"
 			}
-			rec.KAOfficer = strings.TrimSpace(getCol(r, 22))
-			rec.SalesManager = strings.TrimSpace(getCol(r, 23))
-			rec.TurnoverEGP = parseFloatDefault(getCol(r, 25), rec.NetValueEGP)
-			rec.Year = parseIntDefault(getCol(r, 26), 2026)
-			expQ := parseFloatDefault(getCol(r, 27), 0)
-			expV := parseFloatDefault(getCol(r, 28), 0)
+			rec.KAOfficer = strings.TrimSpace(getCol(r, rawPlanCols["officer"]))
+			rec.SalesManager = strings.TrimSpace(getCol(r, rawPlanCols["officer_mgr"]))
+			rec.TurnoverEGP = parseFloatDefault(getCol(r, rawPlanCols["turnover"]), rec.NetValueEGP)
+			expQ := parseFloatDefault(getCol(r, rawPlanCols["q_exp"]), 0)
+			expV := parseFloatDefault(getCol(r, rawPlanCols["v_exp"]), 0)
 			if expQ == 0 && rec.PeriodWeek == "Full Month" {
 				expQ = rec.NetQtyCases
 			}
@@ -436,15 +449,17 @@ func ParseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, targe
 		if rec.ItemName == "" && rec.Brand == "" && rec.NetValueEGP == 0 {
 			continue
 		}
-		if rec.MonthAR == "" {
-			_, rec.MonthAR = normalizeMonthEN(rec.MonthEN)
+		if !periods.accept(i + 1) {
+			continue
 		}
-		if rec.MonthEN == "" {
-			rec.MonthEN = monthNumToEN(rec.MonthNum)
-		}
+		rec.MonthAR = ArabicMonthName(rec.MonthNum)
+		rec.MonthEN = monthNumToEN(rec.MonthNum)
 		records = append(records, rec)
 	}
 
+	if err := periods.err(filename); err != nil {
+		return nil, err
+	}
 	if len(records) == 0 {
 		return nil, fmt.Errorf("no valid sell-in records found in %s", filename)
 	}
@@ -662,7 +677,10 @@ func normalizeMonthEN(m string) (int, string) {
 	case "dec", "12", "ديسمبر":
 		return 12, "ديسمبر"
 	default:
-		return 1, "يناير"
+		if m, _, ok := ParseMonthToken(m); ok {
+			return m, ArabicMonthName(m)
+		}
+		return 0, ""
 	}
 }
 
