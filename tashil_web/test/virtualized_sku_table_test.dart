@@ -52,12 +52,12 @@ void main() {
       );
 
       // Verify Table Title & Pinned Column indicator
-      expect(find.text('Sell-Out Analytics Data Table (Pinned SKU & Barcode)'), findsOneWidget);
-      expect(find.text('Total 2 rows'), findsOneWidget);
+      expect(find.text('بيانات Sell-Out'), findsOneWidget);
+      expect(find.text('2 صف'), findsOneWidget);
 
       // Verify Pinned Column Headers
       expect(find.text('GTIN / Barcode'), findsOneWidget);
-      expect(find.text('Product / SKU Name'), findsOneWidget);
+      expect(find.text('الصنف'), findsOneWidget);
 
       // Verify Pinned Column Data
       expect(find.text('6221001122334'), findsOneWidget);
@@ -68,16 +68,16 @@ void main() {
       // Verify Scrollable Metrics Headers
       expect(find.text('Chain'), findsOneWidget);
       expect(find.text('Store / Branch'), findsOneWidget);
-      expect(find.text('Quantity Sold'), findsOneWidget);
-      expect(find.text('Unit Price'), findsOneWidget);
-      expect(find.text('Net Revenue (EGP)'), findsOneWidget);
-      expect(find.text('Sales Date'), findsOneWidget);
+      expect(find.text('الوحدات المباعة'), findsOneWidget);
+      expect(find.text('سعر الوحدة'), findsOneWidget);
+      expect(find.text('صافي المبيعات (ج.م)'), findsOneWidget);
+      expect(find.text('تاريخ البيع'), findsOneWidget);
 
       // Verify Scrollable Metrics Data
       expect(find.text('كارفور المعادي'), findsOneWidget);
       expect(find.text('فتح الله سموحة'), findsOneWidget);
-      expect(find.text('450 units'), findsOneWidget);
-      expect(find.text('320 units'), findsOneWidget);
+      expect(find.text('450 وحدة'), findsOneWidget);
+      expect(find.text('320 وحدة'), findsOneWidget);
     });
 
     testWidgets('renders loading state when isLoading is true', (WidgetTester tester) async {
@@ -103,7 +103,7 @@ void main() {
         ),
       );
 
-      expect(find.text('لا توجد سجلات تطابق معايير الفلترة المحددة'), findsOneWidget);
+      expect(find.text('لا توجد نتائج. جرّب تغيير الفلاتر.'), findsOneWidget);
       expect(find.byIcon(AppIcons.empty), findsOneWidget);
     });
 
@@ -207,7 +207,7 @@ void main() {
       );
 
       // Default page size is 10 -> shows 1 - 10 of 15
-      expect(find.text('Showing 1 - 10 of 15 rows'), findsOneWidget);
+      expect(find.text('1–10 من 15'), findsOneWidget);
       expect(find.text('صنف اختبار رقم 1'), findsOneWidget);
       expect(find.text('صنف اختبار رقم 10'), findsOneWidget);
       expect(find.text('صنف اختبار رقم 11'), findsNothing);
@@ -216,7 +216,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('pagination_next_btn')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Showing 11 - 15 of 15 rows'), findsOneWidget);
+      expect(find.text('11–15 من 15'), findsOneWidget);
       expect(find.text('صنف اختبار رقم 11'), findsOneWidget);
       expect(find.text('صنف اختبار رقم 15'), findsOneWidget);
       expect(find.text('صنف اختبار رقم 1'), findsNothing);
@@ -225,7 +225,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('pagination_prev_btn')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Showing 1 - 10 of 15 rows'), findsOneWidget);
+      expect(find.text('1–10 من 15'), findsOneWidget);
 
       // Change rows per page from 10 to 25
       await tester.tap(find.byKey(const ValueKey('rows_per_page_dropdown')));
@@ -233,7 +233,7 @@ void main() {
       await tester.tap(find.text('25').last);
       await tester.pumpAndSettle();
 
-      expect(find.text('Showing 1 - 15 of 15 rows'), findsOneWidget);
+      expect(find.text('1–15 من 15'), findsOneWidget);
       expect(find.text('صنف اختبار رقم 15'), findsOneWidget);
     });
 
@@ -257,7 +257,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Showing 1 - 2 of 2 rows'), findsOneWidget);
+      expect(find.text('1–2 من 2'), findsOneWidget);
     });
   });
 }

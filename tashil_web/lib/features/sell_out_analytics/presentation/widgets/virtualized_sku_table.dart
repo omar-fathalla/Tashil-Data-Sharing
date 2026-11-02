@@ -695,7 +695,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                 Icon(Icons.inbox_rounded, size: 40.0, color: colorScheme.onSurfaceVariant),
                 M3Spacing.gapSM,
                 Text(
-                  'لا توجد سجلات تطابق معايير الفلترة المحددة',
+                  'لا توجد نتائج. جرّب تغيير الفلاتر.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -740,7 +740,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                 const SizedBox(width: 8.0),
                 Expanded(
                   child: Text(
-                    'Sell-Out Analytics Data Table (Pinned SKU & Barcode)',
+                    'بيانات Sell-Out',
                     style: theme.textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: colorScheme.onSurface,
@@ -752,7 +752,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                 if (isMobileScreen) ...[
                   IconButton(
                     visualDensity: VisualDensity.compact,
-                    tooltip: _forceTableOnMobile ? 'عرض كبطاقات موبايل' : 'عرض كجدول',
+                    tooltip: _forceTableOnMobile ? 'عرض كبطاقات' : 'عرض كجدول',
                     icon: Icon(
                       _forceTableOnMobile
                           ? Icons.view_agenda_rounded
@@ -766,7 +766,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                   const SizedBox(width: 4.0),
                 ],
                 Text(
-                  'Total ${widget.records.length} rows',
+                  '${widget.records.length} صف',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -853,7 +853,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                 _buildSortableHeaderCell(
                                   context: context,
                                   columnKey: 'skuName',
-                                  label: 'Product / SKU Name',
+                                  label: 'الصنف',
                                   width: null,
                                   expand: true,
                                 ),
@@ -932,7 +932,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           : null,
                                       child: Tooltip(
                                         message: r.itemCode.isNotEmpty
-                                            ? '${r.skuName}\nكود الصنف: ${r.itemCode} • الباركود: ${r.barcode} • شد الكرتونة: ${r.unitsPerCarton}'
+                                            ? '${r.skuName}\nكود الصنف: ${r.itemCode} • الباركود: ${r.barcode} • وحدات/كرتونة: ${r.unitsPerCarton}'
                                             : r.skuName,
                                         child: Text(
                                           r.skuName,
@@ -988,28 +988,28 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   _buildSortableHeaderCell(
                                     context: context,
                                     columnKey: 'quantitySold',
-                                    label: 'Quantity Sold',
+                                    label: 'الوحدات المباعة',
                                     width: colQtyWidth,
                                     textAlign: TextAlign.end,
                                   ),
                                   _buildSortableHeaderCell(
                                     context: context,
                                     columnKey: 'unitPrice',
-                                    label: 'Unit Price',
+                                    label: 'سعر الوحدة',
                                     width: colUnitPriceWidth,
                                     textAlign: TextAlign.end,
                                   ),
                                   _buildSortableHeaderCell(
                                     context: context,
                                     columnKey: 'netRevenue',
-                                    label: 'Net Revenue (EGP)',
+                                    label: 'صافي المبيعات (ج.م)',
                                     width: colNetRevenueWidth,
                                     textAlign: TextAlign.end,
                                   ),
                                   _buildSortableHeaderCell(
                                     context: context,
                                     columnKey: 'transactionDate',
-                                    label: 'Sales Date',
+                                    label: 'تاريخ البيع',
                                     width: colDateWidth,
                                     textAlign: TextAlign.center,
                                   ),
@@ -1081,7 +1081,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                         crossAxisAlignment: CrossAxisAlignment.end,
                                         children: [
                                           Text(
-                                            '${CurrencyFormatter.formatUnits(r.quantitySold)} units',
+                                            '${CurrencyFormatter.formatUnits(r.quantitySold)} وحدة',
                                             textAlign: TextAlign.end,
                                             style: const TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w600),
                                           ),
@@ -1110,7 +1110,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           crossAxisAlignment: CrossAxisAlignment.end,
                                           children: [
                                             Text(
-                                              '${r.unitPrice.toStringAsFixed(2)} EGP',
+                                              '${r.unitPrice.toStringAsFixed(2)} ج.م',
                                               textAlign: TextAlign.end,
                                               style: const TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w600),
                                             ),
@@ -1140,7 +1140,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           crossAxisAlignment: CrossAxisAlignment.end,
                                           children: [
                                             Text(
-                                              '${CurrencyFormatter.formatUnits(r.netRevenue.round())} EGP',
+                                              '${CurrencyFormatter.formatUnits(r.netRevenue.round())} ج.م',
                                               textAlign: TextAlign.end,
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
@@ -1204,7 +1204,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
               runSpacing: 8.0,
               children: [
                 Text(
-                  'Showing ${startIndex + 1} - $endIndex of $totalCount rows',
+                  '${startIndex + 1}–$endIndex من $totalCount',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
@@ -1218,7 +1218,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Rows per page:',
+                          'عدد الصفوف:',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -1248,7 +1248,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                         IconButton(
                           key: const ValueKey('pagination_prev_btn'),
                           icon: const Icon(Icons.chevron_left_rounded, size: 20.0),
-                          tooltip: 'Previous Page',
+                          tooltip: 'السابق',
                           visualDensity: VisualDensity.compact,
                           onPressed: safePage > 0
                               ? () => setState(() => _currentPage = safePage - 1)
@@ -1263,7 +1263,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                         IconButton(
                           key: const ValueKey('pagination_next_btn'),
                           icon: const Icon(Icons.chevron_right_rounded, size: 20.0),
-                          tooltip: 'Next Page',
+                          tooltip: 'التالي',
                           visualDensity: VisualDensity.compact,
                           onPressed: safePage < totalPages - 1
                               ? () => setState(() => _currentPage = safePage + 1)
@@ -1339,7 +1339,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
         foreground: Color(0xFF0369A1),
         accent: M3Palette.info,
         icon: Icons.local_grocery_store_rounded,
-        displayNameAr: 'كارفور مصر',
+        displayNameAr: 'كارفور',
         displayNameEn: 'Carrefour',
       );
     }
@@ -1350,7 +1350,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
         foreground: Color(0xFF047857),
         accent: M3Palette.emeraldDeep,
         icon: Icons.shopping_basket_rounded,
-        displayNameAr: 'سبينيس مصر',
+        displayNameAr: 'سبينيس',
         displayNameEn: 'Spinneys',
       );
     }

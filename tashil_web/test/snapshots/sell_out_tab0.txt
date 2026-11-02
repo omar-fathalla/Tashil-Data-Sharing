@@ -1,33 +1,37 @@
-1,455 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-1,455 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+1,455 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+1,455 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 10 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 10 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 10 صنف نشط | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 10 صنف نشط | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
-105,921 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-105,921 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-115.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-115.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-120 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-120 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-130.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-130.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-149.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-149.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-150 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-150 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-150.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-150.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-154.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-154.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-159.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-159.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+105,921 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+105,921 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+115.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+115.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+120 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+120 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+130.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+130.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+149.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+149.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+150 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+150 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+150.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+150.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+154.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+154.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+159.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+159.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+16 صف | 11.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+16 صف | 11.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
 16 فرع | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 16 فرع | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
-18,000 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-18,000 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-180 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-180 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+18,000 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+18,000 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+180 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+180 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+1–10 من 16 | 12.0 | FontWeight.w600 | ff45464f | 0.5 | 1.33
+1–10 من 16 | 12.0 | FontWeight.w600 | ff45464f | 0.5 | 1.33
 2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -54,54 +58,54 @@
 2026-03-07 | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 2026-03-07 | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 2026-03-07 | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-22,500 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-22,500 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-23,400 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-23,400 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+22,500 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+22,500 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+23,400 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+23,400 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 25 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 25 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-25.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-25.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-250 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-250 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-300 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-300 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-362 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-362 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-40.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-40.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-498 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-498 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+25.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+25.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+250 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+250 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+300 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+300 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+362 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+362 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+40.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+40.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+498 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+498 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 50 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 50 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-55,607 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-55,607 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-567 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-567 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-6,000 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-6,000 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+55,607 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+55,607 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+567 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+567 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+6,000 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+6,000 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 6,247 | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 6,247 | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
-623 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-623 units | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-65,175 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-65,175 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-7,500 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-7,500 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+623 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+623 وحدة | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+65,175 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+65,175 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+7,500 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+7,500 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
 720.9K ج.م | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 720.9K ج.م | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
-73.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-73.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-74,417 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-74,417 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-90.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-90.00 EGP | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-99,043 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-99,043 EGP | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
-Active SKUs & Branch Velocity | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Active SKUs & Branch Velocity | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Active Stores & Outlets | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Active Stores & Outlets | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+73.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+73.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+74,417 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+74,417 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+90.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+90.00 ج.م | 11.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+99,043 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+99,043 ج.م | 11.5 | FontWeight.w700 | ff1565c0 | 0.25 | 1.43
+Active SKUs | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Active SKUs | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Active Stores | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Active Stores | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Adeco Corn Oil 1.5L | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 Adeco Corn Oil 1.5L | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 Adeco Extra Virgin Olive Oil 500ml | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
@@ -112,43 +116,15 @@ Adeco Natural Tomato Paste 380g | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.4
 Adeco Natural Tomato Paste 380g | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 Adeco Sunflower Oil 1L | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 Adeco Sunflower Oil 1L | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-All Branches (47) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Branches (47) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Branches (48) | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
-All Branches (48) | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
-All Categories | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
-All Categories | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
-All Categories | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Categories | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Chains | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
-All Chains | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
-All Chains | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Chains | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Years (2025–2026) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Years (2025–2026) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Beet El-Gomla | 11.0 | FontWeight.w700 | ff6b21a8 | 0.25 | 1.43
 Beet El-Gomla | 11.0 | FontWeight.w700 | ff6b21a8 | 0.25 | 1.43
-Beet El-Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Beet El-Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Branch Sales Ranking Chart | 12.0 | FontWeight.w700 | ff1565c0 | 0.2 | 1.33
-Branch Sales Ranking Chart | 12.0 | FontWeight.w700 | ff1565c0 | 0.2 | 1.33
 Carrefour | 11.0 | FontWeight.w700 | ff0369a1 | 0.25 | 1.43
 Carrefour | 11.0 | FontWeight.w700 | ff0369a1 | 0.25 | 1.43
 Carrefour | 11.0 | FontWeight.w700 | ff0369a1 | 0.25 | 1.43
 Carrefour | 11.0 | FontWeight.w700 | ff0369a1 | 0.25 | 1.43
-Carrefour | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Carrefour | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Chain | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
 Chain | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
 Chain | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Date Range | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
-Date Range | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
-Date Range | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
-Export Excel | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
-Export Excel | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
-Export Excel | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
-Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Fathalla | 11.0 | FontWeight.w700 | ff1d4ed8 | 0.25 | 1.43
 Fathalla | 11.0 | FontWeight.w700 | ff1d4ed8 | 0.25 | 1.43
 Fathalla | 11.0 | FontWeight.w700 | ff1d4ed8 | 0.25 | 1.43
@@ -162,120 +138,106 @@ Gomla Market | 11.0 | FontWeight.w700 | ffb45309 | 0.25 | 1.43
 Gomla Market | 11.0 | FontWeight.w700 | ffb45309 | 0.25 | 1.43
 Gomla Market | 11.0 | FontWeight.w700 | ffb45309 | 0.25 | 1.43
 Gomla Market | 11.0 | FontWeight.w700 | ffb45309 | 0.25 | 1.43
-Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Institutions | 11.0 | FontWeight.w700 | ff0f766e | 0.25 | 1.43
 Institutions | 11.0 | FontWeight.w700 | ff0f766e | 0.25 | 1.43
-Institutions | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Institutions | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Net Revenue (EGP) | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Net Revenue (EGP) | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Net Revenue (EGP) | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+Net Sales (EGP) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Net Sales (EGP) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Page 1 of 2 | 11.0 | FontWeight.w700 | ff1d1b20 | 0.5 | 1.45
 Page 1 of 2 | 11.0 | FontWeight.w700 | ff1d1b20 | 0.5 | 1.45
-Performance & Branch Analytics | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Performance & Branch Analytics | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Print PDF | 11.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
-Print PDF | 11.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
-Print PDF | 11.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
-Product / SKU Name | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Product / SKU Name | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Product / SKU Name | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Quantity Sold | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Quantity Sold | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Quantity Sold | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Rows per page: | 11.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
-Rows per page: | 11.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
-Sales Date | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Sales Date | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Sales Date | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Search SKU or Barcode... | 13.0 | FontWeight.w400 | a645464f | 0.25 | 1.43
-Search SKU or Barcode... | 13.0 | FontWeight.w400 | a645464f | 0.25 | 1.43
-Sell-Out Analytics Data Table (Pinned SKU & Barcode) | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
-Sell-Out Analytics Data Table (Pinned SKU & Barcode) | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
-Sell-Out Analytics Data Table (Pinned SKU & Barcode) | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
-Sell-Out Analytics, Branch Performance & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-Out Analytics, Branch Performance & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-Out Analytics, Branch Performance & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-Out Data & Operations | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
-Sell-Out Data & Operations | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
-Showing 1 - 10 of 16 rows | 12.0 | FontWeight.w600 | ff45464f | 0.5 | 1.33
-Showing 1 - 10 of 16 rows | 12.0 | FontWeight.w600 | ff45464f | 0.5 | 1.33
+Sales Data | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
+Sales Data | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
+Sell-Out | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Sell-Out | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Sell-Out | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
 Spinneys | 11.0 | FontWeight.w700 | ff047857 | 0.25 | 1.43
 Spinneys | 11.0 | FontWeight.w700 | ff047857 | 0.25 | 1.43
-Spinneys | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Spinneys | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Store / Branch | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
 Store / Branch | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
 Store / Branch | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Target Management (Sell-Out) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Target Management (Sell-Out) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Total 16 rows | 11.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
-Total 16 rows | 11.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
-Total Net Revenue (EGP) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Total Net Revenue (EGP) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Store Performance | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Store Performance | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Store Ranking by Sales | 12.0 | FontWeight.w700 | ff1565c0 | 0.2 | 1.33
+Store Ranking by Sales | 12.0 | FontWeight.w700 | ff1565c0 | 0.2 | 1.33
+Targets | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Targets | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 Total Units Sold | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Total Units Sold | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Unit Price | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Unit Price | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Unit Price | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
 Upload Sell-Out | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
 Upload Sell-Out | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
 Upload Sell-Out | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
-Uploaded Sheets (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Uploaded Sheets (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-أسواق فتح الله (Fathalla Market) • سنة 2026 • 34 فرع • إجمالي السلسلة: 40.23M ج.م (+26.1% عن 2025) | 11.0 | FontWeight.w600 | d945464f | 0.4 | 1.33
-أسواق فتح الله (Fathalla Market) • سنة 2026 • 34 فرع • إجمالي السلسلة: 40.23M ج.م (+26.1% عن 2025) | 11.0 | FontWeight.w600 | d945464f | 0.4 | 1.33
+Uploaded Files (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Uploaded Files (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 أسواق فتح الله (Fathalla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 أسواق فتح الله (Fathalla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-إجمالي الفروع النشطة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
-إجمالي الفروع النشطة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+أسواق فتح الله | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+أسواق فتح الله | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+أسواق فتح الله • سنة 2026 • 34 فرع • إجمالي السلسلة: 40.23M ج.م (+26.1% عن 2025) | 11.0 | FontWeight.w600 | d945464f | 0.4 | 1.33
+أسواق فتح الله • سنة 2026 • 34 فرع • إجمالي السلسلة: 40.23M ج.م (+26.1% عن 2025) | 11.0 | FontWeight.w600 | d945464f | 0.4 | 1.33
 إجمالي الكمية المباعة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 إجمالي الكمية المباعة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
-إجمالي صافي المبيعات | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
-إجمالي صافي المبيعات | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+ابحث بالصنف أو الباركود | 13.0 | FontWeight.w400 | a645464f | 0.25 | 1.43
+ابحث بالصنف أو الباركود | 13.0 | FontWeight.w400 | a645464f | 0.25 | 1.43
 ادوات نظافة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 ادوات نظافة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 اقراص غسالات اطباق | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 اقراص غسالات اطباق | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-الأصناف النشطة ومتوسط الفرع | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
-الأصناف النشطة ومتوسط الفرع | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+الأصناف النشطة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+الأصناف النشطة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 الأعلى للأقل | 11.5 | FontWeight.w800 | ff1565c0 | 0.1 | null
 الأعلى للأقل | 11.5 | FontWeight.w800 | ff1565c0 | 0.1 | null
 الأعلى للأقل | 11.5 | FontWeight.w800 | ff1565c0 | 0.1 | null
+الصنف | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+الصنف | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+الصنف | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+الفترة | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+الفترة | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+الفترة | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+الفروع النشطة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+الفروع النشطة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 الكل | 12.0 | FontWeight.w800 | ff1a1b21 | null | null
 الكل | 12.0 | FontWeight.w800 | ff1a1b21 | null | null
 الكل | 12.0 | FontWeight.w800 | ff1a1b21 | null | null
-بيت الجملة (Beet El-Gomla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-بيت الجملة (Beet El-Gomla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-بيت الجملة - التجمع الخامس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-بيت الجملة - التجمع الخامس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-بيت الجملة - المهندسين | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-بيت الجملة - المهندسين | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-بيت الجملة - مدينة نصر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-بيت الجملة - مدينة نصر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+المؤسسات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+المؤسسات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+الوحدات المباعة | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+الوحدات المباعة | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+الوحدات المباعة | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+بيانات Sell-Out | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+بيانات Sell-Out | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+بيانات Sell-Out | 12.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+بيت الجملة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+بيت الجملة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+بيت الجملة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+بيت الجملة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+تاريخ البيع | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+تاريخ البيع | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+تاريخ البيع | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+ترتيب الفروع حسب المبيعات | 15.0 | FontWeight.w900 | ff1a1b21 | 0.15 | 1.2
+ترتيب الفروع حسب المبيعات | 15.0 | FontWeight.w900 | ff1a1b21 | 0.15 | 1.2
+تصدير | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+تصدير | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
+تصدير | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
 جل غسيل اطباق | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 جل غسيل اطباق | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 جملة ماركت (Gomla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 جملة ماركت (Gomla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-جملة ماركت - الدقي | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-جملة ماركت - الدقي | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-جملة ماركت - لوران الإسكندرية | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-جملة ماركت - لوران الإسكندرية | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 جملة ماركت - مدينة نصر | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 جملة ماركت - مدينة نصر | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-جملة ماركت - مدينة نصر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-جملة ماركت - مدينة نصر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+جملة ماركت | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+جملة ماركت | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 ديتول ومطهرات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 ديتول ومطهرات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 ديفا هاند ووش500مل بامب + لتر هديه توت برى | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 ديفا هاند ووش500مل بامب + لتر هديه توت برى | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-سبينيس (Spinneys) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-سبينيس (Spinneys) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 سبينيس - مول العرب | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 سبينيس - مول العرب | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-سبينيس - مول العرب | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-سبينيس - مول العرب | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+سبينيس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+سبينيس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+سبينيس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+سبينيس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+سعر الوحدة | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+سعر الوحدة | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+سعر الوحدة | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
 سنة 2025 | 12.0 | FontWeight.w800 | ff1a1b21 | null | null
 سنة 2025 | 12.0 | FontWeight.w800 | ff1a1b21 | null | null
 سنة 2025 | 12.0 | FontWeight.w800 | ff1a1b21 | null | null
@@ -286,10 +248,8 @@ Uploaded Sheets (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 سنة 2026 | 12.0 | FontWeight.w800 | ffffffff | null | null
 سنة 2026 | 12.0 | FontWeight.w800 | ffffffff | null | null
 سنة 2026 | 12.0 | FontWeight.w800 | ffffffff | null | null
-سنة 2026 • نمو -97.7% عن 2025 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-سنة 2026 • نمو -97.7% عن 2025 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-شارت ترتيب مبيعات فروع السلسلة من الأعلى للأقل | 15.0 | FontWeight.w900 | ff1a1b21 | 0.15 | 1.2
-شارت ترتيب مبيعات فروع السلسلة من الأعلى للأقل | 15.0 | FontWeight.w900 | ff1a1b21 | 0.15 | 1.2
+سنة 2026 • نمو -97.7% مقارنة بالعام السابق | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+سنة 2026 • نمو -97.7% مقارنة بالعام السابق | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 شامبو وبلسم | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 شامبو وبلسم | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 شاور جل | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -300,6 +260,16 @@ Uploaded Sheets (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 صابون قطع | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 صابون وجه | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 صابون وجه | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+صافي المبيعات (ج.م) | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+صافي المبيعات (ج.م) | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+صافي المبيعات (ج.م) | 12.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
+صافي المبيعات | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+صافي المبيعات | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+طباعة | 11.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+طباعة | 11.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+طباعة | 11.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+عدد الصفوف: | 11.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
+عدد الصفوف: | 11.0 | FontWeight.w500 | ff45464f | 0.5 | 1.45
 فتح الله - ستانلي | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 فتح الله - ستانلي | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 فتح الله جملة ماركت - سموحة | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
@@ -388,28 +358,35 @@ Uploaded Sheets (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 فيبا صابون سائل للاطباق بالليمون 2 لتر | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 قطاع المؤسسات والفنادق - توريد الجيزة | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 قطاع المؤسسات والفنادق - توريد الجيزة | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-قطاع المؤسسات والفنادق - توريد الجيزة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-قطاع المؤسسات والفنادق - توريد الجيزة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-قطاع المستشفيات والشركات - التوريدات الطبية | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-قطاع المستشفيات والشركات - التوريدات الطبية | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-قطاع الوزارات والهيئات - التوريد المركزي | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-قطاع الوزارات والهيئات - التوريد المركزي | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-كارفور (Carrefour) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-كارفور (Carrefour) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كارفور | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كارفور | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كارفور | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كارفور | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كارفور المعادي سيتي سنتر | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 كارفور المعادي سيتي سنتر | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 كارفور المعادي سيتي سنتر | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
 كارفور المعادي سيتي سنتر | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-كارفور المعادي سيتي سنتر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-كارفور المعادي سيتي سنتر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-كارفور داندي مول | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-كارفور داندي مول | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-كارفور سيتي ستارز | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-كارفور سيتي ستارز | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كل السلاسل (All Chains) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كل السلاسل (All Chains) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السلاسل | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
+كل السلاسل | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
+كل السلاسل | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السلاسل | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السنوات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السنوات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل الفئات | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
+كل الفئات | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
+كل الفئات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل الفئات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل الفروع (34) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل الفروع (34) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل الفروع (48) | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
+كل الفروع (48) | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
 كلور ابيض و الوان | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 كلور ابيض و الوان | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+مبيعات السلاسل للمستهلك وأداء الفروع والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+مبيعات السلاسل للمستهلك وأداء الفروع والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+مبيعات السلاسل للمستهلك وأداء الفروع والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
 متوسط الفرع: 45.1K ج.م | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 متوسط الفرع: 45.1K ج.م | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 مساحيق جيل اوتوماتيك | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -442,9 +419,6 @@ Uploaded Sheets (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 منظف سجاد | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 منظف متعدد الاغراض | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 منظف متعدد الاغراض | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-منظومة مبيعات التجزئة (Sell-Out)، تحليلات باريتو وأداء الفروع، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
-منظومة مبيعات التجزئة (Sell-Out)، تحليلات باريتو وأداء الفروع، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
-منظومة مبيعات التجزئة (Sell-Out)، تحليلات باريتو وأداء الفروع، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
 منعمات ملابس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 منعمات ملابس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 هاند وواش | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null

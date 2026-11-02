@@ -403,7 +403,7 @@ void main() {
       expect(find.byKey(const ValueKey('rbac_export_restricted_banner')), findsOneWidget);
 
       // Tapping export is blocked and does not download a CSV
-      await tester.tap(find.text('Export Excel'));
+      await tester.tap(find.text('تصدير').first);
       await tester.pumpAndSettle();
       expect(ExcelExportService.lastDownloadedFilename, isNull);
 
