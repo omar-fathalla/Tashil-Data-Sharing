@@ -1,8 +1,10 @@
 package middleware
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -14,13 +16,13 @@ func TestETagRoundTrip(t *testing.T) {
 	}))
 
 	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/analytics/records", nil))
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/analytics/summary", nil))
 	tag := rr.Header().Get("ETag")
 	if rr.Code != 200 || tag == "" || rr.Body.String() != body {
 		t.Fatalf("first: code=%d tag=%q body=%q", rr.Code, tag, rr.Body.String())
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/analytics/records", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/analytics/summary", nil)
 	req.Header.Set("If-None-Match", tag)
 	rr2 := httptest.NewRecorder()
 	h.ServeHTTP(rr2, req)
@@ -49,5 +51,76 @@ func TestETagSkipsDownloadsAndErrors(t *testing.T) {
 		if rr.Header().Get("ETag") != "" {
 			t.Fatalf("%s should have no ETag", p)
 		}
+	}
+}
+
+func jsonHandler(body *string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(*body))
+	})
+}
+
+func TestETagNoStoreAndVary(t *testing.T) {
+	body := `{"a":1}`
+	rr := httptest.NewRecorder()
+	ETag(jsonHandler(&body)).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/stores", nil))
+	if cc := rr.Header().Get("Cache-Control"); cc != "private, no-store" {
+		t.Fatalf("cache-control=%q", cc)
+	}
+	v := rr.Header().Get("Vary")
+	for _, h := range []string{"Authorization", "X-Tenant-ID", "X-Simulated-Role", "X-Assigned-Chain"} {
+		if !strings.Contains(v, h) {
+			t.Fatalf("Vary %q missing %s", v, h)
+		}
+	}
+}
+
+func TestETagStarDoesNotMatch(t *testing.T) {
+	body := `{"a":1}`
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/stores", nil)
+	req.Header.Set("If-None-Match", "*")
+	rr := httptest.NewRecorder()
+	ETag(jsonHandler(&body)).ServeHTTP(rr, req)
+	if rr.Code != 200 || rr.Body.String() != body {
+		t.Fatalf("code=%d body=%q", rr.Code, rr.Body.String())
+	}
+}
+
+func TestETagSkipsRecordsAndNonJSON(t *testing.T) {
+	body := `{"a":1}`
+	rr := httptest.NewRecorder()
+	ETag(jsonHandler(&body)).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/analytics/records", nil))
+	if rr.Header().Get("ETag") != "" || rr.Body.String() != body {
+		t.Fatal("records endpoint must bypass ETag")
+	}
+	h := ETag(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("hi"))
+	}))
+	rr = httptest.NewRecorder()
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/x", nil))
+	if rr.Header().Get("ETag") != "" || rr.Body.String() != "hi" {
+		t.Fatal("non-JSON must bypass ETag")
+	}
+}
+
+func TestETagLargeResponseStreamsWithoutTag(t *testing.T) {
+	chunk := bytes.Repeat([]byte("a"), 1<<20)
+	h := ETag(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		for i := 0; i < 7; i++ {
+			_, _ = w.Write(chunk)
+		}
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/big", nil)
+	req.Header.Set("If-None-Match", `"x"`)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != 200 || rr.Body.Len() != 7<<20 || rr.Header().Get("ETag") != "" {
+		t.Fatalf("code=%d len=%d etag=%q", rr.Code, rr.Body.Len(), rr.Header().Get("ETag"))
+	}
+	if rr.Header().Get("Content-Type") != "application/json" {
+		t.Fatal("headers lost when streaming")
 	}
 }

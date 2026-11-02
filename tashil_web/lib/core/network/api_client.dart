@@ -3217,7 +3217,7 @@ class ApiClient {
       }
 
       final uri = Uri.parse(ApiEndpoints.storeMatrix).replace(queryParameters: params.isEmpty ? null : params);
-      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 60));
       if (resp.statusCode == 200) {
         isServerOnline.value = true;
         lastConnectionError = null;
@@ -3239,6 +3239,14 @@ class ApiClient {
         }
         return items;
       }
+      if (!allowMockFallback) {
+        throw ServerConnectionException(
+          'تعذّر تحميل البيانات من الخادم. حاول مرة أخرى بعد قليل.',
+          'HTTP ${resp.statusCode}',
+        );
+      }
+    } on ServerConnectionException {
+      rethrow;
     } catch (e) {
       debugPrint('[ApiClient] Fallback getStoreBenchmarkMatrix: $e');
       if (!allowMockFallback) {

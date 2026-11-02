@@ -42,8 +42,10 @@ class CacheStore {
   }
 
   /// Called on every explicit invalidation (forceRefresh, after writes) so lower cache
-  /// layers (the HTTP stale-while-revalidate cache) refetch too.
-  void Function()? onInvalidate = BackendHttp.cache.clear;
+  /// layers (the HTTP stale-while-revalidate cache) revalidate too. Entries are only
+  /// expired (ETag check on next read), not dropped, so other screens keep their data;
+  /// writes already drop the HTTP cache via BackendHttp.
+  void Function()? onInvalidate = BackendHttp.cache.expireAll;
 
   bool contains(String key) => get<Object?>(key) != null;
   void invalidate(String key) {
