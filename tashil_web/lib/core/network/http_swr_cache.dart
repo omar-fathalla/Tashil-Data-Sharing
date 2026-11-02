@@ -56,6 +56,10 @@ class HttpSwrCache {
     final key = _key(url, headers);
     final hit = _entries[key];
     if (hit != null) {
+      if (hit.mustRevalidate) {
+        // Explicitly expired (forceRefresh): wait for a cheap conditional check.
+        return _revalidate(key, hit, headers, send);
+      }
       if (_now().difference(hit.checkedAt) >= freshFor) {
         unawaited(_revalidate(key, hit, headers, send).catchError((_) => hit.toResponse()));
       }
@@ -85,6 +89,8 @@ class HttpSwrCache {
     return future.whenComplete(() => _inFlight.remove(key));
   }
 
+  /// Never returns a 304 to the caller: a 304 is mapped to the cached body when it
+  /// is still valid, otherwise the request is retried without `If-None-Match`.
   Future<http.Response> _fetch(
     String key,
     _SwrEntry? previous,
@@ -95,15 +101,27 @@ class HttpSwrCache {
     final reqHeaders = <String, String>{...?headers};
     final tag = previous?.etag;
     if (tag != null) reqHeaders['If-None-Match'] = tag;
-    final resp = await send(reqHeaders);
-    if (generation != _generation) return resp;
-    if (resp.statusCode == 304 && previous != null) {
-      previous.checkedAt = _now();
-      return previous.toResponse();
+    var resp = await send(reqHeaders);
+    final stale = generation != _generation;
+    if (resp.statusCode == 304) {
+      if (previous != null && !stale) {
+        previous.checkedAt = _now();
+        previous.mustRevalidate = false;
+        return previous.toResponse();
+      }
+      final plain = <String, String>{...?headers}..remove('If-None-Match');
+      resp = await send(plain);
+      if (resp.statusCode == 304) {
+        throw http.ClientException('Unexpected 304 for unconditional request', resp.request?.url);
+      }
     }
+    if (stale || generation != _generation) return resp;
     if (resp.statusCode == 200) {
       final etag = resp.headers['etag'];
-      final changed = previous == null || etag == null || etag != previous.etag;
+      final changed = previous == null ||
+          (etag == null || previous.etag == null
+              ? !listEquals(resp.bodyBytes, previous.bodyBytes)
+              : etag != previous.etag);
       _put(key, _SwrEntry(resp.bodyBytes, resp.headers, etag, _now()));
       if (previous != null && changed) _bump();
     }
@@ -126,13 +144,24 @@ class HttpSwrCache {
   void invalidateAll() {
     _generation++;
     _entries.clear();
+    _inFlight.clear();
     _bump();
+  }
+
+  /// Keeps cached bodies but makes the next read of each wait for an ETag
+  /// revalidation (cheap 304 when unchanged). Used for scoped refreshes so one
+  /// screen's forceRefresh does not throw away every other screen's data.
+  void expireAll() {
+    for (final e in _entries.values) {
+      e.mustRevalidate = true;
+    }
   }
 
   /// Drops every cached response without notifying (logout / session switch).
   void clear() {
     _generation++;
     _entries.clear();
+    _inFlight.clear();
   }
 }
 
@@ -143,6 +172,7 @@ class _SwrEntry {
   final Map<String, String> headers;
   final String? etag;
   DateTime checkedAt;
+  bool mustRevalidate = false;
 
   http.Response toResponse() => http.Response.bytes(bodyBytes, 200, headers: headers);
 }

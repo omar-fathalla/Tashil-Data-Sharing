@@ -19,7 +19,12 @@ class SellOutExplorerData {
     required this.stores,
     required this.currentBranchMatrix,
     required this.prevBranchMatrix,
+    this.sideError,
   });
+
+  /// Set when a side request (stores / branch matrix) failed. The records table is
+  /// still shown; only the widgets fed by the failed request render empty.
+  final Object? sideError;
 }
 
 /// Filter combo used both for the request and as the cache key.
@@ -88,16 +93,28 @@ class SellOutExplorerRepository {
             limit: q.limit,
           );
           final summary = api.lastSellOutSummary;
+          // Side widgets fail independently: the table only depends on getRecords.
+          Object? sideError;
+          Future<T> side<T>(Future<T> f, T empty) => f.catchError((Object e) {
+                sideError ??= e;
+                return empty;
+              });
           final results = await Future.wait([
-            api.getStores(),
-            api.getStoreBenchmarkMatrix(
-              chain: q.matrixChain,
-              year: q.matrixYear,
-              month: q.month,
-              startDate: q.startDate,
-              endDate: q.endDate,
+            side<Object>(api.getStores(), const <Map<String, dynamic>>[]),
+            side<Object>(
+              api.getStoreBenchmarkMatrix(
+                chain: q.matrixChain,
+                year: q.matrixYear,
+                month: q.month,
+                startDate: q.startDate,
+                endDate: q.endDate,
+              ),
+              const <StoreBenchmarkItem>[],
             ),
-            api.getStoreBenchmarkMatrix(chain: q.matrixChain, year: q.compYear, month: q.month),
+            side<Object>(
+              api.getStoreBenchmarkMatrix(chain: q.matrixChain, year: q.compYear, month: q.month),
+              const <StoreBenchmarkItem>[],
+            ),
           ]);
           return SellOutExplorerData(
             records: records,
@@ -105,6 +122,7 @@ class SellOutExplorerRepository {
             stores: results[0] as List<Map<String, dynamic>>,
             currentBranchMatrix: results[1] as List<StoreBenchmarkItem>,
             prevBranchMatrix: results[2] as List<StoreBenchmarkItem>,
+            sideError: sideError,
           );
         }));
   }
