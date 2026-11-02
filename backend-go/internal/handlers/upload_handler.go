@@ -161,10 +161,6 @@ func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Requ
 		targetChain = "fathalla"
 	}
 
-	if replaceArchiveID != "" {
-		_, _ = h.processor.DeleteArchivedFile(r.Context(), tenantID, replaceArchiveID)
-	}
-
 	if periodDate == "" && qYear != "" && qYear != "0" && qYear != "all" {
 		m := "01"
 		if qMonth != "" && qMonth != "0" && qMonth != "all" {
@@ -177,19 +173,23 @@ func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Requ
 		periodDate = fmt.Sprintf("%s-%s-15", qYear, m)
 	}
 
-	ctx := r.Context()
+	ctx := ingestion.WithUploadGuards(r.Context(), uploadGuardsFromRequest(r))
 	if periodDate != "" {
 		ctx = gemini.WithRequestedPeriodDate(ctx, periodDate)
 	}
 
+	// Blocking checks run before the old archive is replaced, so a rejected file never deletes data.
+	if err := h.processor.PrecheckSellIn(ctx, tenantID, filename, fileBytes, targetChain); err != nil {
+		writeUploadError(w, err, "sell_in_ingestion_failed")
+		return
+	}
+	if replaceArchiveID != "" {
+		_, _ = h.processor.DeleteArchivedFile(r.Context(), tenantID, replaceArchiveID)
+	}
+
 	result, err := h.processor.ProcessSellInPlan(ctx, tenantID, filename, fileBytes, false, targetChain)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"error":   "sell_in_ingestion_failed",
-			"message": err.Error(),
-		})
+		writeUploadError(w, err, "sell_in_ingestion_failed")
 		return
 	}
 
@@ -469,6 +469,7 @@ func (h *UploadHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := gemini.WithRequestedTier(r.Context(), aiTier)
+	ctx = ingestion.WithUploadGuards(ctx, uploadGuardsFromRequest(r))
 	if periodDate != "" {
 		ctx = gemini.WithRequestedPeriodDate(ctx, periodDate)
 	}
@@ -476,12 +477,7 @@ func (h *UploadHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	result, err := h.processor.ProcessUploadWithDryRun(ctx, tenantID, filename, fileBytes, dryRun, targetChain)
 
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"error":   "ingestion_failed",
-			"message": err.Error(),
-		})
+		writeUploadError(w, err, "ingestion_failed")
 		return
 	}
 
@@ -508,6 +504,9 @@ func (h *UploadHandler) HandleCommit(w http.ResponseWriter, r *http.Request) {
 		TargetChain string `json:"chain"`
 		Tenant      string `json:"tenant"`
 		PeriodDate  string `json:"period_date"`
+		// Answers to a confirmation dialog shown at preview (see ingestion.ConfirmationRequiredError).
+		ReplaceConfirmed bool   `json:"replace_confirmed"`
+		PeriodChoice     string `json:"period_choice"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid json body"}`, http.StatusBadRequest)
@@ -521,19 +520,14 @@ func (h *UploadHandler) HandleCommit(w http.ResponseWriter, r *http.Request) {
 		tenantID = req.Tenant
 	}
 
-	commitCtx := r.Context()
+	commitCtx := ingestion.WithUploadGuards(r.Context(), ingestion.UploadGuards{ReplaceConfirmed: req.ReplaceConfirmed, PeriodChoice: req.PeriodChoice})
 	if req.PeriodDate != "" {
 		commitCtx = gemini.WithRequestedPeriodDate(commitCtx, req.PeriodDate)
 	}
 
 	result, err := h.processor.CommitStagedUpload(commitCtx, tenantID, req.BatchID, req.TargetChain)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"error":   "commit_failed",
-			"message": err.Error(),
-		})
+		writeUploadError(w, err, "commit_failed")
 		return
 	}
 
@@ -779,3 +773,40 @@ func (h *UploadHandler) HandleDeleteArchive(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+// uploadGuardsFromRequest reads the uploader's answers to a previous confirmation dialog.
+func uploadGuardsFromRequest(r *http.Request) ingestion.UploadGuards {
+	get := func(k string) string {
+		if v := strings.TrimSpace(r.URL.Query().Get(k)); v != "" {
+			return v
+		}
+		if r.MultipartForm != nil {
+			if vals := r.MultipartForm.Value[k]; len(vals) > 0 {
+				return strings.TrimSpace(vals[0])
+			}
+		}
+		return ""
+	}
+	return ingestion.UploadGuards{
+		ReplaceConfirmed: strings.EqualFold(get("replace_confirmed"), "true"),
+		PeriodChoice:     get("period_choice"),
+	}
+}
+
+// writeUploadError returns 409 with the dialog payload for a confirmation request, else 422.
+func writeUploadError(w http.ResponseWriter, err error, code string) {
+	w.Header().Set("Content-Type", "application/json")
+	if c, ok := ingestion.AsConfirmationRequired(err); ok {
+		w.WriteHeader(http.StatusConflict)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"error":        "confirmation_required",
+			"message":      c.MessageAR,
+			"confirmation": c,
+		})
+		return
+	}
+	w.WriteHeader(http.StatusUnprocessableEntity)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"error":   code,
+		"message": err.Error(),
+	})
+}

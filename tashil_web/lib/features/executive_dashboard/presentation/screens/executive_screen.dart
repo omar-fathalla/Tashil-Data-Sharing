@@ -15,6 +15,7 @@ import '../widgets/sellout_trend_chart.dart';
 import '../widgets/market_share_section.dart';
 import '../../../cpfr_replenishment/domain/cpfr_models.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
+import '../../../../core/data/available_years.dart';
 
 /// ExecutiveScreen is the primary executive management overview.
 class ExecutiveScreen extends StatefulWidget {
@@ -40,7 +41,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
   }
 
   String selectedPeriod = 'YTD';
-  int selectedYear = 2026;
+  int selectedYear = AvailableYears.current.defaultYear;
+  bool _yearTouched = false;
   int selectedMonth = 0;
   String selectedChain = 'all';
   bool isLoading = true;
@@ -75,7 +77,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
     (number: 12, shortName: 'Dec', fullName: 'December'),
   ];
 
-  static const List<int> _years = [2026, 2025, 2024];
+  List<int> get _years => AvailableYears.current.including(selectedYear);
 
   List<({String code, String shortName, String fullName})> get _availableChains {
     final list = <({String code, String shortName, String fullName})>[
@@ -140,6 +142,16 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
       if (mounted) setState(() {});
     });
     _loadData();
+    // Year filter: data years + current year; default = latest year with data.
+    AvailableYears.load(widget.apiClient).then((o) {
+      if (!mounted) return;
+      if (!_yearTouched && o.defaultYear != selectedYear) {
+        setState(() => selectedYear = o.defaultYear);
+        _loadData();
+      } else {
+        setState(() {});
+      }
+    });
   }
 
   @override
@@ -482,7 +494,10 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
             textStyle: WidgetStatePropertyAll(Theme.of(context).textTheme.labelMedium),
           ),
           onSelectionChanged: (s) {
-            setState(() => selectedYear = s.first);
+            setState(() {
+              selectedYear = s.first;
+              _yearTouched = true;
+            });
             _loadData();
           },
         ),
