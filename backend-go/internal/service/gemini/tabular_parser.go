@@ -1207,6 +1207,7 @@ func parseFullTabularPayload(filename string, rawContent []byte) (*domain.Normal
 
 		rev := parseRevenueFloat(rawRev)
 		qty := parseQuantityInt(rawQty)
+		qtyInvented := cols.qtyIdx < 0 && qty == 0 && rev > 0
 		if cols.qtyIdx < 0 && qty == 0 && rev > 0 {
 			if isLargeDataset {
 				qty = int(math.Max(1, math.Round(rev/45.0)))
@@ -1244,6 +1245,7 @@ func parseFullTabularPayload(filename string, rawContent []byte) (*domain.Normal
 
 		dateKey := rawDate + "|" + rawYear + "|" + rawMonth + "|" + sheetFallbackDate
 		txDate, ok := dateCache[dateKey]
+		dateFromFile := rawDate != "" || rawYear != "" || rawMonth != "" || sheetFallbackDate != ""
 		if !ok {
 			ymDate := ""
 			if rawYear != "" || rawMonth != "" {
@@ -1263,6 +1265,9 @@ func parseFullTabularPayload(filename string, rawContent []byte) (*domain.Normal
 				} else {
 					txDate = today
 				}
+			}
+			if !dateFromFile {
+				txDate = today
 			}
 			dateCache[dateKey] = txDate
 		}
@@ -1397,6 +1402,8 @@ func parseFullTabularPayload(filename string, rawContent []byte) (*domain.Normal
 			UnitPrice:        uPrice,
 			RecommendedPrice: uPrice,
 			TransactionDate:  txDate,
+			DateFromFile:     dateFromFile,
+			QtyInvented:      qtyInvented,
 		})
 	}
 

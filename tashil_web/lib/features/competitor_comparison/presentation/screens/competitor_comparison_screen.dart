@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/data/available_years.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
@@ -50,8 +51,9 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
   String? _selectedOwnBarcode;
   String? _selectedCompetitorBarcode;
 
-  // Temporal State: Default to Year 2026
-  int _selectedYear = 2026;
+  // Temporal State: latest year with data (from the backend year list).
+  int _selectedYear = AvailableYears.current.defaultYear;
+  bool _yearTouched = false;
   int _selectedMonth = 0; // 0 = All Months (Jan - Apr), 1..4 = specific month
   bool _showFullTwoYearTimeline = false;
 
@@ -68,10 +70,9 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     (code: 'fathalla', labelAr: 'أسواق فتح الله (بيانات فعلية مرفوعة)'),
   ];
 
-  static const List<({int year, String labelAr})> _yearOptions = [
-    (year: 2026, labelAr: 'سنة 2026 (الحالية)'),
-    (year: 2025, labelAr: 'سنة 2025 (السابقة)'),
-  ];
+  List<({int year, String labelAr})> get _yearOptions => [
+        for (final y in AvailableYears.current.including(_selectedYear)) (year: y, labelAr: 'سنة $y'),
+      ];
 
   static const List<({int month, String labelAr})> _monthOptions = [
     (month: 0, labelAr: 'كل الشهور (يناير - أبريل)'),
@@ -87,6 +88,15 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     _repo = widget.repository ?? CompetitorComparisonRepository(widget.apiClient);
     _lastTenantId = widget.apiClient.tenantId;
     _loadCompetitiveData();
+    AvailableYears.load(widget.apiClient).then((o) {
+      if (!mounted) return;
+      if (!_yearTouched && o.defaultYear != _selectedYear) {
+        setState(() => _selectedYear = o.defaultYear);
+        _loadCompetitiveData();
+      } else {
+        setState(() {});
+      }
+    });
   }
 
   @override
@@ -102,7 +112,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
         _lastTenantId != widget.apiClient.tenantId) {
       _lastTenantId = widget.apiClient.tenantId;
       _repo = widget.repository ?? CompetitorComparisonRepository(widget.apiClient);
-      _selectedYear = 2026;
+      _selectedYear = AvailableYears.current.defaultYear;
+      _yearTouched = false;
       _selectedMonth = 0;
       _selectedChain = 'fathalla';
       _selectedCategory = 'الكل';
@@ -754,6 +765,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                           if (!sel || _selectedYear == yr.year) return;
                           setState(() {
                             _selectedYear = yr.year;
+                            _yearTouched = true;
                             _simulatedOwnPrice = null;
                           });
                           _loadCompetitiveData();

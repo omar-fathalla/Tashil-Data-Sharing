@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:tashil_web/core/utils/sheet_name_utils.dart';
 import 'package:tashil_web/core/widgets/m3_states.dart';
 import 'package:flutter/material.dart';
+import '../../../data_ingestion/presentation/widgets/upload_checks.dart';
 import 'package:flutter/services.dart';
 import 'package:tashil_web/core/theme/m3_text_variants.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
@@ -30,6 +31,7 @@ import '../widgets/target_management_panel.dart';
 import '../widgets/sell_table_shared.dart';
 import '../../data/sell_in_explorer_repository.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
+import '../../../../core/data/available_years.dart';
 
 /// SellInExplorerScreen provides dedicated Supplier Sell-In (توريدات السلاسل):
 /// - Tab 0: بيانات وحركات الـ Sell-In (Sell-In Explorer Table, KPIs, Filters, Upload/Export)
@@ -60,7 +62,8 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
 
   int _activeTab = 0; // 0: Sell-In Explorer, 1: Remaining Stock & Reports, 2: Sell-In Targets, 3: Uploaded Sell-In Sheets Archive
   String _selectedChain = 'all';
-  int _selectedYear = 2026; // Default to 2026
+  int _selectedYear = AvailableYears.current.defaultYear; // latest year with data
+  bool _yearTouched = false;
   int _selectedMonth = 0; // 0 = All Months
   static const int _pageSize = 25;
   List<SellInRecordItem> _records = const []; // accumulated rows (infinite scroll)
@@ -125,6 +128,16 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     _repo = widget.repository ?? SellInExplorerRepository(widget.apiClient);
     _lastTenantId = widget.apiClient.tenantId;
     _loadAllData();
+    AvailableYears.load(widget.apiClient).then((o) {
+      if (!mounted) return;
+      if (!_yearTouched && _selectedYear != 0 && o.defaultYear != _selectedYear) {
+        setState(() => _selectedYear = o.defaultYear);
+        _loadSellInRecords();
+        _loadStockReconciliationReport();
+      } else {
+        setState(() {});
+      }
+    });
   }
 
   @override
@@ -158,7 +171,8 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       _lastTenantId = widget.apiClient.tenantId;
       _repo = widget.repository ?? SellInExplorerRepository(widget.apiClient);
       _selectedChain = 'all';
-      _selectedYear = 2026;
+      _selectedYear = AvailableYears.current.defaultYear;
+      _yearTouched = false;
       _selectedMonth = 0;
       _searchQuery = '';
       _loadAllData();
@@ -346,15 +360,24 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
               ? _selectedMonth
               : (_archiveUploadMonth > 0 ? _archiveUploadMonth : null));
 
-      final res = await widget.apiClient.uploadSellInFile(
-        filename: picked.name,
-        fileBytes: picked.bytes,
-        chain: targetChain,
-        replaceArchiveId: replaceArchiveId,
-        year: targetYear,
-        month: targetMonth,
-      );
       if (!mounted) return;
+      final res = await runUploadWithQuestions(context, (replaceConfirmed, periodChoice) => widget.apiClient.uploadSellInFile(
+            filename: picked.name,
+            fileBytes: picked.bytes,
+            chain: targetChain,
+            replaceArchiveId: replaceArchiveId,
+            year: targetYear,
+            month: targetMonth,
+            replaceConfirmed: replaceConfirmed,
+            periodChoice: periodChoice,
+          ));
+      if (!mounted) return;
+      if (res == null) {
+        M3Feedback.showInfo(context, 'اتلغى الرفع ومفيش حاجة اتحفظت');
+        return;
+      }
+      final notes = uploadWarningsSummary(IngestionWarningsView(res.quarantinedCustomers.length, res.unknownBarcodes.length));
+      if (notes.isNotEmpty) M3Feedback.showWarning(context, notes);
       final actionLabel = replaceArchiveId != null
           ? 'تم استبدال الملف.'
           : 'تم رفع الملف وإضافته للبيانات.';
@@ -367,7 +390,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       await _loadAllData();
     } catch (e) {
       if (!mounted) return;
-      M3Feedback.showError(context, 'تعذّر رفع الملف.');
+      M3Feedback.showError(context, e is UploadRejectedException ? 'تعذّر رفع الملف: ${e.message}' : 'تعذّر رفع الملف.');
     } finally {
       if (mounted) {
         setState(() {
@@ -624,7 +647,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
         'صافي Sell-In (بدون الضريبة)': CurrencyFormatter.formatEGP(_data.totalValueEgp),
         'Sell-In شامل الضريبة': CurrencyFormatter.formatEGP(_data.totalGrossInclVatEgp),
         'الكراتين والوحدات': '${CurrencyFormatter.formatNumber(_data.totalCases.round())} كرتونة (${CurrencyFormatter.formatNumber(_data.totalUnitsPieces)} وحدة)',
-        'متوسط الخصم عن قائمة الأسعار': '${_data.effectiveDiscountPct.toStringAsFixed(1)}%',
+        'متوسط الخصم عن قائمة الأسعار': _data.totalOfficialListExclVatEgp > 0 ? '${_data.effectiveDiscountPct.toStringAsFixed(1)}%' : '—',
       },
     );
     final filename =
@@ -1499,13 +1522,15 @@ value: _selectedYear,
 label: 'Year',
 options: m3OptionsFromMenuItems<int>([
                         const DropdownMenuItem(value: 0, child: Text('كل السنوات')),
-                        const DropdownMenuItem(value: 2026, child: Text('2026')),
-                        const DropdownMenuItem(value: 2025, child: Text('2025')),
-                        const DropdownMenuItem(value: 2024, child: Text('2024')),
+                        for (final y in AvailableYears.current.including(_selectedYear))
+                          DropdownMenuItem(value: y, child: Text('$y')),
                       ]),
 onChanged: m3Legacy<int>((v) {
                         if (v != null) {
-                          setState(() => _selectedYear = v);
+                          setState(() {
+                            _selectedYear = v;
+                            _yearTouched = true;
+                          });
                           _loadSellInRecords();
                           _loadStockReconciliationReport();
                         }
@@ -1997,13 +2022,15 @@ value: _selectedYear,
 label: 'Year',
 options: m3OptionsFromMenuItems<int>([
                         const DropdownMenuItem(value: 0, child: Text('كل السنوات')),
-                        const DropdownMenuItem(value: 2026, child: Text('2026')),
-                        const DropdownMenuItem(value: 2025, child: Text('2025')),
-                        const DropdownMenuItem(value: 2024, child: Text('2024')),
+                        for (final y in AvailableYears.current.including(_selectedYear))
+                          DropdownMenuItem(value: y, child: Text('$y')),
                       ]),
 onChanged: m3Legacy<int>((v) {
                         if (v != null) {
-                          setState(() => _selectedYear = v);
+                          setState(() {
+                            _selectedYear = v;
+                            _yearTouched = true;
+                          });
                           _loadStockReconciliationReport();
                           _loadSellInRecords();
                         }
@@ -3146,9 +3173,8 @@ options: m3OptionsFromMenuItems<int>([
                               value: 0,
                               child: Text('من الملف تلقائيًا'),
                             ),
-                            const DropdownMenuItem(value: 2026, child: Text('2026')),
-                            const DropdownMenuItem(value: 2025, child: Text('2025')),
-                            const DropdownMenuItem(value: 2024, child: Text('2024')),
+                            for (final y in AvailableYears.current.including(_archiveUploadYear))
+                              DropdownMenuItem(value: y, child: Text('$y')),
                           ]),
 onChanged: m3Legacy<int>((v) {
                             if (v != null) {

@@ -13,6 +13,8 @@ import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../widgets/ai_analysis_progress_card.dart';
 import '../widgets/anomaly_resolution_table.dart';
 import '../widgets/dropzone_file_picker.dart';
+import '../widgets/upload_checks.dart';
+import '../../../../core/data/available_years.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 
 /// UploadPortalScreen serves as the entry point for uploading retail files
@@ -84,20 +86,31 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
     if (_selectedYear == 'auto' && _selectedMonth == 'auto') {
       return null;
     }
-    final year = _selectedYear == 'auto' ? '2026' : _selectedYear;
-    final month = _selectedMonth == 'auto' ? '01' : _selectedMonth.padLeft(2, '0');
-    return '$year-$month-15';
+    // Only a full year+month is sent; half a period is never completed with a guessed value
+    // (_periodSelectionError blocks the upload instead).
+    if (_selectedYear == 'auto' || _selectedMonth == 'auto') return null;
+    return '$_selectedYear-${_selectedMonth.padLeft(2, '0')}-15';
+  }
+
+  /// Arabic message when only one of year/month is chosen; null when the selection is usable.
+  String? _periodSelectionError() {
+    final yearAuto = _selectedYear == 'auto';
+    final monthAuto = _selectedMonth == 'auto';
+    if (yearAuto == monthAuto) return null;
+    return yearAuto
+        ? 'اخترت الشهر من غير السنة. اختار السنة كمان، أو رجّع الاتنين "تلقائي" عشان نقرا الفترة من الملف.'
+        : 'اخترت السنة من غير الشهر. اختار الشهر كمان، أو رجّع الاتنين "تلقائي" عشان نقرا الفترة من الملف.';
   }
 
   String _describeTargetPeriod() {
     if (_selectedYear == 'auto' && _selectedMonth == 'auto') {
       return 'اكتشاف تلقائي من الشيت (Auto)';
     }
-    final yLabel = _selectedYear == 'auto' ? '2026' : _selectedYear;
-    final mLabel = _selectedMonth == 'auto'
-        ? 'يناير (01)'
-        : (_monthNamesAr[_selectedMonth] ?? _selectedMonth);
-    return '$mLabel • سنة $yLabel (${_buildEffectivePeriodDate()})';
+    if (_selectedYear == 'auto' || _selectedMonth == 'auto') {
+      return 'الفترة ناقصة: ${_periodSelectionError() ?? ''}';
+    }
+    final mLabel = _monthNamesAr[_selectedMonth] ?? _selectedMonth;
+    return '$mLabel • سنة $_selectedYear (${_buildEffectivePeriodDate()})';
   }
 
   @override
@@ -107,6 +120,35 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
     _selectedTenant = ApiClient.normalizeDataTenantSlug(widget.apiClient.tenantId);
     _loadContext();
     _loadArchive();
+    AvailableYears.load(widget.apiClient).then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  // Answers the user gave to upload questions for the staged file; resent on commit.
+  bool _replaceConfirmed = false;
+  String? _periodChoice;
+
+  /// Runs an upload/commit call, asking the user each server question (409) and resending with the answer.
+  /// Returns null when the user cancels a question (nothing saved).
+  Future<IngestionResultModel?> _withUploadQuestions(
+    Future<IngestionResultModel> Function(bool replaceConfirmed, String? periodChoice) call,
+  ) async {
+    for (var attempt = 0; attempt < 4; attempt++) {
+      try {
+        return await call(_replaceConfirmed, _periodChoice);
+      } on UploadConfirmationRequiredException catch (q) {
+        if (!mounted) return null;
+        if (q.kind == 'chain_required') {
+          setState(() => _showChainRequiredError = true);
+        }
+        final answer = await askUploadConfirmation(context, q);
+        if (answer == null || q.kind == 'chain_required') return null;
+        if (answer.replaceConfirmed) _replaceConfirmed = true;
+        if (answer.periodChoice != null) _periodChoice = answer.periodChoice;
+      }
+    }
+    return null;
   }
 
   @override
@@ -462,6 +504,12 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
       return;
     }
 
+    final periodError = _periodSelectionError();
+    if (periodError != null) {
+      M3Feedback.showError(context, periodError);
+      return;
+    }
+
     final activeChain = _selectedChain!;
     final effectivePeriodDate = _buildEffectivePeriodDate();
     final fileKey = '$filename-${bytes.length}-$_selectedTenant-$activeChain-${effectivePeriodDate ?? 'auto'}';
@@ -481,16 +529,27 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
       result = null;
       _stagedFileKey = fileKey;
     });
+    _replaceConfirmed = false;
+    _periodChoice = null;
 
     try {
-      final res = await widget.apiClient.uploadFile(
-        filename,
-        bytes,
-        targetChain: activeChain,
-        targetTenant: _selectedTenant,
-        periodDate: effectivePeriodDate,
-        dryRun: true,
-      );
+      final res = await _withUploadQuestions((replaceConfirmed, periodChoice) => widget.apiClient.uploadFile(
+            filename,
+            bytes,
+            targetChain: activeChain,
+            targetTenant: _selectedTenant,
+            periodDate: effectivePeriodDate,
+            dryRun: true,
+            replaceConfirmed: replaceConfirmed,
+            periodChoice: periodChoice,
+          ));
+      if (res == null) {
+        if (mounted) {
+          setState(() => isProcessing = false);
+          M3Feedback.showInfo(context, 'اتلغى الرفع ومفيش حاجة اتحفظت');
+        }
+        return;
+      }
       widget.apiClient.recordAuditLog(
         action: 'INGEST_ANALYZE',
         resource: filename,
@@ -666,12 +725,22 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
     setState(() => isCommitting = true);
 
     try {
-      final committedResult = await widget.apiClient.commitStagedUpload(
-        batchId: result!.batchId,
-        targetChain: activeChain,
-        targetTenant: _selectedTenant,
-        periodDate: _buildEffectivePeriodDate(),
-      );
+      final batchId = result!.batchId;
+      final committedResult = await _withUploadQuestions((replaceConfirmed, periodChoice) => widget.apiClient.commitStagedUpload(
+            batchId: batchId,
+            targetChain: activeChain,
+            targetTenant: _selectedTenant,
+            periodDate: _buildEffectivePeriodDate(),
+            replaceConfirmed: replaceConfirmed,
+            periodChoice: periodChoice,
+          ));
+      if (committedResult == null) {
+        if (mounted) {
+          setState(() => isCommitting = false);
+          M3Feedback.showInfo(context, 'اتلغى الحفظ ومفيش حاجة اتحفظت');
+        }
+        return;
+      }
 
       widget.apiClient.recordAuditLog(
         action: 'INGEST_COMMIT',
@@ -1012,6 +1081,11 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
             if (result != null) ...[
               M3Spacing.gapMD,
               // Anomaly Resolution Table
+              UploadChecksPanel(
+                warnings: result!.uploadWarnings,
+                quarantined: result!.quarantinedCustomers,
+                unknownBarcodes: result!.unknownBarcodes,
+              ),
               AnomalyResolutionTable(anomalies: result!.anomalies),
             ],
 
@@ -1180,9 +1254,8 @@ leadingIcon: Icons.calendar_today_rounded,
 expand: true,
 options: m3OptionsFromMenuItems<String>([
                   const DropdownMenuItem(value: 'auto', child: Text('تلقائي من الشيت (Auto)', overflow: TextOverflow.ellipsis)),
-                  const DropdownMenuItem(value: '2026', child: Text('سنة 2026 (26)', overflow: TextOverflow.ellipsis)),
-                  const DropdownMenuItem(value: '2025', child: Text('سنة 2025 (25)', overflow: TextOverflow.ellipsis)),
-                  const DropdownMenuItem(value: '2024', child: Text('سنة 2024 (24)', overflow: TextOverflow.ellipsis)),
+                  for (final y in AvailableYears.current.including(int.tryParse(_selectedYear) ?? 0))
+                    DropdownMenuItem(value: '$y', child: Text('سنة $y', overflow: TextOverflow.ellipsis)),
                 ]),
 onChanged: m3Legacy<String>((val) {
                   if (val != null) {
@@ -1841,9 +1914,8 @@ label: 'تصفية بالسنة',
 expand: true,
 options: m3OptionsFromMenuItems<String>([
         const DropdownMenuItem(value: 'all', child: Text('كل السنوات')),
-        const DropdownMenuItem(value: '2026', child: Text('سنة 2026')),
-        const DropdownMenuItem(value: '2025', child: Text('سنة 2025')),
-        const DropdownMenuItem(value: '2024', child: Text('سنة 2024')),
+        for (final y in AvailableYears.current.including(int.tryParse(_archiveYearFilter) ?? 0))
+          DropdownMenuItem(value: '$y', child: Text('سنة $y')),
       ]),
 onChanged: m3Legacy<String>((val) {
         if (val != null) {
