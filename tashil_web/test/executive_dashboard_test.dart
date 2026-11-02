@@ -297,12 +297,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('sellout_date_range_chip')), findsOneWidget);
-    expect(find.text('Date Range'), findsOneWidget);
+    expect(find.text('الفترة'), findsOneWidget);
 
     // Trigger Excel export (the toolbar sits below the fold after the redesign).
-    await tester.ensureVisible(find.text('Export Excel'));
+    await tester.ensureVisible(find.text('تصدير').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Export Excel'));
+    await tester.tap(find.text('تصدير').first);
     await tester.pumpAndSettle();
 
     expect(ExcelExportService.lastDownloadedFilename, endsWith('.csv'));
@@ -322,16 +322,16 @@ void main() {
     // Open Date Range Picker via chip, apply it, and then clear it
     await tester.tap(find.byKey(const ValueKey('sellout_date_range_chip')));
     await tester.pumpAndSettle();
-    if (find.text('Apply Range').evaluate().isNotEmpty) {
-      await tester.tap(find.text('Apply Range'));
+    if (find.text('تطبيق').evaluate().isNotEmpty) {
+      await tester.tap(find.text('تطبيق'));
       await tester.pumpAndSettle();
     }
-    expect(find.textContaining('Date:'), findsOneWidget);
+    expect(find.textContaining(' – '), findsWidgets);
 
     // Clear the active date range via the close icon
     await tester.tap(find.byIcon(Icons.close_rounded));
     await tester.pumpAndSettle();
-    expect(find.text('Date Range'), findsOneWidget);
+    expect(find.text('الفترة'), findsOneWidget);
   });
 
   testWidgets('UploadPortalScreen device file picker button uses WebFileHelper and deduplicates repeated CSV rows', (WidgetTester tester) async {

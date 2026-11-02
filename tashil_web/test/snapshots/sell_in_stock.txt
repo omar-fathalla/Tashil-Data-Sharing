@@ -280,6 +280,9 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+أقل من التكلفة (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+أقل من التكلفة (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+أقل من التكلفة (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
 أمر التوريد المقترح (PO) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 أمر التوريد المقترح (PO) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 أيام التغطية (DOS) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
@@ -380,9 +383,6 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 بانتظار شيت كاشير السلسلة | 10.5 | FontWeight.w700 | ffff6f00 | 0.25 | 1.43
 بحث بالصنف أو البراند (مثلاً: Maxell, Diva, Dove)... | 13.0 | FontWeight.w400 | ff45464f | 0.5 | 1.5
 بحث بالصنف أو البراند (مثلاً: Maxell, Diva, Dove)... | 13.0 | FontWeight.w400 | ff45464f | 0.5 | 1.5
-بيع بأقل من التكلفة / حرق سعر (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
-بيع بأقل من التكلفة / حرق سعر (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
-بيع بأقل من التكلفة / حرق سعر (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
 تحت التصريف (Pending POS) | 11.5 | FontWeight.w700 | ffff6f00 | 0.25 | 1.43
 تحت التصريف (Pending POS) | 11.5 | FontWeight.w700 | ffff6f00 | 0.25 | 1.43
 تحت التصريف (Pending POS) | 11.5 | FontWeight.w700 | ffff6f00 | 0.25 | 1.43
@@ -499,9 +499,9 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 طلب توريد عاجل (تحت حد الأمان) | 11.5 | FontWeight.w800 | ff93000a | 0.25 | 1.43
 عرض 1 - 4 من إجمالي 4 صنف (25 صنف بالصفحة) | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 عرض 1 - 4 من إجمالي 4 صنف (25 صنف بالصفحة) | 13.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-عروض ترويجية (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
-عروض ترويجية (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
-عروض ترويجية (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+عروض (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+عروض (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+عروض (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
 فلترة سريعة بالبراند: | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
 فلترة سريعة بالبراند: | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
 كل الأصناف المباعة ليها سعر تكلفة حقيقي | 13.0 | FontWeight.w800 | ff45464f | 0.1 | 1.43
@@ -541,9 +541,9 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 نسبة التصريف وأوامر التوريد (STR %) | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 نمو الكميات المباعة بالقطعة: +0.0% مقارنة بنفس الشهور في عام 2025 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 نمو الكميات المباعة بالقطعة: +0.0% مقارنة بنفس الشهور في عام 2025 | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-هامش صحي (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
-هامش صحي (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
-هامش صحي (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+هامش جيد (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+هامش جيد (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
+هامش جيد (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
 هامش منخفض (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
 هامش منخفض (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
 هامش منخفض (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null

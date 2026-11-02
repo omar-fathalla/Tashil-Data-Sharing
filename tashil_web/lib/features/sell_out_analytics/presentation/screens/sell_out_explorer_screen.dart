@@ -71,7 +71,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   String? selectedStoreId;
   String? selectedCategory;
   DateTimeRange? selectedDateRange;
-  int _selectedYear = 2026; // Default to 2026 as requested
+  static int get _currentYear => DateTime.now().year;
+  static List<int> get _recentYears => [_currentYear, _currentYear - 1, _currentYear - 2];
+  int _selectedYear = DateTime.now().year;
   int _selectedMonth = 0; // 0 = All Months (كل الشهور), 1..12 = Jan..Dec
   String searchQuery = '';
   bool isLoading = true;
@@ -150,7 +152,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       selectedStoreId = null;
       selectedCategory = null;
       selectedDateRange = null;
-      _selectedYear = 2026;
+      _selectedYear = _currentYear;
       _selectedMonth = 0;
       _chartChain = 'fathalla';
       searchQuery = '';
@@ -190,7 +192,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final activeChartChain = (selectedChain != null && selectedChain!.isNotEmpty)
         ? selectedChain!
         : _chartChain;
-    final compYear = (_selectedYear == 2026) ? 2025 : (_selectedYear == 2025 ? 2024 : 2025);
+    final compYear = (_selectedYear > 0 ? _selectedYear : _currentYear) - 1;
 
     final loaded = await _repo.load(SellOutExplorerQuery(
       chain: selectedChain,
@@ -212,7 +214,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
           isLoading = false;
           _loadError = error.toString();
         });
-        M3Feedback.showError(context, 'تعذر تحميل بيانات الـ Sell-Out: $error');
+        debugPrint('Sell-Out load failed: $error');
+      M3Feedback.showError(context, 'تعذّر تحميل بيانات Sell-Out. حاول مرة أخرى.');
       }
       return;
     }
@@ -319,7 +322,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     if (widget.apiClient.currentUser?.canUploadFiles == false) {
       M3Feedback.showError(
         context,
-        'غير مصرح: دور المشرف الميداني مقيد ولا يملك صلاحية رفع الملفات (RBAC)',
+        'ليس لديك صلاحية رفع الملفات.',
       );
       return;
     }
@@ -369,18 +372,19 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
 
       if (!mounted) return;
       final actionLabel = replaceArchiveId != null
-          ? 'تم استبدال وتحديث شيت الـ Sell-Out بنجاح'
-          : 'تم رفع ودمج شيت الـ Sell-Out تراكمياً بنجاح';
+          ? 'تم استبدال الملف.'
+          : 'تم رفع الملف وإضافته للبيانات.';
       M3Feedback.showSuccess(
         context,
-        '$actionLabel (${picked.name}): ${res.validRows} حركة مبيعات بإجمالي ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)}',
+        '$actionLabel (${picked.name}): ${res.validRows} صف • ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)}',
       );
       _repo.invalidateAll();
       _repo.cache.invalidatePrefix(CacheStore.prefix(widget.apiClient.tenantId, TargetRepository.feature));
       await _loadAllData();
     } catch (e) {
       if (!mounted) return;
-      M3Feedback.showError(context, 'تعذر رفع ملف الـ Sell-Out: $e');
+      debugPrint('Sell-Out upload failed: $e');
+        M3Feedback.showError(context, 'تعذّر رفع الملف.');
     } finally {
       if (mounted) {
         setState(() {
@@ -397,11 +401,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       if (!mounted) return;
       M3Feedback.showSuccess(
         context,
-        'تم بدء تحميل شيت الـ Sell-Out الأصلي: ${file.fileName}',
+        'جارٍ تنزيل ${file.fileName}',
       );
     } catch (e) {
       if (!mounted) return;
-      M3Feedback.showError(context, 'تعذر تحميل الشيت المؤرشف: $e');
+      debugPrint('Archive download failed: $e');
+        M3Feedback.showError(context, 'تعذّر تنزيل الملف.');
     }
   }
 
@@ -418,7 +423,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               const SizedBox(width: 10.0),
               const Expanded(
                 child: Text(
-                  'تأكيد حذف شيت الـ Sell-Out',
+                  'حذف الملف؟',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
@@ -428,7 +433,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('هل أنت متأكد من حذف شيت الإكسيل التالي من بيانات مبيعات الـ Sell-Out؟'),
+              const Text('سيتم حذف هذا الملف وبياناته من Sell-Out.'),
               const SizedBox(height: 12.0),
               Container(
                 padding: const EdgeInsets.all(12.0),
@@ -445,7 +450,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     ),
                     const SizedBox(height: 4.0),
                     Text(
-                      'السلسلة: ${file.retailChain.toUpperCase()} • الحركات: ${file.rowsIngested} • القيمة: ${CurrencyFormatter.formatCompactEGP(file.totalRevenue)}',
+                      'السلسلة ${file.retailChain.toUpperCase()} • الصفوف ${file.rowsIngested} • صافي المبيعات ${CurrencyFormatter.formatCompactEGP(file.totalRevenue)}',
                       style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontSize: M3FontSize.bodySmallPlus)),
                     ),
                   ],
@@ -453,7 +458,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               ),
               const SizedBox(height: 10.0),
               Text(
-                'ملاحظة: سيتم حذف حركات هذا الشيت فقط وإعادة احتساب صافي المبيعات والكميات تلقائياً دون المساس ببقية الشهور المرفوعة أو بيانات التوريد (Sell-In).',
+                'لن تتأثر باقي الشهور ولا بيانات Sell-In.',
                 style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(fontSize: M3FontSize.bodySmall, color: cs.onSurfaceVariant)),
               ),
             ],
@@ -470,7 +475,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               ),
               onPressed: () => Navigator.of(ctx).pop(true),
               icon: const Icon(Icons.delete_outline_rounded, size: 18.0),
-              label: const Text('حذف الشيت نهائياً (Delete)'),
+              label: const Text('حذف'),
             ),
           ],
         );
@@ -489,14 +494,15 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       if (!mounted) return;
       M3Feedback.showSuccess(
         context,
-        'تم حذف شيت (${file.fileName}) وتحديث حركات الـ Sell-Out بنجاح',
+        'تم حذف ${file.fileName}.',
       );
       _repo.invalidateAll();
       _repo.cache.invalidatePrefix(CacheStore.prefix(widget.apiClient.tenantId, TargetRepository.feature));
       await _loadAllData();
     } catch (e) {
       if (!mounted) return;
-      M3Feedback.showError(context, 'خطأ أثناء حذف الشيت: $e');
+      debugPrint('Archive delete failed: $e');
+        M3Feedback.showError(context, 'تعذّر حذف الملف.');
     } finally {
       if (mounted) {
         setState(() => _deletingFileId = null);
@@ -508,7 +514,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     if (widget.apiClient.currentUser?.canExportFinancials == false) {
       M3Feedback.showError(
         context,
-        'غير مصرح: دور المشرف الميداني لا يملك صلاحية تصدير التقارير المالية (RBAC)',
+        'ليس لديك صلاحية تصدير التقارير.',
       );
       return;
     }
@@ -536,12 +542,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     widget.apiClient.recordAuditLog(
       action: 'EXPORT_EXCEL',
       resource: filename,
-      details: 'تصدير ${records.length} صف مبيعات إلى ملف Excel/CSV',
+      details: 'تصدير ${records.length} صف (CSV)',
     );
 
     M3Feedback.showSuccess(
       context,
-      'تم تصدير ${records.length} صف إلى ملف Excel/CSV بنجاح',
+      'تم تصدير ${records.length} صف (CSV).',
     );
   }
 
@@ -549,13 +555,13 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     if (widget.apiClient.currentUser?.canExportFinancials == false) {
       M3Feedback.showError(
         context,
-        'غير مصرح: دور المشرف الميداني لا يملك صلاحية تصدير التقارير المالية (RBAC)',
+        'ليس لديك صلاحية تصدير التقارير.',
       );
       return;
     }
 
     final headers = [
-      'الباركود الدولي',
+      'الباركود',
       'اسم الصنف',
       'السلسلة',
       'الفرع',
@@ -589,13 +595,13 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final totalUnits = records.fold<int>(0, (acc, r) => acc + r.quantitySold);
 
     final htmlData = ExcelExportService.generatePrintableReport(
-      title: 'تقرير حركة مبيعات التجزئة (Sell-Out Analytics)',
+      title: 'تقرير Sell-Out',
       headers: headers,
       rows: rows,
       metadata: {
         'الشركة': companyName,
-        'إجمالي صافي المبيعات': CurrencyFormatter.formatEGP(totalNet),
-        'إجمالي الكمية المباعة': '${CurrencyFormatter.formatNumber(totalUnits)} قطعة',
+        'صافي المبيعات': CurrencyFormatter.formatEGP(totalNet),
+        'إجمالي الكمية المباعة': '${CurrencyFormatter.formatNumber(totalUnits)} وحدة',
         'إجمالي الصفوف': '${records.length}',
         'تاريخ التصدير': DateTime.now().toString().split(' ')[0],
       },
@@ -607,12 +613,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     widget.apiClient.recordAuditLog(
       action: 'EXPORT_PDF',
       resource: filename,
-      details: 'تصدير ${records.length} صف مبيعات إلى تقرير PDF/HTML للطباعة',
+      details: 'تقرير طباعة (${records.length} صف)',
     );
 
     M3Feedback.showSuccess(
       context,
-      'تم إعداد تقرير الطباعة و PDF بنجاح (${records.length} صف)',
+      'تقرير الطباعة جاهز (${records.length} صف).',
     );
   }
 
@@ -632,9 +638,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
           children: [
             // Screen Header: Unified M3 Left English Title + Right Arabic Subtitle
             const M3PageHeader(
-              titleEn: 'Sell-Out Analytics, Branch Performance & Sheets Archive',
+              titleEn: 'Sell-Out',
               subtitleAr:
-                  'منظومة مبيعات التجزئة (Sell-Out)، تحليلات باريتو وأداء الفروع، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً',
+                  'مبيعات السلاسل للمستهلك وأداء الفروع والمستهدفات',
             ),
 
             M3Spacing.gapSM,
@@ -648,25 +654,25 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   value: 0,
                   icon: Icons.point_of_sale_rounded,
                   selectedIcon: Icons.point_of_sale_rounded,
-                  label: 'Sell-Out Data & Operations',
+                  label: 'Sales Data',
                 ),
                 const M3ResponsiveTabItem<int>(
                   value: 1,
                   icon: Icons.insights_rounded,
                   selectedIcon: Icons.insights_rounded,
-                  label: 'Performance & Branch Analytics',
+                  label: 'Store Performance',
                 ),
                 const M3ResponsiveTabItem<int>(
                   value: 2,
                   icon: Icons.track_changes_rounded,
                   selectedIcon: Icons.track_changes_rounded,
-                  label: 'Target Management (Sell-Out)',
+                  label: 'Targets',
                 ),
                 M3ResponsiveTabItem<int>(
                   value: 3,
                   icon: Icons.folder_copy_rounded,
                   selectedIcon: Icons.folder_copy_rounded,
-                  label: 'Uploaded Sheets (${_archivedSellOutFiles.length})',
+                  label: 'Uploaded Files (${_archivedSellOutFiles.length})',
                 ),
               ],
               onChanged: (next) {
@@ -691,9 +697,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                 records.isEmpty)
               M3ErrorState(
                 key: const ValueKey('sell_out_error_state'),
-                title: 'Could not load Sell-Out data',
-                message: _loadError,
-                retryLabel: 'Retry',
+                title: 'تعذّر تحميل بيانات Sell-Out',
+                message: 'تعذّر الاتصال بالخادم. حاول مرة أخرى.',
+                retryLabel: 'إعادة المحاولة',
                 onRetry: _loadRecords,
               )
             else if (_activeTab == 1)
@@ -744,20 +750,20 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
         : (_branchChartItems.isNotEmpty ? _branchChartItems.length : fallbackStores);
     final int activeSkusCount = _recordsSummary.activeSkusCount > 0
         ? _recordsSummary.activeSkusCount
-        : (!hasSubFilters && _branchChartItems.length >= 30 && fallbackSkus < 100 ? 285 : fallbackSkus);
+        : fallbackSkus;
     final double avgBranchRevenue = activeStoresCount > 0 ? (totalNetRevenue / activeStoresCount) : 0.0;
 
 
     String yoySubtitleSuffix = '';
-    if (_selectedYear == 2026 && _prevYearTotalChainRevenue > 0 && totalNetRevenue > 0) {
+    if (_selectedYear == _currentYear && _prevYearTotalChainRevenue > 0 && totalNetRevenue > 0) {
       final yoyPct = ((totalNetRevenue - _prevYearTotalChainRevenue) / _prevYearTotalChainRevenue) * 100.0;
       final sign = yoyPct >= 0 ? '+' : '';
-      yoySubtitleSuffix = ' • نمو $sign${yoyPct.toStringAsFixed(1)}% عن 2025';
+      yoySubtitleSuffix = ' • نمو $sign${yoyPct.toStringAsFixed(1)}% مقارنة بالعام السابق';
     }
 
     final String shortYearAr = selectedDateRange != null
         ? '${_formatDate(selectedDateRange!.start)} – ${_formatDate(selectedDateRange!.end)}'
-        : (_selectedYear > 0 ? 'سنة $_selectedYear' : '2025–2026');
+        : (_selectedYear > 0 ? 'سنة $_selectedYear' : 'كل السنوات');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -767,8 +773,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
           builder: (context, constraints) {
             final card1 = _buildSummaryCard(
               context,
-              titleAr: 'إجمالي صافي المبيعات',
-              titleEn: 'Total Net Revenue (EGP)',
+              titleAr: 'صافي المبيعات',
+              titleEn: 'Net Sales (EGP)',
               value: CurrencyFormatter.formatCompactEGP(totalNetRevenue),
               subtitle: '$shortYearAr$yoySubtitleSuffix',
               icon: AppIcons.money,
@@ -787,8 +793,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
             );
             final card3 = _buildSummaryCard(
               context,
-              titleAr: 'الأصناف النشطة ومتوسط الفرع',
-              titleEn: 'Active SKUs & Branch Velocity',
+              titleAr: 'الأصناف النشطة',
+              titleEn: 'Active SKUs',
               value: '$activeSkusCount صنف نشط',
               subtitle: 'متوسط الفرع: ${CurrencyFormatter.formatCompactEGP(avgBranchRevenue)}',
               icon: AppIcons.productMaster,
@@ -796,8 +802,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
             );
             final card4 = _buildSummaryCard(
               context,
-              titleAr: 'إجمالي الفروع النشطة',
-              titleEn: 'Active Stores & Outlets',
+              titleAr: 'الفروع النشطة',
+              titleEn: 'Active Stores',
               value: '$activeStoresCount فرع',
               subtitle: shortYearAr,
               icon: AppIcons.storeMatrix,
@@ -832,7 +838,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                 M3Spacing.hGapXS,
                 Expanded(
                   child: Text(
-                    'تنبيه الصلاحيات (RBAC): دور المشرف الميداني مقيد بالعمليات التشغيلية ولا يسمح بتصدير التقارير المالية',
+                    'التصدير غير متاح لحسابك.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onErrorContainer,
                       fontWeight: FontWeight.w600,
@@ -1038,13 +1044,13 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'مصفوفة مقارنة أسعار كارتة أدكو وهوامش ربح السلسلة (Adeco Official Price & Chain Margin Matrix)',
+                          'الأسعار وهامش السلسلة',
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w900,
                           ),
                         ),
                         Text(
-                          'ربط مباشر بين شيت الكاشير وكارتة الأصناف الرسمية (${_recordsSummary.matchedSkusCount} صنف مطابق بالكود والباركود وشد الكرتونة)',
+                          'سعر البيع الفعلي مقابل قائمة الأسعار • ${_recordsSummary.matchedSkusCount} صنف مطابق',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -1060,7 +1066,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     borderRadius: M3Shape.radiusSm,
                   ),
                   child: Text(
-                    'إجمالي الكراتين المباعة: ${CurrencyFormatter.formatNumber(_recordsSummary.totalCartonsSold.round())} كرتونة • صافي المصنع: ${CurrencyFormatter.formatCompactEGP(_recordsSummary.totalFactoryCost)} • ربح السلسلة: ${CurrencyFormatter.formatCompactEGP(_recordsSummary.totalRetailerGrossProfit)} (${_recordsSummary.avgRetailerMarginPct.toStringAsFixed(1)}%)',
+                    'الكراتين المباعة ${CurrencyFormatter.formatNumber(_recordsSummary.totalCartonsSold.round())} كرتونة • تكلفة المصنع ${CurrencyFormatter.formatCompactEGP(_recordsSummary.totalFactoryCost)} • هامش السلسلة ${CurrencyFormatter.formatCompactEGP(_recordsSummary.totalRetailerGrossProfit)} (${_recordsSummary.avgRetailerMarginPct.toStringAsFixed(1)}%)',
                     style: theme.textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: colorScheme.onPrimaryContainer,
@@ -1095,16 +1101,16 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                 dataRowMaxHeight: 48.0,
                 columnSpacing: 18.0,
                 columns: const [
-                  DataColumn(label: Text('كود الكارتة', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(label: Text('كود الصنف', style: M3TextVariants.denseLabelBold)),
                   DataColumn(label: Text('الصنف الرسمي', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('الشد', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('وحدات/كرتونة', style: M3TextVariants.denseLabelBold)),
                   DataColumn(numeric: true, label: Text('الوحدات', style: M3TextVariants.denseLabelBold)),
                   DataColumn(numeric: true, label: Text('الكراتين', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('سعر الكارتة (شامل)', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('سعر الكاشير الفعلي', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('انحراف السعر', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('سعر القائمة (شامل الضريبة)', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('سعر البيع الفعلي', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('فرق السعر %', style: M3TextVariants.denseLabelBold)),
                   DataColumn(numeric: true, label: Text('تكلفة المصنع للقطعة', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('صافي الكرتونة للفاتورة', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(numeric: true, label: Text('صافي سعر الكرتونة (فاتورة)', style: M3TextVariants.denseLabelBold)),
                   DataColumn(numeric: true, label: Text('صافي المبيعات', style: M3TextVariants.denseLabelBold)),
                   DataColumn(numeric: true, label: Text('هامش السلسلة', style: M3TextVariants.denseLabelBold)),
                 ],
@@ -1180,19 +1186,19 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   static String _formatChainDisplayAr(String chainCode) {
     switch (chainCode.trim().toLowerCase()) {
       case 'fathalla':
-        return 'أسواق فتح الله (Fathalla Market)';
+        return 'أسواق فتح الله';
       case 'gomla':
-        return 'جملة ماركت (Gomla Market)';
+        return 'جملة ماركت';
       case 'beet-elgomla':
-        return 'بيت الجملة (Beet El-Gomla)';
+        return 'بيت الجملة';
       case 'carrefour':
-        return 'كارفور (Carrefour)';
+        return 'كارفور';
       case 'spinneys':
-        return 'سبينيس (Spinneys)';
+        return 'سبينيس';
       case 'institutions':
-        return 'قطاع المؤسسات (Institutions)';
+        return 'قطاع المؤسسات';
       case 'all':
-        return 'كل السلاسل التجارية (All Chains)';
+        return 'كل السلاسل';
       default:
         return chainCode.toUpperCase();
     }
@@ -1247,7 +1253,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       lowestBranch = descList.last;
     }
 
-    final int compYear = (_selectedYear == 2026) ? 2025 : (_selectedYear == 2025 ? 2024 : 2025);
+    final int compYear = (_selectedYear > 0 ? _selectedYear : _currentYear) - 1;
     final double chainYoYPct = (_prevYearTotalChainRevenue > 0 && totalChainRev > 0 && _selectedYear > 0)
         ? ((totalChainRev - _prevYearTotalChainRevenue) / _prevYearTotalChainRevenue) * 100.0
         : 0.0;
@@ -1309,7 +1315,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'شارت ترتيب مبيعات فروع السلسلة من الأعلى للأقل',
+                          'ترتيب الفروع حسب المبيعات',
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w900,
                             height: 1.2,
@@ -1317,7 +1323,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                         ),
                         const SizedBox(height: 2.0),
                         Text(
-                          'Branch Sales Ranking Chart',
+                          'Store Ranking by Sales',
                           style: theme.textTheme.labelMedium?.copyWith(
                             color: colorScheme.primary,
                             fontWeight: FontWeight.w700,
@@ -1359,9 +1365,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     options: const [
                       M3DropdownOption('fathalla', 'أسواق فتح الله (Fathalla)'),
                       M3DropdownOption('gomla', 'جملة ماركت (Gomla)'),
-                      M3DropdownOption('beet-elgomla', 'بيت الجملة (Beet El-Gomla)'),
-                      M3DropdownOption('carrefour', 'كارفور (Carrefour)'),
-                      M3DropdownOption('spinneys', 'سبينيس (Spinneys)'),
+                      M3DropdownOption('beet-elgomla', 'بيت الجملة'),
+                      M3DropdownOption('carrefour', 'كارفور'),
+                      M3DropdownOption('spinneys', 'سبينيس'),
                       M3DropdownOption('all', 'كل السلاسل (All Chains)'),
                     ],
                     onChanged: (val) {
@@ -1375,9 +1381,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   ),
 
                   // Year Switcher Chips (Default: 2026, 2025, All)
-                  for (final yrItem in const [
-                    (year: 2026, label: 'سنة 2026'),
-                    (year: 2025, label: 'سنة 2025'),
+                  for (final yrItem in [
+                    (year: _currentYear, label: 'سنة $_currentYear'),
+                    (year: _currentYear - 1, label: 'سنة ${_currentYear - 1}'),
                     (year: 0, label: 'الكل'),
                   ])
                     ChoiceChip(
@@ -1445,7 +1451,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   if (highestBranch != null)
                     _buildBranchInsightBadge(
                       context,
-                      label: 'الأعلى مبيعاً (#1)',
+                      label: 'الأعلى مبيعًا',
                       branchName: _shortenBranchName(highestBranch.storeName),
                       valueText:
                           '${CurrencyFormatter.formatCompactEGP(highestBranch.totalRevenue)} (${totalChainRev > 0 ? ((highestBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
@@ -1456,7 +1462,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   if (secondBranch != null)
                     _buildBranchInsightBadge(
                       context,
-                      label: 'المركز الثاني (#2)',
+                      label: 'المركز الثاني',
                       branchName: _shortenBranchName(secondBranch.storeName),
                       valueText:
                           '${CurrencyFormatter.formatCompactEGP(secondBranch.totalRevenue)} (${totalChainRev > 0 ? ((secondBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
@@ -1474,7 +1480,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   if (lowestBranch != null && rawBranches.length > 1)
                     _buildBranchInsightBadge(
                       context,
-                      label: 'الأقل مبيعاً (#${rawBranches.length})',
+                      label: 'الأقل مبيعًا',
                       branchName: _shortenBranchName(lowestBranch.storeName),
                       valueText:
                           '${CurrencyFormatter.formatCompactEGP(lowestBranch.totalRevenue)} (${totalChainRev > 0 ? ((lowestBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
@@ -1504,7 +1510,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                           alignment: AlignmentDirectional.centerStart,
                           child: ActionChip(
                             avatar: const Icon(Icons.filter_alt_off_rounded, size: 16.0),
-                            label: const Text('إلغاء فلتر الفرع وعرض كل الفروع'),
+                            label: const Text('عرض كل الفروع'),
                             onPressed: () {
                               setState(() => selectedStoreId = null);
                               _loadRecords();
@@ -1524,7 +1530,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     if (selectedStoreId != null)
                       ActionChip(
                         avatar: const Icon(Icons.filter_alt_off_rounded, size: 16.0),
-                        label: const Text('إلغاء فلتر الفرع وعرض كل الفروع'),
+                        label: const Text('عرض كل الفروع'),
                         onPressed: () {
                           setState(() => selectedStoreId = null);
                           _loadRecords();
@@ -1545,7 +1551,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               padding: const EdgeInsets.symmetric(vertical: 28.0),
               child: Center(
                 child: Text(
-                  'لا توجد بيانات فروع مسجلة لهذه السلسلة في السنة المحددة.',
+                  'لا توجد بيانات فروع لهذه السنة.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -1812,8 +1818,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final branchList = branchMap.values.toList()
       ..sort((a, b) => b.revenue.compareTo(a.revenue));
 
-    final int compYear = (_selectedYear == 2026) ? 2025 : (_selectedYear == 2025 ? 2024 : 2025);
-    final int currYearLabel = _selectedYear > 0 ? _selectedYear : 2026;
+    final int compYear = (_selectedYear > 0 ? _selectedYear : _currentYear) - 1;
+    final int currYearLabel = _selectedYear > 0 ? _selectedYear : _currentYear;
 
     // Build Branch YoY & MoM Growth Matrix
     final branchGrowthMatrix = branchList.map((b) {
@@ -1933,18 +1939,18 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
 
     const monthLabelsAr = <int, String>{
       0: 'كل الشهور',
-      1: 'يناير (01)',
-      2: 'فبراير (02)',
-      3: 'مارس (03)',
-      4: 'أبريل (04)',
-      5: 'مايو (05)',
-      6: 'يونيو (06)',
-      7: 'يوليو (07)',
-      8: 'أغسطس (08)',
-      9: 'سبتمبر (09)',
-      10: 'أكتوبر (10)',
-      11: 'نوفمبر (11)',
-      12: 'ديسمبر (12)',
+      1: 'يناير',
+      2: 'فبراير',
+      3: 'مارس',
+      4: 'أبريل',
+      5: 'مايو',
+      6: 'يونيو',
+      7: 'يوليو',
+      8: 'أغسطس',
+      9: 'سبتمبر',
+      10: 'أكتوبر',
+      11: 'نوفمبر',
+      12: 'ديسمبر',
     };
     final String perfPeriodBadgeAr =
         '${_selectedYear > 0 ? "سنة $_selectedYear" : "كل السنوات"} • ${monthLabelsAr[_selectedMonth] ?? "كل الشهور"}';
@@ -1976,28 +1982,28 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
           builder: (context, constraints) {
             final card1 = _buildSummaryCard(
               context,
-              titleAr: 'أعلى صنف مبيعاً',
-              titleEn: 'Top Performing SKU',
+              titleAr: 'الصنف الأعلى مبيعًا',
+              titleEn: 'Top SKU',
               value: topSku != null ? topSku.skuName : '—',
               subtitle: topSku != null
-                  ? '${CurrencyFormatter.formatCompactEGP(topSku.revenue)} (${CurrencyFormatter.formatNumber(topSku.units)} قطعة) • $perfPeriodBadgeAr'
+                  ? '${CurrencyFormatter.formatCompactEGP(topSku.revenue)} (${CurrencyFormatter.formatNumber(topSku.units)} وحدة) • $perfPeriodBadgeAr'
                   : 'لا توجد مبيعات • $perfPeriodBadgeAr',
               icon: Icons.star_rounded,
               color: colorScheme.primary,
             );
             final card2 = _buildSummaryCard(
               context,
-              titleAr: 'مؤشر باريتو (Pareto 80/20)',
-              titleEn: 'Top 20% SKU Revenue Share',
+              titleAr: 'حصة أعلى 20% من الأصناف',
+              titleEn: "Top 20% SKUs' Share",
               value: '${paretoSharePct.toStringAsFixed(1)}%',
-              subtitle: '$top20PctCount صنف تمثل القوة الدافعة للمبيعات • $perfPeriodBadgeAr',
+              subtitle: '$top20PctCount صنف تحقق معظم المبيعات • $perfPeriodBadgeAr',
               icon: Icons.pie_chart_rounded,
               color: Color.lerp(colorScheme.primary, colorScheme.secondary, 0.30) ?? colorScheme.primary,
             );
             final card3 = _buildSummaryCard(
               context,
-              titleAr: 'أعلى فرع مبيعاً',
-              titleEn: 'Top Revenue Branch',
+              titleAr: 'الفرع الأعلى مبيعًا',
+              titleEn: 'Top Store',
               value: topBranch != null ? topBranch.storeName : '—',
               subtitle: topBranch != null
                   ? '${topBranch.chain.toUpperCase()} • ${CurrencyFormatter.formatCompactEGP(topBranch.revenue)} • $perfPeriodBadgeAr'
@@ -2008,7 +2014,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
             final card4 = _buildSummaryCard(
               context,
               titleAr: 'متوسط مبيعات الفرع',
-              titleEn: 'Average Store Velocity',
+              titleEn: 'Avg. Sales per Store',
               value: CurrencyFormatter.formatCompactEGP(avgBranchRevenue),
               subtitle: '${branchList.length} فرع نشط • $perfPeriodBadgeAr',
               icon: Icons.speed_rounded,
@@ -2053,17 +2059,15 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     width: 170.0,
                     child: M3Dropdown<int>(
 key: const ValueKey('perf_year_dropdown'),
-value: const [2026, 2025, 2024, 0].contains(_selectedYear)
+value: [..._recentYears, 0].contains(_selectedYear)
                           ? _selectedYear
-                          : 2026,
-label: 'السنة (Year)',
+                          : _currentYear,
+label: 'السنة',
 leadingIcon: Icons.calendar_today_rounded,
 expand: true,
 options: m3OptionsFromMenuItems<int>([
-                        const DropdownMenuItem(value: 2026, child: Text('2026')),
-                        const DropdownMenuItem(value: 2025, child: Text('2025')),
-                        const DropdownMenuItem(value: 2024, child: Text('2024')),
-                        const DropdownMenuItem(value: 0, child: Text('كل السنوات (All)')),
+                        for (final y in _recentYears) DropdownMenuItem(value: y, child: Text('$y')),
+                        const DropdownMenuItem(value: 0, child: Text('كل السنوات')),
                       ]),
 onChanged: m3Legacy<int>((v) {
                         if (v != null) {
@@ -2083,7 +2087,7 @@ onChanged: m3Legacy<int>((v) {
                     child: M3Dropdown<int>(
 key: const ValueKey('perf_month_dropdown'),
 value: _selectedMonth,
-label: 'الشهر (Month)',
+label: 'الشهر',
 leadingIcon: Icons.date_range_rounded,
 expand: true,
 options: m3OptionsFromMenuItems<int>(monthLabelsAr.entries
@@ -2114,15 +2118,15 @@ onChanged: m3Legacy<int>((v) {
                     width: 175.0,
                     child: M3Dropdown<String>(
 value: _perfChain,
-label: 'السلسلة (Chain)',
+label: 'السلسلة',
 leadingIcon: Icons.storefront_rounded,
 expand: true,
 options: m3OptionsFromMenuItems<String>([
-                        const DropdownMenuItem(value: 'all', child: Text('All Chains (الكل)')),
-                        const DropdownMenuItem(value: 'fathalla', child: Text('أسواق فتح الله (Fathalla)')),
-                        const DropdownMenuItem(value: 'gomla', child: Text('جملة ماركت (Gomla)')),
-                        const DropdownMenuItem(value: 'beet-elgomla', child: Text('بيت الجملة (Beet El Gomla)')),
-                        const DropdownMenuItem(value: 'chain-1080314', child: Text('الوكالة (El Wakala)')),
+                        const DropdownMenuItem(value: 'all', child: Text('كل السلاسل')),
+                        const DropdownMenuItem(value: 'fathalla', child: Text('أسواق فتح الله')),
+                        const DropdownMenuItem(value: 'gomla', child: Text('جملة ماركت')),
+                        const DropdownMenuItem(value: 'beet-elgomla', child: Text('بيت الجملة')),
+                        const DropdownMenuItem(value: 'chain-1080314', child: Text('الوكالة')),
                       ]),
 onChanged: m3Legacy<String>((v) {
                         if (v != null) {
@@ -2140,11 +2144,11 @@ onChanged: m3Legacy<String>((v) {
                     width: 210.0,
                     child: M3Dropdown<String>(
 value: availableBrands.contains(_perfBrand) ? _perfBrand : 'all',
-label: 'Brand Filter (الماركة)',
+label: 'العلامة التجارية',
 leadingIcon: Icons.branding_watermark_rounded,
 expand: true,
 options: m3OptionsFromMenuItems<String>([
-                        const DropdownMenuItem(value: 'all', child: Text('All Brands (الكل)')),
+                        const DropdownMenuItem(value: 'all', child: Text('كل العلامات التجارية')),
                         ...availableBrands.map((b) => DropdownMenuItem(value: b, child: Text(b))),
                       ]),
 onChanged: m3Legacy<String>((v) {
@@ -2161,7 +2165,7 @@ onChanged: m3Legacy<String>((v) {
                     child: TextField(
                       controller: _perfSearchController,
                       decoration: InputDecoration(
-                        hintText: 'بحث باسم الفرع أو المنطقة أو الصنف',
+                        hintText: 'ابحث بالفرع أو المنطقة أو الصنف',
                         isDense: true,
                         prefixIcon: const Icon(Icons.search_rounded, size: 18.0),
                         suffixIcon: _perfSearch.isNotEmpty
@@ -2197,7 +2201,7 @@ onChanged: m3Legacy<String>((v) {
                       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                     ),
                     onPressed: () {
-                      final headers = ['الرتبة', 'اسم الصنف', 'العلامة التجارية', 'الفئة', 'الكمية المباعة', 'صافي المبيعات (ج.م)', 'نسبة المساهمة'];
+                      final headers = ['الترتيب', 'اسم الصنف', 'العلامة التجارية', 'الفئة', 'الوحدات المباعة', 'صافي المبيعات (ج.م)', 'نسبة المساهمة'];
                       final rows = filteredSkus.asMap().entries.map((entry) {
                         final idx = entry.key + 1;
                         final s = entry.value;
@@ -2207,10 +2211,10 @@ onChanged: m3Legacy<String>((v) {
                       final csv = ExcelExportService.generateCsv(headers: headers, rows: rows);
                       final fn = 'tashil_pareto_performance_${DateTime.now().millisecondsSinceEpoch}.csv';
                       ExcelExportService.downloadCsv(fn, csv);
-                      M3Feedback.showSuccess(context, 'تم تصدير تقرير تحليل أداء الأصناف بنجاح');
+                      M3Feedback.showSuccess(context, 'تم تصدير التقرير.');
                     },
                     icon: const Icon(Icons.download_rounded, size: 18.0),
-                    label: const Text('Export Excel'),
+                    label: const Text('تصدير CSV'),
                   ),
                   FilledButton.tonalIcon(
                     style: FilledButton.styleFrom(
@@ -2218,13 +2222,13 @@ onChanged: m3Legacy<String>((v) {
                       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                     ),
                     onPressed: () {
-                      final headers = ['الفرع', 'السلسلة', 'القطع المباعة', 'صافي المبيعات (ج.م)', 'الحصة %'];
+                      final headers = ['الفرع', 'السلسلة', 'الوحدات المباعة', 'صافي المبيعات (ج.م)', 'الحصة %'];
                       final rows = branchList.map((b) {
                         final share = totalRevenueAll > 0 ? (b.revenue / totalRevenueAll) * 100 : 0.0;
                         return [b.storeName, b.chain.toUpperCase(), b.units, CurrencyFormatter.formatEGP(b.revenue), '${share.toStringAsFixed(1)}%'];
                       }).toList();
                       final html = ExcelExportService.generatePrintableReport(
-                        title: 'تقرير تحليل مبيعات الفروع ومعدلات التصريف (Branch Velocity)',
+                        title: 'تقرير أداء الفروع',
                         headers: headers,
                         rows: rows,
                         metadata: {
@@ -2234,10 +2238,10 @@ onChanged: m3Legacy<String>((v) {
                       );
                       final fn = 'tashil_branch_velocity_${DateTime.now().millisecondsSinceEpoch}.html';
                       ExcelExportService.downloadHtml(fn, html);
-                      M3Feedback.showSuccess(context, 'تم إعداد تقرير طباعة أداء الفروع بنجاح');
+                      M3Feedback.showSuccess(context, 'التقرير جاهز للطباعة.');
                     },
                     icon: const Icon(Icons.print_rounded, size: 18.0),
-                    label: const Text('Print PDF'),
+                    label: const Text('طباعة'),
                   ),
                 ],
               ),
@@ -2266,7 +2270,7 @@ onChanged: m3Legacy<String>((v) {
                     Icon(Icons.storefront_rounded, color: colorScheme.primary, size: 22.0),
                     const SizedBox(width: 8.0),
                     Text(
-                      'أداء الفروع ونقاط البيع (Branch Sales Velocity)',
+                      'أداء الفروع',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -2289,8 +2293,8 @@ onChanged: m3Legacy<String>((v) {
                   ),
                   columns: const [
                     DataColumn(label: Text('الترتيب')),
-                    DataColumn(label: Text('اسم الفرع / نقطة البيع')),
-                    DataColumn(label: Text('السلسلة التجارية')),
+                    DataColumn(label: Text('الفرع')),
+                    DataColumn(label: Text('السلسلة')),
                     DataColumn(label: Text('الكمية المباعة'), numeric: true),
                     DataColumn(label: Text('صافي المبيعات (ج.م)'), numeric: true),
                     DataColumn(label: Text('حصة المبيعات %'), numeric: true),
@@ -2414,7 +2418,7 @@ onChanged: m3Legacy<String>((v) {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'مقارنة نمو وتراجع الفروع سنوياً وشهرياً ($currYearLabel vs $compYear)',
+                                'نمو الفروع: $currYearLabel مقابل $compYear',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.titleMedium?.copyWith(
@@ -2423,7 +2427,7 @@ onChanged: m3Legacy<String>((v) {
                               ),
                               const SizedBox(height: 2.0),
                               Text(
-                                'Branch YoY & MoM Growth Matrix • متابعة الفروع الصاعدة والمتراجعة ($perfPeriodBadgeAr)',
+                                'نمو الفروع (سنوي وشهري) • $perfPeriodBadgeAr',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: M3TextVariants.denseLabelSemi.copyWith(color: colorScheme.onSurfaceVariant),
@@ -2445,13 +2449,13 @@ onChanged: m3Legacy<String>((v) {
                         ),
                         ChoiceChip(
                           avatar: const Icon(AppIcons.trendingUp, size: 18.0),
-                  label: Text('فروع صاعدة ($growingBranchesCount)'),
+                  label: Text('فروع نامية ($growingBranchesCount)'),
                           selected: _perfGrowthStatusFilter == 'growing',
                           onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'growing'),
                         ),
                         ChoiceChip(
                           avatar: const Icon(AppIcons.trendingDown, size: 18.0),
-                  label: Text('تحتاج تنشيط ($decliningBranchesCount)'),
+                  label: Text('فروع متراجعة ($decliningBranchesCount)'),
                           selected: _perfGrowthStatusFilter == 'declining',
                           onSelected: (_) => setState(() => _perfGrowthStatusFilter = 'declining'),
                         ),
@@ -2487,7 +2491,7 @@ onChanged: m3Legacy<String>((v) {
                     final stripCards = [
                       _buildBranchInsightBadge(
                         context,
-                        label: 'نمو السلسلة ($currYearLabel vs $compYear)',
+                        label: 'نمو السلسلة ($currYearLabel مقابل $compYear)',
                         branchName: totalYoYBadge,
                         valueText: CurrencyFormatter.formatCompactEGP(totalCurrMatrixRev),
                         color: tone1,
@@ -2567,18 +2571,18 @@ onChanged: m3Legacy<String>((v) {
                       numeric: true,
                     ),
                     const DataColumn(
-                      label: Text('صافي التغير (Variance)'),
+                      label: Text('الفرق'),
                       numeric: true,
                     ),
                     const DataColumn(
-                      label: Text('نسبة النمو السنوي (YoY %)'),
+                      label: Text('النمو السنوي %'),
                       numeric: true,
                     ),
                     DataColumn(
-                      label: Text(_selectedMonth > 0 ? 'مبيعات الشهر الحالي' : 'المتوسط الشهري (MoM Run-Rate)'),
+                      label: Text(_selectedMonth > 0 ? 'مبيعات الشهر الحالي' : 'المتوسط الشهري'),
                       numeric: true,
                     ),
-                    const DataColumn(label: Text('حالة أداء الفرع')),
+                    const DataColumn(label: Text('الحالة')),
                   ],
                   rows: filteredGrowthBranches.asMap().entries.map((entry) {
                     final rank = entry.key + 1;
@@ -2599,12 +2603,12 @@ onChanged: m3Legacy<String>((v) {
                     } else if (item.status == 'growing') {
                       statusBg = colorScheme.primaryContainer.withOpacity(0.75);
                       statusFg = colorScheme.onPrimaryContainer;
-                      statusLabel = (yoyPct ?? 0) >= 15.0 ? 'نمو قوي' : 'نمو إيجابي';
+                      statusLabel = (yoyPct ?? 0) >= 15.0 ? 'نمو قوي' : 'نمو';
                       statusIcon = AppIcons.trendingUp;
                     } else {
                       statusBg = colorScheme.errorContainer.withOpacity(0.65);
                       statusFg = colorScheme.onErrorContainer;
-                      statusLabel = 'يحتاج تنشيط';
+                      statusLabel = 'متراجع';
                       statusIcon = AppIcons.trendingDown;
                     }
 
@@ -2777,14 +2781,14 @@ onChanged: m3Legacy<String>((v) {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'إدارة شيتات الإكسيل المرفوعة للـ Sell-Out (الرفع التراكمي شهر بشهر)',
+                          'ملفات Sell-Out المرفوعة',
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         const SizedBox(height: 4.0),
                         Text(
-                          'يمكنك رفع شيت مبيعات السلاسل لكل شهر بشكل تراكمي، استبدال أي شيت سابق، تحميل الشيت الأصلي بصيغة Excel، أو حذفه لإعادة احتساب مؤشرات المبيعات بدقة.',
+                          'ارفع ملف كل شهر، ويمكنك استبداله أو تنزيله أو حذفه.',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -2810,7 +2814,7 @@ onChanged: m3Legacy<String>((v) {
                         width: 200.0,
                         child: M3Dropdown<String>(
 value: _archiveUploadChain,
-label: 'Target Chain',
+label: 'السلسلة',
 expand: true,
 options: m3OptionsFromMenuItems<String>([
                             const DropdownMenuItem(value: 'fathalla', child: Text('Fathalla Market')),
@@ -2829,13 +2833,11 @@ onChanged: m3Legacy<String>((v) {
                         width: 155.0,
                         child: M3Dropdown<int>(
 value: _archiveUploadYear,
-label: 'Year (Optional)',
+label: 'السنة (اختياري)',
 expand: true,
 options: m3OptionsFromMenuItems<int>([
-                            const DropdownMenuItem(value: 0, child: Text('Auto from Sheet')),
-                            const DropdownMenuItem(value: 2026, child: Text('2026')),
-                            const DropdownMenuItem(value: 2025, child: Text('2025')),
-                            const DropdownMenuItem(value: 2024, child: Text('2024')),
+                            const DropdownMenuItem(value: 0, child: Text('من الملف تلقائيًا')),
+                            for (final y in _recentYears) DropdownMenuItem(value: y, child: Text('$y')),
                           ]),
 onChanged: m3Legacy<int>((v) {
                             if (v != null) {
@@ -2848,22 +2850,22 @@ onChanged: m3Legacy<int>((v) {
                         width: 175.0,
                         child: M3Dropdown<int>(
 value: _archiveUploadMonth,
-label: 'Month (Optional)',
+label: 'الشهر (اختياري)',
 expand: true,
 options: m3OptionsFromMenuItems<int>([
-                            const DropdownMenuItem(value: 0, child: Text('Auto from Sheet')),
-                            const DropdownMenuItem(value: 1, child: Text('January (01)')),
-                            const DropdownMenuItem(value: 2, child: Text('February (02)')),
-                            const DropdownMenuItem(value: 3, child: Text('March (03)')),
-                            const DropdownMenuItem(value: 4, child: Text('April (04)')),
-                            const DropdownMenuItem(value: 5, child: Text('May (05)')),
-                            const DropdownMenuItem(value: 6, child: Text('June (06)')),
-                            const DropdownMenuItem(value: 7, child: Text('July (07)')),
-                            const DropdownMenuItem(value: 8, child: Text('August (08)')),
-                            const DropdownMenuItem(value: 9, child: Text('September (09)')),
-                            const DropdownMenuItem(value: 10, child: Text('October (10)')),
-                            const DropdownMenuItem(value: 11, child: Text('November (11)')),
-                            const DropdownMenuItem(value: 12, child: Text('December (12)')),
+                            const DropdownMenuItem(value: 0, child: Text('من الملف تلقائيًا')),
+                            const DropdownMenuItem(value: 1, child: Text('يناير')),
+                            const DropdownMenuItem(value: 2, child: Text('فبراير')),
+                            const DropdownMenuItem(value: 3, child: Text('مارس')),
+                            const DropdownMenuItem(value: 4, child: Text('أبريل')),
+                            const DropdownMenuItem(value: 5, child: Text('مايو')),
+                            const DropdownMenuItem(value: 6, child: Text('يونيو')),
+                            const DropdownMenuItem(value: 7, child: Text('يوليو')),
+                            const DropdownMenuItem(value: 8, child: Text('أغسطس')),
+                            const DropdownMenuItem(value: 9, child: Text('سبتمبر')),
+                            const DropdownMenuItem(value: 10, child: Text('أكتوبر')),
+                            const DropdownMenuItem(value: 11, child: Text('نوفمبر')),
+                            const DropdownMenuItem(value: 12, child: Text('ديسمبر')),
                           ]),
 onChanged: m3Legacy<int>((v) {
                             if (v != null) {
@@ -2897,7 +2899,7 @@ onChanged: m3Legacy<int>((v) {
                                 child: CircularProgressIndicator(strokeWidth: 2.0),
                               )
                             : const Icon(Icons.upload_file_rounded, size: 20.0),
-                        label: const Text('Upload Sell Out'),
+                        label: const Text('رفع ملف Sell-Out'),
                       ),
                       OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
@@ -2906,7 +2908,7 @@ onChanged: m3Legacy<int>((v) {
                         ),
                         onPressed: _isLoadingArchive ? null : _loadSellOutArchive,
                         icon: const Icon(Icons.refresh_rounded, size: 18.0),
-                        label: const Text('تحديث القائمة'),
+                        label: const Text('تحديث'),
                       ),
                     ],
                   ),
@@ -2946,14 +2948,14 @@ onChanged: m3Legacy<int>((v) {
                             ),
                             const SizedBox(height: 12.0),
                             Text(
-                              'لا توجد شيتات إكسيل مرفوعة في أرشيف الـ Sell-Out حالياً.',
+                              'لا توجد ملفات مرفوعة بعد.',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                             const SizedBox(height: 6.0),
                             Text(
-                              'اضغط على زر "Upload Sell Out" لرفع شيت مبيعات أول شهر وبدء المتابعة التراكمية.',
+                              'ارفع أول ملف لتبدأ.',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
                               ),
@@ -2970,13 +2972,13 @@ onChanged: m3Legacy<int>((v) {
                           colorScheme.surfaceContainerHigh.withOpacity(0.5),
                         ),
                         columns: const [
-                          DataColumn(label: Text('Excel File')),
+                          DataColumn(label: Text('الملف')),
                           DataColumn(label: Text('Chain')),
                           DataColumn(label: Text('Period')),
                           DataColumn(label: Text('Transactions'), numeric: true),
-                          DataColumn(label: Text('Units Sold'), numeric: true),
-                          DataColumn(label: Text('Net Sell-Out (EGP)'), numeric: true),
-                          DataColumn(label: Text('Upload Date')),
+                          DataColumn(label: Text('الوحدات المباعة'), numeric: true),
+                          DataColumn(label: Text('صافي Sell-Out (ج.م)'), numeric: true),
+                          DataColumn(label: Text('تاريخ الرفع')),
                           DataColumn(label: Text('Actions')),
                         ],
                         rows: _archivedSellOutFiles.map((file) {

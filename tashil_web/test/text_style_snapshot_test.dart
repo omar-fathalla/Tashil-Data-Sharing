@@ -94,11 +94,11 @@ void main() {
   testWidgets('Sell-Out explorer text styles are unchanged', (tester) async {
     await _pump(tester, SellOutExplorerScreen(apiClient: ApiClient()));
     await _check(tester, 'sell_out_tab0');
-    await _tab(tester, 'Performance & Branch Analytics');
+    await _tab(tester, 'Store Performance');
     await _check(tester, 'sell_out_tab1');
-    await _tab(tester, 'Target Management (Sell-Out)');
+    await _tab(tester, 'Targets');
     await _check(tester, 'sell_out_targets');
-    await _tab(tester, 'Uploaded Sheets');
+    await _tab(tester, 'Uploaded Files');
     await _check(tester, 'sell_out_sheets');
   });
 

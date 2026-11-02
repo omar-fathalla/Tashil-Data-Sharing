@@ -43,7 +43,7 @@ void main() {
     expect(errors, isEmpty, reason: errors.map((e) => e.exceptionAsString()).join('\n'));
     expect(expired, greaterThan(0));
     expect(find.byKey(const ValueKey('sell_out_error_state')), findsOneWidget);
-    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('إعادة المحاولة'), findsOneWidget);
   });
 
   testWidgets('Sell-In: 401 → session expired + error/Retry state', (tester) async {
