@@ -1071,7 +1071,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     borderRadius: M3Shape.radiusSm,
                   ),
                   child: Text(
-                    'الكراتين المباعة ${CurrencyFormatter.formatNumber(_recordsSummary.totalCartonsSold.round())} كرتونة • تكلفة المصنع ${CurrencyFormatter.formatCompactEGP(_recordsSummary.totalFactoryCost)} • هامش السلسلة ${CurrencyFormatter.formatCompactEGP(_recordsSummary.totalRetailerGrossProfit)} (${_recordsSummary.avgRetailerMarginPct.toStringAsFixed(1)}%)',
+                    'الكراتين المباعة ${CurrencyFormatter.formatNumber(_recordsSummary.totalCartonsSold.round())} كرتونة • تكلفة المصنع ${CurrencyFormatter.formatCompactEGP(_recordsSummary.totalFactoryCost)} • هامش السلسلة ${CurrencyFormatter.formatMarginSummary(_recordsSummary.totalRetailerGrossProfit, _recordsSummary.avgRetailerMarginPct)}',
                     style: theme.textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: colorScheme.onPrimaryContainer,
@@ -1167,7 +1167,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                       DataCell(
                         Text(
                           s.retailerMarginPct != 0
-                              ? '${s.retailerMarginPct.toStringAsFixed(1)}% (${CurrencyFormatter.formatCompactEGP(s.retailerGrossProfit)})'
+                              ? CurrencyFormatter.formatMarginSummary(s.retailerGrossProfit, s.retailerMarginPct)
                               : '—',
                           style: M3TextVariants.denseLabelHeavy.copyWith(color: marginColor),
                         ),

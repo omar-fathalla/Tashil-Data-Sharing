@@ -631,7 +631,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                         ),
                                         Text(
                                           (r.retailerMarginPct != 0 || r.retailerGrossProfit != 0)
-                                              ? 'هامش ${r.retailerMarginPct.toStringAsFixed(1)}% (${CurrencyFormatter.formatUnits(r.retailerGrossProfit.round())} ج.م)'
+                                              ? CurrencyFormatter.formatMarginSummary(r.retailerGrossProfit, r.retailerMarginPct, compact: false)
                                               : 'EGP ${r.netRevenue.toStringAsFixed(2)}',
                                           style: theme.textTheme.labelSmall?.copyWith(
                                             color: r.retailerMarginPct < 0
@@ -1133,7 +1133,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       width: colNetRevenueWidth,
                                       child: _maybeTooltip(
                                         message: (r.retailerMarginPct != 0 || r.retailerGrossProfit != 0)
-                                            ? 'مجمل ربح السلسلة: ${CurrencyFormatter.formatUnits(r.retailerGrossProfit.round())} ج.م (${r.retailerMarginPct.toStringAsFixed(1)}%) • انحراف السعر: ${r.priceDeltaPct >= 0 ? "+" : ""}${r.priceDeltaPct.toStringAsFixed(1)}%'
+                                            ? 'مجمل ربح السلسلة: ${CurrencyFormatter.formatMarginSummary(r.retailerGrossProfit, r.retailerMarginPct, compact: false)} • انحراف السعر: ${r.priceDeltaPct >= 0 ? "+" : ""}${r.priceDeltaPct.toStringAsFixed(1)}%'
                                             : null,
                                         child: Column(
                                           mainAxisAlignment: MainAxisAlignment.center,
@@ -1150,7 +1150,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             ),
                                             if (r.retailerMarginPct != 0 || r.retailerGrossProfit != 0)
                                               Text(
-                                                'هامش ${r.retailerMarginPct.toStringAsFixed(1)}% (${CurrencyFormatter.formatUnits(r.retailerGrossProfit.round())} ج)',
+                                                CurrencyFormatter.formatMarginSummary(r.retailerGrossProfit, r.retailerMarginPct, compact: false),
                                                 textAlign: TextAlign.end,
                                                 style: TextStyle(
                                                   fontSize: M3FontSize.micro,
