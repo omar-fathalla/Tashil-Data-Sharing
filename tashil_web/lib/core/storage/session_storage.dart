@@ -224,4 +224,12 @@ class SessionStorage {
   static void updateBrowserUrl(String path) {
     platformUpdateUrl(path);
   }
+
+  /// Replaces the current history entry (no new Back step).
+  static void replaceBrowserUrl(String path) {
+    platformReplaceUrl(path);
+  }
+
+  /// Current browser path on web; '' elsewhere.
+  static String currentBrowserPath() => platformCurrentPath();
 }

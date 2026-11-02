@@ -33,3 +33,17 @@ void platformUpdateUrl(String path) {
     html.window.history.pushState(null, '', path);
   } catch (_) {}
 }
+
+void platformReplaceUrl(String path) {
+  try {
+    html.window.history.replaceState(null, '', path);
+  } catch (_) {}
+}
+
+String platformCurrentPath() {
+  try {
+    return html.window.location.pathname ?? '';
+  } catch (_) {
+    return '';
+  }
+}

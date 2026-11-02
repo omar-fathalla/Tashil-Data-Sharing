@@ -13,6 +13,7 @@ import 'core/theme/m3_motion.dart';
 import 'features/auth/presentation/screens/super_admin_login_screen.dart';
 import 'features/auth/presentation/screens/tenant_login_screen.dart';
 import 'features/auth/presentation/widgets/security_guard.dart';
+import 'features/navigation/app_page_route.dart';
 import 'features/navigation/presentation/app_shell.dart';
 import 'features/super_admin/presentation/screens/super_admin_screen.dart';
 
@@ -91,6 +92,10 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
         candidateSlug != 'index.html' &&
         candidateSlug != 'favicon.png';
 
+    // Page inside the portal (e.g. `sell-in` in `/adeco/sell-in`), kept so
+    // a refresh or a login redirect returns to the same page.
+    final requestedPage = AppPageRoute.pageSlugFromPath(path);
+
     final saved = SessionStorage.loadSession();
     final savedUser = saved?.currentUserJson != null
         ? TenantUserModel.fromJson(saved!.currentUserJson!)
@@ -150,7 +155,9 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
       _apiClient.currentUser = savedUser;
       _apiClient.currentTenantProfile =
           ApiClient.getTenantProfileBySlug(_activeTenant);
-      SessionStorage.updateBrowserUrl('/$_activeTenant');
+      SessionStorage.replaceBrowserUrl(
+        AppPageRoute.pathFor(_activeTenant, requestedPage),
+      );
     } else {
       // Show Company Login Portal
       _isAdminMode = false;
@@ -165,7 +172,9 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
         _apiClient.currentUser = null;
         _apiClient.currentTenantProfile =
             ApiClient.getTenantProfileBySlug(_activeTenant);
-        SessionStorage.updateBrowserUrl('/$_activeTenant');
+        SessionStorage.replaceBrowserUrl(
+          AppPageRoute.pathFor(_activeTenant, requestedPage),
+        );
       } else {
         _activeTenant = 'adeco';
         _isGenericCompanyPortal = true;
@@ -292,7 +301,14 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
           : res.tenant;
       _persistSession();
       if (!res.user.isSuperAdmin) {
-        SessionStorage.updateBrowserUrl('/$cleanSlug');
+        // Return to the page that was requested before login, if any.
+        final currentPath = SessionStorage.currentBrowserPath();
+        final pendingPage = currentPath.toLowerCase().startsWith('/$cleanSlug/')
+            ? AppPageRoute.pageSlugFromPath(currentPath)
+            : '';
+        SessionStorage.updateBrowserUrl(
+          AppPageRoute.pathFor(cleanSlug, pendingPage),
+        );
       } else {
         SessionStorage.updateBrowserUrl('/admin');
       }
