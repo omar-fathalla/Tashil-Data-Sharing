@@ -2,10 +2,14 @@ package ingestion
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 )
@@ -28,6 +32,70 @@ type ArchiveSyncReport struct {
 	Files         []ArchiveSyncFile `json:"files"`
 	OrphanRows    map[string]int    `json:"orphan_rows"` // rows of deleted / unknown files, per kind
 	OrphanDeleted map[string]bool   `json:"orphan_deleted,omitempty"`
+	// Skipped is set when another instance holds the archive-sync lease, so this one did nothing.
+	Skipped string `json:"skipped,omitempty"`
+}
+
+// SyncLease is a cross-instance lease (Firestore-backed in production) so that only one Cloud Run instance
+// re-writes archives at a time; the others skip instead of repeating the same heavy work.
+type SyncLease interface {
+	TryAcquireLease(ctx context.Context, name, holder string, ttl time.Duration) (bool, error)
+	ReleaseLease(ctx context.Context, name, holder string) error
+}
+
+// archiveSyncLeaseTTL bounds how long a crashed holder blocks other instances; a live holder renews it.
+const archiveSyncLeaseTTL = 10 * time.Minute
+
+// WithSyncLease makes ReconcileArchivesToSink(execute=true) run on one instance at a time.
+func (p *Processor) WithSyncLease(l SyncLease) *Processor {
+	p.syncLease = l
+	return p
+}
+
+func syncLeaseHolder() string {
+	h, _ := os.Hostname()
+	b := make([]byte, 4)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%s-%d-%s", h, os.Getpid(), hex.EncodeToString(b))
+}
+
+// holdSyncLease acquires the tenant's archive-sync lease and keeps renewing it until release is called.
+func (p *Processor) holdSyncLease(ctx context.Context, tenantID string) (ok bool, release func(), err error) {
+	if p.syncLease == nil {
+		return true, func() {}, nil
+	}
+	name := "archive-sync__" + tenantID
+	holder := syncLeaseHolder()
+	ok, err = p.syncLease.TryAcquireLease(ctx, name, holder, archiveSyncLeaseTTL)
+	if err != nil || !ok {
+		return false, func() {}, err
+	}
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		t := time.NewTicker(archiveSyncLeaseTTL / 3)
+		defer t.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-t.C:
+				if _, err := p.syncLease.TryAcquireLease(context.Background(), name, holder, archiveSyncLeaseTTL); err != nil {
+					log.Printf("WARN [archive-sync] lease renew: %v", err)
+				}
+			}
+		}
+	}()
+	return true, func() {
+		close(stop)
+		<-done
+		rctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := p.syncLease.ReleaseLease(rctx, name, holder); err != nil {
+			log.Printf("WARN [archive-sync] lease release: %v", err)
+		}
+	}, nil
 }
 
 func archiveKind(e *ArchivedFile) bqsink.Kind {
@@ -130,6 +198,21 @@ func (p *Processor) ReconcileArchivesToSink(ctx context.Context, tenantID string
 		return rep, nil
 	}
 
+	ok, release, err := p.holdSyncLease(ctx, rep.TenantID)
+	if err != nil {
+		return rep, fmt.Errorf("archive-sync lease: %w", err)
+	}
+	if !ok {
+		rep.Skipped = "another instance holds the archive-sync lease"
+		log.Printf("[archive-sync] tenant=%s skipped: %s", rep.TenantID, rep.Skipped)
+		return rep, nil
+	}
+	defer release()
+
+	// Orphans first: deleting rows of removed files is cheap and must not wait behind (or be lost with) a large
+	// archive write that can take minutes.
+	p.deleteArchiveOrphans(ctx, rec, tenantID, live, rep)
+
 	byID := map[string]*ArchivedFile{}
 	for _, e := range live {
 		byID[e.ID] = e
@@ -165,35 +248,11 @@ func (p *Processor) ReconcileArchivesToSink(ctx context.Context, tenantID string
 	if len(toWrite) > 0 {
 		sortArchiveReplayOrder(toWrite)
 		log.Printf("[archive-sync] tenant=%s writing %d archived file(s) to BigQuery", rep.TenantID, len(toWrite))
-		p.replayFiles(ctx, toWrite, true)
-	}
-
-	for kind, n := range rep.OrphanRows {
-		if n == 0 {
-			continue
-		}
-		var ids, files []string
-		for _, e := range live {
-			if string(archiveKind(e)) == kind {
-				ids = append(ids, e.ID)
-				files = append(files, e.FileName)
-			}
-		}
-		if len(ids) == 0 {
-			// No live file of this kind: deleting would wipe the table for the tenant; leave it for an explicit purge.
-			log.Printf("WARN [archive-sync] tenant=%s kind=%s has %d orphan row(s) but no live file; not deleted", rep.TenantID, kind, n)
-			continue
-		}
-		res := rec.DeleteOrphans(ctx, bqsink.Kind(kind), tenantID, ids, files)
-		if rep.OrphanDeleted == nil {
-			rep.OrphanDeleted = map[string]bool{}
-		}
-		rep.OrphanDeleted[kind] = res != nil && res.Status == bqsink.StatusOK
-		switch bqsink.Kind(kind) {
-		case bqsink.KindSellIn:
-			p.noteSellInWritten(ctx, tenantID, res)
-		case bqsink.KindSellOut:
-			p.noteSellOutWritten(ctx, tenantID, res)
+		// One file at a time (replayFiles frees each workbook before the next), so peak memory is one file.
+		for _, e := range toWrite {
+			start := time.Now()
+			p.replayFiles(ctx, []*ArchivedFile{e}, true)
+			log.Printf("[archive-sync] tenant=%s wrote %q in %s", rep.TenantID, e.FileName, time.Since(start).Round(time.Millisecond))
 		}
 	}
 
@@ -219,9 +278,48 @@ func (p *Processor) ReconcileArchivesToSink(ctx context.Context, tenantID string
 	return rep, nil
 }
 
+// deleteArchiveOrphans removes rows of files that are no longer in the archive, per kind.
+func (p *Processor) deleteArchiveOrphans(ctx context.Context, rec bqsink.ArchiveReconciler, tenantID string, live []*ArchivedFile, rep *ArchiveSyncReport) {
+	kinds := make([]string, 0, len(rep.OrphanRows))
+	for k := range rep.OrphanRows {
+		kinds = append(kinds, k)
+	}
+	sort.Strings(kinds)
+	for _, kind := range kinds {
+		n := rep.OrphanRows[kind]
+		if n == 0 {
+			continue
+		}
+		var ids, files []string
+		for _, e := range live {
+			if string(archiveKind(e)) == kind {
+				ids = append(ids, e.ID)
+				files = append(files, e.FileName)
+			}
+		}
+		if len(ids) == 0 {
+			// No live file of this kind: deleting would wipe the table for the tenant; leave it for an explicit purge.
+			log.Printf("WARN [archive-sync] tenant=%s kind=%s has %d orphan row(s) but no live file; not deleted", rep.TenantID, kind, n)
+			continue
+		}
+		res := rec.DeleteOrphans(ctx, bqsink.Kind(kind), tenantID, ids, files)
+		if rep.OrphanDeleted == nil {
+			rep.OrphanDeleted = map[string]bool{}
+		}
+		rep.OrphanDeleted[kind] = res != nil && res.Status == bqsink.StatusOK
+		log.Printf("[archive-sync] tenant=%s kind=%s orphan_rows=%d deleted=%v", rep.TenantID, kind, n, rep.OrphanDeleted[kind])
+		switch bqsink.Kind(kind) {
+		case bqsink.KindSellIn:
+			p.noteSellInWritten(ctx, tenantID, res)
+		case bqsink.KindSellOut:
+			p.noteSellOutWritten(ctx, tenantID, res)
+		}
+	}
+}
+
 // LogArchiveSync prints one line per file so the before/after state is visible in Cloud Run logs.
 func LogArchiveSync(rep *ArchiveSyncReport) {
-	if rep == nil {
+	if rep == nil || rep.Skipped != "" {
 		return
 	}
 	for _, f := range rep.Files {

@@ -150,11 +150,11 @@ type BigQuerySink struct {
 func (s *BigQuerySink) Enabled() bool { return true }
 
 func (s *BigQuerySink) WriteSellOut(ctx context.Context, meta Meta, facts []domain.SellOutFact, mode SellOutMode) *Result {
-	return s.run(ctx, PlanSellOut(meta, facts, mode, time.Now()), "upsert")
+	return s.run(ctx, StreamSellOut(meta, facts, mode, time.Now()), "upsert")
 }
 
 func (s *BigQuerySink) WriteSellIn(ctx context.Context, meta Meta, records []domain.SellInRecord) *Result {
-	return s.run(ctx, PlanSellIn(meta, records, time.Now()), "upsert")
+	return s.run(ctx, StreamSellIn(meta, records, time.Now()), "upsert")
 }
 
 func (s *BigQuerySink) WriteProductMaster(ctx context.Context, meta Meta, summary *domain.ProductMasterSummaryResponse) *Result {
@@ -215,13 +215,13 @@ func (s *BigQuerySink) ref(table string) string {
 func (s *BigQuerySink) run(ctx context.Context, plan Plan, op string) *Result {
 	start := time.Now()
 	res := &Result{Status: StatusOK, Table: plan.Table.Name}
-	if len(plan.Rows) == 0 {
+	if plan.Len() == 0 {
 		res.Status = StatusSkipped
 		return res
 	}
 	err := s.replace(ctx, plan)
 	if err == nil {
-		res.RowsWritten = len(plan.Rows)
+		res.RowsWritten = plan.Len()
 	}
 	s.finish(ctx, res, err, start, plan.Kind, op, plan.Meta)
 	return res
@@ -281,8 +281,16 @@ func (s *BigQuerySink) replace(ctx context.Context, plan Plan) error {
 			log.Printf("[bqsink] warning: staging table %s not dropped (expires in 2h): %v", stagingName, err)
 		}
 	}()
-	if err := s.load(ctx, staging, plan.Table.Schema, plan.Rows, bigquery.WriteTruncate); err != nil {
-		return fmt.Errorf("load staging: %w", err)
+	// Load the staging table in bounded chunks so peak memory is one chunk of encoded rows, not the whole file;
+	// the replace below stays a single transaction, so readers never see a partial file.
+	for _, c := range LoadChunks(plan.Len(), loadChunkRows) {
+		disp := bigquery.WriteAppend
+		if c[0] == 0 {
+			disp = bigquery.WriteTruncate
+		}
+		if err := s.loadRange(ctx, staging, plan, c[0], c[1], disp); err != nil {
+			return fmt.Errorf("load staging rows %d-%d: %w", c[0], c[1], err)
+		}
 	}
 	sql := BuildReplaceSQL(s.ref(plan.Table.Name), s.ref(stagingName), plan.Table.Schema, plan.DeleteWhere)
 	var err error
@@ -332,6 +340,44 @@ func (s *BigQuerySink) runQuery(ctx context.Context, sql string, params []bigque
 	return status.Err()
 }
 
+// loadChunkRows bounds how many rows are encoded and sent per staging load job.
+const loadChunkRows = 20000
+
+// LoadChunks splits n rows into [from, to) ranges of at most size rows.
+func LoadChunks(n, size int) [][2]int {
+	if size <= 0 {
+		size = n
+	}
+	var out [][2]int
+	for from := 0; from < n; from += size {
+		to := from + size
+		if to > n {
+			to = n
+		}
+		out = append(out, [2]int{from, to})
+	}
+	return out
+}
+
+// EncodeRows writes rows [from, to) of the plan as newline-delimited JSON.
+func EncodeRows(buf *bytes.Buffer, plan Plan, from, to int) error {
+	enc := json.NewEncoder(buf)
+	for i := from; i < to; i++ {
+		if err := enc.Encode(plan.Row(i)); err != nil {
+			return fmt.Errorf("encode row %d: %w", i, err)
+		}
+	}
+	return nil
+}
+
+func (s *BigQuerySink) loadRange(ctx context.Context, table *bigquery.Table, plan Plan, from, to int, disp bigquery.TableWriteDisposition) error {
+	var buf bytes.Buffer
+	if err := EncodeRows(&buf, plan, from, to); err != nil {
+		return err
+	}
+	return s.loadBuffer(ctx, table, plan.Table.Schema, &buf, disp)
+}
+
 func (s *BigQuerySink) load(ctx context.Context, table *bigquery.Table, schema bigquery.Schema, rows []map[string]interface{}, disp bigquery.TableWriteDisposition) error {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -340,7 +386,11 @@ func (s *BigQuerySink) load(ctx context.Context, table *bigquery.Table, schema b
 			return fmt.Errorf("encode row: %w", err)
 		}
 	}
-	src := bigquery.NewReaderSource(&buf)
+	return s.loadBuffer(ctx, table, schema, &buf, disp)
+}
+
+func (s *BigQuerySink) loadBuffer(ctx context.Context, table *bigquery.Table, schema bigquery.Schema, buf *bytes.Buffer, disp bigquery.TableWriteDisposition) error {
+	src := bigquery.NewReaderSource(buf)
 	src.SourceFormat = bigquery.JSON
 	src.Schema = schema
 	loader := table.LoaderFrom(src)

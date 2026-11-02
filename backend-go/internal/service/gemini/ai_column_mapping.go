@@ -153,6 +153,11 @@ func (c *Client) inferColumnMapping(ctx context.Context, filename string, sample
 		mapper = c.callGeminiForMapping
 	}
 	prompt := buildColumnMapPrompt(filename, sample)
+	key := mappingPlanKey(prompt)
+	if plan, ok := c.planCache.get(key); ok && plan.check(sample) == nil {
+		log.Printf("[ingest-mapping] file=%q reusing stored mapping plan (no Gemini call)", filename)
+		return plan, "cached", "stored-plan", nil
+	}
 	type attempt struct{ tier, model string }
 	attempts := []attempt{{"tier1", c.model}}
 	if GetRequestedTier(ctx) == "tier2" {
@@ -184,6 +189,7 @@ func (c *Client) inferColumnMapping(ctx context.Context, filename string, sample
 			log.Printf("[ingest-mapping] file=%q tier=%s model=%s low confidence %.2f", filename, a.tier, a.model, plan.Confidence)
 			continue
 		}
+		c.planCache.put(key, plan)
 		return plan, a.tier, a.model, nil
 	}
 	if lastErr == nil {

@@ -96,6 +96,7 @@ type Client struct {
 
 	dvMu         sync.Mutex
 	dataVersions map[string]string
+	leases       map[string]memLease
 }
 
 // NewClient constructs the Firestore repository with initial seeded entities and live Cloud Firestore sync.

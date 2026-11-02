@@ -64,6 +64,33 @@ type Plan struct {
 	Rows        []map[string]interface{}
 	DeleteWhere string // may reference @tenant_id, @batch_id, @source_file, @keys, @chains and the staging table as `{{staging}}`
 	Params      []bigquery.QueryParameter
+	// N and RowAt describe rows built lazily (streamed in bounded chunks); used when Rows is nil.
+	N     int
+	RowAt func(i int) map[string]interface{}
+}
+
+// Len is the number of rows the plan writes.
+func (p Plan) Len() int {
+	if p.Rows != nil || p.RowAt == nil {
+		return len(p.Rows)
+	}
+	return p.N
+}
+
+// Row returns row i, building it on demand for streamed plans.
+func (p Plan) Row(i int) map[string]interface{} {
+	if p.Rows != nil || p.RowAt == nil {
+		return p.Rows[i]
+	}
+	return p.RowAt(i)
+}
+
+func (p Plan) materialize() []map[string]interface{} {
+	rows := make([]map[string]interface{}, 0, p.N)
+	for i := 0; i < p.N; i++ {
+		rows = append(rows, p.RowAt(i))
+	}
+	return rows
 }
 
 // NormalizeTenant returns the canonical "tenant-<slug>" key used by the archive.
@@ -187,65 +214,83 @@ func IngestionLogSpec() TableSpec {
 	}
 }
 
+// sellOutRow builds the BigQuery row of one sell-out fact.
+func sellOutRow(meta Meta, f *domain.SellOutFact, mode SellOutMode, now time.Time) map[string]interface{} {
+	row := RowFor(*f)
+	for k, v := range metaRow(meta, now) {
+		row[k] = v
+	}
+	row[ColChainKey] = chainKey(f.RetailerChain)
+	month := ""
+	if len(strings.TrimSpace(f.TransactionDate)) >= 7 {
+		month = strings.TrimSpace(f.TransactionDate)[:7]
+	}
+	row[ColPeriodMonth] = month
+	if mode == ModeUpsertRecords {
+		row[ColWriteMode] = string(ModeUpsertRecords)
+	} else {
+		row[ColWriteMode] = string(ModeReplacePeriods)
+	}
+	if d, ok := parseDate(f.TransactionDate); ok {
+		row[ColPartitionDate] = d.Format("2006-01-02")
+	}
+	return row
+}
+
 // PlanSellOut builds an idempotent write plan for sell-out facts.
 func PlanSellOut(meta Meta, facts []domain.SellOutFact, mode SellOutMode, now time.Time) Plan {
+	p := StreamSellOut(meta, facts, mode, now)
+	p.Rows = p.materialize()
+	return p
+}
+
+// StreamSellOut is PlanSellOut without materialising the rows: each row is built when it is loaded, so a large
+// file never holds every row map in memory at once.
+func StreamSellOut(meta Meta, facts []domain.SellOutFact, mode SellOutMode, now time.Time) Plan {
 	meta.TenantID = NormalizeTenant(meta.TenantID)
-	rows := make([]map[string]interface{}, 0, len(facts))
-	for i := range facts {
-		f := facts[i]
-		row := RowFor(f)
-		for k, v := range metaRow(meta, now) {
-			row[k] = v
-		}
-		ck := chainKey(f.RetailerChain)
-		row[ColChainKey] = ck
-		month := ""
-		if len(strings.TrimSpace(f.TransactionDate)) >= 7 {
-			month = strings.TrimSpace(f.TransactionDate)[:7]
-		}
-		row[ColPeriodMonth] = month
-		if mode == ModeUpsertRecords {
-			row[ColWriteMode] = string(ModeUpsertRecords)
-		} else {
-			row[ColWriteMode] = string(ModeReplacePeriods)
-		}
-		if d, ok := parseDate(f.TransactionDate); ok {
-			row[ColPartitionDate] = d.Format("2006-01-02")
-		}
-		rows = append(rows, row)
+	return Plan{Kind: KindSellOut, Meta: meta, Table: SellOutSpec(), N: len(facts),
+		RowAt:       func(i int) map[string]interface{} { return sellOutRow(meta, &facts[i], mode, now) },
+		DeleteWhere: archiveDeleteWhere, Params: baseParams(meta)}
+}
+
+// sellInRow builds the BigQuery row of one sell-in record.
+func sellInRow(meta Meta, r *domain.SellInRecord, now time.Time) map[string]interface{} {
+	row := RowFor(*r)
+	for k, v := range metaRow(meta, now) {
+		row[k] = v
 	}
-	return Plan{Kind: KindSellOut, Meta: meta, Table: SellOutSpec(), Rows: rows, DeleteWhere: archiveDeleteWhere, Params: baseParams(meta)}
+	ck := chainKey(r.RetailerChain)
+	if ck == "" {
+		ck = "fathalla"
+	}
+	yr, mn := r.Year, r.MonthNum
+	if yr <= 0 {
+		yr = 2026
+	}
+	if mn <= 0 || mn > 12 {
+		mn = 1
+	}
+	month := fmt.Sprintf("%04d-%02d", yr, mn)
+	row[ColChainKey] = ck
+	row[ColPeriodMonth] = month
+	row[ColPartitionDate] = month + "-01"
+	return row
 }
 
 // PlanSellIn builds an idempotent write plan for sell-in records (SetSellInRecords semantics:
 // replace same file+chain, and any (chain, year, month) present in the upload).
 func PlanSellIn(meta Meta, records []domain.SellInRecord, now time.Time) Plan {
+	p := StreamSellIn(meta, records, now)
+	p.Rows = p.materialize()
+	return p
+}
+
+// StreamSellIn is PlanSellIn with rows built lazily while loading (bounded memory for large files).
+func StreamSellIn(meta Meta, records []domain.SellInRecord, now time.Time) Plan {
 	meta.TenantID = NormalizeTenant(meta.TenantID)
-	rows := make([]map[string]interface{}, 0, len(records))
-	for i := range records {
-		r := records[i]
-		row := RowFor(r)
-		for k, v := range metaRow(meta, now) {
-			row[k] = v
-		}
-		ck := chainKey(r.RetailerChain)
-		if ck == "" {
-			ck = "fathalla"
-		}
-		yr, mn := r.Year, r.MonthNum
-		if yr <= 0 {
-			yr = 2026
-		}
-		if mn <= 0 || mn > 12 {
-			mn = 1
-		}
-		month := fmt.Sprintf("%04d-%02d", yr, mn)
-		row[ColChainKey] = ck
-		row[ColPeriodMonth] = month
-		row[ColPartitionDate] = month + "-01"
-		rows = append(rows, row)
-	}
-	return Plan{Kind: KindSellIn, Meta: meta, Table: SellInSpec(), Rows: rows, DeleteWhere: archiveDeleteWhere, Params: baseParams(meta)}
+	return Plan{Kind: KindSellIn, Meta: meta, Table: SellInSpec(), N: len(records),
+		RowAt:       func(i int) map[string]interface{} { return sellInRow(meta, &records[i], now) },
+		DeleteWhere: archiveDeleteWhere, Params: baseParams(meta)}
 }
 
 // PlanProductMaster builds a snapshot write plan: re-uploading the same sheet (same batch or filename) replaces its rows;
