@@ -74,6 +74,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   static int get _currentYear => DateTime.now().year;
   static List<int> get _recentYears => [_currentYear, _currentYear - 1, _currentYear - 2];
   int _selectedYear = DateTime.now().year;
+  // Bumped on every _loadRecords call; a response whose seq is stale (the user changed year/filters
+  // while it was in flight) is dropped so it cannot overwrite the newer selection.
+  int _recordsLoadSeq = 0;
   int _selectedMonth = 0; // 0 = All Months (كل الشهور), 1..12 = Jan..Dec
   String searchQuery = '';
   bool isLoading = true;
@@ -186,6 +189,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   }
 
   Future<void> _loadRecords() async {
+    final seq = ++_recordsLoadSeq;
     if (mounted) setState(() => isLoading = true);
     final effectiveYear = (selectedDateRange == null && _selectedYear > 0) ? _selectedYear : null;
     final effectiveMonth = (selectedDateRange == null && _selectedMonth > 0) ? _selectedMonth : null;
@@ -208,6 +212,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       matrixYear: _selectedYear > 0 ? _selectedYear : null,
       compYear: compYear,
     ));
+    if (seq != _recordsLoadSeq) return;
     if (loaded case Failure(:final error)) {
       if (mounted) {
         setState(() {

@@ -42,6 +42,13 @@ func (h *AnalyticsHandler) HandleExecutiveSummary(w http.ResponseWriter, r *http
 	startDate := q.Get("start_date")
 	endDate := q.Get("end_date")
 	chain := q.Get("chain")
+	if startDate == "" && endDate == "" {
+		yr, _ := strconv.Atoi(q.Get("year"))
+		mo, _ := strconv.Atoi(q.Get("month"))
+		if s, e, ok := yearMonthRange(yr, mo); ok {
+			startDate, endDate, period = s, e, "CUSTOM"
+		}
+	}
 
 	kpis, err := h.bqRepo.GetExecutiveKPIs(r.Context(), tenantID, period, startDate, endDate, chain)
 	if err != nil {
@@ -110,13 +117,9 @@ func (h *AnalyticsHandler) HandleRecords(w http.ResponseWriter, r *http.Request)
 	endDate := q.Get("end_date")
 	yr, _ := strconv.Atoi(q.Get("year"))
 	mo, _ := strconv.Atoi(q.Get("month"))
-	if startDate == "" && endDate == "" && yr > 0 {
-		if mo > 0 && mo <= 12 {
-			startDate = fmt.Sprintf("%04d-%02d-01", yr, mo)
-			endDate = fmt.Sprintf("%04d-%02d-31", yr, mo)
-		} else {
-			startDate = fmt.Sprintf("%04d-01-01", yr)
-			endDate = fmt.Sprintf("%04d-12-31", yr)
+	if startDate == "" && endDate == "" {
+		if s, e, ok := yearMonthRange(yr, mo); ok {
+			startDate, endDate = s, e
 		}
 	}
 
@@ -723,3 +726,14 @@ func (h *AnalyticsHandler) HandleCPFRDashboard(w http.ResponseWriter, r *http.Re
 
 
 
+
+// yearMonthRange turns ?year=&month= into an inclusive YYYY-MM-DD range (string-compared dates).
+func yearMonthRange(yr, mo int) (string, string, bool) {
+	if yr <= 0 {
+		return "", "", false
+	}
+	if mo > 0 && mo <= 12 {
+		return fmt.Sprintf("%04d-%02d-01", yr, mo), fmt.Sprintf("%04d-%02d-31", yr, mo), true
+	}
+	return fmt.Sprintf("%04d-01-01", yr), fmt.Sprintf("%04d-12-31", yr), true
+}
