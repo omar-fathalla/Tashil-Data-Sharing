@@ -93,3 +93,9 @@ func resolveSellInChainFromCustomer(rules []customerChainRule, customer, current
 	}
 	return current
 }
+
+// ResolveSellInChain applies the same customer->chain rules SetSellInRecords uses, so callers can
+// key incoming rows by the chain they will be stored under.
+func ResolveSellInChain(customer, current string) string {
+	return resolveSellInChainFromCustomer(activeCustomerChainRules(), customer, current)
+}

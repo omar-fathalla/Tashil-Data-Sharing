@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../data_ingestion/presentation/widgets/upload_checks.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/utils/export_columns.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
@@ -156,12 +157,21 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
     try {
       final targetChain =
           _uploadTargetChain != 'all' ? _uploadTargetChain : _selectedChain;
-      final res = await widget.apiClient.uploadSellInFile(
-        filename: picked.name,
-        fileBytes: picked.bytes,
-        chain: targetChain,
-      );
       if (!mounted) return;
+      final res = await runUploadWithQuestions(context, (replaceConfirmed, periodChoice) => widget.apiClient.uploadSellInFile(
+            filename: picked.name,
+            fileBytes: picked.bytes,
+            chain: targetChain,
+            replaceConfirmed: replaceConfirmed,
+            periodChoice: periodChoice,
+          ));
+      if (!mounted) return;
+      if (res == null) {
+        M3Feedback.showInfo(context, 'اتلغى الرفع ومفيش حاجة اتحفظت');
+        return;
+      }
+      final notes = uploadWarningsSummary(IngestionWarningsView(res.quarantinedCustomers.length, res.unknownBarcodes.length));
+      if (notes.isNotEmpty) M3Feedback.showWarning(context, notes);
       setState(() {
         _lastUploadedSellInFilename = picked.name;
       });
