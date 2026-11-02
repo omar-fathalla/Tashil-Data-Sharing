@@ -93,7 +93,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
         _searchController.text = code;
       });
       widget.onSearchChanged(code);
-      M3Feedback.showSuccess(context, 'تم مسح الباركود بنجاح: $code');
+      M3Feedback.showSuccess(context, 'تم مسح الباركود: $code');
     }
   }
 
@@ -142,7 +142,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                               ),
                               const SizedBox(width: 8.0),
                               Text(
-                                'Filter by Date Range',
+                                'الفترة',
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -160,7 +160,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
 
                       // Quick preset chips
                       Text(
-                        'Quick Presets:',
+                        'اختيارات سريعة',
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.w600,
@@ -202,11 +202,11 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                             },
                           ),
                           ActionChip(
-                            label: const Text('Full Year 2026'),
+                            label: Text('سنة ${DateTime.now().year}'),
                             onPressed: () {
                               setDialogState(() {
-                                tempStart = DateTime(2026, 1, 1);
-                                tempEnd = DateTime(2026, 12, 31);
+                                tempStart = DateTime(DateTime.now().year, 1, 1);
+                                tempEnd = DateTime(DateTime.now().year, 12, 31);
                               });
                             },
                           ),
@@ -223,10 +223,10 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                               onTap: () async {
                                 final picked = await showDatePicker(
                                   context: context,
-                                  initialDate: tempStart ?? DateTime(2026, 1, 1),
+                                  initialDate: tempStart ?? DateTime(DateTime.now().year, 1, 1),
                                   firstDate: DateTime(2020, 1, 1),
                                   lastDate: DateTime(2030, 12, 31),
-                                  helpText: 'Select Start Date',
+                                  helpText: 'تاريخ البداية',
                                 );
                                 if (picked != null) {
                                   setDialogState(() => tempStart = picked);
@@ -267,10 +267,10 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                               onTap: () async {
                                 final picked = await showDatePicker(
                                   context: context,
-                                  initialDate: tempEnd ?? DateTime(2026, 1, 31),
+                                  initialDate: tempEnd ?? DateTime.now(),
                                   firstDate: DateTime(2020, 1, 1),
                                   lastDate: DateTime(2030, 12, 31),
-                                  helpText: 'Select End Date',
+                                  helpText: 'تاريخ النهاية',
                                 );
                                 if (picked != null) {
                                   setDialogState(() => tempEnd = picked);
@@ -317,7 +317,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                         children: [
                           TextButton.icon(
                             icon: const Icon(Icons.clear_all_rounded, size: 18.0),
-                            label: const Text('Reset All'),
+                            label: const Text('إعادة الضبط'),
                             onPressed: () {
                               widget.onDateRangeChanged?.call(null);
                               Navigator.of(dialogCtx).pop();
@@ -328,7 +328,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                             children: [
                               TextButton(
                                 onPressed: () => Navigator.of(dialogCtx).pop(),
-                                child: const Text('Cancel'),
+                                child: const Text('إلغاء'),
                               ),
                               const SizedBox(width: 8.0),
                               FilledButton(
@@ -341,7 +341,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                                   }
                                   Navigator.of(dialogCtx).pop();
                                 },
-                                child: const Text('Apply Range'),
+                                child: const Text('تطبيق'),
                               ),
                             ],
                           ),
@@ -387,29 +387,6 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
 
     final defaultChainStores = <String, List<Map<String, String>>>{
       'fathalla': defaultFathallaStores,
-      'beet-elgomla': [
-        {'id': 'beet_mohandessin', 'name': 'بيت الجملة - المهندسين'},
-        {'id': 'beet_tagamoa', 'name': 'بيت الجملة - التجمع الخامس'},
-        {'id': 'beet_nasrcity', 'name': 'بيت الجملة - مدينة نصر'},
-      ],
-      'institutions': [
-        {'id': 'inst_giza_b2b', 'name': 'قطاع المؤسسات والفنادق - توريد الجيزة'},
-        {'id': 'inst_hospitals', 'name': 'قطاع المستشفيات والشركات - التوريدات الطبية'},
-        {'id': 'inst_ministries', 'name': 'قطاع الوزارات والهيئات - التوريد المركزي'},
-      ],
-      'carrefour': [
-        {'id': 'crf_cairo_maadi', 'name': 'كارفور المعادي سيتي سنتر'},
-        {'id': 'crf_giza_dandy', 'name': 'كارفور داندي مول'},
-        {'id': 'crf_cairo_citystars', 'name': 'كارفور سيتي ستارز'},
-      ],
-      'gomla': [
-        {'id': 'gom_cairo_nasrcity', 'name': 'جملة ماركت - مدينة نصر'},
-        {'id': 'gom_loran', 'name': 'جملة ماركت - لوران الإسكندرية'},
-        {'id': 'gom_giza_dokki', 'name': 'جملة ماركت - الدقي'},
-      ],
-      'spinneys': [
-        {'id': 'spi_giza_mollarab', 'name': 'سبينيس - مول العرب'},
-      ],
     };
 
     final chainStores = (chainStoresOverride != null && chainStoresOverride.isNotEmpty)
@@ -423,8 +400,8 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
 
     // Determine available stores based on selectedChain
     List<Map<String, String>> availableStores;
-    if (selectedChain != null && chainStores.containsKey(selectedChain)) {
-      availableStores = chainStores[selectedChain]!;
+    if (selectedChain != null) {
+      availableStores = chainStores[selectedChain] ?? const <Map<String, String>>[];
     } else {
       // Show all stores (or all Fathalla 34 branches)
       final all = <Map<String, String>>[];
@@ -462,8 +439,8 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
 
     final hasDateRange = selectedDateRange != null;
     final dateRangeLabel = hasDateRange
-        ? 'Date: ${_formatDate(selectedDateRange.start)} -> ${_formatDate(selectedDateRange.end)}'
-        : 'Date Range';
+        ? '${_formatDate(selectedDateRange.start)} – ${_formatDate(selectedDateRange.end)}'
+        : 'الفترة';
 
     // Unified control container decoration
     final controlDecoration = BoxDecoration(
@@ -493,7 +470,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
               onSearchChanged(val);
             },
             decoration: InputDecoration(
-              hintText: 'Search SKU or Barcode...',
+              hintText: 'ابحث بالصنف أو الباركود',
               hintStyle: theme.textTheme.bodyMedium?.copyWith(
                 fontFamily: 'Cairo',
                 color: colorScheme.onSurfaceVariant.withOpacity(0.65),
@@ -534,7 +511,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                       size: 20.0,
                       color: colorScheme.primary,
                     ),
-                    tooltip: 'Scan Barcode with Camera / مسح الباركود بالكاميرا',
+                    tooltip: 'امسح الباركود',
                     padding: const EdgeInsetsDirectional.only(end: 6.0),
                     constraints: const BoxConstraints(minWidth: 38.0, minHeight: 44.0),
                     splashRadius: 18.0,
@@ -555,15 +532,15 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
         expand: expand,
         width: expand ? null : 190.0,
         value: selectedChain,
-        hint: 'All Chains',
+        hint: 'كل السلاسل',
         options: const [
-          M3DropdownOption(null, 'All Chains'),
-          M3DropdownOption('fathalla', 'Fathalla Market'),
-          M3DropdownOption('beet-elgomla', 'Beet El-Gomla'),
-          M3DropdownOption('institutions', 'Institutions'),
-          M3DropdownOption('carrefour', 'Carrefour'),
-          M3DropdownOption('gomla', 'Gomla Market'),
-          M3DropdownOption('spinneys', 'Spinneys'),
+          M3DropdownOption(null, 'كل السلاسل'),
+          M3DropdownOption('fathalla', 'أسواق فتح الله'),
+          M3DropdownOption('beet-elgomla', 'بيت الجملة'),
+          M3DropdownOption('institutions', 'المؤسسات'),
+          M3DropdownOption('carrefour', 'كارفور'),
+          M3DropdownOption('gomla', 'جملة ماركت'),
+          M3DropdownOption('spinneys', 'سبينيس'),
         ],
         onChanged: (val) {
           onChainChanged(val);
@@ -578,9 +555,9 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
         expand: expand,
         width: expand ? null : 220.0,
         value: validStoreId,
-        hint: 'All Branches (${availableStores.length})',
+        hint: 'كل الفروع (${availableStores.length})',
         options: [
-          M3DropdownOption(null, 'All Branches (${availableStores.length})'),
+          M3DropdownOption(null, 'كل الفروع (${availableStores.length})'),
           ...availableStores.map((s) => M3DropdownOption<String?>(s['id'], s['name']!)),
         ],
         onChanged: onStoreChanged,
@@ -593,9 +570,9 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
         expand: expand,
         width: expand ? null : 200.0,
         value: selectedCategory,
-        hint: 'All Categories',
+        hint: 'كل الفئات',
         options: [
-          const M3DropdownOption(null, 'All Categories'),
+          const M3DropdownOption(null, 'كل الفئات'),
           ...categories.map((cat) => M3DropdownOption<String?>(cat, cat)),
         ],
         onChanged: onCategoryChanged,
@@ -604,18 +581,18 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
 
     Widget buildYearSelectorPill() {
       if (widget.onYearChanged == null) return const SizedBox.shrink();
-      final activeYr = widget.selectedYear ?? 2026;
+      final activeYr = widget.selectedYear ?? DateTime.now().year;
+      final nowYr = DateTime.now().year;
+      final years = [nowYr, nowYr - 1, nowYr - 2];
       return KeyedSubtree(
         key: const ValueKey('sellout_year_selector_pill'),
         child: M3Dropdown<int>(
           width: 210.0,
-          value: const [2026, 2025, 2024, 0].contains(activeYr) ? activeYr : 2026,
+          value: [...years, 0].contains(activeYr) ? activeYr : nowYr,
           leadingIcon: AppIcons.calendar,
-          options: const [
-            M3DropdownOption(2026, '2026'),
-            M3DropdownOption(2025, '2025'),
-            M3DropdownOption(2024, '2024'),
-            M3DropdownOption(0, 'All Years (2025–2026)'),
+          options: [
+            for (final y in years) M3DropdownOption(y, '$y'),
+            const M3DropdownOption(0, 'كل السنوات'),
           ],
           onChanged: (val) => widget.onYearChanged!(val),
         ),

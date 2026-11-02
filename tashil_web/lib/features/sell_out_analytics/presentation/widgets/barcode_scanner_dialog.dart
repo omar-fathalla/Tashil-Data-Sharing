@@ -4,21 +4,6 @@ import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/m3_shape.dart';
 
-/// Product barcode specimen model for quick testing and scanner demonstration
-class BarcodeSpecimen {
-  final String barcode;
-  final String skuName;
-  final String category;
-  final String chain;
-
-  const BarcodeSpecimen({
-    required this.barcode,
-    required this.skuName,
-    required this.category,
-    required this.chain,
-  });
-}
-
 /// Material Design 3 Barcode Camera Scanner Dialog
 /// Supports live camera viewfinder simulation, photo/image scan,
 /// instant catalog detection, and direct barcode entry.
@@ -52,47 +37,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
   bool _isScanning = true;
   bool _isDetecting = false;
 
-  // Catalog Barcode specimens from real Adeco & Retail datasets (English)
-  static const List<BarcodeSpecimen> _specimens = [
-    BarcodeSpecimen(
-      barcode: '99069570',
-      skuName: 'Diva Hand Wash 500ml',
-      category: 'Personal Care',
-      chain: 'Beet El-Gomla',
-    ),
-    BarcodeSpecimen(
-      barcode: '99069587',
-      skuName: 'Adeco Auto Powder Lavender 3kg',
-      category: 'Laundry Detergent',
-      chain: 'Fathalla Market',
-    ),
-    BarcodeSpecimen(
-      barcode: '6223000451234',
-      skuName: 'Diva Shower Gel Sea Breeze 1L',
-      category: 'Personal Care',
-      chain: 'Carrefour',
-    ),
-    BarcodeSpecimen(
-      barcode: '6221155012345',
-      skuName: 'Adeco Spring Air Freshener 460ml',
-      category: 'Air Care',
-      chain: 'Gomla Market',
-    ),
-    BarcodeSpecimen(
-      barcode: '99069594',
-      skuName: 'Diva Dishwashing Liquid Lemon 4L',
-      category: 'Dish Care',
-      chain: 'Spinneys',
-    ),
-    BarcodeSpecimen(
-      barcode: '6224000129876',
-      skuName: 'Adeco Bleach Ultra White 1000ml',
-      category: 'Bleach & Disinfectants',
-      chain: 'Institutions',
-    ),
-  ];
-
-  int _currentSpecimenIndex = 0;
+  final TextEditingController _manualController = TextEditingController();
 
   @override
   void initState() {
@@ -113,10 +58,11 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
   @override
   void dispose() {
     _laserController.dispose();
+    _manualController.dispose();
     super.dispose();
   }
 
-  void _triggerScanDetection(String barcode, {String? skuName}) {
+  void _triggerScanDetection(String barcode) {
     if (_isDetecting) return;
     setState(() {
       _isDetecting = true;
@@ -131,16 +77,10 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
     });
   }
 
-  void _simulateCameraCapture() {
-    final specimen = _specimens[_currentSpecimenIndex];
-    _currentSpecimenIndex = (_currentSpecimenIndex + 1) % _specimens.length;
-    _triggerScanDetection(specimen.barcode, skuName: specimen.skuName);
-  }
-
-  void _simulatePhotoUpload() {
-    // Pick the primary barcode specimen
-    final specimen = _specimens.first;
-    _triggerScanDetection(specimen.barcode, skuName: specimen.skuName);
+  void _submitManualBarcode() {
+    final code = _manualController.text.trim();
+    if (code.isEmpty) return;
+    _triggerScanDetection(code);
   }
 
   @override
@@ -197,14 +137,14 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Smart Barcode Scanner',
+                              'امسح الباركود',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w800,
                                 color: colorScheme.onSurface,
                               ),
                             ),
                             Text(
-                              'Point camera at product barcode to detect',
+                              'وجّه الكاميرا نحو الباركود',
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w500,
@@ -215,7 +155,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                       ),
                       IconButton(
                         icon: const Icon(Icons.close_rounded),
-                        tooltip: 'Close',
+                        tooltip: 'إغلاق',
                         onPressed: () => Navigator.of(context).pop(),
                       ),
                     ],
@@ -330,7 +270,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                                           : Colors.white70,
                                       size: 20.0,
                                     ),
-                                    tooltip: 'Flash',
+                                    tooltip: 'الفلاش',
                                     onPressed: () =>
                                         setState(() => _isFlashOn = !_isFlashOn),
                                   ),
@@ -342,7 +282,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                                       color: Colors.white70,
                                       size: 20.0,
                                     ),
-                                    tooltip: 'Switch Camera',
+                                    tooltip: 'تبديل الكاميرا',
                                     onPressed: () => setState(
                                         () => _isBackCamera = !_isBackCamera),
                                   ),
@@ -367,8 +307,8 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                             ),
                             child: Text(
                               _isDetecting
-                                  ? '✓ Barcode detected successfully'
-                                  : 'Point camera at product barcode',
+                                  ? 'تم التعرّف على الباركود'
+                                  : 'وجّه الكاميرا نحو الباركود',
                               style: TextStyle(
                                 color: _isDetecting
                                     ? M3Palette.emerald
@@ -386,139 +326,30 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
 
                 const SizedBox(height: 16.0),
 
-                // Material Design 3 Connected Button Group (Camera Scan & Scan Image)
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: M3Shape.radiusMd,
-                    border: Border.all(color: colorScheme.outlineVariant),
-                    color: colorScheme.surfaceContainerHighest.withOpacity(0.35),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            key: const ValueKey('scanner_simulate_capture_button'),
-                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(13.0)),
-                            onTap: _isDetecting ? null : _simulateCameraCapture,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12.0),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary,
-                                borderRadius: const BorderRadius.horizontal(left: Radius.circular(13.0)),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.camera_alt_rounded, size: 18.0, color: colorScheme.onPrimary),
-                                  const SizedBox(width: 8.0),
-                                  Text(
-                                    'Camera Scan',
-                                    style: theme.textTheme.labelLarge?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      color: colorScheme.onPrimary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Container(
-                        width: 1.0,
-                        height: 28.0,
-                        color: colorScheme.outlineVariant,
-                      ),
-                      Expanded(
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            key: const ValueKey('scanner_photo_scan_button'),
-                            borderRadius: const BorderRadius.horizontal(right: Radius.circular(13.0)),
-                            onTap: _isDetecting ? null : _simulatePhotoUpload,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12.0),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.photo_library_rounded, size: 18.0, color: colorScheme.primary),
-                                  const SizedBox(width: 8.0),
-                                  Text(
-                                    'Scan Image',
-                                    style: theme.textTheme.labelLarge?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      color: colorScheme.onSurface,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 16.0),
-
-                // Catalog Quick-Scan Specimens
+                // Manual barcode entry
                 Row(
                   children: [
-                    Icon(Icons.inventory_2_rounded,
-                        size: 15.0, color: colorScheme.primary),
-                    const SizedBox(width: 6.0),
                     Expanded(
-                      child: Text(
-                        'Quick Scan Catalog Barcodes:',
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: colorScheme.onSurface,
+                      child: TextField(
+                        key: const ValueKey('scanner_manual_barcode_field'),
+                        controller: _manualController,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => _submitManualBarcode(),
+                        decoration: const InputDecoration(
+                          labelText: 'أدخل الباركود',
+                          border: OutlineInputBorder(),
+                          isDense: true,
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8.0),
+                    FilledButton(
+                      key: const ValueKey('scanner_manual_submit_button'),
+                      onPressed: _isDetecting ? null : _submitManualBarcode,
+                      child: const Text('بحث'),
+                    ),
                   ],
-                ),
-                const SizedBox(height: 8.0),
-                Wrap(
-                  spacing: 6.0,
-                  runSpacing: 6.0,
-                  children: _specimens.map((specimen) {
-                    return InkWell(
-                      borderRadius: M3Shape.radiusLg,
-                      onTap: () => _triggerScanDetection(specimen.barcode,
-                          skuName: specimen.skuName),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10.0, vertical: 6.0),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withOpacity(0.6),
-                          borderRadius: M3Shape.radiusLg,
-                          border: Border.all(
-                            color: colorScheme.outlineVariant.withOpacity(0.6),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.qr_code_2_rounded,
-                                size: 14.0, color: colorScheme.primary),
-                            const SizedBox(width: 4.0),
-                            Text(
-                              '${specimen.barcode} (${specimen.skuName.split(' ').first})',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onSurface,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
                 ),
               ],
             ),

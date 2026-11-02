@@ -75,19 +75,19 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
   static const int _skuPageSize = 25;
 
   static const List<({int month, String labelAr, String labelEn})> _months = [
-    (month: 0, labelAr: 'إجمالي السنة (كل الشهور)', labelEn: 'Full Year'),
-    (month: 1, labelAr: 'يناير (01)', labelEn: 'January'),
-    (month: 2, labelAr: 'فبراير (02)', labelEn: 'February'),
-    (month: 3, labelAr: 'مارس (03)', labelEn: 'March'),
-    (month: 4, labelAr: 'أبريل (04)', labelEn: 'April'),
-    (month: 5, labelAr: 'مايو (05)', labelEn: 'May'),
-    (month: 6, labelAr: 'يونيو (06)', labelEn: 'June'),
-    (month: 7, labelAr: 'يوليو (07)', labelEn: 'July'),
-    (month: 8, labelAr: 'أغسطس (08)', labelEn: 'August'),
-    (month: 9, labelAr: 'سبتمبر (09)', labelEn: 'September'),
-    (month: 10, labelAr: 'أكتوبر (10)', labelEn: 'October'),
-    (month: 11, labelAr: 'نوفمبر (11)', labelEn: 'November'),
-    (month: 12, labelAr: 'ديسمبر (12)', labelEn: 'December'),
+    (month: 0, labelAr: 'السنة كاملة', labelEn: 'Full year'),
+    (month: 1, labelAr: 'يناير', labelEn: 'January'),
+    (month: 2, labelAr: 'فبراير', labelEn: 'February'),
+    (month: 3, labelAr: 'مارس', labelEn: 'March'),
+    (month: 4, labelAr: 'أبريل', labelEn: 'April'),
+    (month: 5, labelAr: 'مايو', labelEn: 'May'),
+    (month: 6, labelAr: 'يونيو', labelEn: 'June'),
+    (month: 7, labelAr: 'يوليو', labelEn: 'July'),
+    (month: 8, labelAr: 'أغسطس', labelEn: 'August'),
+    (month: 9, labelAr: 'سبتمبر', labelEn: 'September'),
+    (month: 10, labelAr: 'أكتوبر', labelEn: 'October'),
+    (month: 11, labelAr: 'نوفمبر', labelEn: 'November'),
+    (month: 12, labelAr: 'ديسمبر', labelEn: 'December'),
   ];
 
   bool get _isSellIn => widget.targetType == 'sell_in';
@@ -139,7 +139,8 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
     if (loaded case Failure(:final error)) {
       if (mounted) {
         setState(() => _isLoading = false);
-        M3Feedback.showError(context, 'تعذر تحميل المستهدفات: $error');
+        debugPrint('Targets load failed: $error');
+        M3Feedback.showError(context, 'تعذّر تحميل المستهدفات. حاول مرة أخرى.');
       }
       return;
     }
@@ -193,13 +194,13 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
 
   List<({String code, String label})> get _chainOptions {
     final opts = <({String code, String label})>[
-      (code: 'all', label: 'All Chains (كل السلاسل)'),
-      (code: 'fathalla', label: 'Fathalla Market (أسواق فتح الله)'),
-      (code: 'gomla', label: 'Gomla Market (جملة ماركت)'),
-      (code: 'beet-elgomla', label: 'Beet El Gomla (بيت الجملة)'),
-      (code: 'chain-1080314', label: 'El Wakala (الوكالة)'),
-      (code: 'carrefour', label: 'Carrefour (كارفور)'),
-      (code: 'spinneys', label: 'Spinneys (سبينيس)'),
+      (code: 'all', label: 'كل السلاسل'),
+      (code: 'fathalla', label: 'أسواق فتح الله'),
+      (code: 'gomla', label: 'جملة ماركت'),
+      (code: 'beet-elgomla', label: 'بيت الجملة'),
+      (code: 'chain-1080314', label: 'الوكالة'),
+      (code: 'carrefour', label: 'كارفور'),
+      (code: 'spinneys', label: 'سبينيس'),
     ];
     final seen = opts.map((e) => e.code.toLowerCase()).toSet();
     for (final c in _companyChains) {
@@ -305,9 +306,9 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                       child: Text(
                         existing == null
                             ? (_isSellIn
-                                ? 'إضافة Target شامل للتوريد (السلسلة ← الفروع ← الأصناف)'
-                                : 'إضافة Target جديد للمبيعات (Sell-Out)')
-                            : 'تعديل المستهدف الشامل (Target)',
+                                ? 'إضافة مستهدف'
+                                : 'إضافة مستهدف')
+                            : 'تعديل المستهدف',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
@@ -343,7 +344,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                                 const SizedBox(width: 10.0),
                                 Expanded(
                                   child: Text(
-                                    'أدخل السلسلة والسنة والقيمة المستهدفة (أو الكمية بالكرتونة) واترك الباقي مفتوحاً؛ سيقوم النظام تلقائياً بتوليد Target شامل مقسم على كل فروع السلسلة وأصناف كل فرع وإجمالي بضاعة السلسلة ومناديب المبيعات.',
+                                    'أدخل السلسلة والسنة والمستهدف، وسنوزّعه تلقائيًا على الفروع والأصناف.',
                                     style: theme.textTheme.bodySmall?.copyWith(
                                       fontWeight: FontWeight.w700,
                                       color: colorScheme.onSurface,
@@ -360,7 +361,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
 value: _chainOptions.any((c) => c.code == chain)
                               ? chain
                               : 'fathalla',
-label: 'سلسلة التجزئة (Retail Chain) *',
+label: 'السلسلة *',
 expand: true,
 options: m3OptionsFromMenuItems<String>(_chainOptions
                               .map(
@@ -384,7 +385,7 @@ onChanged: m3Legacy<String>((v) {
                               child: M3Dropdown<int>(
 key: const ValueKey('target_dialog_year_dropdown'),
 value: year,
-label: 'السنة (Year) *',
+label: 'السنة *',
 expand: true,
 options: m3OptionsFromMenuItems<int>(planningYears
                                     .map(
@@ -406,7 +407,7 @@ onChanged: m3Legacy<int>((v) {
                             Expanded(
                               child: M3Dropdown<int>(
 value: month,
-label: 'الفترة / الشهر (Period)',
+label: 'الشهر',
 expand: true,
 options: m3OptionsFromMenuItems<int>(_months
                                     .map(
@@ -439,8 +440,8 @@ onChanged: m3Legacy<int>((v) {
                                 ),
                                 decoration: const InputDecoration(
                                   labelText:
-                                      'القيمة المستهدفة بالجنيه (Target EGP) *',
-                                  hintText: 'مثال: 150000000',
+                                      'المستهدف (ج.م) *',
+                                  hintText: 'مثال: 150,000,000',
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -457,8 +458,8 @@ onChanged: m3Legacy<int>((v) {
                                 ),
                                 decoration: InputDecoration(
                                   labelText:
-                                      'الكمية المستهدفة ($_unitLabelAr) (تُحسب تلقائياً إن تُركت)',
-                                  hintText: 'مثال: 250000',
+                                      'الكمية المستهدفة ($_unitLabelAr) (اختياري)',
+                                  hintText: 'مثال: 250,000',
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -483,7 +484,7 @@ onChanged: m3Legacy<int>((v) {
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
-                                      'معاينة الحسابات التلقائية الشاملة للسلسلة:',
+                                      'معاينة',
                                       style: theme.textTheme.labelMedium
                                           ?.copyWith(
                                         fontWeight: FontWeight.w800,
@@ -528,11 +529,11 @@ onChanged: m3Legacy<int>((v) {
                                       '• إجمالي البضاعة: ${CurrencyFormatter.formatNumber(effectiveUnits.round())} كرتونة',
                                       style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         fontWeight: FontWeight.w700,                                       )),
                                     ),
-                                    Text(
+                                    if (_isSellIn) Text(
                                       '• الوزن اللوجستي: ${effectiveTons.toStringAsFixed(1)} طن',
                                       style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         fontWeight: FontWeight.w700,                                       )),
                                     ),
-                                    Text(
+                                    if (_isSellIn) Text(
                                       '• شامل تأمين المرتجعات: ${CurrencyFormatter.formatNumber(grossUnitsWithBuffer.round())} كرتونة',
                                       style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         fontWeight: FontWeight.w700,                                         color: M3StatusColors.of(context).accents.teal,                                       )),
                                     ),
@@ -549,9 +550,9 @@ onChanged: m3Legacy<int>((v) {
                               child: TextField(
                                 controller: branchCtrl,
                                 decoration: const InputDecoration(
-                                  labelText: 'الفرع / الإقليم (اختياري)',
+                                  labelText: 'الفرع (اختياري)',
                                   hintText:
-                                      'اتركه مفتوحاً لتوزيع التارجت على كل الفروع تلقائياً',
+                                      'اتركه فارغًا للتوزيع على كل الفروع',
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -562,9 +563,9 @@ onChanged: m3Legacy<int>((v) {
                               child: TextField(
                                 controller: categoryCtrl,
                                 decoration: const InputDecoration(
-                                  labelText: 'الفئة / العلامة (اختياري)',
+                                  labelText: 'الفئة (اختياري)',
                                   hintText:
-                                      'اتركه مفتوحاً لتوزيع التارجت على كل الأصناف تلقائياً',
+                                      'اتركه فارغًا للتوزيع على كل الأصناف',
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -575,11 +576,11 @@ onChanged: m3Legacy<int>((v) {
                         const SizedBox(height: 12.0),
                         TextField(
                           controller: notesCtrl,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'ملاحظات الخطة (اختياري)',
                             hintText:
-                                'مثال: المستهدف السنوي الشامل لتوريدات السلسلة والفروع والأصناف',
-                            border: OutlineInputBorder(),
+                                'مثال: مستهدف ${DateTime.now().year}',
+                            border: const OutlineInputBorder(),
                             isDense: true,
                           ),
                         ),
@@ -596,8 +597,8 @@ onChanged: m3Legacy<int>((v) {
                     icon: const Icon(Icons.save_rounded, size: 18.0),
                     label: Text(
                       _isSellIn
-                          ? 'حفظ وتوليد الـ Target الشامل'
-                          : 'حفظ الـ Target',
+                          ? 'حفظ'
+                          : 'حفظ',
                     ),
                     onPressed: () async {
                       final rev = double.tryParse(
@@ -611,7 +612,7 @@ onChanged: m3Legacy<int>((v) {
                       if (rev <= 0 && units <= 0) {
                         M3Feedback.showError(
                           context,
-                          'يرجى إدخال القيمة المستهدفة بالجنيه أو الكمية المستهدفة',
+                          'أدخل المستهدف بالجنيه أو بالكمية.',
                         );
                         return;
                       }
@@ -637,14 +638,14 @@ onChanged: m3Legacy<int>((v) {
                         M3Feedback.showSuccess(
                           context,
                           _isSellIn
-                              ? 'تم حفظ الـ Target الشامل وتوزيعه تلقائياً على الفروع والأصناف والمناديب بنجاح'
-                              : 'تم حفظ الـ Target وتحديث نسبة التحقيق بنجاح',
+                              ? 'تم حفظ المستهدف وتوزيعه.'
+                              : 'تم حفظ المستهدف.',
                         );
                         _repo.invalidateAll();
                         await _loadTargets();
                       } catch (e) {
                         if (!mounted) return;
-                        M3Feedback.showError(context, 'تعذر حفظ المستهدف: $e');
+                        M3Feedback.showError(context, 'تعذّر حفظ المستهدف. حاول مرة أخرى.');
                       }
                     },
                   ),
@@ -683,7 +684,7 @@ onChanged: m3Legacy<int>((v) {
       await _loadTargets();
     } catch (e) {
       if (!mounted) return;
-      M3Feedback.showError(context, 'تعذر رفع ملف المستهدفات: $e');
+      M3Feedback.showError(context, 'تعذّر رفع ملف المستهدفات. حاول مرة أخرى.');
     } finally {
       if (mounted) {
         setState(() => _isUploading = false);
@@ -740,14 +741,14 @@ onChanged: m3Legacy<int>((v) {
     ExcelExportService.downloadCsv(filename, csvData);
     M3Feedback.showSuccess(
       context,
-      'تم تحميل قالب إكسيل المستهدفات ($filename)',
+      'تم تنزيل القالب.',
     );
   }
 
   void _exportTargetsComparisonCsv() {
     final items = _summary?.items ?? const [];
     if (items.isEmpty) {
-      M3Feedback.showError(context, 'لا توجد مستهدفات مسجلة لتصديرها حالياً');
+      M3Feedback.showError(context, 'لا توجد مستهدفات للتصدير.');
       return;
     }
     final active = _activeTargetItem;
@@ -759,7 +760,7 @@ onChanged: m3Legacy<int>((v) {
         'الفترة (Period)',
         'الفرع (Branch)',
         'المحافظة / الإقليم',
-        'مندوب المبيعات (Sales Rep)',
+        'مندوب المبيعات',
         'الصنف / الماركة (SKU / Brand)',
         'القطاع (Sector)',
         'حصة النطاق % (Share %)',
@@ -780,8 +781,8 @@ onChanged: m3Legacy<int>((v) {
           item.monthLabel,
           item.branchName,
           'كل الأقاليم',
-          'إدارة كبار العملاء (KA)',
-          'إجمالي كافة الأصناف (${item.activeSkusCount} صنف)',
+          'كبار العملاء (Key Accounts)',
+          'كل الأصناف (${item.activeSkusCount})',
           'MT + CC',
           '100%',
           item.targetRevenueEgp,
@@ -975,11 +976,11 @@ onChanged: m3Legacy<int>((v) {
             final card1 = _buildKpiCard(
               context,
               titleAr: _isSellIn
-                  ? 'إجمالي مستهدف التوريد الشامل'
-                  : 'إجمالي مستهدف المبيعات',
+                  ? 'مستهدف Sell-In'
+                  : 'مستهدف Sell-Out',
               titleEn: _isSellIn
-                  ? 'Comprehensive Target Sell-In'
-                  : 'Target Sell-Out (EGP)',
+                  ? 'Sell-In Target'
+                  : 'Sell-Out Target (EGP)',
               value: CurrencyFormatter.formatCompactEGP(
                 summary.totalTargetRevenueEgp,
               ),
@@ -995,8 +996,8 @@ onChanged: m3Legacy<int>((v) {
             final card2 = _buildKpiCard(
               context,
               titleAr: _isSellIn
-                  ? 'المحقق الفعلي للتوريد'
-                  : 'المحقق الفعلي للمبيعات',
+                  ? 'المحقق (Sell-In)'
+                  : 'المحقق (Sell-Out)',
               titleEn:
                   _isSellIn ? 'Actual Sell-In (EGP)' : 'Actual Sell-Out (EGP)',
               value: CurrencyFormatter.formatCompactEGP(
@@ -1006,7 +1007,7 @@ onChanged: m3Legacy<int>((v) {
                   ? '${CurrencyFormatter.formatNumber(summary.totalActualUnits.round())} كرتونة • ${summary.totalActualWeightTons.toStringAsFixed(1)} طن'
                   : '${CurrencyFormatter.formatNumber(summary.totalActualUnits.round())} $_unitLabelAr محققة فعلياً',
               subtitleEn: _isSellIn && summary.totalExpectedRevenueEgp > 0
-                  ? 'EXP: ${CurrencyFormatter.formatCompactEGP(summary.totalExpectedRevenueEgp)}'
+                  ? 'Forecast: ${CurrencyFormatter.formatCompactEGP(summary.totalExpectedRevenueEgp)}'
                   : 'Actual $_unitLabelEn',
               icon: Icons.insights_rounded,
               color: M3StatusColors.of(context).accents.teal,
@@ -1017,15 +1018,15 @@ onChanged: m3Legacy<int>((v) {
               titleEn: 'Overall Achievement %',
               value: '${summary.overallAchievementPct.toStringAsFixed(1)}%',
               subtitleAr: summary.overallAchievementPct >= 100
-                  ? 'تجاوز المستهدف بنجاح'
+                  ? 'تجاوز المستهدف'
                   : (summary.overallAchievementPct >= 85
-                      ? 'أداء قريب من المستهدف'
-                      : 'يحتاج لتنشيط للوصول للمستهدف'),
+                      ? 'قريب من المستهدف'
+                      : 'أقل من المستهدف'),
               subtitleEn: summary.overallAchievementPct >= 100
-                  ? 'Target Exceeded'
+                  ? 'Above target'
                   : (summary.overallAchievementPct >= 85
-                      ? 'Near Target'
-                      : 'Action Required'),
+                      ? 'Near target'
+                      : 'Below target'),
               icon: Icons.pie_chart_rounded,
               color: summary.overallAchievementPct >= 100
                   ? M3StatusColors.of(context).accents.positive
@@ -1037,19 +1038,19 @@ onChanged: m3Legacy<int>((v) {
             final card4 = _buildKpiCard(
               context,
               titleAr: _isSellIn
-                  ? 'الفجوة ونطاق التغطية الشامل'
-                  : 'الفجوة / الفرق في المبيعات',
-              titleEn: 'Variance & Scope Coverage',
+                  ? 'الفرق'
+                  : 'الفرق',
+              titleEn: 'Variance',
               value:
                   '${summary.totalVarianceEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatCompactEGP(summary.totalVarianceEgp)}',
               subtitleAr: _isSellIn && summary.totalBranchesCovered > 0
                   ? 'موزع على ${summary.totalBranchesCovered} فرع • ${summary.totalSkusCovered} صنف'
                   : (summary.totalVarianceEgp >= 0
-                      ? 'فائض فوق المستهدف'
-                      : 'المتبقي لتحقيق المستهدف'),
+                      ? 'فوق المستهدف'
+                      : 'المتبقي للمستهدف'),
               subtitleEn: summary.totalVarianceEgp >= 0
-                  ? 'Surplus Above Target'
-                  : 'Remaining to Target',
+                  ? 'Above target'
+                  : 'To go',
               icon: summary.totalVarianceEgp >= 0
                   ? Icons.trending_up_rounded
                   : Icons.account_tree_rounded,
@@ -1139,10 +1140,10 @@ onChanged: m3Legacy<int>((v) {
 value: [0, ..._targetPlanningYears].contains(_selectedYear)
                           ? _selectedYear
                           : 0,
-label: 'Target Year',
+label: 'السنة',
 expand: true,
 options: m3OptionsFromMenuItems<int>([
-                        const DropdownMenuItem(value: 0, child: Text('All Years')),
+                        const DropdownMenuItem(value: 0, child: Text('كل السنوات')),
                         ..._targetPlanningYears.map(
                           (yr) => DropdownMenuItem<int>(
                             value: yr,
@@ -1164,7 +1165,7 @@ onChanged: m3Legacy<int>((v) {
 value: _chainOptions.any((c) => c.code == _selectedChain)
                           ? _selectedChain
                           : 'all',
-label: 'Retail Chain',
+label: 'السلسلة',
 expand: true,
 options: m3OptionsFromMenuItems<String>(_chainOptions
                           .map(
@@ -1199,8 +1200,8 @@ onChanged: m3Legacy<String>((v) {
                     icon: const Icon(Icons.add_task_rounded, size: 20.0),
                     label: Text(
                       _isSellIn
-                          ? 'إضافة Target شامل (Chain → Branch → SKU)'
-                          : 'Add Target Manually',
+                          ? 'إضافة مستهدف'
+                          : 'إضافة مستهدف',
                     ),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(0, 48.0),
@@ -1223,7 +1224,7 @@ onChanged: m3Legacy<String>((v) {
                             child: CircularProgressIndicator(strokeWidth: 2.0),
                           )
                         : const Icon(Icons.upload_file_rounded, size: 20.0),
-                    label: const Text('Upload Target Excel'),
+                    label: const Text('رفع ملف المستهدفات'),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(0, 48.0),
                       padding: const EdgeInsets.symmetric(
@@ -1239,7 +1240,7 @@ onChanged: m3Legacy<String>((v) {
                   OutlinedButton.icon(
                     onPressed: _downloadTargetTemplate,
                     icon: const Icon(Icons.download_rounded, size: 20.0),
-                    label: const Text('Excel Template'),
+                    label: const Text('تنزيل القالب'),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, 48.0),
                       padding: const EdgeInsets.symmetric(
@@ -1256,7 +1257,7 @@ onChanged: m3Legacy<String>((v) {
                     onPressed: _exportTargetsComparisonCsv,
                     icon: const Icon(Icons.table_view_rounded, size: 20.0),
                     label: Text(
-                      _isSellIn ? 'تصدير التارجت الشامل Excel' : 'Export Report',
+                      _isSellIn ? 'تصدير' : 'تصدير',
                     ),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, 48.0),
@@ -1317,8 +1318,8 @@ onChanged: m3Legacy<String>((v) {
                                   const SizedBox(width: 8.0),
                                   Text(
                                     _isSellIn
-                                        ? 'المستوى الأول (Level 1): المستهدف الشامل على مستوى السلسلة التجارية'
-                                        : 'جدول مقارنة المستهدفات بالمحقق الفعلي',
+                                        ? 'المستهدف حسب السلسلة'
+                                        : 'المستهدف مقابل المحقق',
                                     style:
                                         theme.textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.w800,
@@ -1328,7 +1329,7 @@ onChanged: m3Legacy<String>((v) {
                               ),
                               if (_isSellIn)
                                 Text(
-                                  'اضغط على أي سلسلة بالأسفل لاستعراض تفكيك الفروع والأصناف بالتفصيل',
+                                  'اضغط على السلسلة لعرض الفروع والأصناف.',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: colorScheme.primary,
                                     fontWeight: FontWeight.w700,
@@ -1348,7 +1349,7 @@ onChanged: m3Legacy<String>((v) {
                               const DataColumn(label: Text('السلسلة (Chain)')),
                               const DataColumn(label: Text('الفترة (Period)')),
                               const DataColumn(
-                                label: Text('النطاق والتفكيك الشامل'),
+                                label: Text('النطاق'),
                               ),
                               const DataColumn(
                                 numeric: true,
@@ -1360,21 +1361,21 @@ onChanged: m3Legacy<String>((v) {
                               ),
                               const DataColumn(
                                 numeric: true,
-                                label: Text('الفرق (Variance)'),
+                                label: Text('الفرق (ج.م)'),
                               ),
                               DataColumn(
                                 numeric: true,
                                 label: Text(
-                                  'إجمالي البضاعة ($_unitLabelAr: فعلي / مستهدف)',
+                                  'الكمية ($_unitLabelAr: فعلي / مستهدف)',
                                 ),
                               ),
                               if (_isSellIn)
                                 const DataColumn(
                                   numeric: true,
-                                  label: Text('الوزن (فعلي / مستهدف طن)'),
+                                  label: Text('الوزن بالطن (فعلي / مستهدف)'),
                                 ),
                               const DataColumn(
-                                label: Text('نسبة التحقيق (Achievement %)'),
+                                label: Text('نسبة التحقيق %'),
                               ),
                               const DataColumn(label: Text('إجراءات')),
                             ],
@@ -1572,7 +1573,7 @@ onChanged: m3Legacy<String>((v) {
                                               if (!context.mounted) return;
                                               M3Feedback.showError(
                                                 context,
-                                                'تعذر حذف المستهدف: $e',
+                                                'تعذّر حذف المستهدف. حاول مرة أخرى.',
                                               );
                                             }
                                           },
@@ -1624,8 +1625,8 @@ onChanged: m3Legacy<String>((v) {
           const SizedBox(height: 14.0),
           Text(
             _isSellIn
-                ? 'ابدأ الآن بإنشاء الـ Target الشامل للسلسلة (السلسلة ← الفروع ← الأصناف)'
-                : 'لم يتم تسجيل مستهدفات مبيعات (Sell-Out Targets) لهذه الفترة بعد',
+                ? 'لا توجد مستهدفات لهذه الفترة بعد.'
+                : 'لا توجد مستهدفات لهذه الفترة بعد.',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
             ),
@@ -1636,8 +1637,8 @@ onChanged: m3Legacy<String>((v) {
             constraints: const BoxConstraints(maxWidth: 680.0),
             child: Text(
               _isSellIn
-                  ? 'بمجرد إدخال اسم السلسلة والسنة والقيمة المستهدفة (أو الكمية بالكرتونة) وترك الباقي مفتوحاً، سيقوم النظام تلقائياً بتوليد خريطة مستهدفات شاملة توضح المطلوب من كل فرع من فروع السلسلة، وكمية البضاعة المطلوبة من كل صنف داخل كل فرع، وإجمالي البضاعة للسلسلة بالكامل.'
-                  : 'اضغط على "إضافة Target يدوياً" أو قم برفع شيت إكسيل المستهدفات ليقوم النظام بمقارنته تلقائياً مع الأرقام الفعلية وحساب نسبة التحقيق.',
+                  ? 'أضف مستهدفًا للسلسلة وسنوزّعه تلقائيًا على الفروع والأصناف.'
+                  : 'أضف مستهدفًا أو ارفع ملف المستهدفات لمقارنته بالمحقق.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 height: 1.5,
@@ -1654,26 +1655,8 @@ onChanged: m3Legacy<String>((v) {
               FilledButton.icon(
                 onPressed: () => _openTargetFormDialog(),
                 icon: const Icon(Icons.add_task_rounded),
-                label: Text(
-                  _isSellIn
-                      ? 'إدخال Target شامل جديد للسلسلة'
-                      : 'إضافة Target يدوياً',
-                ),
+                label: const Text('إضافة مستهدف'),
               ),
-              if (_isSellIn)
-                FilledButton.tonalIcon(
-                  onPressed: () => _openTargetFormDialog(
-                    prefillChain:
-                        _selectedChain != 'all' ? _selectedChain : 'fathalla',
-                    prefillYear: _selectedYear > 0 ? _selectedYear : 2026,
-                    prefillRev: 150000000,
-                    prefillUnits: 255000,
-                  ),
-                  icon: const Icon(Icons.auto_awesome_rounded),
-                  label: const Text(
-                    'تجربة سريعة: Target شامل لأسواق فتح الله (2026)',
-                  ),
-                ),
             ],
           ),
         ],
@@ -1729,7 +1712,7 @@ onChanged: m3Legacy<String>((v) {
                       size: 22.0,
                     ),
                     Text(
-                      'شجرة التفكيك الشامل للـ Target:',
+                      'توزيع المستهدف:',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w900,
                         color: colorScheme.primary,
@@ -1767,7 +1750,7 @@ onChanged: m3Legacy<String>((v) {
                             ? colorScheme.primaryContainer
                             : null,
                         label: Text(
-                          '3. أصناف وبضاعة: ${activeBranch.branchName} (${activeBranch.skus.length} صنف)',
+                          '3. أصناف: ${activeBranch.branchName} (${activeBranch.skus.length} صنف)',
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                         onPressed: () => setState(() {
@@ -1832,7 +1815,7 @@ onChanged: m3Legacy<String>((v) {
                   index: 0,
                   icon: Icons.store_mall_directory_rounded,
                   label:
-                      '1. تارجت فروع السلسلة (${target.branches.length} فرع)',
+                      '1. الفروع (${target.branches.length})',
                 ),
                 const SizedBox(width: 8.0),
                 _buildSubTabButton(
@@ -1840,7 +1823,7 @@ onChanged: m3Legacy<String>((v) {
                   index: 1,
                   icon: Icons.receipt_long_rounded,
                   label:
-                      '2. أصناف وبضاعة الفرع المختار (${activeBranch?.skus.length ?? 0} صنف)',
+                      '2. أصناف الفرع (${activeBranch?.skus.length ?? 0})',
                 ),
                 const SizedBox(width: 8.0),
                 _buildSubTabButton(
@@ -1848,7 +1831,7 @@ onChanged: m3Legacy<String>((v) {
                   index: 2,
                   icon: Icons.warehouse_rounded,
                   label:
-                      '3. إجمالي بضاعة السلسلة بالكامل (${target.chainSkuTotals.length} صنف)',
+                      '3. أصناف السلسلة (${target.chainSkuTotals.length})',
                 ),
                 const SizedBox(width: 8.0),
                 _buildSubTabButton(
@@ -1856,7 +1839,7 @@ onChanged: m3Legacy<String>((v) {
                   index: 3,
                   icon: Icons.badge_rounded,
                   label:
-                      '4. كوتة المناديب والماركات (${target.salesRepQuotas.length} مندوب)',
+                      '4. المناديب والعلامات التجارية (${target.salesRepQuotas.length})',
                 ),
                 const SizedBox(width: 8.0),
                 _buildSubTabButton(
@@ -1864,7 +1847,7 @@ onChanged: m3Legacy<String>((v) {
                   index: 4,
                   icon: Icons.calendar_month_rounded,
                   label:
-                      '5. التوزيع الشهري الموسمي (${target.monthlyPhasing.length} شهر)',
+                      '5. التوزيع الشهري (${target.monthlyPhasing.length})',
                 ),
               ],
             ),
@@ -1993,14 +1976,14 @@ onChanged: m3Legacy<String>((v) {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'المستوى الثاني (Level 2): توزيع مستهدف السلسلة على الفروع (${filteredBranches.length} من ${target.branches.length} فرع)',
+                  'المستهدف حسب الفرع (${filteredBranches.length} من ${target.branches.length})',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 2.0),
                 Text(
-                  'يوضح لكل فرع المطلوب تحقيقه بالجنيه وكمية البضاعة بالكرتونة والوزن بالطن • اضغط على أي فرع للدخول إلى أصناف وبضاعة الفرع بالتفصيل',
+                  'اضغط على الفرع لعرض أصنافه.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -2093,14 +2076,14 @@ onChanged: m3Legacy<String>((v) {
               ),
               DataColumn(
                 numeric: true,
-                label: Text('المحقق الفعلي (Actual EGP & Cases)'),
+                label: Text('المحقق (ج.م / كرتونة)'),
               ),
               DataColumn(
                 numeric: true,
-                label: Text('المتبقي على الفرع (Variance)'),
+                label: Text('الفرق (ج.م)'),
               ),
               DataColumn(label: Text('نسبة التحقيق %')),
-              DataColumn(label: Text('أصناف الفرع وتخصيص')),
+              DataColumn(label: Text('الأصناف')),
             ],
             rows: filteredBranches.map((b) {
               final isPositive = b.varianceRevenueEgp >= 0;
@@ -2176,7 +2159,7 @@ onChanged: m3Legacy<String>((v) {
                           style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                             fontWeight: FontWeight.w800,                             fontSize: M3FontSize.labelMediumPlus,                           )),
                         ),
                         Text(
-                          'شامل المرتجع: ${CurrencyFormatter.formatNumber(b.grossTargetUnits.round())} ك',
+                          'شامل المرتجع: ${CurrencyFormatter.formatNumber(b.grossTargetUnits.round())} كرتونة',
                           style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                             fontSize: M3FontSize.tinyPlus,                             color: M3StatusColors.of(context).accents.teal,                             fontWeight: FontWeight.w700,                           )),
                         ),
                       ],
@@ -2269,7 +2252,7 @@ onChanged: m3Legacy<String>((v) {
                         ),
                         const SizedBox(width: 4.0),
                         IconButton(
-                          tooltip: 'تخصيص تارجت منفصل لهذا الفرع',
+                          tooltip: 'تعديل مستهدف الفرع',
                           icon: const Icon(Icons.tune_rounded, size: 18.0),
                           onPressed: () => _openTargetFormDialog(
                             prefillChain: target.retailerChain,
@@ -2364,7 +2347,7 @@ onChanged: m3Legacy<String>((v) {
                     width: 310.0,
                     child: M3Dropdown<String>(
 value: branch.branchName,
-label: 'الفرع المختار (Level 3 Branch)',
+label: 'الفرع',
 expand: true,
 options: m3OptionsFromMenuItems<String>(target.branches
                           .map(
@@ -2398,7 +2381,7 @@ onChanged: m3Legacy<String>((v) {
                     context,
                     icon: Icons.payments_rounded,
                     label:
-                        'تارجت الفرع: ${CurrencyFormatter.formatEGP(branch.targetRevenueEgp)} (${branch.shareOfChainPct.toStringAsFixed(2)}% من السلسلة)',
+                        'مستهدف الفرع: ${CurrencyFormatter.formatEGP(branch.targetRevenueEgp)} (${branch.shareOfChainPct.toStringAsFixed(2)}% من السلسلة)',
                     color: colorScheme.primary,
                   ),
                   _buildInfoPill(
@@ -2417,7 +2400,7 @@ onChanged: m3Legacy<String>((v) {
                   FilledButton.tonalIcon(
                     onPressed: () => _exportBranchSkusExcel(target, branch),
                     icon: const Icon(Icons.download_rounded, size: 18.0),
-                    label: const Text('تصدير أصناف الفرع Excel'),
+                    label: const Text('تصدير أصناف الفرع'),
                   ),
                 ],
               ),
@@ -2500,14 +2483,14 @@ onChanged: m3Legacy<String>((v) {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'إجمالي البضاعة والأصناف المطلوبة للسلسلة بالكامل (${target.chainDisplayName} — ${target.chainSkuTotals.length} صنف)',
+          'أصناف السلسلة (${target.chainSkuTotals.length} صنف)',
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w900,
           ),
         ),
         const SizedBox(height: 4.0),
         Text(
-          'تجميع شامل لكل صنف على مستوى كافة فروع السلسلة (${target.branches.length} فرع) يوضح إجمالي الكراتين والأطنان والقيمة المطلوبة من كل صنف وماركة.',
+          'الإجمالي لكل صنف في كل الفروع',
           style: theme.textTheme.bodySmall?.copyWith(
             color: colorScheme.onSurfaceVariant,
           ),
@@ -2554,7 +2537,7 @@ onChanged: m3Legacy<String>((v) {
               width: 170.0,
               child: M3Dropdown<String>(
 value: brands.contains(_skuBrandFilter) ? _skuBrandFilter : 'all',
-label: 'الماركة (Brand)',
+label: 'العلامة التجارية',
 expand: true,
 options: m3OptionsFromMenuItems<String>(brands
                     .map(
@@ -2586,11 +2569,11 @@ options: m3OptionsFromMenuItems<String>([
                   const DropdownMenuItem(value: 'all', child: Text('كل القطاعات')),
                   const DropdownMenuItem(
                     value: 'MT',
-                    child: Text('منظفات (MT)'),
+                    child: Text('منظفات'),
                   ),
                   const DropdownMenuItem(
                     value: 'CC',
-                    child: Text('عناية سيارات رابيدو (CC)'),
+                    child: Text('العناية بالسيارات'),
                   ),
                 ]),
 onChanged: m3Legacy<String>((v) {
@@ -2607,20 +2590,20 @@ onChanged: m3Legacy<String>((v) {
               width: 195.0,
               child: M3Dropdown<String>(
 value: _skuStockStatusFilter,
-label: 'حالة الرصيد المتبقي',
+label: 'حالة المخزون',
 options: m3OptionsFromMenuItems<String>([
                   const DropdownMenuItem(value: 'all', child: Text('كل الحالات')),
                   const DropdownMenuItem(
                     value: 'urgent_replenishment',
-                    child: Text('سحب عالي / أولوية توريد'),
+                    child: Text('مخزون منخفض'),
                   ),
                   const DropdownMenuItem(
                     value: 'optimal',
-                    child: Text('رصيد آمن ومتوازن'),
+                    child: Text('مخزون مناسب'),
                   ),
                   const DropdownMenuItem(
                     value: 'overstock',
-                    child: Text('تكدس مخزني - تهدئة توريد'),
+                    child: Text('مخزون زائد'),
                   ),
                 ]),
 onChanged: m3Legacy<String>((v) {
@@ -2641,7 +2624,7 @@ onChanged: m3Legacy<String>((v) {
                   _skuPage = 0;
                 }),
                 decoration: const InputDecoration(
-                  hintText: 'ابحث باسم الصنف أو العبوة...',
+                  hintText: 'ابحث بالصنف أو الباركود',
                   prefixIcon: Icon(Icons.search_rounded, size: 18.0),
                   isDense: true,
                   contentPadding: EdgeInsets.symmetric(
@@ -2680,7 +2663,7 @@ onChanged: m3Legacy<String>((v) {
       if (res.items.isEmpty) {
         M3Feedback.showError(
           context,
-          'لم يتم العثور على بطاقة تعريفية لهذا الصنف في كارتة الأصناف',
+          'الصنف غير موجود في قائمة الأسعار.',
         );
         return;
       }
@@ -2713,7 +2696,7 @@ onChanged: m3Legacy<String>((v) {
       );
     } catch (e) {
       if (!mounted) return;
-      M3Feedback.showError(context, 'تعذر فتح بطاقة هوية الصنف: $e');
+      M3Feedback.showError(context, 'تعذّر فتح بيانات الصنف.');
     }
   }
 
@@ -2731,10 +2714,10 @@ onChanged: m3Legacy<String>((v) {
           colorScheme.surfaceContainerHigh.withOpacity(0.55),
         ),
         columns: [
-          DataColumn(label: Text('اسم الصنف وهوية الكارتة ($scopeLabel)')),
+          DataColumn(label: Text('الصنف ($scopeLabel)')),
           const DataColumn(label: Text('الماركة والقطاع')),
           const DataColumn(numeric: true, label: Text('حصة الصنف %')),
-          const DataColumn(numeric: true, label: Text('سعر الكرتونة (خطة vs كارتة)')),
+          const DataColumn(numeric: true, label: Text('سعر الكرتونة (الخطة مقابل القائمة)')),
           const DataColumn(
             numeric: true,
             label: Text('كمية البضاعة المستهدفة (كرتونة / قطعة)'),
@@ -2746,13 +2729,13 @@ onChanged: m3Legacy<String>((v) {
           const DataColumn(numeric: true, label: Text('الوزن (طن)')),
           const DataColumn(
             numeric: true,
-            label: Text('المسحوب الفعلي (Cases & EGP)'),
+            label: Text('المحقق (ج.م / كرتونة)'),
           ),
           const DataColumn(
             numeric: true,
-            label: Text('المتبقي المطلوب توريده'),
+            label: Text('المتبقي'),
           ),
-          const DataColumn(label: Text('حالة الرصيد المتبقي')),
+          const DataColumn(label: Text('حالة المخزون')),
         ],
         rows: skus.map((s) {
           final isPositive = s.varianceRevenueEgp >= 0;
@@ -2808,14 +2791,14 @@ onChanged: m3Legacy<String>((v) {
                           ),
                           if (s.itemCode.isNotEmpty || s.barcode.isNotEmpty)
                             Text(
-                              'كود: ${s.itemCode.isNotEmpty ? s.itemCode : "-"} • باركود: ${s.barcode.isNotEmpty ? s.barcode : "-"} • شد $packUnits',
+                              'كود: ${s.itemCode.isNotEmpty ? s.itemCode : "-"} • باركود: ${s.barcode.isNotEmpty ? s.barcode : "-"} • $packUnits وحدة/كرتونة',
                               style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontFamily: 'monospace',                                 fontSize: M3FontSize.tinyPlus,                                 fontWeight: FontWeight.w700,                                 color: colorScheme.primary,                               )),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             )
                           else if (s.subCategory.isNotEmpty)
                             Text(
-                              '${s.subCategory} • شد $packUnits',
+                              '${s.subCategory} • $packUnits وحدة/كرتونة',
                               style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontSize: M3FontSize.labelSmall,                                 color: colorScheme.onSurfaceVariant,                               )),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -2880,7 +2863,7 @@ onChanged: m3Legacy<String>((v) {
                         style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                           fontWeight: FontWeight.w900,                           color: colorScheme.primary,                           fontSize: M3FontSize.labelMediumPlus,                         )),
                       ),
                       Text(
-                        '${CurrencyFormatter.formatNumber(targetPieces)} قطعة (شد $packUnits)',
+                        '${CurrencyFormatter.formatNumber(targetPieces)} قطعة ($packUnits وحدة/كرتونة)',
                         style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                           fontSize: M3FontSize.tinyPlus,                           fontWeight: FontWeight.w700,                           color: M3StatusColors.of(context).accents.tealStrong,                         )),
                       ),
                     ],
@@ -2908,7 +2891,7 @@ onChanged: m3Legacy<String>((v) {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      '${CurrencyFormatter.formatNumber(s.actualUnits.round())} كرتونة (${CurrencyFormatter.formatNumber(actualPieces)} ق)',
+                      '${CurrencyFormatter.formatNumber(s.actualUnits.round())} كرتونة (${CurrencyFormatter.formatNumber(actualPieces)} وحدة)',
                       style: M3TextVariants.cellPlusHeavy,
                     ),
                     Text(
@@ -2947,7 +2930,7 @@ onChanged: m3Legacy<String>((v) {
                     borderRadius: M3Shape.radiusSm,
                   ),
                   child: Text(
-                    '${s.stockStatusAr} (${s.remainingStockCases.round()} ك)',
+                    '${s.stockStatusAr} (${s.remainingStockCases.round()} كرتونة)',
                     style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                       fontWeight: FontWeight.w800,                       fontSize: M3FontSize.labelSmallPlus,                       color: stockColor,                     )),
                   ),
                 ),
@@ -2970,7 +2953,7 @@ onChanged: m3Legacy<String>((v) {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          'صفحة ${currentPage + 1} من $totalPages (إجمالي $totalItems صنف)',
+          'صفحة ${currentPage + 1} من $totalPages • $totalItems صنف',
           style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w700, fontSize: M3FontSize.bodySmallPlus)),
         ),
         Row(
@@ -3008,14 +2991,14 @@ onChanged: m3Legacy<String>((v) {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'أولاً: كوتة وتارجت مناديب المبيعات ومسؤولي السلاسل المحسوبة تلقائياً (${target.salesRepQuotas.length} مندوب)',
+          'مستهدف المناديب (${target.salesRepQuotas.length})',
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w900,
           ),
         ),
         const SizedBox(height: 4.0),
         Text(
-          'يتم تجميع تارجت كل مندوب تلقائياً من حصص الفروع والأصناف المسندة إليه داخل السلسلة.',
+          'مستهدف المندوب = مجموع فروعه وأصنافه.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: colorScheme.onSurfaceVariant,
           ),
@@ -3028,7 +3011,7 @@ onChanged: m3Legacy<String>((v) {
               colorScheme.surfaceContainerHigh.withOpacity(0.55),
             ),
             columns: const [
-              DataColumn(label: Text('مندوب المبيعات (Sales Rep)')),
+              DataColumn(label: Text('مندوب المبيعات')),
               DataColumn(label: Text('الإقليم / المحافظة')),
               DataColumn(numeric: true, label: Text('عدد الفروع')),
               DataColumn(numeric: true, label: Text('حصة المندوب %')),
@@ -3064,14 +3047,14 @@ onChanged: m3Legacy<String>((v) {
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                         Text(
-                          'مسؤول السلاسل: ${r.kaOfficer}',
+                          'مسؤول كبار العملاء: ${r.kaOfficer}',
                           style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                             fontSize: M3FontSize.labelSmall,                             color: colorScheme.onSurfaceVariant,                           )),
                         ),
                       ],
                     ),
                   ),
                   DataCell(Text('${r.governorate} (${r.regionCode})')),
-                  DataCell(Text('${r.branchesCount} فروع')),
+                  DataCell(Text('${r.branchesCount} فرع')),
                   DataCell(Text('${r.sharePct.toStringAsFixed(1)}%')),
                   DataCell(
                     Text(
@@ -3114,7 +3097,7 @@ onChanged: m3Legacy<String>((v) {
         ),
         const SizedBox(height: 22.0),
         Text(
-          'ثانياً: توزيع تارجت السلسلة على العلامات التجارية والقطاعات (${target.brands.length} ماركة)',
+          'المستهدف حسب العلامة التجارية (${target.brands.length})',
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w900,
           ),
@@ -3208,14 +3191,14 @@ onChanged: m3Legacy<String>((v) {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'التوزيع الشهري الموسمي للمستهدف (${target.chainDisplayName} — ${target.year})',
+          'التوزيع الشهري (${target.chainDisplayName} — ${target.year})',
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w900,
           ),
         ),
         const SizedBox(height: 4.0),
         Text(
-          'يقوم النظام بتقسيم مستهدف السنة على الشهور حسب الأوزان الموسمية لسحب السلسلة ومقارنته بالمسحوبات الفعلية والمتوقع بنهاية الشهر (EXP).',
+          'يتوزّع المستهدف على الشهور حسب الموسم.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: colorScheme.onSurfaceVariant,
           ),
@@ -3241,15 +3224,15 @@ onChanged: m3Legacy<String>((v) {
               DataColumn(numeric: true, label: Text('الوزن (طن)')),
               DataColumn(
                 numeric: true,
-                label: Text('الفعلي المحقق (Actual EGP & Cases)'),
+                label: Text('المحقق (ج.م / كرتونة)'),
               ),
               DataColumn(
                 numeric: true,
-                label: Text('المتوقع لنهاية الشهر (EXP EGP)'),
+                label: Text('المتوقع لنهاية الشهر (ج.م)'),
               ),
               DataColumn(
                 numeric: true,
-                label: Text('الفجوة / الفرق (Variance)'),
+                label: Text('الفرق (ج.م)'),
               ),
               DataColumn(label: Text('نسبة التحقيق %')),
             ],

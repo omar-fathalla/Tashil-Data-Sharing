@@ -72,8 +72,8 @@ void main() {
         ),
       ),
     ));
-    expect(find.text('عروض ترويجية (1)'), findsOneWidget);
-    expect(find.text('بيع بأقل من التكلفة / حرق سعر (1)'), findsOneWidget);
+    expect(find.text('عروض (1)'), findsOneWidget);
+    expect(find.text('أقل من التكلفة (1)'), findsOneWidget);
     expect(find.byIcon(AppIcons.promo), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('sell_filter_chip_promo')));
     await tester.pump();

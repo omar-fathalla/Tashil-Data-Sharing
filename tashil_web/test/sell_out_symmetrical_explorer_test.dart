@@ -33,30 +33,30 @@ void main() {
       await tester.pumpAndSettle();
 
       // 1. Verify 4 Symmetrical Tabs (English Only) in SegmentedButton
-      expect(find.text('Sell-Out Data & Operations'), findsOneWidget);
-      expect(find.text('Performance & Branch Analytics'), findsOneWidget);
-      expect(find.text('Target Management (Sell-Out)'), findsOneWidget);
-      expect(find.textContaining('Uploaded Sheets'), findsOneWidget);
+      expect(find.text('Sales Data'), findsOneWidget);
+      expect(find.text('Store Performance'), findsOneWidget);
+      expect(find.text('Targets'), findsOneWidget);
+      expect(find.textContaining('Uploaded Files'), findsOneWidget);
 
       // 2. Verify 4 Executive KPI Cards on Tab 0
-      expect(find.text('إجمالي صافي المبيعات'), findsOneWidget);
-      expect(find.text('Total Net Revenue (EGP)'), findsOneWidget);
+      expect(find.text('صافي المبيعات'), findsOneWidget);
+      expect(find.text('Net Sales (EGP)'), findsOneWidget);
 
       expect(find.text('إجمالي الكمية المباعة'), findsOneWidget);
       expect(find.text('Total Units Sold'), findsOneWidget);
 
-      expect(find.text('الأصناف النشطة ومتوسط الفرع'), findsOneWidget);
-      expect(find.text('Active SKUs & Branch Velocity'), findsOneWidget);
+      expect(find.text('الأصناف النشطة'), findsOneWidget);
+      expect(find.text('Active SKUs'), findsOneWidget);
 
-      expect(find.text('إجمالي الفروع النشطة'), findsOneWidget);
-      expect(find.text('Active Stores & Outlets'), findsOneWidget);
+      expect(find.text('الفروع النشطة'), findsOneWidget);
+      expect(find.text('Active Stores'), findsOneWidget);
 
       // 2b. All 4 KPI cards share identical width, height and top/bottom edges
       final kpiRects = [
-        'Total Net Revenue (EGP)',
+        'Net Sales (EGP)',
         'Total Units Sold',
-        'Active SKUs & Branch Velocity',
-        'Active Stores & Outlets',
+        'Active SKUs',
+        'Active Stores',
       ].map((t) => tester.getRect(find.byKey(ValueKey('kpi_card_$t')))).toList();
       for (final r in kpiRects.skip(1)) {
         expect(r.height, closeTo(kpiRects.first.height, 0.5));
@@ -67,8 +67,8 @@ void main() {
 
       // 3. Verify Full-Width Branch Sales Ranking Chart with Year 2026 Default & Two-Row Layout
       expect(find.byKey(const ValueKey('full_width_branch_sales_chart')), findsOneWidget);
-      expect(find.text('شارت ترتيب مبيعات فروع السلسلة من الأعلى للأقل'), findsOneWidget);
-      expect(find.text('Branch Sales Ranking Chart'), findsOneWidget);
+      expect(find.text('ترتيب الفروع حسب المبيعات'), findsOneWidget);
+      expect(find.text('Store Ranking by Sales'), findsOneWidget);
       // Vertical columns mode is removed entirely; chart starts collapsed.
       expect(find.textContaining('الصف الأول: الفروع الأعلى مبيعاً'), findsNothing);
       expect(find.byKey(const ValueKey('branch_chart_layout_toggle')), findsNothing);
@@ -164,18 +164,18 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to Tab 1
-      await tester.tap(find.text('Performance & Branch Analytics'));
+      await tester.tap(find.text('Store Performance'));
       await tester.pumpAndSettle();
 
       // Verify Tab 1 KPI Cards
-      expect(find.text('أعلى صنف مبيعاً'), findsOneWidget);
-      expect(find.text('Top Performing SKU'), findsOneWidget);
-      expect(find.text('مؤشر باريتو (Pareto 80/20)'), findsOneWidget);
-      expect(find.text('Top 20% SKU Revenue Share'), findsOneWidget);
-      expect(find.text('أعلى فرع مبيعاً'), findsOneWidget);
-      expect(find.text('Top Revenue Branch'), findsOneWidget);
+      expect(find.text('الصنف الأعلى مبيعًا'), findsOneWidget);
+      expect(find.text('Top SKU'), findsOneWidget);
+      expect(find.text('حصة أعلى 20% من الأصناف'), findsOneWidget);
+      expect(find.text("Top 20% SKUs' Share"), findsOneWidget);
+      expect(find.text('الفرع الأعلى مبيعًا'), findsOneWidget);
+      expect(find.text('Top Store'), findsOneWidget);
       expect(find.text('متوسط مبيعات الفرع'), findsOneWidget);
-      expect(find.text('Average Store Velocity'), findsOneWidget);
+      expect(find.text('Avg. Sales per Store'), findsOneWidget);
 
       // Verify Tab 1 Year (2026 Default) and Month Filter Dropdowns
       expect(find.byKey(const ValueKey('perf_year_dropdown')), findsOneWidget);
@@ -185,11 +185,11 @@ void main() {
       expect(find.text('كل الشهور'), findsWidgets);
 
       // Verify Tables (SKU Pareto Breakdown table was removed and replaced with Branch YoY & MoM Growth Matrix)
-      expect(find.textContaining('Branch Sales Velocity'), findsOneWidget);
+      expect(find.text('أداء الفروع'), findsWidgets);
       expect(find.textContaining('SKU Pareto Breakdown'), findsNothing);
       expect(find.byKey(const ValueKey('branch_growth_matrix_section')), findsOneWidget);
-      expect(find.textContaining('مقارنة نمو وتراجع الفروع سنوياً وشهرياً'), findsOneWidget);
-      expect(find.textContaining('Branch YoY & MoM Growth Matrix'), findsOneWidget);
+      expect(find.textContaining('نمو الفروع: '), findsOneWidget);
+      expect(find.textContaining('نمو الفروع (سنوي وشهري)'), findsOneWidget);
     });
 
     testWidgets('switches to Tab 2 (Target Management) and renders TargetManagementPanel',
@@ -212,13 +212,13 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to Tab 2
-      await tester.tap(find.text('Target Management (Sell-Out)'));
+      await tester.tap(find.text('Targets'));
       await tester.pumpAndSettle();
 
       expect(find.byKey(ValueKey('sell_out_targets_${apiClient.tenantId}')), findsOneWidget);
 
       // Open Add Target Manually dialog and verify dynamic future years formula (2026, 2027, 2028)
-      await tester.tap(find.text('Add Target Manually'));
+      await tester.tap(find.text('إضافة مستهدف').first);
       await tester.pumpAndSettle();
 
       final yearDropdown = find.byKey(const ValueKey('target_dialog_year_dropdown'));
@@ -252,16 +252,16 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to Tab 3
-      final tab3Finder = find.textContaining('Uploaded Sheets');
+      final tab3Finder = find.textContaining('Uploaded Files');
       await tester.ensureVisible(tab3Finder);
       await tester.tap(tab3Finder);
       await tester.pumpAndSettle();
 
       // Verify Upload Banner & Controls
-      expect(find.textContaining('إدارة شيتات الإكسيل المرفوعة للـ Sell-Out'), findsOneWidget);
-      expect(find.text('Upload Sell Out'), findsOneWidget);
-      expect(find.text('تحديث القائمة'), findsOneWidget);
-      expect(find.text('Target Chain'), findsWidgets);
+      expect(find.textContaining('ملفات Sell-Out المرفوعة'), findsOneWidget);
+      expect(find.text('رفع ملف Sell-Out'), findsOneWidget);
+      expect(find.text('تحديث'), findsOneWidget);
+      expect(find.text('السلسلة'), findsWidgets);
     });
 
     test('parses enriched SellOutRecordModel, SellOutSkuSummaryModel, and SellOutRecordsSummaryModel accurately', () {

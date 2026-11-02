@@ -44,9 +44,9 @@ void main() {
       expect(find.byKey(const ValueKey('sellout_date_range_chip')), findsOneWidget);
       expect(find.byKey(const ValueKey('export_excel_button')), findsOneWidget);
       expect(find.byKey(const ValueKey('export_pdf_button')), findsOneWidget);
-      expect(find.text('Search SKU or Barcode...'), findsOneWidget);
+      expect(find.text('ابحث بالصنف أو الباركود'), findsOneWidget);
       // DropdownMenu also lays out its entries offstage for sizing.
-      expect(find.text('All Chains'), findsWidgets);
+      expect(find.text('كل السلاسل'), findsWidgets);
 
       // Tap export buttons to ensure callbacks fire
       await tester.tap(find.byKey(const ValueKey('export_excel_button')));
@@ -162,9 +162,9 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('sellout_chain_dropdown')));
       await tester.pumpAndSettle();
 
-      // Verify English names exist without Arabic parentheses
-      expect(find.text('Beet El-Gomla'), findsWidgets);
-      expect(find.text('Institutions'), findsWidgets);
+      // Verify single-language (Arabic) names without parentheses
+      expect(find.text('بيت الجملة'), findsWidgets);
+      expect(find.text('المؤسسات'), findsWidgets);
       expect(find.text('Beet El-Gomla (بيت الجملة)'), findsNothing);
       expect(find.text('Institutions (قطاع المؤسسات)'), findsNothing);
     });
@@ -205,12 +205,13 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      // Barcode dialog should be displayed with camera capture button
-      expect(find.text('Smart Barcode Scanner'), findsOneWidget);
-      expect(find.byKey(const ValueKey('scanner_simulate_capture_button')), findsOneWidget);
+      // Barcode dialog should be displayed with manual barcode entry (no demo barcodes)
+      expect(find.text('امسح الباركود'), findsOneWidget);
+      expect(find.byKey(const ValueKey('scanner_simulate_capture_button')), findsNothing);
+      expect(find.text('Quick Scan Catalog Barcodes:'), findsNothing);
 
-      // Tap simulate capture button
-      await tester.tap(find.byKey(const ValueKey('scanner_simulate_capture_button')));
+      await tester.enterText(find.byKey(const ValueKey('scanner_manual_barcode_field')), '99069570');
+      await tester.tap(find.byKey(const ValueKey('scanner_manual_submit_button')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pumpAndSettle();

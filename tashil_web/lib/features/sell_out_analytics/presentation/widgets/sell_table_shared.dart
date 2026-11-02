@@ -85,7 +85,7 @@ class SellActionButtons {
             const SizedBox(width: 5.0),
             Flexible(
               child: Text(
-                'Print PDF',
+                'طباعة',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelMedium?.copyWith(
@@ -128,7 +128,7 @@ class SellActionButtons {
             const SizedBox(width: 5.0),
             Flexible(
               child: Text(
-                'Export Excel',
+                'تصدير',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelMedium?.copyWith(
@@ -213,7 +213,7 @@ class SellTableFilterChips extends StatelessWidget {
         SellTableFilterOption(value: 'all', label: 'الكل', count: all),
         SellTableFilterOption(
             value: 'healthy',
-            label: 'هامش صحي',
+            label: 'هامش جيد',
             count: healthy,
             icon: AppIcons.trendingUp),
         SellTableFilterOption(
@@ -223,12 +223,12 @@ class SellTableFilterChips extends StatelessWidget {
             icon: AppIcons.warning),
         SellTableFilterOption(
             value: 'negative_margin',
-            label: 'بيع بأقل من التكلفة / حرق سعر',
+            label: 'أقل من التكلفة',
             count: negativeMargin,
             icon: AppIcons.error),
         SellTableFilterOption(
             value: 'promo',
-            label: 'عروض ترويجية',
+            label: 'عروض',
             count: promo,
             icon: AppIcons.promo),
       ];

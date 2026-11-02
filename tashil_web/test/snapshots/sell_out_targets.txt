@@ -20,95 +20,95 @@
 2028 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Actual Sell-Out (EGP) | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 Actual Sell-Out (EGP) | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
-Add Target Manually | 14.5 | FontWeight.w700 | ffffffff | null | null
-Add Target Manually | 14.5 | FontWeight.w700 | ffffffff | null | null
-Add Target Manually | 14.5 | FontWeight.w700 | ffffffff | null | null
-All Chains (كل السلاسل) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Chains (كل السلاسل) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Years | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Years | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Beet El Gomla (بيت الجملة) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Beet El Gomla (بيت الجملة) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Carrefour (كارفور) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Carrefour (كارفور) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-El Wakala (الوكالة) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-El Wakala (الوكالة) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Excel Template | 14.5 | FontWeight.w700 | ff1565c0 | null | null
-Excel Template | 14.5 | FontWeight.w700 | ff1565c0 | null | null
-Excel Template | 14.5 | FontWeight.w700 | ff1565c0 | null | null
-Export Report | 14.5 | FontWeight.w700 | ff1565c0 | null | null
-Export Report | 14.5 | FontWeight.w700 | ff1565c0 | null | null
-Export Report | 14.5 | FontWeight.w700 | ff1565c0 | null | null
-Fathalla Market (أسواق فتح الله) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Fathalla Market (أسواق فتح الله) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Gomla Market (جملة ماركت) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Gomla Market (جملة ماركت) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Overall Achievement % | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 Overall Achievement % | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
-Performance & Branch Analytics | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Performance & Branch Analytics | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Retail Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Retail Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Retail Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Retail Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Retail Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Retail Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Retail Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Sell-Out Analytics, Branch Performance & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-Out Analytics, Branch Performance & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-Out Analytics, Branch Performance & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-Out Data & Operations | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Sell-Out Data & Operations | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Spinneys (سبينيس) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Spinneys (سبينيس) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Target Management (Sell-Out) | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
-Target Management (Sell-Out) | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
-Target Sell-Out (EGP) | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
-Target Sell-Out (EGP) | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
-Target Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Target Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Target Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Target Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Target Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Target Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Target Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Upload Target Excel | 14.5 | FontWeight.w700 | ff404659 | null | null
-Upload Target Excel | 14.5 | FontWeight.w700 | ff404659 | null | null
-Upload Target Excel | 14.5 | FontWeight.w700 | ff404659 | null | null
-Uploaded Sheets (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Uploaded Sheets (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Variance & Scope Coverage | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
-Variance & Scope Coverage | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
-إجمالي مستهدف المبيعات | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-إجمالي مستهدف المبيعات | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-إضافة Target يدوياً | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
-إضافة Target يدوياً | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
-إضافة Target يدوياً | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
-اضغط على "إضافة Target يدوياً" أو قم برفع شيت إكسيل المستهدفات ليقوم النظام بمقارنته تلقائياً مع الأرقام الفعلية وحساب نسبة التحقيق. | 13.0 | FontWeight.w400 | ff45464f | 0.25 | 1.5
-اضغط على "إضافة Target يدوياً" أو قم برفع شيت إكسيل المستهدفات ليقوم النظام بمقارنته تلقائياً مع الأرقام الفعلية وحساب نسبة التحقيق. | 13.0 | FontWeight.w400 | ff45464f | 0.25 | 1.5
-الفجوة / الفرق في المبيعات | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-الفجوة / الفرق في المبيعات | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-المحقق الفعلي للمبيعات | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-المحقق الفعلي للمبيعات | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-فائض فوق المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
-فائض فوق المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
-فائض فوق المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
-لم يتم تسجيل مستهدفات مبيعات (Sell-Out Targets) لهذه الفترة بعد | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
-لم يتم تسجيل مستهدفات مبيعات (Sell-Out Targets) لهذه الفترة بعد | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
-منظومة مبيعات التجزئة (Sell-Out)، تحليلات باريتو وأداء الفروع، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
-منظومة مبيعات التجزئة (Sell-Out)، تحليلات باريتو وأداء الفروع، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
-منظومة مبيعات التجزئة (Sell-Out)، تحليلات باريتو وأداء الفروع، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+Sales Data | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Sales Data | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Sell-Out Target (EGP) | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
+Sell-Out Target (EGP) | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
+Sell-Out | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Sell-Out | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Sell-Out | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Store Performance | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Store Performance | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Targets | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
+Targets | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
+Uploaded Files (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Uploaded Files (3) | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+Variance | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
+Variance | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
+أسواق فتح الله | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+أسواق فتح الله | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+أضف مستهدفًا أو ارفع ملف المستهدفات لمقارنته بالمحقق. | 13.0 | FontWeight.w400 | ff45464f | 0.25 | 1.5
+أضف مستهدفًا أو ارفع ملف المستهدفات لمقارنته بالمحقق. | 13.0 | FontWeight.w400 | ff45464f | 0.25 | 1.5
+أقل من المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+أقل من المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+أقل من المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+إضافة مستهدف | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
+إضافة مستهدف | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
+إضافة مستهدف | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
+إضافة مستهدف | 14.5 | FontWeight.w700 | ffffffff | null | null
+إضافة مستهدف | 14.5 | FontWeight.w700 | ffffffff | null | null
+إضافة مستهدف | 14.5 | FontWeight.w700 | ffffffff | null | null
+السلسلة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السلسلة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السلسلة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السنة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السنة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السنة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السنة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السنة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السنة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السنة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+الفرق | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
+الفرق | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
+المحقق (Sell-Out) | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
+المحقق (Sell-Out) | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
+الوكالة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+الوكالة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+بيت الجملة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+بيت الجملة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+تصدير | 14.5 | FontWeight.w700 | ff1565c0 | null | null
+تصدير | 14.5 | FontWeight.w700 | ff1565c0 | null | null
+تصدير | 14.5 | FontWeight.w700 | ff1565c0 | null | null
+تنزيل القالب | 14.5 | FontWeight.w700 | ff1565c0 | null | null
+تنزيل القالب | 14.5 | FontWeight.w700 | ff1565c0 | null | null
+تنزيل القالب | 14.5 | FontWeight.w700 | ff1565c0 | null | null
+جملة ماركت | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+جملة ماركت | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+رفع ملف المستهدفات | 14.5 | FontWeight.w700 | ff404659 | null | null
+رفع ملف المستهدفات | 14.5 | FontWeight.w700 | ff404659 | null | null
+رفع ملف المستهدفات | 14.5 | FontWeight.w700 | ff404659 | null | null
+سبينيس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+سبينيس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+فوق المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+فوق المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+فوق المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+كارفور | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كارفور | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السلاسل | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السلاسل | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السنوات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السنوات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+لا توجد مستهدفات لهذه الفترة بعد. | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
+لا توجد مستهدفات لهذه الفترة بعد. | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
+مبيعات السلاسل للمستهلك وأداء الفروع والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+مبيعات السلاسل للمستهلك وأداء الفروع والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+مبيعات السلاسل للمستهلك وأداء الفروع والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+مستهدف Sell-Out | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
+مستهدف Sell-Out | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
 نسبة التحقيق الإجمالية | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
 نسبة التحقيق الإجمالية | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-يحتاج لتنشيط للوصول للمستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
-يحتاج لتنشيط للوصول للمستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
-يحتاج لتنشيط للوصول للمستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
-• Action Required | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
-• Action Required | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
+• Above target | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
+• Above target | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
 • Actual Units | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
 • Actual Units | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
-• Surplus Above Target | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
-• Surplus Above Target | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
+• Below target | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
+• Below target | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
 • Target Units | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
 • Target Units | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
 󰂚 | 22.0 | null | ffba1a1a | null | 1.0

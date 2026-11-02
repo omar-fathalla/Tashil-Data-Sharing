@@ -22,38 +22,12 @@
 2028 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Actual Sell-In (EGP) | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 Actual Sell-In (EGP) | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
-All Chains (كل السلاسل) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Chains (كل السلاسل) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Years | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Years | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Beet El Gomla (بيت الجملة) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Beet El Gomla (بيت الجملة) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Carrefour (كارفور) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Carrefour (كارفور) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Comprehensive Target Sell-In | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
-Comprehensive Target Sell-In | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 Data & Operation | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 Data & Operation | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
-El Wakala (الوكالة) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-El Wakala (الوكالة) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Excel Template | 14.5 | FontWeight.w700 | ff1565c0 | null | null
-Excel Template | 14.5 | FontWeight.w700 | ff1565c0 | null | null
-Excel Template | 14.5 | FontWeight.w700 | ff1565c0 | null | null
-Fathalla Market (أسواق فتح الله) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Fathalla Market (أسواق فتح الله) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Gomla Market (جملة ماركت) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Gomla Market (جملة ماركت) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Overall Achievement % | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 Overall Achievement % | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 Remaining Stock and Reorder | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 Remaining Stock and Reorder | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
-Retail Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Retail Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Retail Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Retail Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Retail Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Retail Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Retail Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Sell In | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
 Sell In | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
 Sell In | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
@@ -63,65 +37,88 @@ Sell In · Sell Out | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
 Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
 Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
 Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Spinneys (سبينيس) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Spinneys (سبينيس) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+Sell-In Target | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
+Sell-In Target | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 Target Management | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
 Target Management | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
-Target Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Target Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Target Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Target Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Target Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Target Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Target Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Upload Target Excel | 14.5 | FontWeight.w700 | ff404659 | null | null
-Upload Target Excel | 14.5 | FontWeight.w700 | ff404659 | null | null
-Upload Target Excel | 14.5 | FontWeight.w700 | ff404659 | null | null
 Uploaded Sheets | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
 Uploaded Sheets | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
-Variance & Scope Coverage | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
-Variance & Scope Coverage | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
-إجمالي مستهدف التوريد الشامل | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-إجمالي مستهدف التوريد الشامل | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-إدخال Target شامل جديد للسلسلة | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
-إدخال Target شامل جديد للسلسلة | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
-إدخال Target شامل جديد للسلسلة | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
-إضافة Target شامل (Chain → Branch → SKU) | 14.5 | FontWeight.w700 | ffffffff | null | null
-إضافة Target شامل (Chain → Branch → SKU) | 14.5 | FontWeight.w700 | ffffffff | null | null
-إضافة Target شامل (Chain → Branch → SKU) | 14.5 | FontWeight.w700 | ffffffff | null | null
-ابدأ الآن بإنشاء الـ Target الشامل للسلسلة (السلسلة ← الفروع ← الأصناف) | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
-ابدأ الآن بإنشاء الـ Target الشامل للسلسلة (السلسلة ← الفروع ← الأصناف) | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
-الفجوة ونطاق التغطية الشامل | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-الفجوة ونطاق التغطية الشامل | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-المحقق الفعلي للتوريد | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-المحقق الفعلي للتوريد | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-بمجرد إدخال اسم السلسلة والسنة والقيمة المستهدفة (أو الكمية بالكرتونة) وترك الباقي مفتوحاً، سيقوم النظام تلقائياً بتوليد خريطة مستهدفات شاملة توضح المطلوب من كل فرع من فروع السلسلة، وكمية البضاعة المطلوبة من كل صنف داخل كل فرع، وإجمالي البضاعة للسلسلة بالكامل. | 13.0 | FontWeight.w400 | ff45464f | 0.25 | 1.5
-بمجرد إدخال اسم السلسلة والسنة والقيمة المستهدفة (أو الكمية بالكرتونة) وترك الباقي مفتوحاً، سيقوم النظام تلقائياً بتوليد خريطة مستهدفات شاملة توضح المطلوب من كل فرع من فروع السلسلة، وكمية البضاعة المطلوبة من كل صنف داخل كل فرع، وإجمالي البضاعة للسلسلة بالكامل. | 13.0 | FontWeight.w400 | ff45464f | 0.25 | 1.5
-تجربة سريعة: Target شامل لأسواق فتح الله (2026) | 14.0 | FontWeight.w600 | ff404659 | 0.1 | null
-تجربة سريعة: Target شامل لأسواق فتح الله (2026) | 14.0 | FontWeight.w600 | ff404659 | 0.1 | null
-تجربة سريعة: Target شامل لأسواق فتح الله (2026) | 14.0 | FontWeight.w600 | ff404659 | 0.1 | null
-تصدير التارجت الشامل Excel | 14.5 | FontWeight.w700 | ff1565c0 | null | null
-تصدير التارجت الشامل Excel | 14.5 | FontWeight.w700 | ff1565c0 | null | null
-تصدير التارجت الشامل Excel | 14.5 | FontWeight.w700 | ff1565c0 | null | null
-فائض فوق المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
-فائض فوق المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
-فائض فوق المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+Variance | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
+Variance | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
+أسواق فتح الله | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+أسواق فتح الله | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+أضف مستهدفًا للسلسلة وسنوزّعه تلقائيًا على الفروع والأصناف. | 13.0 | FontWeight.w400 | ff45464f | 0.25 | 1.5
+أضف مستهدفًا للسلسلة وسنوزّعه تلقائيًا على الفروع والأصناف. | 13.0 | FontWeight.w400 | ff45464f | 0.25 | 1.5
+أقل من المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+أقل من المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+أقل من المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+إضافة مستهدف | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
+إضافة مستهدف | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
+إضافة مستهدف | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
+إضافة مستهدف | 14.5 | FontWeight.w700 | ffffffff | null | null
+إضافة مستهدف | 14.5 | FontWeight.w700 | ffffffff | null | null
+إضافة مستهدف | 14.5 | FontWeight.w700 | ffffffff | null | null
+السلسلة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السلسلة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السلسلة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السنة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السنة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السنة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
+السنة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السنة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السنة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+السنة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+الفرق | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
+الفرق | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
+المحقق (Sell-In) | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
+المحقق (Sell-In) | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
+الوكالة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+الوكالة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+بيت الجملة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+بيت الجملة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+تصدير | 14.5 | FontWeight.w700 | ff1565c0 | null | null
+تصدير | 14.5 | FontWeight.w700 | ff1565c0 | null | null
+تصدير | 14.5 | FontWeight.w700 | ff1565c0 | null | null
+تنزيل القالب | 14.5 | FontWeight.w700 | ff1565c0 | null | null
+تنزيل القالب | 14.5 | FontWeight.w700 | ff1565c0 | null | null
+تنزيل القالب | 14.5 | FontWeight.w700 | ff1565c0 | null | null
+جملة ماركت | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+جملة ماركت | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+رفع ملف المستهدفات | 14.5 | FontWeight.w700 | ff404659 | null | null
+رفع ملف المستهدفات | 14.5 | FontWeight.w700 | ff404659 | null | null
+رفع ملف المستهدفات | 14.5 | FontWeight.w700 | ff404659 | null | null
+سبينيس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+سبينيس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+فوق المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+فوق المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+فوق المستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
+كارفور | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كارفور | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السلاسل | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السلاسل | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السنوات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السنوات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+لا توجد مستهدفات لهذه الفترة بعد. | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
+لا توجد مستهدفات لهذه الفترة بعد. | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
+مستهدف Sell-In | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
+مستهدف Sell-In | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
 منظومة التوريد للسلاسل التجارية (Sell-In)، حساب الأرصدة المتبقية (Sell-In − Sell-Out)، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
 منظومة التوريد للسلاسل التجارية (Sell-In)، حساب الأرصدة المتبقية (Sell-In − Sell-Out)، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
 منظومة التوريد للسلاسل التجارية (Sell-In)، حساب الأرصدة المتبقية (Sell-In − Sell-Out)، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
 نسبة التحقيق الإجمالية | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
 نسبة التحقيق الإجمالية | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-يحتاج لتنشيط للوصول للمستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
-يحتاج لتنشيط للوصول للمستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
-يحتاج لتنشيط للوصول للمستهدف | 12.0 | FontWeight.w700 | ff45464f | 0.4 | 1.33
-• Action Required | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
-• Action Required | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
+• Above target | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
+• Above target | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
 • Actual Cases | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
 • Actual Cases | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
+• Below target | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
+• Below target | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
 • Gross w/ Buffer: 0 Cases | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
 • Gross w/ Buffer: 0 Cases | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
-• Surplus Above Target | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
-• Surplus Above Target | 11.0 | FontWeight.w400 | b345464f | 0.4 | 1.33
 󰂚 | 22.0 | null | ffba1a1a | null | 1.0
 󰈑 | 20.0 | null | ff1565c0 | null | 1.0
 󰉈 | 20.0 | null | ff404659 | null | 1.0
@@ -137,7 +134,6 @@ Variance & Scope Coverage | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
  | 18.0 | null | ff45464f | null | 1.0
  | 24.0 | null | ff45464f | null | 1.0
  | 24.0 | null | ff45464f | null | 1.0
- | 18.0 | null | ff404659 | null | 1.0
  | 20.0 | null | ff1565c0 | null | 1.0
  | 22.0 | null | ff00796b | null | 1.0
  | 20.0 | null | ff45464f | null | 1.0
