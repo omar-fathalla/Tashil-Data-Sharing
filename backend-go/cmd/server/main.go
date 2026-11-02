@@ -19,6 +19,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 	"github.com/tashil/data-sharing/backend/internal/service/dataquality"
 	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
+	"github.com/tashil/data-sharing/backend/internal/service/customers"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
@@ -58,6 +59,18 @@ func main() {
 		dqService.OnSourceChanged()
 	})
 	bqRepo.OnSourceChange(dqService.OnSourceChanged)
+	// Sell-In customer registry: only exact or admin-approved names count; unknown names are quarantined.
+	customerRegistry := customers.New(fsRepo)
+	ingestProcessor.SetCustomerRegistry(customerRegistry)
+	ingestProcessor.OnUploadIssues(func(ctx context.Context, tenantID, filename string, unknown []ingestion.UnknownBarcode) {
+		items := make([]dataquality.UnknownItem, 0, len(unknown))
+		for _, u := range unknown {
+			items = append(items, dataquality.UnknownItem{ItemCode: u.ItemCode, Barcode: u.Barcode, ItemName: u.ItemName, Rows: u.Rows, Value: u.Value})
+		}
+		if err := dqService.RecordSellInUnknownItems(ctx, tenantID, filename, items); err != nil {
+			log.Printf("[data-quality] unknown items for %s: %v", filename, err)
+		}
+	})
 
 	// Durable BigQuery persistence of uploaded sheets (off unless BIGQUERY_SINK_ENABLED=true)
 	sink := bqsink.New(context.Background(), bqsink.ConfigFromEnv(cfg.ProjectID, cfg.BigQueryDataset))
@@ -108,6 +121,7 @@ func main() {
 		tbq := bigquery.NewClient(cfg.ProjectID, cfg.BigQueryDataset, true)
 		tfs := firestore.NewClient(cfg.FirestoreDatabase, true)
 		tp := ingestion.NewProcessor(geminiAgent, tbq, tfs).WithArchiveDir(archDir)
+		tp.SetCustomerRegistry(customerRegistry)
 		_ = tp.ClearTenantData(ctx, "all")
 		if err := tp.ReplayArchivedFilesToDatabase(ctx); err != nil {
 			return nil, nil, err
@@ -177,6 +191,7 @@ func main() {
 	competitorHandler := handlers.NewCompetitorHandler(fsRepo, fsRepo)
 	chainDiscountHandler := handlers.NewChainDiscountHandler(fsRepo, fsRepo, bqRepo)
 	dataQualityHandler := handlers.NewDataQualityHandler(dqService, fsRepo)
+	customerRegistryHandler := handlers.NewCustomerRegistryHandler(ingestProcessor, fsRepo)
 
 	// 5. Setup Mux Router (Go 1.22+ method + path patterns)
 	mux := http.NewServeMux()
@@ -242,6 +257,11 @@ func main() {
 	mux.HandleFunc("GET /api/v1/data-quality/issues", dataQualityHandler.HandleListIssues)
 	mux.HandleFunc("PATCH /api/v1/data-quality/issues/{id}", dataQualityHandler.HandlePatchStatus)
 	mux.HandleFunc("GET /api/v1/data-quality/summary", dataQualityHandler.HandleSummary)
+	mux.HandleFunc("GET /api/v1/customers/registry", customerRegistryHandler.HandleList)
+	mux.HandleFunc("POST /api/v1/customers/registry/approve", customerRegistryHandler.HandleApprove)
+	mux.HandleFunc("POST /api/v1/customers/registry/reject", customerRegistryHandler.HandleReject)
+	mux.HandleFunc("POST /api/v1/customers/registry/unmerge", customerRegistryHandler.HandleUnmerge)
+	mux.HandleFunc("GET /api/v1/sell-in/years", customerRegistryHandler.HandleYears)
 	mux.HandleFunc("GET /api/v1/analytics/oos-monitor", oosHandler.HandleOOSMonitor)
 	mux.HandleFunc("GET /api/v1/stores", storeHandler.HandleGetStores)
 	mux.HandleFunc("GET /api/v1/tenants", storeHandler.HandleGetTenants)

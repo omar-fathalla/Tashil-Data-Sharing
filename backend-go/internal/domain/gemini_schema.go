@@ -173,6 +173,11 @@ type NormalizedRecord struct {
 	UnitPrice        float64 `json:"unit_price,omitempty"`
 	RecommendedPrice float64 `json:"recommended_price,omitempty"`
 	TransactionDate  string  `json:"transaction_date"` // YYYY-MM-DD
+	// DateFromFile is true when TransactionDate came from the workbook (a date/month cell or a month
+	// sheet), false when it was filled in (today / form period). QtyInvented marks a quantity that was
+	// estimated because the file had no quantity column. Neither is serialized.
+	DateFromFile bool `json:"-"`
+	QtyInvented  bool `json:"-"`
 }
 
 // DiscoveredSheetInfo describes a single worksheet/tab detected inside an Excel workbook.

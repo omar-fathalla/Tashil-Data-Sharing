@@ -16,6 +16,12 @@ const Map<String, String> kDqSourceLabels = {
   'sell_in': 'Sell-In',
 };
 
+/// Label for a data-quality source; Sell-In uploads use "sellin_upload:<file>".
+String dqSourceLabel(String source) {
+  if (source.startsWith('sellin_upload:')) return 'ملف توريد: ${source.substring('sellin_upload:'.length)}';
+  return kDqSourceLabels[source] ?? source;
+}
+
 double? _num(dynamic v) => v is num ? v.toDouble() : null;
 DateTime? _date(dynamic v) => v is String && v.isNotEmpty ? DateTime.tryParse(v) : null;
 

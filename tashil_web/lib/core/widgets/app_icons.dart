@@ -94,6 +94,9 @@ class AppIcons {
   static const IconData donutChart = Icons.donut_small_rounded;
   static const IconData filterAlt = Icons.filter_alt_rounded;
   static const IconData groups = Icons.groups_rounded;
+  static const IconData pendingCustomers = Icons.person_search_rounded;
+  static const IconData undo = Icons.undo_rounded;
+  static const IconData block = Icons.block_rounded;
   static const IconData collapseAll = Icons.unfold_less_rounded;
   static const IconData expandAll = Icons.unfold_more_rounded;
   static const IconData expandMore = Icons.expand_more_rounded;

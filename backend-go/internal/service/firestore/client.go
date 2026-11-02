@@ -1,6 +1,7 @@
 package firestore
 
 import (
+	"github.com/tashil/data-sharing/backend/internal/service/customers"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -93,6 +94,7 @@ type Client struct {
 	cdProfiles map[string]domain.ChainDiscountProfiles
 	dqMu       sync.RWMutex
 	dqStates   map[string]domain.DataQualityState
+	crMem      customers.MemoryStore // customer registry fallback when Firestore is not configured
 
 	dvMu         sync.Mutex
 	dataVersions map[string]string

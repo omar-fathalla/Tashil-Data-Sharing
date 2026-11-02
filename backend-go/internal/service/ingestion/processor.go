@@ -1,6 +1,9 @@
 package ingestion
 
 import (
+	"errors"
+
+	"github.com/tashil/data-sharing/backend/internal/service/customers"
 	"sync/atomic"
 	"context"
 	"fmt"
@@ -22,6 +25,11 @@ import (
 
 // IngestionResult contains the outcome of an ingestion operation returned to caller.
 type IngestionResult struct {
+	UploadWarnings       []UploadIssue                   `json:"upload_warnings,omitempty"`
+	QuarantinedCustomers []customers.QuarantinedCustomer `json:"quarantined_customers,omitempty"`
+	UnknownBarcodes      []UnknownBarcode                `json:"unknown_barcodes,omitempty"`
+	PeriodBreakdown      []MonthSlice                    `json:"period_breakdown,omitempty"`
+	ParseLayout          string                          `json:"parse_layout,omitempty"`
 	BatchID                string                                   `json:"batch_id"`
 	ArchiveID              string                                   `json:"archive_id,omitempty"`
 	ArchivedFile           *ArchivedFile                            `json:"archived_file,omitempty"`
@@ -86,6 +94,7 @@ type StagedUpload struct {
 	PrevArchivedFile       *ArchivedFile
 	PrevArchivedBytes      []byte
 	CreatedAt              time.Time
+	SheetMonths            []MonthSlice // Sell-Out months read from the workbook itself (period-conflict check at commit)
 }
 
 // Processor coordinates parsing, AI normalization, validation, staging, and multi-tenant persistence.
@@ -110,6 +119,20 @@ type Processor struct {
 	onRebuilt     func()
 
 	onProductMaster func(tenantID, filename string, raw []byte)
+
+	customers      *customers.Registry
+	onUploadIssues func(ctx context.Context, tenantID, filename string, unknown []UnknownBarcode)
+}
+
+// SetCustomerRegistry enables Sell-In customer quarantine (TOP RULE: exact approved names only).
+func (p *Processor) SetCustomerRegistry(r *customers.Registry) { p.customers = r }
+
+// CustomerRegistry returns the registry (nil when disabled).
+func (p *Processor) CustomerRegistry() *customers.Registry { return p.customers }
+
+// OnUploadIssues registers a hook that records upload findings (unknown barcodes) on the data-quality page.
+func (p *Processor) OnUploadIssues(fn func(ctx context.Context, tenantID, filename string, unknown []UnknownBarcode)) {
+	p.onUploadIssues = fn
 }
 
 // NewProcessor constructs a new ingestion processor.
@@ -235,6 +258,10 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 		targetChain = strings.TrimSpace(targetChains[0])
 	}
 
+	if err := formulaGuard(ctx, filename, fileBytes); err != nil {
+		return nil, err
+	}
+
 	// Auto-detect Adeco Product Master & Price List workbook (كارتة الأصناف والأسعار)
 	if gemini.IsProductMasterWorkbook(fileBytes) || strings.EqualFold(targetChain, "product-master") || strings.EqualFold(targetChain, "product_master") {
 		return p.ProcessProductMaster(ctx, tenantID, filename, fileBytes, dryRun)
@@ -292,9 +319,19 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 
 	payload.RetailerDetected = effectiveChain
 
+	if g, interactive := uploadGuards(ctx); interactive && targetChain == "" {
+		_ = g
+		return nil, chainRequiredError(discoveredChain)
+	}
+
 	requestedPeriodDate := gemini.GetRequestedPeriodDate(ctx)
-	if requestedPeriodDate != "" {
-		if len(payload.DetectedSheets) <= 1 || !payload.IsWideMatrixWorkbook {
+	sheetMonths := sellOutSheetMonths(payload.NormalizedRecords)
+	periodChoice, perr := sellOutPeriodChoice(ctx, requestedPeriodDate, sheetMonths)
+	if perr != nil {
+		return nil, perr
+	}
+	if requestedPeriodDate != "" && periodChoice != "sheet" {
+		if len(payload.DetectedSheets) <= 1 || !payload.IsWideMatrixWorkbook || periodChoice == "form" {
 			for i := range payload.NormalizedRecords {
 				payload.NormalizedRecords[i].TransactionDate = requestedPeriodDate
 			}
@@ -866,6 +903,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			DiscoveredStoreMap:     discoveredStoreMap,
 			OOSAlerts:              payload.ComputedOOSAlerts,
 			Result:                 res,
+			SheetMonths:            sheetMonths,
 			IsWideMatrix:           payload.IsWideMatrixWorkbook,
 			PrevArchivedFile:       prevArchivedFile,
 			PrevArchivedBytes:      prevArchivedBytes,
@@ -930,7 +968,11 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 	}
 	updatedArchived := p.UpdateArchivedFileByBatch(batchID, chainToUse, commitYear, commitMonth)
 
-	if requestedPeriodDate != "" && (staged.Result == nil || len(staged.Result.DetectedSheets) <= 1) {
+	commitChoice, cerr := sellOutPeriodChoice(ctx, requestedPeriodDate, staged.SheetMonths)
+	if cerr != nil && !staged.IsSellInPlan && !staged.IsProductMaster {
+		return nil, cerr
+	}
+	if requestedPeriodDate != "" && commitChoice != "sheet" && (staged.Result == nil || len(staged.Result.DetectedSheets) <= 1 || commitChoice == "form") {
 		for i := range staged.ValidFacts {
 			staged.ValidFacts[i].TransactionDate = requestedPeriodDate
 			supplierKey := strings.TrimSpace(staged.ValidFacts[i].Supplier)
@@ -1208,7 +1250,20 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		_ = p.fsRepo.UnmarkArchiveDeleted(ctx, tenantID, "", filename)
 	}
 
-	records, err := gemini.ParseSellInPlanWorkbook(tenantID, filename, fileBytes, targetChain)
+	if err := formulaGuard(ctx, filename, fileBytes); err != nil {
+		return nil, err
+	}
+	records, parseReport, err := gemini.ParseSellInPlanWorkbookWithReport(tenantID, filename, fileBytes, targetChain)
+	var layoutErr *gemini.SellInLayoutError
+	var periodErr *gemini.SellInPeriodError
+	if errors.As(err, &layoutErr) || errors.As(err, &periodErr) {
+		// A known layout with missing headers or unreadable months is rejected, never guessed by AI.
+		return nil, err
+	}
+	var warnings []UploadIssue
+	if parseReport != nil && parseReport.MonthCheck != "" {
+		warnings = append(warnings, UploadIssue{Code: "month_column_mismatch", Severity: "info", MessageAR: parseReport.MonthCheck})
+	}
 	if err != nil || len(records) == 0 {
 		// Intelligent fallback: use Gemini / Wide-Matrix multi-sheet parser so any Excel workbook format works seamlessly in Sell-In!
 		payload, aiErr := p.geminiAgent.AnalyzeAndNormalize(ctx, filename, fileBytes)
@@ -1229,23 +1284,26 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		records = make([]domain.SellInRecord, 0, len(payload.NormalizedRecords))
 		monthNamesEN := []string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
 		monthNamesAR := []string{"يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"}
+		badPeriod, noQty := 0, 0
+		var badSamples []string
 		for idx, nr := range payload.NormalizedRecords {
-			yr := 2026
-			mn := 1
-			if len(nr.TransactionDate) >= 7 {
-				if y, yErr := strconv.Atoi(nr.TransactionDate[:4]); yErr == nil && y >= 2020 {
-					yr = y
+			// No default year or month: a row without a real date rejects the file below.
+			yr, mn, okDate := gemini.ParseDateToken(nr.TransactionDate)
+			if !okDate || !nr.DateFromFile {
+				badPeriod++
+				if len(badSamples) < 5 {
+					badSamples = append(badSamples, fmt.Sprintf("%q", nr.TransactionDate))
 				}
-				if m, mErr := strconv.Atoi(nr.TransactionDate[5:7]); mErr == nil && m >= 1 && m <= 12 {
-					mn = m
-				}
+				continue
 			}
 			mEN := monthNamesEN[mn-1]
 			mAR := monthNamesAR[mn-1]
 			qtyCases := float64(nr.QuantitySold)
 			valEGP := nr.NetRevenue
-			if qtyCases == 0 && valEGP > 0 {
-				qtyCases = math.Max(1, math.Round((valEGP/420.0)*10)/10)
+			if (qtyCases == 0 && valEGP != 0) || nr.QtyInvented {
+				// Units are never derived from value (the old value/420 guess); the row keeps 0 units.
+				noQty++
+				qtyCases = 0
 			}
 			tons := math.Round(math.Abs(qtyCases)*0.012*10000) / 10000
 			stMeta := gemini.BuildBranchStoreMetadata(fbChain, nr.RawStoreName)
@@ -1283,6 +1341,29 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 				IngestedAt:         nowUTC,
 			})
 		}
+		if badPeriod > 0 {
+			return nil, fmt.Errorf("الملف %s اترفض ومفيش حاجة اتحفظت: %d صف من غير شهر وسنة واضحين (زي %s). اكتب التاريخ أو الشهر والسنة في كل صف وارفع الملف تاني",
+				filename, badPeriod, strings.Join(badSamples, "، "))
+		}
+		if noQty > 0 {
+			warnings = append(warnings, UploadIssue{Code: "missing_units", Severity: "warning", Count: noQty,
+				MessageAR: fmt.Sprintf("%d صف ليه قيمة من غير كمية. الكمية اتسابت صفر (مفيش كمية اتحسبت من القيمة).", noQty)})
+		}
+	}
+
+	if err := resolveSellInPeriod(ctx, records); err != nil {
+		return nil, err
+	}
+	if err := p.checkSellInPartialMonth(ctx, tenantID, filename, records); err != nil {
+		return nil, err
+	}
+	allRecords := records
+	records, quarantined, qIssue := p.quarantineSellIn(ctx, tenantID, filename, targetChain, records, true)
+	if qIssue != nil {
+		warnings = append(warnings, *qIssue)
+	}
+	if len(records) == 0 && len(allRecords) > 0 {
+		return nil, fmt.Errorf("كل صفوف الملف %s لعملاء مش متسجلين، فمفيش حاجة اتحسبت. أكد العملاء من شاشة «عملاء في انتظار التأكيد» والصفوف هتدخل من غير ما ترفع الملف تاني", filename)
 	}
 
 	effectiveChain := strings.ToLower(strings.TrimSpace(targetChain))
@@ -1292,19 +1373,6 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		} else {
 			effectiveChain = "fathalla"
 		}
-	}
-
-	requestedPeriodDate := gemini.GetRequestedPeriodDate(ctx)
-	var reqYear, reqMonth int
-	if len(requestedPeriodDate) >= 7 {
-		reqYear, _ = strconv.Atoi(requestedPeriodDate[:4])
-		reqMonth, _ = strconv.Atoi(requestedPeriodDate[5:7])
-	}
-
-	// Check how many distinct months exist in the file
-	rawMonthSet := make(map[string]bool)
-	for _, r := range records {
-		rawMonthSet[fmt.Sprintf("%04d-%02d", r.Year, r.MonthNum)] = true
 	}
 
 	batchID := fmt.Sprintf("batch_sellin_%s_%s", time.Now().Format("20060102150405"), uuid.New().String()[:8])
@@ -1317,25 +1385,12 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	samples := make([]domain.NormalizedRecord, 0, 12)
 	monthNums := make(map[int]bool)
 	yearCounts := make(map[int]int)
-	monthNamesEN := []string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
-	monthNamesAR := []string{"يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"}
-
 	for i := range records {
 		records[i].BatchID = batchID
 		records[i].SourceFilename = filename
 		records[i].RecordID = fmt.Sprintf("sellin_%s_%s_%d", tenantID, batchID, i+1)
 		if targetChain != "" && targetChain != "all" {
 			records[i].RetailerChain = effectiveChain
-		}
-		if len(rawMonthSet) <= 1 {
-			if reqYear >= 2020 {
-				records[i].Year = reqYear
-			}
-			if reqMonth >= 1 && reqMonth <= 12 {
-				records[i].MonthNum = reqMonth
-				records[i].MonthEN = monthNamesEN[reqMonth-1]
-				records[i].MonthAR = monthNamesAR[reqMonth-1]
-			}
 		}
 		rec := records[i]
 		if rec.Year >= 2020 {
@@ -1475,6 +1530,24 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		IsStaged:      dryRun,
 		IsCommitted:   !dryRun,
 	}
+	result.UploadWarnings = warnings
+	result.QuarantinedCustomers = quarantined
+	result.PeriodBreakdown = sellInBreakdown(records)
+	if parseReport != nil {
+		result.ParseLayout = parseReport.Layout
+	}
+	// reportUnknown runs after SetSellInRecords enriched the records with the Product Master.
+	reportUnknown := func() {
+		unknown, issue := unknownBarcodes(records)
+		if issue == nil {
+			return
+		}
+		result.UnknownBarcodes = unknown
+		result.UploadWarnings = append(result.UploadWarnings, *issue)
+		if !dryRun && p.onUploadIssues != nil {
+			p.onUploadIssues(ctx, tenantID, filename, unknown)
+		}
+	}
 
 	if dryRun {
 		p.stagedMu.Lock()
@@ -1494,12 +1567,14 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		}
 		p.stagedMu.Unlock()
 		_ = p.bqRepo.SetSellInRecords(ctx, tenantID, filename, records)
+		reportUnknown()
 		return result, nil
 	}
 
 	if err := p.bqRepo.SetSellInRecords(ctx, tenantID, filename, records); err != nil {
 		return nil, fmt.Errorf("failed to store sell-in records: %w", err)
 	}
+	reportUnknown()
 	result.BigQuerySync = p.sinkSellIn(ctx, bqsink.Meta{TenantID: tenantID, BatchID: batchID, ArchiveID: result.ArchiveID, SourceFile: filename}, records)
 	return result, nil
 }

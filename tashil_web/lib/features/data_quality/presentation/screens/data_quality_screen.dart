@@ -7,6 +7,7 @@ import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../data/data_quality_repository.dart';
+import '../../../customer_registry/presentation/pending_customers_screen.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 
 String _egp(double v) {
@@ -129,7 +130,7 @@ class _DataQualityScreenState extends State<DataQualityScreen> with DataRefreshM
       ],
       rows: _issues
           .map((i) => [
-                kDqSourceLabels[i.source] ?? i.source, i.typeLabel, i.severity, i.sheet, i.row, i.column,
+                dqSourceLabel(i.source), i.typeLabel, i.severity, i.sheet, i.row, i.column,
                 i.itemCode, i.barcode, i.itemName, i.foundValue, i.expectedValue,
                 i.impactEgp?.toStringAsFixed(2) ?? '', i.status, i.statusReason, _d(i.firstSeen), _d(i.resolvedAt),
               ])
@@ -163,6 +164,15 @@ class _DataQualityScreenState extends State<DataQualityScreen> with DataRefreshM
                   onPressed: _load,
                   icon: const Icon(AppIcons.refresh),
                 ),
+                if (widget.apiClient != null)
+                  IconButton(
+                    key: const ValueKey('dq_pending_customers'),
+                    tooltip: 'عملاء محتاجين تأكيد',
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => PendingCustomersScreen(apiClient: widget.apiClient),
+                    )),
+                    icon: const Icon(AppIcons.pendingCustomers),
+                  ),
                 const SizedBox(width: 4.0),
                 FilledButton.tonalIcon(
                   key: const ValueKey('dq_export'),
@@ -322,7 +332,7 @@ class _Filters extends StatelessWidget {
         value: filter.source,
         options: [
           const M3DropdownOption('', 'الكل'),
-          for (final s in sources) M3DropdownOption(s, kDqSourceLabels[s] ?? s),
+          for (final s in sources) M3DropdownOption(s, dqSourceLabel(s)),
         ],
         onChanged: (v) => onChanged(filter.copyWith(source: v)),
       ),

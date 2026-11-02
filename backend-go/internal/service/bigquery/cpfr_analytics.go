@@ -14,6 +14,16 @@ import (
 // merging cumulatively by (RetailerChain, Year, MonthNum) and SourceFilename so uploading a Sell-In file
 // month-by-month (e.g. Jan, then Feb, then Mar) preserves all previously uploaded months and chains.
 func (c *Client) SetSellInRecords(ctx context.Context, tenantID, filename string, records []domain.SellInRecord) error {
+	// A record without a real (year, month) is never stored: there is no default year or month.
+	bad := 0
+	for i := range records {
+		if records[i].Year <= 0 || records[i].MonthNum < 1 || records[i].MonthNum > 12 {
+			bad++
+		}
+	}
+	if bad > 0 {
+		return &SellInMissingPeriodError{Filename: filename, Rows: bad}
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.bumpSourceVersion()
@@ -47,16 +57,7 @@ func (c *Client) SetSellInRecords(ctx context.Context, tenantID, filename string
 		if strings.TrimSpace(records[i].SourceFilename) == "" {
 			records[i].SourceFilename = normFile
 		}
-		yr := records[i].Year
-		if yr <= 0 {
-			yr = 2026
-			records[i].Year = yr
-		}
-		mn := records[i].MonthNum
-		if mn <= 0 {
-			mn = 1
-			records[i].MonthNum = mn
-		}
+		yr, mn := records[i].Year, records[i].MonthNum
 		incomingChains[ch] = true
 		incomingPeriods[chainYearMonth{chain: ch, year: yr, month: mn}] = true
 	}
@@ -68,14 +69,7 @@ func (c *Client) SetSellInRecords(ctx context.Context, tenantID, filename string
 		if oldChain == "" {
 			oldChain = "fathalla"
 		}
-		oldYr := oldRec.Year
-		if oldYr <= 0 {
-			oldYr = 2026
-		}
-		oldMn := oldRec.MonthNum
-		if oldMn <= 0 {
-			oldMn = 1
-		}
+		oldYr, oldMn := oldRec.Year, oldRec.MonthNum
 		// Replace if same filename+chain was re-uploaded, OR if same (chain, year, month) is being updated
 		if normFile != "" && strings.EqualFold(strings.TrimSpace(oldRec.SourceFilename), normFile) && incomingChains[oldChain] {
 			continue
@@ -1842,4 +1836,14 @@ func extractMonthFromDate(dateStr string) int {
 
 func round2(v float64) float64 {
 	return math.Round(v*100.0) / 100.0
+}
+
+// SellInMissingPeriodError rejects a Sell-In write whose records have no real year or month.
+type SellInMissingPeriodError struct {
+	Filename string
+	Rows     int
+}
+
+func (e *SellInMissingPeriodError) Error() string {
+	return fmt.Sprintf("الملف %s فيه %d صف من غير شهر أو سنة واضحة، ومفيش حاجة اتحفظت", e.Filename, e.Rows)
 }
