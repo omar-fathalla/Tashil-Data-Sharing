@@ -20,6 +20,9 @@ const (
 	ColPartitionDate = "partition_date"
 	ColPeriodMonth   = "period_month"
 	ColChainKey      = "chain_key"
+	// ColWriteMode records how a Sell-Out file merges with other files (replace_periods | upsert_records);
+	// the read view uses it to rebuild the in-memory semantics while every file stays stored in full.
+	ColWriteMode = "write_mode"
 )
 
 var metaFields = []*bigquery.FieldSchema{
@@ -31,6 +34,7 @@ var metaFields = []*bigquery.FieldSchema{
 	{Name: ColPartitionDate, Type: bigquery.DateFieldType},
 	{Name: ColPeriodMonth, Type: bigquery.StringFieldType},
 	{Name: ColChainKey, Type: bigquery.StringFieldType},
+	{Name: ColWriteMode, Type: bigquery.StringFieldType},
 }
 
 func isMetaName(name string) bool {

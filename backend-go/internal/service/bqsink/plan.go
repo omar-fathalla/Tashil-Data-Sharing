@@ -110,8 +110,17 @@ func baseParams(meta Meta) []bigquery.QueryParameter {
 		{Name: "tenant_id", Value: meta.TenantID},
 		{Name: "batch_id", Value: meta.BatchID},
 		{Name: "source_file", Value: meta.SourceFile},
+		{Name: "archive_id", Value: meta.ArchiveID},
 	}
 }
+
+// archiveDeleteWhere is the idempotent replace key shared by every sink table: an upload replaces only the
+// rows of its own file (same archive_id, or same batch), plus legacy rows written before archive ids were
+// recorded for the same source file. Rows of other files are never deleted, so every uploaded file stays
+// stored in full; overlap between files is resolved by the read views.
+const archiveDeleteWhere = "tenant_id = @tenant_id AND ((@batch_id != '' AND batch_id = @batch_id)" +
+	" OR (@archive_id != '' AND archive_id = @archive_id)" +
+	" OR (IFNULL(archive_id, '') = '' AND LOWER(IFNULL(source_file, '')) = LOWER(@source_file)))"
 
 func metaRow(meta Meta, now time.Time) map[string]interface{} {
 	return map[string]interface{}{
@@ -181,7 +190,6 @@ func IngestionLogSpec() TableSpec {
 // PlanSellOut builds an idempotent write plan for sell-out facts.
 func PlanSellOut(meta Meta, facts []domain.SellOutFact, mode SellOutMode, now time.Time) Plan {
 	meta.TenantID = NormalizeTenant(meta.TenantID)
-	keys := map[string]bool{}
 	rows := make([]map[string]interface{}, 0, len(facts))
 	for i := range facts {
 		f := facts[i]
@@ -196,29 +204,23 @@ func PlanSellOut(meta Meta, facts []domain.SellOutFact, mode SellOutMode, now ti
 			month = strings.TrimSpace(f.TransactionDate)[:7]
 		}
 		row[ColPeriodMonth] = month
+		if mode == ModeUpsertRecords {
+			row[ColWriteMode] = string(ModeUpsertRecords)
+		} else {
+			row[ColWriteMode] = string(ModeReplacePeriods)
+		}
 		if d, ok := parseDate(f.TransactionDate); ok {
 			row[ColPartitionDate] = d.Format("2006-01-02")
 		}
-		if ck != "" && month != "" {
-			keys[ck+"|"+month] = true
-		}
 		rows = append(rows, row)
 	}
-	params := baseParams(meta)
-	where := "tenant_id = @tenant_id AND (batch_id = @batch_id OR record_id IN (SELECT record_id FROM {{staging}}))"
-	if mode != ModeUpsertRecords {
-		where = "tenant_id = @tenant_id AND (batch_id = @batch_id OR CONCAT(IFNULL(chain_key, ''), '|', IFNULL(period_month, '')) IN UNNEST(@keys))"
-		params = append(params, bigquery.QueryParameter{Name: "keys", Value: sortedKeys(keys)})
-	}
-	return Plan{Kind: KindSellOut, Meta: meta, Table: SellOutSpec(), Rows: rows, DeleteWhere: where, Params: params}
+	return Plan{Kind: KindSellOut, Meta: meta, Table: SellOutSpec(), Rows: rows, DeleteWhere: archiveDeleteWhere, Params: baseParams(meta)}
 }
 
 // PlanSellIn builds an idempotent write plan for sell-in records (SetSellInRecords semantics:
 // replace same file+chain, and any (chain, year, month) present in the upload).
 func PlanSellIn(meta Meta, records []domain.SellInRecord, now time.Time) Plan {
 	meta.TenantID = NormalizeTenant(meta.TenantID)
-	keys := map[string]bool{}
-	chains := map[string]bool{}
 	rows := make([]map[string]interface{}, 0, len(records))
 	for i := range records {
 		r := records[i]
@@ -241,18 +243,9 @@ func PlanSellIn(meta Meta, records []domain.SellInRecord, now time.Time) Plan {
 		row[ColChainKey] = ck
 		row[ColPeriodMonth] = month
 		row[ColPartitionDate] = month + "-01"
-		keys[ck+"|"+month] = true
-		chains[ck] = true
 		rows = append(rows, row)
 	}
-	params := append(baseParams(meta),
-		bigquery.QueryParameter{Name: "keys", Value: sortedKeys(keys)},
-		bigquery.QueryParameter{Name: "chains", Value: sortedKeys(chains)},
-	)
-	where := "tenant_id = @tenant_id AND (batch_id = @batch_id" +
-		" OR (LOWER(source_file) = LOWER(@source_file) AND chain_key IN UNNEST(@chains))" +
-		" OR CONCAT(IFNULL(chain_key, ''), '|', IFNULL(period_month, '')) IN UNNEST(@keys))"
-	return Plan{Kind: KindSellIn, Meta: meta, Table: SellInSpec(), Rows: rows, DeleteWhere: where, Params: params}
+	return Plan{Kind: KindSellIn, Meta: meta, Table: SellInSpec(), Rows: rows, DeleteWhere: archiveDeleteWhere, Params: baseParams(meta)}
 }
 
 // PlanProductMaster builds a snapshot write plan: re-uploading the same sheet (same batch or filename) replaces its rows;
@@ -275,8 +268,7 @@ func PlanProductMaster(meta Meta, summary *domain.ProductMasterSummaryResponse, 
 			rows = append(rows, row)
 		}
 	}
-	where := "tenant_id = @tenant_id AND (batch_id = @batch_id OR LOWER(source_file) = LOWER(@source_file))"
-	return Plan{Kind: KindProductMaster, Meta: meta, Table: ProductMasterSpec(), Rows: rows, DeleteWhere: where, Params: baseParams(meta)}
+	return Plan{Kind: KindProductMaster, Meta: meta, Table: ProductMasterSpec(), Rows: rows, DeleteWhere: archiveDeleteWhere, Params: baseParams(meta)}
 }
 
 // TableForKind maps a sheet kind to its table spec.

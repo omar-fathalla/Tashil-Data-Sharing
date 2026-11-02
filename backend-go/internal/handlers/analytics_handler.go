@@ -12,11 +12,13 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
+	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 )
 
 // AnalyticsHandler serves high-speed OLAP aggregates to Flutter Web.
 type AnalyticsHandler struct {
-	bqRepo bigquery.Repository
+	bqRepo  bigquery.Repository
+	records bqsink.RecordsQuerier
 }
 
 // NewAnalyticsHandler creates a new AnalyticsHandler.
@@ -135,6 +137,14 @@ func (h *AnalyticsHandler) HandleRecords(w http.ResponseWriter, r *http.Request)
 			filter.RetailerChain = strings.TrimSpace(claims.AssignedChain)
 		}
 	}
+
+	if resp, ok := h.recordsFromBigQuery(r.Context(), tenantID, filter, limit, offset); ok {
+		setRecordsSource(w, "bigquery")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
+	setRecordsSource(w, "memory")
 
 	allMatched, total, err := h.bqRepo.GetSellOutRecords(r.Context(), tenantID, filter)
 	if err != nil {
@@ -278,38 +288,7 @@ func (h *AnalyticsHandler) HandleRecords(w http.ResponseWriter, r *http.Request)
 	for _, b := range skuBuckets {
 		s := b.summary
 		s.ActiveStoresCount = len(b.stores)
-		if s.TotalUnitsSold > 0 {
-			s.AvgSellingPrice = math.Round((s.TotalNetRevenue/float64(s.TotalUnitsSold))*100) / 100
-		}
-		if s.UnitsPerCarton > 0 && s.TotalUnitsSold > 0 {
-			s.TotalCartonsSold = math.Round((float64(s.TotalUnitsSold)/float64(s.UnitsPerCarton))*100) / 100
-		} else {
-			s.TotalCartonsSold = math.Round(s.TotalCartonsSold*100) / 100
-		}
-		s.TotalNetRevenue = math.Round(s.TotalNetRevenue*100) / 100
-		if s.FactoryUnitCost > 0 && s.TotalUnitsSold > 0 {
-			s.TotalFactoryCost = math.Round((float64(s.TotalUnitsSold)*s.FactoryUnitCost)*100) / 100
-			s.RetailerGrossProfit = math.Round((s.TotalNetRevenue-s.TotalFactoryCost)*100) / 100
-			if s.TotalNetRevenue > 0 {
-				s.RetailerMarginPct = math.Round(((s.RetailerGrossProfit/s.TotalNetRevenue)*100)*100) / 100
-			}
-		} else {
-			s.TotalFactoryCost = math.Round(s.TotalFactoryCost*100) / 100
-			s.RetailerGrossProfit = math.Round(s.RetailerGrossProfit*100) / 100
-		}
-		if s.OfficialConsumerRSP > 0 && s.AvgSellingPrice > 0 {
-			s.PriceDeltaPct = math.Round((((s.AvgSellingPrice-s.OfficialConsumerRSP)/s.OfficialConsumerRSP)*100)*100) / 100
-		}
-		switch {
-		case s.FactoryUnitCost > 0 && s.AvgSellingPrice > 0 && s.AvgSellingPrice < s.FactoryUnitCost:
-			s.PriceStatus = "below_cost"
-		case s.PriceDeltaPct <= -5.0:
-			s.PriceStatus = "promo_discount"
-		case s.PriceDeltaPct >= 5.0:
-			s.PriceStatus = "above_rsp"
-		default:
-			s.PriceStatus = "compliant"
-		}
+		finalizeSKUSummary(&s)
 		skuSummaries = append(skuSummaries, s)
 	}
 

@@ -167,7 +167,7 @@ func (s *BigQuerySink) DeleteBatch(ctx context.Context, kind Kind, meta Meta) *R
 	meta.TenantID = NormalizeTenant(meta.TenantID)
 	spec := TableForKind(kind)
 	res := &Result{Status: StatusOK, Table: spec.Name}
-	if meta.BatchID == "" {
+	if meta.BatchID == "" && meta.ArchiveID == "" {
 		res.Status = StatusSkipped
 		return res
 	}
@@ -175,7 +175,7 @@ func (s *BigQuerySink) DeleteBatch(ctx context.Context, kind Kind, meta Meta) *R
 		if err := s.ensureTable(ctx, spec); err != nil {
 			return err
 		}
-		sql := fmt.Sprintf("DELETE FROM %s WHERE tenant_id = @tenant_id AND batch_id = @batch_id", s.ref(spec.Name))
+		sql := DeleteArchiveSQL(s.ref(spec.Name))
 		return s.runQuery(ctx, sql, baseParams(meta))
 	}()
 	s.finish(ctx, res, err, start, kind, "delete", meta)
