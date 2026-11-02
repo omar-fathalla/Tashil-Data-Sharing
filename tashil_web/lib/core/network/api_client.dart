@@ -2018,7 +2018,18 @@ class ServerConnectionException implements Exception {
 /// Automatically injects JWT Bearer tokens and handles tenant RLS headers.
 class ApiClient {
   String tenantId;
-  String authToken;
+  String _authToken;
+  String get authToken => _authToken;
+  set authToken(String value) {
+    _authToken = value;
+    _currentAuthToken = value;
+  }
+
+  /// Token of the active session (last token set on any ApiClient).
+  static String _currentAuthToken = '';
+
+  /// >0 while a login request is in flight: 401s then belong to old requests.
+  static int _loginsInProgress = 0;
 
   /// When false (strictly enforced in web and production mode),
   /// any connection failure or server outage immediately raises [ServerConnectionException]
@@ -2036,9 +2047,18 @@ class ApiClient {
   /// 401 = the backend refused the login (expired/invalid token). 403 is a
   /// normal permission denial (RBAC) and does not end the session. Auth
   /// endpoints are excluded (a 401 there means wrong credentials).
-  static void reportAuthStatus(int statusCode, [Uri? url]) {
+  ///
+  /// Only a 401 for a request sent with the *current* non-empty token ends the
+  /// session. A late 401 for a request sent before/while logging in (no token
+  /// or an old one) is ignored, so it cannot log out a fresh session.
+  static void reportAuthStatus(int statusCode, [Uri? url, String? sentAuthorization]) {
     if (statusCode != 401) return;
     if (url != null && url.path.contains('/api/v1/auth/')) return;
+    if (_loginsInProgress > 0) return;
+    var sent = (sentAuthorization ?? '').trim();
+    if (sent.toLowerCase().startsWith('bearer ')) sent = sent.substring(7).trim();
+    if (sent.isEmpty || _currentAuthToken.isEmpty) return;
+    if (sent != _asciiSafeHeader(_currentAuthToken)) return;
     onSessionExpired?.call();
   }
 
@@ -2052,8 +2072,10 @@ class ApiClient {
     this.tenantId = 'tenant-adeco',
     String? authToken,
     bool? allowMockFallback,
-  })  : authToken = authToken ?? '',
-        allowMockFallback = allowMockFallback ?? defaultAllowMockFallback;
+  })  : _authToken = authToken ?? '',
+        allowMockFallback = allowMockFallback ?? defaultAllowMockFallback {
+    if (_authToken.isNotEmpty) _currentAuthToken = _authToken;
+  }
 
   static String normalizeTenantSlug(String raw) {
     var clean = raw.trim().toLowerCase();
@@ -7298,6 +7320,7 @@ class ApiClient {
             : rawSlug);
 
     http.Response resp;
+    _loginsInProgress++;
     try {
       final uri = Uri.parse(ApiEndpoints.authLogin);
       resp = await BackendHttp.post(
@@ -7312,6 +7335,8 @@ class ApiClient {
     } catch (e) {
       debugPrint('[ApiClient] Login request failed: $e');
       throw Exception('تعذر الاتصال بالخادم لتسجيل الدخول. تحقق من الاتصال وحاول مرة أخرى.');
+    } finally {
+      _loginsInProgress--;
     }
 
     if (resp.statusCode == 200) {

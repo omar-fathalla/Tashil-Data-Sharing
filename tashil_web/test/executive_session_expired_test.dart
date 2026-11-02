@@ -26,7 +26,7 @@ void main() {
     FlutterError.onError = errors.add;
 
     await http.runWithClient(() async {
-      final api = ApiClient(tenantId: 'tenant-expired-401', allowMockFallback: false);
+      final api = ApiClient(tenantId: 'tenant-expired-401', authToken: 'current-token', allowMockFallback: false);
       await tester.pumpWidget(MaterialApp(
         theme: AppTheme.light(),
         home: Scaffold(body: ExecutiveScreen(apiClient: api)),

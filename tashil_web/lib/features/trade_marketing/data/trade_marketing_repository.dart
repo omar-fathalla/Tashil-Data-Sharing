@@ -141,7 +141,8 @@ class ApiTradeMarketingRepository implements TradeMarketingRepository {
   Future<http.Response> _guard(Future<http.Response> f) async {
     try {
       final r = await f.timeout(_timeout);
-      BackendHttp.onResponseStatus?.call(r.statusCode, r.request?.url ?? Uri());
+      BackendHttp.onResponseStatus?.call(
+          r.statusCode, r.request?.url ?? Uri(), r.request?.headers['Authorization']);
       return r;
     } catch (e) {
       throw const TradeMarketingException('تعذر الاتصال بالخادم / Could not reach the server');

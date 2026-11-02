@@ -14,10 +14,12 @@ import 'http_swr_cache.dart';
 class BackendHttp {
   BackendHttp._();
 
-  static void Function(int statusCode, Uri url)? onResponseStatus;
+  /// [sentAuthorization] is the Authorization header the request was sent with
+  /// (null if none), so a late 401 for an old/pre-login request can be ignored.
+  static void Function(int statusCode, Uri url, String? sentAuthorization)? onResponseStatus;
 
-  static T _note<T extends http.BaseResponse>(T r, Uri url) {
-    onResponseStatus?.call(r.statusCode, url);
+  static T _note<T extends http.BaseResponse>(T r, Uri url, [Map<String, String>? headers]) {
+    onResponseStatus?.call(r.statusCode, url, headers?['Authorization']);
     return r;
   }
 
@@ -30,7 +32,7 @@ class BackendHttp {
   static ValueNotifier<int> get dataRevision => cache.revision;
 
   static Future<http.Response> get(Uri url, {Map<String, String>? headers}) =>
-      cache.get(url, headers, (h) async => _note(await http.get(url, headers: h), url));
+      cache.get(url, headers, (h) async => _note(await http.get(url, headers: h), url, h));
 
   static T _mutated<T extends http.BaseResponse>(T r) {
     if (r.statusCode >= 200 && r.statusCode < 300) cache.invalidateAll();
@@ -39,24 +41,24 @@ class BackendHttp {
 
   static Future<http.Response> post(Uri url,
           {Map<String, String>? headers, Object? body}) async =>
-      _mutated(_note(await http.post(url, headers: headers, body: body), url));
+      _mutated(_note(await http.post(url, headers: headers, body: body), url, headers));
 
   static Future<http.Response> put(Uri url,
           {Map<String, String>? headers, Object? body}) async =>
-      _mutated(_note(await http.put(url, headers: headers, body: body), url));
+      _mutated(_note(await http.put(url, headers: headers, body: body), url, headers));
 
   static Future<http.Response> patch(Uri url,
           {Map<String, String>? headers, Object? body}) async =>
-      _mutated(_note(await http.patch(url, headers: headers, body: body), url));
+      _mutated(_note(await http.patch(url, headers: headers, body: body), url, headers));
 
   static Future<http.Response> delete(Uri url,
           {Map<String, String>? headers, Object? body}) async =>
-      _mutated(_note(await http.delete(url, headers: headers, body: body), url));
+      _mutated(_note(await http.delete(url, headers: headers, body: body), url, headers));
 
   static Future<http.StreamedResponse> send(http.BaseRequest request) async =>
       request.method == 'GET'
-          ? _note(await request.send(), request.url)
-          : _mutated(_note(await request.send(), request.url));
+          ? _note(await request.send(), request.url, request.headers)
+          : _mutated(_note(await request.send(), request.url, request.headers));
 
   /// Header that asks the backend to run a large ingest as a background job.
   static const asyncJobHeader = 'X-Tashil-Async';
