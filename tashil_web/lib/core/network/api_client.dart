@@ -9,6 +9,9 @@ import '../storage/session_storage.dart';
 import '../theme/m3_color_roles.dart';
 import '../utils/web_file_helper.dart';
 import 'api_endpoints.dart';
+import 'upload_feedback.dart';
+
+export 'upload_feedback.dart';
 
 /// Aggregated Sell-Out SKU summary with official Product Master factory pricing and chain margin
 class SellOutSkuSummaryModel {
@@ -1625,6 +1628,12 @@ class IngestionResultModel {
   final String aiTierUsed;
   final bool tier2Escalated;
 
+  // Upload checks (warnings never block; held-out customers are not in any total).
+  final List<UploadWarning> uploadWarnings;
+  final List<QuarantinedCustomerInfo> quarantinedCustomers;
+  final List<Map<String, dynamic>> unknownBarcodes;
+  final List<UploadMonthSlice> periodBreakdown;
+
   IngestionResultModel({
     required this.batchId,
     this.archiveId = '',
@@ -1655,6 +1664,10 @@ class IngestionResultModel {
     this.aiModelUsed = 'Gemini 4 Argon Medium (gemini-1.5-pro)',
     this.aiTierUsed = 'tier2',
     this.tier2Escalated = true,
+    this.uploadWarnings = const [],
+    this.quarantinedCustomers = const [],
+    this.unknownBarcodes = const [],
+    this.periodBreakdown = const [],
   });
 
   factory IngestionResultModel.fromJson(Map<String, dynamic> json) {
@@ -1713,6 +1726,10 @@ class IngestionResultModel {
           ? json['ai_tier_used'] as String
           : 'tier2',
       tier2Escalated: json['tier2_escalated'] as bool? ?? true,
+      uploadWarnings: parseList(json['upload_warnings'], UploadWarning.fromJson),
+      quarantinedCustomers: parseList(json['quarantined_customers'], QuarantinedCustomerInfo.fromJson),
+      unknownBarcodes: parseList(json['unknown_barcodes'], (m) => m),
+      periodBreakdown: parseList(json['period_breakdown'], UploadMonthSlice.fromJson),
     );
   }
 
@@ -1777,6 +1794,10 @@ class IngestionResultModel {
       aiModelUsed: aiModelUsed ?? this.aiModelUsed,
       aiTierUsed: aiTierUsed ?? this.aiTierUsed,
       tier2Escalated: tier2Escalated ?? this.tier2Escalated,
+      uploadWarnings: uploadWarnings,
+      quarantinedCustomers: quarantinedCustomers,
+      unknownBarcodes: unknownBarcodes,
+      periodBreakdown: periodBreakdown,
     );
   }
 }
@@ -1957,6 +1978,25 @@ class UploadRejectedException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// Turns a refused upload/commit response into a typed exception: 409 = a question for the user
+/// (nothing saved), any other 4xx/5xx = rejection with the server's Arabic message.
+/// Returns normally for 2xx.
+void throwIfUploadRefused(int statusCode, String body, String fallbackMessage) {
+  if (statusCode >= 200 && statusCode < 300) return;
+  if (statusCode == 409) {
+    final c = UploadConfirmationRequiredException.tryParse(body);
+    if (c != null) throw c;
+  }
+  String message = '$fallbackMessage (HTTP $statusCode)';
+  try {
+    final j = jsonDecode(body);
+    if (j is Map && j['message'] is String && (j['message'] as String).isNotEmpty) {
+      message = j['message'] as String;
+    }
+  } catch (_) {}
+  throw UploadRejectedException(message);
 }
 
 /// Thrown when the backend server is unreachable, offline, or returns an error,
@@ -3885,6 +3925,8 @@ class ApiClient {
     String? periodDate,
     bool dryRun = true,
     String aiTier = 'tier2',
+    bool replaceConfirmed = false,
+    String? periodChoice,
   }) async {
     final effectiveTenant = (targetTenant != null && targetTenant.isNotEmpty)
         ? targetTenant
@@ -3911,6 +3953,8 @@ class ApiClient {
       if (periodDate != null && periodDate.isNotEmpty) {
         queryParams['period_date'] = periodDate;
       }
+      if (replaceConfirmed) queryParams['replace_confirmed'] = 'true';
+      if (periodChoice != null && periodChoice.isNotEmpty) queryParams['period_choice'] = periodChoice;
       final uri = Uri.parse(ApiEndpoints.upload).replace(
         queryParameters: queryParams,
       );
@@ -3955,19 +3999,14 @@ class ApiClient {
         );
         return model;
       }
-      if (resp.statusCode == 422) {
-        // The backend validated the sheet and refused to save it: surface the
-        // reason instead of falling back to a locally parsed result.
-        String message = 'تعذّر قراءة الملف بشكل صحيح ولم يتم حفظه';
-        try {
-          final body = jsonDecode(resp.body);
-          if (body is Map && body['message'] is String && (body['message'] as String).isNotEmpty) {
-            message = body['message'] as String;
-          }
-        } catch (_) {}
-        throw UploadRejectedException(message);
+      if (resp.statusCode == 422 || resp.statusCode == 409) {
+        // The backend validated the sheet and refused to save it (or needs an answer first):
+        // surface it instead of falling back to a locally parsed result.
+        throwIfUploadRefused(resp.statusCode, resp.body, 'تعذّر قراءة الملف بشكل صحيح ولم يتم حفظه');
       }
     } on UploadRejectedException {
+      rethrow;
+    } on UploadConfirmationRequiredException {
       rethrow;
     } catch (e) {
       debugPrint('[ApiClient] Fallback to mock ingestion result: $e');
@@ -4094,6 +4133,8 @@ class ApiClient {
     String? targetChain,
     String? targetTenant,
     String? periodDate,
+    bool replaceConfirmed = false,
+    String? periodChoice,
   }) async {
     final effectiveTenant = (targetTenant != null && targetTenant.isNotEmpty)
         ? targetTenant
@@ -4122,14 +4163,27 @@ class ApiClient {
           if (targetChain != null && targetChain.isNotEmpty) 'chain': targetChain,
           if (targetTenant != null && targetTenant.isNotEmpty) 'tenant': targetTenant,
           if (periodDate != null && periodDate.isNotEmpty) 'period_date': periodDate,
+          if (replaceConfirmed) 'replace_confirmed': true,
+          if (periodChoice != null && periodChoice.isNotEmpty) 'period_choice': periodChoice,
         }),
       ).timeout(const Duration(seconds: 120));
 
       if (resp.statusCode == 200) {
         return IngestionResultModel.fromJson(jsonDecode(resp.body) as Map<String, dynamic>);
       }
+      // A refused commit saved nothing: never report it as saved. (Server checks answer 409/422; in
+      // offline/test mode other statuses still fall back to the local preview.)
+      if (resp.statusCode == 409 || resp.statusCode == 422 || !allowMockFallback) {
+        throwIfUploadRefused(resp.statusCode, resp.body, 'فشل حفظ البيانات ومفيش حاجة اتحفظت');
+      }
+      throw Exception('commit HTTP ${resp.statusCode}');
+    } on UploadRejectedException {
+      rethrow;
+    } on UploadConfirmationRequiredException {
+      rethrow;
     } catch (e) {
       debugPrint('[ApiClient] Fallback commitStagedUpload: $e');
+      if (!allowMockFallback) rethrow;
     }
 
     return IngestionResultModel(
@@ -8210,6 +8264,8 @@ class ApiClient {
     String? replaceArchiveId,
     int? year,
     int? month,
+    bool replaceConfirmed = false,
+    String? periodChoice,
   }) async {
     final cleanTenant = normalizeDataTenantSlug(tenantId);
     if (_deletedArchiveFileNames.remove(filename.trim().toLowerCase()) && kIsWeb) {
@@ -8229,6 +8285,8 @@ class ApiClient {
           'replace_archive_id': replaceArchiveId,
         if (year != null && year > 0) 'year': '$year',
         if (month != null && month > 0) 'month': '$month',
+        if (replaceConfirmed) 'replace_confirmed': 'true',
+        if (periodChoice != null && periodChoice.isNotEmpty) 'period_choice': periodChoice,
       },
     );
     try {
@@ -8267,9 +8325,18 @@ class ApiClient {
         }
         return model;
       }
+      // Rejected or needs an answer: nothing was saved, so never show a fake success.
+      if (resp.statusCode == 409 || resp.statusCode == 422 || !allowMockFallback) {
+        throwIfUploadRefused(resp.statusCode, resp.body, 'فشل رفع ملف التوريد');
+      }
       throw Exception('فشل رفع ملف التوريد (${resp.statusCode})');
+    } on UploadRejectedException {
+      rethrow;
+    } on UploadConfirmationRequiredException {
+      rethrow;
     } catch (e) {
-      // Fallback for offline/widget test environments
+      if (!allowMockFallback) rethrow;
+      // Fallback for offline/widget test environments only.
       return IngestionResultModel(
         batchId: 'batch_sellin_local_${DateTime.now().millisecondsSinceEpoch}',
         filename: filename,

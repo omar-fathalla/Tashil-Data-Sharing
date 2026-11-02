@@ -13,6 +13,7 @@ import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../product_master/presentation/screens/product_master_screen.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
+import '../../../../core/data/available_years.dart';
 
 /// PricingComplianceScreen monitors SKU-level price compliance against Recommended Retail Price (RRP)
 /// and measures promotional uplift percentages across retail chains.
@@ -72,6 +73,9 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
     super.initState();
     _lastTenantId = widget.apiClient.tenantId;
     _loadPricingCompliance();
+    AvailableYears.load(widget.apiClient).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -361,11 +365,10 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                           label: 'السنة المالية:',
                           icon: Icons.calendar_today_rounded,
                           value: _selectedYear,
-                          items: const [
-                            DropdownMenuItem(value: 0, child: Text('كافة السنوات (إجمالي)')),
-                            DropdownMenuItem(value: 2026, child: Text('عام 2026')),
-                            DropdownMenuItem(value: 2025, child: Text('عام 2025')),
-                            DropdownMenuItem(value: 2024, child: Text('عام 2024')),
+                          items: [
+                            const DropdownMenuItem(value: 0, child: Text('كافة السنوات (إجمالي)')),
+                            for (final y in AvailableYears.current.including(_selectedYear))
+                              DropdownMenuItem(value: y, child: Text('عام $y')),
                           ],
                           onChanged: (val) {
                             if (val != null && val != _selectedYear) {

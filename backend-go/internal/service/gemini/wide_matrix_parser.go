@@ -1340,6 +1340,7 @@ func buildPayloadFromWideMatrix(
 					UnitPrice:        uPrice,
 					RecommendedPrice: inferredRRP,
 					TransactionDate:  primary.sheetDate,
+					DateFromFile:     primary.sheetDate != "",
 				})
 
 				// Generate Pricing & Promotion Compliance item if price variance exists or for top flagship branches
@@ -1407,6 +1408,7 @@ func buildPayloadFromWideMatrix(
 				UnitPrice:        inferredRRP,
 				RecommendedPrice: inferredRRP,
 				TransactionDate:  primary.sheetDate,
+				DateFromFile:     primary.sheetDate != "",
 			})
 		}
 	}
@@ -1480,6 +1482,7 @@ func buildPayloadFromWideMatrix(
 						UnitPrice:        uPrice,
 						RecommendedPrice: uPrice,
 						TransactionDate:  sh.sheetDate,
+						DateFromFile:     sh.sheetDate != "",
 					})
 					sheetRecCount++
 				}
@@ -1522,6 +1525,7 @@ func buildPayloadFromWideMatrix(
 						UnitPrice:        uPrice,
 						RecommendedPrice: uPrice,
 						TransactionDate:  sh.sheetDate,
+						DateFromFile:     sh.sheetDate != "",
 					})
 					sheetRecCount++
 				}

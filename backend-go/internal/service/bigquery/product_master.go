@@ -1165,7 +1165,10 @@ func (c *Client) enrichSellOutFactLocked(r *domain.SellOutFact) {
 			lookupCode = ""
 		}
 	}
-	if pm, ok := c.lookupProductMasterFullLocked(r.TenantID, lookupCode, r.Barcode, lookupName, "", 0, r.UnitPrice); ok {
+	// A real retailer barcode that is not in our price list (e.g. Arma 6223006125803) is a foreign item:
+	// never re-label it with an Adeco item found by fuzzy name matching.
+	foreign := c.sellOutHasForeignBarcodeLocked(normTenant, r.Barcode) && !c.isProductMasterCodeLocked(normTenant, r.ItemCode)
+	if pm, ok := c.lookupProductMasterFullLocked(r.TenantID, lookupCode, r.Barcode, lookupName, "", 0, r.UnitPrice); ok && !foreign {
 		r.ItemCode = pm.ItemCode
 		if pm.Barcode != "" {
 			_, barStillValid := c.productMasterByBarcode[normTenant][strings.TrimSpace(r.Barcode)]
@@ -1253,6 +1256,7 @@ func (c *Client) enrichPricingItemLocked(item *domain.PricingComplianceItem) {
 }
 
 func (c *Client) enrichSellInRecordLocked(r *domain.SellInRecord) {
+	r.RetailerChain = resolveSellInChainFromCustomer(activeCustomerChainRules(), r.CustomerName, r.RetailerChain)
 	actualCasePriceExcl := 0.0
 	if math.Abs(r.NetQtyCases) > 0.001 && math.Abs(r.NetValueEGP) > 0.01 {
 		actualCasePriceExcl = math.Round(math.Abs(r.NetValueEGP/r.NetQtyCases)*100) / 100
@@ -1293,13 +1297,24 @@ func (c *Client) enrichSellInRecordLocked(r *domain.SellInRecord) {
 			r.UnitsPerCarton = 12
 		}
 		r.VATRate = 0.14
-		r.InvoiceDiscountPct = 10.0
+		// No price-list match: the invoice discount is unknown. Leave it at 0 (UI shows "—")
+		// instead of inventing the old hardcoded 10%.
+		r.InvoiceDiscountPct = 0
 		r.PricingWaveStatus = "unmatched"
 		r.CanonicalFamilyKey = CanonicalSellInFamilyKey(nil, r.ItemName)
 	}
 
 	if r.UnitsPerCarton <= 0 {
 		r.UnitsPerCarton = 12
+	}
+	if ok && sellInQtyLooksLikePieces(r.NetQtyCases, r.NetValueEGP, r.OfficialUnitExclVATEGP, r.OfficialCartonExclVATEGP, r.UnitsPerCarton) {
+		// The Fathalla "out" exports carry quantity in pieces; storing it as cases inflated the list value
+		// (and the "discount") by the pack size. Convert to cases once; the ratio test is idempotent.
+		r.NetQtyCases = math.Round(r.NetQtyCases/float64(r.UnitsPerCarton)*10000) / 10000
+		if math.Abs(r.NetQtyCases) > 0.0001 && math.Abs(r.NetValueEGP) > 0.01 {
+			actualCasePriceExcl = math.Round(math.Abs(r.NetValueEGP/r.NetQtyCases)*100) / 100
+			r.ActualCasePriceExclEGP = actualCasePriceExcl
+		}
 	}
 	r.TotalUnitsSupplied = int(math.Round(r.NetQtyCases * float64(r.UnitsPerCarton)))
 	r.GrossValueInclVATEGP = math.Round(r.NetValueEGP*(1.0+r.VATRate)*100) / 100
@@ -1828,4 +1843,57 @@ func (c *Client) UpsertProductMasterItem(ctx context.Context, tenantID string, i
 		updated = c.productMasterByBarcode[normTenant][item.Barcode]
 	}
 	return &updated, nil
+}
+
+// sellInQtyLooksLikePieces reports whether a Sell-In quantity is really in pieces: the net value per
+// "case" is much closer to the official unit price than to the carton price.
+func sellInQtyLooksLikePieces(qty, net, unitPrice, cartonPrice float64, upc int) bool {
+	if upc <= 1 || unitPrice <= 0 || cartonPrice <= 0 || math.Abs(qty) < 0.001 || math.Abs(net) < 0.01 {
+		return false
+	}
+	per := math.Abs(net / qty)
+	dUnit := math.Abs(math.Log(per / unitPrice))
+	dCarton := math.Abs(math.Log(per / cartonPrice))
+	return dUnit < dCarton
+}
+
+// sellOutHasForeignBarcodeLocked is true when the row carries a full retail barcode (8+ digits) that is
+// not in the tenant's product master, i.e. the item is not ours.
+func (c *Client) sellOutHasForeignBarcodeLocked(normTenant, barcode string) bool {
+	bc := domain.CleanBarcode(barcode)
+	if len(bc) < 8 {
+		return false
+	}
+	for _, ch := range bc {
+		if ch < '0' || ch > '9' {
+			return false
+		}
+	}
+	if len(c.productMasterByBarcode[normTenant]) == 0 {
+		return false
+	}
+	if _, ok := c.productMasterByBarcode[normTenant][bc]; ok {
+		return false
+	}
+	if _, ok := c.productMasterByBarcode[normTenant][strings.TrimSpace(barcode)]; ok {
+		return false
+	}
+	if len(c.productMasterByBarcodeCandidates[normTenant][bc]) > 0 {
+		return false
+	}
+	return true
+}
+
+// isProductMasterCodeLocked reports whether code is one of the tenant's own item codes (a row already
+// tied to an Adeco item keeps re-enriching even if its barcode changed in the price list).
+func (c *Client) isProductMasterCodeLocked(normTenant, code string) bool {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return false
+	}
+	_, ok := c.productMasterByCode[normTenant][code]
+	if !ok {
+		_, ok = c.productMasterByCode[normTenant][strings.ToUpper(code)]
+	}
+	return ok
 }
