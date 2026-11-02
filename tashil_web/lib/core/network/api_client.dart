@@ -3708,7 +3708,7 @@ class ApiClient {
         fileSizeBytes: 13804976,
         retailChain: 'beet-elgomla',
         chainNameAr: 'بيت الجملة',
-        chainNameEn: 'Beet El-Gomla',
+        chainNameEn: 'Beet El Gomla',
         targetYear: '2026',
         targetMonth: '01-12',
         rowsIngested: 256735,
@@ -4788,7 +4788,7 @@ class ApiClient {
         return 'Gomla Market';
       case 'beet-elgomla':
       case 'beet_elgomla':
-        return 'Beet El-Gomla';
+        return 'Beet El Gomla';
       case 'chain-1080314':
       case 'el-wakala':
       case 'wakala':
@@ -4826,7 +4826,7 @@ class ApiClient {
         return 'جملة ماركت (Gomla Market)';
       case 'beet-elgomla':
       case 'beet_elgomla':
-        return 'بيت الجملة (Beet El-Gomla)';
+        return 'بيت الجملة (Beet El Gomla)';
       case 'chain-1080314':
       case 'el-wakala':
       case 'wakala':
@@ -7072,7 +7072,7 @@ class ApiClient {
       RetailChainModel(
         chainId: 'beet-elgomla',
         tenantId: 'adeco',
-        displayName: 'بيت الجملة (Beet El-Gomla)',
+        displayName: 'بيت الجملة (Beet El Gomla)',
         code: 'beet-elgomla',
         chainType: 'supermarket',
         storeCount: 30,

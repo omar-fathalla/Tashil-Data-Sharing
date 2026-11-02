@@ -116,8 +116,8 @@ Adeco Natural Tomato Paste 380g | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.4
 Adeco Natural Tomato Paste 380g | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 Adeco Sunflower Oil 1L | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 Adeco Sunflower Oil 1L | 12.0 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-Beet El-Gomla | 11.0 | FontWeight.w700 | ff6b21a8 | 0.25 | 1.43
-Beet El-Gomla | 11.0 | FontWeight.w700 | ff6b21a8 | 0.25 | 1.43
+Beet El Gomla | 11.0 | FontWeight.w700 | ff6b21a8 | 0.25 | 1.43
+Beet El Gomla | 11.0 | FontWeight.w700 | ff6b21a8 | 0.25 | 1.43
 Carrefour | 11.0 | FontWeight.w700 | ff0369a1 | 0.25 | 1.43
 Carrefour | 11.0 | FontWeight.w700 | ff0369a1 | 0.25 | 1.43
 Carrefour | 11.0 | FontWeight.w700 | ff0369a1 | 0.25 | 1.43

@@ -526,15 +526,15 @@ onChanged: m3Legacy<int>((v) {
                                       style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         fontWeight: FontWeight.w700,                                       )),
                                     ),
                                     Text(
-                                      '• إجمالي البضاعة: ${CurrencyFormatter.formatNumber(effectiveUnits.round())} كرتونة',
+                                      '• الكمية: ${CurrencyFormatter.formatNumber(effectiveUnits.round())} كرتونة',
                                       style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         fontWeight: FontWeight.w700,                                       )),
                                     ),
                                     if (_isSellIn) Text(
-                                      '• الوزن اللوجستي: ${effectiveTons.toStringAsFixed(1)} طن',
+                                      '• الوزن: ${effectiveTons.toStringAsFixed(1)} طن',
                                       style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         fontWeight: FontWeight.w700,                                       )),
                                     ),
                                     if (_isSellIn) Text(
-                                      '• شامل تأمين المرتجعات: ${CurrencyFormatter.formatNumber(grossUnitsWithBuffer.round())} كرتونة',
+                                      '• شامل احتياطي المرتجعات: ${CurrencyFormatter.formatNumber(grossUnitsWithBuffer.round())} كرتونة',
                                       style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         fontWeight: FontWeight.w700,                                         color: M3StatusColors.of(context).accents.teal,                                       )),
                                     ),
                                   ],
@@ -698,7 +698,7 @@ onChanged: m3Legacy<int>((v) {
       'السنة (Year)',
       'الشهر (Month)',
       'الفرع (Branch)',
-      'الفئة أو الماركة (Category)',
+      'الفئة أو العلامة التجارية (Category)',
       'القيمة المستهدفة بالجنيه (Target_Revenue_EGP)',
       'الكمية المستهدفة ($_unitLabelAr) (Target_Units)',
       'ملاحظات (Notes)',
@@ -712,7 +712,7 @@ onChanged: m3Legacy<int>((v) {
         'كل الفئات',
         150000000,
         255000,
-        'مستهدف السنة الشامل (يُوزع تلقائياً على الفروع والأصناف)',
+        'مستهدف السنة (يُوزَّع تلقائيًا على الفروع والأصناف)',
       ],
       [
         'جملة ماركت',
@@ -722,7 +722,7 @@ onChanged: m3Legacy<int>((v) {
         'كل الفئات',
         45000000,
         76000,
-        'مستهدف جملة ماركت السنوي الشامل',
+        'مستهدف جملة ماركت السنوي',
       ],
       [
         'بيت الجملة',
@@ -732,7 +732,7 @@ onChanged: m3Legacy<int>((v) {
         'كل الفئات',
         38000000,
         64000,
-        'مستهدف بيت الجملة السنوي الشامل',
+        'مستهدف بيت الجملة السنوي',
       ],
     ];
     final csvData =
@@ -755,23 +755,23 @@ onChanged: m3Legacy<int>((v) {
     if (_isSellIn && active != null && active.branches.isNotEmpty) {
       // Export full comprehensive report: Chain + All Branches + Top SKUs
       final headers = [
-        'المستوى (Level)',
+        'المستوى',
         'السلسلة (Chain)',
         'الفترة (Period)',
         'الفرع (Branch)',
         'المحافظة / الإقليم',
         'مندوب المبيعات',
-        'الصنف / الماركة (SKU / Brand)',
+        'الصنف / العلامة التجارية (SKU / Brand)',
         'القطاع (Sector)',
         'حصة النطاق % (Share %)',
         'القيمة المستهدفة بالجنيه (Target EGP)',
-        'المحقق الفعلي بالجنيه (Actual EGP)',
+        'المحقق بالجنيه (Actual EGP)',
         'الفجوة بالجنيه (Variance EGP)',
         'الكمية المستهدفة بالكرتونة (Target Cases)',
         'الكمية الفعلية بالكرتونة (Actual Cases)',
         'الوزن المستهدف بالطن (Target Tons)',
         'نسبة التحقيق % (Achievement %)',
-        'الحالة / الرصيد',
+        'الحالة / المخزون',
       ];
       final rows = <List<dynamic>>[];
       for (final item in items) {
@@ -781,7 +781,7 @@ onChanged: m3Legacy<int>((v) {
           item.monthLabel,
           item.branchName,
           'كل الأقاليم',
-          'كبار العملاء (Key Accounts)',
+          'كبار العملاء',
           'كل الأصناف (${item.activeSkusCount})',
           'MT + CC',
           '100%',
@@ -844,7 +844,7 @@ onChanged: m3Legacy<int>((v) {
       ExcelExportService.downloadCsv(filename, csvData);
       M3Feedback.showSuccess(
         context,
-        'تم تصدير التقرير الشامل للمستهدفات (السلسلة + الفروع + إجمالي الأصناف: ${rows.length} صف)',
+        'تم تصدير المستهدفات (${rows.length} صف).',
       );
       return;
     }
@@ -855,7 +855,7 @@ onChanged: m3Legacy<int>((v) {
       'الفرع',
       'الفئة',
       'المستهدف (ج.م)',
-      'المحقق الفعلي (ج.م)',
+      'المحقق (ج.م)',
       'الفرق (ج.م)',
       'نسبة تحقيق القيمة %',
       'الكمية المستهدفة ($_unitLabelAr)',
@@ -913,13 +913,13 @@ onChanged: m3Legacy<int>((v) {
       'الكمية المستهدفة للفرع بالكرتونة (Target Cases)',
       'القيمة المستهدفة للفرع بالجنيه (Target EGP)',
       'الوزن المستهدف بالطن (Tons)',
-      'الكمية الفعلية المسحوبة (Actual Cases)',
-      'القيمة الفعلية المسحوبة (Actual EGP)',
+      'الكمية المحققة (Actual Cases)',
+      'القيمة المحققة (Actual EGP)',
       'المتبقي بالكرتونة (Variance Cases)',
       'المتبقي بالجنيه (Variance EGP)',
       'نسبة التحقيق %',
-      'الرصيد المتبقي بالفرع (Cases)',
-      'حالة الرصيد بالفرع',
+      'المخزون المتبقي بالفرع (Cases)',
+      'حالة المخزون بالفرع',
     ];
     final rows = branch.skus
         .map(
@@ -988,7 +988,7 @@ onChanged: m3Legacy<int>((v) {
                   ? '${CurrencyFormatter.formatNumber(summary.totalTargetUnits.round())} كرتونة • ${summary.totalTargetWeightTons.toStringAsFixed(1)} طن'
                   : '${CurrencyFormatter.formatNumber(summary.totalTargetUnits.round())} $_unitLabelAr مستهدفة',
               subtitleEn: _isSellIn
-                  ? 'Gross w/ Buffer: ${CurrencyFormatter.formatNumber(summary.totalGrossTargetUnits.round())} Cases'
+                  ? '+ returns: ${CurrencyFormatter.formatNumber(summary.totalGrossTargetUnits.round())} cases'
                   : 'Target $_unitLabelEn',
               icon: Icons.flag_circle_rounded,
               color: colorScheme.primary,
@@ -1005,7 +1005,7 @@ onChanged: m3Legacy<int>((v) {
               ),
               subtitleAr: _isSellIn
                   ? '${CurrencyFormatter.formatNumber(summary.totalActualUnits.round())} كرتونة • ${summary.totalActualWeightTons.toStringAsFixed(1)} طن'
-                  : '${CurrencyFormatter.formatNumber(summary.totalActualUnits.round())} $_unitLabelAr محققة فعلياً',
+                  : '${CurrencyFormatter.formatNumber(summary.totalActualUnits.round())} $_unitLabelAr محققة',
               subtitleEn: _isSellIn && summary.totalExpectedRevenueEgp > 0
                   ? 'Forecast: ${CurrencyFormatter.formatCompactEGP(summary.totalExpectedRevenueEgp)}'
                   : 'Actual $_unitLabelEn',
@@ -1018,7 +1018,7 @@ onChanged: m3Legacy<int>((v) {
               titleEn: 'Overall Achievement %',
               value: '${summary.overallAchievementPct.toStringAsFixed(1)}%',
               subtitleAr: summary.overallAchievementPct >= 100
-                  ? 'تجاوز المستهدف'
+                  ? 'فوق المستهدف'
                   : (summary.overallAchievementPct >= 85
                       ? 'قريب من المستهدف'
                       : 'أقل من المستهدف'),
@@ -1357,7 +1357,7 @@ onChanged: m3Legacy<String>((v) {
                               ),
                               const DataColumn(
                                 numeric: true,
-                                label: Text('المحقق الفعلي (Actual EGP)'),
+                                label: Text('المحقق (ج.م)'),
                               ),
                               const DataColumn(
                                 numeric: true,
@@ -1773,14 +1773,14 @@ onChanged: m3Legacy<String>((v) {
                       context,
                       icon: Icons.inventory_rounded,
                       label:
-                          'إجمالي بضاعة السلسلة المستهدفة: ${CurrencyFormatter.formatNumber(target.targetUnits.round())} كرتونة (${target.targetWeightTons.toStringAsFixed(1)} طن)',
+                          'الكمية المستهدفة للسلسلة: ${CurrencyFormatter.formatNumber(target.targetUnits.round())} كرتونة (${target.targetWeightTons.toStringAsFixed(1)} طن)',
                       color: colorScheme.primary,
                     ),
                     _buildInfoPill(
                       context,
                       icon: Icons.shield_rounded,
                       label:
-                          'إجمالي التوريد شامل احتياطي المرتجعات (+${target.historicalReturnRatePct.toStringAsFixed(1)}%): ${CurrencyFormatter.formatNumber(target.grossTargetUnits.round())} كرتونة (${CurrencyFormatter.formatCompactEGP(target.grossTargetRevenueEgp)})',
+                          'Sell-In شامل احتياطي المرتجعات (+${target.historicalReturnRatePct.toStringAsFixed(1)}%): ${CurrencyFormatter.formatNumber(target.grossTargetUnits.round())} كرتونة (${CurrencyFormatter.formatCompactEGP(target.grossTargetRevenueEgp)})',
                       color: M3StatusColors.of(context).accents.teal,
                     ),
                     _buildInfoPill(
@@ -1794,7 +1794,7 @@ onChanged: m3Legacy<String>((v) {
                       context,
                       icon: Icons.category_rounded,
                       label:
-                          'القطاعات: منظفات (MT) ${CurrencyFormatter.formatCompactEGP(target.mtTargetRevenueEgp)} • عناية بالسيارات رابيدو (CC) ${CurrencyFormatter.formatCompactEGP(target.ccTargetRevenueEgp)}',
+                          'القطاعات: منظفات ${CurrencyFormatter.formatCompactEGP(target.mtTargetRevenueEgp)} • العناية بالسيارات ${CurrencyFormatter.formatCompactEGP(target.ccTargetRevenueEgp)}',
                       color: M3StatusColors.of(context).accents.indigo,
                     ),
                   ],
@@ -2068,7 +2068,7 @@ onChanged: m3Legacy<String>((v) {
               ),
               DataColumn(
                 numeric: true,
-                label: Text('بضاعة الفرع المستهدفة (كرتونة)'),
+                label: Text('كمية الفرع المستهدفة (كرتونة)'),
               ),
               DataColumn(
                 numeric: true,
@@ -2388,7 +2388,7 @@ onChanged: m3Legacy<String>((v) {
                     context,
                     icon: Icons.inventory_2_rounded,
                     label:
-                        'إجمالي بضاعة الفرع: ${CurrencyFormatter.formatNumber(branch.targetUnits.round())} كرتونة • ${branch.targetWeightTons.toStringAsFixed(2)} طن',
+                        'كمية الفرع: ${CurrencyFormatter.formatNumber(branch.targetUnits.round())} كرتونة • ${branch.targetWeightTons.toStringAsFixed(2)} طن',
                     color: M3StatusColors.of(context).accents.teal,
                   ),
                   _buildInfoPill(
@@ -2544,7 +2544,7 @@ options: m3OptionsFromMenuItems<String>(brands
                       (b) => DropdownMenuItem<String>(
                         value: b,
                         child: Text(
-                          b == 'all' ? 'كل الماركات' : b,
+                          b == 'all' ? 'كل العلامات التجارية' : b,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -2595,7 +2595,7 @@ options: m3OptionsFromMenuItems<String>([
                   const DropdownMenuItem(value: 'all', child: Text('كل الحالات')),
                   const DropdownMenuItem(
                     value: 'urgent_replenishment',
-                    child: Text('مخزون منخفض'),
+                    child: Text('إعادة طلب عاجلة'),
                   ),
                   const DropdownMenuItem(
                     value: 'optimal',
@@ -2715,12 +2715,12 @@ onChanged: m3Legacy<String>((v) {
         ),
         columns: [
           DataColumn(label: Text('الصنف ($scopeLabel)')),
-          const DataColumn(label: Text('الماركة والقطاع')),
+          const DataColumn(label: Text('العلامة التجارية والقطاع')),
           const DataColumn(numeric: true, label: Text('حصة الصنف %')),
           const DataColumn(numeric: true, label: Text('سعر الكرتونة (الخطة مقابل القائمة)')),
           const DataColumn(
             numeric: true,
-            label: Text('كمية البضاعة المستهدفة (كرتونة / قطعة)'),
+            label: Text('الكمية المستهدفة (كرتونة / وحدة)'),
           ),
           const DataColumn(
             numeric: true,
@@ -2838,7 +2838,7 @@ onChanged: m3Legacy<String>((v) {
                     ),
                     if (s.officialCartonExclVatEgp > 0)
                       Text(
-                        'كارتة: ${CurrencyFormatter.formatEGP(s.officialCartonExclVatEgp)}',
+                        'القائمة: ${CurrencyFormatter.formatEGP(s.officialCartonExclVatEgp)}',
                         style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                           fontSize: M3FontSize.tinyPlus,                           color: colorScheme.onSurfaceVariant,                         )),
                       ),
                   ],
@@ -2863,7 +2863,7 @@ onChanged: m3Legacy<String>((v) {
                         style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                           fontWeight: FontWeight.w900,                           color: colorScheme.primary,                           fontSize: M3FontSize.labelMediumPlus,                         )),
                       ),
                       Text(
-                        '${CurrencyFormatter.formatNumber(targetPieces)} قطعة ($packUnits وحدة/كرتونة)',
+                        '${CurrencyFormatter.formatNumber(targetPieces)} وحدة ($packUnits وحدات/كرتونة)',
                         style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                           fontSize: M3FontSize.tinyPlus,                           fontWeight: FontWeight.w700,                           color: M3StatusColors.of(context).accents.tealStrong,                         )),
                       ),
                     ],
@@ -3026,11 +3026,11 @@ onChanged: m3Legacy<String>((v) {
               DataColumn(numeric: true, label: Text('الوزن (طن)')),
               DataColumn(
                 numeric: true,
-                label: Text('منظفات MT / رابيدو CC'),
+                label: Text('منظفات / العناية بالسيارات'),
               ),
               DataColumn(
                 numeric: true,
-                label: Text('المحقق الفعلي (Actual EGP)'),
+                label: Text('المحقق (ج.م)'),
               ),
               DataColumn(label: Text('نسبة التحقيق %')),
             ],
@@ -3074,7 +3074,7 @@ onChanged: m3Legacy<String>((v) {
                   DataCell(Text('${r.targetWeightTons.toStringAsFixed(1)} طن')),
                   DataCell(
                     Text(
-                      'MT: ${CurrencyFormatter.formatCompactEGP(r.mtTargetRevenueEgp)} • CC: ${CurrencyFormatter.formatCompactEGP(r.ccTargetRevenueEgp)}',
+                      'منظفات: ${CurrencyFormatter.formatCompactEGP(r.mtTargetRevenueEgp)} • العناية بالسيارات: ${CurrencyFormatter.formatCompactEGP(r.ccTargetRevenueEgp)}',
                       style: M3TextVariants.cell,
                     ),
                   ),
@@ -3113,19 +3113,19 @@ onChanged: m3Legacy<String>((v) {
               DataColumn(label: Text('العلامة التجارية (Brand)')),
               DataColumn(label: Text('القطاع (Sector)')),
               DataColumn(numeric: true, label: Text('عدد الأصناف')),
-              DataColumn(numeric: true, label: Text('حصة الماركة %')),
+              DataColumn(numeric: true, label: Text('حصة العلامة التجارية %')),
               DataColumn(
                 numeric: true,
                 label: Text('المستهدف بالجنيه (Target EGP)'),
               ),
               DataColumn(
                 numeric: true,
-                label: Text('البضاعة المستهدفة (كرتونة)'),
+                label: Text('الكمية المستهدفة (كرتونة)'),
               ),
               DataColumn(numeric: true, label: Text('الوزن (طن)')),
               DataColumn(
                 numeric: true,
-                label: Text('المحقق الفعلي (Actual EGP)'),
+                label: Text('المحقق (ج.م)'),
               ),
               DataColumn(label: Text('نسبة التحقيق %')),
             ],
@@ -3219,7 +3219,7 @@ onChanged: m3Legacy<String>((v) {
               ),
               DataColumn(
                 numeric: true,
-                label: Text('بضاعة الشهر المستهدفة (كرتونة)'),
+                label: Text('كمية الشهر المستهدفة (كرتونة)'),
               ),
               DataColumn(numeric: true, label: Text('الوزن (طن)')),
               DataColumn(
@@ -3265,7 +3265,7 @@ onChanged: m3Legacy<String>((v) {
                   DataCell(Text('${m.targetWeightTons.toStringAsFixed(1)} طن')),
                   DataCell(
                     Text(
-                      '${CurrencyFormatter.formatEGP(m.actualRevenueEgp)} (${CurrencyFormatter.formatNumber(m.actualUnits.round())} ك)',
+                      '${CurrencyFormatter.formatEGP(m.actualRevenueEgp)} (${CurrencyFormatter.formatNumber(m.actualUnits.round())} كرتونة)',
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
