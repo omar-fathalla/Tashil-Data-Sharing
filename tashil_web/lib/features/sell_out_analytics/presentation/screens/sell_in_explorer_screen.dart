@@ -256,7 +256,10 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     return loaded.valueOrNull?.records ?? _records;
   }
 
+  int _stockReportGeneration = 0; // drops responses for an older chain/year/status
+
   Future<void> _loadStockReconciliationReport() async {
+    final gen = ++_stockReportGeneration;
     if (mounted) setState(() => _isLoadingStockReport = true);
     try {
       final res = await widget.apiClient.fetchCPFRDashboard(
@@ -264,6 +267,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
         year: _selectedYear > 0 ? _selectedYear : null,
         stockStatus: _stockStatusFilter,
       );
+      if (gen != _stockReportGeneration) return;
       if (mounted) {
         setState(() {
           _stockDashboard = res;
@@ -271,7 +275,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
         });
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && gen == _stockReportGeneration) {
         setState(() => _isLoadingStockReport = false);
       }
     }
@@ -1199,14 +1203,20 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                 style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.labelSmallPlus,                   fontWeight: FontWeight.w700,                   color: cs.onSurfaceVariant,                 )),
               ),
               const SizedBox(height: 2.0),
-              Text(
-                valueText,
-                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.bodyMediumLarge,                   fontWeight: FontWeight.w900,                   color: accentColor,                 )),
-              ),
-              Text(
-                subText,
-                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.tinyPlus,                   fontWeight: FontWeight.w600,                   color: cs.onSurfaceVariant,                 )),
-              ),
+              if (_isLoading) ...[
+                const M3SkeletonBox(key: ValueKey('sell_in_waterfall_skeleton'), width: 96.0, height: 18.0),
+                const SizedBox(height: 4.0),
+                const M3SkeletonBox(width: 140.0, height: 10.0),
+              ] else ...[
+                Text(
+                  valueText,
+                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.bodyMediumLarge,                   fontWeight: FontWeight.w900,                   color: accentColor,                 )),
+                ),
+                Text(
+                  subText,
+                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.tinyPlus,                   fontWeight: FontWeight.w600,                   color: cs.onSurfaceVariant,                 )),
+                ),
+              ],
             ],
           ),
         ],
@@ -1240,6 +1250,11 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_isLoading)
+          const Padding(
+            padding: EdgeInsets.only(bottom: M3Spacing.sm),
+            child: LinearProgressIndicator(key: ValueKey('sell_in_loading_bar'), year2023: false),
+          ),
         // 1. Summary KPI Row - Stretches across full horizontal width
         LayoutBuilder(
           builder: (context, constraints) {
@@ -1593,7 +1608,7 @@ onChanged: m3Legacy<int>((v) {
           child: _isLoading
               ? const Padding(
                   padding: EdgeInsets.all(48.0),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(child: CircularProgressIndicator(year2023: false)),
                 )
               : _records.isEmpty
                   ? Padding(
@@ -3695,20 +3710,27 @@ onChanged: m3Legacy<int>((v) {
             ],
           ),
           const SizedBox(height: 12.0),
-          Text(
-            value,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: colorScheme.onSurface,
+          // Never show the previous filter's numbers while a new response is loading.
+          if (_isLoading) ...[
+            const M3SkeletonBox(key: ValueKey('sell_in_kpi_skeleton'), width: 120.0, height: 28.0),
+            const SizedBox(height: 8.0),
+            const M3SkeletonBox(width: 180.0, height: 12.0),
+          ] else ...[
+            Text(
+              value,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: colorScheme.onSurface,
+              ),
             ),
-          ),
-          const SizedBox(height: 6.0),
-          Text(
-            subtitle,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+            const SizedBox(height: 6.0),
+            Text(
+              subtitle,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"io"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -34,6 +33,8 @@ type PaginatedSellInRecordsResponse struct {
 	TotalVAT14EGP                float64               `json:"total_vat_14_egp"`
 	TotalGrossInclVATEGP         float64               `json:"total_gross_incl_vat_egp"`
 	MatchedCatalogSKUsCount      int                   `json:"matched_catalog_skus_count"`
+	ByChain                      []SellInBreakdownItem `json:"by_chain,omitempty"`
+	ByBrand                      []SellInBreakdownItem `json:"by_brand,omitempty"`
 }
 
 // HandleSellInRecords serves GET /api/v1/analytics/sell-in-records for the Sell-In Explorer page.
@@ -74,6 +75,15 @@ func (h *AnalyticsHandler) HandleSellInRecords(w http.ResponseWriter, r *http.Re
 		}
 	}
 
+	// Totals in BigQuery (latest batch per chain/month, Stage B math); only the page comes from memory.
+	if resp, ok := h.sellInRecordsFromBigQuery(r.Context(), tenantID, filter); ok {
+		setRecordsSource(w, "bigquery")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+		return
+	}
+	setRecordsSource(w, "memory")
+
 	// First fetch all matching for accurate summary KPIs
 	allFilter := filter
 	allFilter.Limit = 0
@@ -82,59 +92,6 @@ func (h *AnalyticsHandler) HandleSellInRecords(w http.ResponseWriter, r *http.Re
 	if err != nil {
 		http.Error(w, `{"error":"failed to query sell-in records"}`, http.StatusInternalServerError)
 		return
-	}
-
-	var totVal, totCases, totTons, totExp float64
-	var totPieces int
-	var totListExcl, totListIncl, totDiscGranted, totVAT, totGrossIncl float64
-	matchedSkus := make(map[string]bool)
-
-	for _, rec := range allRecords {
-		totVal += rec.NetValueEGP
-		totCases += rec.NetQtyCases
-		totPieces += rec.TotalUnitsSupplied
-		totTons += rec.WeightTons
-		totExp += rec.ExpectedValueEGP
-
-		listExcl := rec.OfficialListValueExclEGP
-		if listExcl == 0 && rec.NetValueEGP != 0 {
-			listExcl = rec.NetValueEGP / 0.90
-		}
-		vatRate := rec.VATRate
-		if vatRate <= 0 {
-			vatRate = 0.14
-		}
-		listIncl := listExcl * (1.0 + vatRate)
-		grossIncl := rec.GrossValueInclVATEGP
-		if grossIncl == 0 && rec.NetValueEGP != 0 {
-			grossIncl = rec.NetValueEGP * (1.0 + vatRate)
-		}
-		vatAmt := rec.VATAmountEGP
-		if vatAmt == 0 && grossIncl != 0 {
-			vatAmt = grossIncl - rec.NetValueEGP
-		}
-		discAmt := rec.DiscountGrantedEGP
-		if discAmt == 0 && listExcl > rec.NetValueEGP && rec.NetValueEGP > 0 {
-			discAmt = listExcl - rec.NetValueEGP
-		}
-
-		totListExcl += listExcl
-		totListIncl += listIncl
-		totDiscGranted += discAmt
-		totVAT += vatAmt
-		totGrossIncl += grossIncl
-
-		if rec.ItemCode != "" {
-			matchedSkus[rec.ItemName] = true
-		}
-	}
-
-	effDiscPct := 10.0
-	if totListExcl > 0 {
-		effDiscPct = math.Round(((totListExcl-totVal)/totListExcl)*1000) / 10
-		if effDiscPct < 0 {
-			effDiscPct = 0
-		}
 	}
 
 	var pageRecords []domain.SellInRecord
@@ -147,26 +104,7 @@ func (h *AnalyticsHandler) HandleSellInRecords(w http.ResponseWriter, r *http.Re
 	} else {
 		pageRecords = []domain.SellInRecord{}
 	}
-
-	resp := PaginatedSellInRecordsResponse{
-		Records:                     pageRecords,
-		TotalCount:                  total,
-		Limit:                       limit,
-		Offset:                      offset,
-		TotalValueEGP:               math.Round(totVal*100) / 100,
-		TotalCases:                  math.Round(totCases*100) / 100,
-		TotalUnitsPieces:            totPieces,
-		TotalWeightTons:             math.Round(totTons*1000) / 1000,
-		TotalExpectedEGP:            math.Round(totExp*100) / 100,
-		TotalOfficialListExclVATEGP: math.Round(totListExcl*100) / 100,
-		TotalOfficialListInclVATEGP: math.Round(totListIncl*100) / 100,
-		TotalDiscountGrantedEGP:     math.Round(totDiscGranted*100) / 100,
-		EffectiveDiscountPct:        effDiscPct,
-		TotalNetExclVATEGP:          math.Round(totVal*100) / 100,
-		TotalVAT14EGP:               math.Round(totVAT*100) / 100,
-		TotalGrossInclVATEGP:        math.Round(totGrossIncl*100) / 100,
-		MatchedCatalogSKUsCount:     len(matchedSkus),
-	}
+	resp := buildSellInRecordsResponse(sellInTotalsFromRecords(allRecords), pageRecords, total, limit, offset)
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
