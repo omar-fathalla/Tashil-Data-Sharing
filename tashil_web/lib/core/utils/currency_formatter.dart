@@ -17,6 +17,9 @@ class CurrencyFormatter {
 
   /// Compact formatting for Bento cards: e.g. "1.45M ج.م" or "250K ج.م"
   static String formatCompactEGP(double amount) {
+    if (amount < 0) {
+      return '−${formatCompactEGP(-amount)}';
+    }
     if (amount >= 1000000) {
       final inM = amount / 1000000.0;
       return '${inM.toStringAsFixed(2)}M ج.م';
@@ -47,5 +50,32 @@ class CurrencyFormatter {
       return '${inK.toStringAsFixed(1)}K قطعة';
     }
     return '$count قطعة';
+  }
+
+  /// Chain margin amount. A loss reads "خسارة 21.36M ج.م" with no minus sign
+  /// (Lexicon rule); a profit is the plain amount. [compact] picks the
+  /// "21.36M" form, otherwise the full "21,360,308" form with separators.
+  static String formatMarginEGP(double amount, {bool compact = true}) {
+    final abs = amount.abs();
+    final text = compact ? formatCompactEGP(abs) : formatEGP(abs);
+    return amount < 0 ? 'خسارة $text' : text;
+  }
+
+  /// Margin percentage. A loss reads "خسارة 52.7%" (no minus sign); a profit
+  /// reads "هامش 12.3%".
+  static String formatMarginPct(double pct) {
+    final text = '${pct.abs().toStringAsFixed(1)}%';
+    return pct < 0 ? 'خسارة $text' : 'هامش $text';
+  }
+
+  /// Amount and percentage together, e.g. "خسارة 21.36M ج.م (52.7%)" or
+  /// "4.10M ج.م (هامش 12.3%)".
+  static String formatMarginSummary(double amount, double pct, {bool compact = true}) {
+    final money = compact ? formatCompactEGP(amount.abs()) : formatEGP(amount.abs());
+    final p = '${pct.abs().toStringAsFixed(1)}%';
+    if (amount < 0 || pct < 0) {
+      return 'خسارة $money ($p)';
+    }
+    return '$money (هامش $p)';
   }
 }

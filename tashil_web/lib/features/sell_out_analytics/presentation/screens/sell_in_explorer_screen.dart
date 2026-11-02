@@ -1885,9 +1885,7 @@ onChanged: m3Legacy<int>((v) {
               titleEn: 'Chain Margin',
               value: d.matchedSellOutPosValueEgp > 0 && d.matchedSellOutValueWithCostEgp <= 0
                   ? '—'
-                  : d.matchedChainGrossMarginEgp < 0
-                      ? 'خسارة ${CurrencyFormatter.formatCompactEGP(d.matchedChainGrossMarginEgp.abs())} (هامش −${d.matchedChainGrossMarginPct.abs().toStringAsFixed(1)}%)'
-                      : '${CurrencyFormatter.formatCompactEGP(d.matchedChainGrossMarginEgp)} (هامش ${d.matchedChainGrossMarginPct.toStringAsFixed(1)}%)',
+                  : CurrencyFormatter.formatMarginSummary(d.matchedChainGrossMarginEgp, d.matchedChainGrossMarginPct),
               subtitle: d.matchedMissingCostSellOutEgp > 0
                   ? 'محسوب على الأصناف المعروفة تكلفتها فقط • مستبعد ${CurrencyFormatter.formatCompactEGP(d.matchedMissingCostSellOutEgp)}'
                   : 'سعر البيع للمستهلك ناقص صافي تكلفة التوريد',
@@ -2232,9 +2230,7 @@ onChanged: m3Legacy<String>((v) {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      m.chainGrossMarginEgp < 0
-                                          ? '−${CurrencyFormatter.formatEGP(m.chainGrossMarginEgp.abs())}'
-                                          : CurrencyFormatter.formatEGP(m.chainGrossMarginEgp),
+                                      CurrencyFormatter.formatMarginEGP(m.chainGrossMarginEgp, compact: false),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w800,
                                         color: m.chainGrossMarginEgp < 0
@@ -2243,7 +2239,7 @@ onChanged: m3Legacy<String>((v) {
                                       ),
                                     ),
                                     Text(
-                                      'هامش السلسلة: ${m.chainGrossMarginPct < 0 ? '−' : ''}${m.chainGrossMarginPct.abs().toStringAsFixed(1)}%',
+                                      'هامش السلسلة: ${CurrencyFormatter.formatMarginPct(m.chainGrossMarginPct)}',
                                       style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.tinyPlus,                                         fontWeight: FontWeight.w700,                                         color: M3StatusColors.of(context).accents.positive,                                       )),
                                     ),
                                   ],
