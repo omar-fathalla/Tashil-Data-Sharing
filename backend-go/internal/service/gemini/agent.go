@@ -147,6 +147,11 @@ func applyTierMetadata(payload *domain.NormalizedRetailIngestionPayload, tier, m
 // tier2 is requested or the Tier 1 call fails.
 func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawContent []byte) (*domain.NormalizedRetailIngestionPayload, error) {
 	requestedTier := GetRequestedTier(ctx)
+	if !isReplay(ctx) {
+		if err := checkSellOutLayout(filename, rawContent); err != nil {
+			return nil, err
+		}
+	}
 
 	if c.useMock {
 		payload, err := c.mockAnalyze(filename, rawContent)

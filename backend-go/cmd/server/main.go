@@ -134,6 +134,17 @@ func main() {
 		// Converge on the durable Sell-In / Sell-Out rows (BigQuery) before serving, then keep polling for changes.
 		// Failures are logged per dataset and keep the archive-replayed data.
 		durableTenants := []string{"tenant-adeco"}
+		// Every archived upload must be stored in full in BigQuery: write files that are missing there and drop
+		// rows of deleted files (idempotent; a no-op once in sync). BQ_ARCHIVE_SYNC=report logs only, =off skips.
+		if mode := strings.ToLower(strings.TrimSpace(os.Getenv("BQ_ARCHIVE_SYNC"))); mode != "off" {
+			for _, t := range durableTenants {
+				rep, err := ingestProcessor.ReconcileArchivesToSink(context.Background(), t, mode != "report")
+				if err != nil {
+					log.Printf("WARN [archive-sync] tenant=%s: %v", t, err)
+				}
+				ingestion.LogArchiveSync(rep)
+			}
+		}
 		ingestProcessor.SyncDurableFromStore(context.Background(), "tenant-adeco", true)
 		go ingestProcessor.RunDurableSync(context.Background(), durableTenants, ingestion.DefaultDurableSyncInterval)
 	}
@@ -145,6 +156,11 @@ func main() {
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWTSecret, allowDemoTokens)
 	uploadHandler := handlers.NewUploadHandler(ingestProcessor)
 	analyticsHandler := handlers.NewAnalyticsHandler(bqRepo)
+	// Sell-Out explorer totals/SKU summaries/paging run in BigQuery when the sink is live
+	// (RECORDS_SOURCE=memory forces the in-memory path).
+	if bqs, ok := sink.(*bqsink.BigQuerySink); ok && os.Getenv("RECORDS_SOURCE") != "memory" {
+		analyticsHandler.WithRecordsQuerier(bqs)
+	}
 	oosHandler := handlers.NewOOSHandler(fsRepo).WithBigQueryRepo(bqRepo)
 	storeHandler := handlers.NewStoreHandler(fsRepo)
 	authHandler := handlers.NewAuthHandler(fsRepo, authMiddleware)

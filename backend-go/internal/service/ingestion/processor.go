@@ -226,6 +226,8 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 		return nil, fmt.Errorf("empty file uploaded")
 	}
 	var directSync *bqsink.Result
+	// The durable write runs after the file is archived so its rows carry the archive id.
+	var directSinkMode bqsink.SellOutMode
 
 	targetChain := ""
 	if len(targetChains) > 0 {
@@ -647,7 +649,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			if err := p.bqRepo.ReplaceTenantFacts(ctx, tenantID, validFacts); err != nil {
 				return nil, fmt.Errorf("failed to replace tenant facts in bigquery: %w", err)
 			}
-			directSync = p.sinkSellOut(ctx, bqsink.Meta{TenantID: tenantID, BatchID: batchID, SourceFile: filename}, validFacts, bqsink.ModeReplacePeriods)
+			directSinkMode = bqsink.ModeReplacePeriods
 			if err := p.bqRepo.SetTenantWorkbookAnalytics(ctx, tenantID, wbMeta); err != nil {
 				return nil, fmt.Errorf("failed to store workbook analytics in bigquery: %w", err)
 			}
@@ -679,7 +681,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			if err := p.bqRepo.InsertSellOutFacts(ctx, validFacts); err != nil {
 				return nil, fmt.Errorf("failed to stream facts to bigquery: %w", err)
 			}
-			directSync = p.sinkSellOut(ctx, bqsink.Meta{TenantID: tenantID, BatchID: batchID, SourceFile: filename}, validFacts, bqsink.ModeUpsertRecords)
+			directSinkMode = bqsink.ModeUpsertRecords
 			if len(wbMeta.PricingItems) > 0 || len(wbMeta.SupplierShares) > 0 {
 				_ = p.bqRepo.SetTenantWorkbookAnalytics(ctx, tenantID, wbMeta)
 			}
@@ -801,6 +803,14 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 		len(discoveredStores),
 		totalRevenue,
 	)
+
+	if directSinkMode != "" {
+		sinkMeta := bqsink.Meta{TenantID: tenantID, BatchID: batchID, SourceFile: filename}
+		if archivedEntry != nil {
+			sinkMeta.ArchiveID = archivedEntry.ID
+		}
+		directSync = p.sinkSellOut(ctx, sinkMeta, validFacts, directSinkMode)
+	}
 
 	res := &IngestionResult{
 		BatchID:                batchID,

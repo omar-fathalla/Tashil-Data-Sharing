@@ -1292,7 +1292,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
         accent: Color(0xFF9333EA),
         icon: Icons.storefront_rounded,
         displayNameAr: 'بيت الجملة',
-        displayNameEn: 'Beet El-Gomla',
+        displayNameEn: 'Beet El Gomla',
       );
     }
     if (c.contains('مؤسسات') ||

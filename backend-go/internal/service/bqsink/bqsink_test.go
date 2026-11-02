@@ -62,21 +62,26 @@ func TestPlanSellOutReplacePeriods(t *testing.T) {
 	if r[ColChainKey] != "fathalla" || r[ColPeriodMonth] != "2026-09" || r[ColPartitionDate] != "2026-09-30" || r[ColTenantID] != "tenant-adeco" || r[ColBatchID] != "b1" {
 		t.Fatalf("bad row meta: %+v", r)
 	}
-	var keys []string
-	for _, q := range p.Params {
-		if q.Name == "keys" {
-			keys = q.Value.([]string)
+	if r[ColWriteMode] != string(ModeReplacePeriods) {
+		t.Fatalf("write_mode not recorded: %+v", r)
+	}
+	// Every file is stored in full: a write only replaces rows of its own archive / batch / legacy same file,
+	// never other files' rows (no period- or record-based deletes).
+	if p.DeleteWhere != archiveDeleteWhere || strings.Contains(p.DeleteWhere, "period_month") || strings.Contains(p.DeleteWhere, "record_id") {
+		t.Fatalf("sell-out must delete by archive only: %s", p.DeleteWhere)
+	}
+	up := PlanSellOut(Meta{TenantID: "tenant-adeco", BatchID: "b1", ArchiveID: "arch_1"}, facts, ModeUpsertRecords, now)
+	if up.DeleteWhere != archiveDeleteWhere || up.Rows[0][ColWriteMode] != string(ModeUpsertRecords) || up.Rows[0][ColArchiveID] != "arch_1" {
+		t.Fatalf("upsert plan: %s %+v", up.DeleteWhere, up.Rows[0])
+	}
+	var gotArchive interface{}
+	for _, q := range up.Params {
+		if q.Name == "archive_id" {
+			gotArchive = q.Value
 		}
 	}
-	if strings.Join(keys, ",") != "fathalla|2026-09,gomla|2026-08" {
-		t.Fatalf("unexpected keys %v", keys)
-	}
-	if !strings.Contains(p.DeleteWhere, "UNNEST(@keys)") {
-		t.Fatalf("replace mode must delete by period keys: %s", p.DeleteWhere)
-	}
-	up := PlanSellOut(Meta{TenantID: "tenant-adeco", BatchID: "b1"}, facts, ModeUpsertRecords, now)
-	if !strings.Contains(up.DeleteWhere, "record_id IN (SELECT record_id FROM {{staging}})") {
-		t.Fatalf("upsert mode must delete by record_id: %s", up.DeleteWhere)
+	if gotArchive != "arch_1" {
+		t.Fatalf("archive_id param missing: %+v", up.Params)
 	}
 }
 
@@ -87,6 +92,9 @@ func TestPlanSellInAndProductMaster(t *testing.T) {
 	}, now)
 	if p.Rows[0][ColPeriodMonth] != "2026-03" || p.Rows[0][ColPartitionDate] != "2026-03-01" || p.Rows[0][ColChainKey] != "fathalla" {
 		t.Fatalf("bad sell-in row: %+v", p.Rows[0])
+	}
+	if p.DeleteWhere != archiveDeleteWhere {
+		t.Fatalf("sell-in must delete by archive only: %s", p.DeleteWhere)
 	}
 	pm := PlanProductMaster(Meta{TenantID: "tenant-adeco", BatchID: "b3"}, &domain.ProductMasterSummaryResponse{
 		SourceFilename: "pm.xlsx", Items: []domain.ProductMasterItem{{ItemCode: "FGCL-1", ActiveChains: []string{"fathalla"}}},

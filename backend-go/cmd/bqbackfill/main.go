@@ -7,7 +7,7 @@
 //
 //	TASHIL_ARCHIVE_DIR=/path/to/archive go run ./cmd/bqbackfill
 //
-// To actually write (requires credentials with the tashil-backend-sa roles):
+// To write missing files and drop rows of deleted files (requires tashil-backend-sa roles):
 //
 //	TASHIL_ARCHIVE_DIR=... PROJECT_ID=... BIGQUERY_DATASET=... go run ./cmd/bqbackfill -execute
 //
@@ -50,17 +50,33 @@ func main() {
 	for _, f := range list.Files {
 		fmt.Printf("  %-15s %-14s %-12s %s\n", f.FileType, f.TenantID, f.RetailChain, f.FileName)
 	}
-	if !*execute {
-		fmt.Println("dry run: pass -execute to load these into BigQuery")
-		return
-	}
 
+	// Compare every archived file with its rows in BigQuery (read-only), then with -execute write the
+	// missing files (keyed by archive id, idempotent) and drop rows of deleted files. The server runs the
+	// same reconcile on startup (BQ_ARCHIVE_SYNC), so this command is only needed for out-of-band runs.
 	sinkCfg := bqsink.ConfigFromEnv(cfg.ProjectID, cfg.BigQueryDataset)
 	sinkCfg.Enabled = true
 	p.WithSink(bqsink.New(context.Background(), sinkCfg))
-	_ = p.ClearTenantData(context.Background(), "all")
-	if err := p.BackfillArchiveToSink(context.Background()); err != nil {
-		log.Fatalf("backfill failed: %v", err)
+	tenants := map[string]bool{}
+	for _, f := range list.Files {
+		tenants[f.TenantID] = true
 	}
-	fmt.Println("backfill finished; check the ingestion_log table for per-file status")
+	for t := range tenants {
+		rep, err := p.ReconcileArchivesToSink(context.Background(), t, *execute)
+		if err != nil {
+			log.Printf("tenant %s: %v", t, err)
+		}
+		if rep == nil {
+			continue
+		}
+		for _, f := range rep.Files {
+			fmt.Printf("  %-14s %-45s archive=%-7d bq_before=%-7d legacy=%-7d bq_after=%-7d %s\n", f.Kind, f.FileName, f.ArchiveRows, f.StoredBefore, f.LegacyBefore, f.StoredAfter, f.Action)
+		}
+		for k, n := range rep.OrphanRows {
+			fmt.Printf("  orphan rows %s: %d (deleted=%v)\n", k, n, rep.OrphanDeleted[k])
+		}
+	}
+	if !*execute {
+		fmt.Println("dry run: pass -execute to write missing files and drop orphan rows")
+	}
 }

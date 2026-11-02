@@ -1,5 +1,3 @@
-(0) | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
-(0) | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 0 ج.م (10.0%) | 15.0 | FontWeight.w900 | ffe64a19 | 0.25 | 1.43
 0 ج.م (10.0%) | 15.0 | FontWeight.w900 | ffe64a19 | 0.25 | 1.43
 0 ج.م | 15.0 | FontWeight.w900 | ff00695c | 0.25 | 1.43
@@ -16,32 +14,26 @@
 0 ج.م | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 0 كرتونة | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 0 كرتونة | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
-0 كرتونة • 0 قطعة | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-0 كرتونة • 0 قطعة | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+0 كرتونة • 0 وحدة | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+0 كرتونة • 0 وحدة | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 0.0 طن | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 0.0 طن | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
-1. التوريد بالسعر الرسمي (قبل الخصم) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-1. التوريد بالسعر الرسمي (قبل الخصم) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-2. إجمالي الخصم التجاري الممنوح للسلسلة | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-2. إجمالي الخصم التجاري الممنوح للسلسلة | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+1. بالسعر الرسمي | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+1. بالسعر الرسمي | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+2. الخصم التجاري | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+2. الخصم التجاري | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-3. صافي التوريد الفعلي (غير شامل الضريبة) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-3. صافي التوريد الفعلي (غير شامل الضريبة) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-4. ضريبة القيمة المضافة (14% VAT) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-4. ضريبة القيمة المضافة (14% VAT) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-5. إجمالي الفواتير (شامل ضريبة 14%) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-5. إجمالي الفواتير (شامل ضريبة 14%) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-All Chains | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Chains | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Months | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Months | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Years | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-All Years | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+3. صافي Sell-In (بدون الضريبة) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+3. صافي Sell-In (بدون الضريبة) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+4. ضريبة القيمة المضافة (14%) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+4. ضريبة القيمة المضافة (14%) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+5. قيمة الفواتير | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+5. قيمة الفواتير | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 April (04) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 April (04) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 August (08) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -55,8 +47,6 @@ Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Data & Operation | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
-Data & Operation | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
 December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -67,8 +57,8 @@ February (02) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 February (02) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Gross Sell-In (Incl. 14% VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Gross Sell-In (Incl. 14% VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Gross Sell-In (incl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Gross Sell-In (incl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 January (01) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 January (01) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 July (07) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -86,36 +76,29 @@ Month | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Month | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Month | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Month | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+Net Sell-In (excl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Net Sell-In (excl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 October (10) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 October (10) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Remaining Stock and Reorder | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
-Remaining Stock and Reorder | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
-Sell In | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
-Sell In | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
-Sell In | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
-Sell In | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
-Sell In · Sell Out | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
-Sell In · Sell Out | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
-Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-In Analytics, Remaining Stock & Sheets Archive | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Quantity (cases) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Quantity (cases) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Sell-In Data | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
+Sell-In Data | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
+Sell-In | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Sell-In | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
+Sell-In | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
 September (09) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 September (09) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Target Management | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
-Target Management | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
-Total Cases & Pieces | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Total Cases & Pieces | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Total Net Sell-In (Excl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Total Net Sell-In (Excl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Total Weight (Tons) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Total Weight (Tons) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Upload Sell-In | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
-Upload Sell-In | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
-Upload Sell-In | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
-Uploaded Sheets | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
-Uploaded Sheets | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Stock & Reorder | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Stock & Reorder | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Targets | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Targets | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Uploaded Files (0) | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Uploaded Files (0) | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
+Weight (t) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Weight (t) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 Year | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
@@ -123,48 +106,65 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-إجمالي الفواتير شامل ضريبة 14% | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
-إجمالي الفواتير شامل ضريبة 14% | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
-إجمالي الكمية بالكرتونة والقطعة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
-إجمالي الكمية بالكرتونة والقطعة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 إجمالي المطالبة المالية على السلسلة | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 إجمالي المطالبة المالية على السلسلة | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 إجمالي الوزن الفعلي | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 إجمالي الوزن الفعلي | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 إجمالي صافي التوريد (غير شامل الضريبة) | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 إجمالي صافي التوريد (غير شامل الضريبة) | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
-اضغط على أي صنف بالجدول لفتح بطاقة الهوية (Product ID Card) | 11.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-اضغط على أي صنف بالجدول لفتح بطاقة الهوية (Product ID Card) | 11.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-بحث بالصنف أو الكرتونة | 13.0 | FontWeight.w300 | b345464f | 0.25 | 1.43
-بحث بالصنف أو الكرتونة | 13.0 | FontWeight.w300 | b345464f | 0.25 | 1.43
+ابحث بالصنف أو الكود أو الباركود | 13.0 | FontWeight.w300 | b345464f | 0.25 | 1.43
+ابحث بالصنف أو الكود أو الباركود | 13.0 | FontWeight.w300 | b345464f | 0.25 | 1.43
+اضغط على الصنف لعرض بياناته. | 11.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
+اضغط على الصنف لعرض بياناته. | 11.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
+التوريد للسلاسل والمخزون المتبقي والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+التوريد للسلاسل والمخزون المتبقي والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+التوريد للسلاسل والمخزون المتبقي والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
+الخصم التجاري عن قائمة الأسعار: 10.0% | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+الخصم التجاري عن قائمة الأسعار: 10.0% | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+الفرق بين السعر الرسمي وصافي الفاتورة: 10.0% | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+الفرق بين السعر الرسمي وصافي الفاتورة: 10.0% | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+الكمية | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+الكمية | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+المخزون وإعادة الطلب | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+المخزون وإعادة الطلب | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+المستهدفات | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+المستهدفات | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+الملفات المرفوعة | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+الملفات المرفوعة | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+بيانات التوريد | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
+بيانات التوريد | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
 تصدير | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
 تصدير | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
 تصدير | 11.0 | FontWeight.w700 | ff1a1b21 | 0.5 | 1.33
-خصم تجاري فعلي عن الكارتة: 10.0% | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-خصم تجاري فعلي عن الكارتة: 10.0% | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-خصم فعلي محسوب من الفرق بين السعر الرسمي وصافي الفاتورة: 10.0% | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-خصم فعلي محسوب من الفرق بين السعر الرسمي وصافي الفاتورة: 10.0% | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-شامل 14% ضريبة: 0 ج.م • 0 حركة | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-شامل 14% ضريبة: 0 ج.م • 0 حركة | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-شريط التدفق المالي والضريبي (Tax & Discount Waterfall — ربط مباشر مع كارتة الأصناف Product Master 2026) | 13.0 | FontWeight.w900 | ff1a1b21 | 0.1 | 1.43
-شريط التدفق المالي والضريبي (Tax & Discount Waterfall — ربط مباشر مع كارتة الأصناف Product Master 2026) | 13.0 | FontWeight.w900 | ff1a1b21 | 0.1 | 1.43
-شريط التدفق المالي والضريبي (Tax & Discount Waterfall — ربط مباشر مع كارتة الأصناف Product Master 2026) | 13.0 | FontWeight.w900 | ff1a1b21 | 0.1 | 1.43
+حسب قائمة الأسعار | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+حسب قائمة الأسعار | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+رفع ملف Sell-In | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+رفع ملف Sell-In | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+رفع ملف Sell-In | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+شامل الضريبة: 0 ج.م • 0 صف | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+شامل الضريبة: 0 ج.م • 0 صف | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 ضريبة القيمة المضافة: 0 ج.م • المتوقع: 0 ج.م | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 ضريبة القيمة المضافة: 0 ج.م • المتوقع: 0 ج.م | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-ضريبة مبيعات 14% قانونية | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-ضريبة مبيعات 14% قانونية | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 طباعة | 11.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
 طباعة | 11.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
 طباعة | 11.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33
+قيمة الفواتير شامل الضريبة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+قيمة الفواتير شامل الضريبة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 كرتونة موردة للسلاسل | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 كرتونة موردة للسلاسل | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-لا توجد حركات توريد (Sell-In) مطابقة للفلتر المحدد حالياً. | 15.0 | FontWeight.w500 | ff45464f | 0.15 | 1.5
-لا توجد حركات توريد (Sell-In) مطابقة للفلتر المحدد حالياً. | 15.0 | FontWeight.w500 | ff45464f | 0.15 | 1.5
-منظومة التوريد للسلاسل التجارية (Sell-In)، حساب الأرصدة المتبقية (Sell-In − Sell-Out)، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
-منظومة التوريد للسلاسل التجارية (Sell-In)، حساب الأرصدة المتبقية (Sell-In − Sell-Out)، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
-منظومة التوريد للسلاسل التجارية (Sell-In)، حساب الأرصدة المتبقية (Sell-In − Sell-Out)، المستهدفات، وإدارة الشيتات المرفوعة تراكمياً | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
-وفق سعر الكرتونة بكارتة الأصناف | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
-وفق سعر الكرتونة بكارتة الأصناف | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+كل السلاسل | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السلاسل | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السنوات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل السنوات | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل الشهور | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+كل الشهور | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+لا توجد نتائج. جرّب تغيير الفلاتر. | 15.0 | FontWeight.w500 | ff45464f | 0.15 | 1.5
+لا توجد نتائج. جرّب تغيير الفلاتر. | 15.0 | FontWeight.w500 | ff45464f | 0.15 | 1.5
+من السعر الرسمي إلى الفاتورة (Price-to-Invoice Waterfall) | 13.0 | FontWeight.w900 | ff1a1b21 | 0.1 | 1.43
+من السعر الرسمي إلى الفاتورة (Price-to-Invoice Waterfall) | 13.0 | FontWeight.w900 | ff1a1b21 | 0.1 | 1.43
+من السعر الرسمي إلى الفاتورة (Price-to-Invoice Waterfall) | 13.0 | FontWeight.w900 | ff1a1b21 | 0.1 | 1.43
+— | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
+— | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 󰁘 | 20.0 | null | ff1565c0 | null | 1.0
 󰂾 | 18.0 | null | ff455a64 | null | 1.0
 󰃀 | 15.0 | null | ffffffff | null | 1.0
