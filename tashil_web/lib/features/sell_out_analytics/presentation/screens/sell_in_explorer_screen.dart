@@ -624,7 +624,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
         'صافي Sell-In (بدون الضريبة)': CurrencyFormatter.formatEGP(_data.totalValueEgp),
         'Sell-In شامل الضريبة': CurrencyFormatter.formatEGP(_data.totalGrossInclVatEgp),
         'الكراتين والوحدات': '${CurrencyFormatter.formatNumber(_data.totalCases.round())} كرتونة (${CurrencyFormatter.formatNumber(_data.totalUnitsPieces)} وحدة)',
-        'متوسط الخصم عن قائمة الأسعار': '${_data.effectiveDiscountPct.toStringAsFixed(1)}%',
+        'متوسط الخصم عن قائمة الأسعار': _data.totalOfficialListExclVatEgp > 0 ? '${_data.effectiveDiscountPct.toStringAsFixed(1)}%' : '—',
       },
     );
     final filename =
