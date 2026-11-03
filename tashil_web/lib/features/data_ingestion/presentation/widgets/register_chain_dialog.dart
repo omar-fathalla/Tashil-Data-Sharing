@@ -43,8 +43,9 @@ class RegisterChainButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (apiClient.currentUser?.canManageChains != true)
+    if (apiClient.currentUser?.canManageChains != true) {
       return const SizedBox.shrink();
+    }
     return OutlinedButton.icon(
       key: const ValueKey('register_chain_button'),
       onPressed: () => _register(context),
@@ -73,8 +74,9 @@ class RegisterChainButton extends StatelessWidget {
     } on ChainAlreadyRegisteredException catch (e) {
       if (context.mounted) M3Feedback.showWarning(context, e.message);
     } catch (e) {
-      if (context.mounted)
+      if (context.mounted) {
         M3Feedback.showError(context, '$e'.replaceFirst('Exception: ', ''));
+      }
     }
   }
 }

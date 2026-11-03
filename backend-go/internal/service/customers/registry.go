@@ -20,6 +20,7 @@ import (
 	"unicode"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 )
 
 const (
@@ -349,7 +350,7 @@ func (r *Registry) Partition(ctx context.Context, tenantID, filename, uploadChai
 			a.q.Months = append(a.q.Months, m)
 		}
 		sort.Strings(a.q.Months)
-		sug := Suggest(a.q.Name, approved)
+		sug := Suggest(a.q.Name, bigquery.ResolveSellInChain(a.q.Name, uploadChain), approved)
 		a.q.SuggestedName, a.q.SuggestedChain, a.q.SuggestionReason = sug.Name, sug.Chain, sug.Reason
 		a.q.Value = round2(a.q.Value)
 		a.q.Units = round2(a.q.Units)
