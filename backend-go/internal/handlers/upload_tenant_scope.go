@@ -6,14 +6,17 @@ import (
 	"strings"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
 )
 
 // resolveUploadTenant honours a requested tenant_id only for a verified super_admin. Anyone else may
-// send an empty or matching tenant_id (the token's tenant is used); a different one is refused with 403.
+// send an empty tenant_id or one naming their own tenant in any spelling ("adeco", "tenant-adeco",
+// "tenant_adeco"; see middleware.SameTenant); the TOKEN's own value is then returned, so a non-super_admin
+// is never routed anywhere but its token tenant. A different tenant is refused with 403.
 func resolveUploadTenant(w http.ResponseWriter, c *domain.UserClaims, tokenTenant, requested string) (string, bool) {
 	requested = strings.TrimSpace(requested)
-	if requested == "" || requested == tokenTenant {
+	if requested == "" || middleware.SameTenant(requested, tokenTenant) {
 		return tokenTenant, true
 	}
 	if c != nil && c.Role == domain.RoleSuperAdmin {
@@ -21,6 +24,16 @@ func resolveUploadTenant(w http.ResponseWriter, c *domain.UserClaims, tokenTenan
 	}
 	writeErr(w, http.StatusForbidden, "forbidden: you cannot upload to another tenant")
 	return "", false
+}
+
+// applySystemTenantOverride is the ?tenant= / X-Tenant-ID / form "tenant" rule of the general upload,
+// commit, archive list and archive download handlers: only a "system"/"all" token tenant (exact legacy
+// spellings, see middleware.IsSystemTenant) is replaced by a non-empty override; anyone else keeps its own.
+func applySystemTenantOverride(tokenTenant, override string) string {
+	if override != "" && middleware.IsSystemTenant(tokenTenant) {
+		return override
+	}
+	return tokenTenant
 }
 
 // requireSuperForReplace lets only a verified super_admin replace (delete) an existing archive.

@@ -3463,6 +3463,9 @@ onChanged: m3Legacy<int>((v) {
                               ),
                               DataCell(
                                 ArchiveActionsGroup(
+                                  // Replacing a Sell-In archive deletes the old one: super_admin only
+                                  // (the backend answers 403 for anyone else).
+                                  showEdit: widget.apiClient.currentUser?.isSuperAdmin ?? false,
                                   isEditing: isReplacing,
                                   isDeleting: isDeleting,
                                   onEdit: (isDeleting || isReplacing || _isUploading)
