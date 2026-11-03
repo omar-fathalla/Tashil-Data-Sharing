@@ -58,11 +58,11 @@ func TestArchivedSellInTotalsUnchanged(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		rs, _, err := gemini.ParseSellInPlanWorkbookWithReport("tenant-adeco", f, b, "fathalla")
+		rs, rep, err := gemini.ParseSellInPlanWorkbookWithReport("tenant-adeco", f, b, "fathalla")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, q := reg.Partition(context.Background(), "tenant-adeco", f, "fathalla", rs, false); len(q) != 0 {
+		if _, q := reg.PartitionLayout(context.Background(), "tenant-adeco", f, "fathalla", rep.Layout, rs, false); len(q) != 0 {
 			t.Errorf("%s: %d names would be quarantined, first %q", f, len(q), q[0].Name)
 		}
 	}

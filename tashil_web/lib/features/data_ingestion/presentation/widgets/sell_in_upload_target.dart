@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/data/available_years.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 
@@ -26,7 +27,7 @@ bool isExplicitChain(String? chain) {
 /// Chain options from the tenant chains API (the same source as the upload portal).
 List<M3DropdownOption<String>> chainOptions(List<RetailChainModel> chains) => [
       for (final c in chains)
-        if (isExplicitChain(c.code))
+        if (isExplicitChain(c.code) && c.registered)
           M3DropdownOption<String>(c.code, c.displayName.isNotEmpty ? c.displayName : c.code),
     ];
 
@@ -120,6 +121,12 @@ class _SellInUploadTargetDialogState extends State<_SellInUploadTargetDialog> {
               ],
               onChanged: (v) => setState(() => _month = v),
             ),
+            const SizedBox(height: M3Spacing.xs),
+            Text(
+              sellInPeriodHelpText,
+              key: const ValueKey('sellInUploadPeriodHelp'),
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
           ],
         ),
       ),
@@ -141,6 +148,28 @@ class _SellInUploadTargetDialogState extends State<_SellInUploadTargetDialog> {
   }
 }
 
+/// "شهور الملف (أغسطس، سبتمبر 2026)" for the months of a file when the user chose the sheet's
+/// own months; [months] are "2026-08" or "chain|2026-08".
+String describeSheetPeriod(Iterable<String> months) {
+  final byYear = <int, Set<int>>{};
+  for (final raw in months) {
+    final p = (raw.contains('|') ? raw.split('|').last : raw).split('-');
+    final y = p.isNotEmpty ? int.tryParse(p[0]) : null;
+    final m = p.length > 1 ? int.tryParse(p[1]) : null;
+    if (y == null || m == null || m < 1 || m > 12) continue;
+    (byYear[y] ??= <int>{}).add(m);
+  }
+  if (byYear.isEmpty) return 'شهور الملف';
+  final years = byYear.keys.toList()..sort();
+  final parts = [
+    for (final y in years) '${(byYear[y]!.toList()..sort()).map((m) => _monthsAr[m - 1]).join('، ')} $y',
+  ];
+  return 'شهور الملف (${parts.join(' • ')})';
+}
+
+/// Shown under the year/month fields of the upload dialog.
+const sellInPeriodHelpText = 'سيبها "من الملف" (موصى بيه). لو اخترت شهر والملف فيه شهور تانية، هنسألك تختار.';
+
 /// The longest the screen waits for a Sell-In upload job before it stops the spinner.
 const sellInUploadTimeout = Duration(minutes: 5);
 
@@ -155,14 +184,15 @@ String uploadFailureMessage(Object error) {
 }
 
 /// Shows an upload failure in an M3 dialog that stays until the user closes it.
-Future<void> showUploadFailureDialog(BuildContext context, String fileName, Object error) {
+/// [title] defaults to the rejected-upload title; a failed commit passes its own.
+Future<void> showUploadFailureDialog(BuildContext context, String fileName, Object error, {String? title}) {
   return showDialog<void>(
     context: context,
     builder: (ctx) {
       final theme = Theme.of(ctx);
       return AlertDialog(
         icon: Icon(AppIcons.error, color: theme.colorScheme.error),
-        title: const Text('الملف اترفض ومفيش حاجة اتحفظت'),
+        title: Text(title ?? 'الملف اترفض ومفيش حاجة اتحفظت'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -176,6 +206,94 @@ Future<void> showUploadFailureDialog(BuildContext context, String fileName, Obje
         ),
         actions: [
           FilledButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('تمام')),
+        ],
+      );
+    },
+  );
+}
+
+/// A saved upload where some customer names were held out of the totals until an admin confirms
+/// them. Never says "rejected": the counted rows are saved. [onOpenPending] opens the
+/// "customers needing confirmation" screen (the button is hidden when null).
+Future<void> showQuarantineSavedDialog(
+  BuildContext context, {
+  required String fileName,
+  required int validRows,
+  required double validValue,
+  required List<QuarantinedCustomerInfo> customers,
+  VoidCallback? onOpenPending,
+}) {
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) {
+      final theme = Theme.of(ctx);
+      return AlertDialog(
+        key: const ValueKey('quarantineSavedDialog'),
+        icon: Icon(AppIcons.warning, color: theme.colorScheme.tertiary),
+        title: const Text('الملف اتحفظ، وفيه صفوف محجوزة'),
+        content: SizedBox(
+          width: 420.0,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(fileName, style: theme.textTheme.titleSmall),
+                const SizedBox(height: M3Spacing.xs),
+                Text('اتحسب: $validRows صف • ${CurrencyFormatter.formatCompactEGP(validValue)}',
+                    style: theme.textTheme.bodyMedium),
+                const SizedBox(height: M3Spacing.xs),
+                Text('الصفوف دي برّه كل الإجماليات لحد ما الأدمن يأكد اسم العميل:',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                const SizedBox(height: M3Spacing.sm),
+                Table(
+                  columnWidths: const {0: FlexColumnWidth(3), 1: IntrinsicColumnWidth(), 2: IntrinsicColumnWidth()},
+                  defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                  children: [
+                    TableRow(children: [
+                      Text('العميل', style: theme.textTheme.labelMedium),
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(start: M3Spacing.sm),
+                        child: Text('الصفوف', style: theme.textTheme.labelMedium),
+                      ),
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(start: M3Spacing.sm),
+                        child: Text('القيمة', style: theme.textTheme.labelMedium),
+                      ),
+                    ]),
+                    for (final c in customers)
+                      TableRow(children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: Text(c.name, style: theme.textTheme.bodyMedium),
+                        ),
+                        Padding(
+                          padding: const EdgeInsetsDirectional.only(start: M3Spacing.sm),
+                          child: Text('${c.rows}', style: theme.textTheme.bodyMedium),
+                        ),
+                        Padding(
+                          padding: const EdgeInsetsDirectional.only(start: M3Spacing.sm),
+                          child: Text(CurrencyFormatter.formatCompactEGP(c.value), style: theme.textTheme.bodyMedium),
+                        ),
+                      ]),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('تمام')),
+          if (onOpenPending != null)
+            FilledButton.icon(
+              key: const ValueKey('openPendingCustomers'),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                onOpenPending();
+              },
+              icon: const Icon(AppIcons.pendingCustomers),
+              label: const Text('عملاء محتاجين تأكيد'),
+            ),
         ],
       );
     },

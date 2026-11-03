@@ -33,6 +33,7 @@ import '../widgets/sell_table_shared.dart';
 import '../../data/sell_in_explorer_repository.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 import '../../../../core/data/available_years.dart';
+import '../../../customer_registry/presentation/pending_customers_screen.dart';
 
 /// SellInExplorerScreen provides dedicated Supplier Sell-In (توريدات السلاسل):
 /// - Tab 0: بيانات وحركات الـ Sell-In (Sell-In Explorer Table, KPIs, Filters, Upload/Export)
@@ -343,7 +344,9 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
 
   Future<void> _loadChains() async {
     try {
-      final chains = await widget.apiClient.getRetailChains();
+      // Filters also list chains referenced by Sell-In data but not registered yet (e.g. زهران);
+      // upload targets keep registered chains only (chainOptions).
+      final chains = await widget.apiClient.getRetailChainsWithReferenced();
       if (!mounted) return;
       setState(() => _chains = chains);
     } catch (_) {
@@ -403,17 +406,36 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
         M3Feedback.showInfo(context, 'اتلغى الرفع ومفيش حاجة اتحفظت');
         return;
       }
-      final notes = uploadWarningsSummary(IngestionWarningsView(res.quarantinedCustomers.length, res.unknownBarcodes.length));
-      if (notes.isNotEmpty) M3Feedback.showWarning(context, notes);
-      final actionLabel = replaceArchiveId != null
-          ? 'تم استبدال الملف.'
-          : 'تم رفع الملف وإضافته للبيانات.';
-      M3Feedback.showSuccess(
-        context,
-        '$actionLabel (${picked.name}): ${res.validRows} صف • ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)}',
-      );
       _repo.invalidateAll();
       _repo.cache.invalidatePrefix(CacheStore.prefix(widget.apiClient.tenantId, TargetRepository.feature));
+      unawaited(AvailableYears.load(widget.apiClient, force: true));
+      if (res.quarantinedCustomers.isNotEmpty) {
+        // Saved, with some customer rows held out of totals: an M3 dialog, never "rejected".
+        await showQuarantineSavedDialog(
+          context,
+          fileName: picked.name,
+          validRows: res.validRows,
+          validValue: res.totalRevenue,
+          customers: res.quarantinedCustomers,
+          onOpenPending: () => Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => PendingCustomersScreen(apiClient: widget.apiClient),
+          )),
+        );
+        if (!mounted) return;
+        if (res.unknownBarcodes.isNotEmpty) {
+          M3Feedback.showWarning(context, uploadWarningsSummary(IngestionWarningsView(0, res.unknownBarcodes.length)));
+        }
+      } else {
+        final notes = uploadWarningsSummary(IngestionWarningsView(0, res.unknownBarcodes.length));
+        if (notes.isNotEmpty) M3Feedback.showWarning(context, notes);
+        final actionLabel = replaceArchiveId != null
+            ? 'تم استبدال الملف.'
+            : 'تم رفع الملف وإضافته للبيانات.';
+        M3Feedback.showSuccess(
+          context,
+          '$actionLabel (${picked.name}): ${res.validRows} صف • ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)}',
+        );
+      }
       await _loadAllData();
     } catch (e) {
       // Stop the spinner first, then show the server's Arabic reason (or the timeout) in a dialog.

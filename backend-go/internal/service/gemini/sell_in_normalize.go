@@ -29,6 +29,16 @@ func (e *SellInLayoutError) Error() string {
 		e.Filename, strings.Join(e.Missing, "، "))
 }
 
+// SellInChainRequiredError: a GP SOP export was uploaded without a chain ("", "all", "الكل"). The file
+// has no chain column, so it is rejected instead of defaulting to fathalla.
+type SellInChainRequiredError struct {
+	Filename string
+}
+
+func (e *SellInChainRequiredError) Error() string {
+	return fmt.Sprintf("الملف %s مفيهوش عمود للسلسلة، فلازم تختار السلسلة اللي الملف ده تبعها (مش «الكل») وترفعه تاني. مفيش حاجة اتحفظت.", e.Filename)
+}
+
 // SellInPeriodError: some rows have no readable month or year. The file is rejected as a whole.
 type SellInPeriodError struct {
 	Filename     string
@@ -349,7 +359,7 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 			RegionCode:         "ALX", // as served since in25/in26 were first loaded; the Branch column is an open decision
 			Governorate:        st.Governorate,
 			Sector:             "MT",
-			CustomerName:       st.BranchName,
+			CustomerName:       gpSOPCustomerName(cust, st.BranchName),
 			CustomerBranchCode: st.ID,
 			ItemGroup:          strings.TrimSpace(getCol(r, cols["item_code"])),
 			ItemName:           strings.TrimSpace(getCol(r, cols["item_name"])),
@@ -380,3 +390,13 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 
 // MonthNumToEN returns "Jan".."Dec" (exported for the ingestion package).
 func MonthNumToEN(m int) string { return monthNumToEN(m) }
+
+// gpSOPCustomerName is the customer as written in the file (same spelling the other layouts store),
+// not the store label «فرع <chain> - …», so one customer has one name across layouts. Names that were
+// already approved under the old label map back to it via customers/seed_aliases.json (item 7).
+func gpSOPCustomerName(raw, branchLabel string) string {
+	if strings.TrimSpace(raw) == "" {
+		return branchLabel
+	}
+	return strings.TrimSpace(raw)
+}

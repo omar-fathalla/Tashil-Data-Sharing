@@ -1164,10 +1164,9 @@ func parseFullTabularPayload(filename string, rawContent []byte) (*domain.Normal
 	// Consolidation index for large multi-supplier files so 250k+ rows aggregate cleanly in memory
 	consolidatedIdx := make(map[string]int)
 
+	// An unknown retailer is never treated as Gomla: the processor re-keys stores to the chain the
+	// uploader chose (this used to produce gom_ ids on qa_test uploads).
 	effectiveRetailerForStore := retailer
-	if effectiveRetailerForStore == "" {
-		effectiveRetailerForStore = "gomla"
-	}
 
 	for rowIdx, r := range dataRows {
 		if isRowEmpty(r) {
@@ -1969,7 +1968,7 @@ func resolveCanonicalStoreID(retailer, rawStore string) (string, bool) {
 			return BuildBranchStoreMetadata("beet-elgomla", rawStore).ID, true
 		}
 		return "bet_alex_smouha", false
-	case "gomla", "":
+	case "gomla":
 		switch {
 		case strings.Contains(lower, "nasr") || strings.Contains(rawStore, "مدينة نصر"):
 			return "gom_cairo_nasrcity", true
@@ -1989,6 +1988,10 @@ func resolveCanonicalStoreID(retailer, rawStore string) (string, bool) {
 		if strings.TrimSpace(rawStore) != "" {
 			return BuildBranchStoreMetadata(retailer, rawStore).ID, true
 		}
+		if strings.TrimSpace(retailer) == "" {
+			// No chain: never attribute the row to Gomla (it used to fall into the gomla case).
+			return "store_unassigned_main", false
+		}
 		return fmt.Sprintf("store_%s_main", strings.ToLower(strings.TrimSpace(retailer))), false
 	}
 }
@@ -2003,8 +2006,10 @@ func defaultStoreNameForRetailer(retailer string) string {
 		return "سبينيس - مول العرب"
 	case "beet-elgomla", "beet_elgomla":
 		return "فرع بيت الجملة - سموحة"
-	case "gomla", "":
+	case "gomla":
 		return "Gomla Market Nasr City"
+	case "":
+		return "فرع غير محدد"
 	default:
 		if name, ok := domain.GetCustomChainDisplayName(retailer); ok && name != "" {
 			return name + " - الفرع الرئيسي"

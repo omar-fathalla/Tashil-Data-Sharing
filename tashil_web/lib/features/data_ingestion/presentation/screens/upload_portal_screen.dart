@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
@@ -7,12 +9,15 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../widgets/ai_analysis_progress_card.dart';
 import '../widgets/anomaly_resolution_table.dart';
 import '../widgets/dropzone_file_picker.dart';
+import '../widgets/register_chain_dialog.dart';
+import '../widgets/sell_in_upload_target.dart';
 import '../widgets/upload_checks.dart';
 import '../../../../core/data/available_years.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
@@ -63,6 +68,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
   String _archiveYearFilter = 'all';
   String _archiveSearchQuery = '';
   bool _isLoadingArchive = true;
+  bool _archiveLoadFailed = false;
   String? _downloadingArchiveId;
   String? _deletingArchiveId;
   final TextEditingController _archiveSearchController = TextEditingController();
@@ -103,6 +109,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
   }
 
   String _describeTargetPeriod() {
+    if (_periodChoice == 'sheet') return describeSheetPeriod(_sheetMonths);
     if (_selectedYear == 'auto' && _selectedMonth == 'auto') {
       return 'اكتشاف تلقائي من الشيت (Auto)';
     }
@@ -128,6 +135,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
   // Answers the user gave to upload questions for the staged file; resent on commit.
   bool _replaceConfirmed = false;
   String? _periodChoice;
+  List<String> _sheetMonths = const [];
 
   /// Runs an upload/commit call, asking the user each server question (409) and resending with the answer.
   /// Returns null when the user cancels a question (nothing saved).
@@ -146,6 +154,9 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
         if (answer == null || q.kind == 'chain_required') return null;
         if (answer.replaceConfirmed) _replaceConfirmed = true;
         if (answer.periodChoice != null) _periodChoice = answer.periodChoice;
+        if (q.kind == 'period_conflict' && q.breakdown.isNotEmpty) {
+          _sheetMonths = [for (final b in q.breakdown) b.month];
+        }
       }
     }
     return null;
@@ -435,19 +446,33 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
   }
 
   Future<void> _loadArchive() async {
-    setState(() => _isLoadingArchive = true);
-    final resp = await widget.apiClient.getUploadedFilesArchive(
-      chain: _archiveChainFilter == 'all' ? null : _archiveChainFilter,
-      year: _archiveYearFilter == 'all' ? null : _archiveYearFilter,
-      searchQuery: _archiveSearchQuery.trim().isEmpty ? null : _archiveSearchQuery.trim(),
-      targetTenant: _selectedTenant,
-    );
-    if (mounted) {
-      setState(() {
-        _archivedFiles = resp.files;
-        _archiveChainCounts = resp.chainCounts;
-        _isLoadingArchive = false;
-      });
+    setState(() {
+      _isLoadingArchive = true;
+      _archiveLoadFailed = false;
+    });
+    try {
+      final resp = await widget.apiClient.getUploadedFilesArchive(
+        chain: _archiveChainFilter == 'all' ? null : _archiveChainFilter,
+        year: _archiveYearFilter == 'all' ? null : _archiveYearFilter,
+        searchQuery: _archiveSearchQuery.trim().isEmpty ? null : _archiveSearchQuery.trim(),
+        targetTenant: _selectedTenant,
+      );
+      if (mounted) {
+        setState(() {
+          _archivedFiles = resp.files;
+          _archiveChainCounts = resp.chainCounts;
+          _isLoadingArchive = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _archivedFiles = [];
+          _archiveChainCounts = {};
+          _archiveLoadFailed = true;
+          _isLoadingArchive = false;
+        });
+      }
     }
   }
 
@@ -531,6 +556,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
     });
     _replaceConfirmed = false;
     _periodChoice = null;
+    _sheetMonths = const [];
 
     try {
       final res = await _withUploadQuestions((replaceConfirmed, periodChoice) => widget.apiClient.uploadFile(
@@ -764,11 +790,13 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
           context,
           'تم حفظ واعتماد ${committedResult.validRows} صفاً لسلسلة $chainDisplayName بنجاح وتدفق البيانات إلى BigQuery',
         );
+        unawaited(AvailableYears.load(widget.apiClient, force: true));
       }
     } catch (e) {
       if (mounted) {
         setState(() => isCommitting = false);
-        M3Feedback.showError(context, 'فشل حفظ واعتماد البيانات: $e');
+        // Any 4xx/5xx from the commit (410 expired preview, 409 changed file...) in an M3 dialog.
+        await showUploadFailureDialog(context, result?.filename ?? '', e, title: 'الحفظ ماتمش ومفيش حاجة اتحفظت');
       }
     }
   }
@@ -1216,13 +1244,26 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
           ],
           M3Spacing.gapMD,
           _buildCompanyChainsEntryBox(colorScheme, theme),
+          if (widget.apiClient.currentUser?.canManageChains == true) ...[
+            M3Spacing.gapSM,
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: RegisterChainButton(
+                apiClient: widget.apiClient,
+                targetTenant: _selectedTenant,
+                onRegistered: (_) => _loadContext(),
+              ),
+            ),
+          ],
           M3Spacing.gapMD,
           LayoutBuilder(
             builder: (context, constraints) {
+              // Under 600px the fields stack and the labels are short Arabic (no clipped English).
+              final compact = constraints.maxWidth < 600;
               final chainDropdown = M3Dropdown<String?>(
 key: const ValueKey('ingestion_retail_chain_dropdown'),
 value: hasSelectedChain ? _selectedChain : null,
-label: 'سلسلة التجزئة المستهدفة (Target Retail Chain) *',
+label: compact ? 'السلسلة *' : 'سلسلة التجزئة المستهدفة (Target Retail Chain) *',
 leadingIcon: Icons.store_mall_directory_rounded,
 expand: true,
 errorText: _showChainRequiredError ? 'مطلوب' : null,
@@ -1249,7 +1290,7 @@ onChanged: m3Legacy<String?>((val) {
               final yearDropdown = M3Dropdown<String>(
 key: const ValueKey('ingestion_year_dropdown'),
 value: _selectedYear,
-label: 'سنة البيانات (Target Year)',
+label: compact ? 'السنة' : 'سنة البيانات (Target Year)',
 leadingIcon: Icons.calendar_today_rounded,
 expand: true,
 options: m3OptionsFromMenuItems<String>([
@@ -1267,7 +1308,7 @@ onChanged: m3Legacy<String>((val) {
               final monthDropdown = M3Dropdown<String>(
 key: const ValueKey('ingestion_month_dropdown'),
 value: _selectedMonth,
-label: 'الشهر المستهدف (Target Month)',
+label: compact ? 'الشهر' : 'الشهر المستهدف (Target Month)',
 leadingIcon: Icons.date_range_rounded,
 expand: true,
 options: m3OptionsFromMenuItems<String>([
@@ -1302,13 +1343,18 @@ onChanged: m3Legacy<String>((val) {
                 children: [
                   chainDropdown,
                   M3Spacing.gapSM,
-                  Row(
-                    children: [
-                      Expanded(child: yearDropdown),
-                      M3Spacing.hGapSM,
-                      Expanded(child: monthDropdown),
-                    ],
-                  ),
+                  if (compact) ...[
+                    yearDropdown,
+                    M3Spacing.gapSM,
+                    monthDropdown,
+                  ] else
+                    Row(
+                      children: [
+                        Expanded(child: yearDropdown),
+                        M3Spacing.hGapSM,
+                        Expanded(child: monthDropdown),
+                      ],
+                    ),
                 ],
               );
             },
@@ -1981,8 +2027,10 @@ onChanged: m3Legacy<String>((val) {
                   ),
                 ],
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 8.0,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
@@ -1998,7 +2046,6 @@ onChanged: m3Legacy<String>((val) {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8.0),
                   M3Button.tonal(
                     label: 'تحديث',
                     icon: Icons.refresh_rounded,
@@ -2067,6 +2114,33 @@ onChanged: m3Legacy<String>((val) {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24.0),
               child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_archiveLoadFailed)
+            Container(
+              key: const Key('archive_load_failed'),
+              padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16.0),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: M3Shape.radiusLg,
+                border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.4)),
+              ),
+              child: Column(
+                children: [
+                  Icon(AppIcons.cloudOff, size: 40.0, color: colorScheme.error),
+                  const SizedBox(height: 8.0),
+                  Text(
+                    'مقدرناش نحمّل الأرشيف',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8.0),
+                  TextButton.icon(
+                    onPressed: _loadArchive,
+                    icon: const Icon(AppIcons.refresh),
+                    label: const Text('إعادة المحاولة'),
+                  ),
+                ],
+              ),
             )
           else if (_archivedFiles.isEmpty)
             Container(
@@ -2178,11 +2252,14 @@ onChanged: m3Legacy<String>((val) {
                             children: [
                               Icon(Icons.storefront_rounded, size: 13.0, color: chainColor),
                               const SizedBox(width: 4.0),
-                              Text(
-                                file.chainNameAr,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: chainColor,
-                                  fontWeight: FontWeight.bold,
+                              Flexible(
+                                child: Text(
+                                  file.chainNameAr,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: chainColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ],
@@ -2315,11 +2392,14 @@ onChanged: m3Legacy<String>((val) {
       children: [
         Icon(icon, size: 14.0, color: theme.colorScheme.onSurfaceVariant),
         const SizedBox(width: 4.0),
-        Text(
-          text,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w500,
+        Flexible(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],

@@ -82,7 +82,7 @@ func (h *DataQualityHandler) HandleSummary(w http.ResponseWriter, r *http.Reques
 
 // HandlePatchStatus serves PATCH /api/v1/data-quality/issues/{id} with {"status": "...", "reason": "..."}.
 func (h *DataQualityHandler) HandlePatchStatus(w http.ResponseWriter, r *http.Request) {
-	c, ok := tmClaims(w, r)
+	c, ok := tmWriteClaims(w, r)
 	if !ok {
 		return
 	}

@@ -157,6 +157,14 @@ class HttpSwrCache {
     }
   }
 
+  /// Makes the next read of [url] (any headers) wait for a revalidation.
+  void expireUrl(Uri url) {
+    final prefix = '$url\n';
+    for (final e in _entries.entries) {
+      if (e.key.startsWith(prefix)) e.value.mustRevalidate = true;
+    }
+  }
+
   /// Drops every cached response without notifying (logout / session switch).
   void clear() {
     _generation++;

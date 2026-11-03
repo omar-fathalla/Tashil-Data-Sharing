@@ -15,6 +15,9 @@ type contextKey string
 
 const (
 	UserClaimsContextKey contextKey = "userClaims"
+	// VerifiedClaimsContextKey holds the token's claims before any X-Tenant-ID / X-Simulated-Role /
+	// X-Assigned-* header adjustment. Use it for authorization decisions that must not trust headers.
+	VerifiedClaimsContextKey contextKey = "verifiedUserClaims"
 )
 
 // CustomClaims matches the structure encoded into our JWTs.
@@ -143,6 +146,8 @@ func (a *AuthMiddleware) Handler(next http.Handler) http.Handler {
 			return
 		}
 
+		verified := *claims
+
 		// If client provided X-Tenant-ID switch header and user is Super Admin, allow context switch
 		if tenantHeader != "" && claims.Role == domain.RoleSuperAdmin && !strings.EqualFold(tenantHeader, "system") {
 			normHeader := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(tenantHeader)), "tenant-")
@@ -151,23 +156,23 @@ func (a *AuthMiddleware) Handler(next http.Handler) http.Handler {
 			}
 		}
 
-		// Allow optional RBAC role switcher headers within the user's authenticated tenant context
-		simRole := strings.TrimSpace(r.Header.Get("X-Simulated-Role"))
-		simChain := strings.TrimSpace(r.Header.Get("X-Assigned-Chain"))
-		simRegion := strings.TrimSpace(r.Header.Get("X-Assigned-Region"))
-		if simRole != "" {
-			if domain.UserRole(simRole) != domain.RoleSuperAdmin || a.allowDemoTokens || claims.Role == domain.RoleSuperAdmin {
+		// Role / chain / region simulation headers are honoured only for a verified super admin or in
+		// demo mode. For everyone else they are ignored, so a header can never widen access (a chain-A
+		// user cannot read chain B, a merchandiser cannot act as vendor_admin).
+		if verified.Role == domain.RoleSuperAdmin || a.allowDemoTokens {
+			if simRole := strings.TrimSpace(r.Header.Get("X-Simulated-Role")); simRole != "" {
 				claims.Role = domain.UserRole(simRole)
 			}
-		}
-		if simChain != "" {
-			claims.AssignedChain = simChain
-		}
-		if simRegion != "" {
-			claims.AssignedRegion = simRegion
+			if simChain := strings.TrimSpace(r.Header.Get("X-Assigned-Chain")); simChain != "" {
+				claims.AssignedChain = simChain
+			}
+			if simRegion := strings.TrimSpace(r.Header.Get("X-Assigned-Region")); simRegion != "" {
+				claims.AssignedRegion = simRegion
+			}
 		}
 
 		ctx := context.WithValue(r.Context(), UserClaimsContextKey, claims)
+		ctx = context.WithValue(ctx, VerifiedClaimsContextKey, &verified)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -224,6 +229,30 @@ func (a *AuthMiddleware) GenerateToken(claims domain.UserClaims, duration time.D
 }
 
 // GetUserClaims retrieves the authenticated UserClaims from request context.
+// GetVerifiedClaims returns the token claims before header-based role/tenant simulation.
+func GetVerifiedClaims(ctx context.Context) (*domain.UserClaims, bool) {
+	claims, ok := ctx.Value(VerifiedClaimsContextKey).(*domain.UserClaims)
+	return claims, ok
+}
+
+// WriteClaims returns the claims every write gate must use: the token's own role, user and chain
+// (never X-Simulated-Role / X-Assigned-*), with the tenant a super admin selected via X-Tenant-ID.
+func WriteClaims(ctx context.Context) (*domain.UserClaims, bool) {
+	v, ok := GetVerifiedClaims(ctx)
+	if !ok || v == nil {
+		// AuthMiddleware always stores verified claims; this only serves handler unit tests that
+		// inject claims directly (no headers are applied there).
+		return GetUserClaims(ctx)
+	}
+	out := *v
+	if out.Role == domain.RoleSuperAdmin {
+		if eff, ok := GetUserClaims(ctx); ok && eff != nil && strings.TrimSpace(eff.TenantID) != "" {
+			out.TenantID = eff.TenantID
+		}
+	}
+	return &out, true
+}
+
 func GetUserClaims(ctx context.Context) (*domain.UserClaims, bool) {
 	claims, ok := ctx.Value(UserClaimsContextKey).(*domain.UserClaims)
 	return claims, ok

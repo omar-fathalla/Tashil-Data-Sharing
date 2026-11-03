@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../../../core/data/available_years.dart';
+import '../../../core/network/backend_http.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/m3_spacing.dart';
@@ -65,6 +70,12 @@ class _PendingCustomersScreenState extends State<PendingCustomersScreen> {
         M3Feedback.showWarning(context, 'اتسجل القرار، بس فيه ملفات معرفناش نعيد حسابها: ${r.errors.join('، ')}');
       } else {
         M3Feedback.showSuccess(context, 'اتسجل القرار واتعاد حساب ${r.reappliedFiles.length} ملف');
+      }
+      // Reapplied rows may add a year (e.g. 2027) or change totals: refresh shared caches.
+      final api = widget.apiClient;
+      if (api != null) {
+        BackendHttp.cache.invalidateAll();
+        unawaited(AvailableYears.load(api, force: true));
       }
       await _load();
     } catch (err) {

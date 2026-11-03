@@ -101,7 +101,7 @@ func (h *CompetitorHandler) HandleListCustomSkus(w http.ResponseWriter, r *http.
 
 // HandleSaveCustomSku serves POST /api/v1/competitors/custom-skus (upsert by dedupe key).
 func (h *CompetitorHandler) HandleSaveCustomSku(w http.ResponseWriter, r *http.Request) {
-	c, ok := tmClaims(w, r)
+	c, ok := tmWriteClaims(w, r)
 	if !ok {
 		return
 	}
@@ -159,7 +159,7 @@ func (h *CompetitorHandler) HandleSaveCustomSku(w http.ResponseWriter, r *http.R
 
 // HandleDeleteCustomSku serves DELETE /api/v1/competitors/custom-skus/{id}
 func (h *CompetitorHandler) HandleDeleteCustomSku(w http.ResponseWriter, r *http.Request) {
-	c, ok := tmClaims(w, r)
+	c, ok := tmWriteClaims(w, r)
 	if !ok {
 		return
 	}

@@ -255,6 +255,20 @@ func (p *Processor) checkSellInPartialMonth(ctx context.Context, tenantID, filen
 		target[k].rows++
 		target[k].value += r.NetValueEGP
 	}
+	if p.customers != nil {
+		// Quarantined rows of other files count as "existing" too: a file whose rows all wait for a
+		// customer confirmation still holds the month, and confirming it later would replace it.
+		for k, q := range p.customers.QuarantinedByChainMonth(ctx, tenantID, filename) {
+			if incoming[k] == nil {
+				continue
+			}
+			if existing[k] == nil {
+				existing[k] = &agg{}
+			}
+			existing[k].rows += q.Rows
+			existing[k].value += q.Value
+		}
+	}
 	var bd []MonthSlice
 	for k, ex := range existing {
 		in := incoming[k]
@@ -294,11 +308,11 @@ func (p *Processor) checkSellInPartialMonth(ctx context.Context, tenantID, filen
 }
 
 // quarantineSellIn applies the customer registry (TOP RULE: exact approved names only).
-func (p *Processor) quarantineSellIn(ctx context.Context, tenantID, filename, chain string, records []domain.SellInRecord, persist bool) ([]domain.SellInRecord, []customers.QuarantinedCustomer, *UploadIssue) {
+func (p *Processor) quarantineSellIn(ctx context.Context, tenantID, filename, chain, layout string, records []domain.SellInRecord, persist bool) ([]domain.SellInRecord, []customers.QuarantinedCustomer, *UploadIssue) {
 	if p.customers == nil {
 		return records, nil, nil
 	}
-	kept, held := p.customers.Partition(ctx, tenantID, filename, chain, records, persist)
+	kept, held := p.customers.PartitionLayout(ctx, tenantID, filename, chain, layout, records, persist)
 	if len(held) == 0 {
 		return kept, nil, nil
 	}
@@ -471,7 +485,8 @@ func (p *Processor) PrecheckSellIn(ctx context.Context, tenantID, filename strin
 	recs, _, err := gemini.ParseSellInPlanWorkbookWithReport(tenantID, filename, raw, chain)
 	var layoutErr *gemini.SellInLayoutError
 	var periodErr *gemini.SellInPeriodError
-	if errors.As(err, &layoutErr) || errors.As(err, &periodErr) {
+	var chainErr *gemini.SellInChainRequiredError
+	if errors.As(err, &layoutErr) || errors.As(err, &periodErr) || errors.As(err, &chainErr) {
 		return err
 	}
 	if err != nil || len(recs) == 0 {
