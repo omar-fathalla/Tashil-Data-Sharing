@@ -1782,7 +1782,7 @@ var frozenStoreIDPrefixes = map[string]string{
 }
 
 // storeIDPrefixForChain keeps the historical chain[:3] prefix when it is plain alphanumeric, and
-// otherwise uses the first three alphanumerics (qa_test -> qat, not "qa_"). Returns "" when the
+// otherwise uses the first three alphanumerics (frozen codes above win, e.g. qa_test -> qa_). Returns "" when the
 // chain has fewer than three alphanumerics (caller keeps its default).
 func storeIDPrefixForChain(chain string) string {
 	if p, ok := frozenStoreIDPrefixes[chain]; ok {

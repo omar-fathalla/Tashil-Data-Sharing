@@ -308,11 +308,11 @@ func (p *Processor) checkSellInPartialMonth(ctx context.Context, tenantID, filen
 }
 
 // quarantineSellIn applies the customer registry (TOP RULE: exact approved names only).
-func (p *Processor) quarantineSellIn(ctx context.Context, tenantID, filename, chain string, records []domain.SellInRecord, persist bool) ([]domain.SellInRecord, []customers.QuarantinedCustomer, *UploadIssue) {
+func (p *Processor) quarantineSellIn(ctx context.Context, tenantID, filename, chain, layout string, records []domain.SellInRecord, persist bool) ([]domain.SellInRecord, []customers.QuarantinedCustomer, *UploadIssue) {
 	if p.customers == nil {
 		return records, nil, nil
 	}
-	kept, held := p.customers.Partition(ctx, tenantID, filename, chain, records, persist)
+	kept, held := p.customers.PartitionLayout(ctx, tenantID, filename, chain, layout, records, persist)
 	if len(held) == 0 {
 		return kept, nil, nil
 	}

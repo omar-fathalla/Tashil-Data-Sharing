@@ -184,3 +184,17 @@ func TestClearAndArchiveDeleteAreSuperAdminOnly(t *testing.T) {
 		t.Errorf("super_admin archive delete must pass the gate, got %d", rec.Code)
 	}
 }
+
+// N1: national_sales_manager is refused on upload; vendor_admin (and super_admin) pass the ingest gate.
+func TestUploadGateNSMRefusedVendorAdminPasses(t *testing.T) {
+	h, mw := writeGateMux(t)
+	if rec := hit(h, "POST", "/api/v1/ingest/upload", tokenFor(t, mw, domain.RoleNationalSalesManager), nil); rec.Code != http.StatusForbidden {
+		t.Errorf("national_sales_manager upload: want 403, got %d", rec.Code)
+	}
+	for _, role := range []domain.UserRole{domain.RoleVendorAdmin, domain.RoleSuperAdmin} {
+		rec := hit(h, "POST", "/api/v1/ingest/upload", tokenFor(t, mw, role), nil)
+		if rec.Code == http.StatusForbidden || rec.Code == http.StatusUnauthorized {
+			t.Errorf("%s upload must pass the gate, got %d %s", role, rec.Code, rec.Body.String())
+		}
+	}
+}

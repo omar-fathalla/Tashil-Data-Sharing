@@ -1439,7 +1439,11 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		return nil, err
 	}
 	allRecords := records
-	records, quarantined, qIssue := p.quarantineSellIn(ctx, tenantID, filename, targetChain, records, true)
+	layout := ""
+	if parseReport != nil {
+		layout = parseReport.Layout
+	}
+	records, quarantined, qIssue := p.quarantineSellIn(ctx, tenantID, filename, targetChain, layout, records, true)
 	if qIssue != nil {
 		warnings = append(warnings, *qIssue)
 	}

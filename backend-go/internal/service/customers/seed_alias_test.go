@@ -36,7 +36,7 @@ func TestSeedAliasesAllResolveApproved(t *testing.T) {
 		}
 		recs = append(recs, chainRec(newName, "fathalla"))
 	}
-	kept, q := r.Partition(ctx, "tenant-adeco", "in26.xlsx", "fathalla", recs, false)
+	kept, q := r.PartitionLayout(ctx, "tenant-adeco", "in26.xlsx", "fathalla", AliasLayout, recs, false)
 	if len(q) != 0 || len(kept) != 84 {
 		t.Fatalf("kept=%d quarantined=%d (%+v)", len(kept), len(q), q)
 	}
@@ -59,7 +59,7 @@ func TestSeedAliasDecisionOnOldNameWins(t *testing.T) {
 	if _, err := r.Decide(ctx, "tenant-adeco", old, StatusRejected, "", "", "admin@x"); err != nil {
 		t.Fatal(err)
 	}
-	kept, q := r.Partition(ctx, "tenant-adeco", "in26.xlsx", "fathalla", []domain.SellInRecord{chainRec(newName, "fathalla")}, false)
+	kept, q := r.PartitionLayout(ctx, "tenant-adeco", "in26.xlsx", "fathalla", AliasLayout, []domain.SellInRecord{chainRec(newName, "fathalla")}, false)
 	if len(kept) != 0 || len(q) != 1 || q[0].Status != StatusRejected {
 		t.Fatalf("rejected old name must hold the aliased row: kept=%d q=%+v", len(kept), q)
 	}
@@ -74,11 +74,37 @@ func TestSeedAliasExactOnlyAndSeedTenantOnly(t *testing.T) {
 		break
 	}
 	r := New(&MemoryStore{})
-	if _, q := r.Partition(ctx, "tenant-adeco", "x.xlsx", "fathalla", []domain.SellInRecord{chainRec(newName+" 2", "fathalla")}, false); len(q) != 1 {
+	if _, q := r.PartitionLayout(ctx, "tenant-adeco", "x.xlsx", "fathalla", AliasLayout, []domain.SellInRecord{chainRec(newName+" 2", "fathalla")}, false); len(q) != 1 {
 		t.Fatalf("near spelling must not be aliased: %+v", q)
 	}
-	kept, q := r.Partition(ctx, "tenant-other", "x.xlsx", "fathalla", []domain.SellInRecord{chainRec(newName, "fathalla")}, false)
+	kept, q := r.PartitionLayout(ctx, "tenant-other", "x.xlsx", "fathalla", AliasLayout, []domain.SellInRecord{chainRec(newName, "fathalla")}, false)
 	if len(q) != 1 || (len(kept) > 0 && kept[0].CustomerName != newName) {
 		t.Fatalf("alias must apply only to seed tenants: kept=%+v q=%+v", kept, q)
+	}
+}
+
+// B1: a Zahran or Gomla upload with «زهران - البيطاش» is never aliased to the Fathalla customer; it
+// goes to quarantine. Neither is a fathalla upload from another layout, nor a call without a layout.
+func TestSeedAliasOnlyForFathallaGPSOP(t *testing.T) {
+	ctx := context.Background()
+	const name = "زهران - البيطاش"
+	if _, ok := loadAliases(t)[name]; !ok {
+		t.Fatalf("%q must be one of the 84 aliases", name)
+	}
+	cases := []struct{ chain, layout string }{
+		{"zahran", AliasLayout}, {"gomla", AliasLayout}, {"zahran", "raw_plan"}, {"gomla", "clean_30_col"},
+		{"fathalla", "raw_plan"}, {"fathalla", "guided_template"}, {"fathalla", ""},
+	}
+	for _, c := range cases {
+		r := New(&MemoryStore{})
+		kept, q := r.PartitionLayout(ctx, "tenant-adeco", "z.xlsx", c.chain, c.layout, []domain.SellInRecord{chainRec(name, c.chain)}, false)
+		if len(kept) != 0 || len(q) != 1 || q[0].Name != name {
+			t.Errorf("chain=%s layout=%q: want quarantined under its own name, kept=%+v q=%+v", c.chain, c.layout, kept, q)
+		}
+	}
+	// Plain Partition (no layout) never aliases either.
+	r := New(&MemoryStore{})
+	if kept, q := r.Partition(ctx, "tenant-adeco", "f.xlsx", "fathalla", []domain.SellInRecord{chainRec(name, "fathalla")}, false); len(kept) != 0 || len(q) != 1 {
+		t.Errorf("Partition without layout aliased: kept=%+v q=%+v", kept, q)
 	}
 }
