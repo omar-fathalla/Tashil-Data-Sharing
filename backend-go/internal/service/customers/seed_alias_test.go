@@ -108,3 +108,21 @@ func TestSeedAliasOnlyForFathallaGPSOP(t *testing.T) {
 		t.Errorf("Partition without layout aliased: kept=%+v q=%+v", kept, q)
 	}
 }
+
+// S1: the parser normalizes the upload chain ("", "all", «فتح الله», "Fathalla Market") to fathalla on
+// every row; the alias gate uses that row chain, so all 84 still resolve approved with zero quarantine.
+func TestSeedAliasUsesNormalizedRowChain(t *testing.T) {
+	ctx := context.Background()
+	aliases := loadAliases(t)
+	for _, upload := range []string{"", "all", "فتح الله", "Fathalla Market", "FATHALLA"} {
+		var recs []domain.SellInRecord
+		for n := range aliases {
+			recs = append(recs, chainRec(n, "fathalla"))
+		}
+		r := New(&MemoryStore{})
+		kept, q := r.PartitionLayout(ctx, "tenant-adeco", "in26.xlsx", upload, AliasLayout, recs, false)
+		if len(q) != 0 || len(kept) != 84 {
+			t.Errorf("upload chain %q: kept=%d quarantined=%d", upload, len(kept), len(q))
+		}
+	}
+}

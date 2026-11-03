@@ -316,8 +316,11 @@ const AliasChain = "fathalla"
 // «فرع فتح الله - …» customer, so they apply ONLY to a fathalla upload parsed as gp_sop_export (where
 // those names are Fathalla's own branch labels). A Zahran or Gomla upload with the same name is never
 // aliased and goes through the normal approval check (TOP RULE: never attribute one customer's data to another).
-func (r *Registry) aliasApplies(tenantID, uploadChain, layout string) bool {
-	return layout == AliasLayout && strings.EqualFold(strings.TrimSpace(uploadChain), AliasChain) && r.seedApplies(tenantID)
+//
+// The raw upload chain is NOT compared: the parser normalizes it ("", "all", «فتح الله», "Fathalla
+// Market" -> fathalla), so the gate is the row's normalized RetailerChain, checked per row.
+func (r *Registry) aliasApplies(tenantID, layout string) bool {
+	return layout == AliasLayout && r.seedApplies(tenantID)
 }
 
 // PartitionLayout is Partition with the parse layout of the file (needed for the item-7 aliases;
@@ -337,7 +340,7 @@ func (r *Registry) PartitionLayout(ctx context.Context, tenantID, filename, uplo
 	}
 	held := map[string]*agg{}
 	var order []string
-	useAlias := r.aliasApplies(tenantID, uploadChain, layout)
+	useAlias := r.aliasApplies(tenantID, layout)
 	for _, rec := range records {
 		name := strings.TrimSpace(rec.CustomerName)
 		if name == "" {
