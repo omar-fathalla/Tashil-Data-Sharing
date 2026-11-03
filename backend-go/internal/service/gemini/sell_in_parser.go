@@ -217,7 +217,13 @@ func parseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, repor
 
 	// Build dynamic column index map for flexible/guided template formats
 	colMap := buildSellInHeaderMap(headerRow)
-	if !isClean30ColFormat && !isGuidedTemplateFormat && colMap["item_name"] < 0 && len(headerRow) < 25 {
+	// A narrow raw plan (only Customer / Item 1 / Year / Month / net Q / net V) is still a raw
+	// plan: detect it by its header names, not by width. Before this, a <25-column raw plan fell
+	// through to the AI fallback, which rebuilt the date from Year+Month and then rejected every
+	// row as "no clear month and year".
+	_, rawMissing := buildRawPlanHeaderMap(headerRow)
+	isNarrowRawPlan := len(rawMissing) == 0
+	if !isClean30ColFormat && !isGuidedTemplateFormat && colMap["item_name"] < 0 && len(headerRow) < 25 && !isNarrowRawPlan {
 		return nil, fmt.Errorf("file %s does not match standard single-sheet sell-in columns", filename)
 	}
 

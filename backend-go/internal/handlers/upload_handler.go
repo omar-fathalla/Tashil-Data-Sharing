@@ -128,6 +128,8 @@ func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Requ
 		fileBytes, _ = io.ReadAll(r.Body)
 	}
 
+	// Only the bundled Fathalla seed plan may default its chain; an uploaded file must name its chain.
+	fromSeed := len(fileBytes) == 0
 	if len(fileBytes) == 0 {
 		candidatePaths := []string{
 			"data/cpfr_seed/Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx",
@@ -157,7 +159,7 @@ func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Requ
 	if filename == "" {
 		filename = "CPFR_Sell_In_Plan.xlsx"
 	}
-	if targetChain == "" || targetChain == "all" {
+	if fromSeed && (targetChain == "" || targetChain == "all") {
 		targetChain = "fathalla"
 	}
 

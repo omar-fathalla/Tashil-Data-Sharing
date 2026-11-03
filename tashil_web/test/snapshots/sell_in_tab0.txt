@@ -38,8 +38,6 @@ April (04) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 April (04) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 August (08) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 August (08) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
@@ -49,14 +47,8 @@ Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 February (02) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 February (02) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Gross Sell-In (incl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Gross Sell-In (incl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 January (01) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null

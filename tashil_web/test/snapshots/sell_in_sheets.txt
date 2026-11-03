@@ -8,18 +8,10 @@ April (04) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 April (04) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 August (08) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 August (08) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 February (02) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 February (02) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 January (01) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 January (01) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 July (07) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -61,6 +53,10 @@ Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+أسواق فتح الله (Fathalla Market) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+أسواق فتح الله (Fathalla Market) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+اختار السلسلة | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
+اختار السلسلة | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
 ارفع أول ملف لتبدأ. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 ارفع أول ملف لتبدأ. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 ارفع ملف كل شهر (أو أكثر من شهر في ملف واحد)، ولن تُحذف الشهور السابقة. يمكنك استبدال أي ملف أو حذفه. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
@@ -81,14 +77,20 @@ Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 المستهدفات | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 الملفات المرفوعة | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
 الملفات المرفوعة | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
+الوكالة (El Wakala) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+الوكالة (El Wakala) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 بيانات التوريد | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 بيانات التوريد | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+بيت الجملة (Beet El Gomla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+بيت الجملة (Beet El Gomla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 تحديث | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
 تحديث | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
 تحديث | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-رفع ملف Sell-In | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
-رفع ملف Sell-In | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
-رفع ملف Sell-In | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
+جملة ماركت (Gomla Market) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+جملة ماركت (Gomla Market) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+رفع ملف Sell-In | 14.0 | FontWeight.w600 | 611a1b21 | 0.1 | null
+رفع ملف Sell-In | 14.0 | FontWeight.w600 | 611a1b21 | 0.1 | null
+رفع ملف Sell-In | 14.0 | FontWeight.w600 | 611a1b21 | 0.1 | null
 لا توجد ملفات مرفوعة بعد. | 15.0 | FontWeight.w500 | ff45464f | 0.15 | 1.5
 لا توجد ملفات مرفوعة بعد. | 15.0 | FontWeight.w500 | ff45464f | 0.15 | 1.5
 ملفات Sell-In المرفوعة | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
@@ -99,7 +101,7 @@ Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 󰃩 | 18.0 | null | ff1565c0 | null | 1.0
 󰉈 | 20.0 | null | ff45464f | null | 1.0
-󰉪 | 20.0 | null | ffffffff | null | 1.0
+󰉪 | 20.0 | null | 611a1b21 | null | 1.0
 󰌞 | 20.0 | null | ff404659 | null | 1.0
 󰌠 | 48.0 | null | ff45464f | null | 1.0
 󰎲 | 20.0 | null | ff45464f | null | 1.0

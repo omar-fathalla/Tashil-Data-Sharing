@@ -435,6 +435,19 @@ func sellOutPeriodChoice(ctx context.Context, requested string, sheet []MonthSli
 	return "", periodConflictError(form, sheet)
 }
 
+// sellInChainGuard: TOP RULE — an interactive Sell-In upload must name its chain. There is no
+// default chain (no fathalla fallback) and no guess from the file. Replays keep their stored chain.
+func sellInChainGuard(ctx context.Context, chain string) error {
+	if _, interactive := uploadGuards(ctx); !interactive {
+		return nil
+	}
+	switch strings.ToLower(strings.TrimSpace(chain)) {
+	case "", "all", "الكل":
+		return chainRequiredError("")
+	}
+	return nil
+}
+
 // chainRequiredError: TOP RULE — the AI-detected chain is only a suggestion, never applied by itself.
 func chainRequiredError(suggested string) *ConfirmationRequiredError {
 	msg := "اختار السلسلة اللي الملف ده تبعها قبل الرفع. مفيش حاجة اتحفظت."
@@ -449,6 +462,9 @@ func chainRequiredError(suggested string) *ConfirmationRequiredError {
 // PrecheckSellIn runs the blocking Sell-In checks without writing anything, so a caller can stop
 // before destructive steps (e.g. replacing an archived file).
 func (p *Processor) PrecheckSellIn(ctx context.Context, tenantID, filename string, raw []byte, chain string) error {
+	if err := sellInChainGuard(ctx, chain); err != nil {
+		return err
+	}
 	if err := formulaGuard(ctx, filename, raw); err != nil {
 		return err
 	}

@@ -194,8 +194,6 @@
 92.3% | 20.0 | FontWeight.w900 | ff1a1b21 | 0.0 | 1.33
 960 كرتونة (11,520 وحدة) | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
 960 كرتونة (11,520 وحدة) | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Chain Margin | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Chain Margin | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Chain | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
@@ -205,12 +203,6 @@ Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Chain | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 Remaining Stock | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Remaining Stock | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 Sell-In Data | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
@@ -255,6 +247,8 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
+أسواق فتح الله (Fathalla Market) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+أسواق فتح الله (Fathalla Market) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 أقل من التكلفة (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
 أقل من التكلفة (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
 أقل من التكلفة (0) | 12.0 | FontWeight.w600 | ff1a1b21 | null | null
@@ -349,6 +343,8 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 الملفات المرفوعة | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 النمو السنوي | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
 النمو السنوي | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
+الوكالة (El Wakala) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+الوكالة (El Wakala) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 بالكمية: +0.0% عن نفس الفترة من العام السابق | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 بالكمية: +0.0% عن نفس الفترة من العام السابق | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 بانتظار ملف Sell-Out | 10.5 | FontWeight.w700 | ffff6f00 | 0.25 | 1.43
@@ -403,6 +399,8 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 بانتظار ملف Sell-Out | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
 بيانات التوريد | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 بيانات التوريد | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
+بيت الجملة (Beet El Gomla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+بيت الجملة (Beet El Gomla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 تصدير CSV | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
 تصدير CSV | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
 تصدير CSV | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
@@ -411,6 +409,8 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 جل غسيل ملابس أوتوماتيك 3 لتر × 4 عبوة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
 جل غسيل ملابس أوتوماتيك 3 لتر × 4 عبوة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
 جل غسيل ملابس أوتوماتيك 3 لتر × 4 عبوة | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
+جملة ماركت (Gomla Market) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
+جملة ماركت (Gomla Market) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 حالة المخزون | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 حالة المخزون | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
 حالة المخزون | 13.0 | FontWeight.w600 | ff1a1b21 | null | null

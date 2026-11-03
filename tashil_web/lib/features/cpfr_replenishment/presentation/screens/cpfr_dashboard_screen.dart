@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../data_ingestion/presentation/widgets/upload_checks.dart';
+import '../../../data_ingestion/presentation/widgets/sell_in_upload_target.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/utils/export_columns.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
@@ -54,8 +55,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
   // Dynamic Company Retail Chains
   List<RetailChainModel> _companyChains = const [];
   String _selectedChain = 'all'; // all or specific chain code
-  String _uploadTargetChain =
-      'fathalla'; // target chain when uploading a Sell-In file
+  // TOP RULE: no default upload chain; '' until the user picks one.
+  String _uploadTargetChain = '';
   String? _lastUploadedSellInFilename;
 
   // Horizontal ScrollController for Monthly Reconciliation Table
@@ -88,10 +89,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
       if (mounted) {
         setState(() {
           _companyChains = chains;
-          if (_companyChains.isNotEmpty &&
-              (_uploadTargetChain == 'all' ||
-                  !_companyChains.any((c) => c.code == _uploadTargetChain))) {
-            _uploadTargetChain = _companyChains.first.code;
+          if (!_companyChains.any((c) => c.code == _uploadTargetChain)) {
+            _uploadTargetChain = '';
           }
         });
       }
@@ -150,21 +149,33 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
   }
 
   Future<void> _pickAndUploadSellInFile() async {
+    // TOP RULE: the chain is always explicit; ask when the selector is empty.
+    var targetChain = _uploadTargetChain;
+    int? targetYear;
+    int? targetMonth;
+    if (!isExplicitChain(targetChain)) {
+      final target = await askSellInUploadTarget(context,
+          chains: _companyChains, initialChain: _selectedChain);
+      if (target == null || !mounted) return;
+      targetChain = target.chain;
+      targetYear = target.year;
+      targetMonth = target.month;
+    }
     final picked = await WebFileHelper.pickFile(accept: '.xlsx,.xls,.csv');
     if (picked == null || picked.bytes.isEmpty) return;
 
     setState(() => _isUploadingSellIn = true);
     try {
-      final targetChain =
-          _uploadTargetChain != 'all' ? _uploadTargetChain : _selectedChain;
       if (!mounted) return;
       final res = await runUploadWithQuestions(context, (replaceConfirmed, periodChoice) => widget.apiClient.uploadSellInFile(
             filename: picked.name,
             fileBytes: picked.bytes,
             chain: targetChain,
+            year: targetYear,
+            month: targetMonth,
             replaceConfirmed: replaceConfirmed,
             periodChoice: periodChoice,
-          ));
+          ).timeout(sellInUploadTimeout));
       if (!mounted) return;
       if (res == null) {
         M3Feedback.showInfo(context, 'اتلغى الرفع ومفيش حاجة اتحفظت');
@@ -182,7 +193,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
       await _loadDashboard();
     } catch (e) {
       if (!mounted) return;
-      M3Feedback.showError(context, 'تعذر رفع ملف التوريد: $e');
+      setState(() => _isUploadingSellIn = false);
+      await showUploadFailureDialog(context, picked.name, e);
     } finally {
       if (mounted) {
         setState(() => _isUploadingSellIn = false);
@@ -825,9 +837,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                     value:
                         _companyChains.any((c) => c.code == _uploadTargetChain)
                             ? _uploadTargetChain
-                            : (_companyChains.isNotEmpty
-                                ? _companyChains.first.code
-                                : null),
+                            : null,
                     hint: 'اختر سلسلة التجزئة',
                     options: m3OptionsFromMenuItems<String?>([
                       for (final chain in _companyChains)

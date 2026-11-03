@@ -1250,6 +1250,9 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		_ = p.fsRepo.UnmarkArchiveDeleted(ctx, tenantID, "", filename)
 	}
 
+	if err := sellInChainGuard(ctx, targetChain); err != nil {
+		return nil, err
+	}
 	if err := formulaGuard(ctx, filename, fileBytes); err != nil {
 		return nil, err
 	}

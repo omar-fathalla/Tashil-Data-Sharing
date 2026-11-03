@@ -3,6 +3,7 @@ import 'package:tashil_web/core/utils/sheet_name_utils.dart';
 import 'package:tashil_web/core/widgets/m3_states.dart';
 import 'package:flutter/material.dart';
 import '../../../data_ingestion/presentation/widgets/upload_checks.dart';
+import '../../../data_ingestion/presentation/widgets/sell_in_upload_target.dart';
 import 'package:flutter/services.dart';
 import 'package:tashil_web/core/theme/m3_text_variants.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
@@ -101,7 +102,9 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   // Tab 3: Uploaded Sell-In Excel Sheets Archive State
   bool _isLoadingArchive = false;
   List<ArchivedExcelFileModel> _archivedSellInFiles = const [];
-  String _archiveUploadChain = 'fathalla';
+  // TOP RULE: no default chain. '' until the user picks one from the tenant chains list.
+  String _archiveUploadChain = '';
+  List<RetailChainModel> _chains = const [];
   int _archiveUploadYear = 0; // 0 = Auto-detect from sheet
   int _archiveUploadMonth = 0; // 0 = Auto-detect from sheet
   String? _deletingFileId;
@@ -128,6 +131,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     _repo = widget.repository ?? SellInExplorerRepository(widget.apiClient);
     _lastTenantId = widget.apiClient.tenantId;
     _loadAllData();
+    _loadChains();
     AvailableYears.load(widget.apiClient).then((o) {
       if (!mounted) return;
       if (!_yearTouched && _selectedYear != 0 && o.defaultYear != _selectedYear) {
@@ -337,12 +341,41 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     return '${mb.toStringAsFixed(2)} MB';
   }
 
+  Future<void> _loadChains() async {
+    try {
+      final chains = await widget.apiClient.getRetailChains();
+      if (!mounted) return;
+      setState(() => _chains = chains);
+    } catch (_) {
+      // The dropdowns stay empty and the upload asks again; nothing defaults to a chain.
+    }
+  }
+
+  /// Uploads one Sell-In file. TOP RULE: the chain is always explicit. [forceChain] comes from a
+  /// control the user set (archive form, or the archived file being replaced); otherwise a dialog
+  /// asks for it. The screen filters never set the period: year/month are sent only when chosen.
   Future<void> _pickAndUploadSellInFile({
     String? replaceArchiveId,
     String? forceChain,
     int? forceYear,
     int? forceMonth,
   }) async {
+    var targetChain = forceChain;
+    var targetYear = forceYear;
+    var targetMonth = forceMonth;
+    if (!isExplicitChain(targetChain)) {
+      if (_chains.isEmpty) await _loadChains();
+      if (!mounted) return;
+      final target = await askSellInUploadTarget(
+        context,
+        chains: _chains,
+        initialChain: _selectedChain,
+      );
+      if (target == null || !mounted) return;
+      targetChain = target.chain;
+      targetYear = target.year;
+      targetMonth = target.month;
+    }
     final picked = await WebFileHelper.pickFile(accept: '.xlsx,.xls,.csv');
     if (picked == null || picked.bytes.isEmpty) return;
 
@@ -353,28 +386,18 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       }
     });
     try {
-      final targetChain = forceChain ??
-          (_selectedChain != 'all' ? _selectedChain : _archiveUploadChain);
-      final targetYear = forceYear ??
-          (_selectedYear > 0
-              ? _selectedYear
-              : (_archiveUploadYear > 0 ? _archiveUploadYear : null));
-      final targetMonth = forceMonth ??
-          (_selectedMonth > 0
-              ? _selectedMonth
-              : (_archiveUploadMonth > 0 ? _archiveUploadMonth : null));
-
+      final chain = targetChain!;
       if (!mounted) return;
       final res = await runUploadWithQuestions(context, (replaceConfirmed, periodChoice) => widget.apiClient.uploadSellInFile(
             filename: picked.name,
             fileBytes: picked.bytes,
-            chain: targetChain,
+            chain: chain,
             replaceArchiveId: replaceArchiveId,
             year: targetYear,
             month: targetMonth,
             replaceConfirmed: replaceConfirmed,
             periodChoice: periodChoice,
-          ));
+          ).timeout(sellInUploadTimeout));
       if (!mounted) return;
       if (res == null) {
         M3Feedback.showInfo(context, 'اتلغى الرفع ومفيش حاجة اتحفظت');
@@ -393,8 +416,13 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       _repo.cache.invalidatePrefix(CacheStore.prefix(widget.apiClient.tenantId, TargetRepository.feature));
       await _loadAllData();
     } catch (e) {
+      // Stop the spinner first, then show the server's Arabic reason (or the timeout) in a dialog.
       if (!mounted) return;
-      M3Feedback.showError(context, e is UploadRejectedException ? 'تعذّر رفع الملف: ${e.message}' : 'تعذّر رفع الملف.');
+      setState(() {
+        _isUploading = false;
+        _replacingFileId = null;
+      });
+      await showUploadFailureDialog(context, picked.name, e);
     } finally {
       if (mounted) {
         setState(() {
@@ -1504,22 +1532,9 @@ options: m3OptionsFromMenuItems<String>([
                           value: 'all',
                           child: Text('كل السلاسل'),
                         ),
-                        const DropdownMenuItem(
-                          value: 'fathalla',
-                          child: Text('Fathalla Market'),
-                        ),
-                        const DropdownMenuItem(
-                          value: 'gomla',
-                          child: Text('Gomla Market'),
-                        ),
-                        const DropdownMenuItem(
-                          value: 'beet-elgomla',
-                          child: Text('Beet El Gomla'),
-                        ),
-                        const DropdownMenuItem(
-                          value: 'chain-1080314',
-                          child: Text('El Wakala'),
-                        ),
+                        for (final c in _chains)
+                          if (isExplicitChain(c.code))
+                            DropdownMenuItem(value: c.code, child: Text(c.displayName.isNotEmpty ? c.displayName : c.code)),
                       ]),
 onChanged: m3Legacy<String>((v) {
                         if (v != null) {
@@ -2002,22 +2017,9 @@ value: _selectedChain,
 label: 'Chain',
 options: m3OptionsFromMenuItems<String>([
                         const DropdownMenuItem(value: 'all', child: Text('كل السلاسل')),
-                        const DropdownMenuItem(
-                          value: 'fathalla',
-                          child: Text('Fathalla Market'),
-                        ),
-                        const DropdownMenuItem(
-                          value: 'gomla',
-                          child: Text('Gomla Market'),
-                        ),
-                        const DropdownMenuItem(
-                          value: 'beet-elgomla',
-                          child: Text('Beet El Gomla'),
-                        ),
-                        const DropdownMenuItem(
-                          value: 'chain-1080314',
-                          child: Text('El Wakala'),
-                        ),
+                        for (final c in _chains)
+                          if (isExplicitChain(c.code))
+                            DropdownMenuItem(value: c.code, child: Text(c.displayName.isNotEmpty ? c.displayName : c.code)),
                       ]),
 onChanged: m3Legacy<String>((v) {
                         if (v != null) {
@@ -3149,24 +3151,8 @@ onChanged: m3Legacy<String>((val) {
                         child: M3Dropdown<String>(
 value: _archiveUploadChain,
 label: 'السلسلة',
-options: m3OptionsFromMenuItems<String>([
-                            const DropdownMenuItem(
-                              value: 'fathalla',
-                              child: Text('Fathalla Market'),
-                            ),
-                            const DropdownMenuItem(
-                              value: 'gomla',
-                              child: Text('Gomla Market'),
-                            ),
-                            const DropdownMenuItem(
-                              value: 'beet-elgomla',
-                              child: Text('Beet El Gomla'),
-                            ),
-                            const DropdownMenuItem(
-                              value: 'chain-1080314',
-                              child: Text('El Wakala'),
-                            ),
-                          ]),
+hint: 'اختار السلسلة',
+options: chainOptions(_chains),
 onChanged: m3Legacy<String>((v) {
                             if (v != null) {
                               setState(() => _archiveUploadChain = v);
@@ -3238,7 +3224,7 @@ onChanged: m3Legacy<int>((v) {
                             vertical: 10.0,
                           ),
                         ),
-                        onPressed: _isUploading
+                        onPressed: _isUploading || !isExplicitChain(_archiveUploadChain)
                             ? null
                             : () => _pickAndUploadSellInFile(
                                   forceChain: _archiveUploadChain,
