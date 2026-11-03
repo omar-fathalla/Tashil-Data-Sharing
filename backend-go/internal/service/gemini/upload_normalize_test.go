@@ -154,10 +154,11 @@ func TestUncachedFormulaCells(t *testing.T) {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 	w, _ := zw.Create("xl/worksheets/sheet1.xml")
-	_, _ = w.Write([]byte(`<worksheet><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><f>A1*2</f><v>2</v></c><c r="C1"><f>A1*3</f></c><c r="D1"/></row></sheetData></worksheet>`))
+	_, _ = w.Write([]byte(`<worksheet><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><f>A1*2</f><v>2</v></c><c r="C1"><f>A1*3</f></c><c r="D1"/><c r="E1"><f>A1*4</f><v></v></c><c r="F1" t="str"><f>IF(A1,"","x")</f><v></v></c></row></sheetData></worksheet>`))
 	_ = zw.Close()
+	// C1 has no value; E1 has an empty <v></v> as openpyxl writes it; F1 is a real empty-string result.
 	rep := FindUncachedFormulaCells(buf.Bytes())
-	if rep.Count != 1 || len(rep.Cells) != 1 || rep.Cells[0] != "sheet1!C1" {
+	if rep.Count != 2 || len(rep.Cells) != 2 || rep.Cells[0] != "sheet1!C1" || rep.Cells[1] != "sheet1!E1" {
 		t.Fatalf("got %+v", rep)
 	}
 	if !strings.Contains(UncachedFormulaMessageAR(rep), "افتح الملف في إكسل واحفظه مرة تانية") {

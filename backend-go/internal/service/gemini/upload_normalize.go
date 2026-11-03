@@ -201,6 +201,7 @@ type UncachedFormulaReport struct {
 }
 
 var reCellOpen = regexp.MustCompile(`<c\b([^>]*?)(/?)>`)
+var reCachedValue = regexp.MustCompile(`<v(?:\s[^>]*)?>[^<]+</v>`)
 var reCellRef = regexp.MustCompile(`\br="([A-Z]+\d+)"`)
 
 // FindUncachedFormulaCells scans every worksheet of an XLSX for <c><f>..</f></c> without a <v> value.
@@ -246,7 +247,12 @@ func FindUncachedFormulaCells(raw []byte) UncachedFormulaReport {
 			if !bytes.Contains(body, []byte("<f")) {
 				continue
 			}
-			if bytes.Contains(body, []byte("<v>")) || bytes.Contains(body, []byte("<v ")) || bytes.Contains(body, []byte("<is>")) {
+			// An empty <v></v> (or <v/>) on a numeric cell is not a saved value: openpyxl writes it
+			// for a formula that was never calculated. Excel saves an empty-string result as
+			// t="str" with an empty <v>, which is a real cached value.
+			isStr := bytes.Contains(data[loc[2]:loc[3]], []byte(`t="str"`))
+			hasV := bytes.Contains(body, []byte("<v>")) || bytes.Contains(body, []byte("<v "))
+			if reCachedValue.Match(body) || (isStr && hasV) || bytes.Contains(body, []byte("<is>")) {
 				continue
 			}
 			rep.Count++
