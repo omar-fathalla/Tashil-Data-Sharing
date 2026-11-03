@@ -1993,11 +1993,18 @@ class UploadRejectedException implements Exception {
 /// Turns a refused upload/commit response into a typed exception: 409 = a question for the user
 /// (nothing saved), any other 4xx/5xx = rejection with the server's Arabic message.
 /// Returns normally for 2xx.
+/// Shown when the backend refuses an upload with 403 (another tenant, or a replace by a non-super_admin).
+const String uploadForbiddenMessage =
+    'مش مسموح لحسابك بالعملية دي: استبدال ملف مؤرشف أو الرفع لشركة تانية متاح للمشرف العام بس. مفيش حاجة اتحفظت.';
+
 void throwIfUploadRefused(int statusCode, String body, String fallbackMessage) {
   if (statusCode >= 200 && statusCode < 300) return;
   if (statusCode == 409) {
     final c = UploadConfirmationRequiredException.tryParse(body);
     if (c != null) throw c;
+  }
+  if (statusCode == 403) {
+    throw UploadRejectedException(uploadForbiddenMessage);
   }
   String message = '$fallbackMessage (HTTP $statusCode)';
   try {
@@ -8385,7 +8392,6 @@ class ApiClient {
     bool replaceConfirmed = false,
     String? periodChoice,
   }) async {
-    final cleanTenant = normalizeDataTenantSlug(tenantId);
     if (_deletedArchiveFileNames.remove(filename.trim().toLowerCase()) && kIsWeb) {
       SessionStorage.saveDeletedArchiveFileNames(_deletedArchiveFileNames);
     }
@@ -8395,9 +8401,10 @@ class ApiClient {
         SessionStorage.saveDeletedArchiveIds(_deletedArchiveIds);
       }
     }
+    // No tenant_id: the backend takes the tenant from the token (a super_admin switches tenant through the
+    // X-Tenant-ID header in _headers). Sending tenant-<slug> next to a bare-slug token caused the prod 403.
     final uri = Uri.parse(ApiEndpoints.loadSellInPlan).replace(
       queryParameters: {
-        'tenant_id': 'tenant-$cleanTenant',
         if (chain.isNotEmpty) 'chain': chain,
         if (replaceArchiveId != null && replaceArchiveId.isNotEmpty)
           'replace_archive_id': replaceArchiveId,
@@ -8410,7 +8417,6 @@ class ApiClient {
     try {
       final req = http.MultipartRequest('POST', uri);
       req.headers.addAll(_headers);
-      req.fields['tenant_id'] = 'tenant-$cleanTenant';
       req.fields['chain'] = chain;
       if (replaceArchiveId != null && replaceArchiveId.isNotEmpty) {
         req.fields['replace_archive_id'] = replaceArchiveId;
@@ -8444,7 +8450,7 @@ class ApiClient {
         return model;
       }
       // Rejected or needs an answer: nothing was saved, so never show a fake success.
-      if (resp.statusCode == 409 || resp.statusCode == 422 || !allowMockFallback) {
+      if (resp.statusCode == 403 || resp.statusCode == 409 || resp.statusCode == 422 || !allowMockFallback) {
         throwIfUploadRefused(resp.statusCode, resp.body, 'فشل رفع ملف التوريد');
       }
       throw Exception('فشل رفع ملف التوريد (${resp.statusCode})');

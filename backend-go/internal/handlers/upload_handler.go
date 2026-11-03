@@ -446,9 +446,7 @@ func (h *UploadHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 			tenantOverride = vals[0]
 		}
 	}
-	if tenantOverride != "" && (tenantID == "system" || tenantID == "all" || tenantID == "tenant-system" || tenantID == "tenant-all") {
-		tenantID = tenantOverride
-	}
+	tenantID = applySystemTenantOverride(tenantID, tenantOverride)
 
 	// Extract optional target retailer chain
 	targetChain := r.URL.Query().Get("chain")
@@ -557,9 +555,7 @@ func (h *UploadHandler) HandleCommit(w http.ResponseWriter, r *http.Request) {
 		}
 		req.TargetChain = qc
 	}
-	if req.Tenant != "" && (tenantID == "system" || tenantID == "all" || tenantID == "tenant-system" || tenantID == "tenant-all") {
-		tenantID = req.Tenant
-	}
+	tenantID = applySystemTenantOverride(tenantID, req.Tenant)
 
 	commitCtx := ingestion.WithUploadGuards(r.Context(), ingestion.UploadGuards{ReplaceConfirmed: req.ReplaceConfirmed, PeriodChoice: req.PeriodChoice})
 	if req.PeriodDate != "" {
@@ -669,9 +665,7 @@ func (h *UploadHandler) HandleListArchive(w http.ResponseWriter, r *http.Request
 	if tenantOverride == "" {
 		tenantOverride = r.Header.Get("X-Tenant-ID")
 	}
-	if tenantOverride != "" && (tenantID == "system" || tenantID == "all" || tenantID == "tenant-system" || tenantID == "tenant-all") {
-		tenantID = tenantOverride
-	}
+	tenantID = applySystemTenantOverride(tenantID, tenantOverride)
 
 	chainFilter := r.URL.Query().Get("chain")
 	yearFilter := r.URL.Query().Get("year")
@@ -708,9 +702,7 @@ func (h *UploadHandler) HandleDownloadArchivedFile(w http.ResponseWriter, r *htt
 	if tenantOverride == "" {
 		tenantOverride = r.Header.Get("X-Tenant-ID")
 	}
-	if tenantOverride != "" && (tenantID == "system" || tenantID == "all" || tenantID == "tenant-system" || tenantID == "tenant-all") {
-		tenantID = tenantOverride
-	}
+	tenantID = applySystemTenantOverride(tenantID, tenantOverride)
 
 	archiveID := r.PathValue("id")
 	if archiveID == "" {

@@ -13,6 +13,7 @@ class ArchiveActionsGroup extends StatelessWidget {
     required this.onDelete,
     this.isEditing = false,
     this.isDeleting = false,
+    this.showEdit = true,
   });
 
   final VoidCallback? onEdit;
@@ -20,6 +21,9 @@ class ArchiveActionsGroup extends StatelessWidget {
   final VoidCallback? onDelete;
   final bool isEditing;
   final bool isDeleting;
+
+  /// Hides the Edit (replace) segment, e.g. for users the backend would refuse a replace.
+  final bool showEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -41,15 +45,17 @@ class ArchiveActionsGroup extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _segment(
-                context,
-                label: 'Edit',
-                icon: AppIcons.edit,
-                busy: isEditing,
-                onPressed: onEdit,
-                color: colorScheme.primary,
-              ),
-              divider,
+              if (showEdit) ...[
+                _segment(
+                  context,
+                  label: 'Edit',
+                  icon: AppIcons.edit,
+                  busy: isEditing,
+                  onPressed: onEdit,
+                  color: colorScheme.primary,
+                ),
+                divider,
+              ],
               _segment(
                 context,
                 label: 'Download',

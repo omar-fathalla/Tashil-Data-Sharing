@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 )
@@ -33,9 +32,7 @@ func AssertTenantMatch(ctx context.Context, targetTenantID string) error {
 	}
 	// Only SuperAdmin can access any tenant, others must match their own
 	if claims.Role != domain.RoleSuperAdmin {
-		normUser := strings.TrimPrefix(strings.ToLower(claims.TenantID), "tenant-")
-		normTarget := strings.TrimPrefix(strings.ToLower(targetTenantID), "tenant-")
-		if normUser != normTarget {
+		if CanonicalTenant(claims.TenantID) != CanonicalTenant(targetTenantID) {
 			return fmt.Errorf("%w: user tenant '%s' cannot access '%s'", ErrTenantForbidden, claims.TenantID, targetTenantID)
 		}
 	}
