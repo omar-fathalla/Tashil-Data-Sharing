@@ -87,3 +87,22 @@ func TestDeleteTenantIsAlwaysTenantScoped(t *testing.T) {
 		t.Fatalf("noop: %+v", res)
 	}
 }
+
+// An empty filter must scan as zeros: every SUM in the totals/groups SQL is wrapped in IFNULL(.., 0).
+func TestSellInTotalsSQLSumsAreNullSafe(t *testing.T) {
+	totals, groups, _, _ := SellInTotalsSQL("p.d.t", SellInTotalsQuery{TenantID: "tenant-adeco", Year: 2031})
+	for name, sql := range map[string]string{"totals": totals, "groups": groups} {
+		sel := sql[strings.LastIndex(sql, " SELECT "):]
+		for i := 0; ; {
+			j := strings.Index(sel[i:], "SUM(")
+			if j < 0 {
+				break
+			}
+			j += i
+			if !strings.HasSuffix(sel[:j], "IFNULL(") {
+				t.Fatalf("%s: bare SUM at %q", name, sel[max(0, j-20):min(len(sel), j+30)])
+			}
+			i = j + 4
+		}
+	}
+}

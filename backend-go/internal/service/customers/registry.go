@@ -31,14 +31,51 @@ const (
 //go:embed seed_customers.json
 var seedJSON []byte
 
+// MonthStat is the quarantined share of one file in one month.
+type MonthStat struct {
+	Rows  int     `json:"rows" firestore:"rows"`
+	Value float64 `json:"value" firestore:"value"`
+}
+
+// Supersession records that a later upload replaced one month of a quarantined file (kept for
+// traceability; never deleted, so it can be restored).
+type Supersession struct {
+	Month string    `json:"month" firestore:"month"`
+	By    string    `json:"superseded_by" firestore:"superseded_by"`
+	At    time.Time `json:"superseded_at" firestore:"superseded_at"`
+}
+
 // FileStat is the quarantined share of one uploaded file for one customer name.
 type FileStat struct {
-	File   string    `json:"file" firestore:"file"`
-	Rows   int       `json:"rows" firestore:"rows"`
-	Value  float64   `json:"value" firestore:"value"`
-	Units  float64   `json:"units" firestore:"units"`
-	Months []string  `json:"months" firestore:"months"`
-	SeenAt time.Time `json:"seen_at" firestore:"seen_at"`
+	File       string               `json:"file" firestore:"file"`
+	Chain      string               `json:"chain,omitempty" firestore:"chain"` // stored chain of the rows at upload time
+	Rows       int                  `json:"rows" firestore:"rows"`
+	Value      float64              `json:"value" firestore:"value"`
+	Units      float64              `json:"units" firestore:"units"`
+	Months     []string             `json:"months" firestore:"months"`
+	ByMonth    map[string]MonthStat `json:"by_month,omitempty" firestore:"by_month"`
+	Superseded []Supersession       `json:"superseded,omitempty" firestore:"superseded"`
+	SeenAt     time.Time            `json:"seen_at" firestore:"seen_at"`
+}
+
+// IsSuperseded reports whether month m of this file was replaced by a later confirmed upload.
+func (f FileStat) IsSuperseded(m string) bool {
+	for _, s := range f.Superseded {
+		if s.Month == m {
+			return true
+		}
+	}
+	return false
+}
+
+// Live is false when every month of the file was superseded (the file must not be re-applied).
+func (f FileStat) Live() bool {
+	for _, m := range f.Months {
+		if !f.IsSuperseded(m) {
+			return true
+		}
+	}
+	return len(f.Months) == 0
 }
 
 // Entry is one customer name known to the registry.
@@ -150,6 +187,20 @@ type Registry struct {
 	now   func() time.Time
 	// SeedTenants are the tenants whose served data the embedded seed describes.
 	SeedTenants map[string]bool
+	// ChainOf returns the chain a row is stored under (set by the ingestion processor); nil = RetailerChain.
+	ChainOf func(domain.SellInRecord) string
+}
+
+// ChainOfName is the stored chain of a row with this customer name uploaded under chain.
+func (r *Registry) ChainOfName(name, chain string) string {
+	return r.chainOf(domain.SellInRecord{CustomerName: name, RetailerChain: chain})
+}
+
+func (r *Registry) chainOf(rec domain.SellInRecord) string {
+	if r.ChainOf != nil {
+		return r.ChainOf(rec)
+	}
+	return strings.ToLower(strings.TrimSpace(rec.RetailerChain))
 }
 
 type tenantCache struct {
@@ -239,6 +290,8 @@ func (r *Registry) Partition(ctx context.Context, tenantID, filename, uploadChai
 	type agg struct {
 		q      QuarantinedCustomer
 		months map[string]bool
+		by     map[string]MonthStat
+		chain  string
 		parent string
 		branch string
 	}
@@ -261,7 +314,8 @@ func (r *Registry) Partition(ctx context.Context, tenantID, filename, uploadChai
 		}
 		a := held[key]
 		if a == nil {
-			a = &agg{q: QuarantinedCustomer{Name: name, Status: StatusPending}, months: map[string]bool{}, parent: rec.ParentCustomer, branch: rec.CustomerBranchCode}
+			a = &agg{q: QuarantinedCustomer{Name: name, Status: StatusPending}, months: map[string]bool{}, by: map[string]MonthStat{},
+				chain: r.chainOf(rec), parent: rec.ParentCustomer, branch: rec.CustomerBranchCode}
 			if e != nil {
 				a.q.Status = e.Status
 			}
@@ -271,7 +325,12 @@ func (r *Registry) Partition(ctx context.Context, tenantID, filename, uploadChai
 		a.q.Rows++
 		a.q.Value += rec.NetValueEGP
 		a.q.Units += rec.NetQtyCases
-		a.months[fmt.Sprintf("%04d-%02d", rec.Year, rec.MonthNum)] = true
+		mk := fmt.Sprintf("%04d-%02d", rec.Year, rec.MonthNum)
+		a.months[mk] = true
+		ms := a.by[mk]
+		ms.Rows++
+		ms.Value = round2(ms.Value + rec.NetValueEGP)
+		a.by[mk] = ms
 	}
 	if len(held) == 0 {
 		// A file whose names are now all approved clears its old quarantine stats.
@@ -303,7 +362,7 @@ func (r *Registry) Partition(ctx context.Context, tenantID, filename, uploadChai
 		}
 		e := &st.Entries[i]
 		e.SuggestedName, e.SuggestedChain, e.SuggestionReason = sug.Name, sug.Chain, sug.Reason
-		e.Quarantine = append(e.Quarantine, FileStat{File: filename, Rows: a.q.Rows, Value: a.q.Value, Units: a.q.Units, Months: a.q.Months, SeenAt: now})
+		e.Quarantine = append(e.Quarantine, FileStat{File: filename, Chain: a.chain, Rows: a.q.Rows, Value: a.q.Value, Units: a.q.Units, Months: a.q.Months, ByMonth: a.by, SeenAt: now})
 		e.UpdatedAt = now
 		changed = true
 	}
@@ -329,6 +388,72 @@ func clearFileLocked(st *State, filename string) bool {
 		st.Entries[i].Quarantine = q
 	}
 	return changed
+}
+
+// QuarantinedByChainMonth sums the live quarantined rows of pending/approved names per
+// "chain|YYYY-MM", excluding one file (the file being uploaded) and superseded months.
+func (r *Registry) QuarantinedByChainMonth(ctx context.Context, tenantID, excludeFile string) map[string]MonthStat {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	st := r.stateLocked(ctx, tenantID)
+	out := map[string]MonthStat{}
+	for _, e := range st.Entries {
+		if e.Status != StatusPending && e.Status != StatusApproved {
+			continue
+		}
+		for _, f := range e.Quarantine {
+			if strings.EqualFold(strings.TrimSpace(f.File), strings.TrimSpace(excludeFile)) || f.Chain == "" {
+				continue
+			}
+			for m, ms := range f.ByMonth {
+				if f.IsSuperseded(m) {
+					continue
+				}
+				k := f.Chain + "|" + m
+				cur := out[k]
+				cur.Rows += ms.Rows
+				cur.Value = round2(cur.Value + ms.Value)
+				out[k] = cur
+			}
+		}
+	}
+	return out
+}
+
+// SupersedeMonths marks the quarantine stats of other files on the given "chain|YYYY-MM" keys as
+// superseded by byFile (the user confirmed the replacement). Nothing is deleted. Returns the count.
+func (r *Registry) SupersedeMonths(ctx context.Context, tenantID, byFile string, keys map[string]bool) int {
+	if len(keys) == 0 {
+		return 0
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	st := r.stateLocked(ctx, tenantID)
+	n := clearFileMonthsLocked(st, byFile, keys, r.now().UTC())
+	if n > 0 {
+		r.saveLocked(ctx, st)
+	}
+	return n
+}
+
+// clearFileMonthsLocked marks (never removes) the replaced months of other files' quarantine stats.
+func clearFileMonthsLocked(st *State, byFile string, keys map[string]bool, at time.Time) int {
+	n := 0
+	for i := range st.Entries {
+		for j := range st.Entries[i].Quarantine {
+			f := &st.Entries[i].Quarantine[j]
+			if strings.EqualFold(strings.TrimSpace(f.File), strings.TrimSpace(byFile)) {
+				continue
+			}
+			for _, m := range f.Months {
+				if keys[f.Chain+"|"+m] && !f.IsSuperseded(m) {
+					f.Superseded = append(f.Superseded, Supersession{Month: m, By: byFile, At: at})
+					n++
+				}
+			}
+		}
+	}
+	return n
 }
 
 func (r *Registry) saveLocked(ctx context.Context, st *State) {

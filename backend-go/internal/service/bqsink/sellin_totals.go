@@ -130,11 +130,12 @@ func SellInTotalsSQL(tableRef string, q SellInTotalsQuery) (totals, groups, page
 		// Handler-level fallback (no default 10%): discount = list - net when missing.
 		" e AS (SELECT *, IF(disc_r = 0 AND list_r > net0 AND net0 > 0, list_r - net0, disc_r) AS disc_f FROM d" +
 		" WHERE " + sellInWhere(q, &params) + ")"
-	sums := "COUNT(*) AS cnt, SUM(net0) AS net, SUM(q) AS cases, SUM(units_r) AS units," +
-		" SUM(list_r) AS list_excl, SUM(disc_f) AS disc"
-	totals = base + " SELECT " + sums + ", SUM(IFNULL(weight_tons, 0)) AS tons, SUM(IFNULL(expected_value_egp, 0)) AS expected," +
-		" SUM(list_r * (1 + vr)) AS list_incl, SUM(IF(list_r > 0, net0, 0)) AS net_with_list," +
-		" SUM(ROUND(gross_r - net0, 2)) AS vat, SUM(gross_r) AS gross," +
+	// IFNULL(SUM(..), 0): an empty filter (no rows) returns zeros, not NULLs that fail the scan.
+	sums := "COUNT(*) AS cnt, IFNULL(SUM(net0), 0) AS net, IFNULL(SUM(q), 0) AS cases, IFNULL(SUM(units_r), 0) AS units," +
+		" IFNULL(SUM(list_r), 0) AS list_excl, IFNULL(SUM(disc_f), 0) AS disc"
+	totals = base + " SELECT " + sums + ", IFNULL(SUM(IFNULL(weight_tons, 0)), 0) AS tons, IFNULL(SUM(IFNULL(expected_value_egp, 0)), 0) AS expected," +
+		" IFNULL(SUM(list_r * (1 + vr)), 0) AS list_incl, IFNULL(SUM(IF(list_r > 0, net0, 0)), 0) AS net_with_list," +
+		" IFNULL(SUM(ROUND(gross_r - net0, 2)), 0) AS vat, IFNULL(SUM(gross_r), 0) AS gross," +
 		" COUNT(DISTINCT IF(IFNULL(item_code, '') != '', IFNULL(item_name, ''), NULL)) AS matched_skus FROM e"
 	groups = base + " SELECT IFNULL(year, 0) AS year, IFNULL(month_num, 0) AS month_num, chain_r AS chain, IFNULL(brand, '') AS brand, " +
 		sums + " FROM e GROUP BY 1, 2, 3, 4 ORDER BY 1, 2, 3, 4"

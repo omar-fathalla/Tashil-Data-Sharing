@@ -255,6 +255,20 @@ func (p *Processor) checkSellInPartialMonth(ctx context.Context, tenantID, filen
 		target[k].rows++
 		target[k].value += r.NetValueEGP
 	}
+	if p.customers != nil {
+		// Quarantined rows of other files count as "existing" too: a file whose rows all wait for a
+		// customer confirmation still holds the month, and confirming it later would replace it.
+		for k, q := range p.customers.QuarantinedByChainMonth(ctx, tenantID, filename) {
+			if incoming[k] == nil {
+				continue
+			}
+			if existing[k] == nil {
+				existing[k] = &agg{}
+			}
+			existing[k].rows += q.Rows
+			existing[k].value += q.Value
+		}
+	}
 	var bd []MonthSlice
 	for k, ex := range existing {
 		in := incoming[k]

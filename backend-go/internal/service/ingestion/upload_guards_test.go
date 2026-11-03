@@ -156,7 +156,7 @@ func TestProcessSellInQuarantinesUnknownCustomer(t *testing.T) {
 	if _, err := reg.Decide(ctx, "tenant-adeco", res.QuarantinedCustomers[0].Name, customers.StatusApproved, "", "", "t"); err != nil {
 		t.Fatal(err)
 	}
-	applied, errs := p.ReapplySellInFiles(ctx, "tenant-adeco", []string{"in26.xlsx"})
+	applied, errs := p.ReapplySellInFiles(ctx, "tenant-adeco", []string{"in26.xlsx"}, []string{"fathalla"})
 	if len(applied) != 1 || len(errs) != 0 {
 		t.Fatalf("reapply: %v %v", applied, errs)
 	}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/config"
+	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/handlers"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
@@ -189,7 +190,28 @@ func main() {
 	storeHandler := handlers.NewStoreHandler(fsRepo)
 	authHandler := handlers.NewAuthHandler(fsRepo, authMiddleware)
 	portalHandler := handlers.NewPortalHandler(fsRepo)
-	adminHandler := handlers.NewAdminHandler(fsRepo)
+	adminHandler := handlers.NewAdminHandler(fsRepo).WithReferencedChains(func(tenantID string) []string {
+		// Read-only: chains named by SELLIN_CUSTOMER_CHAIN_MAP rules and chains present in Sell-In memory.
+		seen := map[string]bool{}
+		var out []string
+		add := func(c string) {
+			if c = strings.ToLower(strings.TrimSpace(c)); c != "" && !seen[c] {
+				seen[c] = true
+				out = append(out, c)
+			}
+		}
+		for _, r := range bigquery.ActiveSellInChainRules() {
+			add(r[1])
+		}
+		if snap, ok := interface{}(bqRepo).(interface {
+			SellInRecordsSnapshot(string) []domain.SellInRecord
+		}); ok {
+			for _, r := range snap.SellInRecordsSnapshot(tenantID) {
+				add(bigquery.ResolveSellInChain(r.CustomerName, r.RetailerChain))
+			}
+		}
+		return out
+	})
 	auditHandler := handlers.NewAuditHandler(fsRepo)
 	tradeMarketingHandler := handlers.NewTradeMarketingHandler(fsRepo, fsRepo).WithSalesSource(bqRepo)
 	competitorHandler := handlers.NewCompetitorHandler(fsRepo, fsRepo)

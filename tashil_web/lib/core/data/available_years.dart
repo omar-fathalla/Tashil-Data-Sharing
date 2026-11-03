@@ -54,11 +54,18 @@ class AvailableYears {
   /// Loads once; later calls return the cached value unless [force] is set (e.g. after an upload).
   static Future<YearOptions> load(ApiClient api, {bool force = false}) {
     if (_loaded && !force) return Future.value(notifier.value);
-    return _inFlight ??= _fetch(api).whenComplete(() => _inFlight = null);
+    final pending = _inFlight;
+    if (force && pending != null) {
+      // A request started before the upload may miss its year: fetch again after it.
+      return _inFlight = pending.then((_) => _fetch(api, force: true)).whenComplete(() => _inFlight = null);
+    }
+    return _inFlight ??= _fetch(api, force: force).whenComplete(() => _inFlight = null);
   }
 
-  static Future<YearOptions> _fetch(ApiClient api) async {
+  static Future<YearOptions> _fetch(ApiClient api, {bool force = false}) async {
     try {
+      // Skip a cached (pre-upload) answer.
+      if (force) BackendHttp.cache.expireUrl(Uri.parse(ApiEndpoints.dataYears));
       final res = await BackendHttp.get(Uri.parse(ApiEndpoints.dataYears), headers: api.requestHeaders)
           .timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {

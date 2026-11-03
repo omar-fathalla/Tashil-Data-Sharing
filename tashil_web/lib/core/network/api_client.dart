@@ -222,6 +222,10 @@ class RetailChainModel {
   final int storeCount;
   final String createdAt;
 
+  /// False for a chain code referenced by Sell-In data/rules but not registered yet
+  /// (`GET /admin/chains?include_referenced=1`): shown in filters, never offered as an upload target.
+  final bool registered;
+
   RetailChainModel({
     required this.chainId,
     this.tenantId = '',
@@ -230,6 +234,7 @@ class RetailChainModel {
     this.chainType = 'hypermarket',
     this.storeCount = 0,
     this.createdAt = '',
+    this.registered = true,
   });
 
   factory RetailChainModel.fromJson(Map<String, dynamic> json) {
@@ -241,6 +246,7 @@ class RetailChainModel {
       chainType: json['chain_type'] as String? ?? 'hypermarket',
       storeCount: (json['store_count'] as num?)?.toInt() ?? 0,
       createdAt: json['created_at'] as String? ?? '',
+      registered: json['registered'] != false,
     );
   }
 
@@ -331,6 +337,9 @@ class TenantUserModel {
       role == 'chain_kam';
 
   bool get canViewAuditLogs => isSuperAdmin || role == 'vendor_admin';
+
+  /// Chain create/update/delete (the server checks the verified JWT role too).
+  bool get canManageChains => isSuperAdmin || role == 'vendor_admin' || role == 'admin';
 
   TenantUserModel copyWith({
     String? userId,
@@ -4268,6 +4277,9 @@ class ApiClient {
     }
   }
 
+  /// Last successful archive answer per (tenant, filters); served when a later request fails.
+  final Map<String, UploadedFilesArchiveResponse> _lastArchiveByKey = {};
+
   /// Retrieves archived Excel/CSV files for the tenant, optionally filtered by retail chain, year, search query, and fileType ('sell_out' | 'sell_in').
   Future<UploadedFilesArchiveResponse> getUploadedFilesArchive({
     String? chain,
@@ -4280,6 +4292,7 @@ class ApiClient {
         ? targetTenant
         : tenantId;
     final cleanSlug = normalizeDataTenantSlug(effectiveTenant);
+    final archiveKey = [cleanSlug, chain ?? '', year ?? '', searchQuery?.trim() ?? '', fileType ?? ''].join('|');
     try {
       final queryParams = <String, String>{};
       if (chain != null && chain.isNotEmpty && chain != 'all' && chain != 'الكل') {
@@ -4321,15 +4334,28 @@ class ApiClient {
           final k = item.retailChain.toLowerCase();
           counts[k] = (counts[k] ?? 0) + 1;
         }
-        return UploadedFilesArchiveResponse(
+        final out = UploadedFilesArchiveResponse(
           tenantId: parsed.tenantId,
           totalCount: filteredFiles.length,
           chainCounts: counts,
           files: filteredFiles,
         );
+        _lastArchiveByKey[archiveKey] = out;
+        return out;
+      }
+      if (!allowMockFallback) {
+        throw ArchiveLoadException('HTTP ${resp.statusCode}');
       }
     } catch (e) {
       debugPrint('[ApiClient] Fallback getUploadedFilesArchive: $e');
+      if (!allowMockFallback) {
+        // Production: never show the local demo archive (other chains' files). Keep the last
+        // successful answer for the same filter, or let the screen show "couldn't load" + retry.
+        final last = _lastArchiveByKey[archiveKey];
+        if (last != null) return last;
+        if (e is ArchiveLoadException) rethrow;
+        throw ArchiveLoadException('$e');
+      }
     }
 
     _ensureLocalArchiveSeeded(cleanSlug);
@@ -7534,6 +7560,72 @@ class ApiClient {
           !_deletedChainCodes.contains('$cleanTenant:${c.code.toLowerCase()}') &&
           !_deletedChainCodes.contains(c.code.toLowerCase())),
     );
+  }
+
+  /// Registered chains plus chain codes referenced by Sell-In rules/data that are not registered
+  /// yet (`registered == false`). Read-only; nothing is cached or written. Falls back to
+  /// [getRetailChains] when the request fails.
+  Future<List<RetailChainModel>> getRetailChainsWithReferenced({String? targetTenant}) async {
+    final cleanTenant = normalizeDataTenantSlug(targetTenant ?? tenantId);
+    try {
+      final uri = Uri.parse(ApiEndpoints.adminChains).replace(
+        queryParameters: {'tenant_id': cleanTenant, 'include_referenced': '1'},
+      );
+      final headers = Map<String, String>.from(_headers);
+      headers['X-Tenant-ID'] = 'tenant-$cleanTenant';
+      if (currentUser?.isSuperAdmin == true) {
+        headers['X-Simulated-Role'] = 'vendor_admin';
+      }
+      final resp = await BackendHttp.get(uri, headers: headers).timeout(const Duration(seconds: 6));
+      if (resp.statusCode == 200) {
+        return (jsonDecode(resp.body) as List<dynamic>)
+            .map((e) => RetailChainModel.fromJson(e as Map<String, dynamic>))
+            .where((item) =>
+                !item.registered ||
+                (!_deletedChainCodes.contains('$cleanTenant:${item.code.toLowerCase()}') &&
+                    !_deletedChainCodes.contains(item.code.toLowerCase())))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] getRetailChainsWithReferenced ($cleanTenant): $e');
+    }
+    return getRetailChains(targetTenant: targetTenant);
+  }
+
+  /// Admin «Register chain»: create-if-absent on the server, with no offline fallback.
+  /// Throws [ChainAlreadyRegisteredException] on 409 and [Exception] (server Arabic message) otherwise.
+  Future<RetailChainModel> registerRetailChain({
+    required String displayName,
+    required String code,
+    String chainType = 'supermarket',
+    String? targetTenant,
+  }) async {
+    final cleanTenant = normalizeDataTenantSlug(targetTenant ?? tenantId);
+    final cleanCode = generateChainCode(displayName, customCode: code);
+    final uri = Uri.parse(ApiEndpoints.adminChains).replace(queryParameters: {'tenant_id': cleanTenant});
+    final headers = Map<String, String>.from(_headers);
+    headers['X-Tenant-ID'] = 'tenant-$cleanTenant';
+    final resp = await BackendHttp.post(
+      uri,
+      headers: headers,
+      body: jsonEncode({
+        'tenant_id': cleanTenant,
+        'display_name': displayName.trim(),
+        'code': cleanCode,
+        'chain_type': chainType,
+      }),
+    ).timeout(const Duration(seconds: 10));
+    if (resp.statusCode == 201 || resp.statusCode == 200) {
+      final created = RetailChainModel.fromJson(jsonDecode(resp.body) as Map<String, dynamic>);
+      _deletedChainCodes.remove(cleanCode);
+      _deletedChainCodes.remove('$cleanTenant:$cleanCode');
+      _registerInMemoryChain(created, tenantSlug: cleanTenant);
+      return created;
+    }
+    if (resp.statusCode == 409) {
+      throw ChainAlreadyRegisteredException(_extractBackendError(resp, 'السلسلة دي متسجلة بالفعل'));
+    }
+    throw Exception(_extractBackendError(resp, 'تعذّر تسجيل السلسلة'));
   }
 
   /// Create a new retail chain for the active (or specified) company tenant
@@ -13123,6 +13215,18 @@ class ProductMasterSummaryModel {
   }
 }
 
+/// The uploaded-files archive could not be loaded (production; no local demo fallback).
+class ArchiveLoadException implements Exception {
+  final String reason;
+  ArchiveLoadException(this.reason);
+  @override
+  String toString() => 'ArchiveLoadException: $reason';
+}
 
-
-
+/// 409 from «Register chain»: the code is already registered for this company (nothing changed).
+class ChainAlreadyRegisteredException implements Exception {
+  final String message;
+  ChainAlreadyRegisteredException(this.message);
+  @override
+  String toString() => message;
+}

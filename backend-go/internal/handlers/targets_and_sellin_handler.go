@@ -3,9 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
@@ -76,13 +78,18 @@ func (h *AnalyticsHandler) HandleSellInRecords(w http.ResponseWriter, r *http.Re
 	}
 
 	// Totals in BigQuery (latest batch per chain/month, Stage B math); only the page comes from memory.
+	started := time.Now()
 	if resp, ok := h.sellInRecordsFromBigQuery(r.Context(), tenantID, filter); ok {
 		setRecordsSource(w, "bigquery")
+		log.Printf("[sell-in-records] tenant=%s chain=%q year=%d month=%d source=bigquery rows=%d took=%s", tenantID, filter.RetailerChain, filter.Year, filter.Month, resp.TotalCount, time.Since(started).Round(time.Millisecond))
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
 	setRecordsSource(w, "memory")
+	defer func() {
+		log.Printf("[sell-in-records] tenant=%s chain=%q year=%d month=%d source=memory took=%s", tenantID, filter.RetailerChain, filter.Year, filter.Month, time.Since(started).Round(time.Millisecond))
+	}()
 
 	// First fetch all matching for accurate summary KPIs
 	allFilter := filter

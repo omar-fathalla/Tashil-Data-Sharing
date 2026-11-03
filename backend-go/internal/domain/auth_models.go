@@ -42,6 +42,7 @@ type RetailChain struct {
 	ChainType   string    `json:"chain_type"`          // e.g. "wholesale", "hypermarket", "supermarket", "discount"
 	StoreCount  int       `json:"store_count"`         // e.g. 34
 	CreatedAt   time.Time `json:"created_at"`
+	CreatedBy   string    `json:"created_by,omitempty"` // verified JWT email of the admin who registered it
 }
 
 // CreateRetailChainRequest contains fields to register a new tenant-scoped retail chain.

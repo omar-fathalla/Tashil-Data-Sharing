@@ -518,6 +518,17 @@ func (h *UploadHandler) HandleCommit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"batch_id is required"}`, http.StatusBadRequest)
 		return
 	}
+	// The chain may come from the query (?chain=, like /ingest/upload) or the body ("chain").
+	// Both present and different -> 400; nothing is committed.
+	if qc := strings.TrimSpace(r.URL.Query().Get("chain")); qc != "" {
+		if bc := strings.TrimSpace(req.TargetChain); bc != "" && !strings.EqualFold(bc, qc) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "chain_conflict", "message": "السلسلة في الرابط غير السلسلة في الطلب. مفيش حاجة اتحفظت."})
+			return
+		}
+		req.TargetChain = qc
+	}
 	if req.Tenant != "" && (tenantID == "system" || tenantID == "all" || tenantID == "tenant-system" || tenantID == "tenant-all") {
 		tenantID = req.Tenant
 	}
@@ -797,6 +808,11 @@ func uploadGuardsFromRequest(r *http.Request) ingestion.UploadGuards {
 // writeUploadError returns 409 with the dialog payload for a confirmation request, else 422.
 func writeUploadError(w http.ResponseWriter, err error, code string) {
 	w.Header().Set("Content-Type", "application/json")
+	if status, msg := ingestion.IsStagedUploadError(err); status != 0 {
+		w.WriteHeader(status)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": code, "message": msg})
+		return
+	}
 	if c, ok := ingestion.AsConfirmationRequired(err); ok {
 		w.WriteHeader(http.StatusConflict)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{

@@ -59,10 +59,33 @@ func (h *AnalyticsHandler) querySellInTotals(ctx context.Context, tenantID strin
 		log.Printf("WARN [sell-in] BigQuery totals failed, serving from memory: %v", err)
 		return nil, false
 	}
-	if res.Totals.Count == 0 {
-		return nil, false // memory may hold rows not yet in BigQuery (e.g. right after an upload)
+	if res.Totals.Count == 0 && h.memoryHasSellIn(tenantID, f) {
+		return nil, false // memory holds rows not yet in BigQuery (e.g. right after an upload)
 	}
+	// Count == 0 with nothing local: an empty BigQuery answer (no wait for the in-memory load).
 	return res, true
+}
+
+type sellInSnapshotReader interface {
+	SellInRecordsSnapshot(tenantID string) []domain.SellInRecord
+}
+
+// memoryHasSellIn checks the current in-memory copy without waiting for the durable load.
+func (h *AnalyticsHandler) memoryHasSellIn(tenantID string, f bigquery.SellInRecordFilter) bool {
+	snap, ok := h.bqRepo.(sellInSnapshotReader)
+	if !ok {
+		return false
+	}
+	for _, r := range snap.SellInRecordsSnapshot(tenantID) {
+		if f.Year > 0 && r.Year != f.Year || f.Month > 0 && r.MonthNum != f.Month {
+			continue
+		}
+		if !filterIsAll(f.RetailerChain) && !strings.EqualFold(strings.TrimSpace(bigquery.ResolveSellInChain(r.CustomerName, r.RetailerChain)), strings.TrimSpace(f.RetailerChain)) {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 // sellInRecordsFromBigQuery answers sell-in-records with BigQuery totals and an in-memory page.

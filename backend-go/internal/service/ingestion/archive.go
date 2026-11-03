@@ -388,6 +388,11 @@ func (p *Processor) SaveArchivedFile(
 				continue
 			}
 			existingID = id
+			if bytes.Equal(p.archivedBytesLocked(id), fileBytes) {
+				// Same bytes = replay or confirmation re-apply: uploaded_at keeps the original upload time
+				// (the re-apply order depends on it). Only different bytes (a real new upload) move it.
+				existingUploadedAt = entry.UploadedAt
+			}
 			break
 		}
 	}

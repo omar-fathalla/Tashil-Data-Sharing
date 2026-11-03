@@ -15,6 +15,9 @@ type contextKey string
 
 const (
 	UserClaimsContextKey contextKey = "userClaims"
+	// VerifiedClaimsContextKey holds the token's claims before any X-Tenant-ID / X-Simulated-Role /
+	// X-Assigned-* header adjustment. Use it for authorization decisions that must not trust headers.
+	VerifiedClaimsContextKey contextKey = "verifiedUserClaims"
 )
 
 // CustomClaims matches the structure encoded into our JWTs.
@@ -143,6 +146,8 @@ func (a *AuthMiddleware) Handler(next http.Handler) http.Handler {
 			return
 		}
 
+		verified := *claims
+
 		// If client provided X-Tenant-ID switch header and user is Super Admin, allow context switch
 		if tenantHeader != "" && claims.Role == domain.RoleSuperAdmin && !strings.EqualFold(tenantHeader, "system") {
 			normHeader := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(tenantHeader)), "tenant-")
@@ -168,6 +173,7 @@ func (a *AuthMiddleware) Handler(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), UserClaimsContextKey, claims)
+		ctx = context.WithValue(ctx, VerifiedClaimsContextKey, &verified)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -224,6 +230,12 @@ func (a *AuthMiddleware) GenerateToken(claims domain.UserClaims, duration time.D
 }
 
 // GetUserClaims retrieves the authenticated UserClaims from request context.
+// GetVerifiedClaims returns the token claims before header-based role/tenant simulation.
+func GetVerifiedClaims(ctx context.Context) (*domain.UserClaims, bool) {
+	claims, ok := ctx.Value(VerifiedClaimsContextKey).(*domain.UserClaims)
+	return claims, ok
+}
+
 func GetUserClaims(ctx context.Context) (*domain.UserClaims, bool) {
 	claims, ok := ctx.Value(UserClaimsContextKey).(*domain.UserClaims)
 	return claims, ok

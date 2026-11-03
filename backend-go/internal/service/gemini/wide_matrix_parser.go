@@ -554,9 +554,13 @@ func BuildBranchStoreMetadata(retailer, rawBranch string) domain.Store {
 		prefix = "kaz"
 		chainLabel = "فرع كازيون"
 	default:
-		if chain != "fathalla" && len(chain) >= 3 {
-			prefix = chain[:3]
-			chainLabel = "فرع " + chain
+		// Prefixes above are frozen: existing StoreIDs (fat_/gom_/bet_/...) must never change.
+		// Rows of Zahran / El Wakala etc. uploaded under the fathalla file keep fat_.
+		if chain != "fathalla" {
+			if p := storeIDPrefixForChain(chain); p != "" {
+				prefix = p
+				chainLabel = "فرع " + chain
+			}
 		}
 	}
 
@@ -1765,4 +1769,24 @@ func buildPayloadFromWideMatrix(
 		UnitsYoYPct:          unitsYoY,
 		IsWideMatrixWorkbook: true,
 	}, true
+}
+
+// storeIDPrefixForChain keeps the historical chain[:3] prefix when it is plain alphanumeric, and
+// otherwise uses the first three alphanumerics (qa_test -> qat, not "qa_"). Returns "" when the
+// chain has fewer than three alphanumerics (caller keeps its default).
+func storeIDPrefixForChain(chain string) string {
+	isAlnum := func(b byte) bool { return b >= 'a' && b <= 'z' || b >= '0' && b <= '9' }
+	if len(chain) >= 3 && isAlnum(chain[0]) && isAlnum(chain[1]) && isAlnum(chain[2]) {
+		return chain[:3]
+	}
+	out := make([]byte, 0, 3)
+	for i := 0; i < len(chain) && len(out) < 3; i++ {
+		if isAlnum(chain[i]) {
+			out = append(out, chain[i])
+		}
+	}
+	if len(out) < 3 {
+		return ""
+	}
+	return string(out)
 }

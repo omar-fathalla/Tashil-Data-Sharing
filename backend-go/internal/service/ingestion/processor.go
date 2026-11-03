@@ -95,6 +95,15 @@ type StagedUpload struct {
 	PrevArchivedBytes      []byte
 	CreatedAt              time.Time
 	SheetMonths            []MonthSlice // Sell-Out months read from the workbook itself (period-conflict check at commit)
+	PeriodChoice           string       // "form" | "sheet" chosen at dry-run; used when the commit request has none
+	// Sell-Out dry-runs are archived only on a successful commit (with the month the choice implies).
+	ArchivePending bool
+	FileBytes      []byte
+	ArchYear       string
+	ArchMonth      string
+	ArchRows       int
+	ArchStores     int
+	ArchRevenue    float64
 }
 
 // Processor coordinates parsing, AI normalization, validation, staging, and multi-tenant persistence.
@@ -125,7 +134,12 @@ type Processor struct {
 }
 
 // SetCustomerRegistry enables Sell-In customer quarantine (TOP RULE: exact approved names only).
-func (p *Processor) SetCustomerRegistry(r *customers.Registry) { p.customers = r }
+func (p *Processor) SetCustomerRegistry(r *customers.Registry) {
+	if r != nil && r.ChainOf == nil {
+		r.ChainOf = storedChain
+	}
+	p.customers = r
+}
 
 // CustomerRegistry returns the registry (nil when disabled).
 func (p *Processor) CustomerRegistry() *customers.Registry { return p.customers }
@@ -464,7 +478,15 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			st, cached := rawStoreToMeta[rec.RawStoreName]
 			if !cached {
 				st = gemini.BuildBranchStoreMetadata(payload.RetailerDetected, rec.RawStoreName)
-				if rec.ResolvedStoreID != "" && (expectedPrefix == "" || strings.HasPrefix(rec.ResolvedStoreID, expectedPrefix)) {
+				// The parser's id is kept only when it carries this chain's prefix. Custom chains have
+				// no fixed prefix: use the one BuildBranchStoreMetadata gives them (qa_test -> qat_).
+				want := expectedPrefix
+				if want == "" {
+					if i := strings.Index(st.ID, "_"); i > 0 {
+						want = st.ID[:i+1]
+					}
+				}
+				if rec.ResolvedStoreID != "" && (want == "" || strings.HasPrefix(rec.ResolvedStoreID, want)) {
 					st.ID = rec.ResolvedStoreID
 				}
 				rawStoreToMeta[rec.RawStoreName] = st
@@ -824,23 +846,26 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 		}
 	}
 	archYear, archMonth := inferArchiveYearAndMonth(filename, requestedPeriodDate, latestDate, distinctMonths)
-	var prevArchivedFile *ArchivedFile
-	var prevArchivedBytes []byte
-	if dryRun {
-		prevArchivedFile, prevArchivedBytes = p.SnapshotExistingArchivedFile(tenantID, payload.RetailerDetected, filename)
+	// A dry-run is a preview: it never adds an archive entry. The file is archived on commit.
+	var archivedEntry *ArchivedFile
+	if !dryRun {
+		archivedEntry = p.SaveArchivedFile(
+			tenantID,
+			batchID,
+			filename,
+			fileBytes,
+			payload.RetailerDetected,
+			archYear,
+			archMonth,
+			reportedValidRows,
+			len(discoveredStores),
+			totalRevenue,
+		)
 	}
-	archivedEntry := p.SaveArchivedFile(
-		tenantID,
-		batchID,
-		filename,
-		fileBytes,
-		payload.RetailerDetected,
-		archYear,
-		archMonth,
-		reportedValidRows,
-		len(discoveredStores),
-		totalRevenue,
-	)
+	archiveID := ""
+	if archivedEntry != nil {
+		archiveID = archivedEntry.ID
+	}
 
 	if directSinkMode != "" {
 		sinkMeta := bqsink.Meta{TenantID: tenantID, BatchID: batchID, SourceFile: filename}
@@ -852,7 +877,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 
 	res := &IngestionResult{
 		BatchID:                batchID,
-		ArchiveID:              archivedEntry.ID,
+		ArchiveID:              archiveID,
 		ArchivedFile:           archivedEntry,
 		Filename:               filename,
 		RetailerDetected:       payload.RetailerDetected,
@@ -905,11 +930,30 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			Result:                 res,
 			SheetMonths:            sheetMonths,
 			IsWideMatrix:           payload.IsWideMatrixWorkbook,
-			PrevArchivedFile:       prevArchivedFile,
-			PrevArchivedBytes:      prevArchivedBytes,
 			CreatedAt:              now,
+			PeriodChoice:           periodChoice,
+			ArchivePending:         true,
+			FileBytes:              fileBytes,
+			ArchYear:               archYear,
+			ArchMonth:              archMonth,
+			ArchRows:               reportedValidRows,
+			ArchStores:             len(discoveredStores),
+			ArchRevenue:            totalRevenue,
 		}
 		p.stagedMu.Unlock()
+		_, interactive := uploadGuards(ctx)
+		p.persistStaged(ctx, stagedDiskMeta{
+			BatchID:         batchID,
+			TenantID:        tenantID,
+			Filename:        filename,
+			TargetChain:     effectiveChain,
+			RequestedPeriod: requestedPeriodDate,
+			PeriodChoice:    periodChoice,
+			Interactive:     interactive,
+			ValidRows:       reportedValidRows,
+			TotalRevenue:    totalRevenue,
+			CreatedAt:       now,
+		}, fileBytes)
 	}
 
 	return res, nil
@@ -919,12 +963,26 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, targetChainOverride string) (*IngestionResult, error) {
 	p.stagedMu.Lock()
 	staged, ok := p.staged[batchID]
-	if !ok {
+	if ok && staged != nil && normalizeArchiveTenantID(staged.TenantID) != normalizeArchiveTenantID(tenantID) {
 		p.stagedMu.Unlock()
-		return nil, fmt.Errorf("staged upload not found or expired")
+		return nil, &StagedUploadError{Status: 404, Message: "المعاينة دي مش تبع الحساب ده. مفيش حاجة اتحفظت."}
 	}
-	delete(p.staged, batchID)
+	if ok {
+		delete(p.staged, batchID)
+	}
 	p.stagedMu.Unlock()
+	if !ok || staged == nil {
+		// Another instance ran the dry-run: rebuild it from the archive mount (or 410 / 409).
+		var err error
+		if staged, err = p.restageFromDisk(ctx, tenantID, batchID); err != nil {
+			return nil, err
+		}
+	}
+	// Commit with the period choice the user made at the dry-run when the request carries none.
+	if g, interactive := uploadGuards(ctx); interactive && g.PeriodChoice == "" && staged.PeriodChoice != "" {
+		g.PeriodChoice = staged.PeriodChoice
+		ctx = WithUploadGuards(ctx, g)
+	}
 
 	chainToUse := strings.ToLower(strings.TrimSpace(staged.TargetChain))
 	if staged.IsProductMaster && chainToUse == "" {
@@ -966,11 +1024,30 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		commitYear = requestedPeriodDate[:4]
 		commitMonth = requestedPeriodDate[5:7]
 	}
-	updatedArchived := p.UpdateArchivedFileByBatch(batchID, chainToUse, commitYear, commitMonth)
+	var updatedArchived *ArchivedFile
+	if !staged.ArchivePending {
+		updatedArchived = p.UpdateArchivedFileByBatch(batchID, chainToUse, commitYear, commitMonth)
+	}
 
 	commitChoice, cerr := sellOutPeriodChoice(ctx, requestedPeriodDate, staged.SheetMonths)
 	if cerr != nil && !staged.IsSellInPlan && !staged.IsProductMaster {
 		return nil, cerr
+	}
+	if commitChoice == "" && staged.PeriodChoice != "" && !staged.IsSellInPlan && !staged.IsProductMaster {
+		commitChoice = staged.PeriodChoice
+	}
+	if staged.ArchivePending {
+		// Archive only now, with the months the period choice implies: "sheet" -> the file's own
+		// months (e.g. "08-09"), "form" -> the form month, otherwise what the dry-run inferred.
+		archYear, archMonth := staged.ArchYear, staged.ArchMonth
+		switch {
+		case commitChoice == "sheet" && len(staged.SheetMonths) > 0:
+			archYear, archMonth = sheetMonthsArchivePeriod(staged.SheetMonths)
+		case commitYear != "" && commitMonth != "":
+			archYear, archMonth = commitYear, commitMonth
+		}
+		updatedArchived = p.SaveArchivedFile(tenantID, batchID, staged.Filename, staged.FileBytes, chainToUse,
+			archYear, archMonth, staged.ArchRows, len(staged.DiscoveredStores), staged.ArchRevenue)
 	}
 	if requestedPeriodDate != "" && commitChoice != "sheet" && (staged.Result == nil || len(staged.Result.DetectedSheets) <= 1 || commitChoice == "form") {
 		for i := range staged.ValidFacts {
@@ -1083,6 +1160,7 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		staged.Result.ArchivedFile = updatedArchived
 		staged.Result.ArchiveID = updatedArchived.ID
 	}
+	p.removeStaged(tenantID, batchID)
 	return staged.Result, nil
 }
 
@@ -1365,8 +1443,25 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	if qIssue != nil {
 		warnings = append(warnings, *qIssue)
 	}
-	if len(records) == 0 && len(allRecords) > 0 {
-		return nil, fmt.Errorf("كل صفوف الملف %s لعملاء مش متسجلين، فمفيش حاجة اتحسبت. أكد العملاء من شاشة «عملاء في انتظار التأكيد» والصفوف هتدخل من غير ما ترفع الملف تاني", filename)
+	if g, inter := uploadGuards(ctx); inter && g.ReplaceConfirmed && !dryRun && p.customers != nil {
+		// The user confirmed replacing these months: older files' quarantined stats for the same
+		// (chain, month) are marked superseded (kept, traceable), so confirming them later cannot
+		// bring the replaced month back.
+		keys := map[string]bool{}
+		for _, r := range allRecords {
+			keys[storedChain(r)+"|"+periodKey(r.Year, r.MonthNum)] = true
+		}
+		p.customers.SupersedeMonths(ctx, tenantID, filename, keys)
+	}
+	// A file whose rows are all quarantined is still archived (rows_ingested = 0) and reported as a
+	// success with warnings, so confirming the customer later can re-apply it from the archive.
+	if chains, ok := reapplyChainsFrom(ctx); ok {
+		// Confirmation re-apply: only the confirmed customer's chain is rewritten; other chains in the
+		// same file are left exactly as they are.
+		records = filterSellInByChain(records, chains)
+		if err := p.checkReapplyOwnsMonths(tenantID, filename, records); err != nil {
+			return nil, err
+		}
 	}
 
 	effectiveChain := strings.ToLower(strings.TrimSpace(targetChain))
@@ -1453,6 +1548,18 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		discoveredCats = append(discoveredCats, cat)
 	}
 
+	if len(records) == 0 {
+		// All rows quarantined: the archive still names the file's real period (it adds no year to
+		// SellInYears because rows_ingested is 0).
+		for _, rec := range allRecords {
+			if rec.Year >= 2020 {
+				yearCounts[rec.Year]++
+			}
+			if rec.MonthNum >= 1 && rec.MonthNum <= 12 {
+				monthNums[rec.MonthNum] = true
+			}
+		}
+	}
 	primaryYear := 2026
 	maxYrCount := 0
 	for y, cnt := range yearCounts {
@@ -1541,7 +1648,7 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	}
 	// reportUnknown runs after SetSellInRecords enriched the records with the Product Master.
 	reportUnknown := func() {
-		unknown, issue := unknownBarcodes(records)
+		unknown, issue := p.unknownBarcodesAll(tenantID, records, allRecords)
 		if issue == nil {
 			return
 		}
@@ -1569,16 +1676,24 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 			CreatedAt:         time.Now(),
 		}
 		p.stagedMu.Unlock()
-		_ = p.bqRepo.SetSellInRecords(ctx, tenantID, filename, records)
+		if len(records) > 0 {
+			_ = p.bqRepo.SetSellInRecords(ctx, tenantID, filename, records)
+		}
 		reportUnknown()
 		return result, nil
 	}
 
-	if err := p.bqRepo.SetSellInRecords(ctx, tenantID, filename, records); err != nil {
-		return nil, fmt.Errorf("failed to store sell-in records: %w", err)
+	// Never call SetSellInRecords with an empty slice: nothing is replaced for any (chain, month)
+	// and nothing is written to the sink when every row is quarantined.
+	if len(records) > 0 {
+		if err := p.bqRepo.SetSellInRecords(ctx, tenantID, filename, records); err != nil {
+			return nil, fmt.Errorf("failed to store sell-in records: %w", err)
+		}
 	}
 	reportUnknown()
-	result.BigQuerySync = p.sinkSellIn(ctx, bqsink.Meta{TenantID: tenantID, BatchID: batchID, ArchiveID: result.ArchiveID, SourceFile: filename}, records)
+	if len(records) > 0 {
+		result.BigQuerySync = p.sinkSellIn(ctx, bqsink.Meta{TenantID: tenantID, BatchID: batchID, ArchiveID: result.ArchiveID, SourceFile: filename}, records)
+	}
 	return result, nil
 }
 
@@ -1586,14 +1701,51 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 func (p *Processor) DiscardStagedUpload(ctx context.Context, tenantID, batchID string) error {
 	p.stagedMu.Lock()
 	staged, ok := p.staged[batchID]
+	if ok && staged != nil && normalizeArchiveTenantID(staged.TenantID) != normalizeArchiveTenantID(tenantID) {
+		p.stagedMu.Unlock()
+		return nil
+	}
 	delete(p.staged, batchID)
 	p.stagedMu.Unlock()
+	// Sell-Out previews have no archive entry: discarding clears the staging only.
+	p.removeStaged(tenantID, batchID)
+	if ok && staged != nil && staged.ArchivePending {
+		return nil
+	}
 	if ok && staged != nil {
 		p.RemoveArchivedFileByBatch(batchID, staged.PrevArchivedFile, staged.PrevArchivedBytes)
 	} else {
 		p.RemoveArchivedFileByBatch(batchID, nil, nil)
 	}
 	return nil
+}
+
+// sheetMonthsArchivePeriod turns the workbook's own months into the archive year/month ("08-09").
+func sheetMonthsArchivePeriod(months []MonthSlice) (string, string) {
+	year, minM, maxM := "", 99, 0
+	for _, m := range months {
+		if len(m.Period) < 7 {
+			continue
+		}
+		if year == "" || m.Period[:4] > year {
+			year = m.Period[:4]
+		}
+		var n int
+		fmt.Sscanf(m.Period[5:7], "%d", &n)
+		if n < minM {
+			minM = n
+		}
+		if n > maxM {
+			maxM = n
+		}
+	}
+	if year == "" {
+		return "", ""
+	}
+	if minM == maxM {
+		return year, fmt.Sprintf("%02d", minM)
+	}
+	return year, fmt.Sprintf("%02d-%02d", minM, maxM)
 }
 
 func appendUniqueAnomaly(list *[]domain.IngestionAnomaly, anomaly domain.IngestionAnomaly) {

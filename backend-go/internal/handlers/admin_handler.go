@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -18,6 +19,69 @@ import (
 // AdminHandler manages tenant company lifecycle and provisioning.
 type AdminHandler struct {
 	fsRepo firestore.Repository
+	// referencedChains lists chain codes used by Sell-In data or chain rules (read-only, optional).
+	referencedChains func(tenantID string) []string
+}
+
+// WithReferencedChains lets GET /admin/chains?include_referenced=1 add chains that Sell-In data
+// or SELLIN_CUSTOMER_CHAIN_MAP uses but that have no registered document (registered:false).
+func (h *AdminHandler) WithReferencedChains(f func(tenantID string) []string) *AdminHandler {
+	h.referencedChains = f
+	return h
+}
+
+func chainTenantSlug(t string) string {
+	t = strings.ToLower(strings.TrimSpace(t))
+	t = strings.TrimPrefix(strings.TrimPrefix(t, "tenant-"), "tenant_")
+	return t
+}
+
+// chainWriteAccess authorizes chain catalog writes (create / update / delete) from the verified JWT
+// claims only: role must be an admin role, and the tenant is the claims tenant. A header, query or
+// body tenant that differs from the claims tenant is refused (super admins may target any tenant).
+// X-Tenant-ID / X-Simulated-Role headers never grant write access. Returns (tenant, status, message).
+func (h *AdminHandler) chainWriteAccess(r *http.Request, bodyTenantID string) (string, int, string) {
+	claims, ok := middleware.GetVerifiedClaims(r.Context())
+	if !ok || claims == nil || strings.TrimSpace(claims.UserID) == "" && strings.TrimSpace(claims.Email) == "" {
+		return "", http.StatusUnauthorized, "unauthorized: a valid admin token is required"
+	}
+	super := claims.Role == domain.RoleSuperAdmin
+	if !super && claims.Role != domain.RoleVendorAdmin && claims.Role != domain.RoleAdmin {
+		return "", http.StatusForbidden, "forbidden: admin role required"
+	}
+	requested := ""
+	for _, t := range []string{bodyTenantID, r.URL.Query().Get("tenant_id"), r.Header.Get("X-Tenant-ID")} {
+		if t = strings.TrimSpace(t); t == "" {
+			continue
+		}
+		if requested != "" && chainTenantSlug(requested) != chainTenantSlug(t) {
+			return "", http.StatusForbidden, "forbidden: conflicting tenant ids"
+		}
+		requested = t
+	}
+	own := strings.TrimSpace(claims.TenantID)
+	if super || own == "system" {
+		if requested != "" {
+			return requested, 0, ""
+		}
+		if own == "" || own == "system" {
+			return "adeco", 0, ""
+		}
+		return own, 0, ""
+	}
+	if own == "" {
+		return "", http.StatusForbidden, "forbidden: token has no tenant"
+	}
+	if requested != "" && chainTenantSlug(requested) != chainTenantSlug(own) {
+		return "", http.StatusForbidden, "forbidden: tenant does not match token"
+	}
+	return own, 0, ""
+}
+
+func writeChainAccessError(w http.ResponseWriter, code int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
 // NewAdminHandler constructs an AdminHandler.
@@ -37,20 +101,6 @@ func (h *AdminHandler) checkSuperAdminAccess(r *http.Request) bool {
 		return true
 	}
 	return false
-}
-
-func (h *AdminHandler) checkChainCatalogAccess(r *http.Request) bool {
-	if h.checkSuperAdminAccess(r) {
-		return true
-	}
-	if strings.TrimSpace(r.Header.Get("X-Tenant-ID")) != "" || strings.TrimSpace(r.URL.Query().Get("tenant_id")) != "" {
-		return true
-	}
-	claims, ok := middleware.GetUserClaims(r.Context())
-	if !ok || claims == nil {
-		return false
-	}
-	return claims.TenantID != "" || claims.Role == domain.RoleVendorAdmin
 }
 
 func (h *AdminHandler) resolveChainTenantID(r *http.Request, bodyTenantID string) string {
@@ -98,7 +148,34 @@ func (h *AdminHandler) HandleListChains(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(chains)
+	if r.URL.Query().Get("include_referenced") != "1" || h.referencedChains == nil {
+		_ = json.NewEncoder(w).Encode(chains)
+		return
+	}
+	// Read-only: registered chains plus chains referenced by Sell-In data / chain rules. Nothing is written.
+	type listedChain struct {
+		domain.RetailChain
+		Registered bool `json:"registered"`
+	}
+	out := make([]listedChain, 0, len(chains))
+	seen := map[string]bool{}
+	for _, c := range chains {
+		seen[strings.ToLower(c.Code)] = true
+		out = append(out, listedChain{RetailChain: c, Registered: true})
+	}
+	for _, code := range h.referencedChains(tenantID) {
+		code = strings.ToLower(strings.TrimSpace(code))
+		if code == "" || seen[code] {
+			continue
+		}
+		seen[code] = true
+		name := code
+		if n, ok := domain.GetCustomChainDisplayName(code); ok && n != "" {
+			name = n
+		}
+		out = append(out, listedChain{RetailChain: domain.RetailChain{ChainID: code, Code: code, DisplayName: name, TenantID: chainTenantSlug(tenantID)}})
+	}
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 // HandleCreateChain serves POST /api/v1/admin/chains.
@@ -109,9 +186,9 @@ func (h *AdminHandler) HandleCreateChain(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	tenantID := h.resolveChainTenantID(r, req.TenantID)
-	if !h.checkChainCatalogAccess(r) && strings.TrimSpace(req.TenantID) == "" {
-		http.Error(w, `{"error":"forbidden: tenant access required"}`, http.StatusForbidden)
+	tenantID, code0, msg := h.chainWriteAccess(r, req.TenantID)
+	if code0 != 0 {
+		writeChainAccessError(w, code0, msg)
 		return
 	}
 
@@ -134,6 +211,14 @@ func (h *AdminHandler) HandleCreateChain(w http.ResponseWriter, r *http.Request)
 		chainType = "supermarket"
 	}
 
+	claims, _ := middleware.GetVerifiedClaims(r.Context())
+	createdBy := ""
+	if claims != nil {
+		createdBy = strings.TrimSpace(claims.Email)
+		if createdBy == "" {
+			createdBy = claims.UserID
+		}
+	}
 	chain := &domain.RetailChain{
 		ChainID:     code,
 		TenantID:    tenantID,
@@ -141,10 +226,17 @@ func (h *AdminHandler) HandleCreateChain(w http.ResponseWriter, r *http.Request)
 		Code:        code,
 		ChainType:   chainType,
 		StoreCount:  req.StoreCount,
-		CreatedAt:   time.Now(),
+		CreatedAt:   time.Now().UTC(),
+		CreatedBy:   createdBy,
 	}
 
-	if err := h.fsRepo.SaveRetailChain(r.Context(), chain); err != nil {
+	// Create-if-absent: a duplicate code is 409, never an overwrite. Registering a chain touches no
+	// Sell-In row, StoreID or prefix; it only adds the chain to the catalog.
+	if err := h.fsRepo.CreateRetailChain(r.Context(), chain); err != nil {
+		if errors.Is(err, firestore.ErrRetailChainExists) {
+			writeChainAccessError(w, http.StatusConflict, fmt.Sprintf("السلسلة بالكود %q متسجلة قبل كده؛ مفيش حاجة اتغيرت", code))
+			return
+		}
 		http.Error(w, `{"error":"failed to save retail chain"}`, http.StatusInternalServerError)
 		return
 	}
@@ -164,18 +256,13 @@ func (h *AdminHandler) HandleCreateChain(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	// Record audit log
-	claims, _ := middleware.GetUserClaims(r.Context())
-	adminEmail := "tenant-admin"
-	if claims != nil && claims.Email != "" {
-		adminEmail = claims.Email
-	}
+	// Record audit log (who and when, from the verified token)
 	_ = h.fsRepo.SaveAuditLog(r.Context(), &domain.AuditLogEntry{
 		LogID:     "log-" + uuid.New().String()[:8],
 		TenantID:  tenantID,
-		UserID:    "admin",
-		UserEmail: adminEmail,
-		UserRole:  "vendor_admin",
+		UserID:    claims.UserID,
+		UserEmail: createdBy,
+		UserRole:  string(claims.Role),
 		Action:    "CREATE_CHAIN",
 		Resource:  chain.Code,
 		Details:   fmt.Sprintf("إضافة سلسلة تجزئة للشركة (%s): %s (كود: %s)", tenantID, chain.DisplayName, chain.Code),
@@ -206,9 +293,9 @@ func (h *AdminHandler) HandleUpdateChain(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	tenantID := h.resolveChainTenantID(r, req.TenantID)
-	if !h.checkChainCatalogAccess(r) && strings.TrimSpace(req.TenantID) == "" {
-		http.Error(w, `{"error":"forbidden: tenant access required"}`, http.StatusForbidden)
+	tenantID, code0, msg := h.chainWriteAccess(r, req.TenantID)
+	if code0 != 0 {
+		writeChainAccessError(w, code0, msg)
 		return
 	}
 
@@ -260,9 +347,9 @@ func (h *AdminHandler) HandleUpdateChain(w http.ResponseWriter, r *http.Request)
 
 // HandleDeleteChain serves DELETE /api/v1/admin/chains/{id}.
 func (h *AdminHandler) HandleDeleteChain(w http.ResponseWriter, r *http.Request) {
-	tenantID := h.resolveChainTenantID(r, "")
-	if !h.checkChainCatalogAccess(r) {
-		http.Error(w, `{"error":"forbidden: tenant access required"}`, http.StatusForbidden)
+	tenantID, code0, msg := h.chainWriteAccess(r, "")
+	if code0 != 0 {
+		writeChainAccessError(w, code0, msg)
 		return
 	}
 

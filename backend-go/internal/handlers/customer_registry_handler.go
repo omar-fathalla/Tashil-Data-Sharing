@@ -11,12 +11,13 @@ import (
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/service/customers"
+	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
 )
 
 // CustomerRegistryProcessor is what the registry endpoints need from the ingestion processor.
 type CustomerRegistryProcessor interface {
 	CustomerRegistry() *customers.Registry
-	ReapplySellInFiles(ctx context.Context, tenantID string, files []string) ([]string, []string)
+	ReapplySellInFiles(ctx context.Context, tenantID string, files []string, chains []string) ([]ingestion.ReapplyResult, []string)
 	SellInYears(tenantID string) []int
 }
 
@@ -96,11 +97,25 @@ func (h *CustomerRegistryHandler) decide(w http.ResponseWriter, r *http.Request,
 		writeErr(w, http.StatusBadRequest, "اسم العميل مطلوب")
 		return
 	}
+	// Files to re-apply: the name's quarantined files that were not fully superseded by a later
+	// confirmed upload. Chains: where those rows were held (re-apply touches only these chains).
 	var files []string
+	chainSet := map[string]bool{}
+	seenFile := map[string]bool{}
 	for _, e := range reg.List(r.Context(), c.TenantID, "", false) {
 		if e.Key == customers.NormalizeName(req.Name) {
 			for _, q := range e.Quarantine {
+				if !q.Live() || seenFile[q.File] {
+					continue
+				}
+				seenFile[q.File] = true
 				files = append(files, q.File)
+				if q.Chain != "" {
+					chainSet[q.Chain] = true
+				} else if e.UploadChain != "" {
+					// Stats recorded before FileStat.Chain existed: the upload chain + chain rules.
+					chainSet[reg.ChainOfName(e.Name, e.UploadChain)] = true
+				}
 			}
 		}
 	}
@@ -109,15 +124,29 @@ func (h *CustomerRegistryHandler) decide(w http.ResponseWriter, r *http.Request,
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	var applied, errs []string
+	var applied []ingestion.ReapplyResult
+	var errs []string
 	switch status {
 	case customers.StatusApproved:
 		if len(files) > 0 {
-			sort.Strings(files)
-			applied, errs = h.p.ReapplySellInFiles(r.Context(), c.TenantID, files)
+			if entry.Chain != "" {
+				// An explicit chain on approval moves the rows there; that chain is rewritten too.
+				chainSet[reg.ChainOfName(entry.Name, entry.Chain)] = true
+			}
+			chains := make([]string, 0, len(chainSet))
+			for ch := range chainSet {
+				chains = append(chains, ch)
+			}
+			sort.Strings(chains)
+			if len(chains) == 0 {
+				errs = append(errs, "مفيش سلسلة متسجلة لصفوف العميل ده، فمااتعادش أي ملف. ارفع الملف تاني")
+				break
+			}
+			// Order: original upload order (ReapplySellInFiles sorts by uploaded_at), not by name.
+			applied, errs = h.p.ReapplySellInFiles(r.Context(), c.TenantID, files, chains)
 		}
 	case customers.StatusPending:
-		applied, errs = h.p.ReapplySellInFiles(r.Context(), c.TenantID, nil)
+		applied, errs = h.p.ReapplySellInFiles(r.Context(), c.TenantID, nil, nil)
 	}
 	if h.audit != nil {
 		details := "name=" + entry.Name + " status=" + status
@@ -131,13 +160,20 @@ func (h *CustomerRegistryHandler) decide(w http.ResponseWriter, r *http.Request,
 			details += " reason=" + req.Reason
 		}
 		details += " reapplied=" + strconv.Itoa(len(applied))
+		for _, a := range applied {
+			details += " file=" + a.File + " batch=" + a.BatchID
+		}
 		_ = h.audit.SaveAuditLog(r.Context(), &domain.AuditLogEntry{
 			TenantID: normalizeAuditTenantID(c.TenantID), UserID: c.UserID, UserEmail: c.Email,
 			UserRole: string(c.Role), Action: action, Resource: "sellin_customer_registry",
 			Details: details, IPAddress: extractRequestIP(r), Status: "success", CreatedAt: h.now().UTC(),
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"entry": entry, "reapplied_files": applied, "errors": errs})
+	names := make([]string, 0, len(applied))
+	for _, a := range applied {
+		names = append(names, a.File)
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"entry": entry, "reapplied_files": names, "reapplied": applied, "errors": errs})
 }
 
 // HandleYears serves GET /api/v1/sell-in/years: years that have data plus the current year,

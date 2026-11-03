@@ -4,6 +4,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/customers"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -14,6 +15,8 @@ import (
 
 	cloudFirestore "cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/security"
@@ -50,6 +53,7 @@ type Repository interface {
 	GetRetailChain(ctx context.Context, code string) (*domain.RetailChain, error)
 	GetRetailChainByTenant(ctx context.Context, tenantID string, code string) (*domain.RetailChain, error)
 	SaveRetailChain(ctx context.Context, chain *domain.RetailChain) error
+	CreateRetailChain(ctx context.Context, chain *domain.RetailChain) error
 	DeleteRetailChain(ctx context.Context, code string) error
 	DeleteRetailChainByTenant(ctx context.Context, tenantID string, code string) error
 
@@ -1786,6 +1790,66 @@ func (c *Client) SaveRetailChain(ctx context.Context, chain *domain.RetailChain)
 		}(*chain, normSlug, normCode)
 	}
 
+	return nil
+}
+
+// ErrRetailChainExists is returned by CreateRetailChain when the tenant already has that code.
+var ErrRetailChainExists = errors.New("retail chain code already exists")
+
+// CreateRetailChain registers a tenant chain only if the code is absent (Firestore Create, never Set):
+// a duplicate code returns ErrRetailChainExists and nothing is overwritten.
+func (c *Client) CreateRetailChain(ctx context.Context, chain *domain.RetailChain) error {
+	normSlug := normalizeFirestoreTenantSlug(chain.TenantID)
+	normCode := strings.ToLower(strings.TrimSpace(chain.Code))
+	if normCode == "" {
+		return fmt.Errorf("chain code is required")
+	}
+	chain.TenantID, chain.Code = normSlug, normCode
+	if chain.ChainID == "" {
+		chain.ChainID = normCode
+	}
+	if chain.CreatedAt.IsZero() {
+		chain.CreatedAt = time.Now().UTC()
+	}
+	c.mu.Lock()
+	if _, ok := c.tenantRetailChains[normSlug][normCode]; ok {
+		c.mu.Unlock()
+		return ErrRetailChainExists
+	}
+	c.mu.Unlock()
+	if c.fsClient != nil {
+		docID := fmt.Sprintf("%s_%s", normSlug, normCode)
+		if _, err := c.fsClient.Collection("tenant_retail_chains").Doc(docID).Create(ctx, *chain); err != nil {
+			if status.Code(err) == codes.AlreadyExists {
+				return ErrRetailChainExists
+			}
+			return err
+		}
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.tenantRetailChains[normSlug] == nil {
+		c.tenantRetailChains[normSlug] = make(map[string]domain.RetailChain)
+	}
+	if _, ok := c.tenantRetailChains[normSlug][normCode]; ok && c.fsClient == nil {
+		return ErrRetailChainExists
+	}
+	c.tenantRetailChains[normSlug][normCode] = *chain
+	if _, ok := c.retailChains[normCode]; !ok {
+		c.retailChains[normCode] = *chain
+	}
+	domain.RegisterCustomChainDisplayName(normCode, chain.DisplayName)
+	if prof, exists := c.tenantProfiles[normSlug]; exists {
+		found := false
+		for _, ac := range prof.ActiveChains {
+			found = found || strings.EqualFold(ac, normCode)
+		}
+		if !found {
+			prof.ActiveChains = append(prof.ActiveChains, normCode)
+			c.tenantProfiles[normSlug] = prof
+		}
+	}
+	c.persistRetailChainsLocked()
 	return nil
 }
 
