@@ -485,7 +485,8 @@ func (p *Processor) PrecheckSellIn(ctx context.Context, tenantID, filename strin
 	recs, _, err := gemini.ParseSellInPlanWorkbookWithReport(tenantID, filename, raw, chain)
 	var layoutErr *gemini.SellInLayoutError
 	var periodErr *gemini.SellInPeriodError
-	if errors.As(err, &layoutErr) || errors.As(err, &periodErr) {
+	var chainErr *gemini.SellInChainRequiredError
+	if errors.As(err, &layoutErr) || errors.As(err, &periodErr) || errors.As(err, &chainErr) {
 		return err
 	}
 	if err != nil || len(recs) == 0 {

@@ -130,10 +130,12 @@ func ParseSellInPlanWorkbookWithReport(tenantID, filename string, rawContent []b
 
 func parseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, report *SellInParseReport, targetChains ...string) ([]domain.SellInRecord, error) {
 	defaultChain := "fathalla"
+	chainChosen := false
 	if len(targetChains) > 0 && strings.TrimSpace(targetChains[0]) != "" {
 		tc := strings.ToLower(strings.TrimSpace(targetChains[0]))
-		if tc != "all" && tc != "الكل" {
+		if tc != "all" && tc != "الكل" && tc != "جميع السلاسل" {
 			defaultChain = normalizeSellInChainCode(tc, "fathalla")
+			chainChosen = true
 		}
 	}
 
@@ -203,6 +205,11 @@ func parseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, repor
 
 	if hdr := findGPSOPHeaderRow(rows); hdr >= 0 {
 		report.Layout = "gp_sop_export"
+		if !chainChosen {
+			// TOP RULE: a GP SOP export has no chain column, so the chain is never defaulted (a Zahran
+			// or Gomla export must not become fathalla and pick up the Fathalla aliases).
+			return nil, &SellInChainRequiredError{Filename: filename}
+		}
 		return parseGPSOPExport(tenantID, filename, rows, hdr, defaultChain, report)
 	}
 

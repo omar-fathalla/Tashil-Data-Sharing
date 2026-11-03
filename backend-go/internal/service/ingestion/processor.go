@@ -1337,7 +1337,8 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	records, parseReport, err := gemini.ParseSellInPlanWorkbookWithReport(tenantID, filename, fileBytes, targetChain)
 	var layoutErr *gemini.SellInLayoutError
 	var periodErr *gemini.SellInPeriodError
-	if errors.As(err, &layoutErr) || errors.As(err, &periodErr) {
+	var chainErr *gemini.SellInChainRequiredError
+	if errors.As(err, &layoutErr) || errors.As(err, &periodErr) || errors.As(err, &chainErr) {
 		// A known layout with missing headers or unreadable months is rejected, never guessed by AI.
 		return nil, err
 	}

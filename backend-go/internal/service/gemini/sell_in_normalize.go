@@ -29,6 +29,16 @@ func (e *SellInLayoutError) Error() string {
 		e.Filename, strings.Join(e.Missing, "، "))
 }
 
+// SellInChainRequiredError: a GP SOP export was uploaded without a chain ("", "all", "الكل"). The file
+// has no chain column, so it is rejected instead of defaulting to fathalla.
+type SellInChainRequiredError struct {
+	Filename string
+}
+
+func (e *SellInChainRequiredError) Error() string {
+	return fmt.Sprintf("الملف %s مفيهوش عمود للسلسلة، فلازم تختار السلسلة اللي الملف ده تبعها (مش «الكل») وترفعه تاني. مفيش حاجة اتحفظت.", e.Filename)
+}
+
 // SellInPeriodError: some rows have no readable month or year. The file is rejected as a whole.
 type SellInPeriodError struct {
 	Filename     string
