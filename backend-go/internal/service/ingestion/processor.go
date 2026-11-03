@@ -124,6 +124,9 @@ type Processor struct {
 	sellIn        *durableSync
 	sellOut       *durableSync
 	replaying     atomic.Bool
+	// heavyMu serialises memory-heavy work (replays, rebuilds, snapshot exports) within this instance.
+	heavyMu    sync.Mutex
+	rebuilding atomic.Bool
 	snap          snapshotConfig
 	onRebuilt     func()
 

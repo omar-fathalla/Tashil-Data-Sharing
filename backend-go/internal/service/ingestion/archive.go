@@ -1,6 +1,7 @@
 package ingestion
 
 import (
+	"github.com/tashil/data-sharing/backend/internal/fsutil"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -196,46 +197,63 @@ func (p *Processor) WithArchiveDir(dir string) *Processor {
 }
 
 func (p *Processor) loadDiskArchiveLocked() {
-	if p.archiveDir == "" {
-		return
+	p.mergeDiskArchiveLocked(p.readDiskArchive())
+}
+
+// diskArchive is the archive index as read from disk (tombstones + entries), before merging.
+type diskArchive struct {
+	tombs []struct {
+		TenantID  string `json:"tenant_id"`
+		ArchiveID string `json:"archive_id"`
+		FileName  string `json:"file_name"`
 	}
-	tombstonePath := filepath.Join(p.archiveDir, "deleted_tombstones.json")
-	if rawTomb, err := os.ReadFile(tombstonePath); err == nil && len(rawTomb) > 0 && p.fsRepo != nil {
-		var tombs []struct {
-			TenantID  string `json:"tenant_id"`
-			ArchiveID string `json:"archive_id"`
-			FileName  string `json:"file_name"`
-		}
-		if json.Unmarshal(rawTomb, &tombs) == nil {
-			for _, t := range tombs {
-				_ = p.fsRepo.MarkArchiveDeleted(context.Background(), t.TenantID, t.ArchiveID, t.FileName)
-			}
-		}
+	items []*ArchivedFile
+}
+
+func (p *Processor) readDiskArchive() *diskArchive {
+	out := &diskArchive{}
+	dir := p.archiveDir
+	if dir == "" {
+		return out
 	}
-	entries, err := os.ReadDir(p.archiveDir)
+	if rawTomb, err := os.ReadFile(filepath.Join(dir, "deleted_tombstones.json")); err == nil && len(rawTomb) > 0 {
+		_ = json.Unmarshal(rawTomb, &out.tombs)
+	}
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return
+		return out
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() || strings.HasPrefix(entry.Name(), "_") {
 			continue
 		}
-		indexFile := filepath.Join(p.archiveDir, entry.Name(), "index.json")
 		var list []*ArchivedFile
-		if raw, err := os.ReadFile(indexFile); err == nil {
+		if raw, err := os.ReadFile(filepath.Join(dir, entry.Name(), "index.json")); err == nil {
 			_ = json.Unmarshal(raw, &list)
 		}
-		list = mergeArchiveSidecars(list, filepath.Join(p.archiveDir, entry.Name()))
-		for _, item := range list {
-			if item == nil || item.ID == "" {
-				continue
-			}
-			if p.fsRepo != nil && p.fsRepo.IsArchiveDeleted(item.TenantID, item.ID, item.FileName) {
-				continue
-			}
-			// Bytes are read lazily from disk (archivedBytesLocked) instead of pinning every workbook in memory.
-			p.archivedFiles[item.ID] = item
+		out.items = append(out.items, mergeArchiveSidecars(list, filepath.Join(dir, entry.Name()))...)
+	}
+	return out
+}
+
+func (p *Processor) mergeDiskArchiveLocked(disk *diskArchive) {
+	if p.archiveDir == "" || disk == nil {
+		return
+	}
+	if p.fsRepo != nil {
+		for _, t := range disk.tombs {
+			_ = p.fsRepo.MarkArchiveDeleted(context.Background(), t.TenantID, t.ArchiveID, t.FileName)
 		}
+	}
+	for _, item := range disk.items {
+		if item == nil || item.ID == "" {
+			continue
+		}
+		if p.fsRepo != nil && p.fsRepo.IsArchiveDeleted(item.TenantID, item.ID, item.FileName) {
+			continue
+		}
+		// Bytes are read lazily from disk (archivedBytesLocked) instead of pinning every workbook in memory.
+		p.archivedFiles[item.ID] = item
 	}
 }
 
@@ -414,7 +432,8 @@ func (p *Processor) SaveArchivedFile(
 		tenantDir := filepath.Join(p.archiveDir, normTenant)
 		if err := os.MkdirAll(tenantDir, 0o755); err == nil {
 			storagePath = filepath.Join(tenantDir, fmt.Sprintf("%s_%s", archiveID, safeFile))
-			_ = os.WriteFile(storagePath, fileBytes, 0o644)
+			// Same bytes on replay: keep the mtime so the startup snapshot stays valid.
+			_, _ = fsutil.WriteFileIfChanged(storagePath, fileBytes, 0o644)
 		}
 	}
 
@@ -899,8 +918,9 @@ func (p *Processor) replayArchivedFiles(ctx context.Context, writeSink bool) err
 		p.replaying.Store(true)
 		defer p.replaying.Store(false)
 	}
+	disk := p.readDiskArchive() // GCSFuse scan outside archiveMu
 	p.archiveMu.Lock()
-	p.loadDiskArchiveLocked()
+	p.mergeDiskArchiveLocked(disk)
 	files := make([]*ArchivedFile, 0, len(p.archivedFiles))
 	hasSeedSellIn := false
 	hasSeedProductMaster := false
@@ -979,14 +999,22 @@ func (p *Processor) replayArchivedFiles(ctx context.Context, writeSink bool) err
 // replayArchivedPaths replays only the archived workbooks at the given archive-relative paths
 // (as recorded in the snapshot manifest), in the same order rules as a full replay.
 func (p *Processor) replayArchivedPaths(ctx context.Context, relPaths []string) error {
+	var err error
+	p.withHeavy(func() { err = p.replayArchivedPathsLocked(ctx, relPaths) })
+	return err
+}
+
+// replayArchivedPathsLocked is replayArchivedPaths for callers that already hold heavyMu.
+func (p *Processor) replayArchivedPathsLocked(ctx context.Context, relPaths []string) error {
 	p.replaying.Store(true)
 	defer p.replaying.Store(false)
 	want := make(map[string]bool, len(relPaths))
 	for _, r := range relPaths {
 		want[filepath.Base(r)] = true
 	}
+	disk := p.readDiskArchive() // GCSFuse scan outside archiveMu
 	p.archiveMu.Lock()
-	p.loadDiskArchiveLocked()
+	p.mergeDiskArchiveLocked(disk)
 	var files []*ArchivedFile
 	for _, f := range p.archivedFiles {
 		if f.StoragePath != "" && want[filepath.Base(f.StoragePath)] {

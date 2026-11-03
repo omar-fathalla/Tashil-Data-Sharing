@@ -1,7 +1,6 @@
 package ingestion
 
 import (
-	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -246,7 +245,17 @@ func (p *Processor) buildManifest() ([]ManifestEntry, error) {
 
 // WriteSnapshot captures the current in-memory dataset. It refuses to write if
 // an input file changed while the state was being captured.
+//
+// The export is ~430MB of JSON in prod, so it runs behind the heavy-work gate (never alongside a replay)
+// and is streamed straight into the gzip file instead of being re-encoded into extra in-memory copies.
 func (p *Processor) WriteSnapshot() error {
+	var err error
+	p.withHeavy(func() { err = p.writeSnapshotGated() })
+	return err
+}
+
+// writeSnapshotGated is WriteSnapshot for callers that already hold heavyMu.
+func (p *Processor) writeSnapshotGated() error {
 	bq, fsr, ok := p.snapshotStores()
 	if !ok {
 		return nil
@@ -285,21 +294,17 @@ func (p *Processor) WriteSnapshot() error {
 		}
 		after = kept
 	}
-	env := snapshotEnvelope{
-		SchemaVersion: SnapshotSchemaVersion,
-		BuildID:       p.buildID(),
-		CreatedAt:     time.Now().UTC(),
-		Manifest:      after,
-		BigQuery:      bqRaw,
-		Firestore:     fsRaw,
-	}
-	var buf bytes.Buffer
-	zw := gzip.NewWriter(&buf)
-	if err := json.NewEncoder(zw).Encode(&env); err != nil {
+	head, err := json.Marshal(struct {
+		SchemaVersion int             `json:"schema_version"`
+		BuildID       string          `json:"build_id"`
+		CreatedAt     time.Time       `json:"created_at"`
+		Manifest      []ManifestEntry `json:"manifest"`
+	}{SnapshotSchemaVersion, p.buildID(), time.Now().UTC(), after})
+	if err != nil {
 		return fmt.Errorf("snapshot encode: %w", err)
 	}
-	if err := zw.Close(); err != nil {
-		return fmt.Errorf("snapshot gzip: %w", err)
+	if !json.Valid(bqRaw) || !json.Valid(fsRaw) {
+		return errors.New("snapshot encode: store export is not valid JSON")
 	}
 
 	target := p.SnapshotPath()
@@ -311,26 +316,37 @@ func (p *Processor) WriteSnapshot() error {
 		return fmt.Errorf("snapshot temp: %w", err)
 	}
 	tmpName := tmp.Name()
-	cleanup := func() { _ = os.Remove(tmpName) }
-	if _, err := tmp.Write(buf.Bytes()); err != nil {
+	fail := func(stage string, err error) error {
 		tmp.Close()
-		cleanup()
-		return fmt.Errorf("snapshot write: %w", err)
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("snapshot %s: %w", stage, err)
+	}
+	// Same envelope as snapshotEnvelope (decoded by loadSnapshotIncremental), written piece by piece:
+	// {head fields..., "bigquery": <raw>, "firestore": <raw>}
+	cw := &countingWriter{w: tmp}
+	zw := gzip.NewWriter(cw)
+	for _, part := range [][]byte{head[:len(head)-1], []byte(`,"bigquery":`), bqRaw, []byte(`,"firestore":`), fsRaw, []byte("}\n")} {
+		if _, err := zw.Write(part); err != nil {
+			return fail("write", err)
+		}
+	}
+	bqRaw, fsRaw = nil, nil
+	if err := zw.Close(); err != nil {
+		return fail("gzip", err)
 	}
 	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		cleanup()
-		return fmt.Errorf("snapshot sync: %w", err)
+		return fail("sync", err)
 	}
 	if err := tmp.Close(); err != nil {
-		cleanup()
+		_ = os.Remove(tmpName)
 		return fmt.Errorf("snapshot close: %w", err)
 	}
 	if err := os.Rename(tmpName, target); err != nil {
-		cleanup()
+		_ = os.Remove(tmpName)
 		return fmt.Errorf("snapshot rename: %w", err)
 	}
-	log.Printf("[Tashil Snapshot] Wrote %s (%d bytes, %d input files)", target, buf.Len(), len(after))
+	size := cw.n
+	log.Printf("[Tashil Snapshot] Wrote %s (%d bytes, %d input files)", target, size, len(after))
 	return nil
 }
 
@@ -488,14 +504,18 @@ func (p *Processor) RestoreOrReplay(ctx context.Context) (string, error) {
 	// Make sure a partially imported snapshot can never leak into the replayed state.
 	_ = p.bqRepo.ClearTenantData(ctx, "all")
 	_ = p.fsRepo.ClearTenantData(ctx, "all")
-	replayStart := time.Now()
-	err := p.ReplayArchivedFilesToDatabase(ctx)
-	log.Printf("[Tashil Snapshot] Full archive replay took %s", time.Since(replayStart).Round(time.Millisecond))
-	if err == nil {
-		if werr := p.WriteSnapshot(); werr != nil {
-			log.Printf("[Tashil Snapshot] Could not write snapshot after replay: %v", werr)
+	var err error
+	p.withHeavy(func() {
+		replayStart := time.Now()
+		err = p.ReplayArchivedFilesToDatabase(ctx)
+		log.Printf("[Tashil Snapshot] Full archive replay took %s", time.Since(replayStart).Round(time.Millisecond))
+		if err == nil {
+			// Persist right away so the next cold start (or another instance) restores instead of replaying.
+			if werr := p.writeSnapshotGated(); werr != nil {
+				log.Printf("[Tashil Snapshot] Could not write snapshot after replay: %v", werr)
+			}
 		}
-	}
+	})
 	return "replay", err
 }
 
@@ -510,29 +530,57 @@ func IsSnapshotMutation(method, path string) bool {
 }
 
 func (p *Processor) runBackgroundRebuild(ctx context.Context) {
+	// At most one rebuild per instance at a time.
+	if !p.rebuilding.CompareAndSwap(false, true) {
+		log.Printf("[Tashil Snapshot] Background rebuild already running on this instance; skipped")
+		return
+	}
+	defer p.rebuilding.Store(false)
+	// At most one full rebuild across instances; the others adopt its snapshot.
+	run, release := p.acquireRebuild(ctx)
+	defer release()
+	if !run {
+		return
+	}
 	start := time.Now()
-	bqRaw, fsRaw, err := p.snap.rebuild(ctx)
-	if err != nil {
-		log.Printf("[Tashil Snapshot] Background rebuild failed after %s: %v", time.Since(start).Round(time.Millisecond), err)
-		return
-	}
-	if err := p.ImportState(bqRaw, fsRaw); err != nil {
-		log.Printf("[Tashil Snapshot] Background rebuild import failed: %v", err)
-		return
-	}
-	// Everything on disk at rebuild time is now loaded.
-	if man, err := p.buildManifest(); err == nil {
-		for _, e := range man {
-			if strings.HasPrefix(e.Path, "archive:") && !isArchiveMetadataPath(e.Path) {
-				p.markArchiveApplied(e.Path)
+	swapped := false
+	p.withHeavy(func() {
+		bqRaw, fsRaw, err := p.snap.rebuild(ctx)
+		if err != nil {
+			log.Printf("[Tashil Snapshot] Background rebuild failed after %s: %v", time.Since(start).Round(time.Millisecond), err)
+			return
+		}
+		if err := p.ImportState(bqRaw, fsRaw); err != nil {
+			log.Printf("[Tashil Snapshot] Background rebuild import failed: %v", err)
+			return
+		}
+		bqRaw, fsRaw = nil, nil
+		swapped = true
+		// Everything on disk at rebuild time is now loaded.
+		if man, err := p.buildManifest(); err == nil {
+			for _, e := range man {
+				if strings.HasPrefix(e.Path, "archive:") && !isArchiveMetadataPath(e.Path) {
+					p.markArchiveApplied(e.Path)
+				}
 			}
 		}
-	}
-	log.Printf("[Tashil Snapshot] Background rebuild swapped in after %s", time.Since(start).Round(time.Millisecond))
-	if err := p.WriteSnapshot(); err != nil {
-		log.Printf("[Tashil Snapshot] Could not write snapshot after background rebuild: %v", err)
-	}
-	if p.onRebuilt != nil {
+		log.Printf("[Tashil Snapshot] Background rebuild swapped in after %s", time.Since(start).Round(time.Millisecond))
+		if err := p.writeSnapshotGated(); err != nil {
+			log.Printf("[Tashil Snapshot] Could not write snapshot after background rebuild: %v", err)
+		}
+	})
+	if swapped && p.onRebuilt != nil {
 		p.onRebuilt()
 	}
+}
+
+type countingWriter struct {
+	w io.Writer
+	n int64
+}
+
+func (c *countingWriter) Write(b []byte) (int, error) {
+	n, err := c.w.Write(b)
+	c.n += int64(n)
+	return n, err
 }

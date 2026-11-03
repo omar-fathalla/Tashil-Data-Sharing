@@ -1,6 +1,7 @@
 package bigquery
 
 import (
+	"github.com/tashil/data-sharing/backend/internal/fsutil"
 	"context"
 	"encoding/json"
 	"flag"
@@ -131,7 +132,7 @@ func (c *Client) persistTenantProductMasterLocked(normTenant string) {
 		return
 	}
 	if data, err := json.MarshalIndent(summary, "", "  "); err == nil {
-		_ = os.WriteFile(filepath.Join(dir, normTenant+".json"), data, 0o644)
+		_, _ = fsutil.WriteFileIfChanged(filepath.Join(dir, normTenant+".json"), data, 0o644)
 	}
 }
 

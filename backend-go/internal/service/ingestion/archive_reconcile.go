@@ -61,41 +61,7 @@ func syncLeaseHolder() string {
 
 // holdSyncLease acquires the tenant's archive-sync lease and keeps renewing it until release is called.
 func (p *Processor) holdSyncLease(ctx context.Context, tenantID string) (ok bool, release func(), err error) {
-	if p.syncLease == nil {
-		return true, func() {}, nil
-	}
-	name := "archive-sync__" + tenantID
-	holder := syncLeaseHolder()
-	ok, err = p.syncLease.TryAcquireLease(ctx, name, holder, archiveSyncLeaseTTL)
-	if err != nil || !ok {
-		return false, func() {}, err
-	}
-	stop := make(chan struct{})
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		t := time.NewTicker(archiveSyncLeaseTTL / 3)
-		defer t.Stop()
-		for {
-			select {
-			case <-stop:
-				return
-			case <-t.C:
-				if _, err := p.syncLease.TryAcquireLease(context.Background(), name, holder, archiveSyncLeaseTTL); err != nil {
-					log.Printf("WARN [archive-sync] lease renew: %v", err)
-				}
-			}
-		}
-	}()
-	return true, func() {
-		close(stop)
-		<-done
-		rctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := p.syncLease.ReleaseLease(rctx, name, holder); err != nil {
-			log.Printf("WARN [archive-sync] lease release: %v", err)
-		}
-	}, nil
+	return p.holdLease(ctx, "archive-sync__"+tenantID)
 }
 
 func archiveKind(e *ArchivedFile) bqsink.Kind {
@@ -160,9 +126,10 @@ func PlanArchiveSync(tenantID string, live []*ArchivedFile, stored []bqsink.Arch
 
 func (p *Processor) liveArchives(tenantID string) []*ArchivedFile {
 	norm := normalizeArchiveTenantID(tenantID)
+	disk := p.readDiskArchive() // GCSFuse scan outside archiveMu
 	p.archiveMu.Lock()
 	defer p.archiveMu.Unlock()
-	p.loadDiskArchiveLocked()
+	p.mergeDiskArchiveLocked(disk)
 	var out []*ArchivedFile
 	for _, e := range p.archivedFiles {
 		if e == nil || e.TenantID != norm {
@@ -249,9 +216,10 @@ func (p *Processor) ReconcileArchivesToSink(ctx context.Context, tenantID string
 		sortArchiveReplayOrder(toWrite)
 		log.Printf("[archive-sync] tenant=%s writing %d archived file(s) to BigQuery", rep.TenantID, len(toWrite))
 		// One file at a time (replayFiles frees each workbook before the next), so peak memory is one file.
+		// Never alongside a replay, rebuild or snapshot export on this instance (OOM on 2026-11-03).
 		for _, e := range toWrite {
 			start := time.Now()
-			p.replayFiles(ctx, []*ArchivedFile{e}, true)
+			p.withHeavy(func() { p.replayFiles(ctx, []*ArchivedFile{e}, true) })
 			log.Printf("[archive-sync] tenant=%s wrote %q in %s", rep.TenantID, e.FileName, time.Since(start).Round(time.Millisecond))
 		}
 	}

@@ -27,10 +27,10 @@ import (
 )
 
 func main() {
-	// Keep the Go heap well under the 2Gi Cloud Run limit so a full archive replay triggers
+	// Keep the Go heap well under the container memory limit so a full archive replay triggers
 	// garbage collection instead of an out-of-memory kill. GOMEMLIMIT, when set, wins.
 	if os.Getenv("GOMEMLIMIT") == "" {
-		debug.SetMemoryLimit(1536 << 20)
+		debug.SetMemoryLimit(goMemoryLimit(readCgroupMemoryMax()))
 	}
 	cfg := config.Load()
 	log.Printf("[Tashil Cloud Run] Initializing service on port %s (env: %s, mock: %v)", cfg.Port, cfg.Environment, cfg.UseMockServices)
@@ -352,7 +352,10 @@ const dataReadyWait = 170 * time.Second
 func waitForData(next http.Handler, ready <-chan struct{}) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
-		if !strings.HasPrefix(p, "/api/v1/") || strings.HasPrefix(p, "/api/v1/auth/") ||
+		// The archive list reads only the archive index, loaded before the server listens; it must not
+		// wait behind the dataset replay (it returned 503 after 170s on 2026-11-03).
+		if ingestion.IsArchiveListRequest(r.Method, p) ||
+			!strings.HasPrefix(p, "/api/v1/") || strings.HasPrefix(p, "/api/v1/auth/") ||
 			strings.HasPrefix(p, "/api/v1/portal/") || p == "/api/v1/version" {
 			next.ServeHTTP(w, r)
 			return

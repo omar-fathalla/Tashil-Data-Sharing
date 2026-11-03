@@ -1,6 +1,7 @@
 package bigquery
 
 import (
+	"github.com/tashil/data-sharing/backend/internal/fsutil"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -56,7 +57,7 @@ func (c *Client) persistTenantTargetsLocked(normTenant string) {
 		list = []domain.TargetRecord{}
 	}
 	if data, err := json.MarshalIndent(list, "", "  "); err == nil {
-		_ = os.WriteFile(filepath.Join(dir, normTenant+".json"), data, 0o644)
+		_, _ = fsutil.WriteFileIfChanged(filepath.Join(dir, normTenant+".json"), data, 0o644)
 	}
 }
 
