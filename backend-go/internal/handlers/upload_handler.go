@@ -74,7 +74,8 @@ func (h *UploadHandler) HandleClearData(w http.ResponseWriter, r *http.Request) 
 
 // HandleLoadSellInPlan handles POST /api/v1/ingest/load-sell-in-plan (and direct Sell-In file uploads from the CPFR screen).
 func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Request) {
-	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
+	claims, ok := requireWriteRole(w, r, ingestWriteRoles)
+	if !ok {
 		return
 	}
 	if r.Method != http.MethodPost {
@@ -87,9 +88,7 @@ func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Requ
 		http.Error(w, `{"error":"unauthorized tenant context"}`, http.StatusUnauthorized)
 		return
 	}
-	if qTenant := strings.TrimSpace(r.URL.Query().Get("tenant_id")); qTenant != "" {
-		tenantID = qTenant
-	}
+	requestedTenant := strings.TrimSpace(r.URL.Query().Get("tenant_id"))
 
 	targetChain := strings.TrimSpace(r.URL.Query().Get("chain"))
 	filename := strings.TrimSpace(r.URL.Query().Get("filename"))
@@ -107,7 +106,7 @@ func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Requ
 				targetChain = formChain
 			}
 			if formTenant := strings.TrimSpace(r.FormValue("tenant_id")); formTenant != "" {
-				tenantID = formTenant
+				requestedTenant = formTenant
 			}
 			if formReplace := strings.TrimSpace(r.FormValue("replace_archive_id")); formReplace != "" {
 				replaceArchiveID = formReplace
@@ -132,6 +131,14 @@ func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Requ
 		}
 	} else if r.ContentLength > 0 && filename != "" {
 		fileBytes, _ = io.ReadAll(r.Body)
+	}
+
+	tenantID, ok = resolveUploadTenant(w, claims, tenantID, requestedTenant)
+	if !ok {
+		return
+	}
+	if replaceArchiveID != "" && !requireSuperForReplace(w, claims) {
+		return
 	}
 
 	// Only the bundled Fathalla seed plan may default its chain; an uploaded file must name its chain.
@@ -191,15 +198,12 @@ func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Requ
 		writeUploadError(w, err, "sell_in_ingestion_failed")
 		return
 	}
-	if replaceArchiveID != "" {
-		_, _ = h.processor.DeleteArchivedFile(r.Context(), tenantID, replaceArchiveID)
-	}
-
 	result, err := h.processor.ProcessSellInPlan(ctx, tenantID, filename, fileBytes, false, targetChain)
 	if err != nil {
 		writeUploadError(w, err, "sell_in_ingestion_failed")
 		return
 	}
+	deleteReplacedArchive(r.Context(), h.processor, tenantID, replaceArchiveID, result)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -208,7 +212,8 @@ func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Requ
 
 // HandleUploadProductMaster handles POST /api/v1/product-master/upload to ingest or update an Adeco Product Master & Price List workbook (.xlsx or .csv).
 func (h *UploadHandler) HandleUploadProductMaster(w http.ResponseWriter, r *http.Request) {
-	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
+	claims, ok := requireWriteRole(w, r, ingestWriteRoles)
+	if !ok {
 		return
 	}
 	if r.Method != http.MethodPost {
@@ -221,9 +226,7 @@ func (h *UploadHandler) HandleUploadProductMaster(w http.ResponseWriter, r *http
 		http.Error(w, `{"error":"unauthorized tenant context"}`, http.StatusUnauthorized)
 		return
 	}
-	if qTenant := strings.TrimSpace(r.URL.Query().Get("tenant_id")); qTenant != "" {
-		tenantID = qTenant
-	}
+	requestedTenant := strings.TrimSpace(r.URL.Query().Get("tenant_id"))
 
 	filename := strings.TrimSpace(r.URL.Query().Get("filename"))
 	replaceArchiveID := strings.TrimSpace(r.URL.Query().Get("replace_archive_id"))
@@ -234,7 +237,7 @@ func (h *UploadHandler) HandleUploadProductMaster(w http.ResponseWriter, r *http
 	if strings.Contains(contentType, "multipart/form-data") {
 		if err := r.ParseMultipartForm(64 << 20); err == nil {
 			if formTenant := strings.TrimSpace(r.FormValue("tenant_id")); formTenant != "" {
-				tenantID = formTenant
+				requestedTenant = formTenant
 			}
 			if formReplace := strings.TrimSpace(r.FormValue("replace_archive_id")); formReplace != "" {
 				replaceArchiveID = formReplace
@@ -253,6 +256,14 @@ func (h *UploadHandler) HandleUploadProductMaster(w http.ResponseWriter, r *http
 		}
 	} else if r.ContentLength > 0 {
 		fileBytes, _ = io.ReadAll(r.Body)
+	}
+
+	tenantID, ok = resolveUploadTenant(w, claims, tenantID, requestedTenant)
+	if !ok {
+		return
+	}
+	if replaceArchiveID != "" && !requireSuperForReplace(w, claims) {
+		return
 	}
 
 	if len(fileBytes) == 0 {
@@ -283,10 +294,6 @@ func (h *UploadHandler) HandleUploadProductMaster(w http.ResponseWriter, r *http
 		filename = "adeco_product_master_2026_08_01.xlsx"
 	}
 
-	if replaceArchiveID != "" {
-		_, _ = h.processor.DeleteArchivedFile(r.Context(), tenantID, replaceArchiveID)
-	}
-
 	result, err := h.processor.ProcessProductMaster(r.Context(), tenantID, filename, fileBytes, dryRun)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -296,6 +303,9 @@ func (h *UploadHandler) HandleUploadProductMaster(w http.ResponseWriter, r *http
 			"message": err.Error(),
 		})
 		return
+	}
+	if !dryRun {
+		deleteReplacedArchive(r.Context(), h.processor, tenantID, replaceArchiveID, result)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

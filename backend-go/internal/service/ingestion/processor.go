@@ -1166,9 +1166,7 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 
 // ProcessProductMaster parses and ingests an Adeco Product Master & Price List workbook (.xlsx or .csv).
 func (p *Processor) ProcessProductMaster(ctx context.Context, tenantID, filename string, fileBytes []byte, dryRun bool) (*IngestionResult, error) {
-	if p.fsRepo != nil {
-		_ = p.fsRepo.UnmarkArchiveDeleted(ctx, tenantID, "", filename)
-	}
+	// The deleted flag is cleared by SaveArchivedFile, only once the file parsed and was archived.
 
 	summary, err := gemini.ParseProductMasterWorkbook(tenantID, filename, fileBytes)
 	if err != nil {
@@ -1324,9 +1322,7 @@ func (p *Processor) ProcessProductMaster(ctx context.Context, tenantID, filename
 
 // ProcessSellInPlan parses and ingests a Supplier Sell-In & Forecasting Plan workbook (.xlsx or .csv).
 func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename string, fileBytes []byte, dryRun bool, targetChain string) (*IngestionResult, error) {
-	if p.fsRepo != nil {
-		_ = p.fsRepo.UnmarkArchiveDeleted(ctx, tenantID, "", filename)
-	}
+	// The deleted flag is cleared by SaveArchivedFile, only once the file parsed and was archived.
 
 	if err := sellInChainGuard(ctx, targetChain); err != nil {
 		return nil, err
