@@ -139,7 +139,7 @@ func (h *TradeMarketingHandler) HandleUpdateExpense(w http.ResponseWriter, r *ht
 }
 
 func (h *TradeMarketingHandler) save(w http.ResponseWriter, r *http.Request, id string) {
-	c, ok := tmClaims(w, r)
+	c, ok := tmWriteClaims(w, r)
 	if !ok {
 		return
 	}
@@ -207,7 +207,7 @@ func (h *TradeMarketingHandler) save(w http.ResponseWriter, r *http.Request, id 
 
 // HandleDeleteExpense serves DELETE /api/v1/trade-marketing/expenses/{id}
 func (h *TradeMarketingHandler) HandleDeleteExpense(w http.ResponseWriter, r *http.Request) {
-	c, ok := tmClaims(w, r)
+	c, ok := tmWriteClaims(w, r)
 	if !ok {
 		return
 	}

@@ -248,7 +248,7 @@ func normHeader(s string) string {
 // HandleUploadExpenses serves POST /api/v1/trade-marketing/expenses/upload (multipart "file": .xlsx or .csv).
 // Expected header row: year, month, chain_name, category, brand_name, campaign_title, vendor_or_agency, amount_egp, notes.
 func (h *TradeMarketingHandler) HandleUploadExpenses(w http.ResponseWriter, r *http.Request) {
-	c, ok := tmClaims(w, r)
+	c, ok := tmWriteClaims(w, r)
 	if !ok {
 		return
 	}

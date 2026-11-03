@@ -339,7 +339,8 @@ class TenantUserModel {
   bool get canViewAuditLogs => isSuperAdmin || role == 'vendor_admin';
 
   /// Chain create/update/delete (the server checks the verified JWT role too).
-  bool get canManageChains => isSuperAdmin || role == 'vendor_admin' || role == 'admin';
+  // Mirrors chainWriteRoles in backend-go (legacy 'admin' dropped).
+  bool get canManageChains => isSuperAdmin || role == 'vendor_admin';
 
   TenantUserModel copyWith({
     String? userId,

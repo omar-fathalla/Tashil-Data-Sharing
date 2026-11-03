@@ -79,7 +79,7 @@ func (h *CustomerRegistryHandler) HandleUnmerge(w http.ResponseWriter, r *http.R
 }
 
 func (h *CustomerRegistryHandler) decide(w http.ResponseWriter, r *http.Request, status, action string) {
-	c, ok := tmClaims(w, r)
+	c, ok := tmWriteClaims(w, r)
 	if !ok {
 		return
 	}

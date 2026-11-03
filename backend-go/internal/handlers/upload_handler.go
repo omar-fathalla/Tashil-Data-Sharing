@@ -35,6 +35,9 @@ func NewUploadHandler(processor *ingestion.Processor) *UploadHandler {
 
 // HandleClearData handles POST /api/v1/ingest/clear to wipe fake/previous data to zero.
 func (h *UploadHandler) HandleClearData(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireWriteRole(w, r, destructiveWriteRoles); !ok {
+		return
+	}
 	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
@@ -71,6 +74,9 @@ func (h *UploadHandler) HandleClearData(w http.ResponseWriter, r *http.Request) 
 
 // HandleLoadSellInPlan handles POST /api/v1/ingest/load-sell-in-plan (and direct Sell-In file uploads from the CPFR screen).
 func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
@@ -202,6 +208,9 @@ func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Requ
 
 // HandleUploadProductMaster handles POST /api/v1/product-master/upload to ingest or update an Adeco Product Master & Price List workbook (.xlsx or .csv).
 func (h *UploadHandler) HandleUploadProductMaster(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
@@ -296,6 +305,9 @@ func (h *UploadHandler) HandleUploadProductMaster(w http.ResponseWriter, r *http
 
 // HandleLoadLocalExcel handles POST /api/v1/ingest/load-default-excel to ingest the local Adco (Fathalla + Gomla) Excel workbooks.
 func (h *UploadHandler) HandleLoadLocalExcel(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
@@ -371,6 +383,9 @@ func (h *UploadHandler) HandleLoadLocalExcel(w http.ResponseWriter, r *http.Requ
 
 // HandleUpload handles POST /api/v1/ingest/upload.
 func (h *UploadHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
@@ -490,6 +505,9 @@ func (h *UploadHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 
 // HandleCommit handles POST /api/v1/ingest/commit to persist a reviewed staged upload.
 func (h *UploadHandler) HandleCommit(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
@@ -551,6 +569,9 @@ func (h *UploadHandler) HandleCommit(w http.ResponseWriter, r *http.Request) {
 
 // HandleDiscard handles POST /api/v1/ingest/discard to cancel a reviewed staged upload.
 func (h *UploadHandler) HandleDiscard(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
@@ -726,6 +747,9 @@ func (h *UploadHandler) HandleDownloadArchivedFile(w http.ResponseWriter, r *htt
 
 // HandleDeleteArchive handles DELETE /api/v1/ingest/archive/{id} (or DELETE /api/v1/ingest/archive?id=...)
 func (h *UploadHandler) HandleDeleteArchive(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireWriteRole(w, r, destructiveWriteRoles); !ok {
+		return
+	}
 	if r.Method != http.MethodDelete {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return

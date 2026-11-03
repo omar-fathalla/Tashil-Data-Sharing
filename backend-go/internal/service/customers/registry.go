@@ -32,6 +32,13 @@ const (
 //go:embed seed_customers.json
 var seedJSON []byte
 
+// seed_aliases.json maps a customer name as written by the gp_sop_export branch-label fix (new) to
+// the approved seed name already stored in BigQuery (old), e.g. "زهران - البيطاش" ->
+// "فرع فتح الله - زهران - البيطاش". Exact (normalized) match only; generated from ITEM7_84.csv.
+//
+//go:embed seed_aliases.json
+var seedAliasesJSON []byte
+
 // MonthStat is the quarantined share of one file in one month.
 type MonthStat struct {
 	Rows  int     `json:"rows" firestore:"rows"`
@@ -184,6 +191,7 @@ type Registry struct {
 	store Store
 	ttl   time.Duration
 	seed  map[string]string // key -> seed name
+	alias map[string]string // key of a new spelling -> seed name it permanently maps to
 	cache map[string]*tenantCache
 	now   func() time.Time
 	// SeedTenants are the tenants whose served data the embedded seed describes.
@@ -221,8 +229,19 @@ func New(store Store) *Registry {
 	for _, n := range names {
 		r.seed[NormalizeName(n)] = n
 	}
+	var aliases map[string]string
+	_ = json.Unmarshal(seedAliasesJSON, &aliases)
+	r.alias = make(map[string]string, len(aliases))
+	for from, to := range aliases {
+		if _, ok := r.seed[NormalizeName(to)]; ok {
+			r.alias[NormalizeName(from)] = to
+		}
+	}
 	return r
 }
+
+// AliasCount is the number of embedded permanent aliases.
+func (r *Registry) AliasCount() int { return len(r.alias) }
 
 // SeedCount is the number of embedded approved names.
 func (r *Registry) SeedCount() int { return len(r.seed) }
@@ -305,6 +324,11 @@ func (r *Registry) Partition(ctx context.Context, tenantID, filename, uploadChai
 			continue
 		}
 		key := NormalizeName(name)
+		if old, ok := r.alias[key]; ok && r.seedApplies(tenantID) {
+			// Permanent alias: the row keeps the stored seed name, and any decision on that name wins.
+			name, key = old, NormalizeName(old)
+			rec.CustomerName = old
+		}
 		e, ok := r.resolveLocked(st, tenantID, key)
 		if ok {
 			if e.Chain != "" {

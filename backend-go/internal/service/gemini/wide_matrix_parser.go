@@ -1771,10 +1771,23 @@ func buildPayloadFromWideMatrix(
 	}, true
 }
 
+// frozenStoreIDPrefixes pins the historical chain[:3] prefix of every chain that already exists
+// (Firestore tenant_retail_chains + retail_chains + SELLIN_CUSTOMER_CHAIN_MAP, read 3 Nov 2026) and
+// reaches the default case of BuildBranchStoreMetadata. carrefour/gomla/beet-elgomla/spinneys/metro/
+// seoudi/kazyon/fathalla have explicit cases above. Only chains created later use the new rule.
+var frozenStoreIDPrefixes = map[string]string{
+	"qa_test":       "qa_",
+	"chain-1080314": "cha",
+	"zahran":        "zah",
+}
+
 // storeIDPrefixForChain keeps the historical chain[:3] prefix when it is plain alphanumeric, and
 // otherwise uses the first three alphanumerics (qa_test -> qat, not "qa_"). Returns "" when the
 // chain has fewer than three alphanumerics (caller keeps its default).
 func storeIDPrefixForChain(chain string) string {
+	if p, ok := frozenStoreIDPrefixes[chain]; ok {
+		return p
+	}
 	isAlnum := func(b byte) bool { return b >= 'a' && b <= 'z' || b >= '0' && b <= '9' }
 	if len(chain) >= 3 && isAlnum(chain[0]) && isAlnum(chain[1]) && isAlnum(chain[2]) {
 		return chain[:3]

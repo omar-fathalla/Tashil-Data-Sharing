@@ -349,7 +349,7 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 			RegionCode:         "ALX", // as served since in25/in26 were first loaded; the Branch column is an open decision
 			Governorate:        st.Governorate,
 			Sector:             "MT",
-			CustomerName:       st.BranchName,
+			CustomerName:       gpSOPCustomerName(cust, st.BranchName),
 			CustomerBranchCode: st.ID,
 			ItemGroup:          strings.TrimSpace(getCol(r, cols["item_code"])),
 			ItemName:           strings.TrimSpace(getCol(r, cols["item_name"])),
@@ -380,3 +380,13 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 
 // MonthNumToEN returns "Jan".."Dec" (exported for the ingestion package).
 func MonthNumToEN(m int) string { return monthNumToEN(m) }
+
+// gpSOPCustomerName is the customer as written in the file (same spelling the other layouts store),
+// not the store label «فرع <chain> - …», so one customer has one name across layouts. Names that were
+// already approved under the old label map back to it via customers/seed_aliases.json (item 7).
+func gpSOPCustomerName(raw, branchLabel string) string {
+	if strings.TrimSpace(raw) == "" {
+		return branchLabel
+	}
+	return strings.TrimSpace(raw)
+}

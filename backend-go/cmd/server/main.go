@@ -172,7 +172,10 @@ func main() {
 
 	// 4. Initialize Handlers and Auth Middleware
 	// Demo bypass tokens (demo-*-token) are OFF unless ALLOW_DEMO_TOKENS=true.
-	allowDemoTokens := os.Getenv("ALLOW_DEMO_TOKENS") == "true"
+	allowDemoTokens, demoErr := config.DemoTokensAllowed(cfg.Environment, os.Getenv("ALLOW_DEMO_TOKENS"))
+	if demoErr != nil {
+		log.Fatal(demoErr)
+	}
 	log.Printf("[Tashil Cloud Run] Demo tokens allowed: %v", allowDemoTokens)
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWTSecret, allowDemoTokens)
 	uploadHandler := handlers.NewUploadHandler(ingestProcessor)

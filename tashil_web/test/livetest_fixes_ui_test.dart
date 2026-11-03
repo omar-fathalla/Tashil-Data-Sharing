@@ -141,6 +141,7 @@ void main() {
   group('steering 2: «تسجيل سلسلة»', () {
     for (final role in [
       'merchandiser',
+      'admin',
       'chain_kam',
       'national_sales_manager'
     ]) {

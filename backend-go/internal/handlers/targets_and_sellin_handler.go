@@ -119,6 +119,11 @@ func (h *AnalyticsHandler) HandleSellInRecords(w http.ResponseWriter, r *http.Re
 
 // HandleTargets serves GET, POST, and DELETE /api/v1/analytics/targets for Sell-Out and Sell-In Target management.
 func (h *AnalyticsHandler) HandleTargets(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
+			return
+		}
+	}
 	tenantID, err := middleware.EnforceTenantRLS(r)
 	if err != nil {
 		http.Error(w, `{"error":"unauthorized tenant context"}`, http.StatusUnauthorized)
@@ -204,6 +209,9 @@ func (h *AnalyticsHandler) HandleTargets(w http.ResponseWriter, r *http.Request)
 
 // HandleUploadTargetsFile serves POST /api/v1/analytics/targets/upload to import targets from an Excel (.xlsx) or CSV file.
 func (h *AnalyticsHandler) HandleUploadTargetsFile(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return

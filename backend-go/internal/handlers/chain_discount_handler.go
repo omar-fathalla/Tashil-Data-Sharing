@@ -63,7 +63,7 @@ func (h *ChainDiscountHandler) HandleGet(w http.ResponseWriter, r *http.Request)
 // HandlePut serves PUT /api/v1/product-master/chain-discounts with body {"profiles":[...]}:
 // it replaces the tenant's full list (add / edit / delete are all done by sending the new list).
 func (h *ChainDiscountHandler) HandlePut(w http.ResponseWriter, r *http.Request) {
-	c, ok := tmClaims(w, r)
+	c, ok := tmWriteClaims(w, r)
 	if !ok {
 		return
 	}

@@ -46,7 +46,7 @@ func (h *AdminHandler) chainWriteAccess(r *http.Request, bodyTenantID string) (s
 		return "", http.StatusUnauthorized, "unauthorized: a valid admin token is required"
 	}
 	super := claims.Role == domain.RoleSuperAdmin
-	if !super && claims.Role != domain.RoleVendorAdmin && claims.Role != domain.RoleAdmin {
+	if !chainWriteRoles[claims.Role] {
 		return "", http.StatusForbidden, "forbidden: admin role required"
 	}
 	requested := ""
@@ -89,11 +89,9 @@ func NewAdminHandler(fsRepo firestore.Repository) *AdminHandler {
 	return &AdminHandler{fsRepo: fsRepo}
 }
 
+// checkSuperAdminAccess uses the verified token claims only; no header can grant super admin.
 func (h *AdminHandler) checkSuperAdminAccess(r *http.Request) bool {
-	if strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Simulated-Role")), "super_admin") {
-		return true
-	}
-	claims, ok := middleware.GetUserClaims(r.Context())
+	claims, ok := middleware.WriteClaims(r.Context())
 	if !ok || claims == nil {
 		return false
 	}

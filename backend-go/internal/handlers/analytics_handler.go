@@ -634,6 +634,9 @@ func (h *AnalyticsHandler) HandleGetProductMaster(w http.ResponseWriter, r *http
 
 // HandleUpdateProductMasterItem serves PUT /api/v1/product-master/item to upsert a single SKU in the Product Master.
 func (h *AnalyticsHandler) HandleUpdateProductMasterItem(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
+		return
+	}
 	if r.Method != http.MethodPut && r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
