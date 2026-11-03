@@ -356,7 +356,17 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       }
 
       if (replaceArchiveId != null) {
-        await widget.apiClient.deleteArchivedFile(replaceArchiveId, isSellIn: false);
+        // Replace = delete the old archive, then upload. If the backend refuses the delete (e.g. 403 for a
+        // non-super_admin) stop here: uploading anyway would keep both files and double-count Sell-Out.
+        final deleted = await widget.apiClient.deleteArchivedFile(replaceArchiveId, isSellIn: false);
+        if (!deleted) {
+          if (!mounted) return;
+          M3Feedback.showError(
+            context,
+            widget.apiClient.lastArchiveDeleteError ?? 'تعذّر استبدال الملف، ومفيش حاجة اتغيرت.',
+          );
+          return;
+        }
       }
 
       final res = await widget.apiClient.uploadFile(
@@ -491,12 +501,16 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
 
     setState(() => _deletingFileId = file.id);
     try {
-      await widget.apiClient.deleteArchivedFile(
+      final deleted = await widget.apiClient.deleteArchivedFile(
         file.id,
         fileName: file.fileName,
         isSellIn: false,
       );
       if (!mounted) return;
+      if (!deleted) {
+        M3Feedback.showError(context, widget.apiClient.lastArchiveDeleteError ?? 'تعذّر حذف الملف.');
+        return;
+      }
       M3Feedback.showSuccess(
         context,
         'تم حذف ${file.fileName}.',
@@ -3075,6 +3089,9 @@ onChanged: m3Legacy<int>((v) {
                               ),
                               DataCell(
                                 ArchiveActionsGroup(
+                                  // Replace and delete remove an archive: super_admin only on the backend.
+                                  showEdit: widget.apiClient.currentUser?.isSuperAdmin ?? false,
+                                  showDelete: widget.apiClient.currentUser?.isSuperAdmin ?? false,
                                   isEditing: isReplacing,
                                   isDeleting: isDeleting,
                                   onEdit: (isDeleting || isReplacing || _isUploading)

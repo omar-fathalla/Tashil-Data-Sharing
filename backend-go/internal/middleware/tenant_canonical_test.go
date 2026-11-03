@@ -79,3 +79,17 @@ func TestAssertTenantMatchUnchanged(t *testing.T) {
 		t.Fatalf("missing claims: %v", err)
 	}
 }
+
+// L2: an empty/blank claims tenant must never match a target that also canonicalizes to "" (e.g. "tenant-").
+func TestAssertTenantMatchRejectsEmptyCanonical(t *testing.T) {
+	for _, pair := range [][2]string{{"", "tenant-"}, {"tenant-", ""}, {"tenant-", "tenant-"}, {"", ""}} {
+		ctx := context.WithValue(context.Background(), UserClaimsContextKey, &domain.UserClaims{TenantID: pair[0], Role: domain.RoleVendorAdmin})
+		if err := AssertTenantMatch(ctx, pair[1]); err == nil {
+			t.Fatalf("claims %q vs target %q: expected error, got nil", pair[0], pair[1])
+		}
+	}
+	ctx := context.WithValue(context.Background(), UserClaimsContextKey, &domain.UserClaims{TenantID: "adeco", Role: domain.RoleVendorAdmin})
+	if err := AssertTenantMatch(ctx, "tenant-adeco"); err != nil {
+		t.Fatalf("adeco vs tenant-adeco: %v", err)
+	}
+}

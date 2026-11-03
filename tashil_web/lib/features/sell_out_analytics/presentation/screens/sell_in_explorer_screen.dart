@@ -531,11 +531,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
 
     setState(() => _deletingFileId = file.id);
     try {
-      await widget.apiClient.deleteArchivedFile(
+      final deleted = await widget.apiClient.deleteArchivedFile(
         file.id,
         isSellIn: true,
       );
       if (!mounted) return;
+      if (!deleted) {
+        M3Feedback.showError(context, widget.apiClient.lastArchiveDeleteError ?? 'تعذّر حذف الملف.');
+        return;
+      }
       M3Feedback.showSuccess(
         context,
         'تم حذف ${file.fileName}',
@@ -3466,6 +3470,7 @@ onChanged: m3Legacy<int>((v) {
                                   // Replacing a Sell-In archive deletes the old one: super_admin only
                                   // (the backend answers 403 for anyone else).
                                   showEdit: widget.apiClient.currentUser?.isSuperAdmin ?? false,
+                                  showDelete: widget.apiClient.currentUser?.isSuperAdmin ?? false,
                                   isEditing: isReplacing,
                                   isDeleting: isDeleting,
                                   onEdit: (isDeleting || isReplacing || _isUploading)

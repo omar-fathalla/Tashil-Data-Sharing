@@ -32,7 +32,7 @@ func AssertTenantMatch(ctx context.Context, targetTenantID string) error {
 	}
 	// Only SuperAdmin can access any tenant, others must match their own
 	if claims.Role != domain.RoleSuperAdmin {
-		if CanonicalTenant(claims.TenantID) != CanonicalTenant(targetTenantID) {
+		if !SameTenant(claims.TenantID, targetTenantID) {
 			return fmt.Errorf("%w: user tenant '%s' cannot access '%s'", ErrTenantForbidden, claims.TenantID, targetTenantID)
 		}
 	}

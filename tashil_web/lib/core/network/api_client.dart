@@ -1997,6 +1997,29 @@ class UploadRejectedException implements Exception {
 const String uploadForbiddenMessage =
     'مش مسموح لحسابك بالعملية دي: استبدال ملف مؤرشف أو الرفع لشركة تانية متاح للمشرف العام بس. مفيش حاجة اتحفظت.';
 
+/// The server's own `message`, when it is a non-empty Arabic text (English internals are not shown).
+String? serverArabicMessage(String body) {
+  try {
+    final j = jsonDecode(body);
+    if (j is Map) {
+      for (final k in const ['message', 'error']) {
+        final v = j[k];
+        if (v is String && v.trim().isNotEmpty && RegExp(r'[\u0600-\u06FF]').hasMatch(v)) return v.trim();
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
+/// Arabic reason for a refused archive delete.
+String archiveDeleteRefusedMessage(int statusCode, String body) {
+  final server = serverArabicMessage(body);
+  if (server != null) return server;
+  if (statusCode == 403) return 'مش مسموح لحسابك بحذف أو استبدال الملفات المؤرشفة؛ متاح للمشرف العام بس. مفيش حاجة اتغيرت.';
+  if (statusCode == 404) return 'الملف مش موجود في الأرشيف.';
+  return 'تعذّر حذف الملف (HTTP $statusCode). مفيش حاجة اتغيرت.';
+}
+
 void throwIfUploadRefused(int statusCode, String body, String fallbackMessage) {
   if (statusCode >= 200 && statusCode < 300) return;
   if (statusCode == 409) {
@@ -2004,7 +2027,7 @@ void throwIfUploadRefused(int statusCode, String body, String fallbackMessage) {
     if (c != null) throw c;
   }
   if (statusCode == 403) {
-    throw UploadRejectedException(uploadForbiddenMessage);
+    throw UploadRejectedException(serverArabicMessage(body) ?? uploadForbiddenMessage);
   }
   String message = '$fallbackMessage (HTTP $statusCode)';
   try {
@@ -4467,7 +4490,15 @@ class ApiClient {
     );
   }
 
+  /// Server reason for the last refused [deleteArchivedFile] (Arabic), or null after a success.
+  String? lastArchiveDeleteError;
+
   /// Deletes an archived Excel/CSV file and purges its ingested facts from the database and storage.
+  ///
+  /// Returns true only when the backend confirmed the delete (200/204). Local archive caches and the
+  /// deleted-id/file-name lists change ONLY after that confirmation, so a refused delete (e.g. 403 for a
+  /// non-super_admin) leaves the list exactly as it was. Offline mock mode ([allowMockFallback] with an
+  /// unreachable server) keeps the old local-only delete.
   Future<bool> deleteArchivedFile(
     String archiveId, {
     String? targetTenant,
@@ -4479,7 +4510,6 @@ class ApiClient {
         ? targetTenant
         : tenantId;
     final cleanSlug = normalizeDataTenantSlug(effectiveTenant);
-    invalidateExecutiveKpisCache();
     _ensureLocalArchiveSeeded(cleanSlug);
     final localList = _localArchiveByTenant[cleanSlug];
     final effectiveIsPm = isProductMaster ||
@@ -4487,38 +4517,22 @@ class ApiClient {
         archiveId == 'pm_default_seed' ||
         (localList != null && localList.any((f) => f.id == archiveId && f.fileType == 'product_master'));
 
-    _deletedArchiveIds.add(archiveId);
-    if (kIsWeb) {
-      SessionStorage.saveDeletedArchiveIds(_deletedArchiveIds);
-    }
-
-    if (localList != null) {
-      _localArchiveByTenant[cleanSlug] = localList.where((f) {
-        if (f.id == archiveId) return false;
-        if (!effectiveIsPm && fileName != null && f.fileName.toLowerCase() == fileName.trim().toLowerCase()) {
-          return false;
-        }
-        return true;
-      }).toList();
-    }
+    final filtered = localList?.where((f) {
+      if (f.id == archiveId) return false;
+      if (!effectiveIsPm && fileName != null && f.fileName.toLowerCase() == fileName.trim().toLowerCase()) {
+        return false;
+      }
+      return true;
+    }).toList();
 
     final hasRemainingWithSameFileName = fileName != null &&
         fileName.trim().isNotEmpty &&
-        (_localArchiveByTenant[cleanSlug] ?? const [])
+        (filtered ?? const <ArchivedExcelFileModel>[])
             .any((f) => f.fileName.toLowerCase() == fileName.trim().toLowerCase());
 
-    if (fileName != null && fileName.trim().isNotEmpty && !hasRemainingWithSameFileName) {
-      _deletedArchiveFileNames.add(fileName.trim().toLowerCase());
-      if (kIsWeb) {
-        SessionStorage.saveDeletedArchiveFileNames(_deletedArchiveFileNames);
-      }
-    }
-
-    if (effectiveIsPm) {
-      _rollbackLocalProductMasterSheet(cleanSlug, archiveId: archiveId, fileName: fileName);
-    }
-
     bool backendSuccess = false;
+    bool networkError = false;
+    lastArchiveDeleteError = null;
     try {
       var uri = Uri.parse(ApiEndpoints.ingestArchiveItem(archiveId));
       if (fileName != null && fileName.trim().isNotEmpty && !hasRemainingWithSameFileName) {
@@ -4535,11 +4549,36 @@ class ApiClient {
       ).timeout(const Duration(seconds: 10));
       if (resp.statusCode == 200 || resp.statusCode == 204) {
         backendSuccess = true;
+      } else {
+        lastArchiveDeleteError = archiveDeleteRefusedMessage(resp.statusCode, resp.body);
       }
     } catch (e) {
+      networkError = true;
       debugPrint('[ApiClient] deleteArchivedFile network call error: $e');
     }
 
+    if (!backendSuccess && !(networkError && allowMockFallback)) {
+      lastArchiveDeleteError ??= 'تعذّر الاتصال بالخادم، الملف ما اتحذفش.';
+      return false;
+    }
+
+    invalidateExecutiveKpisCache();
+    _deletedArchiveIds.add(archiveId);
+    if (kIsWeb) {
+      SessionStorage.saveDeletedArchiveIds(_deletedArchiveIds);
+    }
+    if (filtered != null) {
+      _localArchiveByTenant[cleanSlug] = filtered;
+    }
+    if (fileName != null && fileName.trim().isNotEmpty && !hasRemainingWithSameFileName) {
+      _deletedArchiveFileNames.add(fileName.trim().toLowerCase());
+      if (kIsWeb) {
+        SessionStorage.saveDeletedArchiveFileNames(_deletedArchiveFileNames);
+      }
+    }
+    if (effectiveIsPm) {
+      _rollbackLocalProductMasterSheet(cleanSlug, archiveId: archiveId, fileName: fileName);
+    }
     _localArchiveBytesById.remove(archiveId);
     if (!isSellIn &&
         !effectiveIsPm &&
@@ -4551,7 +4590,7 @@ class ApiClient {
         SessionStorage.saveClearedTenants(_clearedTenants);
       }
     }
-    return backendSuccess || true;
+    return true;
   }
 
   static String generateChainCode(String displayName, {String? customCode}) {

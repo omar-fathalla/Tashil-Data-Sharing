@@ -92,7 +92,16 @@ void main() {
   GoogleFonts.config.allowRuntimeFetching = false;
 
   testWidgets('Sell-Out explorer text styles are unchanged', (tester) async {
-    await _pump(tester, SellOutExplorerScreen(apiClient: ApiClient()));
+    // Super admin: the snapshot covers the Edit/Delete archive actions, which are hidden for other roles.
+    final sellOutClient = ApiClient()
+      ..currentUser = TenantUserModel(
+        userId: 'snap-super',
+        tenantId: 'adeco',
+        email: 'super@example.com',
+        fullName: 'Super Admin',
+        role: 'super_admin',
+      );
+    await _pump(tester, SellOutExplorerScreen(apiClient: sellOutClient));
     await _check(tester, 'sell_out_tab0');
     await _tab(tester, 'Store Performance');
     await _check(tester, 'sell_out_tab1');

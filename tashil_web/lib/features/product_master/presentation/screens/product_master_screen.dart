@@ -402,12 +402,18 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     final hasOtherSameName = _archivedMasterFiles.any(
       (f) => f.id != file.id && f.fileName.toLowerCase() == file.fileName.toLowerCase(),
     );
-    await widget.apiClient.deleteArchivedFile(
+    final deleted = await widget.apiClient.deleteArchivedFile(
       file.id,
       fileName: hasOtherSameName ? null : file.fileName,
       isProductMaster: true,
     );
     if (!mounted) return;
+    if (!deleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.apiClient.lastArchiveDeleteError ?? 'تعذّر حذف الملف.')),
+      );
+      return;
+    }
     setState(() {
       _archivedMasterFiles = _archivedMasterFiles
           .where((f) => f.id != file.id)

@@ -14,6 +14,7 @@ class ArchiveActionsGroup extends StatelessWidget {
     this.isEditing = false,
     this.isDeleting = false,
     this.showEdit = true,
+    this.showDelete = true,
   });
 
   final VoidCallback? onEdit;
@@ -24,6 +25,9 @@ class ArchiveActionsGroup extends StatelessWidget {
 
   /// Hides the Edit (replace) segment, e.g. for users the backend would refuse a replace.
   final bool showEdit;
+
+  /// Hides the Delete segment (archive delete is super_admin only on the backend).
+  final bool showDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -64,15 +68,17 @@ class ArchiveActionsGroup extends StatelessWidget {
                 onPressed: onDownload,
                 color: colorScheme.primary,
               ),
-              divider,
-              _segment(
-                context,
-                label: 'Delete',
-                icon: AppIcons.delete,
-                busy: isDeleting,
-                onPressed: onDelete,
-                color: colorScheme.error,
-              ),
+              if (showDelete) ...[
+                divider,
+                _segment(
+                  context,
+                  label: 'Delete',
+                  icon: AppIcons.delete,
+                  busy: isDeleting,
+                  onPressed: onDelete,
+                  color: colorScheme.error,
+                ),
+              ],
             ],
           ),
         ),
