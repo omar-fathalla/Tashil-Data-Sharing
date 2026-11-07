@@ -491,7 +491,11 @@ func validateExtraction(payload *domain.NormalizedRetailIngestionPayload, src *m
 
 // validationError builds the user-facing error for a rejected upload.
 func validationError(filename string, v *domain.IngestionValidation) error {
-	return fmt.Errorf("%w: تعذّر قراءة الملف %q بشكل صحيح ولم يتم حفظه (%s)", ErrUploadValidation, filename, strings.Join(v.Issues, "; "))
+	detail := strings.Join(v.Issues, "; ")
+	if v != nil && strings.TrimSpace(v.ExplanationAR) != "" {
+		detail = strings.TrimSpace(v.ExplanationAR)
+	}
+	return fmt.Errorf("%w: تعذّر قراءة الملف %q بشكل صحيح ولم يتم حفظه (%s)", ErrUploadValidation, filename, detail)
 }
 
 func logValidation(filename, source string, v *domain.IngestionValidation) {
@@ -522,6 +526,7 @@ func (c *Client) analyzeWithAIMapping(ctx context.Context, filename string, rawC
 		return nil, false
 	}
 	v := validateExtraction(payload, &src)
+	attachTotalsExplanation(v, provenanceFromPlan(rows, plan))
 	logValidation(filename, "ai", v)
 	if v.Status == "rejected" {
 		return nil, false

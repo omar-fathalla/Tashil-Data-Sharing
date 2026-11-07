@@ -9,6 +9,9 @@ IngestionResultModel _result({
   double mappingConfidence = 0,
   double confidenceScore = 0,
   bool isStaged = true,
+  String validationStatus = '',
+  String validationExplanationAr = '',
+  List<String> validationDiffReasons = const [],
 }) {
   return IngestionResultModel(
     batchId: 'b1',
@@ -26,6 +29,9 @@ IngestionResultModel _result({
     mappingSource: mappingSource,
     mappingConfidence: mappingConfidence,
     aiModelUsed: aiModelUsed,
+    validationStatus: validationStatus,
+    validationExplanationAr: validationExplanationAr,
+    validationDiffReasons: validationDiffReasons,
   );
 }
 
@@ -131,5 +137,46 @@ void main() {
     expect(m.aiModelUsed, isEmpty);
     expect(m.usedAiMapping, isFalse);
     expect(m.tier2Escalated, isFalse);
+  });
+
+  test('IngestionResultModel reads payload.validation explanation_ar', () {
+    final m = IngestionResultModel.fromJson({
+      'batch_id': 'b',
+      'filename': 'f.xlsx',
+      'payload': {
+        'validation': {
+          'status': 'flagged',
+          'explanation_ar':
+              'الموضع: الورقة «يناير»، صفوف البيانات 2–101. فرق بسبب مرتجعات.',
+          'diff_reasons': ['returns', 'sheet_column_gap'],
+        },
+      },
+    });
+    expect(m.validationStatus, 'flagged');
+    expect(m.validationExplanationAr, contains('مرتجعات'));
+    expect(m.validationDiffReasons, contains('returns'));
+  });
+
+  testWidgets('card shows Arabic totals explanation when flagged', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiAnalysisProgressCard(
+            isAnalyzing: false,
+            result: _result(
+              mappingSource: 'ai',
+              aiModelUsed: 'gemini-3.8-flash',
+              mappingConfidence: 0.9,
+              validationStatus: 'flagged',
+              validationExplanationAr:
+                  'الموضع: الورقة «Sheet1»، عمود «الإجمالي» (عمود 15). فرق القيمة بسبب مرتجعات.',
+              validationDiffReasons: const ['returns'],
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.textContaining('تنبيه على الإجماليات'), findsOneWidget);
+    expect(find.textContaining('مرتجعات'), findsOneWidget);
   });
 }

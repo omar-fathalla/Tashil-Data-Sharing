@@ -239,6 +239,7 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 		// Prefer real deterministic parsing; invent samples only outside production.
 		if fullPayload, ok := parseFullTabularPayload(filename, rawContent); ok {
 			v := validateExtraction(fullPayload, nil)
+			attachTotalsExplanation(v, provenanceFromPayload(fullPayload))
 			logValidation(filename, MappingSourceDeterministic, v)
 			if v.Status == "rejected" && !isReplay(ctx) {
 				return nil, validationError(filename, v)
@@ -265,6 +266,7 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 	// 2) Deterministic readers, validated before anything is saved.
 	if fullPayload, ok := parseFullTabularPayload(filename, rawContent); ok {
 		v := validateExtraction(fullPayload, nil)
+		attachTotalsExplanation(v, provenanceFromPayload(fullPayload))
 		logValidation(filename, MappingSourceDeterministic, v)
 		if v.Status == "rejected" && !isReplay(ctx) {
 			return nil, validationError(filename, v)

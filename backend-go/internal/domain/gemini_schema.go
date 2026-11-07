@@ -236,6 +236,11 @@ type IngestionValidation struct {
 	SheetTotalValue float64  `json:"sheet_total_value,omitempty"`
 	MonthsDetected  []string `json:"months_detected,omitempty"`
 	Issues          []string `json:"issues,omitempty"`
+	// ExplanationAR is an Arabic narrative of totals differences grounded in the
+	// computed numbers above (and optional sheet/column/row provenance). Produced
+	// by totalsxplain; does not change honesty thresholds.
+	ExplanationAR string   `json:"explanation_ar,omitempty"`
+	DiffReasons   []string `json:"diff_reasons,omitempty"` // returns|rounding|missing_month|...
 }
 
 
