@@ -8,6 +8,7 @@ import '../../../core/theme/m3_shape.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/layout/window_size_classes.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/testing/test_semantics.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/widgets/data_sharing_logo.dart';
 import '../../data_ingestion/presentation/screens/upload_portal_screen.dart';
@@ -485,13 +486,18 @@ class _AppShellState extends State<AppShell> {
                             onPressed: _openUserProfile,
                           ),
                           if (widget.onLogout != null)
-                            IconButton(
-                              icon: Icon(
-                                Icons.logout_rounded,
-                                color: colorScheme.error,
+                            TestSemantics(
+                              identifier: TestIds.logout,
+                              label: 'Log Out',
+                              button: true,
+                              child: IconButton(
+                                icon: Icon(
+                                  Icons.logout_rounded,
+                                  color: colorScheme.error,
+                                ),
+                                tooltip: 'Log Out',
+                                onPressed: widget.onLogout,
                               ),
-                              tooltip: 'Log Out',
-                              onPressed: widget.onLogout,
                             ),
                         ],
                       ),
@@ -500,11 +506,41 @@ class _AppShellState extends State<AppShell> {
                 ),
                 destinations: _destinations
                     .map(
-                      (d) => NavigationRailDestination(
-                        icon: Icon(d.icon),
-                        selectedIcon: Icon(d.selectedIcon),
-                        label: Text(d.shortLabel),
-                      ),
+                      (d) {
+                        final navId = d.index == 1
+                            ? TestIds.navSellOut
+                            : d.index == 2
+                                ? TestIds.navSellIn
+                                : null;
+                        Widget icon = Icon(d.icon);
+                        Widget selectedIcon = Icon(d.selectedIcon);
+                        Widget label = Text(d.shortLabel);
+                        if (navId != null) {
+                          icon = TestSemantics(
+                            identifier: navId,
+                            label: d.shortLabel,
+                            button: true,
+                            child: icon,
+                          );
+                          selectedIcon = TestSemantics(
+                            identifier: navId,
+                            label: d.shortLabel,
+                            button: true,
+                            child: selectedIcon,
+                          );
+                          label = TestSemantics(
+                            identifier: navId,
+                            label: d.shortLabel,
+                            button: true,
+                            child: label,
+                          );
+                        }
+                        return NavigationRailDestination(
+                          icon: icon,
+                          selectedIcon: selectedIcon,
+                          label: label,
+                        );
+                      },
                     )
                     .toList(),
               ),
@@ -723,26 +759,31 @@ class _AppShellState extends State<AppShell> {
                       },
                     ),
                     if (widget.onLogout != null)
-                      ListTile(
-                        dense: true,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: M3Shape.radiusMd,
-                        ),
-                        leading: Icon(
-                          Icons.logout_rounded,
-                          color: colorScheme.error,
-                        ),
-                        title: Text(
-                          'Log Out',
-                          style: TextStyle(
-                            color: colorScheme.error,
-                            fontWeight: FontWeight.w700,
+                      TestSemantics(
+                        identifier: TestIds.logout,
+                        label: 'Log Out',
+                        button: true,
+                        child: ListTile(
+                          dense: true,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: M3Shape.radiusMd,
                           ),
+                          leading: Icon(
+                            Icons.logout_rounded,
+                            color: colorScheme.error,
+                          ),
+                          title: Text(
+                            'Log Out',
+                            style: TextStyle(
+                              color: colorScheme.error,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            widget.onLogout!();
+                          },
                         ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          widget.onLogout!();
-                        },
                       ),
                   ],
                 ),
@@ -784,9 +825,19 @@ class _AppShellState extends State<AppShell> {
               selectedIcon: Icon(Icons.dashboard_rounded),
               label: 'Dashboard',
             ),
-            const NavigationDestination(
-              icon: Icon(Icons.analytics_rounded),
-              selectedIcon: Icon(Icons.analytics_rounded),
+            NavigationDestination(
+              icon: TestSemantics(
+                identifier: TestIds.navSellOut,
+                label: 'Sell-Out',
+                button: true,
+                child: const Icon(Icons.analytics_rounded),
+              ),
+              selectedIcon: TestSemantics(
+                identifier: TestIds.navSellOut,
+                label: 'Sell-Out',
+                button: true,
+                child: const Icon(Icons.analytics_rounded),
+              ),
               label: 'Sell-Out',
             ),
             const NavigationDestination(

@@ -16,6 +16,7 @@ import '../../../../core/data/result.dart';
 import '../../data/target_repository.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/testing/test_semantics.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
@@ -509,18 +510,28 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: cs.error,
-                foregroundColor: cs.onError,
+            TestSemantics(
+              identifier: TestIds.deleteCancel,
+              label: 'Cancel delete',
+              button: true,
+              child: TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('إلغاء'),
               ),
-              onPressed: () => Navigator.of(ctx).pop(true),
-              icon: const Icon(Icons.delete_outline_rounded, size: 18.0),
-              label: const Text('حذف'),
+            ),
+            TestSemantics(
+              identifier: TestIds.deleteConfirm,
+              label: 'Confirm delete',
+              button: true,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: cs.error,
+                  foregroundColor: cs.onError,
+                ),
+                onPressed: () => Navigator.of(ctx).pop(true),
+                icon: const Icon(Icons.delete_outline_rounded, size: 18.0),
+                label: const Text('حذف'),
+              ),
             ),
           ],
         );
@@ -852,6 +863,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                   selectedIcon: Icons.folder_copy_rounded,
                   label: 'Uploaded Files (${_archivedSellInFiles.length})',
                   subtitle: 'الملفات المرفوعة',
+                  semanticsIdentifier: TestIds.sellinUploadedFiles,
                 ),
               ],
               onChanged: (next) {
@@ -3238,33 +3250,38 @@ onChanged: m3Legacy<int>((v) {
                     spacing: 10.0,
                     runSpacing: 8.0,
                     children: [
-                      FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(0, 44.0),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20.0,
-                            vertical: 10.0,
+                      TestSemantics(
+                        identifier: TestIds.sellinUploadButton,
+                        label: 'Upload Sell-In file',
+                        button: true,
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 44.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20.0,
+                              vertical: 10.0,
+                            ),
                           ),
+                          onPressed: _isUploading || !isExplicitChain(_archiveUploadChain)
+                              ? null
+                              : () => _pickAndUploadSellInFile(
+                                    forceChain: _archiveUploadChain,
+                                    forceYear: _archiveUploadYear > 0
+                                        ? _archiveUploadYear
+                                        : null,
+                                    forceMonth: _archiveUploadMonth > 0
+                                        ? _archiveUploadMonth
+                                        : null,
+                                  ),
+                          icon: _isUploading && _replacingFileId == null
+                              ? const SizedBox(
+                                  width: 18.0,
+                                  height: 18.0,
+                                  child: CircularProgressIndicator(strokeWidth: 2.0),
+                                )
+                              : const Icon(Icons.upload_file_rounded, size: 20.0),
+                          label: const Text('رفع ملف Sell-In'),
                         ),
-                        onPressed: _isUploading || !isExplicitChain(_archiveUploadChain)
-                            ? null
-                            : () => _pickAndUploadSellInFile(
-                                  forceChain: _archiveUploadChain,
-                                  forceYear: _archiveUploadYear > 0
-                                      ? _archiveUploadYear
-                                      : null,
-                                  forceMonth: _archiveUploadMonth > 0
-                                      ? _archiveUploadMonth
-                                      : null,
-                                ),
-                        icon: _isUploading && _replacingFileId == null
-                            ? const SizedBox(
-                                width: 18.0,
-                                height: 18.0,
-                                child: CircularProgressIndicator(strokeWidth: 2.0),
-                              )
-                            : const Icon(Icons.upload_file_rounded, size: 20.0),
-                        label: const Text('رفع ملف Sell-In'),
                       ),
                       OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
@@ -3289,202 +3306,213 @@ onChanged: m3Legacy<int>((v) {
         M3Spacing.gapMD,
 
         // 2. Uploaded Sell-In Sheets Table
-        Container(
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLowest,
-            borderRadius: M3Shape.radiusLg,
-            border: Border.all(
-              color: colorScheme.outlineVariant.withOpacity(0.5),
+        TestSemantics(
+          identifier: TestIds.uploadedFilesList,
+          label: 'Uploaded Files (${_archivedSellInFiles.length})',
+          container: true,
+          child: Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLowest,
+              borderRadius: M3Shape.radiusLg,
+              border: Border.all(
+                color: colorScheme.outlineVariant.withOpacity(0.5),
+              ),
             ),
-          ),
-          child: _isLoadingArchive
-              ? const Padding(
-                  padding: EdgeInsets.all(48.0),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : _archivedSellInFiles.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(48.0),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.folder_off_rounded,
-                              size: 48.0,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(height: 12.0),
-                            Text(
-                              'لا توجد ملفات مرفوعة بعد.',
-                              style: theme.textTheme.titleMedium?.copyWith(
+            child: _isLoadingArchive
+                ? const Padding(
+                    padding: EdgeInsets.all(48.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : _archivedSellInFiles.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(48.0),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.folder_off_rounded,
+                                size: 48.0,
                                 color: colorScheme.onSurfaceVariant,
                               ),
-                            ),
-                            const SizedBox(height: 6.0),
-                            Text(
-                              'ارفع أول ملف لتبدأ.',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : TableScrollContainer(
-                      controller: _archiveSheetsScrollController,
-                      showSwipeHint: true,
-                      child: DataTable(
-                        headingRowColor: WidgetStatePropertyAll(
-                          colorScheme.surfaceContainerHigh.withOpacity(0.5),
-                        ),
-                        columns: const [
-                          DataColumn(label: Text('الملف')),
-                          DataColumn(label: Text('Chain')),
-                          DataColumn(label: Text('Period')),
-                          DataColumn(label: Text('Transactions'), numeric: true),
-                          DataColumn(
-                            label: Text('Cases'),
-                            numeric: true,
-                          ),
-                          DataColumn(
-                            label: Text('Net Sell-In (EGP)'),
-                            numeric: true,
-                          ),
-                          DataColumn(label: Text('Tons'), numeric: true),
-                          DataColumn(label: Text('تاريخ الرفع')),
-                          DataColumn(
-                            label: Text('Actions'),
-                          ),
-                        ],
-                        rows: _archivedSellInFiles.map((file) {
-                          final isDeleting = _deletingFileId == file.id;
-                          final isReplacing = _replacingFileId == file.id;
-                          final periodText = file.targetMonth.isNotEmpty &&
-                                  file.targetMonth != 'auto'
-                              ? '${file.targetMonth} / ${file.targetYear}'
-                              : 'سنة ${file.targetYear}';
-
-                          return DataRow(
-                            cells: [
-                              DataCell(
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.description_rounded,
-                                      color: M3StatusColors.of(context).accents.positive,
-                                      size: 20.0,
-                                    ),
-                                    const SizedBox(width: 8.0),
-                                    Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Tooltip(
-                                          message: file.fileName,
-                                          child: Text(
-                                            sheetShortName(file.fileName),
-                                            style: const TextStyle(fontWeight: FontWeight.w800),
-                                          ),
-                                        ),
-                                        Text(
-                                          _formatFileSize(file.fileSizeBytes),
-                                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                             fontSize: M3FontSize.labelSmall,                                             color: colorScheme.onSurfaceVariant,                                           )),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                              const SizedBox(height: 12.0),
+                              Text(
+                                'لا توجد ملفات مرفوعة بعد.',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
-                              DataCell(
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8.0,
-                                    vertical: 3.0,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        colorScheme.primaryContainer.withOpacity(0.6),
-                                    borderRadius: M3Shape.radiusFull,
-                                  ),
-                                  child: Text(
-                                    file.retailChain.toUpperCase(),
-                                    style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.labelSmall,                                       fontWeight: FontWeight.w800,                                       color: colorScheme.onPrimaryContainer,                                     )),
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Text(
-                                  periodText,
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                              DataCell(
-                                Text(
-                                  CurrencyFormatter.formatNumber(file.rowsIngested),
-                                  style: const TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              DataCell(
-                                Text(
-                                  CurrencyFormatter.formatNumber(
-                                    file.totalCases > 0
-                                        ? file.totalCases.round()
-                                        : file.rowsIngested,
-                                  ),
-                                  style: const TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              DataCell(
-                                Text(
-                                  CurrencyFormatter.formatEGP(file.totalRevenue),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: colorScheme.primary,
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Text(
-                                  '${file.totalWeightTons.toStringAsFixed(1)} طن',
-                                ),
-                              ),
-                              DataCell(
-                                Text(
-                                  file.uploadedAt.length >= 16
-                                      ? file.uploadedAt
-                                          .substring(0, 16)
-                                          .replaceAll('T', ' ')
-                                      : file.uploadedAt,
-                                  style: M3TextVariants.cell.copyWith(color: colorScheme.onSurfaceVariant),
-                                ),
-                              ),
-                              DataCell(
-                                ArchiveActionsGroup(
-                                  // Replacing a Sell-In archive deletes the old one: super_admin only
-                                  // (the backend answers 403 for anyone else).
-                                  showEdit: widget.apiClient.currentUser?.isSuperAdmin ?? false,
-                                  isEditing: isReplacing,
-                                  isDeleting: isDeleting,
-                                  onEdit: (isDeleting || isReplacing || _isUploading)
-                                      ? null
-                                      : () => _pickAndUploadSellInFile(
-                                            replaceArchiveId: file.id,
-                                            forceChain: file.retailChain,
-                                          ),
-                                  onDownload: () => _handleDownloadSellInSheet(file),
-                                  onDelete: (isDeleting || isReplacing)
-                                      ? null
-                                      : () => _confirmAndDeleteSellInSheet(file),
+                              const SizedBox(height: 6.0),
+                              Text(
+                                'ارفع أول ملف لتبدأ.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ],
-                          );
-                        }).toList(),
+                          ),
+                        ),
+                      )
+                    : TableScrollContainer(
+                        controller: _archiveSheetsScrollController,
+                        showSwipeHint: true,
+                        child: DataTable(
+                          headingRowColor: WidgetStatePropertyAll(
+                            colorScheme.surfaceContainerHigh.withOpacity(0.5),
+                          ),
+                          columns: const [
+                            DataColumn(label: Text('الملف')),
+                            DataColumn(label: Text('Chain')),
+                            DataColumn(label: Text('Period')),
+                            DataColumn(label: Text('Transactions'), numeric: true),
+                            DataColumn(
+                              label: Text('Cases'),
+                              numeric: true,
+                            ),
+                            DataColumn(
+                              label: Text('Net Sell-In (EGP)'),
+                              numeric: true,
+                            ),
+                            DataColumn(label: Text('Tons'), numeric: true),
+                            DataColumn(label: Text('تاريخ الرفع')),
+                            DataColumn(
+                              label: Text('Actions'),
+                            ),
+                          ],
+                          rows: _archivedSellInFiles.map((file) {
+                            final isDeleting = _deletingFileId == file.id;
+                            final isReplacing = _replacingFileId == file.id;
+                            final periodText = file.targetMonth.isNotEmpty &&
+                                    file.targetMonth != 'auto'
+                                ? '${file.targetMonth} / ${file.targetYear}'
+                                : 'سنة ${file.targetYear}';
+
+                            return DataRow(
+                              cells: [
+                                DataCell(
+                                  TestSemantics(
+                                    identifier: TestIds.fileRow(file.fileName),
+                                    label: file.fileName,
+                                    container: true,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.description_rounded,
+                                          color: M3StatusColors.of(context).accents.positive,
+                                          size: 20.0,
+                                        ),
+                                        const SizedBox(width: 8.0),
+                                        Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Tooltip(
+                                              message: file.fileName,
+                                              child: Text(
+                                                sheetShortName(file.fileName),
+                                                style: const TextStyle(fontWeight: FontWeight.w800),
+                                              ),
+                                            ),
+                                            Text(
+                                              _formatFileSize(file.fileSizeBytes),
+                                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                             fontSize: M3FontSize.labelSmall,                                             color: colorScheme.onSurfaceVariant,                                           )),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8.0,
+                                      vertical: 3.0,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          colorScheme.primaryContainer.withOpacity(0.6),
+                                      borderRadius: M3Shape.radiusFull,
+                                    ),
+                                    child: Text(
+                                      file.retailChain.toUpperCase(),
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.labelSmall,                                       fontWeight: FontWeight.w800,                                       color: colorScheme.onPrimaryContainer,                                     )),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    periodText,
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    CurrencyFormatter.formatNumber(file.rowsIngested),
+                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    CurrencyFormatter.formatNumber(
+                                      file.totalCases > 0
+                                          ? file.totalCases.round()
+                                          : file.rowsIngested,
+                                    ),
+                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    CurrencyFormatter.formatEGP(file.totalRevenue),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    '${file.totalWeightTons.toStringAsFixed(1)} طن',
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    file.uploadedAt.length >= 16
+                                        ? file.uploadedAt
+                                            .substring(0, 16)
+                                            .replaceAll('T', ' ')
+                                        : file.uploadedAt,
+                                    style: M3TextVariants.cell.copyWith(color: colorScheme.onSurfaceVariant),
+                                  ),
+                                ),
+                                DataCell(
+                                  ArchiveActionsGroup(
+                                    fileName: file.fileName,
+                                    // Replacing a Sell-In archive deletes the old one: super_admin only
+                                    // (the backend answers 403 for anyone else).
+                                    showEdit: widget.apiClient.currentUser?.isSuperAdmin ?? false,
+                                    isEditing: isReplacing,
+                                    isDeleting: isDeleting,
+                                    onEdit: (isDeleting || isReplacing || _isUploading)
+                                        ? null
+                                        : () => _pickAndUploadSellInFile(
+                                              replaceArchiveId: file.id,
+                                              forceChain: file.retailChain,
+                                            ),
+                                    onDownload: () => _handleDownloadSellInSheet(file),
+                                    onDelete: (isDeleting || isReplacing)
+                                        ? null
+                                        : () => _confirmAndDeleteSellInSheet(file),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
+                        ),
                       ),
-                    ),
+          ),
         ),
       ],
     );

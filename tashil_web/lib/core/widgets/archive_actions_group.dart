@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../testing/test_semantics.dart';
 import '../theme/m3_shape.dart';
 import 'app_icons.dart';
 
@@ -14,6 +15,7 @@ class ArchiveActionsGroup extends StatelessWidget {
     this.isEditing = false,
     this.isDeleting = false,
     this.showEdit = true,
+    this.fileName,
   });
 
   final VoidCallback? onEdit;
@@ -24,6 +26,9 @@ class ArchiveActionsGroup extends StatelessWidget {
 
   /// Hides the Edit (replace) segment, e.g. for users the backend would refuse a replace.
   final bool showEdit;
+
+  /// When set, wires `file-delete-<name>` on the Delete segment for automation.
+  final String? fileName;
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +77,9 @@ class ArchiveActionsGroup extends StatelessWidget {
                 busy: isDeleting,
                 onPressed: onDelete,
                 color: colorScheme.error,
+                semanticsIdentifier: fileName != null && fileName!.isNotEmpty
+                    ? TestIds.fileDelete(fileName!)
+                    : null,
               ),
             ],
           ),
@@ -87,8 +95,9 @@ class ArchiveActionsGroup extends StatelessWidget {
     required bool busy,
     required VoidCallback? onPressed,
     required Color color,
+    String? semanticsIdentifier,
   }) {
-    return TextButton.icon(
+    Widget button = TextButton.icon(
       style: TextButton.styleFrom(
         foregroundColor: color,
         visualDensity: VisualDensity.compact,
@@ -106,5 +115,16 @@ class ArchiveActionsGroup extends StatelessWidget {
           : Icon(icon, size: 16.0),
       label: Text(label),
     );
+
+    if (semanticsIdentifier != null) {
+      button = TestSemantics(
+        identifier: semanticsIdentifier,
+        label: label,
+        button: true,
+        child: button,
+      );
+    }
+
+    return button;
   }
 }

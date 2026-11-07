@@ -21,10 +21,14 @@
 *.aab
 *.apk
 
-# Node / Firebase
+# Node / Firebase / Playwright
 node_modules/
 .firebase/
 firebase-debug.log*
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+e2e/playwright/.cache/
 
 # Secrets / Archives
 *.tar.gz

@@ -1,0 +1,27 @@
+# Playwright Semantics smoke (web-only)
+
+Read-only smoke that loads the Flutter web app and asserts login Semantics
+identifiers (`login-email`, `login-password`, `login-submit`) exist in the DOM
+as `flt-semantics-identifier`.
+
+## Local (against a built web app)
+
+```bash
+cd tashil_web && flutter build web --release
+npx --yes serve@14 -s build/web -l 4173
+
+# other terminal
+cd e2e
+npm ci
+npx playwright install chromium
+BASE_URL=http://127.0.0.1:4173/adeco npm test
+```
+
+## Against production (read-only, after Semantics deploy)
+
+```bash
+cd e2e
+BASE_URL=https://www.data.sw-point.com/adeco npm test
+```
+
+Do not submit credentials or click destructive controls in these smokes.

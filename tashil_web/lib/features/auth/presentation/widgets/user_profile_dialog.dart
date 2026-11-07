@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
+import '../../../../core/testing/test_semantics.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
@@ -720,6 +721,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                       label: 'Sign Out',
                       icon: Icons.logout_rounded,
                       isDestructive: true,
+                      semanticsIdentifier: TestIds.logout,
                       onPressed: () {
                         Navigator.pop(context);
                         widget.onLogout!();

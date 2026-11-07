@@ -4,6 +4,7 @@ import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../core/theme/m3_shape.dart';
 import '../../../../core/config/app_version.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/testing/test_semantics.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/data_sharing_logo.dart';
@@ -50,12 +51,14 @@ class DesktopSidebar extends StatelessWidget {
         selectedIcon: Icons.analytics_rounded,
         label: 'Sell-Out',
         labelAr: 'المبيعات (Sell-Out)',
+        semanticsIdentifier: TestIds.navSellOut,
       ),
       _NavDestination(
         icon: Icons.local_shipping_rounded,
         selectedIcon: Icons.local_shipping_rounded,
         label: 'Sell-In',
         labelAr: 'التوريد (Sell-In)',
+        semanticsIdentifier: TestIds.navSellIn,
       ),
       _NavDestination(
         icon: Icons.warning_amber_rounded,
@@ -199,7 +202,7 @@ class DesktopSidebar extends StatelessWidget {
                 final dest = destinations[index];
                 final isSelected = selectedIndex == index;
 
-                return InkWell(
+                Widget item = InkWell(
                   onTap: () => onDestinationSelected(index),
                   borderRadius: M3Shape.radiusXl, // M3 pill shape
                   child: AnimatedContainer(
@@ -268,6 +271,16 @@ class DesktopSidebar extends StatelessWidget {
                     ),
                   ),
                 );
+                final id = dest.semanticsIdentifier;
+                if (id != null && id.isNotEmpty) {
+                  item = TestSemantics(
+                    identifier: id,
+                    label: dest.label,
+                    button: true,
+                    child: item,
+                  );
+                }
+                return item;
               },
             ),
           ),
@@ -336,6 +349,7 @@ class _NavDestination {
   final String label;
   final String labelAr;
   final int? badgeCount;
+  final String? semanticsIdentifier;
 
   _NavDestination({
     required this.icon,
@@ -343,5 +357,6 @@ class _NavDestination {
     required this.label,
     required this.labelAr,
     this.badgeCount,
+    this.semanticsIdentifier,
   });
 }

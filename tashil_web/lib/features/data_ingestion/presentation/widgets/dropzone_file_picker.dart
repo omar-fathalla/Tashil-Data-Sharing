@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/testing/test_semantics.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/web_file_helper.dart';
@@ -123,22 +124,27 @@ class _DropzoneFilePickerState extends State<DropzoneFilePicker> {
                     textAlign: TextAlign.center,
                   ),
                   M3Spacing.gapMD,
-                  M3Button.primary(
-                    label: 'اختيار ملف',
-                    icon: Icons.folder_open_rounded,
-                    isLoading: widget.isProcessing,
-                    onPressed: widget.isProcessing
-                        ? null
-                        : () async {
-                            if (widget.onBeforePickFile != null &&
-                                !widget.onBeforePickFile!()) {
-                              return;
-                            }
-                            final picked = await WebFileHelper.pickFile();
-                            if (picked != null) {
-                              widget.onFileSelected(picked.name, picked.bytes);
-                            }
-                          },
+                  TestSemantics(
+                    identifier: TestIds.uploadChooseFile,
+                    label: 'Choose file',
+                    button: true,
+                    child: M3Button.primary(
+                      label: 'اختيار ملف',
+                      icon: Icons.folder_open_rounded,
+                      isLoading: widget.isProcessing,
+                      onPressed: widget.isProcessing
+                          ? null
+                          : () async {
+                              if (widget.onBeforePickFile != null &&
+                                  !widget.onBeforePickFile!()) {
+                                return;
+                              }
+                              final picked = await WebFileHelper.pickFile();
+                              if (picked != null) {
+                                widget.onFileSelected(picked.name, picked.bytes);
+                              }
+                            },
+                    ),
                   ),
                   const SizedBox(height: 12.0),
                   Container(

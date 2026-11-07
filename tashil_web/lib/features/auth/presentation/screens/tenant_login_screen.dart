@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
+import '../../../../core/testing/test_semantics.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/widgets/m3_feedback.dart';
@@ -407,91 +408,107 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                         CrossAxisAlignment.start,
                                     children: [
                                       // Email field
-                                      TextFormField(
-                                        controller: _emailController,
-                                        keyboardType:
-                                            TextInputType.emailAddress,
-                                        textInputAction: TextInputAction.next,
-                                        autocorrect: false,
-                                        enableSuggestions: false,
-                                        autofillHints: const [
-                                          AutofillHints.email,
-                                        ],
-                                        textDirection: TextDirection.ltr,
-                                        style: TextStyle(
-                                          fontSize: M3FontSize.bodyLarge,
-                                          color: colorScheme.onSurface,
+                                      TestSemantics(
+                                        identifier: TestIds.loginEmail,
+                                        label: isArabic
+                                            ? 'البريد الإلكتروني'
+                                            : 'Email',
+                                        textField: true,
+                                        child: TextFormField(
+                                          controller: _emailController,
+                                          keyboardType:
+                                              TextInputType.emailAddress,
+                                          textInputAction: TextInputAction.next,
+                                          autocorrect: false,
+                                          enableSuggestions: false,
+                                          autofillHints: const [
+                                            AutofillHints.email,
+                                          ],
+                                          textDirection: TextDirection.ltr,
+                                          style: TextStyle(
+                                            fontSize: M3FontSize.bodyLarge,
+                                            color: colorScheme.onSurface,
+                                          ),
+                                          decoration: _inputDecoration(
+                                            hintText: isArabic
+                                                ? 'البريد الإلكتروني'
+                                                : 'Email',
+                                            prefixIcon: Icons.email_rounded,
+                                            colorScheme: colorScheme,
+                                          ),
+                                          validator: (value) {
+                                            if (value == null ||
+                                                value.trim().isEmpty) {
+                                              return isArabic
+                                                  ? 'يرجى إدخال البريد الإلكتروني'
+                                                  : 'Please enter email';
+                                            }
+                                            return null;
+                                          },
                                         ),
-                                        decoration: _inputDecoration(
-                                          hintText: isArabic
-                                              ? 'البريد الإلكتروني'
-                                              : 'Email',
-                                          prefixIcon: Icons.email_rounded,
-                                          colorScheme: colorScheme,
-                                        ),
-                                        validator: (value) {
-                                          if (value == null ||
-                                              value.trim().isEmpty) {
-                                            return isArabic
-                                                ? 'يرجى إدخال البريد الإلكتروني'
-                                                : 'Please enter email';
-                                          }
-                                          return null;
-                                        },
                                       ),
 
                                       const SizedBox(height: 16),
 
                                       // Password field
-                                      TextFormField(
-                                        controller: _passwordController,
-                                        keyboardType:
-                                            TextInputType.visiblePassword,
-                                        textInputAction: TextInputAction.done,
-                                        autocorrect: false,
-                                        enableSuggestions: false,
-                                        autofillHints: const [
-                                          AutofillHints.password,
-                                        ],
-                                        onFieldSubmitted: (_) => _handleLogin(),
-                                        textDirection: TextDirection.ltr,
-                                        obscureText: _obscurePassword,
-                                        style: TextStyle(
-                                          fontSize: M3FontSize.bodyLarge,
-                                          color: colorScheme.onSurface,
-                                        ),
-                                        decoration: _inputDecoration(
-                                          hintText: isArabic
-                                              ? 'كلمة المرور'
-                                              : 'Password',
-                                          prefixIcon: Icons.lock_rounded,
-                                          colorScheme: colorScheme,
-                                          suffixIcon: IconButton(
-                                            icon: Icon(
-                                              _obscurePassword
-                                                  ? Icons
-                                                      .visibility_off_outlined
-                                                  : Icons.visibility_rounded,
-                                              color:
-                                                  colorScheme.onSurfaceVariant,
-                                              size: 22,
-                                            ),
-                                            onPressed: () {
-                                              setState(() {
-                                                _obscurePassword =
-                                                    !_obscurePassword;
-                                              });
-                                            },
+                                      TestSemantics(
+                                        identifier: TestIds.loginPassword,
+                                        label: isArabic
+                                            ? 'كلمة المرور'
+                                            : 'Password',
+                                        textField: true,
+                                        child: TextFormField(
+                                          controller: _passwordController,
+                                          keyboardType:
+                                              TextInputType.visiblePassword,
+                                          textInputAction: TextInputAction.done,
+                                          autocorrect: false,
+                                          enableSuggestions: false,
+                                          autofillHints: const [
+                                            AutofillHints.password,
+                                          ],
+                                          onFieldSubmitted: (_) =>
+                                              _handleLogin(),
+                                          textDirection: TextDirection.ltr,
+                                          obscureText: _obscurePassword,
+                                          style: TextStyle(
+                                            fontSize: M3FontSize.bodyLarge,
+                                            color: colorScheme.onSurface,
                                           ),
+                                          decoration: _inputDecoration(
+                                            hintText: isArabic
+                                                ? 'كلمة المرور'
+                                                : 'Password',
+                                            prefixIcon: Icons.lock_rounded,
+                                            colorScheme: colorScheme,
+                                            suffixIcon: IconButton(
+                                              icon: Icon(
+                                                _obscurePassword
+                                                    ? Icons
+                                                        .visibility_off_outlined
+                                                    : Icons.visibility_rounded,
+                                                color: colorScheme
+                                                    .onSurfaceVariant,
+                                                size: 22,
+                                              ),
+                                              onPressed: () {
+                                                setState(() {
+                                                  _obscurePassword =
+                                                      !_obscurePassword;
+                                                });
+                                              },
+                                            ),
+                                          ),
+                                          validator: (value) {
+                                            if (value == null ||
+                                                value.isEmpty) {
+                                              return isArabic
+                                                  ? 'يرجى إدخال كلمة المرور'
+                                                  : 'Please enter password';
+                                            }
+                                            return null;
+                                          },
                                         ),
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return isArabic
-                                                ? 'يرجى إدخال كلمة المرور'
-                                                : 'Please enter password';
-                                          }
-                                          return null;
-                                        },
                                       ),
 
                                       const SizedBox(height: 16),
@@ -573,52 +590,63 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                       // Login Button
                                       SizedBox(
                                         width: double.infinity,
-                                        child: FilledButton(
-                                          onPressed: _isLoading
-                                              ? null
-                                              : _handleLogin,
-                                          style: FilledButton.styleFrom(
-                                            minimumSize: const Size.fromHeight(
-                                              60,
+                                        child: TestSemantics(
+                                          identifier: TestIds.loginSubmit,
+                                          label: isArabic
+                                              ? 'تسجيل الدخول'
+                                              : 'Login',
+                                          button: true,
+                                          child: FilledButton(
+                                            onPressed: _isLoading
+                                                ? null
+                                                : _handleLogin,
+                                            style: FilledButton.styleFrom(
+                                              minimumSize:
+                                                  const Size.fromHeight(
+                                                60,
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                vertical: 12,
+                                              ),
+                                              backgroundColor:
+                                                  colorScheme.primary,
+                                              foregroundColor:
+                                                  colorScheme.onPrimary,
+                                              disabledBackgroundColor:
+                                                  colorScheme.primary
+                                                      .withValues(alpha: 0.6),
+                                              shape: const StadiumBorder(),
+                                              textStyle: const TextStyle(
+                                                fontFamily: 'Cairo',
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 12,
-                                            ),
-                                            backgroundColor:
-                                                colorScheme.primary,
-                                            foregroundColor:
-                                                colorScheme.onPrimary,
-                                            disabledBackgroundColor: colorScheme
-                                                .primary
-                                                .withValues(alpha: 0.6),
-                                            shape: const StadiumBorder(),
-                                            textStyle: const TextStyle(
-                                              fontFamily: 'Cairo',
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          child: _isLoading
-                                              ? SizedBox(
-                                                  height: 22,
-                                                  width: 22,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        color: colorScheme
-                                                            .onPrimary,
-                                                        strokeWidth: 2.5,
-                                                      ),
-                                                )
-                                              : Text(
-                                                  isArabic
-                                                      ? 'تسجيل الدخول'
-                                                      : 'Login',
-                                                  style: TextStyle(
-                                                    fontSize: M3FontSize.titleMediumPlus,
-                                                    color:
-                                                        colorScheme.onPrimary,
-                                                    fontWeight: FontWeight.w700,
+                                            child: _isLoading
+                                                ? SizedBox(
+                                                    height: 22,
+                                                    width: 22,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                      color: colorScheme
+                                                          .onPrimary,
+                                                      strokeWidth: 2.5,
+                                                    ),
+                                                  )
+                                                : Text(
+                                                    isArabic
+                                                        ? 'تسجيل الدخول'
+                                                        : 'Login',
+                                                    style: TextStyle(
+                                                      fontSize: M3FontSize
+                                                          .titleMediumPlus,
+                                                      color: colorScheme
+                                                          .onPrimary,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
                                                   ),
-                                                ),
+                                          ),
                                         ),
                                       ),
                                     ],

@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'core/data/app_cache.dart';
@@ -31,6 +32,9 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   if (kIsWeb) {
     usePathUrlStrategy();
+    // Expose the semantics tree in the DOM (flt-semantics-*) for web
+    // automation (Playwright / Maestro / Patrol) without manual activation.
+    SemanticsBinding.instance.ensureSemantics();
   }
   runApp(const TashilDataSharingApp());
 }
