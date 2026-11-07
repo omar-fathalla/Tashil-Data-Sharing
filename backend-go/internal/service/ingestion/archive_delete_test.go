@@ -8,6 +8,8 @@ import (
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
+	"github.com/tashil/data-sharing/backend/internal/service/firestore"
+	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 )
 
 func TestDeleteArchivedFileFailsWhenSinkFailsAndKeepsFileListed(t *testing.T) {
@@ -138,5 +140,45 @@ func TestDeleteSellInFileReportsSinkFailureAndStaysListed(t *testing.T) {
 	list := p.ListArchivedFiles(context.Background(), "tenant-adeco", "", "", "", "sell_in")
 	if list.TotalCount != 1 {
 		t.Fatalf("sell-in file must stay listed after failed delete, got %d", list.TotalCount)
+	}
+}
+
+// failTombstoneFS wraps a Repository and forces MarkArchiveDeleted to fail after durable deletes succeed.
+type failTombstoneFS struct {
+	firestore.Repository
+	err error
+}
+
+func (f *failTombstoneFS) MarkArchiveDeleted(context.Context, string, string, string) error {
+	return f.err
+}
+
+func TestDeleteArchivedFileFirestoreFailureKeepsFileListed(t *testing.T) {
+	dir := t.TempDir()
+	baseFS := firestore.NewClient("test-db", true)
+	wrapped := &failTombstoneFS{Repository: baseFS, err: errors.New("firestore tombstone write failed")}
+	agent := gemini.NewAgent("", "gemini-3.8-flash", true)
+	bqRepo := bigquery.NewClient("test-proj", "test-dataset", true)
+	p := NewProcessor(agent, bqRepo, wrapped).WithArchiveDir(dir).WithSink(&fakeSink{})
+
+	entry := p.SaveArchivedFile("tenant-adeco", "batch_fs", "fs_fail.xlsx", []byte("x"), "fathalla", "2026", "01", 1, 1, 1)
+	_, err := p.DeleteArchivedFile(context.Background(), "tenant-adeco", entry.ID)
+	if err == nil {
+		t.Fatal("expected firestore tombstone failure")
+	}
+	var ade *ArchiveDeleteError
+	if !errors.As(err, &ade) || ade.Stage != "firestore" {
+		t.Fatalf("expected ArchiveDeleteError stage=firestore, got %v", err)
+	}
+	list := p.ListArchivedFiles(context.Background(), "tenant-adeco", "", "", "", "sell_out")
+	found := false
+	for _, f := range list.Files {
+		if f.ID == entry.ID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("file must stay listed when firestore tombstone fails after BigQuery delete")
 	}
 }

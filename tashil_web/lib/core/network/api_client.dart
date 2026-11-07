@@ -9,9 +9,11 @@ import '../storage/session_storage.dart';
 import '../theme/m3_color_roles.dart';
 import '../utils/web_file_helper.dart';
 import 'api_endpoints.dart';
+import 'archive_tombstones.dart';
 import 'upload_feedback.dart';
 
 export 'upload_feedback.dart';
+export 'archive_tombstones.dart';
 
 /// Aggregated Sell-Out SKU summary with official Product Master factory pricing and chain margin
 class SellOutSkuSummaryModel {
@@ -4375,11 +4377,25 @@ class ApiClient {
         final parsed = UploadedFilesArchiveResponse.fromJson(
           jsonDecode(resp.body) as Map<String, dynamic>,
         );
-        final filteredFiles = parsed.files.where((f) {
-          if (_deletedArchiveIds.contains(f.id)) return false;
-          if (_deletedArchiveFileNames.contains(f.fileName.toLowerCase())) return false;
-          return true;
-        }).toList();
+        // Server is source of truth: drop stale session tombstones for files still listed
+        // (recovers browsers poisoned by earlier optimistic failed deletes).
+        final cleared = reconcileArchiveTombstones(
+          serverIds: parsed.files.map((f) => f.id),
+          serverFileNamesLower: parsed.files.map((f) => f.fileName.toLowerCase()),
+          deletedIds: _deletedArchiveIds,
+          deletedFileNamesLower: _deletedArchiveFileNames,
+        );
+        if (cleared > 0 && kIsWeb) {
+          SessionStorage.saveDeletedArchiveIds(_deletedArchiveIds);
+          SessionStorage.saveDeletedArchiveFileNames(_deletedArchiveFileNames);
+        }
+        final filteredFiles = filterArchiveFilesByTombstones(
+          files: parsed.files,
+          idOf: (f) => f.id,
+          fileNameOf: (f) => f.fileName,
+          deletedIds: _deletedArchiveIds,
+          deletedFileNamesLower: _deletedArchiveFileNames,
+        );
         final counts = <String, int>{};
         for (final item in filteredFiles) {
           final k = item.retailChain.toLowerCase();
@@ -4561,7 +4577,7 @@ class ApiClient {
       );
     }
 
-    if (resp.statusCode != 200 && resp.statusCode != 204) {
+    if (!archiveDeleteHttpSucceeded(resp.statusCode)) {
       throw ArchiveDeleteException.fromResponse(resp.statusCode, resp.body);
     }
 

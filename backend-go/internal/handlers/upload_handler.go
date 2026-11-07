@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
@@ -35,8 +36,11 @@ func NewUploadHandler(processor *ingestion.Processor) *UploadHandler {
 }
 
 // HandleClearData handles POST /api/v1/ingest/clear to wipe fake/previous data to zero.
+// Company managers (vendor_admin) may clear only their own tenant. Wildcard scope=all / *
+// (every tenant) remains super_admin only — never elevate a tenant-scoped clear to a purge of all tenants.
 func (h *UploadHandler) HandleClearData(w http.ResponseWriter, r *http.Request) {
-	if _, ok := requireWriteRole(w, r, destructiveWriteRoles); !ok {
+	claims, ok := requireWriteRole(w, r, destructiveWriteRoles)
+	if !ok {
 		return
 	}
 	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
@@ -50,7 +54,12 @@ func (h *UploadHandler) HandleClearData(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if r.URL.Query().Get("scope") == "all" {
+	scope := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("scope")))
+	if scope == "all" || scope == "*" {
+		if claims.Role != domain.RoleSuperAdmin {
+			writeErr(w, http.StatusForbidden, "forbidden: clearing all tenants requires super_admin")
+			return
+		}
 		tenantID = "all"
 	}
 
@@ -749,7 +758,8 @@ func (h *UploadHandler) HandleDownloadArchivedFile(w http.ResponseWriter, r *htt
 }
 
 // HandleDeleteArchive handles DELETE /api/v1/ingest/archive/{id} (or DELETE /api/v1/ingest/archive?id=...)
-// Sell-Out and Sell-In share this handler and the same destructiveWriteRoles gate (currently super_admin only).
+// Sell-Out and Sell-In share this handler and the same destructiveWriteRoles gate
+// (super_admin + vendor_admin / company manager; same-tenant only).
 func (h *UploadHandler) HandleDeleteArchive(w http.ResponseWriter, r *http.Request) {
 	if _, ok := requireWriteRole(w, r, destructiveWriteRoles); !ok {
 		return
@@ -787,8 +797,11 @@ func (h *UploadHandler) HandleDeleteArchive(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Prefer strict archive_id. file_name fallback is ONLY for genuine not-found lookups —
+	// never after a BigQuery/Firestore/partial failure, which would risk deleting a newer
+	// same-named archive (DeleteArchivedFile picks the newest name match).
 	deleted, err := h.processor.DeleteArchivedFile(r.Context(), tenantID, archiveID)
-	if err != nil {
+	if err != nil && errors.Is(err, ingestion.ErrArchivedFileNotFound) {
 		if fileName := strings.TrimSpace(r.URL.Query().Get("file_name")); fileName != "" && fileName != archiveID {
 			deleted, err = h.processor.DeleteArchivedFile(r.Context(), tenantID, fileName)
 		}

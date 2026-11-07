@@ -27,8 +27,9 @@ var ingestWriteRoles = map[domain.UserRole]bool{
 //   - Refused: national_sales_manager, chain_kam, and every other role
 //
 // The company-manager account is the only tenant role used in tests and must have full in-tenant
-// permissions (upload, add, delete Sell-Out/Sell-In, clear). Cross-tenant deletes remain blocked by
-// EnforceTenantRLS / SameTenant — vendor_admin may only act inside its own tenant token.
+// permissions (upload, add, delete Sell-Out/Sell-In, clear own tenant). Cross-tenant deletes and
+// wildcard clear (scope=all) remain blocked — vendor_admin may only act inside its own tenant token.
+// Clearing every tenant (scope=all) is super_admin only (see HandleClearData).
 var destructiveWriteRoles = map[domain.UserRole]bool{
 	domain.RoleSuperAdmin:  true,
 	domain.RoleVendorAdmin: true,

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
+	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
@@ -144,4 +146,66 @@ func TestArchiveDeleteRoleGateMatchesCompanyManagerPolicy(t *testing.T) {
 	if !ingestWriteRoles[domain.RoleVendorAdmin] {
 		t.Fatal("upload and delete should both allow company manager (vendor_admin)")
 	}
+}
+
+// file_name fallback must NOT run after a BigQuery failure — otherwise DeleteArchivedFile's
+// newest-by-name match could delete a different (newer) archive with the same file name.
+func TestDeleteArchiveFileNameFallbackSkippedAfterAnalyticsFailure(t *testing.T) {
+	setupIsolatedProductMasterDir(t)
+	bq := bigquery.NewClient("test-project", "test-dataset", true)
+	fs := firestore.NewClient("test-db", true)
+	proc := ingestion.NewProcessor(gemini.NewAgent("", "gemini-2.5-flash", true), bq, fs).WithArchiveDir(t.TempDir())
+	failSink := &failingDeleteSink{err: errors.New("bq down")}
+	proc.WithSink(failSink)
+
+	older := proc.SaveArchivedFile("tenant-adeco", "batch_old", "same.xlsx", []byte("old"), "fathalla", "2026", "01", 1, 1, 1)
+	newer := proc.SaveArchivedFile("tenant-adeco", "batch_new", "same.xlsx", []byte("new"), "fathalla", "2026", "02", 1, 1, 1)
+
+	mw := middleware.NewAuthMiddleware("test-secret", false)
+	up := NewUploadHandler(proc)
+	mux := http.NewServeMux()
+	mux.HandleFunc("DELETE /api/v1/ingest/archive/{id}", up.HandleDeleteArchive)
+	mux.HandleFunc("GET /api/v1/ingest/archive", up.HandleListArchive)
+	h := mw.Handler(mux)
+	tok := tokenWithTenant(t, mw, domain.RoleVendorAdmin, "tenant-adeco")
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/ingest/archive/"+older.ID+"?file_name=same.xlsx", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	req.Header.Set("X-Tenant-ID", "tenant-adeco")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("analytics failure: want 502, got %d %s", rec.Code, rec.Body.String())
+	}
+
+	list := proc.ListArchivedFiles(req.Context(), "tenant-adeco", "", "", "", "sell_out")
+	ids := map[string]bool{}
+	for _, f := range list.Files {
+		ids[f.ID] = true
+	}
+	if !ids[older.ID] || !ids[newer.ID] {
+		t.Fatalf("both archives must remain after failed delete (no name fallback), got %+v", ids)
+	}
+}
+
+// failingDeleteSink is a minimal sink that fails DeleteBatch (used by archive delete tests).
+type failingDeleteSink struct {
+	err error
+}
+
+func (f *failingDeleteSink) Enabled() bool { return true }
+func (f *failingDeleteSink) WriteSellOut(context.Context, bqsink.Meta, []domain.SellOutFact, bqsink.SellOutMode) *bqsink.Result {
+	return &bqsink.Result{Status: bqsink.StatusOK}
+}
+func (f *failingDeleteSink) WriteSellIn(context.Context, bqsink.Meta, []domain.SellInRecord) *bqsink.Result {
+	return &bqsink.Result{Status: bqsink.StatusOK}
+}
+func (f *failingDeleteSink) WriteProductMaster(context.Context, bqsink.Meta, *domain.ProductMasterSummaryResponse) *bqsink.Result {
+	return &bqsink.Result{Status: bqsink.StatusOK}
+}
+func (f *failingDeleteSink) DeleteBatch(_ context.Context, k bqsink.Kind, _ bqsink.Meta) *bqsink.Result {
+	return &bqsink.Result{Status: bqsink.StatusFailed, Table: bqsink.TableForKind(k).Name, Error: f.err.Error()}
+}
+func (f *failingDeleteSink) DeleteTenant(_ context.Context, k bqsink.Kind, _ string) *bqsink.Result {
+	return &bqsink.Result{Status: bqsink.StatusOK, Table: bqsink.TableForKind(k).Name}
 }
