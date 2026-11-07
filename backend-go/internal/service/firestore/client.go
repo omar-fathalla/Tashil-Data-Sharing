@@ -171,6 +171,63 @@ func (c *Client) initAndSyncMetadata() {
 		if err := c.syncDeletedArchivesFromFirestore(ctx); err != nil {
 			log.Printf("[Firestore] Warning: deleted_archives refresh at startup: %v", err)
 		}
+		// Auth users: seed first, then overlay Firestore tenant_users so password
+		// changes / provisioned admins survive Cloud Run revision restarts.
+		c.syncUsersFromFirestore(ctx)
+	}
+}
+
+// mergeFirestoreUser overlays a Firestore tenant_users document onto an optional seed user.
+// Non-empty Firestore PasswordHash wins; empty Firestore hash keeps the seed hash.
+func mergeFirestoreUser(existing domain.TenantUser, exists bool, incoming domain.TenantUser) domain.TenantUser {
+	if exists && incoming.PasswordHash == "" && existing.PasswordHash != "" {
+		incoming.PasswordHash = existing.PasswordHash
+	}
+	return incoming
+}
+
+// syncUsersFromFirestore loads tenant_users into the in-memory auth map.
+// Documents with a non-empty PasswordHash win over seed hashes for the same UserID.
+// When Firestore has the user but an empty hash, the seed hash (if any) is kept.
+func (c *Client) syncUsersFromFirestore(ctx context.Context) {
+	iter := c.fsClient.Collection("tenant_users").Documents(ctx)
+	defer iter.Stop()
+
+	loaded := 0
+	withHash := 0
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Printf("[Firestore] Warning reading tenant_users: %v", err)
+			break
+		}
+		var u domain.TenantUser
+		if err := doc.DataTo(&u); err != nil {
+			continue
+		}
+		if u.UserID == "" {
+			u.UserID = doc.Ref.ID
+		}
+		if u.UserID == "" || strings.TrimSpace(u.Email) == "" {
+			continue
+		}
+
+		c.mu.Lock()
+		existing, exists := c.users[u.UserID]
+		u = mergeFirestoreUser(existing, exists, u)
+		if u.PasswordHash != "" {
+			withHash++
+		}
+		c.users[u.UserID] = u
+		loaded++
+		c.mu.Unlock()
+	}
+
+	if loaded > 0 {
+		log.Printf("[Firestore] Synchronized %d tenant_users from Cloud Firestore (%d with password hash)", loaded, withHash)
 	}
 }
 

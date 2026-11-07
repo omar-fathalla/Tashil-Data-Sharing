@@ -74,15 +74,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Need the previous commit to decide whether backend sources changed.
+          fetch-depth: 0
+      - name: Detect whether backend must redeploy
+        id: backend_paths
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "workflow_dispatch: always redeploy backend"
+            exit 0
+          fi
+          before="${{ github.event.before }}"
+          if [ -z "${before}" ] || [ "${before}" = "0000000000000000000000000000000000000000" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "No usable before SHA; redeploying backend"
+            exit 0
+          fi
+          if git diff --quiet "${before}" "${GITHUB_SHA}" -- backend-go/ .github/workflows/deploy.yml; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "backend-go/ and deploy.yml unchanged vs ${before:0:7}; skipping Cloud Run deploy"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "Backend paths changed; redeploying Cloud Run"
+          fi
       - id: auth
+        if: steps.backend_paths.outputs.deploy == 'true'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ env.WIF_PROVIDER }}
           service_account: ${{ env.DEPLOYER_SA }}
-      - uses: google-github-actions/setup-gcloud@v2
+      - if: steps.backend_paths.outputs.deploy == 'true'
+        uses: google-github-actions/setup-gcloud@v2
       - name: Record git commit for /api/v1/version
+        if: steps.backend_paths.outputs.deploy == 'true'
         run: echo "${GITHUB_SHA}" > backend-go/data/build_commit.txt
       - name: Deploy to Cloud Run (from source, existing settings and env vars are kept)
+        if: steps.backend_paths.outputs.deploy == 'true'
         working-directory: backend-go
         run: |
           # Pin to 1 instance until shared storage lands (#37); relax min/max after that.
@@ -93,9 +122,13 @@ jobs:
             --min-instances=1 \
             --max-instances=1
       - name: Smoke check
+        if: steps.backend_paths.outputs.deploy == 'true'
         run: |
           url="$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT_ID" --format='value(status.url)')"
           curl -fsS --retry 5 --retry-delay 10 "$url/api/v1/version"
+      - name: Skip summary
+        if: steps.backend_paths.outputs.deploy != 'true'
+        run: echo "Skipped Cloud Run deploy (web-only / non-backend change)." >> "$GITHUB_STEP_SUMMARY"
 
   deploy-web:
     needs: [deploy-backend]
