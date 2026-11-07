@@ -1,0 +1,13 @@
+{
+  "header_row_index": 0,
+  "layout": "long",
+  "confidence": 0.93,
+  "columns": [
+    {"index": 0, "role": "barcode"},
+    {"index": 1, "role": "product_name"},
+    {"index": 2, "role": "store"},
+    {"index": 3, "role": "quantity"},
+    {"index": 4, "role": "value"},
+    {"index": 5, "role": "date"}
+  ]
+}

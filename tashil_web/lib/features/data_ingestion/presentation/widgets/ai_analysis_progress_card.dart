@@ -85,6 +85,29 @@ class AiAnalysisProgressCard extends StatelessWidget {
     }
   }
 
+  /// Arabic human-approval banner copy (Phase A7 guardrails).
+  static String? humanApprovalBanner(IngestionResultModel result) {
+    if (!result.needsHumanApproval) return null;
+    if (result.guardrailArabicSummary.trim().isNotEmpty) {
+      return result.guardrailArabicSummary.trim();
+    }
+    return 'يلزم الاعتماد البشري قبل الحفظ النهائي';
+  }
+
+  /// Compact Arabic success-metrics line for the review card.
+  static String successMetricsLine(IngestionResultModel result) {
+    final parts = <String>[
+      result.guardrailSchemaValid ? 'المخطط سليم' : 'المخطط مرفوض',
+      'تقليل البيانات الشخصية',
+      if (result.guardrailPerCallLogged || result.usedAiMapping)
+        'تم تسجيل الاستدعاء'
+      else
+        'بدون استدعاء ذكاء اصطناعي',
+      if (result.needsHumanApproval) 'بانتظار الاعتماد',
+    ];
+    return parts.join(' • ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -201,6 +224,52 @@ class AiAnalysisProgressCard extends StatelessWidget {
             ),
 
             M3Spacing.gapMD,
+
+            if (result != null && humanApprovalBanner(result!) != null) ...[
+              Container(
+                width: double.infinity,
+                padding: M3Spacing.pSm,
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.12),
+                  borderRadius: M3Shape.radiusMd,
+                  border: Border.all(color: Colors.amber.shade700.withOpacity(0.35)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      humanApprovalBanner(result!)!,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber.shade900,
+                      ),
+                    ),
+                    const SizedBox(height: 4.0),
+                    Text(
+                      successMetricsLine(result!),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    if (result!.guardrailReasonsAr.isNotEmpty) ...[
+                      const SizedBox(height: 6.0),
+                      ...result!.guardrailReasonsAr.take(3).map(
+                            (r) => Padding(
+                              padding: const EdgeInsets.only(bottom: 2.0),
+                              child: Text(
+                                '• $r',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: Colors.amber.shade900,
+                                ),
+                              ),
+                            ),
+                          ),
+                    ],
+                  ],
+                ),
+              ),
+              M3Spacing.gapMD,
+            ],
 
             if (isAnalyzing) ...[
               const LinearProgressIndicator(),

@@ -6,13 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/gemini/guardrails"
 )
 
 // MappingSource values reported on NormalizedRetailIngestionPayload.
@@ -31,7 +30,7 @@ const defaultGeminiAPIBase = "https://generativelanguage.googleapis.com"
 var ErrMockSamplesInProduction = fmt.Errorf("تعذّر تحليل الملف: خدمة الذكاء الاصطناعي غير متاحة، ومفيش بيانات تجريبية في بيئة الإنتاج. مفيش حاجة اتحفظت — حاول تاني أو راجع إعدادات GEMINI_API_KEY")
 
 func isProductionEnv() bool {
-	return strings.EqualFold(strings.TrimSpace(os.Getenv("ENVIRONMENT")), "production")
+	return guardrails.IsProduction()
 }
 
 type aiTierContextKey string
@@ -213,16 +212,18 @@ func applyMockMetadata(payload *domain.NormalizedRetailIngestionPayload) {
 
 // logAICall emits a compact per-call log line for ops (model, tier, latency, ok/fail).
 func logAICall(filename, model, tier string, started time.Time, ok bool, callErr error) {
-	status := "ok"
 	errMsg := ""
-	if !ok {
-		status = "fail"
-		if callErr != nil {
-			errMsg = callErr.Error()
-		}
+	if callErr != nil {
+		errMsg = callErr.Error()
 	}
-	log.Printf("[ingest-ai-call] file=%q model=%s tier=%s latency_ms=%d status=%s err=%q",
-		filename, model, tier, time.Since(started).Milliseconds(), status, errMsg)
+	guardrails.LogCall(guardrails.CallRecord{
+		Filename:  filename,
+		Model:     model,
+		Tier:      tier,
+		LatencyMS: time.Since(started).Milliseconds(),
+		OK:        ok,
+		Err:       errMsg,
+	})
 }
 
 // AnalyzeAndNormalize uses the Tier 1 model by default and the Tier 2 model when
@@ -384,7 +385,17 @@ File Content Sample:
 	}
 
 	rawJSONText := geminiResp.Candidates[0].Content.Parts[0].Text
+	if err := guardrails.ValidateIngestionPayloadJSON([]byte(rawJSONText)); err != nil {
+		logAICall(filename, modelName, "full", started, false, err)
+		return nil, fmt.Errorf("gemini schema validation failed: %w", err)
+	}
 	payload, err := domain.ParseGeminiPayload([]byte(rawJSONText))
+	if err == nil && payload != nil {
+		if mErr := guardrails.AssertNoMockMappingSource(payload.MappingSource); mErr != nil {
+			err = mErr
+			payload = nil
+		}
+	}
 	logAICall(filename, modelName, "full", started, err == nil && payload != nil, err)
 	return payload, err
 }
@@ -405,7 +416,7 @@ func (c *Client) mockAnalyze(filename string, rawContent []byte) (*domain.Normal
 		return fullPayload, nil
 	}
 
-	if isProductionEnv() {
+	if err := guardrails.RefuseMockInProduction(); err != nil {
 		return nil, ErrMockSamplesInProduction
 	}
 

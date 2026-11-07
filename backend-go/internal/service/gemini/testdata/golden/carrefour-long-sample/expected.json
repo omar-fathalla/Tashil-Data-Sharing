@@ -1,0 +1,11 @@
+{
+  "id": "carrefour-long-sample",
+  "description": "Long-layout sell-out sample shaped like historical Carrefour exports",
+  "filename": "carrefour_long_sample.xlsx",
+  "mapping_source": "deterministic",
+  "retailer_detected": "carrefour",
+  "min_records": 2,
+  "validation_status": "ok",
+  "requires_human_approval_when_staged": true,
+  "schema_plan_file": "mapping_plan.json"
+}

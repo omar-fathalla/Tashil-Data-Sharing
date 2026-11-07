@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/gemini/guardrails"
 )
 
 // mappingSampleRows is the maximum number of leading rows sent to Gemini for column mapping.
@@ -164,6 +165,7 @@ func (c *Client) inferColumnMapping(ctx context.Context, filename string, sample
 			return c.callGeminiForMapping(ctx, model, prompt, filename)
 		}
 	}
+	sample = guardrails.SanitizeSampleRows(sample)
 	prompt := buildColumnMapPrompt(filename, sample)
 	key := mappingPlanKey(prompt)
 	if plan, ok := c.planCache.get(key); ok && plan.check(sample) == nil {
@@ -184,6 +186,11 @@ func (c *Client) inferColumnMapping(ctx context.Context, filename string, sample
 		if err != nil {
 			lastErr = err
 			log.Printf("[ingest-mapping] file=%q tier=%s model=%s error=%v", filename, a.tier, a.model, err)
+			continue
+		}
+		if _, err := guardrails.ValidateColumnMapPlanJSON([]byte(text)); err != nil {
+			lastErr = err
+			log.Printf("[ingest-mapping] file=%q tier=%s model=%s schema rejected: %v", filename, a.tier, a.model, err)
 			continue
 		}
 		plan := &ColumnMapPlan{}

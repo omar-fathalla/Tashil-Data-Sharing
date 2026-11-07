@@ -1,0 +1,20 @@
+{
+  "header_row_index": 2,
+  "skip_rows": [0, 1],
+  "layout": "wide",
+  "confidence": 0.96,
+  "columns": [
+    {"index": 0, "role": "category"},
+    {"index": 1, "role": "supplier"},
+    {"index": 2, "role": "barcode"},
+    {"index": 3, "role": "product_name"},
+    {"index": 4, "role": "store_value", "branch": "سموحة"},
+    {"index": 5, "role": "store_value", "branch": "ستانلى"},
+    {"index": 6, "role": "total_value"},
+    {"index": 7, "role": "month"},
+    {"index": 8, "role": "store_quantity", "branch": "سموحة"},
+    {"index": 9, "role": "store_quantity", "branch": "ستانلى"},
+    {"index": 10, "role": "total_quantity"},
+    {"index": 11, "role": "year"}
+  ]
+}

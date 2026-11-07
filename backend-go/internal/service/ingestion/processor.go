@@ -21,6 +21,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
+	"github.com/tashil/data-sharing/backend/internal/service/gemini/guardrails"
 )
 
 // IngestionResult contains the outcome of an ingestion operation returned to caller.
@@ -71,6 +72,11 @@ type IngestionResult struct {
 	// Validation mirrors payload.validation so web clients can read explanation_ar
 	// without digging only into the nested payload (still also present on Payload).
 	Validation *domain.IngestionValidation `json:"validation,omitempty"`
+
+	// Guardrails (Phase A7): human approval gate + success metrics for Arabic UI.
+	RequiresHumanApproval bool                      `json:"requires_human_approval,omitempty"`
+	GuardrailReasonsAR    []string                  `json:"guardrail_reasons_ar,omitempty"`
+	GuardrailMetrics      *guardrails.SuccessMetrics `json:"guardrail_metrics,omitempty"`
 
 	// BigQuerySync reports the durable BigQuery write for committed uploads (nil for previews / when not attempted).
 	BigQuerySync *bqsink.Result `json:"bigquery_sync,omitempty"`
@@ -919,6 +925,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 		Validation:             payload.Validation,
 		BigQuerySync:           directSync,
 	}
+	attachGuardrails(res, payload.Validation)
 
 
 	if dryRun {
@@ -1694,6 +1701,7 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		IsStaged:          dryRun,
 		IsCommitted:       !dryRun,
 	}
+	attachGuardrails(result, nil)
 	result.UploadWarnings = warnings
 	result.QuarantinedCustomers = quarantined
 	result.PeriodBreakdown = sellInBreakdown(records)
