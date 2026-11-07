@@ -106,7 +106,7 @@ File: ` + filename + "\nRows:\n")
 
 // callGeminiForMapping is the default columnMapper. The API key travels in a header
 // (never the URL) so transport errors cannot leak it into logs.
-func (c *Client) callGeminiForMapping(ctx context.Context, model, prompt string) (string, error) {
+func (c *Client) callGeminiForMapping(ctx context.Context, model, prompt, filename string) (string, error) {
 	started := time.Now()
 	var schemaObj interface{}
 	_ = json.Unmarshal([]byte(columnMapSchemaJSON), &schemaObj)
@@ -131,27 +131,27 @@ func (c *Client) callGeminiForMapping(ctx context.Context, model, prompt string)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		safe := fmt.Errorf("gemini mapping request failed: %s", c.redact(err.Error()))
-		logAICall("", model, "mapping", started, false, safe)
+		logAICall(filename, model, "mapping", started, false, safe)
 		return "", safe
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		callErr := fmt.Errorf("gemini mapping returned status %d", resp.StatusCode)
-		logAICall("", model, "mapping", started, false, callErr)
+		logAICall(filename, model, "mapping", started, false, callErr)
 		return "", callErr
 	}
 	var gr geminiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&gr); err != nil {
-		logAICall("", model, "mapping", started, false, err)
+		logAICall(filename, model, "mapping", started, false, err)
 		return "", err
 	}
 	if len(gr.Candidates) == 0 || len(gr.Candidates[0].Content.Parts) == 0 {
 		callErr := fmt.Errorf("gemini mapping returned no candidates")
-		logAICall("", model, "mapping", started, false, callErr)
+		logAICall(filename, model, "mapping", started, false, callErr)
 		return "", callErr
 	}
-	logAICall("", model, "mapping", started, true, nil)
+	logAICall(filename, model, "mapping", started, true, nil)
 	return gr.Candidates[0].Content.Parts[0].Text, nil
 }
 
@@ -160,7 +160,9 @@ func (c *Client) callGeminiForMapping(ctx context.Context, model, prompt string)
 func (c *Client) inferColumnMapping(ctx context.Context, filename string, sample [][]string) (*ColumnMapPlan, string, string, error) {
 	mapper := c.mapper
 	if mapper == nil {
-		mapper = c.callGeminiForMapping
+		mapper = func(ctx context.Context, model, prompt string) (string, error) {
+			return c.callGeminiForMapping(ctx, model, prompt, filename)
+		}
 	}
 	prompt := buildColumnMapPrompt(filename, sample)
 	key := mappingPlanKey(prompt)

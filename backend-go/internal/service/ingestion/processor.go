@@ -971,11 +971,24 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		p.stagedMu.Unlock()
 		return nil, &StagedUploadError{Status: 404, Message: "المعاينة دي مش تبع الحساب ده. مفيش حاجة اتحفظت."}
 	}
-	if ok {
+	fromMemory := ok && staged != nil
+	// Claim exclusively while keeping a local reference so a failed write can restore the preview.
+	if fromMemory {
 		delete(p.staged, batchID)
 	}
 	p.stagedMu.Unlock()
-	if !ok || staged == nil {
+	commitOK := false
+	defer func() {
+		if commitOK || !fromMemory || staged == nil {
+			return
+		}
+		p.stagedMu.Lock()
+		if _, exists := p.staged[batchID]; !exists {
+			p.staged[batchID] = staged
+		}
+		p.stagedMu.Unlock()
+	}()
+	if !fromMemory {
 		// Another instance ran the dry-run: rebuild it from the archive mount (or 410 / 409).
 		var err error
 		if staged, err = p.restageFromDisk(ctx, tenantID, batchID); err != nil {
@@ -1113,6 +1126,8 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 			_ = p.bqRepo.SetTenantWorkbookAnalytics(ctx, tenantID, staged.WBMeta)
 		}
 	}
+	// Durable write succeeded — drop the deferred restore of in-memory staging.
+	commitOK = true
 
 	// Save batch record
 	batch := domain.IngestionBatch{
@@ -1623,6 +1638,11 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		math.Round(totalTons*100)/100,
 	)
 
+	// ConfidenceScore is AI mapping confidence only — never a hardcoded 0.99 for deterministic Sell-In.
+	sellInConfidence := 0.0
+	if mappingSource == gemini.MappingSourceAI || mappingSource == gemini.MappingSourceCache {
+		sellInConfidence = mappingConfidence
+	}
 	result := &IngestionResult{
 		BatchID:                batchID,
 		ArchiveID:              archivedEntry.ID,
@@ -1636,7 +1656,7 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		AnomalyRows:            0,
 		TotalRevenue:           math.Round(totalRev*100) / 100,
 		TotalQuantity:          int(math.Round(totalCases)),
-		ConfidenceScore:        0.99,
+		ConfidenceScore:        sellInConfidence,
 		AutoCreatedStoresCount: len(discoveredBranches),
 		DiscoveredBranches:     discoveredBranches,
 		DiscoveredCategories:   discoveredCats,
@@ -1681,6 +1701,7 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	}
 
 	if dryRun {
+		now := time.Now()
 		p.stagedMu.Lock()
 		p.staged[batchID] = &StagedUpload{
 			BatchID:           batchID,
@@ -1694,9 +1715,23 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 			Result:            result,
 			PrevArchivedFile:  prevArch,
 			PrevArchivedBytes: prevBytes,
-			CreatedAt:         time.Now(),
+			CreatedAt:         now,
+			FileBytes:         fileBytes,
 		}
 		p.stagedMu.Unlock()
+		_, interactive := uploadGuards(ctx)
+		// Persist under _staged so another instance can commit after restart / cross-instance preview.
+		p.persistStaged(ctx, stagedDiskMeta{
+			BatchID:      batchID,
+			TenantID:     tenantID,
+			Filename:     filename,
+			TargetChain:  effectiveChain,
+			Interactive:  interactive,
+			IsSellInPlan: true,
+			ValidRows:    len(records),
+			TotalRevenue: math.Round(totalRev*100) / 100,
+			CreatedAt:    now,
+		}, fileBytes)
 		// Preview must never change committed Sell-In data (no SetSellInRecords on dry-run).
 		reportUnknown()
 		return result, nil

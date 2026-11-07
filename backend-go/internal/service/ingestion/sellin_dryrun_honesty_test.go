@@ -56,6 +56,9 @@ func TestSellInDryRunDoesNotChangeCommittedData(t *testing.T) {
 	if res.MappingSource != gemini.MappingSourceDeterministic {
 		t.Fatalf("deterministic sell-in should report mapping_source=deterministic, got %q", res.MappingSource)
 	}
+	if res.ConfidenceScore != 0 || res.MappingConfidence != 0 {
+		t.Fatalf("deterministic sell-in must not present AI confidence (score=%.2f mapping=%.2f)", res.ConfidenceScore, res.MappingConfidence)
+	}
 	after := bq.SellInRecordsSnapshot("tenant-adeco")
 	if len(after) != len(before) {
 		t.Fatalf("dry-run changed committed row count: before=%d after=%d", len(before), len(after))
@@ -130,5 +133,98 @@ func TestSellInRejectionDoesNotWrite(t *testing.T) {
 	}
 	if n := len(bq.SellInRecordsSnapshot("tenant-adeco")); n != 0 {
 		t.Fatalf("rejected upload wrote %d rows", n)
+	}
+}
+
+// Dry-run on instance A, commit on instance B sharing the archive mount (Sell-In restageFromDisk).
+func TestSellInStagedCommitAcrossInstances(t *testing.T) {
+	dir := t.TempDir()
+	a := NewProcessor(gemini.NewAgent("", "m", true), bigquery.NewClient("test-proj", "test-dataset", true), firestore.NewClient("db", true)).WithArchiveDir(dir)
+	a.SetCustomerRegistry(customers.New(&customers.MemoryStore{}))
+	preview := sopWorkbook(t,
+		[]string{"Invoice", "1", "2026-04-05", "FG-X", "صنف", "CTN", "2", "L", "C1", "عائله فتح الله ماركت - طنطا", "KA", "220", "ALX"},
+	)
+	res, err := a.ProcessSellInPlan(interactive(context.Background(), UploadGuards{}), "tenant-adeco", "cross_si.xlsx", preview, true, "fathalla")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.ConfidenceScore != 0 {
+		t.Fatalf("deterministic sell-in must not present AI confidence, got %.2f", res.ConfidenceScore)
+	}
+	if _, _, err := a.loadStaged("tenant-adeco", res.BatchID); err != nil {
+		t.Fatalf("sell-in dry-run must persist under _staged: %v", err)
+	}
+	if n := len(a.bqRepo.(interface {
+		SellInRecordsSnapshot(string) []domain.SellInRecord
+	}).SellInRecordsSnapshot("tenant-adeco")); n != 0 {
+		t.Fatalf("dry-run committed %d rows on A", n)
+	}
+
+	bqB := bigquery.NewClient("test-proj", "test-dataset", true)
+	b := NewProcessor(gemini.NewAgent("", "m", true), bqB, firestore.NewClient("db", true)).WithArchiveDir(dir)
+	b.SetCustomerRegistry(customers.New(&customers.MemoryStore{}))
+	out, err := b.CommitStagedUpload(interactive(context.Background(), UploadGuards{}), "tenant-adeco", res.BatchID, "fathalla")
+	if err != nil {
+		t.Fatalf("commit on B via restageFromDisk: %v", err)
+	}
+	if !out.IsCommitted || out.ValidRows < 1 {
+		t.Fatalf("expected committed sell-in on B, got %+v", out)
+	}
+	if n := len(bqB.SellInRecordsSnapshot("tenant-adeco")); n == 0 {
+		t.Fatal("B must have committed Sell-In rows after cross-instance commit")
+	}
+	if _, _, err := b.loadStaged("tenant-adeco", res.BatchID); err == nil {
+		t.Fatal("staging must be cleared after successful commit")
+	}
+}
+
+func TestSellInDryRunUnknownBarcodeViaEnrichment(t *testing.T) {
+	bq := bigquery.NewClient("test-proj", "test-dataset", true)
+	p := NewProcessor(gemini.NewAgent("", "m", true), bq, firestore.NewClient("db", true)).WithArchiveDir(t.TempDir())
+	p.SetCustomerRegistry(customers.New(&customers.MemoryStore{}))
+	x := sopWorkbook(t,
+		[]string{"Invoice", "1", "2026-05-05", "UNK-999", "صنف مش في الكارتة", "CTN", "1", "L", "C1", "عائله فتح الله ماركت - طنطا", "KA", "40", "ALX"},
+	)
+	res, err := p.ProcessSellInPlan(interactive(context.Background(), UploadGuards{}), "tenant-adeco", "unk.xlsx", x, true, "fathalla")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.UnknownBarcodes) == 0 {
+		t.Fatal("dry-run must report unknown barcodes via EnrichSellInRecords without SetSellInRecords")
+	}
+	if n := len(bq.SellInRecordsSnapshot("tenant-adeco")); n != 0 {
+		t.Fatalf("preview must not commit, got %d rows", n)
+	}
+}
+
+func TestSellInCommitFailureKeepsStaged(t *testing.T) {
+	dir := t.TempDir()
+	bq := bigquery.NewClient("test-proj", "test-dataset", true)
+	p := NewProcessor(gemini.NewAgent("", "m", true), bq, firestore.NewClient("db", true)).WithArchiveDir(dir)
+	p.SetCustomerRegistry(customers.New(&customers.MemoryStore{}))
+	x := sopWorkbook(t,
+		[]string{"Invoice", "1", "2026-06-05", "FG-1", "صنف", "CTN", "1", "L", "C1", "عائله فتح الله ماركت - طنطا", "KA", "10", "ALX"},
+	)
+	res, err := p.ProcessSellInPlan(interactive(context.Background(), UploadGuards{}), "tenant-adeco", "keep.xlsx", x, true, "fathalla")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Force a commit failure: replace staged Sell-In with a row missing period so SetSellInRecords rejects.
+	p.stagedMu.Lock()
+	st := p.staged[res.BatchID]
+	st.SellInRecords = []domain.SellInRecord{{Year: 0, MonthNum: 0, NetValueEGP: 1, TenantID: "tenant-adeco"}}
+	p.stagedMu.Unlock()
+	_, err = p.CommitStagedUpload(interactive(context.Background(), UploadGuards{}), "tenant-adeco", res.BatchID, "fathalla")
+	if err == nil {
+		t.Fatal("expected SetSellInRecords failure")
+	}
+	p.stagedMu.Lock()
+	_, still := p.staged[res.BatchID]
+	p.stagedMu.Unlock()
+	if !still {
+		t.Fatal("failed commit must restore in-memory staged preview")
+	}
+	if _, _, err := p.loadStaged("tenant-adeco", res.BatchID); err != nil {
+		t.Fatalf("disk staging must remain after failed commit: %v", err)
 	}
 }

@@ -40,6 +40,7 @@ type stagedDiskMeta struct {
 	RequestedPeriod string    `json:"requested_period,omitempty"`
 	PeriodChoice    string    `json:"period_choice,omitempty"`
 	Interactive     bool      `json:"interactive"`
+	IsSellInPlan    bool      `json:"is_sell_in_plan,omitempty"`
 	ValidRows       int       `json:"valid_rows"`
 	TotalRevenue    float64   `json:"total_revenue"`
 	CreatedAt       time.Time `json:"created_at"`
@@ -174,8 +175,8 @@ func (p *Processor) loadStaged(tenantID, batchID string) (*stagedDiskMeta, []byt
 	return &m, b, nil
 }
 
-// restageFromDisk rebuilds a staged Sell-Out upload on an instance that did not run the dry-run:
-// it re-parses the saved bytes with the same chain, period and choice, and refuses (409, nothing
+// restageFromDisk rebuilds a staged Sell-Out or Sell-In upload on an instance that did not run the
+// dry-run: it re-parses the saved bytes with the same chain/period/choice, and refuses (409, nothing
 // saved) when the result differs from the preview the user confirmed (rows, value or chain).
 func (p *Processor) restageFromDisk(ctx context.Context, tenantID, batchID string) (*StagedUpload, error) {
 	meta, b, err := p.loadStaged(tenantID, batchID)
@@ -189,7 +190,13 @@ func (p *Processor) restageFromDisk(ctx context.Context, tenantID, batchID strin
 		g.PeriodChoice = meta.PeriodChoice
 		rctx = WithUploadGuards(rctx, g)
 	}
-	res, perr := p.ProcessUploadWithDryRun(rctx, tenantID, meta.Filename, b, true, meta.TargetChain)
+	var res *IngestionResult
+	var perr error
+	if meta.IsSellInPlan {
+		res, perr = p.ProcessSellInPlan(rctx, tenantID, meta.Filename, b, true, meta.TargetChain)
+	} else {
+		res, perr = p.ProcessUploadWithDryRun(rctx, tenantID, meta.Filename, b, true, meta.TargetChain)
+	}
 	if perr != nil {
 		return nil, &StagedUploadError{Status: http.StatusConflict, Message: "مقدرناش نعيد قراية الملف زي المعاينة: " + perr.Error() + ". مفيش حاجة اتحفظت."}
 	}
@@ -199,7 +206,8 @@ func (p *Processor) restageFromDisk(ctx context.Context, tenantID, batchID strin
 	p.stagedMu.Unlock()
 	round := func(v float64) float64 { return math.Round(v*100) / 100 }
 	if st == nil || res.ValidRows != meta.ValidRows || round(res.TotalRevenue) != round(meta.TotalRevenue) ||
-		!strings.EqualFold(strings.TrimSpace(st.TargetChain), strings.TrimSpace(meta.TargetChain)) {
+		!strings.EqualFold(strings.TrimSpace(st.TargetChain), strings.TrimSpace(meta.TargetChain)) ||
+		st.IsSellInPlan != meta.IsSellInPlan {
 		got := "?"
 		if st != nil {
 			got = fmt.Sprintf("%d صف / %.2f ج.م / %s", res.ValidRows, res.TotalRevenue, st.TargetChain)
@@ -211,7 +219,7 @@ func (p *Processor) restageFromDisk(ctx context.Context, tenantID, batchID strin
 	st.BatchID = batchID
 	st.Result.BatchID = batchID
 	st.PeriodChoice = meta.PeriodChoice
-	log.Printf("[staged] batch %s restored from disk for %s (%d rows)", batchID, meta.Filename, meta.ValidRows)
+	log.Printf("[staged] batch %s restored from disk for %s (%d rows, sell_in=%v)", batchID, meta.Filename, meta.ValidRows, meta.IsSellInPlan)
 	return st, nil
 }
 

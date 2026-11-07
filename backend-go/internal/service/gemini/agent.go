@@ -540,6 +540,7 @@ func (c *Client) mockAnalyze(filename string, rawContent []byte) (*domain.Normal
 		ReportingPeriodStart: time.Now().AddDate(0, 0, -7).Format("2006-01-02"),
 		ReportingPeriodEnd:   today,
 		ConfidenceScore:      0.985,
+		MappingConfidence:    0.985,
 		ColumnMapping:        mapping,
 		AnomaliesDetected:    anomalies,
 		NormalizedRecords:    records,

@@ -253,24 +253,37 @@ func TestHTTPMissingAPIKeyRefusesMockInProduction(t *testing.T) {
 }
 
 func TestHTTPLowConfidenceWrongMappingFallsBack(t *testing.T) {
+	low := strings.Replace(book3Plan, `"confidence":0.95`, `"confidence":0.3`, 1)
 	wrong := `{"header_row_index":2,"layout":"wide","confidence":0.95,"columns":[
 {"index":0,"role":"ignore"},{"index":1,"role":"ignore"},{"index":2,"role":"ignore"},{"index":3,"role":"ignore"},
 {"index":4,"role":"store_value","branch":"سموحة"},{"index":5,"role":"store_value","branch":"ستانلى"},
 {"index":6,"role":"ignore"},{"index":7,"role":"ignore"},{"index":8,"role":"store_quantity","branch":"سموحة"},
 {"index":9,"role":"store_quantity","branch":"ستانلى"},{"index":10,"role":"ignore"},{"index":11,"role":"ignore"}]}`
-	f := &geminiHTTPFixture{handler: func(model string, w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(mappingOKBody(wrong))
-	}}
-	c, _ := wiredAgent(t, f, 5*time.Second)
-	x, _ := BuildSampleXLSX(book3LikeRows())
-	p, err := c.AnalyzeAndNormalize(context.Background(), "Book3.xlsx", x)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// No barcode/product → plan rejected → deterministic fallback.
-	if p.MappingSource != MappingSourceDeterministic {
-		t.Fatalf("expected deterministic after wrong mapping, got %s", p.MappingSource)
+	for _, tc := range []struct {
+		name string
+		plan string
+	}{
+		{"low_confidence", low},
+		{"wrong_roles", wrong},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &geminiHTTPFixture{handler: func(model string, w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write(mappingOKBody(tc.plan))
+			}}
+			c, _ := wiredAgent(t, f, 5*time.Second)
+			x, _ := BuildSampleXLSX(book3LikeRows())
+			p, err := c.AnalyzeAndNormalize(context.Background(), "Book3.xlsx", x)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p.MappingSource != MappingSourceDeterministic {
+				t.Fatalf("expected deterministic after %s, got %s calls=%v", tc.name, p.MappingSource, f.callModels())
+			}
+			if len(f.callModels()) < 2 {
+				t.Fatalf("%s should escalate Tier1→Tier2 before fallback, calls=%v", tc.name, f.callModels())
+			}
+		})
 	}
 }
 
@@ -328,9 +341,15 @@ func TestHTTPMissingMonthRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// AI path rejects (no month) → deterministic may still parse from content.
-	if p.MappingSource != MappingSourceDeterministic && p.Validation != nil && p.Validation.Status == "rejected" {
-		t.Fatalf("unexpected: source=%s validation=%+v", p.MappingSource, p.Validation)
+	if len(f.callModels()) == 0 {
+		t.Fatal("expected Gemini mapping calls for a single-sheet workbook")
+	}
+	// AI extraction without month must not stick as MappingSource=ai.
+	if p.MappingSource == MappingSourceAI {
+		t.Fatalf("AI must not accept a plan without month; validation=%+v", p.Validation)
+	}
+	if p.MappingSource != MappingSourceDeterministic {
+		t.Fatalf("expected deterministic fallback after missing-month AI rejection, got %s", p.MappingSource)
 	}
 }
 
@@ -381,19 +400,53 @@ func TestHTTPAPIKeyNeverLogged(t *testing.T) {
 	log.SetOutput(&buf)
 	defer log.SetOutput(prev)
 
-	f := &geminiHTTPFixture{handler: func(model string, w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = io.WriteString(w, "boom "+testAPIKey) // even if body leaked, redact path should not log key from our errors
-	}}
-	c, _ := wiredAgent(t, f, 5*time.Second)
-	x, _ := BuildSampleXLSX(book3LikeRows())
-	_, _ = c.AnalyzeAndNormalize(context.Background(), "Book3.xlsx", x)
-	if strings.Contains(buf.String(), testAPIKey) {
-		t.Fatalf("API key leaked into logs: %s", buf.String())
-	}
-	if atomic.LoadInt32(&f.sawKeyURL) != 0 {
-		t.Fatal("API key must not appear in request URL")
-	}
+	t.Run("mapping_path", func(t *testing.T) {
+		buf.Reset()
+		f := &geminiHTTPFixture{handler: func(model string, w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = io.WriteString(w, "boom "+testAPIKey)
+		}}
+		c, _ := wiredAgent(t, f, 5*time.Second)
+		x, _ := BuildSampleXLSX(book3LikeRows())
+		_, _ = c.AnalyzeAndNormalize(context.Background(), "Book3.xlsx", x)
+		if strings.Contains(buf.String(), testAPIKey) {
+			t.Fatalf("API key leaked into mapping logs: %s", buf.String())
+		}
+		if atomic.LoadInt32(&f.sawKeyURL) != 0 {
+			t.Fatal("API key must not appear in request URL")
+		}
+		if !strings.Contains(buf.String(), `file="Book3.xlsx"`) {
+			t.Fatalf("mapping [ingest-ai-call] must include filename, got %s", buf.String())
+		}
+	})
+
+	t.Run("invokeGeminiAPI_error_body_redaction", func(t *testing.T) {
+		buf.Reset()
+		t.Setenv("ENVIRONMENT", "production") // refuse mock samples after API failure
+		f := &geminiHTTPFixture{handler: func(model string, w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadGateway)
+			// Full normalize path must redact keys that appear in error bodies.
+			_, _ = io.WriteString(w, `{"error":"invalid key `+testAPIKey+`"}`)
+		}}
+		c, _ := wiredAgent(t, f, 5*time.Second)
+		// Unreadable bytes → skip AI mapping + deterministic → invokeGeminiAPI (full normalize).
+		_, err := c.AnalyzeAndNormalize(context.Background(), "carrefour_opaque.bin", []byte{0x00, 0x01, 0x02})
+		if err == nil {
+			t.Fatal("expected error from opaque binary (API fail + production mock refusal)")
+		}
+		if strings.Contains(err.Error(), testAPIKey) {
+			t.Fatalf("API key leaked into invokeGeminiAPI error: %v", err)
+		}
+		if strings.Contains(buf.String(), testAPIKey) {
+			t.Fatalf("API key leaked into invokeGeminiAPI logs: %s", buf.String())
+		}
+		if atomic.LoadInt32(&f.sawKeyURL) != 0 {
+			t.Fatal("API key must not appear in request URL")
+		}
+		if len(f.callModels()) == 0 {
+			t.Fatal("expected invokeGeminiAPI HTTP calls")
+		}
+	})
 }
 
 func TestHTTPDeterministicNeverClaimsTier2Confidence(t *testing.T) {
