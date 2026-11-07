@@ -31,9 +31,126 @@ func TestArchiveDeleteHTTPStatusMapping(t *testing.T) {
 	if st != http.StatusInternalServerError || code != "archive_delete_partial" {
 		t.Fatalf("firestore mapping: %d %s", st, code)
 	}
+	st, code, _ = archiveDeleteHTTPStatus(&ingestion.ArchiveDeleteError{Stage: "disk", Message: "index write failed"})
+	if st != http.StatusInternalServerError || code != "archive_delete_partial" {
+		t.Fatalf("disk mapping: %d %s", st, code)
+	}
+	st, code, _ = archiveDeleteHTTPStatus(&ingestion.ArchiveDeleteError{Stage: "ambiguous", Message: "many"})
+	if st != http.StatusConflict || code != "archive_delete_ambiguous" {
+		t.Fatalf("ambiguous mapping: %d %s", st, code)
+	}
 	st, code, _ = archiveDeleteHTTPStatus(errors.New("other"))
 	if st != http.StatusInternalServerError || code != "delete_failed" {
 		t.Fatalf("default mapping: %d %s", st, code)
+	}
+}
+
+// Stale archive ID + file_name must 404 and must NOT delete a newer same-named upload.
+func TestDeleteStaleArchiveIDDoesNotFallbackToFileName(t *testing.T) {
+	proc, h, mw := archiveDeleteTestEnv(t)
+	// SaveArchivedFile reuses one id per sell-out name; plant two distinct ids sharing FileName.
+	older := &ingestion.ArchivedFile{
+		ID: "arch_stale_old", BatchID: "batch_old", FileType: "sell_out", TenantID: "tenant-adeco",
+		FileName: "same.xlsx", RetailChain: "fathalla", TargetYear: "2026", TargetMonth: "01",
+		RowsIngested: 1, UploadedAt: "2026-01-01T00:00:00Z",
+	}
+	newer := &ingestion.ArchivedFile{
+		ID: "arch_stale_new", BatchID: "batch_new", FileType: "sell_out", TenantID: "tenant-adeco",
+		FileName: "same.xlsx", RetailChain: "fathalla", TargetYear: "2026", TargetMonth: "02",
+		RowsIngested: 1, UploadedAt: "2026-02-01T00:00:00Z",
+	}
+	proc.InsertArchivedFileEntry(older, []byte("old"))
+	proc.InsertArchivedFileEntry(newer, []byte("new"))
+	if _, err := proc.DeleteArchivedFile(context.Background(), "tenant-adeco", older.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	tok := tokenWithTenant(t, mw, domain.RoleVendorAdmin, "tenant-adeco")
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/ingest/archive/"+older.ID+"?file_name=same.xlsx", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	req.Header.Set("X-Tenant-ID", "tenant-adeco")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("stale id delete: want 404, got %d %s", rec.Code, rec.Body.String())
+	}
+
+	list := proc.ListArchivedFiles(req.Context(), "tenant-adeco", "", "", "", "sell_out")
+	foundNewer := false
+	for _, f := range list.Files {
+		if f.ID == newer.ID {
+			foundNewer = true
+		}
+		if f.ID == older.ID {
+			t.Fatal("older archive must stay deleted")
+		}
+	}
+	if !foundNewer {
+		t.Fatal("newer same-named upload must survive stale-id + file_name delete")
+	}
+}
+
+// Repeated delete of an already-removed archive id is an idempotent 404 (no-op).
+func TestDeleteArchiveRepeatedIsIdempotentNotFound(t *testing.T) {
+	proc, h, mw := archiveDeleteTestEnv(t)
+	entry := proc.SaveArchivedFile("tenant-adeco", "batch_1", "once.xlsx", []byte("x"), "fathalla", "2026", "01", 1, 1, 1)
+	tok := tokenWithTenant(t, mw, domain.RoleVendorAdmin, "tenant-adeco")
+
+	del := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodDelete, "/api/v1/ingest/archive/"+entry.ID, nil)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		req.Header.Set("X-Tenant-ID", "tenant-adeco")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	if rec := del(); rec.Code != http.StatusOK {
+		t.Fatalf("first delete: want 200, got %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := del(); rec.Code != http.StatusNotFound {
+		t.Fatalf("second delete: want 404 idempotent no-op, got %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// Legacy name-only delete works when exactly one archive matches; ambiguous when two share a name.
+func TestDeleteArchiveByNameUniqueOnly(t *testing.T) {
+	proc, h, mw := archiveDeleteTestEnv(t)
+	tok := tokenWithTenant(t, mw, domain.RoleVendorAdmin, "tenant-adeco")
+
+	only := proc.SaveArchivedFile("tenant-adeco", "batch_a", "unique.xlsx", []byte("a"), "fathalla", "2026", "01", 1, 1, 1)
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/ingest/archive?file_name=unique.xlsx", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	req.Header.Set("X-Tenant-ID", "tenant-adeco")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unique name delete: want 200, got %d %s", rec.Code, rec.Body.String())
+	}
+	if _, _, err := proc.GetArchivedFile(req.Context(), "tenant-adeco", only.ID); err == nil {
+		t.Fatal("unique name delete must remove the archive")
+	}
+
+	proc.InsertArchivedFileEntry(&ingestion.ArchivedFile{
+		ID: "arch_dup_a", BatchID: "batch_b", FileType: "sell_out", TenantID: "tenant-adeco",
+		FileName: "dup.xlsx", RetailChain: "fathalla", TargetYear: "2026", TargetMonth: "01",
+		RowsIngested: 1, UploadedAt: "2026-01-01T00:00:00Z",
+	}, []byte("b"))
+	proc.InsertArchivedFileEntry(&ingestion.ArchivedFile{
+		ID: "arch_dup_b", BatchID: "batch_c", FileType: "sell_out", TenantID: "tenant-adeco",
+		FileName: "dup.xlsx", RetailChain: "fathalla", TargetYear: "2026", TargetMonth: "02",
+		RowsIngested: 1, UploadedAt: "2026-02-01T00:00:00Z",
+	}, []byte("c"))
+	req2 := httptest.NewRequest(http.MethodDelete, "/api/v1/ingest/archive?file_name=dup.xlsx", nil)
+	req2.Header.Set("Authorization", "Bearer "+tok)
+	req2.Header.Set("X-Tenant-ID", "tenant-adeco")
+	rec2 := httptest.NewRecorder()
+	h.ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusConflict {
+		t.Fatalf("ambiguous name delete: want 409, got %d %s", rec2.Code, rec2.Body.String())
+	}
+	list := proc.ListArchivedFiles(req2.Context(), "tenant-adeco", "", "", "", "sell_out")
+	if list.TotalCount < 2 {
+		t.Fatalf("ambiguous name must leave both archives, got %d", list.TotalCount)
 	}
 }
 
@@ -47,6 +164,7 @@ func archiveDeleteTestEnv(t *testing.T) (*ingestion.Processor, http.Handler, *mi
 	up := NewUploadHandler(proc)
 	mux := http.NewServeMux()
 	mux.HandleFunc("DELETE /api/v1/ingest/archive/{id}", up.HandleDeleteArchive)
+	mux.HandleFunc("DELETE /api/v1/ingest/archive", up.HandleDeleteArchive)
 	mux.HandleFunc("GET /api/v1/ingest/archive", up.HandleListArchive)
 	return proc, mw.Handler(mux), mw
 }

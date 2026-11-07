@@ -63,12 +63,20 @@ func (h *UploadHandler) HandleClearData(w http.ResponseWriter, r *http.Request) 
 		tenantID = "all"
 	}
 
-	if err := h.processor.PurgeTenantData(r.Context(), tenantID); err != nil {
+	var clearErr error
+	if tenantID == "all" {
+		// Wildcard wipe is super_admin-only (gated above). Service layer also refuses
+		// PurgeTenantData("all") so accidental callers cannot escalate.
+		clearErr = h.processor.PurgeAllTenants(r.Context())
+	} else {
+		clearErr = h.processor.PurgeTenantData(r.Context(), tenantID)
+	}
+	if clearErr != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"error":   "clear_failed",
-			"message": err.Error(),
+			"message": clearErr.Error(),
 		})
 		return
 	}
@@ -787,24 +795,26 @@ func (h *UploadHandler) HandleDeleteArchive(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	if archiveID == "" {
+	fileName := strings.TrimSpace(r.URL.Query().Get("file_name"))
+
+	// Strict ID deletes never fall back to file_name. A stale/missing ID with a name query
+	// used to retry by name and DeleteArchivedFile could pick a newer same-named upload.
+	// Legacy name-only delete is allowed only when no archive ID is provided, and only when
+	// the name resolves to exactly one archive.
+	var deleted *ingestion.ArchivedFile
+	switch {
+	case archiveID != "":
+		deleted, err = h.processor.DeleteArchivedFile(r.Context(), tenantID, archiveID)
+	case fileName != "":
+		deleted, err = h.processor.DeleteArchivedFileByName(r.Context(), tenantID, fileName)
+	default:
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"error":   "missing_archive_id",
-			"message": "archive file id is required in path or query param",
+			"message": "archive file id is required in path or query param (or file_name for legacy unique-name delete)",
 		})
 		return
-	}
-
-	// Prefer strict archive_id. file_name fallback is ONLY for genuine not-found lookups —
-	// never after a BigQuery/Firestore/partial failure, which would risk deleting a newer
-	// same-named archive (DeleteArchivedFile picks the newest name match).
-	deleted, err := h.processor.DeleteArchivedFile(r.Context(), tenantID, archiveID)
-	if err != nil && errors.Is(err, ingestion.ErrArchivedFileNotFound) {
-		if fileName := strings.TrimSpace(r.URL.Query().Get("file_name")); fileName != "" && fileName != archiveID {
-			deleted, err = h.processor.DeleteArchivedFile(r.Context(), tenantID, fileName)
-		}
 	}
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -840,8 +850,10 @@ func archiveDeleteHTTPStatus(err error) (status int, code, message string) {
 		switch ade.Stage {
 		case "bigquery", "memory_store":
 			return http.StatusBadGateway, "archive_delete_analytics_failed", message
-		case "firestore", "partial":
+		case "firestore", "partial", "disk":
 			return http.StatusInternalServerError, "archive_delete_partial", message
+		case "ambiguous":
+			return http.StatusConflict, "archive_delete_ambiguous", message
 		}
 	}
 	return http.StatusInternalServerError, "delete_failed", message

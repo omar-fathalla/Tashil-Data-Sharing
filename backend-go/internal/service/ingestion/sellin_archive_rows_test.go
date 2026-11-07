@@ -2,6 +2,7 @@ package ingestion
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
@@ -61,6 +62,61 @@ func TestSetArchiveStoredRowsUpdatesBatchAndCount(t *testing.T) {
 	p.archiveMu.RUnlock()
 	if e.RowsIngested != 62681 || e.BatchID != "batch_sellin_b" {
 		t.Fatalf("got rows=%d batch=%s", e.RowsIngested, e.BatchID)
+	}
+}
+
+func TestListArchivedFilesZeroStoredRowsWhenArchiveAbsentFromCounts(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestProcessor(t, dir)
+	entry := p.SaveArchivedFile("tenant-adeco", "batch_sellin_z", "empty.xlsx", []byte("z"), "fathalla", "2026", "01", 5000, 1, 1)
+
+	// Successful query returning no row for this archive_id (GROUP BY omits 0-row groups).
+	sink := &countingSink{counts: nil}
+	p.WithSink(sink)
+
+	list := p.ListArchivedFiles(context.Background(), "tenant-adeco", "", "", "", "sell_in")
+	if list.TotalCount != 1 {
+		t.Fatalf("want 1 file, got %d", list.TotalCount)
+	}
+	if list.Files[0].RowsIngested != 0 {
+		t.Fatalf("absent archive_id after successful counts query must overlay 0, got %d", list.Files[0].RowsIngested)
+	}
+	p.archiveMu.RLock()
+	got := p.archivedFiles[entry.ID].RowsIngested
+	p.archiveMu.RUnlock()
+	if got != 0 {
+		t.Fatalf("persisted archive rows must be 0, got %d", got)
+	}
+}
+
+type failingCountSink struct {
+	fakeSink
+	err error
+}
+
+func (f *failingCountSink) ArchiveRowCounts(context.Context, string) ([]bqsink.ArchiveRows, error) {
+	return nil, f.err
+}
+
+func (f *failingCountSink) DeleteOrphans(context.Context, bqsink.Kind, string, []string, []string) *bqsink.Result {
+	return &bqsink.Result{Status: bqsink.StatusOK}
+}
+
+func TestListArchivedFilesKeepsStaleCountWhenRowCountQueryFails(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestProcessor(t, dir)
+	entry := p.SaveArchivedFile("tenant-adeco", "batch_sellin_fail", "fail.xlsx", []byte("z"), "fathalla", "2026", "01", 4242, 1, 1)
+	p.WithSink(&failingCountSink{err: errors.New("bq unavailable")})
+
+	list := p.ListArchivedFiles(context.Background(), "tenant-adeco", "", "", "", "sell_in")
+	if list.Files[0].RowsIngested != 4242 {
+		t.Fatalf("query failure must keep stale rows_ingested, got %d", list.Files[0].RowsIngested)
+	}
+	p.archiveMu.RLock()
+	got := p.archivedFiles[entry.ID].RowsIngested
+	p.archiveMu.RUnlock()
+	if got != 4242 {
+		t.Fatalf("archive entry must stay 4242, got %d", got)
 	}
 }
 
