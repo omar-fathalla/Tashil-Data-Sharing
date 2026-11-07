@@ -3,6 +3,7 @@
 /// Failed deletes (403/502/…) must NOT add tombstones. Successful server list
 /// responses should reconcile away stale tombstones so files the backend still
 /// has reappear after earlier optimistic/failed deletes.
+library archive_tombstones;
 
 /// True when a delete HTTP status means the backend confirmed removal.
 bool archiveDeleteHttpSucceeded(int statusCode) =>
