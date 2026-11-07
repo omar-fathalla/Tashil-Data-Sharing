@@ -169,19 +169,27 @@ func TestSimulatedVendorAdminCannotDecideOrWriteChains(t *testing.T) {
 	}
 }
 
-// Clear (any scope) and archive delete are super_admin only, even for a vendor_admin.
-func TestClearAndArchiveDeleteAreSuperAdminOnly(t *testing.T) {
+// Clear (any scope) and archive delete: company manager (vendor_admin) and super_admin pass the gate;
+// other roles (e.g. national_sales_manager) remain refused. X-Simulated-Role cannot widen a non-super token.
+func TestClearAndArchiveDeleteAllowCompanyManager(t *testing.T) {
 	h, mw := writeGateMux(t)
-	tok := tokenFor(t, mw, domain.RoleVendorAdmin)
+	va := tokenFor(t, mw, domain.RoleVendorAdmin)
 	for _, rt := range [][2]string{{"POST", "/api/v1/ingest/clear"}, {"POST", "/api/v1/ingest/clear?scope=sell_in"},
 		{"DELETE", "/api/v1/ingest/clear"}, {"DELETE", "/api/v1/ingest/archive/a1"}, {"DELETE", "/api/v1/ingest/archive"}} {
-		if rec := hit(h, rt[0], rt[1], tok, map[string]string{"X-Simulated-Role": "super_admin"}); rec.Code != http.StatusForbidden {
-			t.Errorf("vendor_admin %s %s: want 403, got %d", rt[0], rt[1], rec.Code)
+		rec := hit(h, rt[0], rt[1], va, nil)
+		if rec.Code == http.StatusForbidden || rec.Code == http.StatusUnauthorized {
+			t.Errorf("vendor_admin (company manager) %s %s must pass the gate, got %d", rt[0], rt[1], rec.Code)
 		}
 	}
 	su := tokenFor(t, mw, domain.RoleSuperAdmin)
 	if rec := hit(h, "DELETE", "/api/v1/ingest/archive/does-not-exist", su, nil); rec.Code == http.StatusForbidden || rec.Code == http.StatusUnauthorized {
 		t.Errorf("super_admin archive delete must pass the gate, got %d", rec.Code)
+	}
+	nsm := tokenFor(t, mw, domain.RoleNationalSalesManager)
+	for _, rt := range [][2]string{{"DELETE", "/api/v1/ingest/archive/a1"}, {"POST", "/api/v1/ingest/clear"}} {
+		if rec := hit(h, rt[0], rt[1], nsm, map[string]string{"X-Simulated-Role": "super_admin"}); rec.Code != http.StatusForbidden {
+			t.Errorf("national_sales_manager %s %s: want 403, got %d", rt[0], rt[1], rec.Code)
+		}
 	}
 }
 

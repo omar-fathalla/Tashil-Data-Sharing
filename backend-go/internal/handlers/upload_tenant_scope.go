@@ -36,12 +36,13 @@ func applySystemTenantOverride(tokenTenant, override string) string {
 	return tokenTenant
 }
 
-// requireSuperForReplace lets only a verified super_admin replace (delete) an existing archive.
+// requireSuperForReplace lets a verified super_admin or vendor_admin (company manager) replace
+// (delete) an existing archive inside the tenant already enforced by the upload path.
 func requireSuperForReplace(w http.ResponseWriter, c *domain.UserClaims) bool {
-	if c != nil && c.Role == domain.RoleSuperAdmin {
+	if c != nil && (c.Role == domain.RoleSuperAdmin || c.Role == domain.RoleVendorAdmin) {
 		return true
 	}
-	writeErr(w, http.StatusForbidden, "forbidden: only a super admin can replace an archived file")
+	writeErr(w, http.StatusForbidden, "forbidden: only a company manager (vendor_admin) or super admin can replace an archived file")
 	return false
 }
 

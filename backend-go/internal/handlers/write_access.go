@@ -22,18 +22,16 @@ var ingestWriteRoles = map[domain.UserRole]bool{
 // destructiveWriteRoles may clear data (any scope) and delete archive entries (Sell-Out and Sell-In
 // share HandleDeleteArchive, so both use this same gate).
 //
-// Current rule (keep until Mohamed decides otherwise):
-//   - Allowed: super_admin only
-//   - Refused: vendor_admin, national_sales_manager, chain_kam, and every other role
+// Policy (Mohamed, 7 Nov 2026):
+//   - Allowed: super_admin + vendor_admin (مدير الشركة / company manager / tenant admin)
+//   - Refused: national_sales_manager, chain_kam, and every other role
 //
-// Why adeco tenant accounts get 403 on DELETE /api/v1/ingest/archive/{id}:
-// they authenticate as vendor_admin (or another non-super_admin role). The gate runs before any
-// BigQuery/Firestore mutation. This is an application role check, not Google IAM.
-//
-// Policy note: upload already allows vendor_admin (ingestWriteRoles). Whether archive delete
-// should match upload (vendor_admin too) is Mohamed's decision — do not loosen here casually.
+// The company-manager account is the only tenant role used in tests and must have full in-tenant
+// permissions (upload, add, delete Sell-Out/Sell-In, clear). Cross-tenant deletes remain blocked by
+// EnforceTenantRLS / SameTenant — vendor_admin may only act inside its own tenant token.
 var destructiveWriteRoles = map[domain.UserRole]bool{
-	domain.RoleSuperAdmin: true,
+	domain.RoleSuperAdmin:  true,
+	domain.RoleVendorAdmin: true,
 }
 
 // chainWriteRoles may create / update / delete retail chains (legacy "admin" dropped).
@@ -52,7 +50,7 @@ func requireWriteRole(w http.ResponseWriter, r *http.Request, roles map[domain.U
 	}
 	if !roles[c.Role] {
 		writeErr(w, http.StatusForbidden, fmt.Sprintf(
-			"Forbidden: your role cannot perform this action (role=%s; archive delete and clear require super_admin)",
+			"Forbidden: your role cannot perform this action (role=%s; archive delete and clear require super_admin or vendor_admin)",
 			c.Role,
 		))
 		return nil, false
