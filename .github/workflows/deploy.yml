@@ -85,10 +85,13 @@ jobs:
       - name: Deploy to Cloud Run (from source, existing settings and env vars are kept)
         working-directory: backend-go
         run: |
+          # Pin to 1 instance until shared storage lands (#37); relax min/max after that.
           gcloud run deploy "$SERVICE" --source . \
             --region "$REGION" --project "$PROJECT_ID" --quiet \
             --update-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest \
-            --memory=2Gi
+            --memory=2Gi \
+            --min-instances=1 \
+            --max-instances=1
       - name: Smoke check
         run: |
           url="$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT_ID" --format='value(status.url)')"

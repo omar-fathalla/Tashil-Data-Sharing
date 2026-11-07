@@ -4,9 +4,9 @@ Pushing to `main` runs `.github/workflows/deploy.yml`:
 
 1. `go vet` + `go test ./...` (backend-go) and `flutter analyze` + `flutter test` (tashil_web).
 2. Backend: `gcloud run deploy tashil-backend --source backend-go` (europe-west1) from the clean
-   checkout. No flags other than region/project are passed, so the service keeps its current
-   settings (min 1 / max 3, CPU always on, startup boost, gen2, archive volume, all env vars and
-   secrets incl. `BIGQUERY_SINK_ENABLED=true`). The commit SHA is written to
+   checkout. Deploy pins `--min-instances=1 --max-instances=1` until shared storage lands
+   (#37); other settings (CPU always on, startup boost, gen2, archive volume, env vars and
+   secrets incl. `BIGQUERY_SINK_ENABLED=true`) are kept. The commit SHA is written to
    `backend-go/data/build_commit.txt`, so `/api/v1/version` reports it.
 3. Web: `flutter build web --dart-define=APP_VERSION=<n>` and `firebase deploy --only hosting`.
 
