@@ -975,6 +975,10 @@ func (p *Processor) DeleteArchivedFile(ctx context.Context, tenantID, archiveID 
 	}
 
 	// --- Phase 3: remove from archive list / tombstone / disk ---
+	// Learn peer deletes first so rewriting index.json cannot resurrect a file another
+	// instance already tombstoned (Sell-In flap: delete A → refresh → gone → delete B → A returns).
+	p.refreshArchiveTombstonesAlways(ctx)
+
 	p.archiveMu.Lock()
 	defer p.archiveMu.Unlock()
 
@@ -1025,6 +1029,8 @@ func (p *Processor) DeleteArchivedFile(ctx context.Context, tenantID, archiveID 
 	p.removeArchiveSidecarLocked(&deletedEntry)
 	delete(p.archivedFiles, archiveID)
 	delete(p.archivedBytes, archiveID)
+	// Drop any other ids peers already tombstoned before we rewrite the shared index.
+	p.pruneTombstonedArchivesLocked()
 
 	if err := p.persistTenantArchiveIndexLocked(normTenant); err != nil {
 		log.Printf("ERROR [archive] rewrite index after delete of %s failed: %v", deletedEntry.ID, err)

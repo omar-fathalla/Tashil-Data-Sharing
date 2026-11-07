@@ -104,6 +104,23 @@ func archiveEntryKind(entry *ArchivedFile) string {
 	return "sell_out"
 }
 
+// refreshArchiveTombstonesAlways applies shared-mount (+ optional Firestore) deletion tombstones and
+// prunes matching in-memory entries. Runs on every list/delete — not throttled — so a simple page
+// refresh cannot flap a just-deleted Sell-In/Sell-Out row back into the UI when the request hits a
+// peer Cloud Run instance that still holds the startup copy.
+func (p *Processor) refreshArchiveTombstonesAlways(ctx context.Context) {
+	if p.archiveDir == "" && p.fsRepo == nil {
+		return
+	}
+	if p.fsRepo != nil {
+		p.fsRepo.RefreshDeletedArchives(ctx)
+	}
+	p.archiveMu.Lock()
+	defer p.archiveMu.Unlock()
+	p.applyDiskTombstonesLocked()
+	p.pruneTombstonedArchivesLocked()
+}
+
 // syncArchiveFromDisk picks up archive entries written by OTHER Cloud Run instances and drops
 // entries deleted by other instances (including seed-index rows).
 //
@@ -113,8 +130,17 @@ func archiveEntryKind(entry *ArchivedFile) string {
 // sidecars (metadata only; bytes are read lazily from StoragePath on download), refreshes deletion
 // tombstones from disk (+ Firestore when configured), prunes tombstoned in-memory entries, and when the
 // same (tenant, type, chain, file name) exists twice keeps only the newest upload.
+//
+// Tombstone refresh/prune is NOT gated by archiveDiskSyncInterval (see refreshArchiveTombstonesAlways);
+// only the sidecar merge is throttled.
 func (p *Processor) syncArchiveFromDisk(normTenant string, force bool) {
-	if p.archiveDir == "" || normTenant == "" {
+	if normTenant == "" {
+		return
+	}
+	// Always hide deletes from peer instances before any list filter runs.
+	p.refreshArchiveTombstonesAlways(context.Background())
+
+	if p.archiveDir == "" {
 		return
 	}
 	now := time.Now().UnixNano()
@@ -125,18 +151,13 @@ func (p *Processor) syncArchiveFromDisk(normTenant string, force bool) {
 		return
 	}
 
-	// Learn deletes from other instances before merging uploads. Firestore refresh is best-effort;
-	// the shared deleted_tombstones.json is the fast path on the archive mount.
-	if p.fsRepo != nil {
-		p.fsRepo.RefreshDeletedArchives(context.Background())
-	}
-
 	tenantDir := filepath.Join(p.archiveDir, normTenant)
 	disk := mergeArchiveSidecars(nil, tenantDir)
 
 	p.archiveMu.Lock()
 	defer p.archiveMu.Unlock()
 	p.lastArchiveDiskSync = now
+	// Re-apply after merge window: a concurrent delete may have landed while we read sidecars.
 	p.applyDiskTombstonesLocked()
 	p.pruneTombstonedArchivesLocked()
 	for _, item := range disk {
