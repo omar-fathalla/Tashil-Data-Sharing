@@ -16,6 +16,7 @@ import (
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
+	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 )
 
@@ -547,11 +548,69 @@ func (p *Processor) RemoveArchivedFileByBatch(batchID string, prevEntry *Archive
 	}
 }
 
+// setArchiveStoredRows updates rows_ingested (and batch_id when non-empty) after a durable sink write
+// so the archive list matches rows actually stored for this archive_id.
+func (p *Processor) setArchiveStoredRows(archiveID string, rows int, batchID string) {
+	if archiveID == "" || rows < 0 {
+		return
+	}
+	p.archiveMu.Lock()
+	defer p.archiveMu.Unlock()
+	entry := p.archivedFiles[archiveID]
+	if entry == nil {
+		return
+	}
+	entry.RowsIngested = rows
+	if strings.TrimSpace(batchID) != "" {
+		entry.BatchID = batchID
+	}
+	p.writeArchiveSidecarLocked(entry)
+}
+
+// enrichArchiveStoredRows overlays BigQuery row counts (by archive_id) onto the list response so
+// rows_ingested reflects stored analytics rows, not a stale parse-time count.
+func (p *Processor) enrichArchiveStoredRows(ctx context.Context, resp *ArchiveListResponse) {
+	if resp == nil || len(resp.Files) == 0 || p.sink == nil || !p.sink.Enabled() {
+		return
+	}
+	rec, ok := p.sink.(bqsink.ArchiveReconciler)
+	if !ok {
+		return
+	}
+	stored, err := rec.ArchiveRowCounts(ctx, resp.TenantID)
+	if err != nil || len(stored) == 0 {
+		return
+	}
+	byID := map[string]int{}
+	for _, s := range stored {
+		if s.ArchiveID != "" {
+			byID[s.ArchiveID] += s.Rows
+		}
+	}
+	p.archiveMu.Lock()
+	for _, f := range resp.Files {
+		if f == nil || f.ID == "" {
+			continue
+		}
+		n, ok := byID[f.ID]
+		if !ok {
+			continue
+		}
+		f.RowsIngested = n
+		if entry := p.archivedFiles[f.ID]; entry != nil && entry.RowsIngested != n {
+			entry.RowsIngested = n
+			p.writeArchiveSidecarLocked(entry)
+		}
+	}
+	p.archiveMu.Unlock()
+}
+
 // ListArchivedFiles returns archived files for the tenant, optionally filtered by retail chain, year, search query, and file type ("sell_out" | "sell_in" | "product_master" | "all").
+// rows_ingested is the count of rows stored for that archive in analytics when BigQuery counts are available;
+// otherwise it is the parse-time count recorded at upload.
 func (p *Processor) ListArchivedFiles(ctx context.Context, tenantID, chainFilter, yearFilter, searchQuery string, fileTypeFilters ...string) *ArchiveListResponse {
 	p.syncArchiveFromDisk(normalizeArchiveTenantID(tenantID), false)
 	p.archiveMu.RLock()
-	defer p.archiveMu.RUnlock()
 
 	normTenant := normalizeArchiveTenantID(tenantID)
 	normChain := strings.ToLower(strings.TrimSpace(chainFilter))
@@ -639,12 +698,15 @@ func (p *Processor) ListArchivedFiles(ctx context.Context, tenantID, chainFilter
 		filtered = []*ArchivedFile{}
 	}
 
-	return &ArchiveListResponse{
+	resp := &ArchiveListResponse{
 		TenantID:    normTenant,
 		TotalCount:  len(filtered),
 		ChainCounts: chainCounts,
 		Files:       filtered,
 	}
+	p.archiveMu.RUnlock()
+	p.enrichArchiveStoredRows(ctx, resp)
+	return resp
 }
 
 // GetArchivedFile retrieves an archived file metadata and its raw bytes by ID for a tenant.
