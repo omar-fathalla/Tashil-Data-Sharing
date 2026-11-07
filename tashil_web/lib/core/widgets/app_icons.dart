@@ -95,6 +95,7 @@ class AppIcons {
   static const IconData filterAlt = Icons.filter_alt_rounded;
   static const IconData groups = Icons.groups_rounded;
   static const IconData pendingCustomers = Icons.person_search_rounded;
+  static const IconData sellInAssist = Icons.auto_awesome_rounded;
   static const IconData undo = Icons.undo_rounded;
   static const IconData block = Icons.block_rounded;
   static const IconData collapseAll = Icons.unfold_less_rounded;
