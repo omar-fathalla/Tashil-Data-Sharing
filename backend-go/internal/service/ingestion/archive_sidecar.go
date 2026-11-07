@@ -104,10 +104,13 @@ func archiveEntryKind(entry *ArchivedFile) string {
 	return "sell_out"
 }
 
-// refreshArchiveTombstonesAlways applies shared-mount (+ optional Firestore) deletion tombstones and
-// prunes matching in-memory entries. Runs on every list/delete — not throttled — so a simple page
-// refresh cannot flap a just-deleted Sell-In/Sell-Out row back into the UI when the request hits a
-// peer Cloud Run instance that still holds the startup copy.
+// refreshArchiveTombstonesAlways applies deletion tombstones from shared storage and prunes matching
+// in-memory entries. Source of truth across Cloud Run replicas:
+//   1. Firestore collection deleted_archives (RefreshDeletedArchives when configured)
+//   2. GCS archive mount file deleted_tombstones.json (applyDiskTombstonesLocked)
+// Per-instance memory alone is never enough — live Sell-In showed DELETE 200 on one revision
+// while peer revisions kept listing the same ids until shared tombs were re-read.
+// Runs on every list/delete (not throttled) so a page refresh cannot flap a just-deleted row.
 func (p *Processor) refreshArchiveTombstonesAlways(ctx context.Context) {
 	if p.archiveDir == "" && p.fsRepo == nil {
 		return

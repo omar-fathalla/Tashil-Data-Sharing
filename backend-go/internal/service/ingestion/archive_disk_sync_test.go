@@ -2,7 +2,11 @@ package ingestion
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
@@ -241,5 +245,104 @@ func TestDeleteOtherFileDoesNotResurrectPeerDeletedArchive(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Live Sell-In 01:45–01:52 Cairo (rev 00062): three Cloud Run instances; DELETE 200 + BQ purge on
+// the handling instance only; peer lists still showed deleted files; one peer DELETE 404 while
+// another still listed the same id. Tombstones must live on the shared archive mount (and Firestore
+// in prod) — not per-instance memory — so every instance's List drops them.
+func TestSellInThreeInstancesConvergeOnSharedTombstones(t *testing.T) {
+	dir := t.TempDir()
+	// Separate Firestore clients per instance (as on Cloud Run). Cross-instance hide path in this
+	// mock is the shared deleted_tombstones.json on the archive mount (GCS in prod).
+	inst5aec := newArchiveTestProcessor(dir) // handled most deletes live
+	instD931 := newArchiveTestProcessor(dir) // handled in26 once
+	inst4eb9 := newArchiveTestProcessor(dir) // listed stale copies / 404 on missing
+
+	type file struct {
+		id, name, batch string
+	}
+	files := []file{
+		{"arch_si_12_unknown", "12_unknown_barcode.xlsx", "batch_si_12"},
+		{"arch_si_06_form", "06_form_vs_sheet.xlsx", "batch_si_06"},
+		{"arch_si_in26", "in26.xlsx", "batch_si_in26"},
+		{"arch_si_13_fuzzy", "13_fuzzy_near_match.xlsx", "batch_si_13"},
+		{"arch_si_adeco_seed", "Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx", "batch_si_seed"},
+	}
+	procs := []*Processor{inst5aec, instD931, inst4eb9}
+	for i, f := range files {
+		insertSharedArchive(t, procs, &ArchivedFile{
+			ID: f.id, BatchID: f.batch, FileType: "sell_in", TenantID: "tenant-adeco",
+			FileName: f.name, RetailChain: "fathalla", TargetYear: "2026",
+			RowsIngested: 100 + i, UploadedAt: fmt.Sprintf("2026-11-07T23:40:%02dZ", i),
+		}, []byte(f.name))
+	}
+
+	// Deletes routed like live: 12 + 06 on 5aec; in26 on d931 then again on 5aec.
+	for _, id := range []string{"arch_si_12_unknown", "arch_si_06_form"} {
+		if _, err := inst5aec.DeleteArchivedFile(context.Background(), "tenant-adeco", id); err != nil {
+			t.Fatalf("5aec delete %s: %v", id, err)
+		}
+	}
+	if _, err := instD931.DeleteArchivedFile(context.Background(), "tenant-adeco", "arch_si_in26"); err != nil {
+		t.Fatalf("d931 delete in26: %v", err)
+	}
+	// 5aec still had in26 in memory (pre-list); second DELETE succeeds or is already pruned mid-phase.
+	if _, err := inst5aec.DeleteArchivedFile(context.Background(), "tenant-adeco", "arch_si_in26"); err != nil && !errors.Is(err, ErrArchivedFileNotFound) {
+		t.Fatalf("5aec re-delete in26: %v", err)
+	}
+
+	// Live: 13_fuzzy missing on 4eb9 (DELETE 404) but still listed on 5aec until that instance deletes.
+	inst4eb9.archiveMu.Lock()
+	delete(inst4eb9.archivedFiles, "arch_si_13_fuzzy")
+	delete(inst4eb9.archivedBytes, "arch_si_13_fuzzy")
+	inst4eb9.archiveMu.Unlock()
+	if _, err := inst4eb9.DeleteArchivedFile(context.Background(), "tenant-adeco", "arch_si_13_fuzzy"); !errors.Is(err, ErrArchivedFileNotFound) {
+		t.Fatalf("4eb9 delete missing 13_fuzzy want not-found, got %v", err)
+	}
+	if !listHasID(inst5aec.ListArchivedFiles(context.Background(), "tenant-adeco", "", "", "", "sell_in").Files, "arch_si_13_fuzzy") {
+		// 5aec list refreshes tombs for 12/06/in26 only; 13 still local until deleted.
+		t.Fatal("5aec should still list 13_fuzzy before its own delete (4eb9 404 does not tombstone)")
+	}
+	if _, err := inst5aec.DeleteArchivedFile(context.Background(), "tenant-adeco", "arch_si_13_fuzzy"); err != nil {
+		t.Fatalf("5aec delete 13_fuzzy: %v", err)
+	}
+
+	// Shared mount must record tombstones (not only the deleting instance's memory).
+	raw, err := os.ReadFile(filepath.Join(dir, "deleted_tombstones.json"))
+	if err != nil || len(raw) == 0 {
+		t.Fatalf("shared deleted_tombstones.json missing after deletes: %v", err)
+	}
+	var tombs []diskTombstoneItem
+	if err := json.Unmarshal(raw, &tombs); err != nil {
+		t.Fatalf("tombstone json: %v", err)
+	}
+	wantTombs := map[string]bool{
+		"arch_si_12_unknown": false, "arch_si_06_form": false, "arch_si_in26": false, "arch_si_13_fuzzy": false,
+	}
+	for _, tmb := range tombs {
+		if _, ok := wantTombs[tmb.ArchiveID]; ok {
+			wantTombs[tmb.ArchiveID] = true
+		}
+	}
+	for id, seen := range wantTombs {
+		if !seen {
+			t.Fatalf("shared tombstone file missing %s: %s", id, raw)
+		}
+	}
+
+	// Peer that never handled those deletes (4eb9) must drop them on plain List via shared tombs.
+	// Fresh fourth instance simulates a new Cloud Run replica booting on the same mount.
+	for _, p := range []*Processor{inst4eb9, instD931, inst5aec, newArchiveTestProcessor(dir)} {
+		listed := p.ListArchivedFiles(context.Background(), "tenant-adeco", "", "", "", "sell_in")
+		for _, gone := range []string{"arch_si_12_unknown", "arch_si_06_form", "arch_si_in26", "arch_si_13_fuzzy"} {
+			if listHasID(listed.Files, gone) {
+				t.Fatalf("instance still lists deleted Sell-In %s: %+v", gone, listed.Files)
+			}
+		}
+		if listed.TotalCount != 1 || listed.Files[0].ID != "arch_si_adeco_seed" {
+			t.Fatalf("want only Adeco seed Sell-In left, got %+v", listed.Files)
+		}
 	}
 }
