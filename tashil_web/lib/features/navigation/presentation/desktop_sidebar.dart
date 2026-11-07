@@ -273,10 +273,9 @@ class DesktopSidebar extends StatelessWidget {
                 );
                 final id = dest.semanticsIdentifier;
                 if (id != null && id.isNotEmpty) {
-                  item = TestSemantics(
+                  item = TestSemantics.navTarget(
                     identifier: id,
                     label: dest.label,
-                    button: true,
                     child: item,
                   );
                 }

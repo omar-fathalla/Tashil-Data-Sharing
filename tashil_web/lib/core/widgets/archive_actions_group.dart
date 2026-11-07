@@ -15,6 +15,7 @@ class ArchiveActionsGroup extends StatelessWidget {
     this.isEditing = false,
     this.isDeleting = false,
     this.showEdit = true,
+    this.archiveId,
     this.fileName,
   });
 
@@ -27,7 +28,8 @@ class ArchiveActionsGroup extends StatelessWidget {
   /// Hides the Edit (replace) segment, e.g. for users the backend would refuse a replace.
   final bool showEdit;
 
-  /// When set, wires `file-delete-<name>` on the Delete segment for automation.
+  /// Archive id + file name wire `file-delete-<archiveId>-<name>` for automation.
+  final String? archiveId;
   final String? fileName;
 
   @override
@@ -38,6 +40,13 @@ class ArchiveActionsGroup extends StatelessWidget {
       thickness: 1.0,
       color: colorScheme.outline,
     );
+
+    final deleteId = (archiveId != null &&
+            archiveId!.isNotEmpty &&
+            fileName != null &&
+            fileName!.isNotEmpty)
+        ? TestIds.fileDelete(archiveId: archiveId!, fileName: fileName!)
+        : null;
 
     return Container(
       decoration: BoxDecoration(
@@ -77,9 +86,7 @@ class ArchiveActionsGroup extends StatelessWidget {
                 busy: isDeleting,
                 onPressed: onDelete,
                 color: colorScheme.error,
-                semanticsIdentifier: fileName != null && fileName!.isNotEmpty
-                    ? TestIds.fileDelete(fileName!)
-                    : null,
+                semanticsIdentifier: deleteId,
               ),
             ],
           ),

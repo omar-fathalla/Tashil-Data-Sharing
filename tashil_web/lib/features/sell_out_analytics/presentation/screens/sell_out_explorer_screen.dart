@@ -3018,7 +3018,10 @@ onChanged: m3Legacy<int>((v) {
                               cells: [
                                 DataCell(
                                   TestSemantics(
-                                    identifier: TestIds.fileRow(file.fileName),
+                                    identifier: TestIds.fileRow(
+                                      archiveId: file.id,
+                                      fileName: file.fileName,
+                                    ),
                                     label: file.fileName,
                                     container: true,
                                     child: Row(
@@ -3101,6 +3104,7 @@ onChanged: m3Legacy<int>((v) {
                                 ),
                                 DataCell(
                                   ArchiveActionsGroup(
+                                    archiveId: file.id,
                                     fileName: file.fileName,
                                     isEditing: isReplacing,
                                     isDeleting: isDeleting,

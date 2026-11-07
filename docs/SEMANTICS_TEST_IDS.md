@@ -20,16 +20,23 @@ Kebab-case tokens. Prefer a short **area prefix**, then the control role.
 | `sellout-*` / `sellin-*` | Page-scoped upload controls / counters | `sellout-upload-button`, `sellin-uploaded-files` |
 | `upload-choose-file` | Smart Upload dropzone “choose file” | `upload-choose-file` |
 | `uploaded-files-list` | Uploaded-files table / list region | `uploaded-files-list` |
-| `file-row-<name>` | One archive row (name sanitized) | `file-row-sales-jan.xlsx` |
-| `file-delete-<name>` | Per-row delete action | `file-delete-sales-jan.xlsx` |
+| `file-row-<archiveId>-<name>` | One archive row (unique by archive id) | `file-row-abc123-sales-jan.xlsx` |
+| `file-delete-<archiveId>-<name>` | Per-row delete action | `file-delete-abc123-sales-jan.xlsx` |
 | `delete-confirm` / `delete-cancel` | Delete confirmation dialog actions | `delete-confirm` |
 | `snackbar-*` | Snackbar / toast feedback | `snackbar-error`, `snackbar-success`, `snackbar-message` |
 
-### File-name sanitization
+### File / archive token sanitization
 
-`<name>` in `file-row-*` / `file-delete-*` is the file name lowercased with
-non `[a-z0-9._-]` runs replaced by `-` (see `TestIds.fileToken` in
-`tashil_web/lib/core/testing/test_semantics.dart`).
+`<archiveId>` and `<name>` are lowercased with non `[a-z0-9._-]` runs replaced
+by `-` (see `TestIds.fileToken`). Archive id is always included so two rows with
+the same file name stay unique.
+
+### Nav uniqueness rule
+
+Each `nav-*` id is attached to **exactly one** interactive face per destination
+(e.g. NavigationRail / Drawer `icon` only — never also `selectedIcon` / `label`).
+Compact “More” sheet items for Sell-Out / Sell-In also carry `nav-sell-out` /
+`nav-sell-in`.
 
 ## Identifier catalog
 
@@ -47,8 +54,8 @@ non `[a-z0-9._-]` runs replaced by `-` (see `TestIds.fileToken` in
 | `sellout-uploaded-files` | Sell-Out “Uploaded Files (N)” tab |
 | `sellin-uploaded-files` | Sell-In “Uploaded Files (N)” tab |
 | `uploaded-files-list` | Uploaded files list / table |
-| `file-row-<name>` | Row for that file (label includes file name) |
-| `file-delete-<name>` | Delete for that file |
+| `file-row-<archiveId>-<name>` | Row for that archive (label includes file name) |
+| `file-delete-<archiveId>-<name>` | Delete for that archive |
 | `delete-cancel` | Cancel on delete confirm dialog |
 | `delete-confirm` | Confirm delete |
 | `snackbar-error` | Error snackbar |
@@ -59,8 +66,8 @@ non `[a-z0-9._-]` runs replaced by `-` (see `TestIds.fileToken` in
 
 ```js
 page.locator('[flt-semantics-identifier="login-email"]')
-// or after Flutter maps identifiers into ARIA:
-page.getByLabel('Email')
+// Tenant path must be explicit (absolute `/` drops `/adeco`):
+await page.goto('/adeco')
 ```
 
 Constants live in `tashil_web/lib/core/testing/test_semantics.dart` (`TestIds`).

@@ -265,6 +265,30 @@ class _AppShellState extends State<AppShell> {
                   const SizedBox(height: 8.0),
                   ..._destinations.map((dest) {
                     final isSelected = _selectedIndex == dest.index;
+                    final navId = TestIds.navIdForIndex(dest.index);
+                    // Compact bottom bar already owns Dashboard / Sell-Out /
+                    // Pricing / OOS ids — only tag destinations missing there
+                    // (notably Sell-In) so each nav-* id stays unique in the tree.
+                    const primaryCompactIndexes = {0, 1, 3, 5};
+                    final attachNavId = navId != null &&
+                        !primaryCompactIndexes.contains(dest.index);
+                    Widget title = Text(
+                      dest.labelEn,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight:
+                            isSelected ? FontWeight.w800 : FontWeight.w600,
+                        color: isSelected
+                            ? colorScheme.onSecondaryContainer
+                            : colorScheme.onSurface,
+                      ),
+                    );
+                    if (attachNavId) {
+                      title = TestSemantics.navTarget(
+                        identifier: navId,
+                        label: dest.shortLabel,
+                        child: title,
+                      );
+                    }
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 4.0),
                       child: ListTile(
@@ -281,16 +305,7 @@ class _AppShellState extends State<AppShell> {
                               ? colorScheme.onSecondaryContainer
                               : colorScheme.onSurfaceVariant,
                         ),
-                        title: Text(
-                          dest.labelEn,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight:
-                                isSelected ? FontWeight.w800 : FontWeight.w600,
-                            color: isSelected
-                                ? colorScheme.onSecondaryContainer
-                                : colorScheme.onSurface,
-                          ),
-                        ),
+                        title: title,
                         trailing: isSelected
                             ? Icon(
                                 Icons.check_circle_rounded,
@@ -504,40 +519,23 @@ class _AppShellState extends State<AppShell> {
                     ),
                   ),
                 ),
+                // Exactly one Semantics identifier per nav destination (on
+                // `label` only — never also on icon/selectedIcon). Label stays
+                // mounted for both selected and unselected states.
                 destinations: _destinations
                     .map(
                       (d) {
-                        final navId = d.index == 1
-                            ? TestIds.navSellOut
-                            : d.index == 2
-                                ? TestIds.navSellIn
-                                : null;
-                        Widget icon = Icon(d.icon);
-                        Widget selectedIcon = Icon(d.selectedIcon);
-                        Widget label = Text(d.shortLabel);
-                        if (navId != null) {
-                          icon = TestSemantics(
-                            identifier: navId,
-                            label: d.shortLabel,
-                            button: true,
-                            child: icon,
-                          );
-                          selectedIcon = TestSemantics(
-                            identifier: navId,
-                            label: d.shortLabel,
-                            button: true,
-                            child: selectedIcon,
-                          );
-                          label = TestSemantics(
-                            identifier: navId,
-                            label: d.shortLabel,
-                            button: true,
-                            child: label,
-                          );
-                        }
+                        final navId = TestIds.navIdForIndex(d.index);
+                        final Widget label = navId == null
+                            ? Text(d.shortLabel)
+                            : TestSemantics.navTarget(
+                                identifier: navId,
+                                label: d.shortLabel,
+                                child: Text(d.shortLabel),
+                              );
                         return NavigationRailDestination(
-                          icon: icon,
-                          selectedIcon: selectedIcon,
+                          icon: Icon(d.icon),
+                          selectedIcon: Icon(d.selectedIcon),
                           label: label,
                         );
                       },
@@ -719,20 +717,38 @@ class _AppShellState extends State<AppShell> {
                 ),
               ),
               M3Spacing.gapXS,
+              // Compact drawer: bottom bar already owns Sell-Out — only attach
+              // ids for destinations missing there (notably Sell-In).
               ..._destinations.map(
-                (dest) => NavigationDrawerDestination(
-                  icon: Icon(dest.icon),
-                  selectedIcon: Icon(dest.selectedIcon),
-                  label: Flexible(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(dest.labelEn, maxLines: 1, overflow: TextOverflow.ellipsis),
-                      ],
+                (dest) {
+                  final navId = TestIds.navIdForIndex(dest.index);
+                  const primaryCompactIndexes = {0, 1, 3, 5};
+                  final attachNavId = navId != null &&
+                      !primaryCompactIndexes.contains(dest.index);
+                  Widget labelChild = Text(
+                    dest.labelEn,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  );
+                  if (attachNavId) {
+                    labelChild = TestSemantics.navTarget(
+                      identifier: navId,
+                      label: dest.shortLabel,
+                      child: labelChild,
+                    );
+                  }
+                  return NavigationDrawerDestination(
+                    icon: Icon(dest.icon),
+                    selectedIcon: Icon(dest.selectedIcon),
+                    label: Flexible(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [labelChild],
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
               const Divider(height: 1.0),
               Padding(
@@ -825,19 +841,13 @@ class _AppShellState extends State<AppShell> {
               selectedIcon: Icon(Icons.dashboard_rounded),
               label: 'Dashboard',
             ),
-            NavigationDestination(
-              icon: TestSemantics(
+            const NavigationDestination(
+              icon: TestSemantics.navTarget(
                 identifier: TestIds.navSellOut,
                 label: 'Sell-Out',
-                button: true,
-                child: const Icon(Icons.analytics_rounded),
+                child: Icon(Icons.analytics_rounded),
               ),
-              selectedIcon: TestSemantics(
-                identifier: TestIds.navSellOut,
-                label: 'Sell-Out',
-                button: true,
-                child: const Icon(Icons.analytics_rounded),
-              ),
+              selectedIcon: Icon(Icons.analytics_rounded),
               label: 'Sell-Out',
             ),
             const NavigationDestination(
