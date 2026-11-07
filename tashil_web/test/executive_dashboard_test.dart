@@ -269,7 +269,10 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('تم التحليل والاستخراج بالذكاء الاصطناعي • بانتظار المراجعة والاعتماد'), findsOneWidget);
+    expect(
+      find.text('تم الاستخراج بقواعد القراءة المحددة (بدون ذكاء اصطناعي) • بانتظار المراجعة والاعتماد'),
+      findsOneWidget,
+    );
     expect(find.text('اعتماد البيانات'), findsOneWidget);
     expect(find.text('4 صف'), findsOneWidget);
     expect(find.text('3 صف'), findsOneWidget);
@@ -371,7 +374,10 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('تم التحليل والاستخراج بالذكاء الاصطناعي • بانتظار المراجعة والاعتماد'), findsOneWidget);
+    expect(
+      find.text('تم الاستخراج بقواعد القراءة المحددة (بدون ذكاء اصطناعي) • بانتظار المراجعة والاعتماد'),
+      findsOneWidget,
+    );
     expect(find.text('اعتماد البيانات'), findsOneWidget);
     expect(find.text('4 صف'), findsOneWidget);
     expect(find.text('3 صف'), findsOneWidget);

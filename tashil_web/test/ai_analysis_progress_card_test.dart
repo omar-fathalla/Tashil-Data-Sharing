@@ -68,12 +68,19 @@ void main() {
   });
 
   testWidgets('deterministic staged card never claims AI confidence', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: AiAnalysisProgressCard(
-            isAnalyzing: false,
-            result: _result(mappingSource: 'deterministic', confidenceScore: 0.99),
+          body: SizedBox(
+            width: 720,
+            child: AiAnalysisProgressCard(
+              isAnalyzing: false,
+              result: _result(mappingSource: 'deterministic', confidenceScore: 0.99),
+            ),
           ),
         ),
       ),
@@ -81,18 +88,26 @@ void main() {
     expect(find.textContaining('بدون ذكاء اصطناعي'), findsOneWidget);
     expect(find.textContaining('درجة ثقة'), findsNothing);
     expect(find.textContaining('درجة الثقة'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('AI staged card shows model and mapping confidence', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: AiAnalysisProgressCard(
-            isAnalyzing: false,
-            result: _result(
-              mappingSource: 'ai',
-              aiModelUsed: 'gemini-3.8-flash',
-              mappingConfidence: 0.87,
+          body: SizedBox(
+            width: 720,
+            child: AiAnalysisProgressCard(
+              isAnalyzing: false,
+              result: _result(
+                mappingSource: 'ai',
+                aiModelUsed: 'gemini-3.8-flash',
+                mappingConfidence: 0.87,
+              ),
             ),
           ),
         ),
@@ -100,6 +115,7 @@ void main() {
     );
     expect(find.textContaining('gemini-3.8-flash'), findsOneWidget);
     expect(find.textContaining('87.0%'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   test('IngestionResultModel reads mapping_source without inventing Gemini defaults', () {

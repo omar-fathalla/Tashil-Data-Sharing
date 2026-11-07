@@ -86,40 +86,47 @@ class AiAnalysisProgressCard extends StatelessWidget {
               spacing: M3Spacing.md,
               runSpacing: M3Spacing.sm,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(
-                        color: Colors.purple.withOpacity(0.12),
-                        borderRadius: M3Shape.radiusSm,
-                      ),
-                      child: const Icon(
-                        Icons.auto_awesome_rounded,
-                        color: Colors.purple,
-                        size: 22.0,
-                      ),
-                    ),
-                    M3Spacing.gapSM,
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'محرك الاستيعاب الذكي للبيانات',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                // Constrained so long honest mapping_source labels wrap instead of overflowing.
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8.0),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withOpacity(0.12),
+                          borderRadius: M3Shape.radiusSm,
                         ),
-                        Text(
-                          statusSubtitle(isAnalyzing: isAnalyzing, result: result),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                        child: const Icon(
+                          Icons.auto_awesome_rounded,
+                          color: Colors.purple,
+                          size: 22.0,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      M3Spacing.gapSM,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'محرك الاستيعاب الذكي للبيانات',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              statusSubtitle(isAnalyzing: isAnalyzing, result: result),
+                              softWrap: true,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 if (result != null)
                   Wrap(

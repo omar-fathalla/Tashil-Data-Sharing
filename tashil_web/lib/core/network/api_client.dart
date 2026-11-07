@@ -4106,12 +4106,6 @@ class ApiClient {
       debugPrint('[ApiClient] Fallback to mock ingestion result: $e');
     }
 
-    final isTier1Only = aiTier == 'tier1';
-    final modelName = isTier1Only
-        ? 'Gemini 3.8 Flash'
-        : 'Gemini 4 Argon Medium (gemini-1.5-pro)';
-    final resolvedTier = isTier1Only ? 'tier1' : 'tier2';
-
     final parsedCsv = _tryParseUploadedCsv(
       filename,
       bytes,
@@ -4120,10 +4114,14 @@ class ApiClient {
       dryRun: dryRun,
     );
     if (parsedCsv != null) {
+      // Local CSV parse is deterministic — do not claim Gemini tier/confidence.
       final resModel = parsedCsv.copyWith(
-        aiModelUsed: modelName,
-        aiTierUsed: resolvedTier,
-        tier2Escalated: !isTier1Only,
+        mappingSource: 'deterministic',
+        mappingConfidence: 0,
+        confidenceScore: 0,
+        aiModelUsed: '',
+        aiTierUsed: '',
+        tier2Escalated: false,
       );
       _recordLocalArchivedUpload(
         cleanSlug: cleanSlug,
@@ -4180,7 +4178,9 @@ class ApiClient {
       anomalyRows: 2,
       totalRevenue: 345000.0,
       totalQuantity: 2850,
-      confidenceScore: isTier1Only ? 0.985 : 0.996,
+      confidenceScore: 0.985,
+      mappingConfidence: 0.985,
+      mappingSource: 'mock',
       isStaged: dryRun,
       isCommitted: !dryRun,
       discoveredRetailer: discovered.isNotEmpty ? discovered : detectedChain,
@@ -4188,9 +4188,9 @@ class ApiClient {
       chainMismatchDetected: mismatch,
       suggestedChain: mismatch ? discovered : null,
       suggestedChainName: suggestedName,
-      aiModelUsed: modelName,
-      aiTierUsed: resolvedTier,
-      tier2Escalated: !isTier1Only,
+      aiModelUsed: 'mock',
+      aiTierUsed: 'mock',
+      tier2Escalated: false,
 
       anomalies: [
         {
