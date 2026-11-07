@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -18,7 +19,19 @@ var ingestWriteRoles = map[domain.UserRole]bool{
 	domain.RoleVendorAdmin: true,
 }
 
-// destructiveWriteRoles may clear data (any scope) and delete archive entries.
+// destructiveWriteRoles may clear data (any scope) and delete archive entries (Sell-Out and Sell-In
+// share HandleDeleteArchive, so both use this same gate).
+//
+// Current rule (keep until Mohamed decides otherwise):
+//   - Allowed: super_admin only
+//   - Refused: vendor_admin, national_sales_manager, chain_kam, and every other role
+//
+// Why adeco tenant accounts get 403 on DELETE /api/v1/ingest/archive/{id}:
+// they authenticate as vendor_admin (or another non-super_admin role). The gate runs before any
+// BigQuery/Firestore mutation. This is an application role check, not Google IAM.
+//
+// Policy note: upload already allows vendor_admin (ingestWriteRoles). Whether archive delete
+// should match upload (vendor_admin too) is Mohamed's decision — do not loosen here casually.
 var destructiveWriteRoles = map[domain.UserRole]bool{
 	domain.RoleSuperAdmin: true,
 }
@@ -38,7 +51,10 @@ func requireWriteRole(w http.ResponseWriter, r *http.Request, roles map[domain.U
 		return nil, false
 	}
 	if !roles[c.Role] {
-		writeErr(w, http.StatusForbidden, "forbidden: your role cannot perform this action")
+		writeErr(w, http.StatusForbidden, fmt.Sprintf(
+			"Forbidden: your role cannot perform this action (role=%s; archive delete and clear require super_admin)",
+			c.Role,
+		))
 		return nil, false
 	}
 	return c, true

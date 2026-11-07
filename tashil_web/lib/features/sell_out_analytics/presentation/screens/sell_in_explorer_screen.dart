@@ -544,6 +544,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     try {
       await widget.apiClient.deleteArchivedFile(
         file.id,
+        fileName: file.fileName,
         isSellIn: true,
       );
       if (!mounted) return;
@@ -556,7 +557,11 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       await _loadAllData();
     } catch (e) {
       if (!mounted) return;
-      M3Feedback.showError(context, 'تعذّر حذف الملف.');
+      final msg = e is ArchiveDeleteException
+          ? e.message
+          : 'تعذّر حذف الملف.';
+      M3Feedback.showError(context, msg);
+      await _loadAllData();
     } finally {
       if (mounted) {
         setState(() => _deletingFileId = null);

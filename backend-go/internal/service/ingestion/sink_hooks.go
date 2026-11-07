@@ -94,7 +94,7 @@ func (p *Processor) sinkDeleteArchived(ctx context.Context, entry *ArchivedFile)
 		p.noteSellOutWritten(ctx, meta.TenantID, res)
 	}
 	if res.Failed() {
-		log.Printf("ERROR [ingestion] archive %s deleted from portal but its BigQuery rows were NOT removed: %s", entry.ID, res.Error)
+		log.Printf("ERROR [ingestion] archive %s BigQuery row delete failed (archive left listed): %s", entry.ID, res.Error)
 	}
 	return res
 }

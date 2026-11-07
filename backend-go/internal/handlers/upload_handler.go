@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -748,6 +749,7 @@ func (h *UploadHandler) HandleDownloadArchivedFile(w http.ResponseWriter, r *htt
 }
 
 // HandleDeleteArchive handles DELETE /api/v1/ingest/archive/{id} (or DELETE /api/v1/ingest/archive?id=...)
+// Sell-Out and Sell-In share this handler and the same destructiveWriteRoles gate (currently super_admin only).
 func (h *UploadHandler) HandleDeleteArchive(w http.ResponseWriter, r *http.Request) {
 	if _, ok := requireWriteRole(w, r, destructiveWriteRoles); !ok {
 		return
@@ -793,10 +795,11 @@ func (h *UploadHandler) HandleDeleteArchive(w http.ResponseWriter, r *http.Reque
 	}
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
+		status, code, msg := archiveDeleteHTTPStatus(err)
+		w.WriteHeader(status)
 		_ = json.NewEncoder(w).Encode(map[string]string{
-			"error":   "delete_failed",
-			"message": err.Error(),
+			"error":   code,
+			"message": msg,
 		})
 		return
 	}
@@ -805,11 +808,30 @@ func (h *UploadHandler) HandleDeleteArchive(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":     "deleted",
-		"archive_id": archiveID,
+		"archive_id": deleted.ID,
 		"file_name":  deleted.FileName,
 		"chain":      deleted.RetailChain,
 		"message":    fmt.Sprintf("تم حذف شيت '%s' ومسح سجلاته التحليلية بنجاح", deleted.FileName),
 	})
+}
+
+// archiveDeleteHTTPStatus maps DeleteArchivedFile errors to HTTP status + API error code.
+func archiveDeleteHTTPStatus(err error) (status int, code, message string) {
+	message = err.Error()
+	if errors.Is(err, ingestion.ErrArchivedFileNotFound) {
+		// Common after a prior partial delete removed the list entry but left BigQuery orphans.
+		return http.StatusNotFound, "archived_file_not_found", message
+	}
+	var ade *ingestion.ArchiveDeleteError
+	if errors.As(err, &ade) {
+		switch ade.Stage {
+		case "bigquery", "memory_store":
+			return http.StatusBadGateway, "archive_delete_analytics_failed", message
+		case "firestore", "partial":
+			return http.StatusInternalServerError, "archive_delete_partial", message
+		}
+	}
+	return http.StatusInternalServerError, "delete_failed", message
 }
 
 // uploadGuardsFromRequest reads the uploader's answers to a previous confirmation dialog.
