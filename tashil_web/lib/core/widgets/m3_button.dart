@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
+import '../testing/test_semantics.dart';
 import '../theme/m3_shape.dart';
 
 /// M3Button adheres strictly to Google Material Design 3 button specifications.
@@ -140,6 +141,7 @@ class M3ActionItem {
   final bool isPrimary;
   final bool isDestructive;
   final bool isLoading;
+  final String? semanticsIdentifier;
 
   const M3ActionItem({
     required this.label,
@@ -148,6 +150,7 @@ class M3ActionItem {
     this.isPrimary = false,
     this.isDestructive = false,
     this.isLoading = false,
+    this.semanticsIdentifier,
   });
 }
 
@@ -225,7 +228,7 @@ class M3ActionButtonGroup extends StatelessWidget {
       fgColor = colorScheme.onSurface;
     }
 
-    return Material(
+    Widget segment = Material(
       color: bgColor,
       borderRadius: M3Shape.radiusXl,
       clipBehavior: Clip.antiAlias,
@@ -271,6 +274,17 @@ class M3ActionButtonGroup extends StatelessWidget {
         ),
       ),
     );
+
+    final id = item.semanticsIdentifier;
+    if (id != null && id.isNotEmpty) {
+      return TestSemantics(
+        identifier: id,
+        label: item.label,
+        button: true,
+        child: segment,
+      );
+    }
+    return segment;
   }
 }
 

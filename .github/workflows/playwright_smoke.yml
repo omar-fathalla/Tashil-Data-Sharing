@@ -1,0 +1,93 @@
+name: Playwright Semantics Smoke
+
+# Runs on every branch push and on PRs targeting main.
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: playwright-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter-web-semantics-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('tashil_web/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: flutter pub get
+        working-directory: tashil_web
+        run: flutter pub get
+
+      - name: flutter build web
+        working-directory: tashil_web
+        run: flutter build web --release
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      # SPA fallback so /adeco serves index.html (path URL strategy).
+      - name: Start static server
+        run: |
+          npx --yes serve@14 -s tashil_web/build/web -l 4173 >/tmp/serve.log 2>&1 &
+          echo $! > /tmp/serve.pid
+          for i in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:4173/" >/dev/null; then
+              echo "static server ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "static server failed to start"
+          cat /tmp/serve.log || true
+          exit 1
+
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run read-only login Semantics smoke
+        working-directory: e2e
+        env:
+          BASE_ORIGIN: http://127.0.0.1:4173
+          TENANT_PATH: /adeco
+          CI: 'true'
+        run: npx playwright test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/test-results
+            e2e/playwright-report
+          if-no-files-found: ignore
+
+      - name: Stop static server
+        if: always()
+        run: |
+          if [ -f /tmp/serve.pid ]; then
+            kill "$(cat /tmp/serve.pid)" || true
+          fi

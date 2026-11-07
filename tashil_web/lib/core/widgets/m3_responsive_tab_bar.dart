@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
+import '../testing/test_semantics.dart';
 import '../theme/m3_shape.dart';
 import '../theme/m3_motion.dart';
 
@@ -12,12 +13,16 @@ class M3ResponsiveTabItem<T> {
   /// Optional thin second line under [label] (two-line tab).
   final String? subtitle;
 
+  /// Optional stable web automation id (`flt-semantics-identifier`).
+  final String? semanticsIdentifier;
+
   const M3ResponsiveTabItem({
     required this.value,
     required this.label,
     required this.icon,
     this.selectedIcon,
     this.subtitle,
+    this.semanticsIdentifier,
   });
 }
 
@@ -220,7 +225,7 @@ class M3ResponsiveTabBar<T> extends StatelessWidget {
         ? colorScheme.secondaryContainer
         : Colors.transparent;
 
-    return AnimatedContainer(
+    Widget segment = AnimatedContainer(
       duration: M3Motion.short4,
       curve: M3Motion.standard,
       color: bgColor,
@@ -250,15 +255,16 @@ class M3ResponsiveTabBar<T> extends StatelessWidget {
                         color: fgColor,
                       )
                     else
-                    Text(
-                      item.label,
-                      maxLines: 1,
-                      style: TextStyle(
-                        fontSize: M3FontSize.bodyMedium,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
-                        color: fgColor,
+                      Text(
+                        item.label,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: M3FontSize.bodyMedium,
+                          fontWeight:
+                              isSelected ? FontWeight.w800 : FontWeight.w700,
+                          color: fgColor,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -267,5 +273,16 @@ class M3ResponsiveTabBar<T> extends StatelessWidget {
         ),
       ),
     );
+
+    final id = item.semanticsIdentifier;
+    if (id != null && id.isNotEmpty) {
+      segment = TestSemantics(
+        identifier: id,
+        label: item.label,
+        button: true,
+        child: segment,
+      );
+    }
+    return segment;
   }
 }

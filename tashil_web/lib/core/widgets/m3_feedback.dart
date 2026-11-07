@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../testing/test_semantics.dart';
 import '../theme/m3_shape.dart';
 import '../theme/m3_spacing.dart';
 
@@ -100,23 +101,44 @@ class M3Feedback {
     );
   }
 
+  static Widget _snackbarBody({
+    required String identifier,
+    required String message,
+    required IconData icon,
+    required Color iconColor,
+    required Color textColor,
+  }) {
+    return TestSemantics(
+      identifier: identifier,
+      label: message,
+      container: true,
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 20.0),
+          const SizedBox(width: 8.0),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Displays an M3 compliant floating success snackbar.
   static void showSuccess(BuildContext context, String message) {
     final colorScheme = Theme.of(context).colorScheme;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.check_circle_rounded, color: colorScheme.onPrimaryContainer, size: 20.0),
-            const SizedBox(width: 8.0),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: colorScheme.onPrimaryContainer, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
+        content: _snackbarBody(
+          identifier: TestIds.snackbarSuccess,
+          message: message,
+          icon: Icons.check_circle_rounded,
+          iconColor: colorScheme.onPrimaryContainer,
+          textColor: colorScheme.onPrimaryContainer,
         ),
         backgroundColor: colorScheme.primaryContainer,
         behavior: SnackBarBehavior.floating,
@@ -131,17 +153,12 @@ class M3Feedback {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.error_outline_rounded, color: colorScheme.onErrorContainer, size: 20.0),
-            const SizedBox(width: 8.0),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: colorScheme.onErrorContainer, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
+        content: _snackbarBody(
+          identifier: TestIds.snackbarError,
+          message: message,
+          icon: Icons.error_outline_rounded,
+          iconColor: colorScheme.onErrorContainer,
+          textColor: colorScheme.onErrorContainer,
         ),
         backgroundColor: colorScheme.errorContainer,
         behavior: SnackBarBehavior.floating,
@@ -154,17 +171,12 @@ class M3Feedback {
   static void showWarning(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.black87, size: 20.0),
-            const SizedBox(width: 8.0),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
+        content: _snackbarBody(
+          identifier: TestIds.snackbarMessage,
+          message: message,
+          icon: Icons.warning_amber_rounded,
+          iconColor: Colors.black87,
+          textColor: Colors.black87,
         ),
         backgroundColor: Colors.amber.shade300,
         behavior: SnackBarBehavior.floating,
@@ -179,17 +191,12 @@ class M3Feedback {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.info_outline_rounded, color: colorScheme.onSecondaryContainer, size: 20.0),
-            const SizedBox(width: 8.0),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: colorScheme.onSecondaryContainer, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
+        content: _snackbarBody(
+          identifier: TestIds.snackbarMessage,
+          message: message,
+          icon: Icons.info_outline_rounded,
+          iconColor: colorScheme.onSecondaryContainer,
+          textColor: colorScheme.onSecondaryContainer,
         ),
         backgroundColor: colorScheme.secondaryContainer,
         behavior: SnackBarBehavior.floating,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../testing/test_semantics.dart';
 import '../theme/m3_shape.dart';
 import 'app_icons.dart';
 
@@ -14,6 +15,8 @@ class ArchiveActionsGroup extends StatelessWidget {
     this.isEditing = false,
     this.isDeleting = false,
     this.showEdit = true,
+    this.archiveId,
+    this.fileName,
   });
 
   final VoidCallback? onEdit;
@@ -25,6 +28,10 @@ class ArchiveActionsGroup extends StatelessWidget {
   /// Hides the Edit (replace) segment, e.g. for users the backend would refuse a replace.
   final bool showEdit;
 
+  /// Archive id + file name wire `file-delete-<archiveId>-<name>` for automation.
+  final String? archiveId;
+  final String? fileName;
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -33,6 +40,13 @@ class ArchiveActionsGroup extends StatelessWidget {
       thickness: 1.0,
       color: colorScheme.outline,
     );
+
+    final deleteId = (archiveId != null &&
+            archiveId!.isNotEmpty &&
+            fileName != null &&
+            fileName!.isNotEmpty)
+        ? TestIds.fileDelete(archiveId: archiveId!, fileName: fileName!)
+        : null;
 
     return Container(
       decoration: BoxDecoration(
@@ -72,6 +86,7 @@ class ArchiveActionsGroup extends StatelessWidget {
                 busy: isDeleting,
                 onPressed: onDelete,
                 color: colorScheme.error,
+                semanticsIdentifier: deleteId,
               ),
             ],
           ),
@@ -87,8 +102,9 @@ class ArchiveActionsGroup extends StatelessWidget {
     required bool busy,
     required VoidCallback? onPressed,
     required Color color,
+    String? semanticsIdentifier,
   }) {
-    return TextButton.icon(
+    Widget button = TextButton.icon(
       style: TextButton.styleFrom(
         foregroundColor: color,
         visualDensity: VisualDensity.compact,
@@ -106,5 +122,16 @@ class ArchiveActionsGroup extends StatelessWidget {
           : Icon(icon, size: 16.0),
       label: Text(label),
     );
+
+    if (semanticsIdentifier != null) {
+      button = TestSemantics(
+        identifier: semanticsIdentifier,
+        label: label,
+        button: true,
+        child: button,
+      );
+    }
+
+    return button;
   }
 }
