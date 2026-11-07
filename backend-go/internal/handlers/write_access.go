@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -18,9 +19,20 @@ var ingestWriteRoles = map[domain.UserRole]bool{
 	domain.RoleVendorAdmin: true,
 }
 
-// destructiveWriteRoles may clear data (any scope) and delete archive entries.
+// destructiveWriteRoles may clear data (any scope) and delete archive entries (Sell-Out and Sell-In
+// share HandleDeleteArchive, so both use this same gate).
+//
+// Policy (Mohamed, 7 Nov 2026):
+//   - Allowed: super_admin + vendor_admin (مدير الشركة / company manager / tenant admin)
+//   - Refused: national_sales_manager, chain_kam, and every other role
+//
+// The company-manager account is the only tenant role used in tests and must have full in-tenant
+// permissions (upload, add, delete Sell-Out/Sell-In, clear own tenant). Cross-tenant deletes and
+// wildcard clear (scope=all) remain blocked — vendor_admin may only act inside its own tenant token.
+// Clearing every tenant (scope=all) is super_admin only (see HandleClearData).
 var destructiveWriteRoles = map[domain.UserRole]bool{
-	domain.RoleSuperAdmin: true,
+	domain.RoleSuperAdmin:  true,
+	domain.RoleVendorAdmin: true,
 }
 
 // chainWriteRoles may create / update / delete retail chains (legacy "admin" dropped).
@@ -38,7 +50,10 @@ func requireWriteRole(w http.ResponseWriter, r *http.Request, roles map[domain.U
 		return nil, false
 	}
 	if !roles[c.Role] {
-		writeErr(w, http.StatusForbidden, "forbidden: your role cannot perform this action")
+		writeErr(w, http.StatusForbidden, fmt.Sprintf(
+			"Forbidden: your role cannot perform this action (role=%s; archive delete and clear require super_admin or vendor_admin)",
+			c.Role,
+		))
 		return nil, false
 	}
 	return c, true

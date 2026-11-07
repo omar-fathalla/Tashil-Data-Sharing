@@ -189,7 +189,7 @@ func TestConcurrentInstancesDoNotLoseArchiveEntries(t *testing.T) {
 
 	// Simulate the lost update: instance A rewrites index.json last, without B's entry.
 	a.archiveMu.Lock()
-	a.persistTenantArchiveIndexLocked("tenant-adeco")
+	_ = a.persistTenantArchiveIndexLocked("tenant-adeco")
 	a.archiveMu.Unlock()
 
 	c := newTestProcessor(t, dir)

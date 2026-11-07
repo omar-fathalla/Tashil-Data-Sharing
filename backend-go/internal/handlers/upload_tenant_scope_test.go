@@ -114,21 +114,30 @@ func TestUploadAllowsForeignTenantForSuperAdmin(t *testing.T) {
 	}
 }
 
-// P2: replace_archive_id needs a super_admin; a vendor_admin gets 403 and the archive survives.
-func TestReplaceArchiveRequiresSuperAdmin(t *testing.T) {
+// P2: replace_archive_id is allowed for company manager (vendor_admin); NSM still gets 403.
+func TestReplaceArchiveAllowsCompanyManagerRefusesNSM(t *testing.T) {
 	e := newScopeEnv(t)
-	tok := e.token(t, domain.RoleVendorAdmin, "tenant-adeco")
-	id := e.uploadPM(t, tok, "tenant-adeco", "pm_v1.csv", pmCSVv1)
+	va := e.token(t, domain.RoleVendorAdmin, "tenant-adeco")
+	id := e.uploadPM(t, va, "tenant-adeco", "pm_v1.csv", pmCSVv1)
+
+	// Company manager may replace inside its tenant.
+	rec := e.post("/api/v1/product-master/upload?filename=pm_v2.csv&replace_archive_id="+id, va, pmCSVv2)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("vendor_admin replace: want 200, got %d %s", rec.Code, rec.Body.String())
+	}
+
+	nsm := e.token(t, domain.RoleNationalSalesManager, "tenant-adeco")
+	id2 := e.uploadPM(t, va, "tenant-adeco", "pm_keep.csv", pmCSVv1)
 	for _, path := range []string{
-		"/api/v1/product-master/upload?filename=pm_v2.csv&replace_archive_id=" + id,
-		"/api/v1/ingest/load-sell-in-plan?filename=si.csv&chain=fathalla&replace_archive_id=" + id,
+		"/api/v1/product-master/upload?filename=pm_v2.csv&replace_archive_id=" + id2,
+		"/api/v1/ingest/load-sell-in-plan?filename=si.csv&chain=fathalla&replace_archive_id=" + id2,
 	} {
-		if rec := e.post(path, tok, pmCSVv2); rec.Code != http.StatusForbidden {
-			t.Fatalf("%s: want 403, got %d %s", path, rec.Code, rec.Body.String())
+		if rec := e.post(path, nsm, pmCSVv2); rec.Code != http.StatusForbidden {
+			t.Fatalf("NSM %s: want 403, got %d %s", path, rec.Code, rec.Body.String())
 		}
 	}
-	if _, _, err := e.proc.GetArchivedFile(context.Background(), "tenant-adeco", id); err != nil {
-		t.Fatalf("archive deleted by a refused replace: %v", err)
+	if _, _, err := e.proc.GetArchivedFile(context.Background(), "tenant-adeco", id2); err != nil {
+		t.Fatalf("archive deleted by a refused NSM replace: %v", err)
 	}
 }
 

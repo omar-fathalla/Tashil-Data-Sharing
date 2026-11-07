@@ -203,12 +203,12 @@ func TestProductMasterSheetUploadDiffAndDeleteRollback(t *testing.T) {
 	// Delete sheet_v2.csv from archive and verify rollback to sheet_v1.csv (2 SKUs, price back to 11.40)
 	reqDel := httptest.NewRequest(http.MethodDelete, "/api/v1/ingest/archive/"+up2Res.ArchiveID, nil)
 	reqDel.Header.Set("X-Tenant-ID", "tenant-rollback")
-	// Deleting an archive is super_admin only; the demo fallback user is vendor_admin.
-	superTok, err := authMW.GenerateToken(domain.UserClaims{UserID: "su", TenantID: "tenant-rollback", Role: domain.RoleSuperAdmin}, time.Hour)
+	// Company manager (vendor_admin) may delete archives inside its tenant.
+	mgrTok, err := authMW.GenerateToken(domain.UserClaims{UserID: "va", TenantID: "tenant-rollback", Role: domain.RoleVendorAdmin}, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
-	reqDel.Header.Set("Authorization", "Bearer "+superTok)
+	reqDel.Header.Set("Authorization", "Bearer "+mgrTok)
 	recDel := httptest.NewRecorder()
 	handler.ServeHTTP(recDel, reqDel)
 	if recDel.Code != http.StatusOK {
@@ -245,7 +245,7 @@ func TestProductMasterSheetUploadDiffAndDeleteRollback(t *testing.T) {
 
 	// Delete the newer sheet_v1.csv and verify the original sheet_v1.csv remains active and visible in archive
 	reqDelSame := httptest.NewRequest(http.MethodDelete, "/api/v1/ingest/archive/"+upSameRes.ArchiveID, nil)
-	reqDelSame.Header.Set("Authorization", "Bearer "+superTok)
+	reqDelSame.Header.Set("Authorization", "Bearer "+mgrTok)
 	reqDelSame.Header.Set("X-Tenant-ID", "tenant-rollback")
 	recDelSame := httptest.NewRecorder()
 	handler.ServeHTTP(recDelSame, reqDelSame)
@@ -271,8 +271,12 @@ func TestProductMasterSheetUploadDiffAndDeleteRollback(t *testing.T) {
 	var upCustomAdecoRes ingestion.IngestionResult
 	_ = json.Unmarshal(recUpCustomAdeco.Body.Bytes(), &upCustomAdecoRes)
 
+	adecoMgrTok, err := authMW.GenerateToken(domain.UserClaims{UserID: "va-adeco", TenantID: "tenant-adeco", Role: domain.RoleVendorAdmin}, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
 	reqDelCustomAdeco := httptest.NewRequest(http.MethodDelete, "/api/v1/ingest/archive/"+upCustomAdecoRes.ArchiveID, nil)
-	reqDelCustomAdeco.Header.Set("Authorization", "Bearer "+superTok)
+	reqDelCustomAdeco.Header.Set("Authorization", "Bearer "+adecoMgrTok)
 	reqDelCustomAdeco.Header.Set("X-Tenant-ID", "tenant-adeco")
 	recDelCustomAdeco := httptest.NewRecorder()
 	handler.ServeHTTP(recDelCustomAdeco, reqDelCustomAdeco)

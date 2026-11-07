@@ -13,12 +13,33 @@ type tenantLister interface {
 	ListTenants(ctx context.Context) ([]domain.Tenant, error)
 }
 
-// PurgeTenantData is the clear-tenant endpoint: it clears memory like ClearTenantData and also deletes
-// the tenant's durable Sell-In / Sell-Out rows in BigQuery and bumps their versions, so other instances
-// clear too and a restart does not bring the data back. tenantID "all" purges every known tenant.
+// ErrWildcardPurgeRefused is returned when PurgeTenantData is called with tenantID "all"/"*".
+// Global wipes must go through PurgeAllTenants, which is only invoked from the super_admin-gated
+// clear handler (HandleClearData). The service layer does not see JWT roles, so this hard-refuse
+// prevents accidental escalation from other callers.
+var ErrWildcardPurgeRefused = fmt.Errorf("wildcard tenant purge refused: use PurgeAllTenants from a super_admin-gated caller")
+
+// PurgeTenantData is the clear-tenant endpoint for a single tenant: it clears memory like
+// ClearTenantData and also deletes the tenant's durable Sell-In / Sell-Out rows in BigQuery and
+// bumps their versions, so other instances clear too and a restart does not bring the data back.
 //
+// tenantID "all" / "*" is refused here — call PurgeAllTenants after a super_admin role check.
 // Startup and tooling must keep using ClearTenantData (memory only).
 func (p *Processor) PurgeTenantData(ctx context.Context, tenantID string) error {
+	clean := strings.ToLower(strings.TrimSpace(tenantID))
+	if clean == "all" || clean == "*" {
+		return ErrWildcardPurgeRefused
+	}
+	return p.purgeTenantData(ctx, tenantID)
+}
+
+// PurgeAllTenants wipes every known tenant's memory + durable Sell-In/Sell-Out rows.
+// Callers MUST enforce super_admin (see HandleClearData); this method does not check roles.
+func (p *Processor) PurgeAllTenants(ctx context.Context) error {
+	return p.purgeTenantData(ctx, "all")
+}
+
+func (p *Processor) purgeTenantData(ctx context.Context, tenantID string) error {
 	if err := p.ClearTenantData(ctx, tenantID); err != nil {
 		return err
 	}

@@ -1694,6 +1694,17 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	reportUnknown()
 	if len(records) > 0 {
 		result.BigQuerySync = p.sinkSellIn(ctx, bqsink.Meta{TenantID: tenantID, BatchID: batchID, ArchiveID: result.ArchiveID, SourceFile: filename}, records)
+		// Align archive rows_ingested with rows actually written to BigQuery (after period validation).
+		if result.BigQuerySync != nil && result.BigQuerySync.Status == bqsink.StatusOK {
+			written := result.BigQuerySync.RowsWritten
+			p.setArchiveStoredRows(result.ArchiveID, written, batchID)
+			result.ValidRows = written
+			result.TotalRows = written
+			if result.ArchivedFile != nil {
+				result.ArchivedFile.RowsIngested = written
+				result.ArchivedFile.BatchID = batchID
+			}
+		}
 	}
 	return result, nil
 }

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
@@ -34,8 +36,11 @@ func NewUploadHandler(processor *ingestion.Processor) *UploadHandler {
 }
 
 // HandleClearData handles POST /api/v1/ingest/clear to wipe fake/previous data to zero.
+// Company managers (vendor_admin) may clear only their own tenant. Wildcard scope=all / *
+// (every tenant) remains super_admin only — never elevate a tenant-scoped clear to a purge of all tenants.
 func (h *UploadHandler) HandleClearData(w http.ResponseWriter, r *http.Request) {
-	if _, ok := requireWriteRole(w, r, destructiveWriteRoles); !ok {
+	claims, ok := requireWriteRole(w, r, destructiveWriteRoles)
+	if !ok {
 		return
 	}
 	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
@@ -49,16 +54,29 @@ func (h *UploadHandler) HandleClearData(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if r.URL.Query().Get("scope") == "all" {
+	scope := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("scope")))
+	if scope == "all" || scope == "*" {
+		if claims.Role != domain.RoleSuperAdmin {
+			writeErr(w, http.StatusForbidden, "forbidden: clearing all tenants requires super_admin")
+			return
+		}
 		tenantID = "all"
 	}
 
-	if err := h.processor.PurgeTenantData(r.Context(), tenantID); err != nil {
+	var clearErr error
+	if tenantID == "all" {
+		// Wildcard wipe is super_admin-only (gated above). Service layer also refuses
+		// PurgeTenantData("all") so accidental callers cannot escalate.
+		clearErr = h.processor.PurgeAllTenants(r.Context())
+	} else {
+		clearErr = h.processor.PurgeTenantData(r.Context(), tenantID)
+	}
+	if clearErr != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"error":   "clear_failed",
-			"message": err.Error(),
+			"message": clearErr.Error(),
 		})
 		return
 	}
@@ -748,6 +766,8 @@ func (h *UploadHandler) HandleDownloadArchivedFile(w http.ResponseWriter, r *htt
 }
 
 // HandleDeleteArchive handles DELETE /api/v1/ingest/archive/{id} (or DELETE /api/v1/ingest/archive?id=...)
+// Sell-Out and Sell-In share this handler and the same destructiveWriteRoles gate
+// (super_admin + vendor_admin / company manager; same-tenant only).
 func (h *UploadHandler) HandleDeleteArchive(w http.ResponseWriter, r *http.Request) {
 	if _, ok := requireWriteRole(w, r, destructiveWriteRoles); !ok {
 		return
@@ -775,28 +795,34 @@ func (h *UploadHandler) HandleDeleteArchive(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	if archiveID == "" {
+	fileName := strings.TrimSpace(r.URL.Query().Get("file_name"))
+
+	// Strict ID deletes never fall back to file_name. A stale/missing ID with a name query
+	// used to retry by name and DeleteArchivedFile could pick a newer same-named upload.
+	// Legacy name-only delete is allowed only when no archive ID is provided, and only when
+	// the name resolves to exactly one archive.
+	var deleted *ingestion.ArchivedFile
+	switch {
+	case archiveID != "":
+		deleted, err = h.processor.DeleteArchivedFile(r.Context(), tenantID, archiveID)
+	case fileName != "":
+		deleted, err = h.processor.DeleteArchivedFileByName(r.Context(), tenantID, fileName)
+	default:
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"error":   "missing_archive_id",
-			"message": "archive file id is required in path or query param",
+			"message": "archive file id is required in path or query param (or file_name for legacy unique-name delete)",
 		})
 		return
 	}
-
-	deleted, err := h.processor.DeleteArchivedFile(r.Context(), tenantID, archiveID)
-	if err != nil {
-		if fileName := strings.TrimSpace(r.URL.Query().Get("file_name")); fileName != "" && fileName != archiveID {
-			deleted, err = h.processor.DeleteArchivedFile(r.Context(), tenantID, fileName)
-		}
-	}
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
+		status, code, msg := archiveDeleteHTTPStatus(err)
+		w.WriteHeader(status)
 		_ = json.NewEncoder(w).Encode(map[string]string{
-			"error":   "delete_failed",
-			"message": err.Error(),
+			"error":   code,
+			"message": msg,
 		})
 		return
 	}
@@ -805,11 +831,32 @@ func (h *UploadHandler) HandleDeleteArchive(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":     "deleted",
-		"archive_id": archiveID,
+		"archive_id": deleted.ID,
 		"file_name":  deleted.FileName,
 		"chain":      deleted.RetailChain,
 		"message":    fmt.Sprintf("تم حذف شيت '%s' ومسح سجلاته التحليلية بنجاح", deleted.FileName),
 	})
+}
+
+// archiveDeleteHTTPStatus maps DeleteArchivedFile errors to HTTP status + API error code.
+func archiveDeleteHTTPStatus(err error) (status int, code, message string) {
+	message = err.Error()
+	if errors.Is(err, ingestion.ErrArchivedFileNotFound) {
+		// Common after a prior partial delete removed the list entry but left BigQuery orphans.
+		return http.StatusNotFound, "archived_file_not_found", message
+	}
+	var ade *ingestion.ArchiveDeleteError
+	if errors.As(err, &ade) {
+		switch ade.Stage {
+		case "bigquery", "memory_store":
+			return http.StatusBadGateway, "archive_delete_analytics_failed", message
+		case "firestore", "partial", "disk":
+			return http.StatusInternalServerError, "archive_delete_partial", message
+		case "ambiguous":
+			return http.StatusConflict, "archive_delete_ambiguous", message
+		}
+	}
+	return http.StatusInternalServerError, "delete_failed", message
 }
 
 // uploadGuardsFromRequest reads the uploader's answers to a previous confirmation dialog.

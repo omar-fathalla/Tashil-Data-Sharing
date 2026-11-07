@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
+	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 )
 
@@ -239,9 +241,9 @@ func (p *Processor) loadDiskArchiveLocked() {
 	}
 }
 
-func (p *Processor) appendDiskTombstoneLocked(tenantID, archiveID, fileName string) {
+func (p *Processor) appendDiskTombstoneLocked(tenantID, archiveID, fileName string) error {
 	if p.archiveDir == "" {
-		return
+		return nil
 	}
 	tombstonePath := filepath.Join(p.archiveDir, "deleted_tombstones.json")
 	type tombItem struct {
@@ -258,18 +260,23 @@ func (p *Processor) appendDiskTombstoneLocked(tenantID, archiveID, fileName stri
 		ArchiveID: archiveID,
 		FileName:  fileName,
 	})
-	if data, err := json.MarshalIndent(tombs, "", "  "); err == nil {
-		_ = os.WriteFile(tombstonePath, data, 0o644)
+	data, err := json.MarshalIndent(tombs, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal disk tombstones: %w", err)
 	}
+	if err := os.WriteFile(tombstonePath, data, 0o644); err != nil {
+		return fmt.Errorf("write disk tombstones: %w", err)
+	}
+	return nil
 }
 
-func (p *Processor) persistTenantArchiveIndexLocked(normTenant string) {
+func (p *Processor) persistTenantArchiveIndexLocked(normTenant string) error {
 	if p.archiveDir == "" {
-		return
+		return nil
 	}
 	tenantDir := filepath.Join(p.archiveDir, normTenant)
 	if err := os.MkdirAll(tenantDir, 0o755); err != nil {
-		return
+		return fmt.Errorf("mkdir archive tenant dir: %w", err)
 	}
 	var list []*ArchivedFile
 	for _, item := range p.archivedFiles {
@@ -280,9 +287,44 @@ func (p *Processor) persistTenantArchiveIndexLocked(normTenant string) {
 	sort.Slice(list, func(i, j int) bool {
 		return list[i].UploadedAt > list[j].UploadedAt
 	})
-	if data, err := json.MarshalIndent(list, "", "  "); err == nil {
-		_ = os.WriteFile(filepath.Join(tenantDir, "index.json"), data, 0o644)
+	indexPath := filepath.Join(tenantDir, "index.json")
+	if len(list) == 0 {
+		if err := os.Remove(indexPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove empty archive index: %w", err)
+		}
+		return nil
 	}
+	data, err := json.MarshalIndent(list, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal archive index: %w", err)
+	}
+	if err := os.WriteFile(indexPath, data, 0o644); err != nil {
+		return fmt.Errorf("write archive index: %w", err)
+	}
+	return nil
+}
+
+// InsertArchivedFileEntry stores an archive list entry under a caller-chosen ID without the
+// same-name reuse SaveArchivedFile applies. Used by delete-safety tests that need two live
+// archives sharing a FileName (stale-id / ambiguous-name cases).
+func (p *Processor) InsertArchivedFileEntry(entry *ArchivedFile, fileBytes []byte) {
+	if entry == nil || entry.ID == "" {
+		return
+	}
+	p.archiveMu.Lock()
+	defer p.archiveMu.Unlock()
+	copyEntry := *entry
+	copyEntry.TenantID = normalizeArchiveTenantID(entry.TenantID)
+	if copyEntry.FileType == "" {
+		copyEntry.FileType = "sell_out"
+	}
+	if copyEntry.UploadedAt == "" {
+		copyEntry.UploadedAt = time.Now().UTC().Format(time.RFC3339Nano)
+	}
+	bytesCopy := make([]byte, len(fileBytes))
+	copy(bytesCopy, fileBytes)
+	p.archivedFiles[copyEntry.ID] = &copyEntry
+	p.archivedBytes[copyEntry.ID] = bytesCopy
 }
 
 // SnapshotExistingArchivedFile returns a copy of any existing archived file and its bytes for (tenantID, retailChain, filename).
@@ -489,7 +531,9 @@ func (p *Processor) UpdateArchivedFileByBatch(batchID, retailChain, targetYear, 
 						}
 						p.removeArchiveSidecarLocked(other)
 						// A legacy index.json row would bring the replaced entry back on reload.
-						p.appendDiskTombstoneLocked(other.TenantID, otherID, "")
+						if err := p.appendDiskTombstoneLocked(other.TenantID, otherID, ""); err != nil {
+							log.Printf("WARN [archive] disk tombstone on replace failed for %s: %v", otherID, err)
+						}
 						delete(p.archivedFiles, otherID)
 						delete(p.archivedBytes, otherID)
 					}
@@ -547,11 +591,71 @@ func (p *Processor) RemoveArchivedFileByBatch(batchID string, prevEntry *Archive
 	}
 }
 
+// setArchiveStoredRows updates rows_ingested (and batch_id when non-empty) after a durable sink write
+// so the archive list matches rows actually stored for this archive_id.
+func (p *Processor) setArchiveStoredRows(archiveID string, rows int, batchID string) {
+	if archiveID == "" || rows < 0 {
+		return
+	}
+	p.archiveMu.Lock()
+	defer p.archiveMu.Unlock()
+	entry := p.archivedFiles[archiveID]
+	if entry == nil {
+		return
+	}
+	entry.RowsIngested = rows
+	if strings.TrimSpace(batchID) != "" {
+		entry.BatchID = batchID
+	}
+	p.writeArchiveSidecarLocked(entry)
+}
+
+// enrichArchiveStoredRows overlays BigQuery row counts (by archive_id) onto the list response so
+// rows_ingested reflects stored analytics rows, not a stale parse-time count.
+//
+// On a successful ArchiveRowCounts query, an archive_id absent from the result means 0 stored rows
+// (SQL GROUP BY omits empty groups). On query failure, keep the existing rows_ingested values.
+func (p *Processor) enrichArchiveStoredRows(ctx context.Context, resp *ArchiveListResponse) {
+	if resp == nil || len(resp.Files) == 0 || p.sink == nil || !p.sink.Enabled() {
+		return
+	}
+	rec, ok := p.sink.(bqsink.ArchiveReconciler)
+	if !ok {
+		return
+	}
+	stored, err := rec.ArchiveRowCounts(ctx, resp.TenantID)
+	if err != nil {
+		log.Printf("WARN [archive] ArchiveRowCounts failed for tenant=%s; keeping listed rows_ingested: %v", resp.TenantID, err)
+		return
+	}
+	byID := map[string]int{}
+	for _, s := range stored {
+		if s.ArchiveID != "" {
+			byID[s.ArchiveID] += s.Rows
+		}
+	}
+	p.archiveMu.Lock()
+	for _, f := range resp.Files {
+		if f == nil || f.ID == "" {
+			continue
+		}
+		// Successful query: missing id ⇒ 0 rows (not "unknown / keep stale").
+		n := byID[f.ID]
+		f.RowsIngested = n
+		if entry := p.archivedFiles[f.ID]; entry != nil && entry.RowsIngested != n {
+			entry.RowsIngested = n
+			p.writeArchiveSidecarLocked(entry)
+		}
+	}
+	p.archiveMu.Unlock()
+}
+
 // ListArchivedFiles returns archived files for the tenant, optionally filtered by retail chain, year, search query, and file type ("sell_out" | "sell_in" | "product_master" | "all").
+// rows_ingested is the count of rows stored for that archive in analytics when BigQuery counts are available;
+// otherwise it is the parse-time count recorded at upload.
 func (p *Processor) ListArchivedFiles(ctx context.Context, tenantID, chainFilter, yearFilter, searchQuery string, fileTypeFilters ...string) *ArchiveListResponse {
 	p.syncArchiveFromDisk(normalizeArchiveTenantID(tenantID), false)
 	p.archiveMu.RLock()
-	defer p.archiveMu.RUnlock()
 
 	normTenant := normalizeArchiveTenantID(tenantID)
 	normChain := strings.ToLower(strings.TrimSpace(chainFilter))
@@ -639,12 +743,15 @@ func (p *Processor) ListArchivedFiles(ctx context.Context, tenantID, chainFilter
 		filtered = []*ArchivedFile{}
 	}
 
-	return &ArchiveListResponse{
+	resp := &ArchiveListResponse{
 		TenantID:    normTenant,
 		TotalCount:  len(filtered),
 		ChainCounts: chainCounts,
 		Files:       filtered,
 	}
+	p.archiveMu.RUnlock()
+	p.enrichArchiveStoredRows(ctx, resp)
+	return resp
 }
 
 // GetArchivedFile retrieves an archived file metadata and its raw bytes by ID for a tenant.
@@ -681,26 +788,52 @@ func (p *Processor) GetArchivedFile(ctx context.Context, tenantID, archiveID str
 	return nil, nil, fmt.Errorf("archived file bytes unavailable for: %s", archiveID)
 }
 
-// DeleteArchivedFile deletes an archived file from memory, disk, and Cloud Firestore, and purges its facts from BigQuery and Firestore.
+// ArchiveDeleteError is returned when archive delete fails after looking up the file.
+// Stage is one of: "bigquery", "firestore", "memory_store", "partial".
+type ArchiveDeleteError struct {
+	Stage   string
+	Message string
+	Cause   error
+}
+
+func (e *ArchiveDeleteError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.Cause != nil {
+		return fmt.Sprintf("%s: %s: %v", e.Stage, e.Message, e.Cause)
+	}
+	return fmt.Sprintf("%s: %s", e.Stage, e.Message)
+}
+
+func (e *ArchiveDeleteError) Unwrap() error { return e.Cause }
+
+// ErrArchivedFileNotFound is returned when no archive entry matches the requested id/name.
+var ErrArchivedFileNotFound = fmt.Errorf("archived file not found")
+
+func archiveNotFound(archiveID string) error {
+	return fmt.Errorf("%w: %s", ErrArchivedFileNotFound, archiveID)
+}
+
+// DeleteArchivedFile deletes an archived file and purges its analytics rows.
+// Lookup is by exact archive ID only — a missing ID never deletes a different archive
+// (no BatchID/FileName "newest" fallback). For legacy name-only deletes use DeleteArchivedFileByName.
+//
+// Safe order (success only when both durable row removal AND list/archive removal succeed):
+//  1. Look up the entry; leave it listed until durable deletes finish.
+//  2. Delete BigQuery rows via the durable sink (when enabled). On failure, abort — file stays listed.
+//  3. Purge in-memory analytics (bqRepo). On failure, abort — file stays listed.
+//  4. Tombstone + remove from archive list / disk. On failure after a successful BigQuery delete,
+//     return a partial error (rows may already be gone; list still shows the file when possible).
+//
+// Sell-Out last-file delete is scoped to this archive's batch/file only. It no longer calls
+// ClearTenantData or a tenant-wide RemoveBatchRecords("", "") wipe — that was unsafe and is
+// flagged for Mohamed's product decision (use explicit clear endpoints for full wipes).
 func (p *Processor) DeleteArchivedFile(ctx context.Context, tenantID, archiveID string) (*ArchivedFile, error) {
 	p.archiveMu.Lock()
-	defer p.archiveMu.Unlock()
 
 	normTenant := normalizeArchiveTenantID(tenantID)
 	entry, ok := p.archivedFiles[archiveID]
-	if !ok || entry == nil {
-		// Fallback match by BatchID or FileName (preferring the newest entry when multiple versions share a FileName)
-		for _, candidate := range p.archivedFiles {
-			if candidate.TenantID == normTenant &&
-				(candidate.BatchID == archiveID || strings.EqualFold(candidate.FileName, archiveID)) {
-				if entry == nil || candidate.UploadedAt > entry.UploadedAt || (candidate.UploadedAt == entry.UploadedAt && candidate.ID > entry.ID) {
-					entry = candidate
-					archiveID = candidate.ID
-					ok = true
-				}
-			}
-		}
-	}
 	if (!ok || entry == nil) && p.bqRepo != nil {
 		// Handle deletion of synthesized default seed Product Master bubble when not in p.archivedFiles
 		if pm, err := p.bqRepo.GetProductMaster(ctx, normTenant, bigquery.ProductMasterFilter{}); err == nil && pm != nil && pm.TotalSKUs > 0 {
@@ -709,41 +842,56 @@ func (p *Processor) DeleteArchivedFile(ctx context.Context, tenantID, archiveID 
 				srcName = "adeco_product_master_2026_08_01.xlsx"
 			}
 			if strings.EqualFold(archiveID, "pm_default_seed") || strings.EqualFold(archiveID, srcName) {
-				_ = p.bqRepo.RestoreBaselineProductMaster(ctx, normTenant, srcName)
-				_ = p.bqRepo.ClearProductMaster(ctx, normTenant)
-				if p.fsRepo != nil {
-					_ = p.fsRepo.MarkArchiveDeleted(ctx, normTenant, archiveID, srcName)
-				}
-				p.appendDiskTombstoneLocked(normTenant, archiveID, srcName)
-				return &ArchivedFile{
+				p.archiveMu.Unlock()
+				seed := &ArchivedFile{
 					ID:           archiveID,
 					FileType:     "product_master",
 					TenantID:     normTenant,
 					FileName:     srcName,
 					RetailChain:  "product-master",
 					RowsIngested: pm.TotalSKUs,
-				}, nil
+				}
+				if res := p.sinkDeleteArchived(ctx, seed); res != nil && res.Failed() {
+					return nil, &ArchiveDeleteError{Stage: "bigquery", Message: "failed to remove product master rows from BigQuery", Cause: fmt.Errorf("%s", res.Error)}
+				}
+				if err := p.bqRepo.ClearProductMaster(ctx, normTenant); err != nil {
+					return nil, &ArchiveDeleteError{Stage: "memory_store", Message: "failed to clear product master from analytics store", Cause: err}
+				}
+				_ = p.bqRepo.RestoreBaselineProductMaster(ctx, normTenant, srcName)
+				p.archiveMu.Lock()
+				if p.fsRepo != nil {
+					if err := p.fsRepo.MarkArchiveDeleted(ctx, normTenant, archiveID, srcName); err != nil {
+						p.archiveMu.Unlock()
+						return nil, &ArchiveDeleteError{Stage: "firestore", Message: "BigQuery rows removed but archive tombstone failed", Cause: err}
+					}
+				}
+				if err := p.appendDiskTombstoneLocked(normTenant, archiveID, srcName); err != nil {
+					p.archiveMu.Unlock()
+					log.Printf("ERROR [archive] disk tombstone failed after PM seed delete: %v", err)
+					return nil, &ArchiveDeleteError{Stage: "disk", Message: "BigQuery rows removed but disk tombstone failed", Cause: err}
+				}
+				p.archiveMu.Unlock()
+				return seed, nil
 			}
 		}
 	}
 	if !ok || entry == nil {
-		return nil, fmt.Errorf("archived file not found: %s", archiveID)
+		p.archiveMu.Unlock()
+		return nil, archiveNotFound(archiveID)
 	}
 	if entry.TenantID != normTenant && tenantID != "system" && tenantID != "all" && tenantID != "tenant-system" && tenantID != "tenant-all" {
+		p.archiveMu.Unlock()
 		return nil, fmt.Errorf("unauthorized tenant access to archived file")
 	}
 
 	deletedEntry := *entry
-	p.removeArchiveSidecarLocked(entry)
-	defer p.sinkDeleteArchived(ctx, &deletedEntry)
+	archiveID = deletedEntry.ID
 
-	// 1. Remove from in-memory maps first
-	delete(p.archivedFiles, archiveID)
-	delete(p.archivedBytes, archiveID)
-
-	// Check if another version with the same filename still exists for this tenant
 	hasSameNameRemaining := false
 	for _, f := range p.archivedFiles {
+		if f.ID == archiveID {
+			continue
+		}
 		if f.TenantID == normTenant && strings.EqualFold(f.FileName, deletedEntry.FileName) {
 			hasSameNameRemaining = true
 			break
@@ -754,42 +902,16 @@ func (p *Processor) DeleteArchivedFile(ctx context.Context, tenantID, archiveID 
 		tombstoneFileName = ""
 	}
 
-	// 2. Record permanent deletion tombstone in Cloud Firestore and disk
-	if p.fsRepo != nil {
-		_ = p.fsRepo.MarkArchiveDeleted(ctx, normTenant, deletedEntry.ID, tombstoneFileName)
-	}
-	p.appendDiskTombstoneLocked(normTenant, deletedEntry.ID, tombstoneFileName)
-
-	// 3. Remove physical file from disk if exists
-	if entry.StoragePath != "" {
-		_ = os.Remove(entry.StoragePath)
-	}
-
-	// 4. Remove entry from index.json on disk
-	if p.archiveDir != "" {
-		tenantDir := filepath.Join(p.archiveDir, normTenant)
-		indexPath := filepath.Join(tenantDir, "index.json")
-		var remainingDisk []*ArchivedFile
-		for _, f := range p.archivedFiles {
-			if f.TenantID == normTenant {
-				remainingDisk = append(remainingDisk, f)
-			}
-		}
-		if len(remainingDisk) > 0 {
-			if data, err := json.MarshalIndent(remainingDisk, "", "  "); err == nil {
-				_ = os.WriteFile(indexPath, data, 0644)
-			}
-		} else {
-			_ = os.Remove(indexPath)
-		}
-	}
-
-	// 5. Purge facts / analytics from BigQuery and Firestore:
+	// Snapshot remaining PM entries before unlock (used after durable delete).
+	var remainingPM []*ArchivedFile
 	if isProductMasterArchiveEntry(&deletedEntry) {
-		var remainingPM []*ArchivedFile
 		for _, f := range p.archivedFiles {
+			if f.ID == archiveID {
+				continue
+			}
 			if f.TenantID == normTenant && isProductMasterArchiveEntry(f) {
-				remainingPM = append(remainingPM, f)
+				copyEntry := *f
+				remainingPM = append(remainingPM, &copyEntry)
 			}
 		}
 		sort.Slice(remainingPM, func(i, j int) bool {
@@ -798,57 +920,177 @@ func (p *Processor) DeleteArchivedFile(ctx context.Context, tenantID, archiveID 
 			}
 			return remainingPM[i].UploadedAt < remainingPM[j].UploadedAt
 		})
-		if p.bqRepo != nil {
-			_ = p.bqRepo.ClearProductMaster(ctx, normTenant)
-			if len(remainingPM) == 0 {
-				_ = p.bqRepo.RestoreBaselineProductMaster(ctx, normTenant, deletedEntry.FileName)
-			} else {
-				for _, f := range remainingPM {
-					raw := p.archivedBytes[f.ID]
-					if len(raw) == 0 && f.StoragePath != "" {
-						if b, err := os.ReadFile(f.StoragePath); err == nil {
-							raw = b
-						}
-					}
-					if len(raw) > 0 {
-						if summary, err := gemini.ParseProductMasterWorkbook(normTenant, f.FileName, raw); err == nil && summary != nil {
-							_, _ = p.bqRepo.SetProductMaster(ctx, normTenant, summary)
-						}
+	}
+	p.archiveMu.Unlock()
+
+	// --- Phase 1: durable BigQuery row removal (file still listed) ---
+	if res := p.sinkDeleteArchived(ctx, &deletedEntry); res != nil && res.Failed() {
+		return nil, &ArchiveDeleteError{
+			Stage:   "bigquery",
+			Message: "failed to remove analytics rows from BigQuery; archive file was left listed",
+			Cause:   fmt.Errorf("%s", res.Error),
+		}
+	}
+
+	// --- Phase 2: in-memory analytics purge (file still listed) ---
+	if err := p.purgeAnalyticsForDeletedArchive(ctx, normTenant, &deletedEntry, remainingPM); err != nil {
+		return nil, err
+	}
+
+	// --- Phase 3: remove from archive list / tombstone / disk ---
+	p.archiveMu.Lock()
+	defer p.archiveMu.Unlock()
+
+	// Re-check the entry still exists (another request may have won the race).
+	if cur, still := p.archivedFiles[archiveID]; !still || cur == nil {
+		// Analytics already purged; treat as success only if tombstones can be recorded.
+		if p.fsRepo != nil {
+			if err := p.fsRepo.MarkArchiveDeleted(ctx, normTenant, deletedEntry.ID, tombstoneFileName); err != nil {
+				return nil, &ArchiveDeleteError{Stage: "partial", Message: "BigQuery rows removed but archive list update failed", Cause: err}
+			}
+		}
+		if err := p.appendDiskTombstoneLocked(normTenant, deletedEntry.ID, tombstoneFileName); err != nil {
+			log.Printf("ERROR [archive] disk tombstone failed after concurrent delete of %s: %v", deletedEntry.ID, err)
+			return nil, &ArchiveDeleteError{Stage: "disk", Message: "BigQuery rows removed but disk tombstone failed", Cause: err}
+		}
+		return &deletedEntry, nil
+	}
+
+	if p.fsRepo != nil {
+		if err := p.fsRepo.MarkArchiveDeleted(ctx, normTenant, deletedEntry.ID, tombstoneFileName); err != nil {
+			return nil, &ArchiveDeleteError{
+				Stage:   "firestore",
+				Message: "BigQuery rows removed but archive tombstone failed; file left listed so you can retry",
+				Cause:   err,
+			}
+		}
+	}
+	if err := p.appendDiskTombstoneLocked(normTenant, deletedEntry.ID, tombstoneFileName); err != nil {
+		log.Printf("ERROR [archive] disk tombstone failed for %s: %v", deletedEntry.ID, err)
+		return nil, &ArchiveDeleteError{
+			Stage:   "disk",
+			Message: "BigQuery rows removed but disk tombstone failed; file left listed so you can retry",
+			Cause:   err,
+		}
+	}
+
+	if deletedEntry.StoragePath != "" {
+		if err := os.Remove(deletedEntry.StoragePath); err != nil && !os.IsNotExist(err) {
+			log.Printf("ERROR [archive] remove storage file %s failed: %v", deletedEntry.StoragePath, err)
+			return nil, &ArchiveDeleteError{
+				Stage:   "disk",
+				Message: "BigQuery rows removed but archive file remove failed; file left listed so you can retry",
+				Cause:   err,
+			}
+		}
+	}
+
+	p.removeArchiveSidecarLocked(&deletedEntry)
+	delete(p.archivedFiles, archiveID)
+	delete(p.archivedBytes, archiveID)
+
+	if err := p.persistTenantArchiveIndexLocked(normTenant); err != nil {
+		log.Printf("ERROR [archive] rewrite index after delete of %s failed: %v", deletedEntry.ID, err)
+		return nil, &ArchiveDeleteError{
+			Stage:   "disk",
+			Message: "BigQuery rows and list entry removed but archive index rewrite failed",
+			Cause:   err,
+		}
+	}
+
+	return &deletedEntry, nil
+}
+
+// DeleteArchivedFileByName is the legacy path when the client has no archive ID.
+// It deletes only when exactly one archive in the tenant matches fileName (case-insensitive).
+// Multiple same-name uploads → ambiguous error (never pick "newest").
+func (p *Processor) DeleteArchivedFileByName(ctx context.Context, tenantID, fileName string) (*ArchivedFile, error) {
+	fileName = strings.TrimSpace(fileName)
+	if fileName == "" {
+		return nil, archiveNotFound(fileName)
+	}
+	normTenant := normalizeArchiveTenantID(tenantID)
+
+	p.archiveMu.RLock()
+	var matches []*ArchivedFile
+	for _, candidate := range p.archivedFiles {
+		if candidate == nil || candidate.TenantID != normTenant {
+			continue
+		}
+		if strings.EqualFold(candidate.FileName, fileName) {
+			copyEntry := *candidate
+			matches = append(matches, &copyEntry)
+		}
+	}
+	p.archiveMu.RUnlock()
+
+	if len(matches) == 0 {
+		return nil, archiveNotFound(fileName)
+	}
+	if len(matches) > 1 {
+		return nil, &ArchiveDeleteError{
+			Stage:   "ambiguous",
+			Message: fmt.Sprintf("multiple archives named %q; delete by archive id", fileName),
+		}
+	}
+	return p.DeleteArchivedFile(ctx, tenantID, matches[0].ID)
+}
+
+// purgeAnalyticsForDeletedArchive removes in-memory analytics for one deleted archive.
+// Sell-Out/Sell-In deletes are always scoped to this file's batch (and chain when needed).
+// A missing last Sell-Out file no longer wipes the whole tenant.
+func (p *Processor) purgeAnalyticsForDeletedArchive(ctx context.Context, normTenant string, deletedEntry *ArchivedFile, remainingPM []*ArchivedFile) error {
+	if deletedEntry == nil {
+		return nil
+	}
+	if isProductMasterArchiveEntry(deletedEntry) {
+		if p.bqRepo == nil {
+			return nil
+		}
+		if err := p.bqRepo.ClearProductMaster(ctx, normTenant); err != nil {
+			return &ArchiveDeleteError{Stage: "memory_store", Message: "failed to clear product master from analytics store", Cause: err}
+		}
+		if len(remainingPM) == 0 {
+			_ = p.bqRepo.RestoreBaselineProductMaster(ctx, normTenant, deletedEntry.FileName)
+			return nil
+		}
+		for _, f := range remainingPM {
+			p.archiveMu.RLock()
+			raw := p.archivedBytes[f.ID]
+			p.archiveMu.RUnlock()
+			if len(raw) == 0 && f.StoragePath != "" {
+				if b, err := os.ReadFile(f.StoragePath); err == nil {
+					raw = b
+				}
+			}
+			if len(raw) > 0 {
+				if summary, err := gemini.ParseProductMasterWorkbook(normTenant, f.FileName, raw); err == nil && summary != nil {
+					if _, err := p.bqRepo.SetProductMaster(ctx, normTenant, summary); err != nil {
+						return &ArchiveDeleteError{Stage: "memory_store", Message: "failed to rebuild product master after delete", Cause: err}
 					}
 				}
 			}
 		}
-		return &deletedEntry, nil
-	}
-	isSellInFile := isSellInArchiveEntry(&deletedEntry)
-	if isSellInFile {
-		// Only remove Sell-In records belonging to this deleted Sell-In file; never touch Sell-Out or other Sell-In files!
-		_ = p.bqRepo.RemoveSellInFileRecords(ctx, normTenant, deletedEntry.BatchID, deletedEntry.FileName, deletedEntry.RetailChain)
-		return &deletedEntry, nil
+		return nil
 	}
 
-	remainingSellOutTenantFiles := 0
-	remainingSellOutChainFiles := 0
-	for _, f := range p.archivedFiles {
-		if f.TenantID == normTenant && !isSellInArchiveEntry(f) && !isProductMasterArchiveEntry(f) {
-			remainingSellOutTenantFiles++
-			if strings.EqualFold(f.RetailChain, deletedEntry.RetailChain) {
-				remainingSellOutChainFiles++
-			}
+	if p.bqRepo == nil {
+		return nil
+	}
+
+	if isSellInArchiveEntry(deletedEntry) {
+		if err := p.bqRepo.RemoveSellInFileRecords(ctx, normTenant, deletedEntry.BatchID, deletedEntry.FileName, deletedEntry.RetailChain); err != nil {
+			return &ArchiveDeleteError{Stage: "memory_store", Message: "failed to remove sell-in records for archived file", Cause: err}
 		}
+		return nil
 	}
 
-	if remainingSellOutTenantFiles == 0 {
-		// Purge all Sell-Out records for all chains of this tenant
-		_ = p.bqRepo.RemoveBatchRecords(ctx, normTenant, "", "")
-		_ = p.fsRepo.ClearTenantData(ctx, normTenant)
-	} else if remainingSellOutChainFiles == 0 {
-		_ = p.bqRepo.RemoveBatchRecords(ctx, normTenant, "", deletedEntry.RetailChain)
-	} else {
-		_ = p.bqRepo.RemoveBatchRecords(ctx, normTenant, deletedEntry.BatchID, deletedEntry.RetailChain)
+	// Sell-Out: always scope to this archive's batch (and chain). Never wipe the whole tenant
+	// or clear Firestore tenant data as a side effect of deleting the last uploaded file.
+	if err := p.bqRepo.RemoveBatchRecords(ctx, normTenant, deletedEntry.BatchID, deletedEntry.RetailChain); err != nil {
+		return &ArchiveDeleteError{Stage: "memory_store", Message: "failed to remove sell-out records for archived file", Cause: err}
 	}
-
-	return &deletedEntry, nil
+	return nil
 }
 
 // ClearTenantArchives removes all archived files for a specific tenant from memory, disk, and records deletion tombstones in Cloud Firestore.

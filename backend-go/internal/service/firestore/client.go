@@ -2154,16 +2154,10 @@ func (c *Client) syncDeletedArchivesFromFirestore(ctx context.Context) {
 }
 
 // MarkArchiveDeleted records a permanent deletion tombstone for an archived file in memory and Cloud Firestore.
+// Cloud Firestore is written first when a client is configured; the in-memory tombstone is applied only
+// after a successful write so a failed remote tombstone does not hide the file from ListArchivedFiles.
 func (c *Client) MarkArchiveDeleted(ctx context.Context, tenantID, archiveID, fileName string) error {
-	c.mu.Lock()
-	if archiveID != "" {
-		c.deletedArchives["id:"+archiveID] = true
-	}
 	nameKey := archiveTombstoneKeyByName(tenantID, fileName)
-	if nameKey != "" {
-		c.deletedArchives[nameKey] = true
-	}
-	c.mu.Unlock()
 
 	if c.fsClient != nil {
 		docID := archiveID
@@ -2173,14 +2167,25 @@ func (c *Client) MarkArchiveDeleted(ctx context.Context, tenantID, archiveID, fi
 		if docID != "" {
 			bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			_, _ = c.fsClient.Collection("deleted_archives").Doc(docID).Set(bgCtx, map[string]interface{}{
+			if _, err := c.fsClient.Collection("deleted_archives").Doc(docID).Set(bgCtx, map[string]interface{}{
 				"archive_id": archiveID,
 				"tenant_id":  normalizeFirestoreTenantSlug(tenantID),
 				"file_name":  strings.TrimSpace(fileName),
 				"deleted_at": time.Now().UTC().Format(time.RFC3339),
-			})
+			}); err != nil {
+				return fmt.Errorf("firestore deleted_archives write failed: %w", err)
+			}
 		}
 	}
+
+	c.mu.Lock()
+	if archiveID != "" {
+		c.deletedArchives["id:"+archiveID] = true
+	}
+	if nameKey != "" {
+		c.deletedArchives[nameKey] = true
+	}
+	c.mu.Unlock()
 	return nil
 }
 

@@ -9,9 +9,11 @@ import '../storage/session_storage.dart';
 import '../theme/m3_color_roles.dart';
 import '../utils/web_file_helper.dart';
 import 'api_endpoints.dart';
+import 'archive_tombstones.dart';
 import 'upload_feedback.dart';
 
 export 'upload_feedback.dart';
+export 'archive_tombstones.dart';
 
 /// Aggregated Sell-Out SKU summary with official Product Master factory pricing and chain margin
 class SellOutSkuSummaryModel {
@@ -1943,6 +1945,49 @@ class ArchivedExcelFileModel {
       uploadedAt: uploadedAt ?? this.uploadedAt,
     );
   }
+}
+
+/// Thrown when DELETE /api/v1/ingest/archive fails. The file must stay listed.
+class ArchiveDeleteException implements Exception {
+  final int statusCode;
+  final String message;
+  final String? errorCode;
+
+  const ArchiveDeleteException({
+    required this.statusCode,
+    required this.message,
+    this.errorCode,
+  });
+
+  factory ArchiveDeleteException.fromResponse(int statusCode, String body) {
+    String message = 'تعذر حذف الملف (HTTP $statusCode)';
+    String? errorCode;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        errorCode = decoded['error']?.toString();
+        final apiMessage = decoded['message']?.toString();
+        if (apiMessage != null && apiMessage.trim().isNotEmpty) {
+          message = apiMessage.trim();
+        } else if (errorCode != null && errorCode.trim().isNotEmpty) {
+          message = errorCode.trim();
+        }
+      }
+    } catch (_) {
+      final trimmed = body.trim();
+      if (trimmed.isNotEmpty && trimmed.length < 400) {
+        message = trimmed;
+      }
+    }
+    return ArchiveDeleteException(
+      statusCode: statusCode,
+      message: message,
+      errorCode: errorCode,
+    );
+  }
+
+  @override
+  String toString() => message;
 }
 
 /// Response model for GET /api/v1/ingest/archive.
@@ -4332,11 +4377,25 @@ class ApiClient {
         final parsed = UploadedFilesArchiveResponse.fromJson(
           jsonDecode(resp.body) as Map<String, dynamic>,
         );
-        final filteredFiles = parsed.files.where((f) {
-          if (_deletedArchiveIds.contains(f.id)) return false;
-          if (_deletedArchiveFileNames.contains(f.fileName.toLowerCase())) return false;
-          return true;
-        }).toList();
+        // Server is source of truth: drop stale session tombstones for files still listed
+        // (recovers browsers poisoned by earlier optimistic failed deletes).
+        final cleared = reconcileArchiveTombstones(
+          serverIds: parsed.files.map((f) => f.id),
+          serverFileNamesLower: parsed.files.map((f) => f.fileName.toLowerCase()),
+          deletedIds: _deletedArchiveIds,
+          deletedFileNamesLower: _deletedArchiveFileNames,
+        );
+        if (cleared > 0 && kIsWeb) {
+          SessionStorage.saveDeletedArchiveIds(_deletedArchiveIds);
+          SessionStorage.saveDeletedArchiveFileNames(_deletedArchiveFileNames);
+        }
+        final filteredFiles = filterArchiveFilesByTombstones(
+          files: parsed.files,
+          idOf: (f) => f.id,
+          fileNameOf: (f) => f.fileName,
+          deletedIds: _deletedArchiveIds,
+          deletedFileNamesLower: _deletedArchiveFileNames,
+        );
         final counts = <String, int>{};
         for (final item in filteredFiles) {
           final k = item.retailChain.toLowerCase();
@@ -4468,6 +4527,9 @@ class ApiClient {
   }
 
   /// Deletes an archived Excel/CSV file and purges its ingested facts from the database and storage.
+  ///
+  /// Local list / session tombstones are updated ONLY after the backend returns 200/204.
+  /// A 403/4xx/5xx leaves the file listed and throws [ArchiveDeleteException] with the API message.
   Future<bool> deleteArchivedFile(
     String archiveId, {
     String? targetTenant,
@@ -4479,7 +4541,6 @@ class ApiClient {
         ? targetTenant
         : tenantId;
     final cleanSlug = normalizeDataTenantSlug(effectiveTenant);
-    invalidateExecutiveKpisCache();
     _ensureLocalArchiveSeeded(cleanSlug);
     final localList = _localArchiveByTenant[cleanSlug];
     final effectiveIsPm = isProductMaster ||
@@ -4487,6 +4548,41 @@ class ApiClient {
         archiveId == 'pm_default_seed' ||
         (localList != null && localList.any((f) => f.id == archiveId && f.fileType == 'product_master'));
 
+    final hasRemainingWithSameFileName = fileName != null &&
+        fileName.trim().isNotEmpty &&
+        (localList ?? const [])
+            .where((f) => f.id != archiveId)
+            .any((f) => f.fileName.toLowerCase() == fileName.trim().toLowerCase());
+
+    late final http.Response resp;
+    try {
+      var uri = Uri.parse(ApiEndpoints.ingestArchiveItem(archiveId));
+      if (fileName != null && fileName.trim().isNotEmpty) {
+        uri = uri.replace(queryParameters: {'file_name': fileName.trim()});
+      }
+      resp = await BackendHttp.delete(
+        uri,
+        headers: {
+          'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
+          'X-Tenant-ID': _asciiSafeHeader(effectiveTenant),
+          if (currentUser != null && currentUser!.role.isNotEmpty)
+            'X-Simulated-Role': _asciiSafeHeader(currentUser!.role),
+        },
+      ).timeout(const Duration(seconds: 30));
+    } catch (e) {
+      debugPrint('[ApiClient] deleteArchivedFile network call error: $e');
+      throw ArchiveDeleteException(
+        statusCode: 0,
+        message: 'تعذر الاتصال بالخادم أثناء حذف الملف: $e',
+      );
+    }
+
+    if (!archiveDeleteHttpSucceeded(resp.statusCode)) {
+      throw ArchiveDeleteException.fromResponse(resp.statusCode, resp.body);
+    }
+
+    // Backend confirmed both archive removal and analytics purge — update local mirrors.
+    invalidateExecutiveKpisCache();
     _deletedArchiveIds.add(archiveId);
     if (kIsWeb) {
       SessionStorage.saveDeletedArchiveIds(_deletedArchiveIds);
@@ -4495,19 +4591,18 @@ class ApiClient {
     if (localList != null) {
       _localArchiveByTenant[cleanSlug] = localList.where((f) {
         if (f.id == archiveId) return false;
-        if (!effectiveIsPm && fileName != null && f.fileName.toLowerCase() == fileName.trim().toLowerCase()) {
+        if (!effectiveIsPm &&
+            fileName != null &&
+            f.fileName.toLowerCase() == fileName.trim().toLowerCase()) {
           return false;
         }
         return true;
       }).toList();
     }
 
-    final hasRemainingWithSameFileName = fileName != null &&
+    if (fileName != null &&
         fileName.trim().isNotEmpty &&
-        (_localArchiveByTenant[cleanSlug] ?? const [])
-            .any((f) => f.fileName.toLowerCase() == fileName.trim().toLowerCase());
-
-    if (fileName != null && fileName.trim().isNotEmpty && !hasRemainingWithSameFileName) {
+        !hasRemainingWithSameFileName) {
       _deletedArchiveFileNames.add(fileName.trim().toLowerCase());
       if (kIsWeb) {
         SessionStorage.saveDeletedArchiveFileNames(_deletedArchiveFileNames);
@@ -4516,28 +4611,6 @@ class ApiClient {
 
     if (effectiveIsPm) {
       _rollbackLocalProductMasterSheet(cleanSlug, archiveId: archiveId, fileName: fileName);
-    }
-
-    bool backendSuccess = false;
-    try {
-      var uri = Uri.parse(ApiEndpoints.ingestArchiveItem(archiveId));
-      if (fileName != null && fileName.trim().isNotEmpty && !hasRemainingWithSameFileName) {
-        uri = uri.replace(queryParameters: {'file_name': fileName.trim()});
-      }
-      final resp = await BackendHttp.delete(
-        uri,
-        headers: {
-          'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
-          'X-Tenant-ID': _asciiSafeHeader(effectiveTenant),
-          if (currentUser != null && currentUser!.role.isNotEmpty)
-            'X-Simulated-Role': _asciiSafeHeader(currentUser!.role),
-        },
-      ).timeout(const Duration(seconds: 10));
-      if (resp.statusCode == 200 || resp.statusCode == 204) {
-        backendSuccess = true;
-      }
-    } catch (e) {
-      debugPrint('[ApiClient] deleteArchivedFile network call error: $e');
     }
 
     _localArchiveBytesById.remove(archiveId);
@@ -4551,7 +4624,7 @@ class ApiClient {
         SessionStorage.saveClearedTenants(_clearedTenants);
       }
     }
-    return backendSuccess || true;
+    return true;
   }
 
   static String generateChainCode(String displayName, {String? customCode}) {

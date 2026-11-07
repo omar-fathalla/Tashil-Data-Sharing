@@ -1,0 +1,122 @@
+# Run backend and Flutter tests on every push to every branch and on every pull request.
+# Deploy stays on deploy.yml (main only) — this workflow never deploys.
+name: CI tests
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  FLUTTER_VERSION: "3.41.2"
+
+jobs:
+  test-backend:
+    name: Backend Go tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend-go/go.mod
+          cache-dependency-path: backend-go/go.sum
+      - name: go vet
+        run: go vet ./...
+      - name: go test
+        id: go_test
+        run: go test ./... -count=1 -timeout 20m
+      - name: Surface failure summary
+        if: failure() && steps.go_test.outcome == 'failure'
+        run: |
+          {
+            echo "## Backend tests failed"
+            echo ""
+            echo "\`go test ./...\` failed on branch \`${{ github.ref_name }}\`."
+            echo "Reproduce locally:"
+            echo ""
+            echo '```bash'
+            echo 'cd backend-go && go test ./... -count=1 -timeout 20m'
+            echo '```'
+            echo ""
+            echo "Proposed next step: inspect the failing package output above, fix on this PR branch, and push — do not push fixes to main."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  test-flutter:
+    name: Flutter analyze & test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tashil_web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: flutter analyze
+        run: flutter analyze
+      - name: flutter test
+        id: flutter_test
+        run: flutter test
+      - name: Surface failure summary
+        if: failure() && steps.flutter_test.outcome == 'failure'
+        run: |
+          {
+            echo "## Flutter tests failed"
+            echo ""
+            echo "\`flutter test\` failed on branch \`${{ github.ref_name }}\`."
+            echo "Reproduce locally:"
+            echo ""
+            echo '```bash'
+            echo 'cd tashil_web && flutter test'
+            echo '```'
+            echo ""
+            echo "Proposed next step: fix on this PR branch and push — do not auto-push fixes to main."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  comment-on-pr-failure:
+    name: Comment PR when tests fail
+    needs: [test-backend, test-flutter]
+    if: always() && github.event_name == 'pull_request' && (needs.test-backend.result == 'failure' || needs.test-flutter.result == 'failure')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post failure comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const backend = '${{ needs.test-backend.result }}';
+            const flutter = '${{ needs.test-flutter.result }}';
+            const lines = [
+              '## CI tests failed',
+              '',
+              `| Job | Result |`,
+              `| --- | --- |`,
+              `| Backend Go tests | ${backend} |`,
+              `| Flutter analyze & test | ${flutter} |`,
+              '',
+              'Please fix on this PR branch and push. **Do not push fixes to `main`.**',
+              '',
+              'Reproduce:',
+              '```bash',
+              'cd backend-go && go test ./... -count=1 -timeout 20m',
+              'cd tashil_web && flutter test',
+              '```',
+            ];
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: lines.join('\n'),
+            });

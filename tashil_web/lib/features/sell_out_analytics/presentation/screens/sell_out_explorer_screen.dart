@@ -518,7 +518,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     } catch (e) {
       if (!mounted) return;
       debugPrint('Archive delete failed: $e');
-        M3Feedback.showError(context, 'تعذّر حذف الملف.');
+      final msg = e is ArchiveDeleteException
+          ? e.message
+          : 'تعذّر حذف الملف.';
+      M3Feedback.showError(context, msg);
+      // Failed deletes must keep the file listed — refresh from server truth.
+      await _loadAllData();
     } finally {
       if (mounted) {
         setState(() => _deletingFileId = null);
