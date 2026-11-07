@@ -17,6 +17,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
+	"github.com/tashil/data-sharing/backend/internal/service/preupload"
 	"github.com/tashil/data-sharing/backend/internal/service/sellinassist"
 )
 
@@ -447,6 +448,56 @@ func (h *UploadHandler) HandleLoadLocalExcel(w http.ResponseWriter, r *http.Requ
 	_ = json.NewEncoder(w).Encode(result)
 }
 
+// HandlePrecheck handles POST /api/v1/ingest/precheck.
+// Returns an Arabic fix list (missing column / unclear month / unreadable cells) and never writes.
+func (h *UploadHandler) HandlePrecheck(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	tenantID, err := middleware.EnforceTenantRLS(r)
+	if err != nil {
+		http.Error(w, `{"error":"unauthorized tenant context"}`, http.StatusUnauthorized)
+		return
+	}
+
+	_ = r.ParseMultipartForm(200 << 20)
+
+	filename, fileBytes, ok := readUploadBytes(w, r)
+	if !ok {
+		return
+	}
+
+	tenantOverride := r.URL.Query().Get("tenant")
+	if tenantOverride == "" {
+		tenantOverride = r.Header.Get("X-Tenant-ID")
+	}
+	tenantID = applySystemTenantOverride(tenantID, tenantOverride)
+
+	targetChain := r.URL.Query().Get("chain")
+	if targetChain == "" {
+		targetChain = r.Header.Get("X-Retail-Chain")
+	}
+	if targetChain == "" && r.MultipartForm != nil {
+		if vals := r.MultipartForm.Value["chain"]; len(vals) > 0 {
+			targetChain = vals[0]
+		}
+	}
+
+	report := preupload.Check(filename, fileBytes, preupload.Options{
+		TenantID: tenantID,
+		Chain:    targetChain,
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(report)
+}
+
 // HandleUpload handles POST /api/v1/ingest/upload.
 func (h *UploadHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
@@ -466,29 +517,9 @@ func (h *UploadHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	// Limit max file upload to 200MB
 	_ = r.ParseMultipartForm(200 << 20)
 
-	var filename string
-	var fileBytes []byte
-
-	file, header, err := r.FormFile("file")
-	if err == nil {
-		defer file.Close()
-		filename = header.Filename
-		fileBytes, err = io.ReadAll(file)
-		if err != nil {
-			http.Error(w, `{"error":"failed to read uploaded file"}`, http.StatusBadRequest)
-			return
-		}
-	} else {
-		// Fallback to raw request body if sent directly
-		filename = r.URL.Query().Get("filename")
-		if filename == "" {
-			filename = "retail_sales_upload.csv"
-		}
-		fileBytes, err = io.ReadAll(r.Body)
-		if err != nil || len(fileBytes) == 0 {
-			http.Error(w, `{"error":"no file provided in multipart 'file' field or body"}`, http.StatusBadRequest)
-			return
-		}
+	filename, fileBytes, ok := readUploadBytes(w, r)
+	if !ok {
+		return
 	}
 
 	// Extract optional tenant override (Super Admin or explicit header/query/form)
@@ -514,6 +545,16 @@ func (h *UploadHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 		if len(vals) > 0 {
 			targetChain = vals[0]
 		}
+	}
+
+	// Thin pre-upload hook: same body as /ingest/precheck, zero writes, no Gemini / staging.
+	if r.URL.Query().Get("precheck_only") == "true" ||
+		(r.MultipartForm != nil && len(r.MultipartForm.Value["precheck_only"]) > 0 && r.MultipartForm.Value["precheck_only"][0] == "true") {
+		report := preupload.Check(filename, fileBytes, preupload.Options{TenantID: tenantID, Chain: targetChain})
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(report)
+		return
 	}
 
 	// Extract optional dry_run flag
@@ -910,6 +951,31 @@ func archiveDeleteHTTPStatus(err error) (status int, code, message string) {
 		}
 	}
 	return http.StatusInternalServerError, "delete_failed", message
+}
+
+// readUploadBytes reads multipart "file" or the raw body. On failure it writes the HTTP error.
+func readUploadBytes(w http.ResponseWriter, r *http.Request) (filename string, fileBytes []byte, ok bool) {
+	file, header, err := r.FormFile("file")
+	if err == nil {
+		defer file.Close()
+		filename = header.Filename
+		fileBytes, err = io.ReadAll(file)
+		if err != nil {
+			http.Error(w, `{"error":"failed to read uploaded file"}`, http.StatusBadRequest)
+			return "", nil, false
+		}
+		return filename, fileBytes, true
+	}
+	filename = r.URL.Query().Get("filename")
+	if filename == "" {
+		filename = "retail_sales_upload.csv"
+	}
+	fileBytes, err = io.ReadAll(r.Body)
+	if err != nil || len(fileBytes) == 0 {
+		http.Error(w, `{"error":"no file provided in multipart 'file' field or body"}`, http.StatusBadRequest)
+		return "", nil, false
+	}
+	return filename, fileBytes, true
 }
 
 // uploadGuardsFromRequest reads the uploader's answers to a previous confirmation dialog.

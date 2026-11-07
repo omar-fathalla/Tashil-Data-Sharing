@@ -16,6 +16,7 @@ import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../widgets/ai_analysis_progress_card.dart';
 import '../widgets/anomaly_resolution_table.dart';
 import '../widgets/dropzone_file_picker.dart';
+import '../widgets/preupload_fix_list.dart';
 import '../widgets/register_chain_dialog.dart';
 import '../widgets/sell_in_upload_target.dart';
 import '../widgets/upload_checks.dart';
@@ -45,6 +46,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
   bool isProcessing = false;
   bool isCommitting = false;
   IngestionResultModel? result;
+  PreuploadCheckReport? _preuploadReport;
   final Set<String> _processedFiles = {};
   String? _stagedFileKey;
   late String _lastTenantId;
@@ -489,6 +491,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
         isProcessing = false;
         isCommitting = false;
         result = null;
+        _preuploadReport = null;
         _stagedFileKey = null;
         _processedFiles.clear();
       });
@@ -552,6 +555,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
       _showChainRequiredError = false;
       isProcessing = true;
       result = null;
+      _preuploadReport = null;
       _stagedFileKey = fileKey;
     });
     _replaceConfirmed = false;
@@ -559,6 +563,28 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
     _sheetMonths = const [];
 
     try {
+      // Pre-upload Arabic fix list (missing column / unclear month / unreadable cells).
+      // Isolated from writes — blocks dry-run when the server reports blocking fixes.
+      final pre = await widget.apiClient.precheckUpload(
+        filename,
+        bytes,
+        targetChain: activeChain,
+        targetTenant: _selectedTenant,
+      );
+      if (pre.hasBlockingFixes) {
+        if (mounted) {
+          setState(() {
+            isProcessing = false;
+            _preuploadReport = pre;
+          });
+          M3Feedback.showError(
+            context,
+            'الملف محتاج تصليح قبل الرفع (${pre.blockingCount} مشكلة). مفيش حاجة اتحفظت.',
+          );
+        }
+        return;
+      }
+
       final res = await _withUploadQuestions((replaceConfirmed, periodChoice) => widget.apiClient.uploadFile(
             filename,
             bytes,
@@ -1069,6 +1095,14 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
               onBeforePickFile: _validateChainSelectedBeforeUpload,
               onFileSelected: _handleFileSelected,
             ),
+
+            if (_preuploadReport != null) ...[
+              M3Spacing.gapMD,
+              PreuploadFixListPanel(
+                report: _preuploadReport!,
+                onDismiss: () => setState(() => _preuploadReport = null),
+              ),
+            ],
 
             M3Spacing.gapMD,
 

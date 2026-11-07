@@ -10,10 +10,12 @@ import '../theme/m3_color_roles.dart';
 import '../utils/web_file_helper.dart';
 import 'api_endpoints.dart';
 import 'archive_tombstones.dart';
+import 'preupload_check.dart';
 import 'upload_feedback.dart';
 
 export 'upload_feedback.dart';
 export 'archive_tombstones.dart';
+export 'preupload_check.dart';
 
 /// Aggregated Sell-Out SKU summary with official Product Master factory pricing and chain margin
 class SellOutSkuSummaryModel {
@@ -4041,6 +4043,46 @@ class ApiClient {
           e.retailChain.toLowerCase() == normChain &&
           e.fileName.toLowerCase() == updated.fileName.toLowerCase(),
     );
+  }
+
+  /// Pre-upload checker: Arabic fix list before staging. Never writes on the server.
+  Future<PreuploadCheckReport> precheckUpload(
+    String filename,
+    List<int> bytes, {
+    String? targetChain,
+    String? targetTenant,
+  }) async {
+    final effectiveTenant = (targetTenant != null && targetTenant.isNotEmpty)
+        ? targetTenant
+        : tenantId;
+    final queryParams = <String, String>{
+      'filename': filename,
+      if (targetChain != null && targetChain.isNotEmpty) 'chain': targetChain,
+      if (targetTenant != null && targetTenant.isNotEmpty) 'tenant': targetTenant,
+    };
+    final uri = Uri.parse(ApiEndpoints.ingestPrecheck).replace(queryParameters: queryParams);
+    final resp = await BackendHttp.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
+        'X-Tenant-ID': _asciiSafeHeader(effectiveTenant),
+        if (targetChain != null && targetChain.isNotEmpty)
+          'X-Retail-Chain': _asciiSafeHeader(targetChain),
+        'Content-Type': 'application/octet-stream',
+        if (currentUser != null && currentUser!.role.isNotEmpty)
+          'X-Simulated-Role': _asciiSafeHeader(currentUser!.role),
+      },
+      body: bytes,
+    ).timeout(const Duration(seconds: 60));
+    if (resp.statusCode != 200) {
+      throwIfUploadRefused(
+        resp.statusCode,
+        resp.body,
+        'تعذّر فحص الملف قبل الرفع',
+      );
+    }
+    final decoded = jsonDecode(resp.body) as Map<String, dynamic>;
+    return PreuploadCheckReport.fromJson(decoded);
   }
 
   /// Sends file for Two-Tier Gemini AI ingestion (Tier 1: Gemini 3.8 Flash, Tier 2: Gemini 4 Argon Medium / gemini-1.5-pro).
