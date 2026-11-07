@@ -360,15 +360,86 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
         await widget.apiClient.deleteArchivedFile(replaceArchiveId, isSellIn: false);
       }
 
+      // Preview (dry-run) first so automation can assert mapping_source / model
+      // metadata without committing, and users confirm before archive write.
       final res = await widget.apiClient.uploadFile(
         picked.name,
         picked.bytes,
         targetChain: targetChain,
         periodDate: periodDate,
-        dryRun: false,
+        dryRun: true,
       );
 
+      if (!mounted) return;
+
+      final sourceLabel = res.mappingSource.isNotEmpty
+          ? res.mappingSource
+          : 'unknown';
+      final modelLabel =
+          res.aiModelUsed.isNotEmpty ? res.aiModelUsed : 'n/a';
+      final previewSummary =
+          '${picked.name}: ${res.validRows} صف • ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)}'
+          ' • mapping_source=$sourceLabel • model=$modelLabel';
+
       if (res.isStaged && !res.isCommitted) {
+        final shouldCommit = await showDialog<bool>(
+              context: context,
+              builder: (ctx) {
+                final cs = Theme.of(ctx).colorScheme;
+                return AlertDialog(
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: M3Shape.radiusLg,
+                  ),
+                  title: const Text('مراجعة رفع Sell-Out'),
+                  content: Text(
+                    'معاينة فقط — لم يُحفظ شيء بعد.\n$previewSummary',
+                  ),
+                  actions: [
+                    TestSemantics.button(
+                      identifier: TestIds.uploadCommitCancel,
+                      label: 'Cancel upload commit',
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('إلغاء'),
+                      ),
+                    ),
+                    TestSemantics.button(
+                      identifier: TestIds.uploadCommitConfirm,
+                      label: 'Confirm upload commit',
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: cs.primary,
+                        ),
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        child: Text(
+                          replaceArchiveId != null
+                              ? 'تأكيد الاستبدال'
+                              : 'حفظ واعتماد',
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ) ??
+            false;
+
+        if (!shouldCommit) {
+          if (res.batchId.isNotEmpty) {
+            try {
+              await widget.apiClient.discardStagedUpload(batchId: res.batchId);
+            } catch (_) {}
+          }
+          if (!mounted) return;
+          M3Feedback.showInfo(
+            context,
+            'تم إلغاء الاعتماد — المعاينة فقط ($previewSummary)',
+          );
+          return;
+        }
+
         await widget.apiClient.commitStagedUpload(
           batchId: res.batchId,
           targetChain: targetChain,
@@ -382,7 +453,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
           : 'تم رفع الملف وإضافته للبيانات.';
       M3Feedback.showSuccess(
         context,
-        '$actionLabel (${picked.name}): ${res.validRows} صف • ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)}',
+        '$actionLabel ($previewSummary)',
       );
       _repo.invalidateAll();
       _repo.cache.invalidatePrefix(CacheStore.prefix(widget.apiClient.tenantId, TargetRepository.feature));
@@ -470,19 +541,19 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
             ],
           ),
           actions: [
-            TestSemantics(
+            TestSemantics.button(
               identifier: TestIds.deleteCancel,
               label: 'Cancel delete',
-              button: true,
+              onPressed: () => Navigator.of(ctx).pop(false),
               child: TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
                 child: const Text('إلغاء'),
               ),
             ),
-            TestSemantics(
+            TestSemantics.button(
               identifier: TestIds.deleteConfirm,
               label: 'Confirm delete',
-              button: true,
+              onPressed: () => Navigator.of(ctx).pop(true),
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: cs.error,
@@ -2902,10 +2973,20 @@ onChanged: m3Legacy<int>((v) {
                     spacing: 10.0,
                     runSpacing: 8.0,
                     children: [
-                      TestSemantics(
+                      TestSemantics.button(
                         identifier: TestIds.selloutUploadButton,
                         label: 'Upload Sell-Out file',
-                        button: true,
+                        onPressed: _isUploading
+                            ? null
+                            : () => _pickAndUploadSellOutFile(
+                                  forceChain: _archiveUploadChain,
+                                  forceYear: _archiveUploadYear > 0
+                                      ? _archiveUploadYear
+                                      : null,
+                                  forceMonth: _archiveUploadMonth > 0
+                                      ? _archiveUploadMonth
+                                      : null,
+                                ),
                         child: FilledButton.icon(
                           style: FilledButton.styleFrom(
                             minimumSize: const Size(0, 44.0),

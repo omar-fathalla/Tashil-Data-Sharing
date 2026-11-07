@@ -28,6 +28,14 @@ class TestIds {
   static const sellinUploadButton = 'sellin-upload-button';
   static const uploadChooseFile = 'upload-choose-file';
 
+  /// DOM id / data-testid of the persistent hidden `<input type="file">`
+  /// (`#tashil-file-input`). Prefer Playwright `setInputFiles` on this node.
+  static const fileInput = 'tashil-file-input';
+
+  /// Confirm / cancel for Sell-Out staged preview commit dialog.
+  static const uploadCommitConfirm = 'upload-commit-confirm';
+  static const uploadCommitCancel = 'upload-commit-cancel';
+
   static const selloutUploadedFiles = 'sellout-uploaded-files';
   static const sellinUploadedFiles = 'sellin-uploaded-files';
   static const uploadedFilesList = 'uploaded-files-list';
@@ -57,6 +65,8 @@ class TestIds {
     selloutUploadButton,
     sellinUploadButton,
     uploadChooseFile,
+    uploadCommitConfirm,
+    uploadCommitCancel,
     selloutUploadedFiles,
     sellinUploadedFiles,
     uploadedFilesList,
@@ -98,6 +108,7 @@ class TestIds {
       'file-row-${fileToken(archiveId)}-${fileToken(fileName)}';
 
   /// Unique delete-action id for an archive row.
+  /// Pattern: `file-delete-<archiveId>-<slugified-filename>`.
   static String fileDelete({
     required String archiveId,
     required String fileName,
@@ -107,6 +118,11 @@ class TestIds {
 
 /// Thin wrapper that attaches a stable [identifier] (and optional [label])
 /// for web automation without changing visual layout.
+///
+/// For tappable controls prefer [TestSemantics.button]: it sets `button: true`,
+/// wires [onTap] (so Flutter web emits `role="button"` with a real click
+/// handler), uses a semantics [container] boundary, and excludes child
+/// semantics so DataTable cells cannot absorb the node into `role="cell"`.
 class TestSemantics extends StatelessWidget {
   final String identifier;
   final String? label;
@@ -114,6 +130,8 @@ class TestSemantics extends StatelessWidget {
   final bool textField;
   final bool container;
   final bool excludeSemantics;
+  final bool enabled;
+  final VoidCallback? onTap;
   final Widget child;
 
   const TestSemantics({
@@ -125,7 +143,28 @@ class TestSemantics extends StatelessWidget {
     this.textField = false,
     this.container = false,
     this.excludeSemantics = false,
+    this.enabled = true,
+    this.onTap,
   });
+
+  /// Interactive control for Playwright / screen readers.
+  ///
+  /// Always pass [onPressed] so the semantics node owns the tap action
+  /// (required for web `flt-semantics` to be clickable without falling
+  /// through to `flutter-view`).
+  const TestSemantics.button({
+    super.key,
+    required this.identifier,
+    required this.label,
+    required VoidCallback? onPressed,
+    required this.child,
+    bool excludeChildSemantics = true,
+  })  : button = true,
+        textField = false,
+        container = true,
+        excludeSemantics = excludeChildSemantics,
+        enabled = onPressed != null,
+        onTap = onPressed;
 
   /// Single interactive nav face — callers must attach this to exactly one
   /// child per destination (e.g. only `label` or only `icon`, never both
@@ -137,18 +176,28 @@ class TestSemantics extends StatelessWidget {
     required this.child,
   })  : button = true,
         textField = false,
-        container = false,
-        excludeSemantics = false;
+        container = true,
+        excludeSemantics = false,
+        enabled = true,
+        onTap = null;
 
   @override
   Widget build(BuildContext context) {
+    // Buttons without an explicit container get absorbed by DataTable cell
+    // semantics (role=cell, often pointer-events that miss the action).
+    final effectiveContainer = container || (button && onTap != null);
+    final effectiveExclude =
+        excludeSemantics || (button && onTap != null);
+
     return Semantics(
       identifier: identifier,
       label: label,
       button: button,
       textField: textField,
-      container: container,
-      excludeSemantics: excludeSemantics,
+      container: effectiveContainer,
+      excludeSemantics: effectiveExclude,
+      enabled: enabled,
+      onTap: onTap,
       child: child,
     );
   }

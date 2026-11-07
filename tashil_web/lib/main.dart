@@ -11,6 +11,7 @@ import 'core/storage/session_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/m3_color_roles.dart';
 import 'core/theme/m3_motion.dart';
+import 'core/utils/web_file_helper.dart';
 import 'features/auth/presentation/screens/super_admin_login_screen.dart';
 import 'features/auth/presentation/screens/tenant_login_screen.dart';
 import 'features/auth/presentation/widgets/security_guard.dart';
@@ -35,6 +36,9 @@ void main() {
     // Expose the semantics tree in the DOM (flt-semantics-*) for web
     // automation (Playwright / Maestro / Patrol) without manual activation.
     SemanticsBinding.instance.ensureSemantics();
+    // Persistent hidden <input type="file"> for user-activation picks and
+    // Playwright setInputFiles (see WebFileHelper / #tashil-file-input).
+    WebFileHelper.ensureMounted();
   }
   runApp(const TashilDataSharingApp());
 }

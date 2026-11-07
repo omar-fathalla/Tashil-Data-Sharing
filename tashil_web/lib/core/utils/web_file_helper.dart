@@ -4,6 +4,10 @@ import 'dart:typed_data';
 import 'web_file_helper_stub.dart'
     if (dart.library.html) 'web_file_helper_web.dart';
 
+/// Stable DOM id of the hidden web file input (`#tashil-file-input`).
+/// Playwright should prefer `setInputFiles` on this node over `filechooser`.
+const String kTashilFileInputDomId = 'tashil-file-input';
+
 /// Represents a file selected via the browser file picker or test hook.
 class PickedFileData {
   final String name;
@@ -34,6 +38,12 @@ class WebFileHelper {
   static void resetTestOverrides() {
     testFilePickerOverride = null;
     nextMockPickedFile = null;
+  }
+
+  /// Mounts the persistent hidden `<input type="file">` early on web so
+  /// Playwright can discover `#tashil-file-input` before the first click.
+  static void ensureMounted({String accept = '.csv,.xlsx,.xls'}) {
+    ensurePersistentFileInput(accept: accept);
   }
 
   /// Registers a browser drag-and-drop file listener (and test drop hook).

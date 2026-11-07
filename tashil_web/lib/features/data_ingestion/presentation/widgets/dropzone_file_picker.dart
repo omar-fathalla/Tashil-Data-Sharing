@@ -124,10 +124,21 @@ class _DropzoneFilePickerState extends State<DropzoneFilePicker> {
                     textAlign: TextAlign.center,
                   ),
                   M3Spacing.gapMD,
-                  TestSemantics(
+                  TestSemantics.button(
                     identifier: TestIds.uploadChooseFile,
                     label: 'Choose file',
-                    button: true,
+                    onPressed: widget.isProcessing
+                        ? null
+                        : () async {
+                            if (widget.onBeforePickFile != null &&
+                                !widget.onBeforePickFile!()) {
+                              return;
+                            }
+                            final picked = await WebFileHelper.pickFile();
+                            if (picked != null) {
+                              widget.onFileSelected(picked.name, picked.bytes);
+                            }
+                          },
                     child: M3Button.primary(
                       label: 'اختيار ملف',
                       icon: Icons.folder_open_rounded,

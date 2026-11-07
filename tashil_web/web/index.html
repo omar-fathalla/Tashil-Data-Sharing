@@ -7,6 +7,19 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Tashil Data Sharing Platform">
   <meta name="theme-color" content="#0B57D0">
+  <!-- Logical CSS pixels must match Flutter semantics; missing viewport can
+       skew hit targets (~2x) vs the canvas on some DPR configurations. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* Anchor semantics host at the view origin (WebKit static-position bug;
+       also keeps Blink hit boxes aligned with the canvas). */
+    flt-semantics-host {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      transform-origin: 0 0 !important;
+    }
+  </style>
 
   <!-- Favicon & Browser Tab Icons (Cache-busted for immediate browser refresh) -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=20261016b">
@@ -31,6 +44,71 @@
   <link rel="manifest" href="manifest.json?v=20261016b">
 </head>
 <body>
+  <script>
+    // Keep Flutter web semantics hit boxes in CSS pixels.
+    // When devicePixelRatio > 1, a missing inverse-DPR scale makes
+    // flt-semantics nodes land ~2× away from the painted canvas (Playwright
+    // then reports clicks intercepted by flutter-view). Never double-scale if
+    // the engine already applied matrix/scale on a descendant.
+    (function () {
+      function hasEngineScale(host) {
+        var nodes = host.querySelectorAll('[style]');
+        for (var i = 0; i < nodes.length; i++) {
+          var t = nodes[i].style && nodes[i].style.transform;
+          if (!t) continue;
+          if (t.indexOf('matrix') !== -1 || t.indexOf('scale') !== -1) {
+            return true;
+          }
+        }
+        var own = host.style && host.style.transform;
+        return !!(own && (own.indexOf('matrix') !== -1 || own.indexOf('scale') !== -1));
+      }
+
+      function applyInverseDpr(host) {
+        if (!host) return;
+        host.style.setProperty('position', 'absolute', 'important');
+        host.style.setProperty('left', '0', 'important');
+        host.style.setProperty('top', '0', 'important');
+        host.style.setProperty('transform-origin', '0 0', 'important');
+        var dpr = window.devicePixelRatio || 1;
+        if (dpr <= 1.01 || hasEngineScale(host)) return;
+        var s = 1 / dpr;
+        host.style.setProperty(
+          'transform',
+          'matrix(' + s + ', 0, 0, ' + s + ', 0, 0)',
+          'important'
+        );
+      }
+
+      function scan() {
+        document.querySelectorAll('flt-semantics-host').forEach(applyInverseDpr);
+      }
+
+      var scheduled = false;
+      function schedule() {
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(function () {
+          scheduled = false;
+          scan();
+        });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', schedule);
+      } else {
+        schedule();
+      }
+      window.addEventListener('resize', schedule);
+      window.addEventListener('flutter-first-frame', schedule);
+      try {
+        new MutationObserver(schedule).observe(document.documentElement, {
+          childList: true,
+          subtree: true,
+        });
+      } catch (_) {}
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

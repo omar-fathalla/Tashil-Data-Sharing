@@ -124,10 +124,13 @@ class ArchiveActionsGroup extends StatelessWidget {
     );
 
     if (semanticsIdentifier != null) {
-      button = TestSemantics(
+      // Own the tap on the Semantics node so Flutter web exposes role=button
+      // (not DataTable role=cell) and Playwright clicks don't fall through to
+      // flutter-view when the semantics box is offset.
+      button = TestSemantics.button(
         identifier: semanticsIdentifier,
         label: label,
-        button: true,
+        onPressed: onPressed,
         child: button,
       );
     }

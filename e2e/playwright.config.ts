@@ -32,7 +32,13 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        // Keep CSS pixels === layout pixels so Flutter semantics hit boxes
+        // are not scaled ~2× vs the canvas (devicePixelRatio mismatch).
+        deviceScaleFactor: 1,
+      },
     },
   ],
 });
+
