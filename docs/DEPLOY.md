@@ -8,9 +8,11 @@ Pushing to `main` runs `.github/workflows/deploy.yml`:
    (#37); other settings (CPU always on, startup boost, gen2, archive volume, env vars and
    secrets incl. `BIGQUERY_SINK_ENABLED=true`) are kept. The commit SHA is written to
    `backend-go/data/build_commit.txt`, so `/api/v1/version` reports it.
-   **Skip rule:** on `push` to `main`, Cloud Run deploy is skipped when `backend-go/` and
-   `.github/workflows/deploy.yml` are unchanged vs the previous commit (web-only merges no longer
-   mint a new backend revision). `workflow_dispatch` always redeploys the backend.
+   **Skip rule:** on `push` to `main`, Cloud Run deploy is skipped only when `backend-go/` and
+   `.github/workflows/deploy.yml` are unchanged versus the **live** `/api/v1/version` `git_commit`
+   (not `github.event.before`). That way a failed backend deploy followed by a web-only push still
+   redeploys the backend. If live version cannot be read, backend always redeploys.
+   `workflow_dispatch` always redeploys the backend.
 3. Web: `flutter build web --dart-define=APP_VERSION=<n>` and `firebase deploy --only hosting`.
 
 Docs-only changes (`**.md`, `docs/**`) do not deploy. Runs are serialized (`deploy-production`

@@ -33,6 +33,11 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := h.fsRepo.AuthReady(); err != nil {
+		http.Error(w, `{"error":"authentication service unavailable"}`, http.StatusServiceUnavailable)
+		return
+	}
+
 	var req domain.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
