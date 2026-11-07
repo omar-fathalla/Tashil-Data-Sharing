@@ -201,19 +201,7 @@ func (p *Processor) loadDiskArchiveLocked() {
 	if p.archiveDir == "" {
 		return
 	}
-	tombstonePath := filepath.Join(p.archiveDir, "deleted_tombstones.json")
-	if rawTomb, err := os.ReadFile(tombstonePath); err == nil && len(rawTomb) > 0 && p.fsRepo != nil {
-		var tombs []struct {
-			TenantID  string `json:"tenant_id"`
-			ArchiveID string `json:"archive_id"`
-			FileName  string `json:"file_name"`
-		}
-		if json.Unmarshal(rawTomb, &tombs) == nil {
-			for _, t := range tombs {
-				_ = p.fsRepo.MarkArchiveDeleted(context.Background(), t.TenantID, t.ArchiveID, t.FileName)
-			}
-		}
-	}
+	p.applyDiskTombstonesLocked()
 	entries, err := os.ReadDir(p.archiveDir)
 	if err != nil {
 		return
@@ -241,21 +229,42 @@ func (p *Processor) loadDiskArchiveLocked() {
 	}
 }
 
+type diskTombstoneItem struct {
+	TenantID  string `json:"tenant_id"`
+	ArchiveID string `json:"archive_id"`
+	FileName  string `json:"file_name"`
+}
+
+// applyDiskTombstonesLocked loads deleted_tombstones.json into the in-memory tombstone map
+// (no Firestore write). Shared archive mounts use this so every instance learns deletes.
+func (p *Processor) applyDiskTombstonesLocked() {
+	if p.archiveDir == "" || p.fsRepo == nil {
+		return
+	}
+	tombstonePath := filepath.Join(p.archiveDir, "deleted_tombstones.json")
+	rawTomb, err := os.ReadFile(tombstonePath)
+	if err != nil || len(rawTomb) == 0 {
+		return
+	}
+	var tombs []diskTombstoneItem
+	if json.Unmarshal(rawTomb, &tombs) != nil {
+		return
+	}
+	for _, t := range tombs {
+		p.fsRepo.RememberArchiveDeleted(t.TenantID, t.ArchiveID, t.FileName)
+	}
+}
+
 func (p *Processor) appendDiskTombstoneLocked(tenantID, archiveID, fileName string) error {
 	if p.archiveDir == "" {
 		return nil
 	}
 	tombstonePath := filepath.Join(p.archiveDir, "deleted_tombstones.json")
-	type tombItem struct {
-		TenantID  string `json:"tenant_id"`
-		ArchiveID string `json:"archive_id"`
-		FileName  string `json:"file_name"`
-	}
-	var tombs []tombItem
+	var tombs []diskTombstoneItem
 	if raw, err := os.ReadFile(tombstonePath); err == nil && len(raw) > 0 {
 		_ = json.Unmarshal(raw, &tombs)
 	}
-	tombs = append(tombs, tombItem{
+	tombs = append(tombs, diskTombstoneItem{
 		TenantID:  tenantID,
 		ArchiveID: archiveID,
 		FileName:  fileName,
@@ -267,7 +276,30 @@ func (p *Processor) appendDiskTombstoneLocked(tenantID, archiveID, fileName stri
 	if err := os.WriteFile(tombstonePath, data, 0o644); err != nil {
 		return fmt.Errorf("write disk tombstones: %w", err)
 	}
+	if p.fsRepo != nil {
+		p.fsRepo.RememberArchiveDeleted(tenantID, archiveID, fileName)
+	}
 	return nil
+}
+
+// pruneTombstonedArchivesLocked drops in-memory archive entries that carry a deletion tombstone.
+// Required so Cloud Run instances that still hold a startup copy of a deleted (incl. seed-index)
+// entry stop listing it after another instance's delete.
+func (p *Processor) pruneTombstonedArchivesLocked() {
+	if p.fsRepo == nil {
+		return
+	}
+	for id, entry := range p.archivedFiles {
+		if entry == nil {
+			delete(p.archivedFiles, id)
+			delete(p.archivedBytes, id)
+			continue
+		}
+		if p.fsRepo.IsArchiveDeleted(entry.TenantID, entry.ID, entry.FileName) {
+			delete(p.archivedFiles, id)
+			delete(p.archivedBytes, id)
+		}
+	}
 }
 
 func (p *Processor) persistTenantArchiveIndexLocked(normTenant string) error {
@@ -280,9 +312,14 @@ func (p *Processor) persistTenantArchiveIndexLocked(normTenant string) error {
 	}
 	var list []*ArchivedFile
 	for _, item := range p.archivedFiles {
-		if item.TenantID == normTenant {
-			list = append(list, item)
+		if item.TenantID != normTenant {
+			continue
 		}
+		// Never rewrite a tombstoned id back into index.json (other-instance delete race).
+		if p.fsRepo != nil && p.fsRepo.IsArchiveDeleted(item.TenantID, item.ID, item.FileName) {
+			continue
+		}
+		list = append(list, item)
 	}
 	sort.Slice(list, func(i, j int) bool {
 		return list[i].UploadedAt > list[j].UploadedAt

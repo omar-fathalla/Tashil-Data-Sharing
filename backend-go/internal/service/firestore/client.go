@@ -65,6 +65,12 @@ type Repository interface {
 	MarkArchiveDeleted(ctx context.Context, tenantID, archiveID, fileName string) error
 	UnmarkArchiveDeleted(ctx context.Context, tenantID, archiveID, fileName string) error
 	IsArchiveDeleted(tenantID, archiveID, fileName string) bool
+	// RememberArchiveDeleted applies a tombstone to the in-memory map only (no remote write).
+	// Used when reloading disk tombstones or merging remote sync into a running instance.
+	RememberArchiveDeleted(tenantID, archiveID, fileName string)
+	// RefreshDeletedArchives re-reads deleted_archives from Cloud Firestore into memory.
+	// No-op when Firestore is not configured. Safe to call on archive list/sync.
+	RefreshDeletedArchives(ctx context.Context)
 }
 
 // Client implements Repository with fast in-memory storage for Cloud Run and local tests,
@@ -2228,6 +2234,24 @@ func (c *Client) IsArchiveDeleted(tenantID, archiveID, fileName string) bool {
 		return true
 	}
 	return false
+}
+
+// RememberArchiveDeleted records a tombstone in memory only. Does not write Cloud Firestore.
+func (c *Client) RememberArchiveDeleted(tenantID, archiveID, fileName string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if archiveID != "" {
+		c.deletedArchives["id:"+archiveID] = true
+	}
+	if k := archiveTombstoneKeyByName(tenantID, fileName); k != "" {
+		c.deletedArchives[k] = true
+	}
+}
+
+// RefreshDeletedArchives re-syncs deleted_archives from Cloud Firestore so running instances
+// learn about deletes performed by other Cloud Run instances after startup.
+func (c *Client) RefreshDeletedArchives(ctx context.Context) {
+	c.syncDeletedArchivesFromFirestore(ctx)
 }
 
 // seedPasswordHashFromEnv returns a bcrypt hash of the password held in the named environment

@@ -71,3 +71,24 @@ await page.goto('/adeco')
 ```
 
 Constants live in `tashil_web/lib/core/testing/test_semantics.dart` (`TestIds`).
+
+## E2E notes (live / automation)
+
+### `file-delete` / `file-row` id shape
+
+Dynamic ids are **`file-delete-<archiveId>-<slugified-filename>`** (and the same
+pattern for `file-row-…`). Both segments run through `TestIds.fileToken`
+(lowercase; non `[a-z0-9._-]` → `-`). Example:
+
+`file-delete-arch_adeco_fathalla_1792255997606803322-2025-out.xlsx`
+
+Do not look up by filename alone; always include the archive id.
+
+### Nav hit targets vs `devicePixelRatio` (known, do not block)
+
+On some live Chrome sessions (Retina / `devicePixelRatio` ≈ 2), Flutter web
+Semantics hit-boxes for `nav-sell-out` / `nav-sell-in` can sit roughly **2×**
+away from the painted control (off-screen or wrong spot for
+`page.locator(...).click()`). Prefer clicking the visible control via role /
+text, or set the automation viewport DPR to `1` when driving Semantics
+geometry. Tracking only — not a merge blocker for archive-delete fixes.
