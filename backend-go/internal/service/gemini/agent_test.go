@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -131,6 +132,22 @@ func TestGeminiAgentSyntheticFallbackPreserved(t *testing.T) {
 	}
 	if payload.RetailerDetected != "carrefour" || len(payload.NormalizedRecords) == 0 {
 		t.Errorf("expected fallback records for synthetic payload, got %+v", payload)
+	}
+	if payload.MappingSource != MappingSourceMock || payload.AiModelUsed != "mock" || payload.AiTierUsed != "mock" {
+		t.Errorf("expected honest mock metadata, got source=%s model=%s tier=%s conf=%.3f",
+			payload.MappingSource, payload.AiModelUsed, payload.AiTierUsed, payload.ConfidenceScore)
+	}
+	if payload.ConfidenceScore >= 0.996 {
+		t.Errorf("mock must not claim inflated Tier2 confidence, got %.3f", payload.ConfidenceScore)
+	}
+}
+
+func TestMockSamplesRefusedInProduction(t *testing.T) {
+	t.Setenv("ENVIRONMENT", "production")
+	agent := NewAgent("", "gemini-3.8-flash", true)
+	_, err := agent.AnalyzeAndNormalize(context.Background(), "carrefour_synthetic.csv", []byte{1, 2, 3})
+	if err == nil || !errors.Is(err, ErrMockSamplesInProduction) {
+		t.Fatalf("expected ErrMockSamplesInProduction, got %v", err)
 	}
 }
 

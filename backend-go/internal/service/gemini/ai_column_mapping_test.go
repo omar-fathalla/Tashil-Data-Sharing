@@ -55,8 +55,11 @@ func TestAIMappingWideBook3Layout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.MappingSource != "ai" || p.AiTierUsed != "tier1" || p.Validation == nil || p.Validation.Status != "ok" {
+	if p.MappingSource != MappingSourceAI || p.AiTierUsed != "tier1" || p.Validation == nil || p.Validation.Status != "ok" {
 		t.Fatalf("unexpected: source=%s tier=%s validation=%+v", p.MappingSource, p.AiTierUsed, p.Validation)
+	}
+	if p.MappingConfidence != 0.95 || p.ConfidenceScore != 0.95 {
+		t.Fatalf("expected real AI confidence 0.95, got mapping=%.2f score=%.2f", p.MappingConfidence, p.ConfidenceScore)
 	}
 	// sum over i=1..30: value 150*i = 69750, units 3*i = 1395
 	if p.Validation.ExtractedValue != 69750 || p.Validation.ExtractedUnits != 1395 {
@@ -89,8 +92,11 @@ func TestAIMappingUnavailableFallsBackToDeterministic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.MappingSource != "deterministic" || p.Validation == nil || p.Validation.ExtractedUnits != 1395 {
+	if p.MappingSource != MappingSourceDeterministic || p.Validation == nil || p.Validation.ExtractedUnits != 1395 {
 		t.Fatalf("source=%s validation=%+v", p.MappingSource, p.Validation)
+	}
+	if p.AiModelUsed != "" || p.AiTierUsed != "" || p.Tier2Escalated {
+		t.Fatalf("deterministic must not claim AI tier/model: model=%q tier=%q esc=%v", p.AiModelUsed, p.AiTierUsed, p.Tier2Escalated)
 	}
 }
 

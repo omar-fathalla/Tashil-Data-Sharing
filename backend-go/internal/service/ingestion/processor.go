@@ -66,6 +66,8 @@ type IngestionResult struct {
 	AiModelUsed           string `json:"ai_model_used"`
 	AiTierUsed            string `json:"ai_tier_used"`
 	Tier2Escalated        bool   `json:"tier2_escalated"`
+	MappingSource         string  `json:"mapping_source,omitempty"` // ai | deterministic | cache | mock
+	MappingConfidence     float64 `json:"mapping_confidence,omitempty"`
 
 	// BigQuerySync reports the durable BigQuery write for committed uploads (nil for previews / when not attempted).
 	BigQuerySync *bqsink.Result `json:"bigquery_sync,omitempty"`
@@ -909,6 +911,8 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 		AiModelUsed:            payload.AiModelUsed,
 		AiTierUsed:             payload.AiTierUsed,
 		Tier2Escalated:         payload.Tier2Escalated,
+		MappingSource:          payload.MappingSource,
+		MappingConfidence:      payload.MappingConfidence,
 		BigQuerySync:           directSync,
 	}
 
@@ -1339,6 +1343,10 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		return nil, err
 	}
 	var warnings []UploadIssue
+	mappingSource := gemini.MappingSourceDeterministic
+	aiModelUsed, aiTierUsed := "", ""
+	tier2Escalated := false
+	var mappingConfidence float64
 	if parseReport != nil && parseReport.MonthCheck != "" {
 		warnings = append(warnings, UploadIssue{Code: "month_column_mismatch", Severity: "info", MessageAR: parseReport.MonthCheck})
 	}
@@ -1427,6 +1435,15 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 			warnings = append(warnings, UploadIssue{Code: "missing_units", Severity: "warning", Count: noQty,
 				MessageAR: fmt.Sprintf("%d صف ليه قيمة من غير كمية. الكمية اتسابت صفر (مفيش كمية اتحسبت من القيمة).", noQty)})
 		}
+		if src := strings.TrimSpace(payload.MappingSource); src != "" {
+			mappingSource = src
+		} else {
+			mappingSource = gemini.MappingSourceAI
+		}
+		aiModelUsed = payload.AiModelUsed
+		aiTierUsed = payload.AiTierUsed
+		tier2Escalated = payload.Tier2Escalated
+		mappingConfidence = payload.MappingConfidence
 	}
 
 	if err := resolveSellInPeriod(ctx, records); err != nil {
@@ -1634,12 +1651,15 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 			NetRevenueColumn:   "صافي القيمة بالجنيه (Net_Value_EGP) + المتوقع (EXP)",
 			CategoryColumn:     "العلامة التجارية والقطاع (Brand / Sector)",
 		},
-		Anomalies:     []domain.IngestionAnomaly{},
-		SampleRecords: samples,
-		AiModelUsed:   "Gemini 3.8 Flash CPFR Sell-In Engine",
-		AiTierUsed:    "Tier 1 - CPFR Reconciliation & Forecasting",
-		IsStaged:      dryRun,
-		IsCommitted:   !dryRun,
+		Anomalies:         []domain.IngestionAnomaly{},
+		SampleRecords:     samples,
+		AiModelUsed:       aiModelUsed,
+		AiTierUsed:        aiTierUsed,
+		Tier2Escalated:    tier2Escalated,
+		MappingSource:     mappingSource,
+		MappingConfidence: mappingConfidence,
+		IsStaged:          dryRun,
+		IsCommitted:       !dryRun,
 	}
 	result.UploadWarnings = warnings
 	result.QuarantinedCustomers = quarantined
@@ -1647,7 +1667,7 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	if parseReport != nil {
 		result.ParseLayout = parseReport.Layout
 	}
-	// reportUnknown runs after SetSellInRecords enriched the records with the Product Master.
+	// reportUnknown uses read-only Product Master enrichment; it must not persist Sell-In rows.
 	reportUnknown := func() {
 		unknown, issue := p.unknownBarcodesAll(tenantID, records, allRecords)
 		if issue == nil {
@@ -1677,9 +1697,7 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 			CreatedAt:         time.Now(),
 		}
 		p.stagedMu.Unlock()
-		if len(records) > 0 {
-			_ = p.bqRepo.SetSellInRecords(ctx, tenantID, filename, records)
-		}
+		// Preview must never change committed Sell-In data (no SetSellInRecords on dry-run).
 		reportUnknown()
 		return result, nil
 	}
