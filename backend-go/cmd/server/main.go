@@ -24,6 +24,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
+	"github.com/tashil/data-sharing/backend/internal/service/matcher"
 	"github.com/tashil/data-sharing/backend/internal/service/sellinassist"
 )
 
@@ -68,13 +69,25 @@ func main() {
 	// Sell-In customer registry: only exact or admin-approved names count; unknown names are quarantined.
 	customerRegistry := customers.New(fsRepo)
 	ingestProcessor.SetCustomerRegistry(customerRegistry)
+	// Product/barcode matching review queue (Phase A4) — never invents barcodes; uncertain → human review.
+	productMatchQueue := matcher.NewQueue()
 	ingestProcessor.OnUploadIssues(func(ctx context.Context, tenantID, filename string, unknown []ingestion.UnknownBarcode) {
 		items := make([]dataquality.UnknownItem, 0, len(unknown))
+		queries := make([]matcher.Query, 0, len(unknown))
 		for _, u := range unknown {
 			items = append(items, dataquality.UnknownItem{ItemCode: u.ItemCode, Barcode: u.Barcode, ItemName: u.ItemName, Rows: u.Rows, Value: u.Value})
+			queries = append(queries, matcher.Query{
+				ItemCode: u.ItemCode, Barcode: u.Barcode, SKUName: u.ItemName,
+				SourceFile: filename, Rows: u.Rows, Value: u.Value,
+			})
 		}
 		if err := dqService.RecordSellInUnknownItems(ctx, tenantID, filename, items); err != nil {
 			log.Printf("[data-quality] unknown items for %s: %v", filename, err)
+		}
+		cat := matcher.NewCatalog(bqRepo.GetProductMasterItems(tenantID))
+		enqueued := productMatchQueue.EnqueueUnknowns(tenantID, filename, queries, cat)
+		if len(enqueued) > 0 {
+			log.Printf("[product-match] tenant=%s file=%s enqueued %d review item(s)", tenantID, filename, len(enqueued))
 		}
 	})
 
@@ -226,10 +239,13 @@ func main() {
 	chainDiscountHandler := handlers.NewChainDiscountHandler(fsRepo, fsRepo, bqRepo)
 	dataQualityHandler := handlers.NewDataQualityHandler(dqService, fsRepo)
 	customerRegistryHandler := handlers.NewCustomerRegistryHandler(ingestProcessor, fsRepo)
+	productMatchHandler := handlers.NewProductMatchHandler(productMatchQueue, bqRepo)
 	// Sell-In Gemini assist (layout + SELLIN_CUSTOMER_CHAIN_MAP suggestions). Human approval only;
 	// never mutates production data or env. Own package — no edits to hot Gemini ingest paths.
+	// Decisions are RAM-only (same as product-match review queue): lost on restart / not shared across instances.
 	sellInAssistSvc := sellinassist.New(cfg.GeminiAPIKey, cfg.GeminiModel, cfg.GeminiAPIKey == "").WithTier2Model(cfg.GeminiTier2Model)
 	sellInAssistHandler := handlers.NewSellInAssistHandler(sellInAssistSvc)
+	uploadHandler.WithSellInAssist(sellInAssistSvc)
 
 	// 5. Setup Mux Router (Go 1.22+ method + path patterns)
 	mux := http.NewServeMux()
@@ -299,6 +315,11 @@ func main() {
 	mux.HandleFunc("POST /api/v1/customers/registry/approve", customerRegistryHandler.HandleApprove)
 	mux.HandleFunc("POST /api/v1/customers/registry/reject", customerRegistryHandler.HandleReject)
 	mux.HandleFunc("POST /api/v1/customers/registry/unmerge", customerRegistryHandler.HandleUnmerge)
+	mux.HandleFunc("POST /api/v1/product-match", productMatchHandler.HandleMatch)
+	mux.HandleFunc("POST /api/v1/product-match/enqueue", productMatchHandler.HandleEnqueue)
+	mux.HandleFunc("GET /api/v1/product-match/review", productMatchHandler.HandleListReview)
+	mux.HandleFunc("POST /api/v1/product-match/review/decide", productMatchHandler.HandleDecide)
+	mux.HandleFunc("GET /api/v1/product-match/metrics", productMatchHandler.HandleMetrics)
 	mux.HandleFunc("GET /api/v1/sell-in/years", customerRegistryHandler.HandleYears)
 	mux.HandleFunc("GET /api/v1/sell-in/assist/suggestions", sellInAssistHandler.HandleList)
 	mux.HandleFunc("POST /api/v1/sell-in/assist/suggest-layout", sellInAssistHandler.HandleSuggestLayout)
