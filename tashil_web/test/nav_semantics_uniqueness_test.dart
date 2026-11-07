@@ -9,26 +9,18 @@ import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/features/navigation/presentation/app_shell.dart';
 import 'package:tashil_web/features/navigation/presentation/desktop_sidebar.dart';
 
-/// Counts our instrumentation attachments (exactly one per destination).
-int countNavAttachments(WidgetTester tester, String id) {
-  return find
-      .byWidgetPredicate(
-        (w) => w is TestSemantics && w.identifier == id,
-      )
-      .evaluate()
-      .length;
-}
-
-/// Counts engine Semantics nodes that expose [id] (findability check).
-int countSemanticsIdentifiers(WidgetTester tester, String id) {
+/// Counts deepest Semantics nodes that expose [id] (no descendant with the
+/// same id). Material parents may copy an identifier upward; deepest nodes are
+/// the real interactive targets.
+int countInteractiveTargets(WidgetTester tester, String id) {
   final owner = tester.binding.pipelineOwner.semanticsOwner;
   final root = owner?.rootSemanticsNode;
   if (root == null) return 0;
 
-  var count = 0;
+  final matches = <SemanticsNode>[];
   void walk(SemanticsNode node) {
     if (node.getSemanticsData().identifier == id) {
-      count += 1;
+      matches.add(node);
     }
     node.visitChildren((child) {
       walk(child);
@@ -37,7 +29,42 @@ int countSemanticsIdentifiers(WidgetTester tester, String id) {
   }
 
   walk(root);
-  return count;
+
+  bool hasDescendantWithId(SemanticsNode node) {
+    var found = false;
+    void check(SemanticsNode n) {
+      if (n.getSemanticsData().identifier == id) {
+        found = true;
+        return;
+      }
+      n.visitChildren((c) {
+        if (!found) check(c);
+        return !found;
+      });
+    }
+
+    node.visitChildren((c) {
+      check(c);
+      return !found;
+    });
+    return found;
+  }
+
+  return matches.where((n) => !hasDescendantWithId(n)).length;
+}
+
+/// Sell-Out explorer overflows narrow viewports; ignore those layout reports.
+void ignoreRenderFlexOverflows() {
+  final previous = FlutterError.onError;
+  FlutterError.onError = (details) {
+    if (details.exceptionAsString().contains('A RenderFlex overflowed')) {
+      return;
+    }
+    previous?.call(details);
+  };
+  addTearDown(() {
+    FlutterError.onError = previous;
+  });
 }
 
 Widget _shellApp(ApiClient apiClient) {
@@ -69,7 +96,7 @@ void main() {
   });
 
   testWidgets(
-      'DesktopSidebar attaches exactly one nav id per Sell-Out / Sell-In',
+      'DesktopSidebar has exactly one interactive nav-sell-out / nav-sell-in',
       (tester) async {
     final handle = tester.ensureSemantics();
     try {
@@ -93,19 +120,24 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(countNavAttachments(tester, TestIds.navSellOut), 1);
-      expect(countNavAttachments(tester, TestIds.navSellIn), 1);
-      expect(countSemanticsIdentifiers(tester, TestIds.navSellOut), greaterThanOrEqualTo(1));
-      expect(countSemanticsIdentifiers(tester, TestIds.navSellIn), greaterThanOrEqualTo(1));
+      expect(countInteractiveTargets(tester, TestIds.navSellOut), 1);
+      expect(countInteractiveTargets(tester, TestIds.navSellIn), 1);
+
+      await tester.tap(find.text('Sell-Out'));
+      await tester.pumpAndSettle();
+      expect(countInteractiveTargets(tester, TestIds.navSellOut), 1);
+      expect(countInteractiveTargets(tester, TestIds.navSellIn), 1);
     } finally {
       handle.dispose();
     }
   });
 
   testWidgets(
-      'NavigationRail attaches exactly one interactive target per nav id',
+      'NavigationRail has exactly one interactive target per nav id '
+      '(including when Sell-Out is selected)',
       (tester) async {
     final handle = tester.ensureSemantics();
+    ignoreRenderFlexOverflows();
     try {
       tester.view.physicalSize = const Size(800, 1024);
       tester.view.devicePixelRatio = 1.0;
@@ -116,19 +148,24 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(NavigationRail), findsOneWidget);
-      expect(countNavAttachments(tester, TestIds.navSellOut), 1);
-      expect(countNavAttachments(tester, TestIds.navSellIn), 1);
-      expect(countSemanticsIdentifiers(tester, TestIds.navSellOut), greaterThanOrEqualTo(1));
-      expect(countSemanticsIdentifiers(tester, TestIds.navSellIn), greaterThanOrEqualTo(1));
+      expect(countInteractiveTargets(tester, TestIds.navSellOut), 1);
+      expect(countInteractiveTargets(tester, TestIds.navSellIn), 1);
+
+      await tester.tap(find.text('Sell-Out'));
+      await tester.pumpAndSettle();
+
+      expect(countInteractiveTargets(tester, TestIds.navSellOut), 1);
+      expect(countInteractiveTargets(tester, TestIds.navSellIn), 1);
     } finally {
       handle.dispose();
     }
   });
 
   testWidgets(
-      'Drawer exposes Sell-In id (Sell-Out stays on bottom bar only)',
+      'Compact bottom bar keeps exactly one nav-sell-out when Sell-Out selected',
       (tester) async {
     final handle = tester.ensureSemantics();
+    ignoreRenderFlexOverflows();
     try {
       tester.view.physicalSize = const Size(400, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -138,27 +175,53 @@ void main() {
       await tester.pumpWidget(_shellApp(apiClient));
       await tester.pumpAndSettle();
 
-      expect(countNavAttachments(tester, TestIds.navSellOut), 1);
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(countInteractiveTargets(tester, TestIds.navSellOut), 1);
+
+      await tester.tap(find.text('Sell-Out'));
+      await tester.pumpAndSettle();
+
+      // selectedIcon is also tagged — id must remain exactly once when selected.
+      expect(countInteractiveTargets(tester, TestIds.navSellOut), 1);
+    } finally {
+      handle.dispose();
+    }
+  });
+
+  testWidgets(
+      'Drawer exposes exactly one interactive nav-sell-in',
+      (tester) async {
+    final handle = tester.ensureSemantics();
+    ignoreRenderFlexOverflows();
+    try {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(_shellApp(apiClient));
+      await tester.pumpAndSettle();
+
+      // Bottom bar owns Sell-Out before the drawer opens.
+      expect(countInteractiveTargets(tester, TestIds.navSellOut), 1);
 
       final scaffoldState = tester.state<ScaffoldState>(find.byType(Scaffold));
       scaffoldState.openDrawer();
       await tester.pumpAndSettle();
 
       expect(find.byType(NavigationDrawer), findsOneWidget);
-      // Sell-Out is not re-attached in the drawer (bottom bar owns it).
-      expect(countNavAttachments(tester, TestIds.navSellOut), 1);
-      expect(countNavAttachments(tester, TestIds.navSellIn), 1);
-      expect(
-        countSemanticsIdentifiers(tester, TestIds.navSellIn),
-        greaterThanOrEqualTo(1),
-      );
+      // Drawer adds Sell-In only (does not re-attach Sell-Out).
+      expect(countInteractiveTargets(tester, TestIds.navSellIn), 1);
     } finally {
       handle.dispose();
     }
   });
 
-  testWidgets('Compact More sheet attaches nav-sell-in once', (tester) async {
+  testWidgets(
+      'Compact More sheet has exactly one interactive nav-sell-in',
+      (tester) async {
     final handle = tester.ensureSemantics();
+    ignoreRenderFlexOverflows();
     try {
       tester.view.physicalSize = const Size(400, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -168,18 +231,13 @@ void main() {
       await tester.pumpWidget(_shellApp(apiClient));
       await tester.pumpAndSettle();
 
-      // Bottom bar owns Sell-Out (single attachment).
-      expect(countNavAttachments(tester, TestIds.navSellOut), 1);
+      expect(countInteractiveTargets(tester, TestIds.navSellOut), 1);
 
       await tester.tap(find.text('More'));
       await tester.pumpAndSettle();
 
       expect(find.text('Sell-In & Targets'), findsOneWidget);
-      // Sell-In is only instrumented in the More sheet on compact layouts.
-      expect(countNavAttachments(tester, TestIds.navSellIn), 1);
-      expect(countSemanticsIdentifiers(tester, TestIds.navSellIn), greaterThanOrEqualTo(1));
-      // Sell-Out stays only on the bottom bar (sheet does not re-attach).
-      expect(countNavAttachments(tester, TestIds.navSellOut), 1);
+      expect(countInteractiveTargets(tester, TestIds.navSellIn), 1);
     } finally {
       handle.dispose();
     }

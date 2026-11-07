@@ -841,13 +841,20 @@ class _AppShellState extends State<AppShell> {
               selectedIcon: Icon(Icons.dashboard_rounded),
               label: 'Dashboard',
             ),
+            // NavigationBar swaps icon ↔ selectedIcon; tag both so
+            // nav-sell-out stays present in selected and unselected states.
+            // Only one of the two is built at a time.
             const NavigationDestination(
               icon: TestSemantics.navTarget(
                 identifier: TestIds.navSellOut,
                 label: 'Sell-Out',
                 child: Icon(Icons.analytics_rounded),
               ),
-              selectedIcon: Icon(Icons.analytics_rounded),
+              selectedIcon: TestSemantics.navTarget(
+                identifier: TestIds.navSellOut,
+                label: 'Sell-Out',
+                child: Icon(Icons.analytics_rounded),
+              ),
               label: 'Sell-Out',
             ),
             const NavigationDestination(
