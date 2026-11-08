@@ -96,7 +96,6 @@ class AppIcons {
   static const IconData groups = Icons.groups_rounded;
   static const IconData pendingCustomers = Icons.person_search_rounded;
   static const IconData sellInAssist = Icons.auto_awesome_rounded;
-  static const IconData productMatchReview = Icons.qr_code_scanner_rounded;
   static const IconData link = Icons.link_rounded;
   static const IconData tableChart = Icons.table_chart_rounded;
   static const IconData undo = Icons.undo_rounded;

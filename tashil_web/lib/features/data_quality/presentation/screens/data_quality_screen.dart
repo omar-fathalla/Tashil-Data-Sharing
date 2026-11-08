@@ -9,7 +9,6 @@ import '../../../../core/widgets/m3_dropdown.dart';
 import '../../data/data_quality_repository.dart';
 import '../../../customer_registry/presentation/pending_customers_screen.dart';
 import '../../../sellin_assist/presentation/sellin_assist_screen.dart';
-import '../../../product_match/presentation/screens/product_match_review_screen.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 
 String _egp(double v) {
@@ -183,15 +182,6 @@ class _DataQualityScreenState extends State<DataQualityScreen> with DataRefreshM
                       builder: (_) => SellInAssistScreen(apiClient: widget.apiClient),
                     )),
                     icon: const Icon(AppIcons.sellInAssist),
-                  ),
-                if (widget.apiClient != null)
-                  IconButton(
-                    key: const ValueKey('dq_product_match_review'),
-                    tooltip: 'مراجعة مطابقة الأصناف',
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                      builder: (_) => ProductMatchReviewScreen(apiClient: widget.apiClient),
-                    )),
-                    icon: const Icon(AppIcons.productMatchReview),
                   ),
                 const SizedBox(width: 4.0),
                 FilledButton.tonalIcon(

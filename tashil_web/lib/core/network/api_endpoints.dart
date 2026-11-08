@@ -55,11 +55,6 @@ class ApiEndpoints {
   static String get sellInAssistApprove => '$baseUrl/api/v1/sell-in/assist/approve';
   static String get sellInAssistReject => '$baseUrl/api/v1/sell-in/assist/reject';
   static String get sellInAssistMetrics => '$baseUrl/api/v1/sell-in/assist/metrics';
-  static String get productMatch => '$baseUrl/api/v1/product-match';
-  static String get productMatchEnqueue => '$baseUrl/api/v1/product-match/enqueue';
-  static String get productMatchReview => '$baseUrl/api/v1/product-match/review';
-  static String get productMatchDecide => '$baseUrl/api/v1/product-match/review/decide';
-  static String get productMatchMetrics => '$baseUrl/api/v1/product-match/metrics';
   static String get stores => '$baseUrl/api/v1/stores';
   static String get tenants => '$baseUrl/api/v1/tenants';
   static String get batches => '$baseUrl/api/v1/batches';
