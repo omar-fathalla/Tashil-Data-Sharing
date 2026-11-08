@@ -46,35 +46,36 @@ jobs:
           chmod +x scripts/mac_lock_ci.sh
           bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "playwright-semantics-smoke" 45 120
 
+      # Prefer $HOME/toolchains/flutter (see scripts/ci_detect_flutter.sh). Falling through to
+      # flutter-action+cache has caused self-hosted Mac runners to lose GitHub communication.
+      # PUB_CACHE is set by scripts/ci_runner_env.sh ($RUNNER_TEMP/pub-cache per job).
       - name: Detect preinstalled Flutter
         id: flutter_pre
+        env:
+          FLUTTER_VERSION: ${{ env.FLUTTER_VERSION }}
         run: |
-          set -euo pipefail
-          if command -v flutter >/dev/null 2>&1; then
-            flutter --version || true
-            if flutter --version 2>/dev/null | grep -q "${{ env.FLUTTER_VERSION }}"; then
-              echo "use_action=false" >> "$GITHUB_OUTPUT"
-              echo "Reusing preinstalled Flutter ${{ env.FLUTTER_VERSION }} at $(command -v flutter)"
-              exit 0
-            fi
-          fi
-          echo "use_action=true" >> "$GITHUB_OUTPUT"
-          echo "Preinstalled Flutter ${{ env.FLUTTER_VERSION }} not found; will use flutter-action"
+          chmod +x scripts/ci_detect_flutter.sh
+          bash scripts/ci_detect_flutter.sh
 
       - uses: subosito/flutter-action@v2
         if: steps.flutter_pre.outputs.use_action == 'true'
+        timeout-minutes: 20
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
-          cache: true
+          # Cache restore/download of the full SDK has starved tashil-mac (lost communication).
+          cache: false
 
+      # Self-hosted: local PUB_CACHE only (skip remote actions/cache — stalls / races on Mac).
+      # GitHub-hosted: cache the same isolated path ci_runner_env.sh sets (never ~/.pub-cache).
       - name: Cache pub dependencies
+        if: runner.environment != 'self-hosted'
         uses: actions/cache@v4
         with:
-          path: ~/.pub-cache
-          key: ${{ runner.os }}-${{ runner.arch }}-pub-${{ hashFiles('tashil_web/pubspec.lock') }}
+          path: ${{ runner.temp }}/pub-cache
+          key: ${{ runner.os }}-${{ runner.arch }}-pub-isolated-v1-${{ hashFiles('tashil_web/pubspec.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-pub-
+            ${{ runner.os }}-${{ runner.arch }}-pub-isolated-v1-
 
       - name: flutter pub get
         working-directory: tashil_web
@@ -153,6 +154,23 @@ jobs:
             e2e/test-results
             e2e/playwright-report
           if-no-files-found: ignore
+
+      - name: Surface failure summary
+        if: failure()
+        run: |
+          {
+            echo "## Playwright Semantics smoke failed"
+            echo ""
+            echo "flutter pub get / build web / Playwright smoke failed on branch \`${{ github.ref_name }}\`."
+            echo "Reproduce locally:"
+            echo ""
+            echo '```bash'
+            echo 'cd tashil_web && flutter pub get && flutter build web --release'
+            echo 'cd e2e && npm ci && npx playwright test'
+            echo '```'
+            echo ""
+            echo "Proposed next step: fix on this PR branch and push — do not auto-push fixes to main."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Stop static server and clean local artifacts
         if: always()

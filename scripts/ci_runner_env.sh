@@ -16,6 +16,37 @@ if [[ -d "${TOOLCHAINS}/bin" ]]; then
   export PATH="${TOOLCHAINS}/bin:${PATH}"
 fi
 
+# Flutter SDK lives at $HOME/toolchains/flutter (not always symlinked into toolchains/bin).
+# Missing this path forces flutter-action downloads that have starved self-hosted Mac runners
+# ("lost communication with the server" mid-setup).
+for flutter_bin in \
+  "${TOOLCHAINS}/flutter/bin" \
+  "${HOME_DIR}/flutter/bin" \
+  "${HOME_DIR}/fvm/default/bin"; do
+  if [[ -x "${flutter_bin}/flutter" ]]; then
+    echo "${flutter_bin}" >>"${GITHUB_PATH:-/dev/null}"
+    export PATH="${flutter_bin}:${PATH}"
+    break
+  fi
+done
+
+# Never share ~/.pub-cache across concurrent Mac runners (Bad file descriptor / File exists).
+# Prefer $RUNNER_TEMP/pub-cache (per job). Else per-runner dir under toolchains. Honor PUB_CACHE=.
+runner="${RUNNER_NAME:-unknown}"
+if [[ -n "${PUB_CACHE:-}" ]]; then
+  PUB_CACHE_DIR="${PUB_CACHE}"
+elif [[ -n "${RUNNER_TEMP:-}" ]]; then
+  PUB_CACHE_DIR="${RUNNER_TEMP}/pub-cache"
+else
+  runner_slug="$(printf '%s' "${runner}" | tr -c 'A-Za-z0-9._-' '_')"
+  PUB_CACHE_DIR="${TOOLCHAINS}/pub-cache/${runner_slug}"
+fi
+mkdir -p "${PUB_CACHE_DIR}"
+export PUB_CACHE="${PUB_CACHE_DIR}"
+if [[ -n "${GITHUB_ENV:-}" ]]; then
+  echo "PUB_CACHE=${PUB_CACHE}" >>"${GITHUB_ENV}"
+fi
+
 # Android SDK: honor existing ANDROID_HOME, else $HOME/toolchains/android-sdk.
 if [[ -z "${ANDROID_HOME:-}" ]]; then
   if [[ -d "${TOOLCHAINS}/android-sdk" ]]; then
@@ -29,7 +60,6 @@ if [[ -n "${ANDROID_HOME:-}" ]]; then
 fi
 
 # Stable per-runner ADB server port (avoid default 5037 collisions across runners).
-runner="${RUNNER_NAME:-unknown}"
 case "$runner" in
   *mac-3*|*runner-3*) adb_port=5039 ;;
   *mac-2*|*runner-2*) adb_port=5038 ;;
@@ -44,4 +74,4 @@ if [[ -n "${GITHUB_ENV:-}" ]]; then
   } >>"$GITHUB_ENV"
 fi
 
-echo "ci_runner_env: HOME=${HOME_DIR} runner=${runner} ANDROID_HOME=${ANDROID_HOME:-unset} ADB=${ANDROID_ADB_SERVER_PORT}"
+echo "ci_runner_env: HOME=${HOME_DIR} runner=${runner} ANDROID_HOME=${ANDROID_HOME:-unset} ADB=${ANDROID_ADB_SERVER_PORT} PUB_CACHE=${PUB_CACHE}"
