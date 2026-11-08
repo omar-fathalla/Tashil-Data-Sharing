@@ -8,9 +8,13 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
+
+var numberToken = regexp.MustCompile(`\d+(?:\.\d+)?`)
 
 const defaultGeminiBase = "https://generativelanguage.googleapis.com"
 
@@ -89,6 +93,106 @@ func (s *Service) polishArabic(ctx context.Context, question, grounded string, e
 		return "", false
 	}
 	return out, true
+}
+
+// polishPreservesClaims rejects Gemini output that invents numbers absent from
+// the grounded answer / evidence, or drops every key evidence figure.
+func polishPreservesClaims(polished, grounded string, evidence map[string]interface{}) bool {
+	allowed := map[string]bool{}
+	for _, n := range numberToken.FindAllString(grounded, -1) {
+		allowed[canonicalizeNumber(n)] = true
+	}
+	collectEvidenceNumbers(evidence, allowed)
+	if len(allowed) == 0 {
+		// No numeric claims to check — accept non-empty polish.
+		return strings.TrimSpace(polished) != ""
+	}
+
+	polishedNums := numberToken.FindAllString(polished, -1)
+	for _, n := range polishedNums {
+		if !allowed[canonicalizeNumber(n)] {
+			return false // fabricated
+		}
+	}
+
+	// At least one key evidence number must still appear when evidence has keys.
+	keys := []string{"total_revenue", "total_net_value", "total_units_sold", "total_units", "record_count", "active_stores_count"}
+	required := map[string]bool{}
+	for _, k := range keys {
+		if v, ok := evidence[k]; ok {
+			for _, n := range numbersFromValue(v) {
+				required[canonicalizeNumber(n)] = true
+			}
+		}
+	}
+	if len(required) == 0 {
+		return true
+	}
+	seen := map[string]bool{}
+	for _, n := range polishedNums {
+		seen[canonicalizeNumber(n)] = true
+	}
+	for n := range required {
+		if seen[n] {
+			return true
+		}
+	}
+	return false
+}
+
+func collectEvidenceNumbers(v interface{}, into map[string]bool) {
+	switch x := v.(type) {
+	case map[string]interface{}:
+		for _, child := range x {
+			collectEvidenceNumbers(child, into)
+		}
+	case []interface{}:
+		for _, child := range x {
+			collectEvidenceNumbers(child, into)
+		}
+	case []map[string]interface{}:
+		for _, child := range x {
+			collectEvidenceNumbers(child, into)
+		}
+	default:
+		for _, n := range numbersFromValue(x) {
+			into[canonicalizeNumber(n)] = true
+		}
+	}
+}
+
+func numbersFromValue(v interface{}) []string {
+	switch x := v.(type) {
+	case float64:
+		return []string{strconv.FormatFloat(x, 'f', -1, 64), fmt.Sprintf("%.2f", x)}
+	case float32:
+		return []string{strconv.FormatFloat(float64(x), 'f', -1, 64), fmt.Sprintf("%.2f", float64(x))}
+	case int:
+		return []string{strconv.Itoa(x)}
+	case int64:
+		return []string{strconv.FormatInt(x, 10)}
+	case json.Number:
+		return []string{x.String()}
+	case string:
+		return numberToken.FindAllString(x, -1)
+	default:
+		return nil
+	}
+}
+
+func canonicalizeNumber(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return s
+	}
+	if f, err := strconv.ParseFloat(s, 64); err == nil {
+		// Collapse 120000.00 and 120000.
+		if f == float64(int64(f)) {
+			return strconv.FormatInt(int64(f), 10)
+		}
+		return strconv.FormatFloat(f, 'f', -1, 64)
+	}
+	return s
 }
 
 func (s *Service) callGeminiJSON(ctx context.Context, model, prompt string) (string, error) {

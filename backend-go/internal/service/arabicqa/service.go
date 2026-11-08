@@ -131,7 +131,8 @@ func (s *Service) Ask(ctx context.Context, tenantID, question string) (*Answer, 
 		ans.Sources = []string{"bigquery.category_contributions"}
 		ans.Confidence = 0.88
 	case IntentSellIn:
-		recs, total, e := s.data.GetSellInRecords(ctx, tenantID, bigquery.SellInRecordFilter{Limit: 5000, Offset: 0})
+		filter := sellInFilterForPeriod(period, time.Now())
+		recs, total, e := s.data.GetSellInRecords(ctx, tenantID, filter)
 		err = e
 		var rev, units float64
 		for _, r := range recs {
@@ -142,12 +143,18 @@ func (s *Service) Ask(ctx context.Context, tenantID, question string) (*Answer, 
 				units += r.NetQtyCases
 			}
 		}
-		// Prefer full count from querier when available.
+		// Prefer full matched count from querier (not page length).
 		count := total
 		if count == 0 {
 			count = len(recs)
 		}
 		text, ev = answerSellIn(rev, units, count, period)
+		if ev == nil {
+			ev = map[string]interface{}{}
+		}
+		ev["filter_year"] = filter.Year
+		ev["filter_month"] = filter.Month
+		ev["aggregated_rows"] = len(recs)
 		ans.Sources = []string{"bigquery.sell_in_records"}
 		ans.Confidence = 0.9
 	default:
@@ -162,11 +169,14 @@ func (s *Service) Ask(ctx context.Context, tenantID, question string) (*Answer, 
 	ans.AnswerAR = text
 	ans.Evidence = ev
 
-	// Optional Gemini polish — never invents numbers; only rephrases grounded text.
+	// Optional Gemini polish — verified against evidence; fabricated numbers → deterministic.
 	if intent != IntentUnsupported && !s.useMock {
 		if polished, ok := s.polishArabic(ctx, question, text, ev); ok && strings.TrimSpace(polished) != "" {
-			ans.AnswerAR = polished
-			ans.MappingSource = sourceAI
+			if polishPreservesClaims(polished, text, ev) {
+				ans.AnswerAR = polished
+				ans.MappingSource = sourceAI
+			}
+			// else keep deterministic text / mapping_source
 		}
 	}
 
