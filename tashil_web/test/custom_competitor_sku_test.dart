@@ -112,6 +112,24 @@ void main() {
       expect(customs(groups), isEmpty);
     }, () => fakeServer(store, failWrites: true));
   });
+
+  test('custom competitor with no history → empty monthlyPrices; current price kept', () async {
+    final store = <Map<String, dynamic>>[];
+    await http.runWithClient(() async {
+      final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
+      await addPril(api);
+      final groups = await api.getCompetitiveComparisonGroups(chain: 'fathalla');
+      final found = customs(groups).single;
+      expect(found.unitPrice, 150);
+      expect(found.monthlyPrices, isEmpty);
+      expect(found.allMonthlyPrices, isEmpty);
+      // Own live May only — Jan–Apr must not appear on own or custom series.
+      final own = groups.firstWhere((g) => g.ownBarcode == ownBarcode);
+      expect(own.monthlyPrices.map((p) => p.monthNum).toSet(), {5});
+      expect(own.monthlyPrices.any((p) => p.monthNum <= 4), isFalse);
+      expect(found.monthlyPrices.any((p) => p.monthNum <= 4), isFalse);
+    }, () => fakeServer(store));
+  });
 }
 
 http.Response _json(String body, int status) =>

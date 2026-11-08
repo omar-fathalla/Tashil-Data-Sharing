@@ -95,6 +95,14 @@ void main() {
     );
   });
 
+  test('allowDemoSeedData defaults OFF; allowMockFallback does not enable seeds', () {
+    expect(ApiClient.defaultAllowDemoSeedData, isFalse);
+    final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: true);
+    expect(api.allowDemoSeedData, isFalse);
+    final demo = ApiClient(tenantId: 'tenant-adeco', allowDemoSeedData: true);
+    expect(demo.allowDemoSeedData, isTrue);
+  });
+
   test('empty API → no seed months in picker', () {
     final resolved = CompetitorMonthOptions.resolveDataMonths(apiMonths: const []);
     expect(resolved, isEmpty);

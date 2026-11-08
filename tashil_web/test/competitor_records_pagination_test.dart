@@ -198,4 +198,84 @@ void main() {
       );
     }));
   });
+
+  test('live May–Oct + custom no history → Jan–Apr nowhere (incl. truncation)', () async {
+    const own = '6223000239438';
+    const total = 1200;
+    const cap = 500;
+    final customStore = <Map<String, dynamic>>[
+      {
+        'id': 'ccsku_field',
+        'own_barcode': own,
+        'own_sku_name': 'فيبا 3 كجم',
+        'own_unit_price': 184.67,
+        'own_volume_units': 3,
+        'own_volume_unit_label': 'كجم',
+        'competitor_sku_name': 'منافس ميداني 3 كجم',
+        'competitor_brand': 'Field Brand',
+        'competitor_supplier': 'Field Co',
+        'category': 'صابون سائل اطباق',
+        'pack_size_label': '3 كجم',
+        'pack_volume_units': 3,
+        'competitor_price': 150,
+        'retailer_chain': 'fathalla',
+        'estimated_monthly_units': 320,
+        'is_promo_active': false,
+      },
+    ];
+
+    Future<void> assertNoJanApr(ApiClient api, {required bool expectTruncation}) async {
+      final groups = await api.getCompetitiveComparisonGroups(chain: 'fathalla', year: 2026, month: 0);
+      if (expectTruncation) {
+        expect(api.lastSellOutPaginationWarning, isNotNull);
+      }
+      final g = groups.firstWhere((x) => x.ownBarcode == own);
+      expect(g.monthlyPrices.any((p) => p.monthNum <= 4), isFalse);
+      expect(g.allMonthlyPrices.any((p) => p.monthNum <= 4), isFalse);
+      // Picker-facing series months: live May+ only (truncation → May only).
+      final seriesMonths = CompetitorMonthOptions.monthsFromSeries(g.monthlyPrices, year: 2026);
+      expect(seriesMonths.any((m) => m <= 4), isFalse);
+      expect(seriesMonths, isNotEmpty);
+      final custom = g.competitors.where((c) => c.skuName == 'منافس ميداني 3 كجم').single;
+      expect(custom.unitPrice, 150);
+      expect(custom.monthlyPrices, isEmpty);
+      expect(custom.allMonthlyPrices, isEmpty);
+      expect(custom.monthlyPrices.any((p) => p.monthNum <= 4), isFalse);
+    }
+
+    await http.runWithClient(() async {
+      final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: true);
+      // allowMockFallback alone must NOT enable seed months.
+      expect(api.allowDemoSeedData, isFalse);
+      await assertNoJanApr(api, expectTruncation: false);
+
+      api.debugSellOutMaxRows = cap;
+      await assertNoJanApr(api, expectTruncation: true);
+    }, () => MockClient((req) async {
+      if (req.url.path.startsWith('/api/v1/competitors/custom-skus')) {
+        return http.Response(
+          jsonEncode({'custom_skus': customStore, 'count': customStore.length}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      if (!req.url.path.contains('/api/v1/analytics/records')) {
+        return http.Response(jsonEncode({'records': []}), 200);
+      }
+      final offset = int.parse(req.url.queryParameters['offset'] ?? '0');
+      final limit = int.parse(req.url.queryParameters['limit'] ?? '50');
+      // Full fetch: May–Oct distributed; truncated fetch still May-only pages under cap.
+      final page = <Map<String, dynamic>>[];
+      for (var i = 0; i < limit && offset + i < total; i++) {
+        final idx = offset + i;
+        final month = 5 + (idx % 6); // 5..10
+        page.add(_rec(idx, date: '2026-${month.toString().padLeft(2, '0')}-15', barcode: own));
+      }
+      return http.Response(
+        jsonEncode({'records': page, 'total_count': total}),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    }));
+  });
 }

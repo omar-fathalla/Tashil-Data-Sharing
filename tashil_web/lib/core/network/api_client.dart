@@ -2214,6 +2214,13 @@ class ApiClient {
   /// strictly preventing any fake or fabricated mock data from being displayed.
   static bool defaultAllowMockFallback = !kIsWeb;
   bool allowMockFallback;
+
+  /// Explicit demo/offline flag for competitor seed monthly series.
+  /// Default OFF everywhere (including non-web). Never derived from
+  /// [allowMockFallback] — non-web mock fallback must not invent Jan–Apr history.
+  static bool defaultAllowDemoSeedData = false;
+  bool allowDemoSeedData;
+
   final ValueNotifier<bool> isServerOnline = ValueNotifier<bool>(true);
 
   /// Called when the backend rejects the session (HTTP 401/403), e.g. a stale
@@ -2249,8 +2256,10 @@ class ApiClient {
     this.tenantId = 'tenant-adeco',
     String? authToken,
     bool? allowMockFallback,
+    bool? allowDemoSeedData,
   })  : _authToken = authToken ?? '',
-        allowMockFallback = allowMockFallback ?? defaultAllowMockFallback {
+        allowMockFallback = allowMockFallback ?? defaultAllowMockFallback,
+        allowDemoSeedData = allowDemoSeedData ?? defaultAllowDemoSeedData {
     if (_authToken.isNotEmpty) _currentAuthToken = _authToken;
   }
 
@@ -10845,13 +10854,8 @@ class ApiClient {
     }
     final pricePerVol = packVolumeUnits > 0 ? competitorPrice / packVolumeUnits : competitorPrice;
 
-    final monthlyPts = buildMonthlyPriceTrajectory({
-      '2026-01': (price: competitorPrice, units: estimatedMonthlyUnits),
-      '2026-02': (price: competitorPrice, units: estimatedMonthlyUnits),
-      '2026-03': (price: competitorPrice, units: estimatedMonthlyUnits),
-      '2026-04': (price: competitorPrice, units: estimatedMonthlyUnits),
-    }, filterYear: 2026);
-
+    // Current shelf price stays on [unitPrice]. Do not invent Jan–Apr (or any)
+    // monthly history when the custom competitor has no real sell-out series.
     return CompetitorSkuComparisonModel(
       skuName: competitorSkuName,
       barcode: serverId != null && serverId.isNotEmpty
@@ -10876,8 +10880,8 @@ class ApiClient {
       chainPrices: {
         (retailerChain.trim().isNotEmpty ? retailerChain.trim() : 'fathalla'): competitorPrice,
       },
-      monthlyPrices: monthlyPts,
-      allMonthlyPrices: monthlyPts,
+      monthlyPrices: const [],
+      allMonthlyPrices: const [],
     );
   }
 
@@ -11036,8 +11040,8 @@ class ApiClient {
 
     final liveByBarcode = aggregateLiveMonthlyByBarcode(liveRecords);
     // Production / live year: never inject seed monthly prices. Seeds only when there is
-    // no live data at all and mock/demo fallback is explicitly enabled.
-    final allowSeedMonths = liveRecords.isEmpty && allowMockFallback;
+    // no live data at all and the explicit demo flag is on (not [allowMockFallback]).
+    final allowSeedMonths = liveRecords.isEmpty && allowDemoSeedData;
 
     // Group structure (barcodes / brands). Monthly prices come from live or gated seeds.
     final rawDefs = <_RawCompetitiveGroupSeed>[
