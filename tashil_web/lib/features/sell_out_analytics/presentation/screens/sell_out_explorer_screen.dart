@@ -15,6 +15,7 @@ import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/testing/test_semantics.dart';
 import '../../data/sell_out_explorer_repository.dart';
+import '../../domain/sell_out_upload_flow.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
@@ -356,33 +357,57 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
         periodDate = '$_archiveUploadYear-$m-01';
       }
 
-      if (replaceArchiveId != null) {
-        await widget.apiClient.deleteArchivedFile(replaceArchiveId, isSellIn: false);
-      }
-
-      // Preview (dry-run) first so automation can assert mapping_source / model
-      // metadata without committing, and users confirm before archive write.
-      final res = await widget.apiClient.uploadFile(
-        picked.name,
-        picked.bytes,
+      // Never delete [replaceArchiveId] before preview/confirm — cancel, parse
+      // errors, and commit failures must leave the old archive + BQ rows intact.
+      final flow = await runSellOutUploadFlow(
+        filename: picked.name,
+        bytes: picked.bytes,
         targetChain: targetChain,
         periodDate: periodDate,
-        dryRun: true,
-      );
-
-      if (!mounted) return;
-
-      final sourceLabel = res.mappingSource.isNotEmpty
-          ? res.mappingSource
-          : 'unknown';
-      final modelLabel =
-          res.aiModelUsed.isNotEmpty ? res.aiModelUsed : 'n/a';
-      final previewSummary =
-          '${picked.name}: ${res.validRows} صف • ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)}'
-          ' • mapping_source=$sourceLabel • model=$modelLabel';
-
-      if (res.isStaged && !res.isCommitted) {
-        final shouldCommit = await showDialog<bool>(
+        replaceArchiveId: replaceArchiveId,
+        deps: SellOutUploadFlowDeps(
+          upload: ({
+            required filename,
+            required bytes,
+            targetChain,
+            periodDate,
+            required dryRun,
+          }) =>
+              widget.apiClient.uploadFile(
+                filename,
+                bytes,
+                targetChain: targetChain,
+                periodDate: periodDate,
+                dryRun: dryRun,
+              ),
+          commit: ({
+            required batchId,
+            targetChain,
+            periodDate,
+          }) =>
+              widget.apiClient.commitStagedUpload(
+                batchId: batchId,
+                targetChain: targetChain,
+                periodDate: periodDate,
+              ),
+          discard: ({required batchId}) =>
+              widget.apiClient.discardStagedUpload(batchId: batchId),
+          deleteArchive: (archiveId) => widget.apiClient.deleteArchivedFile(
+            archiveId,
+            isSellIn: false,
+          ),
+          confirm: (preview) async {
+            if (!mounted) return false;
+            final sourceLabel = preview.mappingSource.isNotEmpty
+                ? preview.mappingSource
+                : 'unknown';
+            final modelLabel = preview.aiModelUsed.isNotEmpty
+                ? preview.aiModelUsed
+                : 'n/a';
+            final previewSummary =
+                '${picked.name}: ${preview.validRows} صف • ${CurrencyFormatter.formatCompactEGP(preview.totalRevenue)}'
+                ' • mapping_source=$sourceLabel • model=$modelLabel';
+            return showDialog<bool>(
               context: context,
               builder: (ctx) {
                 final cs = Theme.of(ctx).colorScheme;
@@ -392,7 +417,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   ),
                   title: const Text('مراجعة رفع Sell-Out'),
                   content: Text(
-                    'معاينة فقط — لم يُحفظ شيء بعد.\n$previewSummary',
+                    'معاينة فقط — لم يُحفظ شيء بعد'
+                    '${replaceArchiveId != null ? ' (الملف الحالي يبقى حتى تأكيد الاستبدال)' : ''}.\n'
+                    '$previewSummary',
                   ),
                   actions: [
                     TestSemantics.button(
@@ -423,41 +450,48 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   ],
                 );
               },
-            ) ??
-            false;
+            );
+          },
+        ),
+      );
 
-        if (!shouldCommit) {
-          if (res.batchId.isNotEmpty) {
-            try {
-              await widget.apiClient.discardStagedUpload(batchId: res.batchId);
-            } catch (_) {}
-          }
-          if (!mounted) return;
+      if (!mounted) return;
+
+      final preview = flow.preview;
+      final previewSummary = preview == null
+          ? picked.name
+          : '${picked.name}: ${preview.validRows} صف • ${CurrencyFormatter.formatCompactEGP(preview.totalRevenue)}'
+              ' • mapping_source=${preview.mappingSource.isNotEmpty ? preview.mappingSource : 'unknown'}'
+              ' • model=${preview.aiModelUsed.isNotEmpty ? preview.aiModelUsed : 'n/a'}';
+
+      switch (flow.status) {
+        case SellOutUploadFlowStatus.cancelled:
           M3Feedback.showInfo(
             context,
             'تم إلغاء الاعتماد — المعاينة فقط ($previewSummary)',
           );
           return;
-        }
-
-        await widget.apiClient.commitStagedUpload(
-          batchId: res.batchId,
-          targetChain: targetChain,
-          periodDate: periodDate,
-        );
+        case SellOutUploadFlowStatus.previewFailed:
+        case SellOutUploadFlowStatus.commitFailed:
+          debugPrint('Sell-Out upload failed: ${flow.error}');
+          M3Feedback.showError(context, 'تعذّر رفع الملف.');
+          return;
+        case SellOutUploadFlowStatus.committed:
+          final actionLabel = replaceArchiveId != null
+              ? (flow.replacedArchiveDeleted
+                  ? 'تم استبدال الملف.'
+                  : 'تم رفع الملف الجديد (تعذّر حذف الملف القديم).')
+              : 'تم رفع الملف وإضافته للبيانات.';
+          M3Feedback.showSuccess(
+            context,
+            '$actionLabel ($previewSummary)',
+          );
+          _repo.invalidateAll();
+          _repo.cache.invalidatePrefix(
+            CacheStore.prefix(widget.apiClient.tenantId, TargetRepository.feature),
+          );
+          await _loadAllData();
       }
-
-      if (!mounted) return;
-      final actionLabel = replaceArchiveId != null
-          ? 'تم استبدال الملف.'
-          : 'تم رفع الملف وإضافته للبيانات.';
-      M3Feedback.showSuccess(
-        context,
-        '$actionLabel ($previewSummary)',
-      );
-      _repo.invalidateAll();
-      _repo.cache.invalidatePrefix(CacheStore.prefix(widget.apiClient.tenantId, TargetRepository.feature));
-      await _loadAllData();
     } catch (e) {
       if (!mounted) return;
       debugPrint('Sell-Out upload failed: $e');

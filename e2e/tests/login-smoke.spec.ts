@@ -52,9 +52,11 @@ test.describe('Flutter web Semantics smoke', () => {
     const submit = page.locator(byTestId('login-submit')).first();
 
     await email.click();
-    await page.keyboard.type('smoke@example.com');
+    await page.waitForTimeout(250);
+    await page.keyboard.type('smoke@example.com', { delay: 40 });
     await password.click();
-    await page.keyboard.type(DUMMY_PASSWORD);
+    await page.waitForTimeout(250);
+    await page.keyboard.type(DUMMY_PASSWORD, { delay: 40 });
 
     // Dummy password must not appear in DOM text or semantics attributes.
     const html = await page.content();

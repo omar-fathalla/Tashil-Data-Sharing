@@ -45,23 +45,44 @@
 </head>
 <body>
   <script>
-    // Keep Flutter web semantics hit boxes in CSS pixels.
-    // When devicePixelRatio > 1, a missing inverse-DPR scale makes
-    // flt-semantics nodes land ~2× away from the painted canvas (Playwright
-    // then reports clicks intercepted by flutter-view). Never double-scale if
-    // the engine already applied matrix/scale on a descendant.
+    // Keep Flutter web semantics hit boxes in CSS pixels when the engine omits
+    // an inverse-DPR scale. Own transforms are tagged (data-tashil-dpr-fix) so
+    // resize/DPR changes can update them; pure translation/identity matrices
+    // are NOT treated as proof the engine already scaled.
     (function () {
-      function hasEngineScale(host) {
-        var nodes = host.querySelectorAll('[style]');
-        for (var i = 0; i < nodes.length; i++) {
-          var t = nodes[i].style && nodes[i].style.transform;
-          if (!t) continue;
-          if (t.indexOf('matrix') !== -1 || t.indexOf('scale') !== -1) {
-            return true;
-          }
+      function parseScale(transform) {
+        if (!transform) return null;
+        var m = /matrix\(\s*([-.\d]+)\s*,\s*([-.\d]+)\s*,\s*([-.\d]+)\s*,\s*([-.\d]+)/.exec(
+          transform
+        );
+        if (m) return { sx: parseFloat(m[1]), sy: parseFloat(m[4]) };
+        var s = /scale\(\s*([-.\d]+)(?:\s*,\s*([-.\d]+))?/.exec(transform);
+        if (s) return { sx: parseFloat(s[1]), sy: parseFloat(s[2] || s[1]) };
+        return null;
+      }
+
+      function clearOurs(host) {
+        if (!host.hasAttribute('data-tashil-dpr-fix')) return;
+        host.style.removeProperty('transform');
+        host.removeAttribute('data-tashil-dpr-fix');
+        host.removeAttribute('data-tashil-dpr');
+      }
+
+      function hasEngineInverseScale(host) {
+        var list = [host];
+        var styled = host.querySelectorAll('[style]');
+        for (var i = 0; i < styled.length; i++) list.push(styled[i]);
+        for (var j = 0; j < list.length; j++) {
+          var el = list[j];
+          if (el.hasAttribute && el.hasAttribute('data-tashil-dpr-fix')) continue;
+          var sc = parseScale(el.style && el.style.transform);
+          if (!sc) continue;
+          // Identity / pure translation — ignore.
+          if (Math.abs(sc.sx - 1) < 0.02 && Math.abs(sc.sy - 1) < 0.02) continue;
+          // Engine inverse DPR is a shrink (scale < 1).
+          if (sc.sx < 0.95 && sc.sy < 0.95) return true;
         }
-        var own = host.style && host.style.transform;
-        return !!(own && (own.indexOf('matrix') !== -1 || own.indexOf('scale') !== -1));
+        return false;
       }
 
       function applyInverseDpr(host) {
@@ -70,14 +91,33 @@
         host.style.setProperty('left', '0', 'important');
         host.style.setProperty('top', '0', 'important');
         host.style.setProperty('transform-origin', '0 0', 'important');
+
         var dpr = window.devicePixelRatio || 1;
-        if (dpr <= 1.01 || hasEngineScale(host)) return;
+        if (dpr <= 1.01) {
+          clearOurs(host);
+          return;
+        }
+        if (hasEngineInverseScale(host)) {
+          clearOurs(host);
+          return;
+        }
+
+        var prev = parseFloat(host.getAttribute('data-tashil-dpr') || '0');
+        if (
+          host.hasAttribute('data-tashil-dpr-fix') &&
+          Math.abs(prev - dpr) < 0.01
+        ) {
+          return;
+        }
+
         var s = 1 / dpr;
         host.style.setProperty(
           'transform',
           'matrix(' + s + ', 0, 0, ' + s + ', 0, 0)',
           'important'
         );
+        host.setAttribute('data-tashil-dpr-fix', '1');
+        host.setAttribute('data-tashil-dpr', String(dpr));
       }
 
       function scan() {
@@ -101,6 +141,9 @@
       }
       window.addEventListener('resize', schedule);
       window.addEventListener('flutter-first-frame', schedule);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', schedule);
+      }
       try {
         new MutationObserver(schedule).observe(document.documentElement, {
           childList: true,

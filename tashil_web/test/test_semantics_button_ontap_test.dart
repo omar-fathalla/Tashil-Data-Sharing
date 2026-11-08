@@ -89,7 +89,7 @@ void main() {
               rows: [
                 DataRow(
                   cells: [
-                    DataCell(Text(fileName)),
+                    const DataCell(Text(fileName)),
                     DataCell(
                       ArchiveActionsGroup(
                         archiveId: archiveId,

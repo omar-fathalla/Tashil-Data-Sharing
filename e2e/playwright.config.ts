@@ -31,12 +31,18 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
+      name: 'chromium-dpr1',
       use: {
         ...devices['Desktop Chrome'],
-        // Keep CSS pixels === layout pixels so Flutter semantics hit boxes
-        // are not scaled ~2× vs the canvas (devicePixelRatio mismatch).
         deviceScaleFactor: 1,
+      },
+    },
+    {
+      // Hit-test must also succeed under Retina-like DPR (no click bypass).
+      name: 'chromium-dpr2',
+      use: {
+        ...devices['Desktop Chrome'],
+        deviceScaleFactor: 2,
       },
     },
   ],
