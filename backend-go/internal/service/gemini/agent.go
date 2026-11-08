@@ -6,12 +6,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 )
+
+// MappingSource values reported on NormalizedRetailIngestionPayload.
+const (
+	MappingSourceAI            = "ai"
+	MappingSourceDeterministic = "deterministic"
+	MappingSourceCache         = "cache"
+	MappingSourceMock          = "mock"
+)
+
+const defaultGeminiAPIBase = "https://generativelanguage.googleapis.com"
+
+// ErrMockSamplesInProduction is returned when Gemini is unavailable and inventing
+// fixed sample records would be required while ENVIRONMENT=production.
+// Message is Arabic so upload clients can surface it directly.
+var ErrMockSamplesInProduction = fmt.Errorf("تعذّر تحليل الملف: خدمة الذكاء الاصطناعي غير متاحة، ومفيش بيانات تجريبية في بيئة الإنتاج. مفيش حاجة اتحفظت — حاول تاني أو راجع إعدادات GEMINI_API_KEY")
+
+func isProductionEnv() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("ENVIRONMENT")), "production")
+}
 
 type aiTierContextKey string
 
@@ -60,6 +81,7 @@ type Client struct {
 	apiKey     string
 	model      string
 	tier2Model string
+	apiBaseURL string // empty → Google Generative Language API
 	httpClient *http.Client
 	useMock    bool
 	mapper     columnMapper // nil uses the Gemini API; tests inject a stub
@@ -94,6 +116,27 @@ func (c *Client) WithTier2Model(tier2Model string) *Client {
 		c.tier2Model = strings.TrimSpace(tier2Model)
 	}
 	return c
+}
+
+// WithHTTPClient replaces the default HTTP client (tests inject httptest round-trips).
+func (c *Client) WithHTTPClient(hc *http.Client) *Client {
+	if hc != nil {
+		c.httpClient = hc
+	}
+	return c
+}
+
+// WithAPIBaseURL points Gemini HTTP calls at a custom base (e.g. httptest.URL). Empty restores the Google default.
+func (c *Client) WithAPIBaseURL(base string) *Client {
+	c.apiBaseURL = strings.TrimRight(strings.TrimSpace(base), "/")
+	return c
+}
+
+func (c *Client) geminiAPIBase() string {
+	if c.apiBaseURL != "" {
+		return c.apiBaseURL
+	}
+	return defaultGeminiAPIBase
 }
 
 type geminiRequest struct {
@@ -132,6 +175,7 @@ func (c *Client) Model() string { return c.model }
 // Tier2Model returns the configured Tier 2 model name.
 func (c *Client) Tier2Model() string { return c.tier2Model }
 
+// applyTierMetadata records the real model/tier used. It never invents confidence.
 func applyTierMetadata(payload *domain.NormalizedRetailIngestionPayload, tier, model string) {
 	if payload == nil {
 		return
@@ -139,9 +183,46 @@ func applyTierMetadata(payload *domain.NormalizedRetailIngestionPayload, tier, m
 	payload.AiTierUsed = tier
 	payload.AiModelUsed = model
 	payload.Tier2Escalated = tier == "tier2"
-	if payload.ConfidenceScore < 0.996 {
-		payload.ConfidenceScore = 0.996
+}
+
+// applyDeterministicMetadata labels a non-AI parse without claiming Gemini tier/confidence.
+func applyDeterministicMetadata(payload *domain.NormalizedRetailIngestionPayload) {
+	if payload == nil {
+		return
 	}
+	payload.MappingSource = MappingSourceDeterministic
+	payload.AiTierUsed = ""
+	payload.AiModelUsed = ""
+	payload.Tier2Escalated = false
+	payload.MappingConfidence = 0
+}
+
+// applyMockMetadata labels invented sample records (never used in production).
+func applyMockMetadata(payload *domain.NormalizedRetailIngestionPayload) {
+	if payload == nil {
+		return
+	}
+	payload.MappingSource = MappingSourceMock
+	payload.AiTierUsed = "mock"
+	payload.AiModelUsed = "mock"
+	payload.Tier2Escalated = false
+	if payload.MappingConfidence == 0 {
+		payload.MappingConfidence = payload.ConfidenceScore
+	}
+}
+
+// logAICall emits a compact per-call log line for ops (model, tier, latency, ok/fail).
+func logAICall(filename, model, tier string, started time.Time, ok bool, callErr error) {
+	status := "ok"
+	errMsg := ""
+	if !ok {
+		status = "fail"
+		if callErr != nil {
+			errMsg = callErr.Error()
+		}
+	}
+	log.Printf("[ingest-ai-call] file=%q model=%s tier=%s latency_ms=%d status=%s err=%q",
+		filename, model, tier, time.Since(started).Milliseconds(), status, errMsg)
 }
 
 // AnalyzeAndNormalize uses the Tier 1 model by default and the Tier 2 model when
@@ -155,11 +236,22 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 	}
 
 	if c.useMock {
+		// Prefer real deterministic parsing; invent samples only outside production.
+		if fullPayload, ok := parseFullTabularPayload(filename, rawContent); ok {
+			v := validateExtraction(fullPayload, nil)
+			logValidation(filename, MappingSourceDeterministic, v)
+			if v.Status == "rejected" && !isReplay(ctx) {
+				return nil, validationError(filename, v)
+			}
+			fullPayload.Validation = v
+			applyDeterministicMetadata(fullPayload)
+			return fullPayload, nil
+		}
 		payload, err := c.mockAnalyze(filename, rawContent)
 		if err != nil {
 			return nil, err
 		}
-		applyTierMetadata(payload, "tier2", c.tier2Model)
+		applyMockMetadata(payload)
 		return payload, nil
 	}
 
@@ -173,13 +265,12 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 	// 2) Deterministic readers, validated before anything is saved.
 	if fullPayload, ok := parseFullTabularPayload(filename, rawContent); ok {
 		v := validateExtraction(fullPayload, nil)
-		logValidation(filename, "deterministic", v)
+		logValidation(filename, MappingSourceDeterministic, v)
 		if v.Status == "rejected" && !isReplay(ctx) {
 			return nil, validationError(filename, v)
 		}
 		fullPayload.Validation = v
-		fullPayload.MappingSource = "deterministic"
-		applyTierMetadata(fullPayload, "tier2", c.tier2Model)
+		applyDeterministicMetadata(fullPayload)
 		return fullPayload, nil
 	}
 
@@ -198,16 +289,21 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 		if mErr != nil {
 			return nil, mErr
 		}
-		applyTierMetadata(fallbackPayload, tier, activeModel)
+		// mockAnalyze may return deterministic parse or invented samples; trust its MappingSource.
+		if fallbackPayload.MappingSource == "" || fallbackPayload.MappingSource == MappingSourceMock {
+			applyMockMetadata(fallbackPayload)
+		}
 		return fallbackPayload, nil
 	}
 
+	payload.MappingSource = MappingSourceAI
 	applyTierMetadata(payload, tier, activeModel)
 	return payload, nil
 }
 
 func (c *Client) invokeGeminiAPI(ctx context.Context, modelName, filename string, rawContent []byte, sampleLimit int, temperature float64) (*domain.NormalizedRetailIngestionPayload, error) {
-	endpoint := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", modelName, c.apiKey)
+	started := time.Now()
+	endpoint := fmt.Sprintf("%s/v1beta/models/%s:generateContent", c.geminiAPIBase(), modelName)
 
 	prompt := fmt.Sprintf(`You are an expert Egyptian Retail Analytics AI Agent for the Tashil Data Sharing Platform (Model: %s).
 Analyze the provided retail sales file ("%s") and normalize it into the exact structured schema.
@@ -253,29 +349,42 @@ File Content Sample:
 		return nil, fmt.Errorf("failed to create http request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	// API key travels in a header (never the URL) so transport errors cannot leak it into logs.
+	httpReq.Header.Set("x-goog-api-key", c.apiKey)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, err
+		safe := fmt.Errorf("gemini request failed: %s", c.redact(err.Error()))
+		logAICall(filename, modelName, "full", started, false, safe)
+		return nil, safe
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("gemini api returned status %d: %s", resp.StatusCode, string(respBody))
+		safeBody := c.redact(string(respBody))
+		callErr := fmt.Errorf("gemini api returned status %d: %s", resp.StatusCode, safeBody)
+		logAICall(filename, modelName, "full", started, false, callErr)
+		return nil, callErr
 	}
 
 	var geminiResp geminiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&geminiResp); err != nil {
-		return nil, fmt.Errorf("failed to decode gemini response: %w", err)
+		callErr := fmt.Errorf("failed to decode gemini response: %w", err)
+		logAICall(filename, modelName, "full", started, false, callErr)
+		return nil, callErr
 	}
 
 	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
-		return nil, fmt.Errorf("gemini returned empty candidates")
+		callErr := fmt.Errorf("gemini returned empty candidates")
+		logAICall(filename, modelName, "full", started, false, callErr)
+		return nil, callErr
 	}
 
 	rawJSONText := geminiResp.Candidates[0].Content.Parts[0].Text
-	return domain.ParseGeminiPayload([]byte(rawJSONText))
+	payload, err := domain.ParseGeminiPayload([]byte(rawJSONText))
+	logAICall(filename, modelName, "full", started, err == nil && payload != nil, err)
+	return payload, err
 }
 
 func takeSample(data []byte, limit int) []byte {
@@ -287,9 +396,15 @@ func takeSample(data []byte, limit int) []byte {
 
 // mockAnalyze parses full CSV/XLSX content when valid retail headers are present,
 // and falls back to heuristic records for tiny synthetic test payloads.
+// In production it never invents sample records — it fails clearly instead.
 func (c *Client) mockAnalyze(filename string, rawContent []byte) (*domain.NormalizedRetailIngestionPayload, error) {
 	if fullPayload, ok := parseFullTabularPayload(filename, rawContent); ok {
+		applyDeterministicMetadata(fullPayload)
 		return fullPayload, nil
+	}
+
+	if isProductionEnv() {
+		return nil, ErrMockSamplesInProduction
 	}
 
 	lowerFilename := strings.ToLower(filename)
@@ -421,15 +536,18 @@ func (c *Client) mockAnalyze(filename string, rawContent []byte) (*domain.Normal
 		}
 	}
 
-	return &domain.NormalizedRetailIngestionPayload{
+	payload := &domain.NormalizedRetailIngestionPayload{
 		RetailerDetected:     retailer,
 		ReportingPeriodStart: time.Now().AddDate(0, 0, -7).Format("2006-01-02"),
 		ReportingPeriodEnd:   today,
 		ConfidenceScore:      0.985,
+		MappingConfidence:    0.985,
 		ColumnMapping:        mapping,
 		AnomaliesDetected:    anomalies,
 		NormalizedRecords:    records,
-	}, nil
+	}
+	applyMockMetadata(payload)
+	return payload, nil
 }
 
 const replayKey aiTierContextKey = "archive_replay"

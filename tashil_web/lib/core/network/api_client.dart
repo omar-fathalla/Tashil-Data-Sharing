@@ -1639,6 +1639,9 @@ class IngestionResultModel {
   final String aiModelUsed;
   final String aiTierUsed;
   final bool tier2Escalated;
+  /// ai | deterministic | cache | mock (empty when the API omitted it).
+  final String mappingSource;
+  final double mappingConfidence;
 
   // Upload checks (warnings never block; held-out customers are not in any total).
   final List<UploadWarning> uploadWarnings;
@@ -1673,14 +1676,19 @@ class IngestionResultModel {
     this.chainMismatchDetected = false,
     this.suggestedChain,
     this.suggestedChainName,
-    this.aiModelUsed = 'Gemini 4 Argon Medium (gemini-1.5-pro)',
-    this.aiTierUsed = 'tier2',
-    this.tier2Escalated = true,
+    this.aiModelUsed = '',
+    this.aiTierUsed = '',
+    this.tier2Escalated = false,
+    this.mappingSource = '',
+    this.mappingConfidence = 0.0,
     this.uploadWarnings = const [],
     this.quarantinedCustomers = const [],
     this.unknownBarcodes = const [],
     this.periodBreakdown = const [],
   });
+
+  bool get usedAiMapping =>
+      mappingSource == 'ai' || mappingSource == 'cache';
 
   factory IngestionResultModel.fromJson(Map<String, dynamic> json) {
     final rawBranches = json['discovered_branches'] as List<dynamic>? ?? [];
@@ -1731,13 +1739,11 @@ class IngestionResultModel {
       chainMismatchDetected: json['chain_mismatch_detected'] as bool? ?? false,
       suggestedChain: json['suggested_chain'] as String?,
       suggestedChainName: json['suggested_chain_name'] as String?,
-      aiModelUsed: (json['ai_model_used'] as String?)?.isNotEmpty == true
-          ? json['ai_model_used'] as String
-          : 'Gemini 4 Argon Medium (gemini-1.5-pro)',
-      aiTierUsed: (json['ai_tier_used'] as String?)?.isNotEmpty == true
-          ? json['ai_tier_used'] as String
-          : 'tier2',
-      tier2Escalated: json['tier2_escalated'] as bool? ?? true,
+      aiModelUsed: (json['ai_model_used'] as String?) ?? '',
+      aiTierUsed: (json['ai_tier_used'] as String?) ?? '',
+      tier2Escalated: json['tier2_escalated'] as bool? ?? false,
+      mappingSource: (json['mapping_source'] as String?) ?? '',
+      mappingConfidence: (json['mapping_confidence'] as num?)?.toDouble() ?? 0.0,
       uploadWarnings: parseList(json['upload_warnings'], UploadWarning.fromJson),
       quarantinedCustomers: parseList(json['quarantined_customers'], QuarantinedCustomerInfo.fromJson),
       unknownBarcodes: parseList(json['unknown_barcodes'], (m) => m),
@@ -1775,6 +1781,8 @@ class IngestionResultModel {
     String? aiModelUsed,
     String? aiTierUsed,
     bool? tier2Escalated,
+    String? mappingSource,
+    double? mappingConfidence,
   }) {
     return IngestionResultModel(
       batchId: batchId ?? this.batchId,
@@ -1806,6 +1814,8 @@ class IngestionResultModel {
       aiModelUsed: aiModelUsed ?? this.aiModelUsed,
       aiTierUsed: aiTierUsed ?? this.aiTierUsed,
       tier2Escalated: tier2Escalated ?? this.tier2Escalated,
+      mappingSource: mappingSource ?? this.mappingSource,
+      mappingConfidence: mappingConfidence ?? this.mappingConfidence,
       uploadWarnings: uploadWarnings,
       quarantinedCustomers: quarantinedCustomers,
       unknownBarcodes: unknownBarcodes,
@@ -4096,12 +4106,6 @@ class ApiClient {
       debugPrint('[ApiClient] Fallback to mock ingestion result: $e');
     }
 
-    final isTier1Only = aiTier == 'tier1';
-    final modelName = isTier1Only
-        ? 'Gemini 3.8 Flash'
-        : 'Gemini 4 Argon Medium (gemini-1.5-pro)';
-    final resolvedTier = isTier1Only ? 'tier1' : 'tier2';
-
     final parsedCsv = _tryParseUploadedCsv(
       filename,
       bytes,
@@ -4110,10 +4114,14 @@ class ApiClient {
       dryRun: dryRun,
     );
     if (parsedCsv != null) {
+      // Local CSV parse is deterministic — do not claim Gemini tier/confidence.
       final resModel = parsedCsv.copyWith(
-        aiModelUsed: modelName,
-        aiTierUsed: resolvedTier,
-        tier2Escalated: !isTier1Only,
+        mappingSource: 'deterministic',
+        mappingConfidence: 0,
+        confidenceScore: 0,
+        aiModelUsed: '',
+        aiTierUsed: '',
+        tier2Escalated: false,
       );
       _recordLocalArchivedUpload(
         cleanSlug: cleanSlug,
@@ -4170,7 +4178,9 @@ class ApiClient {
       anomalyRows: 2,
       totalRevenue: 345000.0,
       totalQuantity: 2850,
-      confidenceScore: isTier1Only ? 0.985 : 0.996,
+      confidenceScore: 0.985,
+      mappingConfidence: 0.985,
+      mappingSource: 'mock',
       isStaged: dryRun,
       isCommitted: !dryRun,
       discoveredRetailer: discovered.isNotEmpty ? discovered : detectedChain,
@@ -4178,9 +4188,9 @@ class ApiClient {
       chainMismatchDetected: mismatch,
       suggestedChain: mismatch ? discovered : null,
       suggestedChainName: suggestedName,
-      aiModelUsed: modelName,
-      aiTierUsed: resolvedTier,
-      tier2Escalated: !isTier1Only,
+      aiModelUsed: 'mock',
+      aiTierUsed: 'mock',
+      tier2Escalated: false,
 
       anomalies: [
         {

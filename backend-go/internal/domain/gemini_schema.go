@@ -219,7 +219,7 @@ type NormalizedRetailIngestionPayload struct {
 	AiModelUsed          string                  `json:"ai_model_used,omitempty"`
 	AiTierUsed           string                  `json:"ai_tier_used,omitempty"`
 	Tier2Escalated       bool                    `json:"tier2_escalated,omitempty"`
-	MappingSource        string                  `json:"mapping_source,omitempty"` // "ai" or "deterministic"
+	MappingSource        string                  `json:"mapping_source,omitempty"` // "ai" | "deterministic" | "cache" | "mock"
 	MappingConfidence    float64                 `json:"mapping_confidence,omitempty"`
 	Validation           *IngestionValidation    `json:"validation,omitempty"`
 }

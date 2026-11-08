@@ -17,6 +17,52 @@ class AiAnalysisProgressCard extends StatelessWidget {
     required this.result,
   });
 
+  static String statusSubtitle({
+    required bool isAnalyzing,
+    IngestionResultModel? result,
+  }) {
+    if (isAnalyzing) {
+      return 'جارٍ فحص الملف واستخراج الفروع والأصناف والأسعار تلقائياً...';
+    }
+    if (result == null) return '';
+    final sourceLabel = mappingSourceLabel(result);
+    if (result.isStaged) {
+      return '$sourceLabel • بانتظار المراجعة والاعتماد';
+    }
+    return '$sourceLabel • اكتملت المعالجة والتحميل في Google BigQuery بنجاح';
+  }
+
+  /// Honest Arabic label from mapping_source (never claims AI for deterministic/mock).
+  static String mappingSourceLabel(IngestionResultModel result) {
+    switch (result.mappingSource) {
+      case 'ai':
+        final model = result.aiModelUsed.trim();
+        return model.isEmpty
+            ? 'تم الاستخراج بمساعدة الذكاء الاصطناعي'
+            : 'تم الاستخراج بالذكاء الاصطناعي ($model)';
+      case 'cache':
+        return 'تم الاستخراج بخطة أعمدة محفوظة (بدون استدعاء جديد للذكاء الاصطناعي)';
+      case 'mock':
+        return 'معاينة تجريبية (بيانات محاكاة — ليست من الملف)';
+      case 'deterministic':
+        return 'تم الاستخراج بقواعد القراءة المحددة (بدون ذكاء اصطناعي)';
+      default:
+        if (result.aiModelUsed.trim().isNotEmpty) {
+          return 'تم الاستخراج (${result.aiModelUsed.trim()})';
+        }
+        return 'تم تحليل الملف واستخراج السجلات';
+    }
+  }
+
+  static String? aiConfidenceLabel(IngestionResultModel result) {
+    if (!result.usedAiMapping) return null;
+    final conf = result.mappingConfidence > 0
+        ? result.mappingConfidence
+        : result.confidenceScore;
+    if (conf <= 0) return null;
+    return 'درجة ثقة الذكاء الاصطناعي: ${(conf * 100).toStringAsFixed(1)}%';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -25,6 +71,8 @@ class AiAnalysisProgressCard extends StatelessWidget {
     if (!isAnalyzing && result == null) {
       return const SizedBox.shrink();
     }
+
+    final confidenceText = result == null ? null : aiConfidenceLabel(result!);
 
     return Card(
       child: Padding(
@@ -38,44 +86,47 @@ class AiAnalysisProgressCard extends StatelessWidget {
               spacing: M3Spacing.md,
               runSpacing: M3Spacing.sm,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(
-                        color: Colors.purple.withOpacity(0.12),
-                        borderRadius: M3Shape.radiusSm,
-                      ),
-                      child: const Icon(
-                        Icons.auto_awesome_rounded,
-                        color: Colors.purple,
-                        size: 22.0,
-                      ),
-                    ),
-                    M3Spacing.gapSM,
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'محرك الاستيعاب الذكي للبيانات',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                // Constrained so long honest mapping_source labels wrap instead of overflowing.
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8.0),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withOpacity(0.12),
+                          borderRadius: M3Shape.radiusSm,
                         ),
-                        Text(
-                          isAnalyzing
-                              ? 'جارٍ فحص الملف واستخراج الفروع والأصناف والأسعار تلقائياً...'
-                              : (result?.isStaged == true
-                                  ? 'تم التحليل والاستخراج بالذكاء الاصطناعي • بانتظار المراجعة والاعتماد'
-                                  : 'اكتملت المعالجة والتحميل في Google BigQuery بنجاح'),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                        child: const Icon(
+                          Icons.auto_awesome_rounded,
+                          color: Colors.purple,
+                          size: 22.0,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      M3Spacing.gapSM,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'محرك الاستيعاب الذكي للبيانات',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              statusSubtitle(isAnalyzing: isAnalyzing, result: result),
+                              softWrap: true,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 if (result != null)
                   Wrap(
@@ -106,20 +157,21 @@ class AiAnalysisProgressCard extends StatelessWidget {
                             ],
                           ),
                         ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.15),
-                          borderRadius: M3Shape.radiusLg,
-                        ),
-                        child: Text(
-                          'درجة الثقة: ${(result!.confidenceScore * 100).toStringAsFixed(1)}%',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: Colors.green.shade800,
-                            fontWeight: FontWeight.bold,
+                      if (confidenceText != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.15),
+                            borderRadius: M3Shape.radiusLg,
+                          ),
+                          child: Text(
+                            confidenceText,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: Colors.green.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
 
@@ -193,7 +245,9 @@ class AiAnalysisProgressCard extends StatelessWidget {
                               borderRadius: M3Shape.radiusSm,
                             ),
                             child: Text(
-                              'تم الاستيعاب الكامل بالذكاء الاصطناعي',
+                              result!.usedAiMapping
+                                  ? 'استيعاب بمساعدة الذكاء الاصطناعي'
+                                  : 'استيعاب بقواعد القراءة المحددة',
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: Colors.green.shade800,
                                 fontWeight: FontWeight.bold,

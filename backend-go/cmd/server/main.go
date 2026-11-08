@@ -33,6 +33,10 @@ func main() {
 		debug.SetMemoryLimit(1536 << 20)
 	}
 	cfg := config.Load()
+	// Cloud Run sets K_SERVICE; ENVIRONMENT must be explicit so production never invents mock samples.
+	if os.Getenv("K_SERVICE") != "" && strings.TrimSpace(os.Getenv("ENVIRONMENT")) == "" {
+		log.Printf("[Tashil Cloud Run] WARNING: ENVIRONMENT is unset on Cloud Run — defaulting to %q; set ENVIRONMENT=production in the service config", cfg.Environment)
+	}
 	log.Printf("[Tashil Cloud Run] Initializing service on port %s (env: %s, mock: %v)", cfg.Port, cfg.Environment, cfg.UseMockServices)
 
 	// 1. Initialize repositories

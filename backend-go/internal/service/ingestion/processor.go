@@ -66,6 +66,8 @@ type IngestionResult struct {
 	AiModelUsed           string `json:"ai_model_used"`
 	AiTierUsed            string `json:"ai_tier_used"`
 	Tier2Escalated        bool   `json:"tier2_escalated"`
+	MappingSource         string  `json:"mapping_source,omitempty"` // ai | deterministic | cache | mock
+	MappingConfidence     float64 `json:"mapping_confidence,omitempty"`
 
 	// BigQuerySync reports the durable BigQuery write for committed uploads (nil for previews / when not attempted).
 	BigQuerySync *bqsink.Result `json:"bigquery_sync,omitempty"`
@@ -909,6 +911,8 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 		AiModelUsed:            payload.AiModelUsed,
 		AiTierUsed:             payload.AiTierUsed,
 		Tier2Escalated:         payload.Tier2Escalated,
+		MappingSource:          payload.MappingSource,
+		MappingConfidence:      payload.MappingConfidence,
 		BigQuerySync:           directSync,
 	}
 
@@ -967,11 +971,24 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		p.stagedMu.Unlock()
 		return nil, &StagedUploadError{Status: 404, Message: "المعاينة دي مش تبع الحساب ده. مفيش حاجة اتحفظت."}
 	}
-	if ok {
+	fromMemory := ok && staged != nil
+	// Claim exclusively while keeping a local reference so a failed write can restore the preview.
+	if fromMemory {
 		delete(p.staged, batchID)
 	}
 	p.stagedMu.Unlock()
-	if !ok || staged == nil {
+	commitOK := false
+	defer func() {
+		if commitOK || !fromMemory || staged == nil {
+			return
+		}
+		p.stagedMu.Lock()
+		if _, exists := p.staged[batchID]; !exists {
+			p.staged[batchID] = staged
+		}
+		p.stagedMu.Unlock()
+	}()
+	if !fromMemory {
 		// Another instance ran the dry-run: rebuild it from the archive mount (or 410 / 409).
 		var err error
 		if staged, err = p.restageFromDisk(ctx, tenantID, batchID); err != nil {
@@ -1079,20 +1096,30 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		sinkMeta.ArchiveID = updatedArchived.ID
 	}
 	var commitSync *bqsink.Result
+	// markPrimaryCommitted flips commitOK and clears _staged disk immediately after the
+	// main durable write so a later secondary failure cannot restore a preview that would
+	// double-write on retry.
+	markPrimaryCommitted := func() {
+		commitOK = true
+		p.removeStaged(tenantID, batchID)
+	}
 	if staged.IsProductMaster {
 		if _, err := p.bqRepo.SetProductMaster(ctx, tenantID, staged.ProductMasterSummary); err != nil {
 			return nil, fmt.Errorf("failed to persist product master items: %w", err)
 		}
+		markPrimaryCommitted()
 		commitSync = p.sinkProductMaster(ctx, sinkMeta, staged.ProductMasterSummary)
 	} else if staged.IsSellInPlan {
 		if err := p.bqRepo.SetSellInRecords(ctx, tenantID, staged.Filename, staged.SellInRecords); err != nil {
 			return nil, fmt.Errorf("failed to persist sell-in records: %w", err)
 		}
+		markPrimaryCommitted()
 		commitSync = p.sinkSellIn(ctx, sinkMeta, staged.SellInRecords)
 	} else if staged.IsWideMatrix {
 		if err := p.bqRepo.ReplaceTenantFacts(ctx, tenantID, staged.ValidFacts); err != nil {
 			return nil, fmt.Errorf("failed to replace tenant facts in bigquery: %w", err)
 		}
+		markPrimaryCommitted()
 		commitSync = p.sinkSellOut(ctx, sinkMeta, staged.ValidFacts, bqsink.ModeReplacePeriods)
 		if err := p.bqRepo.SetTenantWorkbookAnalytics(ctx, tenantID, staged.WBMeta); err != nil {
 			return nil, fmt.Errorf("failed to store workbook analytics in bigquery: %w", err)
@@ -1104,6 +1131,7 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		if err := p.bqRepo.InsertSellOutFacts(ctx, staged.ValidFacts); err != nil {
 			return nil, fmt.Errorf("failed to stream facts to bigquery: %w", err)
 		}
+		markPrimaryCommitted()
 		commitSync = p.sinkSellOut(ctx, sinkMeta, staged.ValidFacts, bqsink.ModeUpsertRecords)
 		if len(staged.WBMeta.PricingItems) > 0 || len(staged.WBMeta.SupplierShares) > 0 {
 			_ = p.bqRepo.SetTenantWorkbookAnalytics(ctx, tenantID, staged.WBMeta)
@@ -1339,6 +1367,10 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		return nil, err
 	}
 	var warnings []UploadIssue
+	mappingSource := gemini.MappingSourceDeterministic
+	aiModelUsed, aiTierUsed := "", ""
+	tier2Escalated := false
+	var mappingConfidence float64
 	if parseReport != nil && parseReport.MonthCheck != "" {
 		warnings = append(warnings, UploadIssue{Code: "month_column_mismatch", Severity: "info", MessageAR: parseReport.MonthCheck})
 	}
@@ -1427,6 +1459,15 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 			warnings = append(warnings, UploadIssue{Code: "missing_units", Severity: "warning", Count: noQty,
 				MessageAR: fmt.Sprintf("%d صف ليه قيمة من غير كمية. الكمية اتسابت صفر (مفيش كمية اتحسبت من القيمة).", noQty)})
 		}
+		if src := strings.TrimSpace(payload.MappingSource); src != "" {
+			mappingSource = src
+		} else {
+			mappingSource = gemini.MappingSourceAI
+		}
+		aiModelUsed = payload.AiModelUsed
+		aiTierUsed = payload.AiTierUsed
+		tier2Escalated = payload.Tier2Escalated
+		mappingConfidence = payload.MappingConfidence
 	}
 
 	if err := resolveSellInPeriod(ctx, records); err != nil {
@@ -1606,6 +1647,11 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		math.Round(totalTons*100)/100,
 	)
 
+	// ConfidenceScore is AI mapping confidence only — never a hardcoded 0.99 for deterministic Sell-In.
+	sellInConfidence := 0.0
+	if mappingSource == gemini.MappingSourceAI || mappingSource == gemini.MappingSourceCache {
+		sellInConfidence = mappingConfidence
+	}
 	result := &IngestionResult{
 		BatchID:                batchID,
 		ArchiveID:              archivedEntry.ID,
@@ -1619,7 +1665,7 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		AnomalyRows:            0,
 		TotalRevenue:           math.Round(totalRev*100) / 100,
 		TotalQuantity:          int(math.Round(totalCases)),
-		ConfidenceScore:        0.99,
+		ConfidenceScore:        sellInConfidence,
 		AutoCreatedStoresCount: len(discoveredBranches),
 		DiscoveredBranches:     discoveredBranches,
 		DiscoveredCategories:   discoveredCats,
@@ -1634,12 +1680,15 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 			NetRevenueColumn:   "صافي القيمة بالجنيه (Net_Value_EGP) + المتوقع (EXP)",
 			CategoryColumn:     "العلامة التجارية والقطاع (Brand / Sector)",
 		},
-		Anomalies:     []domain.IngestionAnomaly{},
-		SampleRecords: samples,
-		AiModelUsed:   "Gemini 3.8 Flash CPFR Sell-In Engine",
-		AiTierUsed:    "Tier 1 - CPFR Reconciliation & Forecasting",
-		IsStaged:      dryRun,
-		IsCommitted:   !dryRun,
+		Anomalies:         []domain.IngestionAnomaly{},
+		SampleRecords:     samples,
+		AiModelUsed:       aiModelUsed,
+		AiTierUsed:        aiTierUsed,
+		Tier2Escalated:    tier2Escalated,
+		MappingSource:     mappingSource,
+		MappingConfidence: mappingConfidence,
+		IsStaged:          dryRun,
+		IsCommitted:       !dryRun,
 	}
 	result.UploadWarnings = warnings
 	result.QuarantinedCustomers = quarantined
@@ -1647,7 +1696,7 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	if parseReport != nil {
 		result.ParseLayout = parseReport.Layout
 	}
-	// reportUnknown runs after SetSellInRecords enriched the records with the Product Master.
+	// reportUnknown uses read-only Product Master enrichment; it must not persist Sell-In rows.
 	reportUnknown := func() {
 		unknown, issue := p.unknownBarcodesAll(tenantID, records, allRecords)
 		if issue == nil {
@@ -1661,6 +1710,7 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	}
 
 	if dryRun {
+		now := time.Now()
 		p.stagedMu.Lock()
 		p.staged[batchID] = &StagedUpload{
 			BatchID:           batchID,
@@ -1674,12 +1724,24 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 			Result:            result,
 			PrevArchivedFile:  prevArch,
 			PrevArchivedBytes: prevBytes,
-			CreatedAt:         time.Now(),
+			CreatedAt:         now,
+			FileBytes:         fileBytes,
 		}
 		p.stagedMu.Unlock()
-		if len(records) > 0 {
-			_ = p.bqRepo.SetSellInRecords(ctx, tenantID, filename, records)
-		}
+		_, interactive := uploadGuards(ctx)
+		// Persist under _staged so another instance can commit after restart / cross-instance preview.
+		p.persistStaged(ctx, stagedDiskMeta{
+			BatchID:      batchID,
+			TenantID:     tenantID,
+			Filename:     filename,
+			TargetChain:  effectiveChain,
+			Interactive:  interactive,
+			IsSellInPlan: true,
+			ValidRows:    len(records),
+			TotalRevenue: math.Round(totalRev*100) / 100,
+			CreatedAt:    now,
+		}, fileBytes)
+		// Preview must never change committed Sell-In data (no SetSellInRecords on dry-run).
 		reportUnknown()
 		return result, nil
 	}

@@ -269,18 +269,20 @@ type sellInEnricher interface {
 }
 
 // unknownBarcodesAll reports items missing from the Product Master over every row of the file,
-// counted and quarantined (read-only enrichment; nothing is stored).
+// counted and quarantined (read-only enrichment; nothing is stored). Always enriches via
+// EnrichSellInRecords so dry-run previews (which never call SetSellInRecords) still get accurate counts.
 func (p *Processor) unknownBarcodesAll(tenantID string, kept, all []domain.SellInRecord) ([]UnknownBarcode, *UploadIssue) {
-	if len(all) == len(kept) {
-		return unknownBarcodes(kept)
+	source := all
+	if len(source) == 0 {
+		source = kept
 	}
 	en, ok := p.bqRepo.(sellInEnricher)
 	if !ok {
 		return unknownBarcodes(kept)
 	}
-	rows := en.EnrichSellInRecords(tenantID, all)
+	rows := en.EnrichSellInRecords(tenantID, source)
 	u, issue := unknownBarcodes(rows)
-	if issue != nil {
+	if issue != nil && len(all) != len(kept) {
 		issue.MessageAR += " (جزء من الصفوف دي محجوز لعملاء مش متأكدين ومش داخل في الإجماليات)"
 	}
 	return u, issue

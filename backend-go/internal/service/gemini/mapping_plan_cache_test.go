@@ -23,8 +23,11 @@ func TestMappingPlanReusedAcrossReadsAndInstances(t *testing.T) {
 	if len(calls) != 1 {
 		t.Fatalf("second read must not call Gemini, calls=%v", calls)
 	}
-	if first.Validation.ExtractedValue != second.Validation.ExtractedValue || second.MappingSource != "ai" {
-		t.Fatalf("cached plan changed the result: %+v vs %+v", first.Validation, second.Validation)
+	if first.Validation.ExtractedValue != second.Validation.ExtractedValue || second.MappingSource != MappingSourceCache {
+		t.Fatalf("cached plan changed the result: source=%s %+v vs %+v", second.MappingSource, first.Validation, second.Validation)
+	}
+	if first.MappingSource != MappingSourceAI {
+		t.Fatalf("first read should be ai, got %s", first.MappingSource)
 	}
 
 	// A fresh client (another instance) sharing the plan directory also skips Gemini.
