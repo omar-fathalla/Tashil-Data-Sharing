@@ -235,21 +235,32 @@ func (c *Client) enqueueBatchMem(slug string, ops []matcher.EnqueueOp) ([]matche
 	return out, nil
 }
 
+type pmEnqueuePlan struct {
+	op       matcher.EnqueueOp
+	id       string
+	ref      *cloudFirestore.DocumentRef
+	existing *matcher.ReviewItem
+	exists   bool
+	decided  bool
+}
+
 func (c *Client) enqueueBatchFS(ctx context.Context, slug string, ops []matcher.EnqueueOp) ([]matcher.ReviewItem, error) {
 	var out []matcher.ReviewItem
 	err := c.fsClient.RunTransaction(ctx, func(ctx context.Context, tx *cloudFirestore.Transaction) error {
+		// Firestore rejects read-after-write in one txn: all reads first, then all writes.
 		out = out[:0]
 		now := time.Now().UTC()
 		var total matcher.MetricsDelta
+		plans := make([]pmEnqueuePlan, 0, len(ops))
+
 		for _, op := range ops {
-			d := op.Delta
 			if !op.NeedsReview {
-				total = addMD(total, d)
+				total = addMD(total, op.Delta)
 				continue
 			}
 			id := strings.TrimSpace(op.ItemID)
 			if id == "" {
-				total = addMD(total, d)
+				total = addMD(total, op.Delta)
 				continue
 			}
 			ref := c.pmItemRef(slug, id)
@@ -257,6 +268,7 @@ func (c *Client) enqueueBatchFS(ctx context.Context, slug string, ops []matcher.
 			if err != nil && status.Code(err) != codes.NotFound {
 				return err
 			}
+			p := pmEnqueuePlan{op: op, id: id, ref: ref}
 			if err == nil && snap.Exists() {
 				var existing matcher.ReviewItem
 				if err := snap.DataTo(&existing); err != nil {
@@ -265,25 +277,38 @@ func (c *Client) enqueueBatchFS(ctx context.Context, slug string, ops []matcher.
 				if normalizeFirestoreTenantSlug(existing.TenantID) != "" && normalizeFirestoreTenantSlug(existing.TenantID) != slug {
 					return matcher.ErrTenantMismatch
 				}
-				if existing.Status == matcher.StatusPending {
-					d.Queued, d.Pending = 0, 0
-					total = addMD(total, d)
-					existing.Query, existing.Result, existing.CreatedAt, existing.TenantID = op.Query, op.Result, now, slug
-					existing.ID = id
-					if err := tx.Set(ref, existing); err != nil {
-						return err
-					}
-					out = append(out, existing)
-					continue
+				p.exists = true
+				cp := existing
+				p.existing = &cp
+				if existing.Status != matcher.StatusPending {
+					p.decided = true
 				}
-				// decided — leave alone
+			}
+			plans = append(plans, p)
+		}
+
+		for _, p := range plans {
+			d := p.op.Delta
+			if p.exists && p.decided {
 				d.Queued, d.Pending = 0, 0
 				total = addMD(total, d)
 				continue
 			}
+			if p.exists {
+				d.Queued, d.Pending = 0, 0
+				total = addMD(total, d)
+				existing := *p.existing
+				existing.Query, existing.Result, existing.CreatedAt, existing.TenantID = p.op.Query, p.op.Result, now, slug
+				existing.ID = p.id
+				if err := tx.Set(p.ref, existing); err != nil {
+					return err
+				}
+				out = append(out, existing)
+				continue
+			}
 			total = addMD(total, d)
-			item := matcher.ReviewItem{ID: id, TenantID: slug, Status: matcher.StatusPending, Query: op.Query, Result: op.Result, CreatedAt: now}
-			if err := tx.Set(ref, item); err != nil {
+			item := matcher.ReviewItem{ID: p.id, TenantID: slug, Status: matcher.StatusPending, Query: p.op.Query, Result: p.op.Result, CreatedAt: now}
+			if err := tx.Set(p.ref, item); err != nil {
 				return err
 			}
 			out = append(out, item)
@@ -346,6 +371,8 @@ func (c *Client) DecideItem(ctx context.Context, tenantID string, patch matcher.
 			it.ChosenBarcode = patch.ChosenBarcode
 			it.DecidedAt = &now
 			it.TenantID = slug
+
+			// All reads done above; writes only from here (item Set + counter MergeAll Increment).
 			if err := tx.Set(ref, it); err != nil {
 				return err
 			}
@@ -409,19 +436,19 @@ func (c *Client) DecideItem(ctx context.Context, tenantID string, patch matcher.
 	return &cp, nil
 }
 
+// txIncrementCounters applies firestore.Increment via Set(..., MergeAll) with no prior read,
+// so it is safe after other writes in the same transaction.
 func (c *Client) txIncrementCounters(tx *cloudFirestore.Transaction, slug string, d matcher.MetricsDelta, now time.Time) error {
 	if d == (matcher.MetricsDelta{}) {
 		return nil
 	}
-	ref := c.pmCountersRef(slug)
-	snap, err := tx.Get(ref)
-	updates := []cloudFirestore.Update{
-		{Path: "tenant_id", Value: slug},
-		{Path: "updated_at", Value: now},
+	data := map[string]interface{}{
+		"tenant_id":  slug,
+		"updated_at": now,
 	}
 	add := func(path string, n int64) {
 		if n != 0 {
-			updates = append(updates, cloudFirestore.Update{Path: path, Value: cloudFirestore.Increment(n)})
+			data[path] = cloudFirestore.Increment(n)
 		}
 	}
 	add("total_matched", d.TotalMatched)
@@ -434,17 +461,7 @@ func (c *Client) txIncrementCounters(tx *cloudFirestore.Transaction, slug string
 	add("pending", d.Pending)
 	add("approved", d.Approved)
 	add("rejected", d.Rejected)
-
-	if err != nil && status.Code(err) == codes.NotFound {
-		// Create counters doc with absolute values for this batch.
-		m := applyMD(matcher.Metrics{TenantID: slug}, slug, d, now)
-		return tx.Set(ref, m)
-	}
-	if err != nil {
-		return err
-	}
-	_ = snap
-	return tx.Update(ref, updates)
+	return tx.Set(c.pmCountersRef(slug), data, cloudFirestore.MergeAll)
 }
 
 func addMD(a, b matcher.MetricsDelta) matcher.MetricsDelta {

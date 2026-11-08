@@ -44,8 +44,22 @@ jobs:
       - name: go test
         id: go_test
         run: go test ./... -count=1 -timeout 20m
+      - name: Setup Node (Firestore emulator)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Setup Java (Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Firestore emulator product-match tests
+        id: go_emulator_test
+        run: |
+          npx --yes firebase-tools@13.29.1 emulators:exec --only firestore --project demo-tashil \
+            "go test ./internal/service/firestore/ -count=1 -timeout 10m -run Emulator"
       - name: Surface failure summary
-        if: failure() && steps.go_test.outcome == 'failure'
+        if: failure() && (steps.go_test.outcome == 'failure' || steps.go_emulator_test.outcome == 'failure')
         run: |
           {
             echo "## Backend tests failed"

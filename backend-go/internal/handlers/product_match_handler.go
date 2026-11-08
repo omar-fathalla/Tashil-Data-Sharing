@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -36,6 +37,10 @@ func (h *ProductMatchHandler) catalog(tenantID string) *matcher.Catalog {
 var productMatchWriteRoles = map[domain.UserRole]bool{
 	domain.RoleSuperAdmin: true, domain.RoleVendorAdmin: true, domain.RoleAdmin: true,
 	domain.RoleNationalSalesManager: true, domain.RoleExecutive: true,
+}
+
+func productMatchTenantSlug(tenantID string) string {
+	return strings.TrimPrefix(strings.ToLower(strings.TrimSpace(tenantID)), "tenant-")
 }
 
 // HandleMatch serves POST /api/v1/product-match — dry match one or many queries (no persist).
@@ -87,7 +92,8 @@ func (h *ProductMatchHandler) HandleEnqueue(w http.ResponseWriter, r *http.Reque
 	}
 	items, err := h.queue.EnqueueUnknowns(r.Context(), c.TenantID, body.SourceFile, body.Queries, h.catalog(c.TenantID))
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
+		log.Printf("[product-match] enqueue failed tenant=%s: %v", productMatchTenantSlug(c.TenantID), err)
+		writeErr(w, http.StatusInternalServerError, "تعذر إضافة عناصر المراجعة")
 		return
 	}
 	metrics, _ := h.queue.Snapshot(r.Context(), c.TenantID)
@@ -107,7 +113,8 @@ func (h *ProductMatchHandler) HandleListReview(w http.ResponseWriter, r *http.Re
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
 	items, err := h.queue.List(r.Context(), c.TenantID, status)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
+		log.Printf("[product-match] list failed tenant=%s: %v", productMatchTenantSlug(c.TenantID), err)
+		writeErr(w, http.StatusInternalServerError, "تعذر تحميل قائمة المراجعة")
 		return
 	}
 	metrics, _ := h.queue.Snapshot(r.Context(), c.TenantID)
@@ -143,7 +150,7 @@ func (h *ProductMatchHandler) HandleDecide(w http.ResponseWriter, r *http.Reques
 		Catalog: h.catalog(c.TenantID),
 	})
 	if err != nil {
-		writeProductMatchDecideErr(w, err)
+		writeProductMatchDecideErr(w, productMatchTenantSlug(c.TenantID), err)
 		return
 	}
 	metrics, _ := h.queue.Snapshot(r.Context(), c.TenantID)
@@ -154,28 +161,35 @@ func (h *ProductMatchHandler) HandleDecide(w http.ResponseWriter, r *http.Reques
 }
 
 // writeProductMatchDecideErr maps domain errors to safe client messages.
-// Raw Firestore / RPC text is never returned to the client.
-func writeProductMatchDecideErr(w http.ResponseWriter, err error) {
+// Raw Firestore / RPC / err.Error() text is never returned to the client.
+func writeProductMatchDecideErr(w http.ResponseWriter, tenantSlug string, err error) {
+	log.Printf("[product-match] decide failed tenant=%s: %v", tenantSlug, err)
 	switch {
 	case errors.Is(err, matcher.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "عنصر المراجعة غير موجود")
 	case errors.Is(err, matcher.ErrAlreadyDecided):
-		writeErr(w, http.StatusConflict, err.Error())
+		writeErr(w, http.StatusConflict, "تم البت في هذا العنصر مسبقاً")
 	case errors.Is(err, matcher.ErrInventedBarcode):
-		writeErr(w, http.StatusBadRequest, err.Error())
+		writeErr(w, http.StatusBadRequest, "رفض باركود مصنوع: لا يتم اختراع باركودات")
 	case errors.Is(err, matcher.ErrTenantMismatch):
 		writeErr(w, http.StatusForbidden, "غير مسموح عبر المستأجر")
 	default:
+		// Validation / catalog / store failures: fixed client copy only.
 		msg := err.Error()
 		lower := strings.ToLower(msg)
 		if strings.Contains(lower, "firestore") ||
 			strings.Contains(lower, "rpc error") ||
 			strings.Contains(lower, "code =") ||
-			strings.Contains(lower, "google.golang.org") {
+			strings.Contains(lower, "google.golang.org") ||
+			strings.Contains(lower, "unexpected status") {
 			writeErr(w, http.StatusInternalServerError, "تعذر حفظ قرار المراجعة")
 			return
 		}
-		writeErr(w, http.StatusBadRequest, msg)
+		if strings.Contains(lower, "status must be") {
+			writeErr(w, http.StatusBadRequest, "الحالة يجب أن تكون اعتماد أو رفض")
+			return
+		}
+		writeErr(w, http.StatusBadRequest, "القرار غير صالح")
 	}
 }
 
@@ -187,7 +201,8 @@ func (h *ProductMatchHandler) HandleMetrics(w http.ResponseWriter, r *http.Reque
 	}
 	metrics, err := h.queue.Snapshot(r.Context(), c.TenantID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
+		log.Printf("[product-match] metrics failed tenant=%s: %v", productMatchTenantSlug(c.TenantID), err)
+		writeErr(w, http.StatusInternalServerError, "تعذر تحميل مقاييس المطابقة")
 		return
 	}
 	writeJSON(w, http.StatusOK, metrics)

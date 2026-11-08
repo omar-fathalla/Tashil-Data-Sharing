@@ -17,7 +17,9 @@ import (
 
 type decideErrStore struct {
 	matcher.MemoryStore
-	decideErr error
+	decideErr  error
+	listErr    error
+	metricsErr error
 }
 
 func (s *decideErrStore) DecideItem(ctx context.Context, tenantID string, patch matcher.DecidePatch) (*matcher.ReviewItem, error) {
@@ -25,6 +27,20 @@ func (s *decideErrStore) DecideItem(ctx context.Context, tenantID string, patch 
 		return nil, s.decideErr
 	}
 	return s.MemoryStore.DecideItem(ctx, tenantID, patch)
+}
+
+func (s *decideErrStore) ListItems(ctx context.Context, tenantID, status string) ([]matcher.ReviewItem, error) {
+	if s.listErr != nil {
+		return nil, s.listErr
+	}
+	return s.MemoryStore.ListItems(ctx, tenantID, status)
+}
+
+func (s *decideErrStore) GetMetrics(ctx context.Context, tenantID string) (matcher.Metrics, error) {
+	if s.metricsErr != nil {
+		return matcher.Metrics{}, s.metricsErr
+	}
+	return s.MemoryStore.GetMetrics(ctx, tenantID)
 }
 
 type fakePM struct {
@@ -235,5 +251,27 @@ func TestProductMatchDecideSanitizesFirestoreErrors(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "تعذر حفظ قرار المراجعة") {
 		t.Fatalf("want safe Arabic message, got %s", rec.Body.String())
+	}
+}
+
+func TestProductMatchEnqueueListMetricsSanitizeErrors(t *testing.T) {
+	store := &decideErrStore{}
+	store.listErr = errors.New(`firestore list product match items: rpc error: code = Unavailable`)
+	h := NewProductMatchHandler(matcher.NewQueue(store), fakePM{})
+
+	req := withClaims(httptest.NewRequest(http.MethodGet, "/api/v1/product-match/review", nil), domain.RoleVendorAdmin)
+	rec := httptest.NewRecorder()
+	h.HandleListReview(rec, req)
+	if rec.Code != http.StatusInternalServerError || strings.Contains(rec.Body.String(), "rpc error") {
+		t.Fatalf("list leak: %d %s", rec.Code, rec.Body.String())
+	}
+
+	store.listErr = nil
+	store.metricsErr = errors.New(`firestore get product match metrics: boom`)
+	req = withClaims(httptest.NewRequest(http.MethodGet, "/api/v1/product-match/metrics", nil), domain.RoleViewer)
+	rec = httptest.NewRecorder()
+	h.HandleMetrics(rec, req)
+	if rec.Code != http.StatusInternalServerError || strings.Contains(rec.Body.String(), "firestore") {
+		t.Fatalf("metrics leak: %d %s", rec.Code, rec.Body.String())
 	}
 }
