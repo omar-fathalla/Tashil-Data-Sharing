@@ -18,9 +18,11 @@ func answerExecutive(kpis *domain.ExecutiveKPIs, period string) (string, map[str
 		{Metric: "tenant_market_share_pct", Entity: "tenant", Value: kpis.TenantMarketSharePct, Display: claimDisplayPct(kpis.TenantMarketSharePct)},
 		{Metric: "revenue_mom_pct", Entity: "tenant", Value: kpis.RevenueMoMPct, Display: claimDisplayPct(kpis.RevenueMoMPct)},
 	}
-	text := narrativeFromClaims(period, "ملخص الأداء", claims)
+	intro := "ملخص الأداء"
+	text := NarrateFromClaims(period, intro, claims)
 	return text, claimsToEvidence(period, claims, map[string]interface{}{
-		"currency": nonzero(kpis.Currency, "EGP"),
+		"currency":  nonzero(kpis.Currency, "EGP"),
+		"intro_ar":  intro,
 	})
 }
 
@@ -58,10 +60,12 @@ func answerChainShares(shares []domain.ChainShareSummary, period string) (string
 	if topName == "" {
 		topName = shares[0].RetailerChain
 	}
-	text := narrativeFromClaims(period, "حصص السلاسل — أكبر سلسلة «"+topName+"»", claims)
+	intro := "حصص السلاسل — أكبر سلسلة «" + topName + "»"
+	text := NarrateFromClaims(period, intro, claims)
 	return text, claimsToEvidence(period, claims, map[string]interface{}{
 		"chains":    list,
 		"top_chain": topName,
+		"intro_ar":  intro,
 	})
 }
 
@@ -88,8 +92,9 @@ func answerTopSKUs(kpis *domain.ExecutiveKPIs, period string) (string, map[strin
 			"total_units":   sku.TotalUnits,
 		})
 	}
-	text := narrativeFromClaims(period, "أعلى المنتجات", claims)
-	return text, claimsToEvidence(period, claims, map[string]interface{}{"top_skus": list})
+	intro := "أعلى المنتجات"
+	text := NarrateFromClaims(period, intro, claims)
+	return text, claimsToEvidence(period, claims, map[string]interface{}{"top_skus": list, "intro_ar": intro})
 }
 
 func answerCategories(kpis *domain.ExecutiveKPIs, period string) (string, map[string]interface{}) {
@@ -115,8 +120,9 @@ func answerCategories(kpis *domain.ExecutiveKPIs, period string) (string, map[st
 			"share_pct":     c.SharePct,
 		})
 	}
-	text := narrativeFromClaims(period, "مساهمة الفئات", claims)
-	return text, claimsToEvidence(period, claims, map[string]interface{}{"categories": list})
+	intro := "مساهمة الفئات"
+	text := NarrateFromClaims(period, intro, claims)
+	return text, claimsToEvidence(period, claims, map[string]interface{}{"categories": list, "intro_ar": intro})
 }
 
 func answerSellIn(totalRev float64, totalUnits float64, count int, period string) (string, map[string]interface{}) {
@@ -128,8 +134,9 @@ func answerSellIn(totalRev float64, totalUnits float64, count int, period string
 	if count == 0 {
 		return "مفيش سجلات توريد (Sell-In) للمستأجر ده.", claimsToEvidence(period, claims, nil)
 	}
-	text := narrativeFromClaims(period, "ملخص التوريد Sell-In", claims)
-	return text, claimsToEvidence(period, claims, nil)
+	intro := "ملخص التوريد Sell-In"
+	text := NarrateFromClaims(period, intro, claims)
+	return text, claimsToEvidence(period, claims, map[string]interface{}{"intro_ar": intro})
 }
 
 func unsupportedAnswer() (string, map[string]interface{}) {

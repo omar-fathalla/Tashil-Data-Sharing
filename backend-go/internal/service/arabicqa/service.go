@@ -176,13 +176,22 @@ func (s *Service) Ask(ctx context.Context, tenantID, question string) (*Answer, 
 	ans.AnswerAR = text
 	ans.Evidence = ev
 
-	// Optional Gemini narrative from metric+entity claims; otherwise keep deterministic.
+	// Optional Gemini claim subset → server-side NarrateFromClaims only (never model prose).
 	if ans.Intent != IntentUnsupported && !s.useMock {
 		evidenceClaims := claimsFromEvidence(ev)
-		if polished, used, ok := s.polishArabic(ctx, question, text, ev); ok && strings.TrimSpace(polished) != "" {
-			if polishPreservesClaims(polished, used, evidenceClaims) {
-				ans.AnswerAR = polished
+		if used, freeText, ok := s.askGeminiClaims(ctx, question, evidenceClaims); ok {
+			_ = freeText // never shipped
+			if sanitized, ok := acceptAIClaims(used, evidenceClaims); ok {
+				intro, _ := ev["intro_ar"].(string)
+				if intro == "" {
+					intro = "الإجابة"
+				}
+				ans.AnswerAR = NarrateFromClaims(period, intro, sanitized)
 				ans.MappingSource = sourceAI
+				ans.Evidence = claimsToEvidence(period, sanitized, map[string]interface{}{
+					"intro_ar":      intro,
+					"ai_claim_path": true,
+				})
 			}
 		}
 	}

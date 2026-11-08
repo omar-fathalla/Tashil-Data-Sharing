@@ -195,8 +195,9 @@ func TestAskRequiresTenantAndQuestion(t *testing.T) {
 	}
 }
 
-func TestAskGeminiPolishUsesGroundedFacts(t *testing.T) {
+func TestAskValidClaimsIgnoresFalseNarrative(t *testing.T) {
 	f := seedFake()
+	falseNarrative := "إيراد المستأجر تسعة ملايين وخمسمئة ألف ٩٥٠٠٠٠٠ ج.م اختراع تام"
 	svc := New(f, "test-key", "gemini-3.8-flash", false).WithCaller(func(_ context.Context, model, prompt string) (string, error) {
 		if model != "gemini-3.8-flash" {
 			t.Fatalf("model=%s", model)
@@ -207,10 +208,11 @@ func TestAskGeminiPolishUsesGroundedFacts(t *testing.T) {
 		if strings.Contains(prompt, "test-key") {
 			t.Fatal("api key leaked into prompt")
 		}
+		// Valid claim subset + fabricated free text that must NEVER ship.
 		payload := map[string]interface{}{
-			"answer_ar": "إيراد المستأجر 120000.00 ج.م هذا الشهر (قراءة فقط).",
+			"answer_ar": falseNarrative,
 			"claims": []Claim{
-				{Metric: "total_revenue", Entity: "tenant", Value: 120000, Display: "120000.00 ج.م"},
+				{Metric: "total_revenue", Entity: "tenant", Value: 120000, Display: "LIAR_DISPLAY_999"},
 			},
 		}
 		b, _ := json.Marshal(payload)
@@ -221,13 +223,47 @@ func TestAskGeminiPolishUsesGroundedFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	if ans.MappingSource != sourceAI {
-		t.Fatalf("expected ai polish, got %s", ans.MappingSource)
+		t.Fatalf("expected ai claim path, got %s", ans.MappingSource)
 	}
-	if !strings.Contains(ans.AnswerAR, "120000.00") {
-		t.Fatalf("polished answer lost number: %s", ans.AnswerAR)
+	if strings.Contains(ans.AnswerAR, falseNarrative) || strings.Contains(ans.AnswerAR, "٩٥٠٠٠٠٠") || strings.Contains(ans.AnswerAR, "9500000") {
+		t.Fatalf("Gemini free text leaked into answer: %s", ans.AnswerAR)
+	}
+	if strings.Contains(ans.AnswerAR, "LIAR_DISPLAY") {
+		t.Fatalf("model Display must be ignored: %s", ans.AnswerAR)
+	}
+	want := NarrateFromClaims("MTD", "ملخص الأداء", []Claim{
+		{Metric: "total_revenue", Entity: "tenant", Value: 120000, Display: displayForMetric("total_revenue", 120000)},
+	})
+	if ans.AnswerAR != want {
+		t.Fatalf("answer must be NarrateFromClaims only\ngot:  %s\nwant: %s", ans.AnswerAR, want)
 	}
 	if !ans.ReadOnly {
 		t.Fatal("read_only must stay true")
+	}
+}
+
+func TestAskRejectsEmptyClaims(t *testing.T) {
+	f := seedFake()
+	svc := New(f, "test-key", "gemini-3.8-flash", false).WithCaller(func(_ context.Context, _, _ string) (string, error) {
+		// Empty claims — must reject (no number-set-only fallback).
+		b, _ := json.Marshal(map[string]interface{}{
+			"answer_ar": "إيراد 120000.00 ج.م من غير claims",
+			"claims":    []Claim{},
+		})
+		return string(b), nil
+	})
+	ans, err := svc.Ask(context.Background(), "tenant-adeco", "كام الإيراد؟")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ans.MappingSource != sourceDet {
+		t.Fatalf("empty claims must fall back to deterministic, got %s", ans.MappingSource)
+	}
+	if strings.Contains(ans.AnswerAR, "من غير claims") {
+		t.Fatalf("empty-claims free text leaked: %s", ans.AnswerAR)
+	}
+	if !strings.Contains(ans.AnswerAR, "120000") {
+		t.Fatalf("deterministic revenue missing: %s", ans.AnswerAR)
 	}
 }
 
@@ -248,7 +284,7 @@ func TestAskRejectsFabricatedGeminiAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 	if ans.MappingSource != sourceDet {
-		t.Fatalf("fabricated polish must fall back to deterministic, got %s", ans.MappingSource)
+		t.Fatalf("fabricated claims must fall back to deterministic, got %s", ans.MappingSource)
 	}
 	if strings.Contains(ans.AnswerAR, "999999") {
 		t.Fatalf("fabricated number leaked: %s", ans.AnswerAR)
@@ -261,7 +297,6 @@ func TestAskRejectsFabricatedGeminiAnswer(t *testing.T) {
 func TestAskRejectsEntityValueSwap(t *testing.T) {
 	f := seedFake()
 	svc := New(f, "test-key", "gemini-3.8-flash", false).WithCaller(func(_ context.Context, _, _ string) (string, error) {
-		// Swap: attribute Carrefour's 50000 to Fathalla entity.
 		payload := map[string]interface{}{
 			"answer_ar": "فتح الله: 50000.00 ج.م؛ كارفور: 70000.00 ج.م",
 			"claims": []Claim{
@@ -441,28 +476,49 @@ func TestCapabilitiesList(t *testing.T) {
 	}
 }
 
-func TestPolishPreservesClaims(t *testing.T) {
+func TestAcceptAIClaims(t *testing.T) {
 	evidence := []Claim{
-		{Metric: "total_revenue", Entity: "tenant", Value: 120000, Display: "120000.00 ج.م"},
-		{Metric: "total_revenue", Entity: "chain:فتح الله", Value: 70000, Display: "70000.00 ج.م"},
-		{Metric: "total_revenue", Entity: "chain:كارفور", Value: 50000, Display: "50000.00 ج.م"},
+		{Metric: "total_revenue", Entity: "tenant", Value: 120000, Display: "IGNORED"},
+		{Metric: "total_revenue", Entity: "chain:فتح الله", Value: 70000, Display: "IGNORED"},
+		{Metric: "total_revenue", Entity: "chain:كارفور", Value: 50000, Display: "IGNORED"},
 	}
-	usedOK := []Claim{{Metric: "total_revenue", Entity: "tenant", Value: 120000, Display: "120000.00 ج.م"}}
-	if !polishPreservesClaims("الإيراد بلغ 120000.00 ج.م", usedOK, evidence) {
-		t.Fatal("valid bound claim rejected")
+	if _, ok := acceptAIClaims(nil, evidence); ok {
+		t.Fatal("empty claims must be rejected")
 	}
-	usedFab := []Claim{{Metric: "total_revenue", Entity: "tenant", Value: 999999, Display: "999999"}}
-	if polishPreservesClaims("الإيراد 999999 ج.م", usedFab, evidence) {
-		t.Fatal("fabricated claim value accepted")
+	if _, ok := acceptAIClaims([]Claim{}, evidence); ok {
+		t.Fatal("empty slice must be rejected")
 	}
-	usedSwap := []Claim{
-		{Metric: "total_revenue", Entity: "chain:فتح الله", Value: 50000, Display: "50000.00 ج.م"},
+	sanitized, ok := acceptAIClaims([]Claim{
+		{Metric: "total_revenue", Entity: "tenant", Value: 120000, Display: "LIAR"},
+	}, evidence)
+	if !ok || len(sanitized) != 1 {
+		t.Fatalf("valid claim rejected: ok=%v %#v", ok, sanitized)
 	}
-	if polishPreservesClaims("فتح الله: 50000.00 ج.م", usedSwap, evidence) {
+	if sanitized[0].Display != displayForMetric("total_revenue", 120000) || sanitized[0].Display == "LIAR" {
+		t.Fatalf("Display must be recomputed server-side: %+v", sanitized[0])
+	}
+	if _, ok := acceptAIClaims([]Claim{
+		{Metric: "total_revenue", Entity: "tenant", Value: 999999},
+	}, evidence); ok {
+		t.Fatal("fabricated value accepted")
+	}
+	if _, ok := acceptAIClaims([]Claim{
+		{Metric: "total_revenue", Entity: "chain:فتح الله", Value: 50000},
+	}, evidence); ok {
 		t.Fatal("entity/value swap accepted")
 	}
-	if polishPreservesClaims("مفيش أرقام هنا", usedOK, evidence) {
-		t.Fatal("narrative without claim numbers accepted")
+}
+
+func TestNarrateFromClaimsOnly(t *testing.T) {
+	claims := []Claim{
+		{Metric: "total_revenue", Entity: "tenant", Value: 120000, Display: displayForMetric("total_revenue", 120000)},
+	}
+	got := NarrateFromClaims("MTD", "ملخص الأداء", claims)
+	if !strings.Contains(got, "120000.00") || !strings.Contains(got, "ملخص الأداء") {
+		t.Fatalf("narration: %s", got)
+	}
+	if strings.Contains(got, "Gemini") || strings.Contains(got, "اختراع") {
+		t.Fatalf("unexpected free text: %s", got)
 	}
 }
 

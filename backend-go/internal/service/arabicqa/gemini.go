@@ -8,13 +8,9 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
-
-var numberToken = regexp.MustCompile(`\d+(?:\.\d+)?`)
 
 const defaultGeminiBase = "https://generativelanguage.googleapis.com"
 
@@ -49,6 +45,8 @@ type geminiResponse struct {
 	} `json:"candidates"`
 }
 
+// polishPayload is the only accepted AI shape. answer_ar is never shipped —
+// the server rebuilds Arabic exclusively via NarrateFromClaims.
 type polishPayload struct {
 	AnswerAR string  `json:"answer_ar"`
 	Claims   []Claim `json:"claims"`
@@ -61,143 +59,107 @@ func redactKey(msg, apiKey string) string {
 	return strings.ReplaceAll(msg, apiKey, "[REDACTED]")
 }
 
-// polishArabic asks Gemini to narrate only from metric+entity claims.
-func (s *Service) polishArabic(ctx context.Context, question, grounded string, evidence map[string]interface{}) (string, []Claim, bool) {
-	claims := claimsFromEvidence(evidence)
-	claimsJSON, _ := json.Marshal(claims)
+// askGeminiClaims asks Gemini for a structured claim subset. Free text is ignored.
+func (s *Service) askGeminiClaims(ctx context.Context, question string, evidence []Claim) ([]Claim, string, bool) {
+	claimsJSON, _ := json.Marshal(evidence)
 	prompt := fmt.Sprintf(`أنت مساعد عربي لبيانات مبيعات بالتجزئة.
-اكتب إجابة عربية من الـ claims فقط. كل claim مربوط بـ metric + entity + value.
-ممنوع اختراع أرقام أو نقل قيمة من entity لـ entity تانية.
-أرجع JSON فقط:
-{"answer_ar":"...","claims":[{"metric":"...","entity":"...","value":0,"display":"..."}]}
-claims في الرد لازم تكون subset من claims الأدلة (نفس metric+entity+value).
+أرجع JSON فقط (بدون Markdown):
+{"answer_ar":"...","claims":[{"metric":"...","entity":"...","value":0}]}
+
+القواعد:
+1) claims لازم تكون subset من claims الأدلة — نفس metric + entity + value حرفياً.
+2) ممنوع اختراع أرقام أو نقل قيمة من entity لـ entity تانية.
+3) answer_ar للتحقق فقط ولن يُعرض للمستخدم — النص النهائي يُبنى من claims على الخادم.
+4) لا تعتمد على حقل display؛ الخادم يعيد حسابه.
+5) claims فارغة = مرفوض.
 
 السؤال: %s
-الإجابة المؤسسة: %s
-claims الأدلة: %s`, question, grounded, string(claimsJSON))
+claims الأدلة: %s`, question, string(claimsJSON))
 
 	raw, err := s.callGeminiJSON(ctx, s.model, prompt)
 	if err != nil {
-		return "", nil, false
+		return nil, "", false
 	}
-	var p polishPayload
-	if err := json.Unmarshal([]byte(raw), &p); err != nil {
-		raw = strings.TrimSpace(raw)
+	p, err := parsePolishPayload(raw)
+	if err != nil {
+		return nil, "", false
+	}
+	return p.Claims, p.AnswerAR, true
+}
+
+func parsePolishPayload(raw string) (polishPayload, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return polishPayload{}, fmt.Errorf("empty ai payload")
+	}
+	if strings.HasPrefix(raw, "```") {
 		raw = strings.TrimPrefix(raw, "```json")
+		raw = strings.TrimPrefix(raw, "```JSON")
 		raw = strings.TrimPrefix(raw, "```")
 		raw = strings.TrimSuffix(raw, "```")
 		raw = strings.TrimSpace(raw)
-		if err2 := json.Unmarshal([]byte(raw), &p); err2 != nil {
-			return "", nil, false
-		}
 	}
-	out := strings.TrimSpace(p.AnswerAR)
-	if out == "" {
-		return "", nil, false
+	var p polishPayload
+	if err := json.Unmarshal([]byte(raw), &p); err != nil {
+		return polishPayload{}, err
 	}
-	return out, p.Claims, true
+	p.AnswerAR = strings.TrimSpace(p.AnswerAR)
+	if len(p.Claims) == 0 {
+		return polishPayload{}, fmt.Errorf("ai payload missing claims")
+	}
+	return p, nil
 }
 
-// polishPreservesClaims requires Gemini's used claims to be an exact metric+entity
-// subset of evidence claims (same value), and the narrative numbers to come only
-// from those bound claims — so entity/value swaps are rejected.
-func polishPreservesClaims(polished string, used, evidence []Claim) bool {
-	if strings.TrimSpace(polished) == "" {
-		return false
+// acceptAIClaims validates used claims as a metric+entity+value subset of
+// evidence. Empty used → reject. Display is recomputed from evidence (model
+// Display is ignored). Returns sanitized claims ready for NarrateFromClaims.
+func acceptAIClaims(used, evidence []Claim) ([]Claim, bool) {
+	if len(used) == 0 {
+		return nil, false
 	}
 	idx := claimIndex(evidence)
 	if len(idx) == 0 {
-		return false
+		return nil, false
 	}
-	if len(used) == 0 {
-		// No structured claims returned — fall back to number-only check against evidence values.
-		return numbersOnlyFromClaims(polished, evidence)
-	}
-	allowedNums := map[string]bool{}
+	out := make([]Claim, 0, len(used))
+	seen := map[string]bool{}
 	for _, u := range used {
-		ev, ok := idx[u.key()]
+		key := u.key()
+		if key == "|" || strings.TrimSpace(u.Metric) == "" {
+			return nil, false
+		}
+		ev, ok := idx[key]
 		if !ok || !sameValue(ev.Value, u.Value) {
-			return false // unknown metric+entity or swapped value
+			return nil, false
 		}
-		for _, n := range numbersFromValue(u.Value) {
-			allowedNums[canonicalizeNumber(n)] = true
+		if seen[key] {
+			continue
 		}
-		for _, n := range numberToken.FindAllString(u.Display, -1) {
-			allowedNums[canonicalizeNumber(n)] = true
+		seen[key] = true
+		// Recompute Display server-side — never trust model Display.
+		sanitized := Claim{
+			Metric:  ev.Metric,
+			Entity:  ev.Entity,
+			Value:   ev.Value,
+			Display: displayForMetric(ev.Metric, ev.Value),
 		}
+		out = append(out, sanitized)
 	}
-	for _, n := range numberToken.FindAllString(polished, -1) {
-		if !allowedNums[canonicalizeNumber(n)] {
-			return false
-		}
+	if len(out) == 0 {
+		return nil, false
 	}
-	// At least one used claim value must appear in the narrative.
-	for _, u := range used {
-		for _, n := range numbersFromValue(u.Value) {
-			if strings.Contains(polished, n) || strings.Contains(polished, fmt.Sprintf("%.2f", u.Value)) {
-				return true
-			}
-			if canonicalizeNumber(n) != n && strings.Contains(polished, canonicalizeNumber(n)) {
-				return true
-			}
-		}
-	}
-	return false
+	return out, true
 }
 
-func numbersOnlyFromClaims(polished string, evidence []Claim) bool {
-	allowed := map[string]bool{}
-	for _, c := range evidence {
-		for _, n := range numbersFromValue(c.Value) {
-			allowed[canonicalizeNumber(n)] = true
-		}
-	}
-	if len(allowed) == 0 {
-		return false
-	}
-	nums := numberToken.FindAllString(polished, -1)
-	if len(nums) == 0 {
-		return false
-	}
-	for _, n := range nums {
-		if !allowed[canonicalizeNumber(n)] {
-			return false
-		}
-	}
-	return true
-}
-
-func numbersFromValue(v interface{}) []string {
-	switch x := v.(type) {
-	case float64:
-		return []string{strconv.FormatFloat(x, 'f', -1, 64), fmt.Sprintf("%.2f", x)}
-	case float32:
-		return []string{strconv.FormatFloat(float64(x), 'f', -1, 64), fmt.Sprintf("%.2f", float64(x))}
-	case int:
-		return []string{strconv.Itoa(x)}
-	case int64:
-		return []string{strconv.FormatInt(x, 10)}
-	case json.Number:
-		return []string{x.String()}
-	case string:
-		return numberToken.FindAllString(x, -1)
+func displayForMetric(metric string, value float64) string {
+	switch metric {
+	case "total_units", "total_units_sold", "active_stores_count", "record_count":
+		return claimDisplayInt(value)
+	case "tenant_market_share_pct", "share_pct", "revenue_mom_pct":
+		return claimDisplayPct(value)
 	default:
-		return nil
+		return claimDisplayEGP(value)
 	}
-}
-
-func canonicalizeNumber(s string) string {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return s
-	}
-	if f, err := strconv.ParseFloat(s, 64); err == nil {
-		if f == float64(int64(f)) {
-			return strconv.FormatInt(int64(f), 10)
-		}
-		return strconv.FormatFloat(f, 'f', -1, 64)
-	}
-	return s
 }
 
 func (s *Service) callGeminiJSON(ctx context.Context, model, prompt string) (string, error) {

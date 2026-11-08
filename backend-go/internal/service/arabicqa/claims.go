@@ -34,20 +34,33 @@ func claimDisplayPct(v float64) string {
 	return fmt.Sprintf("%.1f%%", v)
 }
 
-// narrativeFromClaims builds the Arabic answer strictly from metric+entity claims.
-func narrativeFromClaims(period string, intro string, claims []Claim) string {
+// NarrateFromClaims builds the shipped Arabic answer exclusively from
+// validated metric+entity claims (never from Gemini free text).
+func NarrateFromClaims(period string, intro string, claims []Claim) string {
 	if len(claims) == 0 {
 		return fmt.Sprintf("%s مفيش أرقام مؤسسة للفترة %s.", intro, periodLabel(period))
 	}
 	parts := make([]string, 0, len(claims))
 	for _, c := range claims {
+		display := c.Display
+		if display == "" {
+			display = displayForMetric(c.Metric, c.Value)
+		}
 		label := c.Entity
 		if label == "" || label == "tenant" {
 			label = metricLabelAR(c.Metric)
 		} else {
-			label = fmt.Sprintf("%s (%s)", label, metricLabelAR(c.Metric))
+			// Strip "chain:" / "sku:" / "category:" prefixes for Arabic readability.
+			short := label
+			for _, p := range []string{"chain:", "sku:", "category:"} {
+				if strings.HasPrefix(short, p) {
+					short = strings.TrimPrefix(short, p)
+					break
+				}
+			}
+			label = fmt.Sprintf("%s (%s)", short, metricLabelAR(c.Metric))
 		}
-		parts = append(parts, fmt.Sprintf("%s: %s", label, c.Display))
+		parts = append(parts, fmt.Sprintf("%s: %s", label, display))
 	}
 	return fmt.Sprintf("%s (فترة %s): %s. قراءة فقط من بيانات المستأجر في BigQuery.",
 		intro, periodLabel(period), strings.Join(parts, "؛ "))
