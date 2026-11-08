@@ -103,7 +103,7 @@ func assertGoldenPayload(t *testing.T, exp goldenExpected, p *domain.NormalizedR
 		if !d.RequiresHumanApproval {
 			t.Fatalf("expected human approval for staged golden %s", exp.ID)
 		}
-		m := guardrails.BuildSuccessMetrics(true, p.MappingSource, p.MappingConfidence, d, p.MappingSource == MappingSourceAI)
+		m := guardrails.BuildSuccessMetrics(guardrails.EventsFromMappingSource(p.MappingSource), p.MappingSource, p.MappingConfidence, d)
 		if m.ArabicSummary == "" || !m.HumanApprovalRequired {
 			t.Fatalf("success metrics incomplete: %+v", m)
 		}
@@ -193,25 +193,48 @@ func TestGoldenCarrefourLongRegression(t *testing.T) {
 	assertGoldenPayload(t, exp, p)
 }
 
-func TestGoldenLivetestHistoricalFilesPresent(t *testing.T) {
-	for _, id := range []string{"sellin-sop-qa", "sellout-form-vs-sheet"} {
-		exp := loadGoldenExpected(t, id)
+func TestGoldenLivetestHistoricalFilesParseExpected(t *testing.T) {
+	t.Run("sellin-sop-qa", func(t *testing.T) {
+		exp := loadGoldenExpected(t, "sellin-sop-qa")
 		path := filepath.Join("..", "ingestion", "testdata", "livetest", exp.Filename)
 		raw, err := os.ReadFile(path)
 		if err != nil {
-			t.Fatalf("%s: %v", path, err)
+			t.Fatal(err)
 		}
-		if len(raw) < 100 {
-			t.Fatalf("%s too small", path)
+		recs, report, err := ParseSellInPlanWorkbookWithReport("tenant-qa", exp.Filename, raw, "qa_test")
+		if err != nil {
+			t.Fatal(err)
 		}
-		d := guardrails.EvaluateApproval(guardrails.Input{
-			MappingSource: "deterministic",
-			IsStaged:      true,
-		})
+		if len(recs) < exp.MinRecords {
+			t.Fatalf("records=%d want >= %d layout=%v", len(recs), exp.MinRecords, report)
+		}
+		var sum float64
+		for _, r := range recs {
+			sum += r.NetValueEGP
+		}
+		if exp.ExtractedValue != nil && sum != *exp.ExtractedValue {
+			t.Fatalf("value=%.2f want %.2f", sum, *exp.ExtractedValue)
+		}
+		d := guardrails.EvaluateApproval(guardrails.Input{MappingSource: "deterministic", IsStaged: true})
 		if !d.RequiresHumanApproval {
-			t.Fatalf("%s: staged historical file must require human approval", id)
+			t.Fatal("staged sell-in must require human approval")
 		}
-	}
+	})
+	t.Run("sellout-form-vs-sheet", func(t *testing.T) {
+		exp := loadGoldenExpected(t, "sellout-form-vs-sheet")
+		path := filepath.Join("..", "ingestion", "testdata", "livetest", exp.Filename)
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("ENVIRONMENT", "development")
+		c := NewAgent("", "gemini-3.8-flash", true)
+		p, err := c.AnalyzeAndNormalize(context.Background(), exp.Filename, raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertGoldenPayload(t, exp, p)
+	})
 }
 
 func TestGoldenProdRefusesMockOnOpaqueHistorical(t *testing.T) {

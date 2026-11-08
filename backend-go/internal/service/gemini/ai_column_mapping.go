@@ -166,10 +166,11 @@ func (c *Client) inferColumnMapping(ctx context.Context, filename string, sample
 		}
 	}
 	sample = guardrails.SanitizeSampleRows(sample)
-	prompt := buildColumnMapPrompt(filename, sample)
+	safeFile := guardrails.FilenameForLog(filename)
+	prompt := buildColumnMapPrompt(safeFile, sample)
 	key := mappingPlanKey(prompt)
 	if plan, ok := c.planCache.get(key); ok && plan.check(sample) == nil {
-		log.Printf("[ingest-mapping] file=%q reusing stored mapping plan (no Gemini call)", filename)
+		log.Printf("[ingest-mapping] file=%q reusing stored mapping plan (no Gemini call)", safeFile)
 		return plan, MappingSourceCache, "stored-plan", nil
 	}
 	type attempt struct{ tier, model string }
@@ -185,12 +186,12 @@ func (c *Client) inferColumnMapping(ctx context.Context, filename string, sample
 		text, err := mapper(ctx, a.model, prompt)
 		if err != nil {
 			lastErr = err
-			log.Printf("[ingest-mapping] file=%q tier=%s model=%s error=%v", filename, a.tier, a.model, err)
+			log.Printf("[ingest-mapping] file=%q tier=%s model=%s error=%v", safeFile, a.tier, a.model, err)
 			continue
 		}
 		if _, err := guardrails.ValidateColumnMapPlanJSON([]byte(text)); err != nil {
 			lastErr = err
-			log.Printf("[ingest-mapping] file=%q tier=%s model=%s schema rejected: %v", filename, a.tier, a.model, err)
+			log.Printf("[ingest-mapping] file=%q tier=%s model=%s schema rejected: %v", safeFile, a.tier, a.model, err)
 			continue
 		}
 		plan := &ColumnMapPlan{}
@@ -200,12 +201,12 @@ func (c *Client) inferColumnMapping(ctx context.Context, filename string, sample
 		}
 		if err := plan.check(sample); err != nil {
 			lastErr = err
-			log.Printf("[ingest-mapping] file=%q tier=%s model=%s rejected plan: %v", filename, a.tier, a.model, err)
+			log.Printf("[ingest-mapping] file=%q tier=%s model=%s rejected plan: %v", safeFile, a.tier, a.model, err)
 			continue
 		}
 		if plan.Confidence < minMappingConfidence {
 			lastErr = fmt.Errorf("low mapping confidence %.2f", plan.Confidence)
-			log.Printf("[ingest-mapping] file=%q tier=%s model=%s low confidence %.2f", filename, a.tier, a.model, plan.Confidence)
+			log.Printf("[ingest-mapping] file=%q tier=%s model=%s low confidence %.2f", safeFile, a.tier, a.model, plan.Confidence)
 			continue
 		}
 		c.planCache.put(key, plan)
@@ -514,7 +515,7 @@ func validationError(filename string, v *domain.IngestionValidation) error {
 
 func logValidation(filename, source string, v *domain.IngestionValidation) {
 	log.Printf("[ingest-validation] file=%q source=%s status=%s records=%d units=%d value=%.2f source_units=%.0f source_value=%.2f sheet_units=%.0f sheet_value=%.2f months=%v issues=%v",
-		filename, source, v.Status, v.RecordCount, v.ExtractedUnits, v.ExtractedValue, v.SourceUnits, v.SourceValue, v.SheetTotalUnits, v.SheetTotalValue, v.MonthsDetected, v.Issues)
+		guardrails.FilenameForLog(filename), source, v.Status, v.RecordCount, v.ExtractedUnits, v.ExtractedValue, v.SourceUnits, v.SourceValue, v.SheetTotalUnits, v.SheetTotalValue, v.MonthsDetected, v.Issues)
 }
 
 // analyzeWithAIMapping runs the AI-mapping path. ok=false means fall back to the deterministic readers.
@@ -527,16 +528,17 @@ func (c *Client) analyzeWithAIMapping(ctx context.Context, filename string, rawC
 	if len(sample) > mappingSampleRows {
 		sample = sample[:mappingSampleRows]
 	}
+	safeFile := guardrails.FilenameForLog(filename)
 	plan, tier, model, err := c.inferColumnMapping(ctx, filename, sample)
 	if err != nil {
-		log.Printf("[ingest-mapping] file=%q falling back to deterministic readers: %v", filename, err)
+		log.Printf("[ingest-mapping] file=%q falling back to deterministic readers: %v", safeFile, err)
 		return nil, false
 	}
 	planJSON, _ := json.Marshal(plan)
-	log.Printf("[ingest-mapping] file=%q tier=%s model=%s confidence=%.2f plan=%s", filename, tier, model, plan.Confidence, planJSON)
+	log.Printf("[ingest-mapping] file=%q tier=%s model=%s confidence=%.2f plan=%s", safeFile, tier, model, plan.Confidence, planJSON)
 	payload, src, err := extractWithMapping(filename, rows, plan)
 	if err != nil {
-		log.Printf("[ingest-mapping] file=%q extraction with AI mapping failed: %v", filename, err)
+		log.Printf("[ingest-mapping] file=%q extraction with AI mapping failed: %v", safeFile, err)
 		return nil, false
 	}
 	v := validateExtraction(payload, &src)
@@ -560,10 +562,10 @@ func (c *Client) analyzeWithAIMapping(ctx context.Context, filename string, rawC
 	return payload, true
 }
 
-// redact strips the API key from an error string before it is logged.
+// redact strips the API key and other PII-shaped tokens before logging.
 func (c *Client) redact(msg string) string {
 	if c.apiKey != "" {
 		msg = strings.ReplaceAll(msg, c.apiKey, "[redacted]")
 	}
-	return msg
+	return guardrails.RedactString(msg)
 }

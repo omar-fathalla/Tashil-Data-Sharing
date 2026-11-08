@@ -40,14 +40,23 @@ func TruncateCell(s string) string {
 // SanitizeSampleRows returns a deep copy of at most MaxSampleRows, with truncated cells.
 // It never expands the sample — callers must already limit what they send to Gemini.
 func SanitizeSampleRows(rows [][]string) [][]string {
-	if len(rows) > MaxSampleRows {
-		rows = rows[:MaxSampleRows]
+	return SanitizeSampleRowsLimit(rows, MaxSampleRows)
+}
+
+// SanitizeSampleRowsLimit truncates cells and caps row count for any Gemini sample path
+// (column-mapping or full-normalize).
+func SanitizeSampleRowsLimit(rows [][]string, maxRows int) [][]string {
+	if maxRows <= 0 {
+		maxRows = MaxSampleRows
+	}
+	if len(rows) > maxRows {
+		rows = rows[:maxRows]
 	}
 	out := make([][]string, len(rows))
 	for i, r := range rows {
 		cp := make([]string, len(r))
 		for j, c := range r {
-			cp[j] = TruncateCell(c)
+			cp[j] = TruncateCell(RedactString(c))
 		}
 		out[i] = cp
 	}

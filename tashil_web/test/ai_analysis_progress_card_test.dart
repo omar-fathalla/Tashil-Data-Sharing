@@ -38,8 +38,8 @@ IngestionResultModel _result({
     requiresHumanApproval: requiresHumanApproval || isStaged,
     guardrailReasonsAr: guardrailReasonsAr,
     guardrailArabicSummary: guardrailArabicSummary,
-    guardrailSchemaValid: true,
-    guardrailPiiMinimized: true,
+    guardrailSchemaValid: mappingSource == 'ai' || mappingSource == 'cache',
+    guardrailPiiMinimized: mappingSource == 'ai' || mappingSource == 'cache',
     guardrailPerCallLogged: mappingSource == 'ai',
   );
 }
@@ -207,29 +207,37 @@ void main() {
     });
     expect(m.needsHumanApproval, isTrue);
     expect(m.guardrailReasonsAr, contains('راجع التخطيط قبل الاعتماد'));
-    expect(m.guardrailArabicSummary, contains('المراجعة البشرية'));
-    expect(AiAnalysisProgressCard.humanApprovalBanner(m), contains('المراجعة البشرية'));
+    expect(m.guardrailArabicSummary, contains('مراجعة البشرية'));
+    expect(AiAnalysisProgressCard.humanApprovalBanner(m), contains('مراجعة البشرية'));
     expect(AiAnalysisProgressCard.successMetricsLine(m), contains('المخطط سليم'));
   });
 
   testWidgets('staged card shows Arabic human-approval banner', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: AiAnalysisProgressCard(
-            isAnalyzing: false,
-            result: _result(
-              mappingSource: 'ai',
-              aiModelUsed: 'gemini-3.8-flash',
-              mappingConfidence: 0.9,
-              guardrailArabicSummary: 'جاهز للمراجعة البشرية قبل الحفظ',
-              guardrailReasonsAr: const ['تم الاستخراج بالذكاء الاصطناعي — راجع التخطيط قبل الاعتماد'],
+          body: SizedBox(
+            width: 720,
+            child: AiAnalysisProgressCard(
+              isAnalyzing: false,
+              result: _result(
+                mappingSource: 'ai',
+                aiModelUsed: 'gemini-3.8-flash',
+                mappingConfidence: 0.9,
+                guardrailArabicSummary: 'جاهز للمراجعة البشرية قبل الحفظ',
+                guardrailReasonsAr: const ['تم الاستخراج بالذكاء الاصطناعي — راجع التخطيط قبل الاعتماد'],
+              ),
             ),
           ),
         ),
       ),
     );
-    expect(find.textContaining('المراجعة البشرية'), findsWidgets);
+    expect(find.textContaining('مراجعة البشرية'), findsWidgets);
     expect(find.textContaining('المخطط سليم'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

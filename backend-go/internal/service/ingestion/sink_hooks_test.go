@@ -73,12 +73,27 @@ func newTestProcessor(t *testing.T, dir string) *Processor {
 
 var sampleCSV = []byte("Header1,Header2\nSample1,Sample2\n")
 
-func TestSinkDisabledByDefaultLeavesResponseUnchanged(t *testing.T) {
-	p := newTestProcessor(t, "")
-	res, err := p.ProcessUpload(context.Background(), "tenant-adeco", "carrefour_weekly.csv", sampleCSV)
+// processUploadApproved stages then commits — required for mock/AI samples (human approval gate).
+func processUploadApproved(t *testing.T, p *Processor, ctx context.Context, tenant, filename string, data []byte, chains ...string) *IngestionResult {
+	t.Helper()
+	staged, err := p.ProcessUploadWithDryRun(ctx, tenant, filename, data, true, chains...)
 	if err != nil {
 		t.Fatal(err)
 	}
+	chain := ""
+	if len(chains) > 0 {
+		chain = chains[0]
+	}
+	res, err := p.CommitStagedUpload(ctx, tenant, staged.BatchID, chain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func TestSinkDisabledByDefaultLeavesResponseUnchanged(t *testing.T) {
+	p := newTestProcessor(t, "")
+	res := processUploadApproved(t, p, context.Background(), "tenant-adeco", "carrefour_weekly.csv", sampleCSV)
 	if res.BigQuerySync != nil {
 		t.Fatalf("expected no bigquery_sync when sink disabled, got %+v", res.BigQuerySync)
 	}
@@ -87,10 +102,7 @@ func TestSinkDisabledByDefaultLeavesResponseUnchanged(t *testing.T) {
 func TestSinkReceivesCommittedUpload(t *testing.T) {
 	fs := &fakeSink{}
 	p := newTestProcessor(t, "").WithSink(fs)
-	res, err := p.ProcessUpload(context.Background(), "tenant-adeco", "carrefour_weekly.csv", sampleCSV)
-	if err != nil {
-		t.Fatal(err)
-	}
+	res := processUploadApproved(t, p, context.Background(), "tenant-adeco", "carrefour_weekly.csv", sampleCSV)
 	if res.BigQuerySync == nil || res.BigQuerySync.Status != bqsink.StatusOK {
 		t.Fatalf("expected ok bigquery_sync, got %+v", res.BigQuerySync)
 	}
@@ -125,10 +137,7 @@ func TestSinkPreviewDoesNotWriteButCommitDoes(t *testing.T) {
 func TestSinkFailureIsSurfacedButUploadSucceeds(t *testing.T) {
 	fs := &fakeSink{fail: errors.New("permission denied")}
 	p := newTestProcessor(t, "").WithSink(fs)
-	res, err := p.ProcessUpload(context.Background(), "tenant-adeco", "carrefour_weekly.csv", sampleCSV)
-	if err != nil {
-		t.Fatalf("in-memory path must keep working: %v", err)
-	}
+	res := processUploadApproved(t, p, context.Background(), "tenant-adeco", "carrefour_weekly.csv", sampleCSV)
 	if res.BigQuerySync == nil || !res.BigQuerySync.Failed() || res.BigQuerySync.Error == "" {
 		t.Fatalf("expected failed bigquery_sync with error, got %+v", res.BigQuerySync)
 	}
@@ -141,9 +150,7 @@ func TestReplayDoesNotWriteToSinkButBackfillDoes(t *testing.T) {
 	dir := t.TempDir()
 	ctx := context.Background()
 	first := newTestProcessor(t, dir)
-	if _, err := first.ProcessUpload(ctx, "tenant-adeco", "carrefour_weekly.csv", sampleCSV); err != nil {
-		t.Fatal(err)
-	}
+	_ = processUploadApproved(t, first, ctx, "tenant-adeco", "carrefour_weekly.csv", sampleCSV)
 
 	fs := &fakeSink{}
 	second := newTestProcessor(t, dir).WithSink(fs)
@@ -166,10 +173,7 @@ func TestDeleteArchivedFileDeletesBatchInSink(t *testing.T) {
 	fs := &fakeSink{}
 	p := newTestProcessor(t, dir).WithSink(fs)
 	ctx := context.Background()
-	res, err := p.ProcessUpload(ctx, "tenant-adeco", "carrefour_weekly.csv", sampleCSV)
-	if err != nil {
-		t.Fatal(err)
-	}
+	res := processUploadApproved(t, p, ctx, "tenant-adeco", "carrefour_weekly.csv", sampleCSV)
 	if _, err := p.DeleteArchivedFile(ctx, "tenant-adeco", res.ArchiveID); err != nil {
 		t.Fatal(err)
 	}

@@ -48,7 +48,7 @@ func TestRefuseMockInProduction(t *testing.T) {
 	}
 }
 
-func TestFormatCallLine_NoPII(t *testing.T) {
+func TestFormatCallLine_NoRawPathOrPII(t *testing.T) {
 	line := FormatCallLine(CallRecord{
 		Filename:  "/tmp/path/Book3.xlsx",
 		Model:     "gemini-3.8-flash",
@@ -66,11 +66,22 @@ func TestFormatCallLine_NoPII(t *testing.T) {
 	LogCallTimed("x.xlsx", "m", "tier1", time.Now().Add(-time.Millisecond), true, nil)
 }
 
-func TestBuildSuccessMetrics(t *testing.T) {
+func TestBuildSuccessMetrics_FromEvents(t *testing.T) {
 	t.Setenv("ENVIRONMENT", "production")
 	d := EvaluateApproval(Input{IsStaged: true, MappingSource: "ai", MappingConfidence: 0.9})
-	m := BuildSuccessMetrics(true, "ai", 0.9, d, true)
-	if !m.SchemaValid || !m.HumanApprovalRequired || !m.MockBlockedInProd || m.ArabicSummary == "" {
-		t.Fatalf("%+v", m)
+
+	ai := BuildSuccessMetrics(EventsFromMappingSource("ai"), "ai", 0.9, d)
+	if !ai.SchemaValid || !ai.SchemaChecked || !ai.PerCallLogged || !ai.PIIMinimized {
+		t.Fatalf("ai events: %+v", ai)
+	}
+
+	cache := BuildSuccessMetrics(EventsFromMappingSource("cache"), "cache", 0.9, d)
+	if !cache.SchemaValid || cache.PerCallLogged {
+		t.Fatalf("cache hit must not count as a Gemini call: %+v", cache)
+	}
+
+	det := BuildSuccessMetrics(EventsFromMappingSource("deterministic"), "deterministic", 0, d)
+	if det.SchemaValid || det.PerCallLogged || det.PIIMinimized {
+		t.Fatalf("deterministic must not hardcode schema/call/pii true: %+v", det)
 	}
 }

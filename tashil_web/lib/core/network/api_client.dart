@@ -1700,8 +1700,8 @@ class IngestionResultModel {
     this.requiresHumanApproval = false,
     this.guardrailReasonsAr = const [],
     this.guardrailArabicSummary = '',
-    this.guardrailSchemaValid = true,
-    this.guardrailPiiMinimized = true,
+    this.guardrailSchemaValid = false,
+    this.guardrailPiiMinimized = false,
     this.guardrailPerCallLogged = false,
     this.uploadWarnings = const [],
     this.quarantinedCustomers = const [],
@@ -1798,16 +1798,16 @@ class IngestionResultModel {
       guardrailSchemaValid: () {
         final metrics = json['guardrail_metrics'];
         if (metrics is Map<String, dynamic>) {
-          return metrics['schema_valid'] as bool? ?? true;
+          return metrics['schema_valid'] as bool? ?? false;
         }
-        return true;
+        return false;
       }(),
       guardrailPiiMinimized: () {
         final metrics = json['guardrail_metrics'];
         if (metrics is Map<String, dynamic>) {
-          return metrics['pii_minimized'] as bool? ?? true;
+          return metrics['pii_minimized'] as bool? ?? false;
         }
-        return true;
+        return false;
       }(),
       guardrailPerCallLogged: () {
         final metrics = json['guardrail_metrics'];

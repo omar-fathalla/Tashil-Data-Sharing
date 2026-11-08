@@ -659,6 +659,14 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 
 	// Auto-create / upsert discovered branches in Firestore
 	autoCreatedCount := len(discoveredStores)
+	// P1: AI/cache/mock/flagged durable writes require explicit human approval (staged commit).
+	// Archive replay is already-approved historical data and skips the gate.
+	if !dryRun && !gemini.IsReplay(ctx) {
+		valStatus := payload.Validation
+		if err := enforceDurableWriteApproval(payload.MappingSource, valStatus, len(payload.AnomaliesDetected), mismatch, false); err != nil {
+			return nil, err
+		}
+	}
 	if !dryRun && len(discoveredStores) > 0 {
 		cnt, err := p.fsRepo.UpsertStoresByTenant(ctx, tenantID, discoveredStores, payload.IsWideMatrixWorkbook)
 		if err == nil && cnt > 0 {
@@ -1642,6 +1650,12 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	var prevBytes []byte
 	if dryRun {
 		prevArch, prevBytes = p.SnapshotExistingArchivedFile(tenantID, effectiveChain, filename)
+	}
+	// Block AI/cache/mock/flagged Sell-In direct commits before archive or BQ writes.
+	if !dryRun {
+		if err := enforceDurableWriteApproval(mappingSource, nil, 0, false, false); err != nil {
+			return nil, err
+		}
 	}
 	archivedEntry := p.SaveArchivedFile(
 		tenantID,

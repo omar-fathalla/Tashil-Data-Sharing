@@ -97,9 +97,12 @@ class AiAnalysisProgressCard extends StatelessWidget {
   /// Compact Arabic success-metrics line for the review card.
   static String successMetricsLine(IngestionResultModel result) {
     final parts = <String>[
-      result.guardrailSchemaValid ? 'المخطط سليم' : 'المخطط مرفوض',
-      'تقليل البيانات الشخصية',
-      if (result.guardrailPerCallLogged || result.usedAiMapping)
+      if (result.guardrailSchemaValid)
+        'المخطط سليم'
+      else if (result.usedAiMapping)
+        'المخطط مرفوض',
+      if (result.guardrailPiiMinimized) 'تقليل البيانات الشخصية',
+      if (result.guardrailPerCallLogged)
         'تم تسجيل الاستدعاء'
       else
         'بدون استدعاء ذكاء اصطناعي',

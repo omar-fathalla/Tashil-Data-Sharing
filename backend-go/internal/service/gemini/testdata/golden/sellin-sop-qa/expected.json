@@ -4,6 +4,7 @@
   "filename": "01_month_formats.xlsx",
   "source": "livetest",
   "kind": "sell_in",
-  "min_records": 1,
+  "min_records": 6,
+  "extracted_value": 600,
   "requires_human_approval_when_staged": true
 }

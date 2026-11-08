@@ -1,6 +1,14 @@
 package guardrails
 
-import "strings"
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
+
+// ErrHumanApprovalRequired is returned when a durable write is attempted for an
+// AI/cache/mock/flagged ingest without an explicit human approval (staged commit).
+var ErrHumanApprovalRequired = errors.New("human approval required before durable write")
 
 // Decision is the human-approval gate for an ingest preview/commit.
 type Decision struct {
@@ -10,31 +18,44 @@ type Decision struct {
 	ArabicReasons []string `json:"arabic_reasons,omitempty"`
 }
 
-// Input feeds EvaluateApproval. Keep it free of full record payloads (PII).
+// Input feeds EvaluateApproval / BlockDurableWrite. Keep it free of full record payloads (PII).
 type Input struct {
 	MappingSource     string
 	MappingConfidence float64
 	IsStaged          bool
 	IsCommitted       bool
-	ValidationStatus  string // ok | flagged | rejected
-	AnomalyCount      int
-	ChainMismatch     bool
+	// HumanApproved is true only after an explicit review action (CommitStagedUpload).
+	HumanApproved    bool
+	ValidationStatus string // ok | flagged | rejected
+	AnomalyCount     int
+	ChainMismatch    bool
 }
 
-// EvaluateApproval decides whether a human must explicitly approve before durable write.
-// Dry-run / staged previews always require approval. AI/mock/flagged paths also force review.
+// NeedsWriteApproval reports whether durable persistence requires explicit human approval.
+// Gates: AI / cache / mock mapping, or flagged|rejected validation. Independent of IsCommitted.
+func NeedsWriteApproval(in Input) bool {
+	src := strings.ToLower(strings.TrimSpace(in.MappingSource))
+	switch src {
+	case "ai", "cache", "mock":
+		return true
+	}
+	switch strings.ToLower(strings.TrimSpace(in.ValidationStatus)) {
+	case "flagged", "rejected":
+		return true
+	}
+	return false
+}
+
+// EvaluateApproval decides UI / API approval state and always records reasons —
+// including for committed results (never short-circuits on IsCommitted).
 func EvaluateApproval(in Input) Decision {
 	var d Decision
 	add := func(en, ar string) {
-		d.RequiresHumanApproval = true
 		d.Reasons = append(d.Reasons, en)
 		d.ArabicReasons = append(d.ArabicReasons, ar)
 	}
 
-	if in.IsCommitted {
-		return d
-	}
-	if in.IsStaged {
+	if in.IsStaged && !in.IsCommitted {
 		add("staged_preview", "المعاينة قيد المراجعة — الاعتماد البشري مطلوب قبل الحفظ")
 	}
 
@@ -65,10 +86,30 @@ func EvaluateApproval(in Input) Decision {
 		add("chain_mismatch", "السلسلة المكتشفة تختلف عن السلسلة المختارة")
 	}
 
-	// Deduplicate while preserving order.
 	d.Reasons = uniq(d.Reasons)
 	d.ArabicReasons = uniq(d.ArabicReasons)
+
+	// Still pending only when a gate applies and the human has not approved yet.
+	gate := NeedsWriteApproval(in) || (in.IsStaged && !in.IsCommitted)
+	d.RequiresHumanApproval = gate && !in.HumanApproved && !in.IsCommitted
 	return d
+}
+
+// BlockDurableWrite returns ErrHumanApprovalRequired when AI/cache/mock/flagged
+// (or other gate) would persist without HumanApproved.
+func BlockDurableWrite(in Input) error {
+	if in.HumanApproved {
+		return nil
+	}
+	if !NeedsWriteApproval(in) {
+		return nil
+	}
+	d := EvaluateApproval(in)
+	reason := "ai_or_flagged"
+	if len(d.Reasons) > 0 {
+		reason = d.Reasons[0]
+	}
+	return fmt.Errorf("%w: %s — يجب اعتماد المعاينة قبل الحفظ", ErrHumanApprovalRequired, reason)
 }
 
 func uniq(in []string) []string {

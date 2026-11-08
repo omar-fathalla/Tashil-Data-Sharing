@@ -117,6 +117,14 @@ func (c *Client) WithTier2Model(tier2Model string) *Client {
 	return c
 }
 
+// WithColumnMapper injects a stub column-mapping function (tests only).
+func (c *Client) WithColumnMapper(fn func(ctx context.Context, model, prompt string) (string, error)) *Client {
+	if fn != nil {
+		c.mapper = columnMapper(fn)
+	}
+	return c
+}
+
 // WithHTTPClient replaces the default HTTP client (tests inject httptest round-trips).
 func (c *Client) WithHTTPClient(hc *http.Client) *Client {
 	if hc != nil {
@@ -572,6 +580,11 @@ func WithReplay(ctx context.Context) context.Context {
 }
 
 func isReplay(ctx context.Context) bool {
+	return IsReplay(ctx)
+}
+
+// IsReplay reports whether ctx is an archive-replay (already-approved historical re-read).
+func IsReplay(ctx context.Context) bool {
 	if ctx == nil {
 		return false
 	}
