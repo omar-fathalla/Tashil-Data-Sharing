@@ -207,6 +207,17 @@ quotes) is **not** valid — use `"ubuntu-latest"` or leave the var unset.
 On Linux fallback, Playwright installs with `npx playwright install --with-deps chromium`.
 Emulator isolation scripts still probe free ports (safe on ubuntu-latest too).
 
+## Production deploy (`deploy.yml`)
+
+Hybrid (#56) + await-ci (#41). Concurrency `group: ${{ github.workflow }}` with
+`cancel-in-progress: false` (#55).
+
+| Job | Runner | Notes |
+|-----|--------|-------|
+| `await-ci` | `CI_HOSTED_RUNNER` (ubuntu) | `if: github.ref == 'refs/heads/main'`; waits for `ci.yml` success; runs smoke unit test — **no** `test-backend` / `test-web` Mac duplicate |
+| `deploy-backend` | `CI_RUNS_ON` (Mac) | gcloud WIF; `CLOUDSDK_CONFIG` under `$RUNNER_TEMP`; hard-fail smoke `/api/v1/version` + `/livez` + `/api/v1/health`; timeout 30m |
+| `deploy-web` | `CI_RUNS_ON` (Mac) | Flutter detect/require-preinstalled; gcloud isolation; timeout 25m |
+
 ## Check / restart / re-register runners
 
 ```bash
