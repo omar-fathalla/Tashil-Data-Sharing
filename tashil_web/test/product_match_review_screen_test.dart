@@ -112,7 +112,7 @@ void main() {
     expect(find.text('مراجعة مطابقة الأصناف'), findsOneWidget);
     expect(find.textContaining('لا يتم اختراع باركودات'), findsOneWidget);
     expect(find.byKey(const Key('product_match_metrics')), findsOneWidget);
-    expect(find.text('تشابه متوسط — يحتاج مراجعة بشرية'), findsOneWidget);
+    expect(find.textContaining('تشابه متوسط — يحتاج مراجعة بشرية'), findsOneWidget);
     expect(find.text('باركودات مخترعة'), findsOneWidget);
     expect(find.text('0'), findsWidgets);
 

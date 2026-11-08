@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_icons.dart';
@@ -220,7 +221,7 @@ class _ProductMatchReviewScreenState extends State<ProductMatchReviewScreen> {
               Material(
                 key: const Key('product_match_ram_note'),
                 color: cs.secondaryContainer.withOpacity(0.45),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: M3Shape.radiusSm,
                 child: const Padding(
                   padding: EdgeInsets.all(M3Spacing.sm),
                   child: Text(
@@ -357,7 +358,7 @@ class _MetricsStrip extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: M3Shape.radiusMd,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/theme/m3_shape.dart';
 import '../../../core/theme/m3_spacing.dart';
 import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/m3_feedback.dart';
@@ -166,7 +167,7 @@ class _SellInAssistScreenState extends State<SellInAssistScreen> {
               key: const Key('sellin_assist_suggest_chains'),
               tooltip: 'اقتراح ربط من أسماء عملاء',
               onPressed: _promptSuggestChains,
-              icon: const Icon(Icons.link_outlined),
+              icon: const Icon(AppIcons.link),
             ),
             IconButton(
               key: const Key('sellin_assist_refresh'),
@@ -190,7 +191,7 @@ class _SellInAssistScreenState extends State<SellInAssistScreen> {
               Material(
                 key: const Key('sellin_assist_ram_note'),
                 color: cs.secondaryContainer.withOpacity(0.45),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: M3Shape.radiusSm,
                 child: const Padding(
                   padding: EdgeInsets.all(M3Spacing.sm),
                   child: Text(
@@ -209,7 +210,7 @@ class _SellInAssistScreenState extends State<SellInAssistScreen> {
                   Chip(label: Text('مرفوض: ${_metrics.rejected}')),
                   Chip(
                     key: const Key('sellin_assist_approval_rate'),
-                    avatar: const Icon(Icons.insights_outlined, size: 16),
+                    avatar: const Icon(AppIcons.insights, size: 16),
                     label: Text('نسبة الاعتماد: $ratePct%'),
                   ),
                 ],
@@ -223,7 +224,7 @@ class _SellInAssistScreenState extends State<SellInAssistScreen> {
                 for (final f in _metrics.approvedFragments)
                   ListTile(
                     dense: true,
-                    leading: const Icon(Icons.content_copy, size: 18),
+                    leading: const Icon(AppIcons.copy, size: 18),
                     title: Text(f, style: theme.textTheme.bodySmall),
                     onTap: () async {
                       await Clipboard.setData(ClipboardData(text: f));
@@ -287,7 +288,7 @@ class _SellInAssistScreenState extends State<SellInAssistScreen> {
           children: [
             Row(
               children: [
-                Icon(s.isLayout ? Icons.table_chart_outlined : Icons.link_outlined),
+                Icon(s.isLayout ? AppIcons.tableChart : AppIcons.link),
                 const SizedBox(width: M3Spacing.xs),
                 Expanded(child: Text(title, style: theme.textTheme.titleMedium)),
                 Chip(label: Text(_statusLabels[s.status] ?? s.status)),

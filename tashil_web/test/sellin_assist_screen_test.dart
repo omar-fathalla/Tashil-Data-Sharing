@@ -74,6 +74,10 @@ class _FakeAssist implements SellInAssistDataSource {
 
 void main() {
   testWidgets('Arabic assist screen shows metrics and requires approve', (tester) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     final fake = _FakeAssist([
       const AssistSuggestion(
         id: 's1',
@@ -100,12 +104,17 @@ void main() {
     expect(find.textContaining('SELLIN_CUSTOMER_CHAIN_MAP'), findsWidgets);
     expect(find.byKey(const Key('sellin_assist_approve_s1')), findsOneWidget);
 
+    await tester.ensureVisible(find.byKey(const Key('sellin_assist_approve_s1')));
     await tester.tap(find.byKey(const Key('sellin_assist_approve_s1')));
     await tester.pumpAndSettle();
     expect(fake.calls, contains('approve|s1'));
   });
 
   testWidgets('suggest chains dialog creates pending suggestions only', (tester) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     final fake = _FakeAssist([]);
     await tester.pumpWidget(MaterialApp(home: SellInAssistScreen(dataSource: fake)));
     await tester.pumpAndSettle();
