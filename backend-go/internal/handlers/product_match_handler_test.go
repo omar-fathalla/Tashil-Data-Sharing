@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -251,6 +252,26 @@ func TestProductMatchDecideSanitizesFirestoreErrors(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "تعذر حفظ قرار المراجعة") {
 		t.Fatalf("want safe Arabic message, got %s", rec.Body.String())
+	}
+}
+
+func TestProductMatchBulkDecideRejectsTooManyIDs(t *testing.T) {
+	h := NewProductMatchHandler(matcher.NewQueue(&matcher.MemoryStore{}), fakePM{})
+	ids := make([]string, MaxBulkDecideIDs+1)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("id-%d", i)
+	}
+	payload, _ := json.Marshal(map[string]interface{}{
+		"ids": ids, "status": "approved", "reason_ar": "x",
+	})
+	req := withClaims(httptest.NewRequest(http.MethodPost, "/api/v1/product-match/review/bulk-decide", bytes.NewReader(payload)), domain.RoleVendorAdmin)
+	rec := httptest.NewRecorder()
+	h.HandleBulkDecide(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "الحد الأقصى") {
+		t.Fatalf("want Arabic cap message, got %s", rec.Body.String())
 	}
 }
 

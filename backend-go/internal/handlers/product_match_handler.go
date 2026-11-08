@@ -3,6 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -10,6 +12,12 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/service/matcher"
 )
+
+// MaxBulkDecideIDs caps one bulk-decide request (aligned with matcher.EnqueueBatchSize).
+const MaxBulkDecideIDs = 200
+
+// maxBulkDecideBodyBytes caps JSON body size for bulk-decide (~64 KiB).
+const maxBulkDecideBodyBytes = 64 << 10
 
 // ProductMasterCatalogSource supplies Product Master items for matching (read-only).
 type ProductMasterCatalogSource interface {
@@ -210,8 +218,18 @@ func (h *ProductMatchHandler) HandleBulkDecide(w http.ResponseWriter, r *http.Re
 		Status   string   `json:"status"`
 		ReasonAR string   `json:"reason_ar"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.IDs) == 0 {
+	limited := io.LimitReader(http.MaxBytesReader(w, r.Body, maxBulkDecideBodyBytes), maxBulkDecideBodyBytes)
+	if err := json.NewDecoder(limited).Decode(&body); err != nil || len(body.IDs) == 0 {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeErr(w, http.StatusRequestEntityTooLarge, "حجم طلب الاعتماد الجماعي كبير جداً")
+			return
+		}
 		writeErr(w, http.StatusBadRequest, "ids and status required")
+		return
+	}
+	if len(body.IDs) > MaxBulkDecideIDs {
+		writeErr(w, http.StatusBadRequest, fmt.Sprintf("الحد الأقصى للاعتماد الجماعي %d عنصراً في الطلب", MaxBulkDecideIDs))
 		return
 	}
 	results, err := h.queue.DecideBulk(r.Context(), c.TenantID, body.IDs, body.Status, c.Email, body.ReasonAR, matcher.DecideOptions{
