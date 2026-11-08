@@ -87,8 +87,9 @@ func DeterministicNarrateAR(agg domain.MonthlySummaryAggregates) string {
 	return b.String()
 }
 
-// Grounded reports whether narrative mentions the key computed figures from agg.
-// Used to reject AI text that invents or omits the fact sheet numbers.
+// Grounded reports whether narrative quotes the key computed figures from agg.
+// For AI paths, callers must also ValidateClaims / GroundedStructured — number
+// presence alone is not enough (correct numbers + fabricated claim must fail).
 func Grounded(narrative string, agg domain.MonthlySummaryAggregates) bool {
 	n := strings.TrimSpace(narrative)
 	if n == "" {

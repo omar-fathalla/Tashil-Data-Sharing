@@ -2,6 +2,7 @@ package monthlysummary
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -135,24 +136,35 @@ func TestAttachMutatesKPIs(t *testing.T) {
 	}
 }
 
-func TestAIGroundedAccepted(t *testing.T) {
-	kpis := fixtureKPIs()
-	agg := BuildAggregates(kpis)
-	aiText := fmt.Sprintf(
+func validAIPayloadJSON(agg domain.MonthlySummaryAggregates) string {
+	narrative := fmt.Sprintf(
 		"أظهر شهر %s مبيعات %.0f جنيه و%d وحدة. تصدرت سلسلة %s الأداء.",
 		agg.CurrentMonthKey, agg.TotalRevenue, agg.TotalUnits, agg.TopChains[0].Name,
 	)
+	payload := AINarrativePayload{
+		NarrativeAR: narrative,
+		Claims: []Claim{
+			{Key: ClaimTotalRevenue, Number: agg.TotalRevenue},
+			{Key: ClaimTotalUnits, Number: float64(agg.TotalUnits)},
+			{Key: ClaimTopChain, Name: agg.TopChains[0].Name},
+		},
+	}
+	b, _ := json.Marshal(payload)
+	return string(b)
+}
+
+func TestAIGroundedAccepted(t *testing.T) {
+	kpis := fixtureKPIs()
+	agg := BuildAggregates(kpis)
+	aiJSON := validAIPayloadJSON(agg)
 	gen := func(ctx context.Context, model, prompt string) (string, error) {
-		if !strings.Contains(prompt, "1250000") && !strings.Contains(prompt, "1.25") {
-			// facts JSON should include the revenue
-			if !strings.Contains(prompt, `"total_revenue"`) {
-				t.Fatalf("prompt missing facts: %s", prompt)
-			}
+		if !strings.Contains(prompt, `"total_revenue"`) {
+			t.Fatalf("prompt missing facts: %s", prompt)
 		}
 		if model != "gemini-test" {
 			t.Fatalf("model=%s", model)
 		}
-		return aiText, nil
+		return aiJSON, nil
 	}
 	sum := Build(context.Background(), kpis, Options{Generator: gen, Model: "gemini-test"})
 	if sum.MappingSource != SourceAI {
@@ -161,15 +173,76 @@ func TestAIGroundedAccepted(t *testing.T) {
 	if sum.ModelUsed != "gemini-test" || !sum.Grounded {
 		t.Fatalf("model/grounded: %+v", sum)
 	}
-	if sum.NarrativeAR != aiText {
+	wantNar, _ := ParseAIPayload(aiJSON)
+	if sum.NarrativeAR != wantNar.NarrativeAR {
 		t.Fatalf("narrative mismatch")
+	}
+}
+
+func TestCorrectNumbersFabricatedClaimFails(t *testing.T) {
+	kpis := fixtureKPIs()
+	agg := BuildAggregates(kpis)
+	narrative := fmt.Sprintf(
+		"المبيعات %.0f والوحدات %d وسلسلة %s، مع إطلاق منتج مفبرك جديد.",
+		agg.TotalRevenue, agg.TotalUnits, agg.TopChains[0].Name,
+	)
+	// Correct core numbers + fabricated claim key / wrong product name must fail grounding.
+	payload := AINarrativePayload{
+		NarrativeAR: narrative,
+		Claims: []Claim{
+			{Key: ClaimTotalRevenue, Number: agg.TotalRevenue},
+			{Key: ClaimTotalUnits, Number: float64(agg.TotalUnits)},
+			{Key: ClaimTopChain, Name: agg.TopChains[0].Name},
+			{Key: "new_product_launch", Name: "SuperFakeSKU"},
+		},
+	}
+	if GroundedStructured(narrative, payload.Claims, agg) {
+		t.Fatal("fabricated claim must not be grounded even with correct numbers")
+	}
+	b, _ := json.Marshal(payload)
+	gen := func(ctx context.Context, model, prompt string) (string, error) {
+		return string(b), nil
+	}
+	sum := Build(context.Background(), kpis, Options{Generator: gen, Model: "gemini-test"})
+	if sum.MappingSource != SourceDeterministic {
+		t.Fatalf("fabricated claim must fall back, got %s", sum.MappingSource)
+	}
+	if strings.Contains(sum.NarrativeAR, "SuperFakeSKU") {
+		t.Fatal("fabricated claim leaked into shipped narrative")
+	}
+
+	// Same numbers but wrong top_chain name also fails.
+	wrongName := AINarrativePayload{
+		NarrativeAR: narrative,
+		Claims: []Claim{
+			{Key: ClaimTotalRevenue, Number: agg.TotalRevenue},
+			{Key: ClaimTotalUnits, Number: float64(agg.TotalUnits)},
+			{Key: ClaimTopChain, Name: "سلسلة مفبركة"},
+		},
+	}
+	if ValidateClaims(wrongName.Claims, agg) {
+		t.Fatal("wrong entity name must fail ValidateClaims")
+	}
+}
+
+func TestAIFreeFormWithoutClaimsFallsBack(t *testing.T) {
+	kpis := fixtureKPIs()
+	agg := BuildAggregates(kpis)
+	// Free-form prose that happens to include correct numbers — still ungrounded without claims.
+	free := fmt.Sprintf("المبيعات %.0f والوحدات %d و%s", agg.TotalRevenue, agg.TotalUnits, agg.TopChains[0].Name)
+	gen := func(ctx context.Context, model, prompt string) (string, error) {
+		return free, nil
+	}
+	sum := Build(context.Background(), kpis, Options{Generator: gen, Model: "gemini-test"})
+	if sum.MappingSource != SourceDeterministic {
+		t.Fatalf("free-form AI must be deterministic-only, got %s", sum.MappingSource)
 	}
 }
 
 func TestAIUngroundedFallsBack(t *testing.T) {
 	kpis := fixtureKPIs()
 	gen := func(ctx context.Context, model, prompt string) (string, error) {
-		return "المبيعات تضاعفت إلى 999999999 جنيه دون أي سند.", nil
+		return `{"narrative_ar":"المبيعات تضاعفت إلى 999999999 جنيه.","claims":[{"key":"total_revenue","number":999999999},{"key":"total_units","number":42000},{"key":"top_chain","name":"فتح الله"}]}`, nil
 	}
 	sum := Build(context.Background(), kpis, Options{Generator: gen, Model: "gemini-test"})
 	if sum.MappingSource != SourceDeterministic {

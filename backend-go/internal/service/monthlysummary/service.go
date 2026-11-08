@@ -59,12 +59,16 @@ func Build(ctx context.Context, kpis *domain.ExecutiveKPIs, opts Options) *domai
 	if err != nil || strings.TrimSpace(raw) == "" {
 		return out
 	}
-	text := sanitizeNarrative(raw)
-	if !Grounded(text, agg) {
-		// Honesty: never ship AI text that invents or drops the fact-sheet numbers.
+	payload, err := ParseAIPayload(raw)
+	if err != nil {
+		// Free-form prose without structured claims → deterministic only.
 		return out
 	}
-	out.NarrativeAR = text
+	if !GroundedStructured(payload.NarrativeAR, payload.Claims, agg) {
+		// Honesty: correct numbers + fabricated claim (or missing evidence) fail grounding.
+		return out
+	}
+	out.NarrativeAR = payload.NarrativeAR
 	out.MappingSource = SourceAI
 	out.ModelUsed = opts.Model
 	out.Grounded = true
@@ -74,12 +78,14 @@ func Build(ctx context.Context, kpis *domain.ExecutiveKPIs, opts Options) *domai
 
 func buildGeminiPrompt(agg domain.MonthlySummaryAggregates) string {
 	facts, _ := json.MarshalIndent(agg, "", "  ")
-	return fmt.Sprintf(`أنت محلل مبيعات تجزئة. اكتب فقرة عربية واحدة قصيرة (3–6 جمل) تلخّص الأداء الشهري.
+	return fmt.Sprintf(`أنت محلل مبيعات تجزئة. أعد JSON فقط (بدون Markdown) بالشكل:
+{"narrative_ar":"...","claims":[{"key":"total_revenue","number":0},{"key":"total_units","number":0},{"key":"top_chain","name":"..."}]}
+
 القواعد الصارمة:
-1) استخدم فقط الأرقام والأسماء الموجودة في JSON التالي. لا تختلق أي رقم أو سلسلة أو منتج.
-2) اذكر صراحة إجمالي المبيعات والوحدات وأبرز سلسلة إن وُجدت.
-3) لا تضف توصيات تشغيلية غير مبنية على الحقول.
-4) أعد النص العربي فقط بدون Markdown.
+1) claims يجب أن تطابق JSON الحقائق حرفياً — لا تختلق مفاتيح أو أرقاماً أو أسماء.
+2) المفاتيح المسموحة فقط: total_revenue, total_units, revenue_mom_pct, units_mom_pct, revenue_yoy_pct, market_share_pct, active_stores, top_chain, top_product, top_category, prior_month_key, current_month_key, prior_month_revenue.
+3) narrative_ar فقرة عربية قصيرة تذكر إجمالي المبيعات والوحدات وأعلى سلسلة إن وُجدت بنفس الأرقام.
+4) أي ادعاء غير موجود في الحقائق مرفوض.
 
 JSON الحقائق المحسوبة مسبقاً:
 %s`, string(facts))
