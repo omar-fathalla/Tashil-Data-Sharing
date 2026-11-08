@@ -6,20 +6,12 @@
 # See docs/ci-self-hosted.md.
 name: CI tests
 
+# No workflow-level paths-ignore: docs-only PRs still start the workflow so required
+# check gates always report. Heavy jobs skip via dorny/paths-filter inside.
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "LICENSE"
-      - ".gitignore"
   pull_request:
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "LICENSE"
-      - ".gitignore"
 
 # Cancel superseded runs on the same PR/branch. Never cancel main.
 # deploy.yml keeps cancel-in-progress: false so production deploys are never interrupted.
@@ -37,16 +29,16 @@ env:
   MAC_SHARED_LOCK: ${{ vars.MAC_SHARED_LOCK }}
 
 jobs:
-  # Path filter so Flutter can skip on backend-only PRs while required checks still report.
+  # Path filter so Flutter can skip on backend/docs-only PRs while required checks still report.
+  # Must use CI_RUNS_ON (self-hosted): ubuntu-latest failed with no runner assigned (run 42519016115).
   changes:
     name: Detect path changes
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 5
     outputs:
       flutter: ${{ steps.filter.outputs.flutter }}
     steps:
       - uses: actions/checkout@v4
-        if: github.event_name != 'pull_request'
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -217,7 +209,8 @@ jobs:
     if: needs.changes.outputs.flutter == 'true'
     # Opt-in Mac lock (MAC_SHARED_LOCK). Tradeoff when enabled: serializes vs Go/smoke.
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
-    timeout-minutes: 20
+    # 35m: up to 8m lock wait + pub/analyze/test (20m was too tight with lock).
+    timeout-minutes: 35
     defaults:
       run:
         working-directory: tashil_web
@@ -318,13 +311,17 @@ jobs:
   test-flutter-gate:
     name: Flutter analyze & test
     needs: [changes, test-flutter]
-    if: always() && !cancelled() && needs.changes.result == 'success'
-    runs-on: ubuntu-latest
+    if: always() && !cancelled()
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 5
     steps:
       - name: Evaluate Flutter path filter / run result
         run: |
           set -euo pipefail
+          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            echo "::error::Detect path changes failed (${{ needs.changes.result }})"
+            exit 1
+          fi
           if [[ "${{ needs.changes.outputs.flutter }}" != "true" ]]; then
             echo "Skipped — no Flutter/web/workflow path changes"
             exit 0

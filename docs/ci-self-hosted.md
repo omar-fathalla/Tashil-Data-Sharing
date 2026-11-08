@@ -81,13 +81,15 @@ bash scripts/mac_lock_ci.sh release "$AGENT"
 | Job | Lock when `MAC_SHARED_LOCK=1`? | acquire step timeout | job timeout |
 |-----|-------------------------------|----------------------|-------------|
 | Backend Go (+ emulator) | yes | 10m | 25m |
-| Flutter analyze & test (run) | yes | 8m | 20m |
+| Flutter analyze & test (run) | yes | 8m | 35m |
 | Playwright Semantics smoke (run) | yes | 15m | 45m |
-| Cloud Run pin / PR comment / path gates | **no** | — | 5m |
+| Cloud Run pin / PR comment / path detect & gates | **no** | — | 5m (same `CI_RUNS_ON`, not ubuntu-latest) |
 
-Path filters (`dorny/paths-filter`): Flutter + Playwright heavy jobs run only when
-`tashil_web/` / `e2e/` / related scripts / workflow files change. Required checks still
-report via lightweight gate jobs (`Flutter analyze & test`, `flutter-web-semantics-smoke`).
+Path filters (`dorny/paths-filter`): no workflow-level `paths-ignore` — workflows always
+start so gates report. Flutter + Playwright heavy jobs run only when `tashil_web/` /
+`e2e/` / related scripts / workflow files change. Required checks report via lightweight
+gate jobs on the same `CI_RUNS_ON` runners (`Flutter analyze & test`,
+`flutter-web-semantics-smoke`).
 
 Self-hosted Flutter: prefer `$HOME/toolchains/flutter` (`scripts/ci_detect_flutter.sh`);
 **fail fast** if missing — never download via `flutter-action` on Mac. `PUB_CACHE` is
