@@ -1,4 +1,6 @@
-/// Models for POST /api/v1/ingest/precheck (Arabic fix list, no server writes).
+// Models for POST /api/v1/ingest/precheck and dry-run preupload_blocked (Arabic fix list).
+
+import 'dart:convert';
 
 class PreuploadFixItem {
   final String code;
@@ -84,5 +86,35 @@ class PreuploadCheckReport {
     );
   }
 
+  /// Parses a 422 `preupload_blocked` body; null when the body is something else.
+  static PreuploadCheckReport? tryParseBlocked(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map) return null;
+      final map = Map<String, dynamic>.from(decoded);
+      if ('${map['error'] ?? ''}' != 'preupload_blocked') return null;
+      return PreuploadCheckReport.fromJson(map);
+    } catch (_) {
+      return null;
+    }
+  }
+
   bool get hasBlockingFixes => !ok || blockingCount > 0 || fixes.any((f) => f.isBlocking);
+}
+
+/// True when a standalone precheck HTTP failure must not block dry-run (404/5xx/network).
+bool precheckFailureShouldContinue(int? statusCode) {
+  if (statusCode == null) return true;
+  return statusCode != 200;
+}
+
+/// Thrown when dry-run/upload is refused by the folded preupload checker (nothing saved).
+class PreuploadBlockedException implements Exception {
+  final PreuploadCheckReport report;
+  const PreuploadBlockedException(this.report);
+
+  @override
+  String toString() => report.fixes.isNotEmpty
+      ? report.fixes.first.messageAr
+      : 'الملف محتاج تصليح قبل الرفع. مفيش حاجة اتحفظت.';
 }

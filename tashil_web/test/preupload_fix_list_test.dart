@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tashil_web/core/network/preupload_check.dart';
 import 'package:tashil_web/features/data_ingestion/presentation/widgets/preupload_fix_list.dart';
 
 void main() {
@@ -37,14 +36,34 @@ void main() {
     expect(report.fixes[1].codeLabelAr, 'شهر مش واضح');
   });
 
+  test('precheck soft-fail continues to dry-run on non-200/404/null', () {
+    expect(precheckFailureShouldContinue(null), isTrue);
+    expect(precheckFailureShouldContinue(404), isTrue);
+    expect(precheckFailureShouldContinue(500), isTrue);
+    expect(precheckFailureShouldContinue(503), isTrue);
+    expect(precheckFailureShouldContinue(200), isFalse);
+  });
+
+  test('tryParseBlocked reads folded dry-run 422 body', () {
+    final report = PreuploadCheckReport.tryParseBlocked('''
+      {"error":"preupload_blocked","ok":false,"wrote_nothing":true,"blocking_count":1,
+       "filename":"x.xlsx","fixes":[{"code":"empty_file","severity":"error",
+       "message_ar":"الملف فاضي","how_to_fix_ar":"اختار ملف"}]}
+    ''');
+    expect(report, isNotNull);
+    expect(report!.hasBlockingFixes, isTrue);
+    expect(report.fixes.first.codeLabelAr, 'ملف فاضي');
+    expect(PreuploadCheckReport.tryParseBlocked('{"error":"other"}'), isNull);
+  });
+
   testWidgets('PreuploadFixListPanel shows Arabic fix list and no-save message', (tester) async {
-    final report = PreuploadCheckReport(
+    const report = PreuploadCheckReport(
       ok: false,
       filename: 'plan.csv',
       kind: 'sell_in',
       wroteNothing: true,
       blockingCount: 1,
-      fixes: const [
+      fixes: [
         PreuploadFixItem(
           code: 'unreadable_cell',
           severity: 'error',
@@ -57,7 +76,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: Scaffold(
           body: PreuploadFixListPanel(report: report),
         ),
@@ -69,5 +88,33 @@ void main() {
     expect(find.textContaining('خلايا مش مقروءة'), findsOneWidget);
     expect(find.textContaining('الحل:'), findsOneWidget);
     expect(find.byKey(const Key('preupload_fix_unreadable_cell')), findsOneWidget);
+  });
+
+  testWidgets('soft-fail helper: non-200 precheck does not surface fix panel alone', (tester) async {
+    // When standalone precheck returns null (404/5xx), UI continues without a report.
+    PreuploadCheckReport? report;
+    if (!precheckFailureShouldContinue(404)) {
+      report = const PreuploadCheckReport(
+        ok: false,
+        filename: 'x',
+        kind: '',
+        wroteNothing: true,
+        blockingCount: 1,
+        fixes: [],
+      );
+    }
+    expect(report, isNull);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: report == null
+              ? const Text('continued_to_dry_run', key: Key('continued_to_dry_run'))
+              : PreuploadFixListPanel(report: report),
+        ),
+      ),
+    );
+    expect(find.byKey(const Key('continued_to_dry_run')), findsOneWidget);
+    expect(find.byKey(const Key('preupload_fix_list_panel')), findsNothing);
   });
 }

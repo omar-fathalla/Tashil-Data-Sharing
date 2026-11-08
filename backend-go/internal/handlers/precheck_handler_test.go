@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"net/http"
@@ -96,5 +97,40 @@ func TestHandleUploadPrecheckOnlyHook(t *testing.T) {
 	}
 	if list := proc.ListArchivedFiles(req.Context(), "tenant-adeco", "", "", ""); list != nil && len(list.Files) != 0 {
 		t.Fatalf("precheck_only must not archive, got %d", len(list.Files))
+	}
+}
+
+func TestHandleUploadFoldsBlockingPrecheckInto422(t *testing.T) {
+	h, mw, proc := precheckEnv(t)
+	tok, err := mw.GenerateToken(domain.UserClaims{
+		UserID: "u1", Email: "a@test", TenantID: "tenant-adeco", Role: domain.RoleVendorAdmin,
+	}, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, _ := zw.Create("xl/worksheets/sheet1.xml")
+	_, _ = w.Write([]byte(`<worksheet><sheetData><row r="1"><c r="A1"><f>1+1</f></c></row></sheetData></worksheet>`))
+	_ = zw.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/ingest/upload?filename=bad.xlsx&chain=fathalla&dry_run=true", bytes.NewReader(buf.Bytes()))
+	req.Header.Set("Authorization", "Bearer "+tok)
+	req.Header.Set("Content-Type", "application/octet-stream")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["error"] != "preupload_blocked" || payload["wrote_nothing"] != true {
+		t.Fatalf("expected folded preupload_blocked: %v", payload)
+	}
+	if list := proc.ListArchivedFiles(req.Context(), "tenant-adeco", "", "", ""); list != nil && len(list.Files) != 0 {
+		t.Fatalf("blocked dry-run must not archive, got %d", len(list.Files))
 	}
 }

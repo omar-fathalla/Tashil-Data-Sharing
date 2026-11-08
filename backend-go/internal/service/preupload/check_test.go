@@ -23,7 +23,6 @@ func TestCheckEmptyFile(t *testing.T) {
 }
 
 func TestCheckMissingSellInColumn(t *testing.T) {
-	// Raw plan missing net V → layout rejection with missing column fix.
 	csv := []byte("Customer,Item 1,Month,Year,net Q\nQA,ItemA,3,2026,2\n")
 	rep := Check("raw_plan.csv", csv, Options{TenantID: "tenant-adeco", Chain: "fathalla"})
 	if rep.OK || rep.Kind != "sell_in" || !rep.WroteNothing {
@@ -112,7 +111,7 @@ func TestCheckCleanSellOutOK(t *testing.T) {
 	}
 }
 
-func TestCheckSellOutMissingStoreAndUnclearMonth(t *testing.T) {
+func TestCheckSellOutMissingStoreAndUnclearMonthAreWarnings(t *testing.T) {
 	rows := [][]string{
 		{"Barcode", "Item", "Qty", "Net Amount"},
 		{"123", "صنف", "2", "50"},
@@ -122,18 +121,79 @@ func TestCheckSellOutMissingStoreAndUnclearMonth(t *testing.T) {
 		t.Fatal(err)
 	}
 	rep := Check("bad_sellout.xlsx", x, Options{})
-	if rep.OK || !rep.WroteNothing {
-		t.Fatalf("must block: %+v", rep)
+	if !rep.WroteNothing {
+		t.Fatal("wrote_nothing required")
 	}
-	codes := map[string]bool{}
+	// Heuristic gaps are warnings — do not block dry-run.
+	if !rep.OK || rep.Blocking != 0 {
+		t.Fatalf("sell-out heuristics must be warnings only: %+v", rep)
+	}
+	codes := map[string]string{}
 	for _, f := range rep.Fixes {
-		codes[f.Code] = true
+		codes[f.Code] = f.Severity
 		if f.MessageAR == "" || f.HowToFixAR == "" {
 			t.Fatalf("Arabic fields required: %+v", f)
 		}
+		if f.Severity != "warning" {
+			t.Fatalf("expected warning severity, got %+v", f)
+		}
 	}
-	if !codes[CodeMissingColumn] || !codes[CodeUnclearMonth] {
-		t.Fatalf("expected missing_column + unclear_month, got %v fixes=%+v", codes, rep.Fixes)
+	if codes[CodeMissingColumn] == "" || codes[CodeUnclearMonth] == "" {
+		t.Fatalf("expected missing_column + unclear_month warnings, got %v fixes=%+v", codes, rep.Fixes)
+	}
+}
+
+func TestCheckFathallaWideJan2026NeverBlocked(t *testing.T) {
+	// Real Fathalla wide branch-pivot layout (title + blank + header); Jan 2026 sample.
+	rows := [][]string{
+		{"Details for Sum of الاجمالى - YEAR: 2026, MONTH: JAN"},
+		{""},
+		{"المجموعة", "المورد", "الباركود", "الصنف", " سموحة", " ستانلى", "الاجمالى", "MONTH", "كمية سموحة", "كمية ستانلى", "اجمالى كميات", "YEAR"},
+		{"منعمات", "ادكو (1)", "6223000233701", "صنف", "100", "50", "150", "JAN", "1", "2", "3", "2026"},
+	}
+	x, err := gemini.BuildSampleXLSX(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rep := Check("Fathalla_Jan_2026.xlsx", x, Options{TenantID: "tenant-adeco", Chain: "fathalla"})
+	if !rep.OK || rep.Blocking != 0 || !rep.WroteNothing {
+		t.Fatalf("wide-matrix must not block: %+v", rep)
+	}
+	for _, f := range rep.Fixes {
+		if f.Severity == "error" {
+			t.Fatalf("no blocking fixes allowed on wide matrix: %+v", f)
+		}
+		if f.Code == CodeMissingColumn && strings.Contains(f.Column, "store") {
+			t.Fatalf("wide branch columns must not flag missing store: %+v", f)
+		}
+	}
+}
+
+func TestIncompleteRawPlanFindsRealHeaderNotTitleRow(t *testing.T) {
+	csv := []byte("تقرير توريد,,,,,,\nCustomer,Item 1,Month,Year,net Q\nQA,ItemA,3,2026,2\n")
+	missing := incompleteRawPlanMissingColumns(csv)
+	if len(missing) != 1 || missing[0] != "net V" {
+		t.Fatalf("expected only net V missing from real header, got %v", missing)
+	}
+}
+
+func TestItem1HeaderDoesNotMatchGenericItem(t *testing.T) {
+	if isItem1Header("item description") || isItem1Header("item") || isItem1Header("Item Name") {
+		t.Fatal("generic item headers must not count as Item 1")
+	}
+	if !isItem1Header("Item 1") || !isItem1Header("item1") {
+		t.Fatal("Item 1 / item1 must match")
+	}
+	csv := []byte("Customer,Item Description,Month,Year,net Q,net V\nQA,Widget,3,2026,2,10\n")
+	missing := incompleteRawPlanMissingColumns(csv)
+	foundItem1 := false
+	for _, m := range missing {
+		if m == "Item 1" {
+			foundItem1 = true
+		}
+	}
+	if !foundItem1 {
+		t.Fatalf("Item Description must leave Item 1 missing, got %v", missing)
 	}
 }
 

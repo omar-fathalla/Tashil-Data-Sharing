@@ -547,13 +547,19 @@ func (h *UploadHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Thin pre-upload hook: same body as /ingest/precheck, zero writes, no Gemini / staging.
+	// Single entry: run preupload.Check once on these bytes (also backs ?precheck_only=true).
+	preReport := preupload.Check(filename, fileBytes, preupload.Options{TenantID: tenantID, Chain: targetChain})
 	if r.URL.Query().Get("precheck_only") == "true" ||
 		(r.MultipartForm != nil && len(r.MultipartForm.Value["precheck_only"]) > 0 && r.MultipartForm.Value["precheck_only"][0] == "true") {
-		report := preupload.Check(filename, fileBytes, preupload.Options{TenantID: tenantID, Chain: targetChain})
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(report)
+		_ = json.NewEncoder(w).Encode(preReport)
+		return
+	}
+
+	// Blocking preupload fixes stop before Gemini / staging / writes (file inspected once).
+	if preReport.Blocking > 0 {
+		writePreuploadBlocked(w, preReport)
 		return
 	}
 
@@ -601,6 +607,20 @@ func (h *UploadHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeUploadError(w, err, "ingestion_failed")
 		return
+	}
+
+	// Advisory preupload warnings ride along on the dry-run / commit response.
+	for _, f := range preReport.Fixes {
+		if f.Severity == "error" {
+			continue
+		}
+		result.UploadWarnings = append(result.UploadWarnings, ingestion.UploadIssue{
+			Code:      f.Code,
+			Severity:  f.Severity,
+			MessageAR: f.MessageAR,
+			Count:     f.Count,
+			Samples:   f.Samples,
+		})
 	}
 
 	// Sell-In dry-run/upload: enqueue layout suggestion for the review UI (never auto-applied).
@@ -951,6 +971,26 @@ func archiveDeleteHTTPStatus(err error) (status int, code, message string) {
 		}
 	}
 	return http.StatusInternalServerError, "delete_failed", message
+}
+
+// writePreuploadBlocked returns 422 with the Arabic fix list; nothing was staged or written.
+func writePreuploadBlocked(w http.ResponseWriter, report preupload.Report) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnprocessableEntity)
+	msg := "الملف محتاج تصليح قبل الرفع. مفيش حاجة اتحفظت."
+	if report.Blocking == 1 && len(report.Fixes) > 0 {
+		msg = report.Fixes[0].MessageAR
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"error":           "preupload_blocked",
+		"message":         msg,
+		"ok":              report.OK,
+		"filename":        report.Filename,
+		"kind":            report.Kind,
+		"wrote_nothing":   true,
+		"blocking_count":  report.Blocking,
+		"fixes":           report.Fixes,
+	})
 }
 
 // readUploadBytes reads multipart "file" or the raw body. On failure it writes the HTTP error.

@@ -209,7 +209,10 @@ func incompleteRawPlanMissingColumns(raw []byte) []string {
 	if err != nil || len(rows) == 0 {
 		return nil
 	}
-	header := rows[0]
+	header, headerIdx := findRawPlanHeader(rows)
+	if headerIdx < 0 {
+		return nil
+	}
 	j := strings.ToLower(strings.Join(header, " | "))
 	// Only for narrow raw-plan style headers (not guided / clean / SOP).
 	if strings.Contains(j, "sell_in") || strings.Contains(j, "كمية التوريد") ||
@@ -224,7 +227,8 @@ func incompleteRawPlanMissingColumns(raw []byte) []string {
 		pred func(string) bool
 	}{
 		{"Customer", func(h string) bool { return strings.Contains(h, "customer") || strings.Contains(h, "عميل") }},
-		{"Item 1", func(h string) bool { return strings.Contains(h, "item 1") || strings.Contains(h, "item") || strings.Contains(h, "صنف") }},
+		// Exact "Item 1" / "item1" only — never match a generic "item" / "Item Description".
+		{"Item 1", isItem1Header},
 		{"Month", func(h string) bool { return strings.Contains(h, "month") || strings.Contains(h, "شهر") }},
 		{"Year", func(h string) bool { return strings.Contains(h, "year") || strings.Contains(h, "سنة") || strings.Contains(h, "عام") }},
 		{"net Q", func(h string) bool { return strings.Contains(h, "net q") || strings.Contains(h, "net_q") }},
@@ -246,22 +250,68 @@ func incompleteRawPlanMissingColumns(raw []byte) []string {
 	return missing
 }
 
+func isItem1Header(h string) bool {
+	h = strings.TrimSpace(strings.ToLower(h))
+	switch h {
+	case "item 1", "item1", "item_1":
+		return true
+	}
+	return strings.HasPrefix(h, "item 1 ") || strings.HasPrefix(h, "item1 ")
+}
+
+// findRawPlanHeader prefers a real raw-plan header over a title/preamble row.
+func findRawPlanHeader(rows [][]string) ([]string, int) {
+	limit := 15
+	if len(rows) < limit {
+		limit = len(rows)
+	}
+	bestIdx, bestScore := -1, 0
+	var best []string
+	for i := 0; i < limit; i++ {
+		if rowEmpty(rows[i]) {
+			continue
+		}
+		score := 0
+		joined := strings.ToLower(strings.Join(rows[i], " | "))
+		for _, kw := range []string{"customer", "item 1", "net q", "net v", "month", "year", "عميل"} {
+			if strings.Contains(joined, kw) {
+				score++
+			}
+		}
+		if score > bestScore {
+			bestScore, bestIdx, best = score, i, rows[i]
+		}
+	}
+	if bestScore >= 2 {
+		return best, bestIdx
+	}
+	return nil, -1
+}
+
 func appendSellOutFixes(rep *Report, filename string, raw []byte) {
 	rows, err := gemini.ExtractXLSXOrCSVRows(raw)
-	if err != nil || len(rows) == 0 {
-		if err != nil {
-			rep.Fixes = append(rep.Fixes, FixItem{
-				Code:       CodeUnreadableCell,
-				Severity:   "error",
-				MessageAR:  fmt.Sprintf("تعذّر قراءة الملف %q: %v", filename, err),
-				HowToFixAR: "تأكد إن الملف Excel (.xlsx) أو CSV سليم ومش مكسور، بعدين حاول تاني.",
-			})
-		}
+	if err != nil {
+		rep.Fixes = append(rep.Fixes, FixItem{
+			Code:       CodeUnreadableCell,
+			Severity:   "error",
+			MessageAR:  fmt.Sprintf("تعذّر قراءة الملف %q: %v", filename, err),
+			HowToFixAR: "تأكد إن الملف Excel (.xlsx) أو CSV سليم ومش مكسور، بعدين حاول تاني.",
+		})
+		return
+	}
+	if len(rows) == 0 {
+		rep.Fixes = append(rep.Fixes, FixItem{
+			Code:       CodeEmptyFile,
+			Severity:   "error",
+			MessageAR:  "الملف مفيهوش صفوف مقروءة.",
+			HowToFixAR: "تأكد إن الشيت فيه عناوين وصفوف بيانات، بعدين ارفعه تاني.",
+		})
 		return
 	}
 
 	header, headerIdx := findLikelyHeader(rows)
 	if headerIdx < 0 {
+		// Parser could not locate a header — blocking.
 		rep.Fixes = append(rep.Fixes, FixItem{
 			Code:       CodeMissingColumn,
 			Severity:   "error",
@@ -271,26 +321,30 @@ func appendSellOutFixes(rep *Report, filename string, raw []byte) {
 		return
 	}
 
+	// Fathalla / Adco wide branch-pivot: branch columns replace a single store column.
+	// Never block these workbooks for "missing store".
+	wide := isWideMatrixHeader(header)
 	joined := strings.ToLower(strings.Join(header, " "))
-	hasStore := containsAny(joined, []string{"store", "branch", "فرع", "معرض", "outlet"})
-	hasValue := containsAny(joined, []string{
-		"revenue", "amount", "value", "sales", "net", "price", "قيمة", "مبيعات", "إيراد", "اجمالي", "إجمالي",
+	hasStore := wide || containsAny(joined, []string{"store", "branch", "فرع", "معرض", "outlet"})
+	hasValue := wide || containsAny(joined, []string{
+		"revenue", "amount", "value", "sales", "net", "price", "قيمة", "مبيعات", "إيراد", "اجمالي", "إجمالي", "الاجمالى", "الاجمالي",
 	})
 	hasMonthOrDate := containsAny(joined, []string{"month", "date", "year", "شهر", "تاريخ", "سنة", "عام"})
 
-	if !hasStore {
+	// Heuristic gaps are warnings; dry-run/parser decides hard failures.
+	if !hasStore && !wide {
 		rep.Fixes = append(rep.Fixes, FixItem{
 			Code:       CodeMissingColumn,
-			Severity:   "error",
+			Severity:   "warning",
 			Column:     "store/branch",
 			MessageAR:  "عمود اسم الفرع / المعرض مش موجود أو مش متعرّف عليه.",
 			HowToFixAR: "ضيف عمود واضح لاسم الفرع (مثلاً «اسم الفرع» أو Store Name) في صف العناوين.",
 		})
 	}
-	if !hasValue {
+	if !hasValue && !wide {
 		rep.Fixes = append(rep.Fixes, FixItem{
 			Code:       CodeMissingColumn,
-			Severity:   "error",
+			Severity:   "warning",
 			Column:     "value/revenue",
 			MessageAR:  "عمود قيمة المبيعات مش موجود أو مش متعرّف عليه.",
 			HowToFixAR: "ضيف عمود لصافي القيمة أو المبيعات (مثلاً «صافي قيمة المبيعات» أو Net Amount).",
@@ -313,7 +367,7 @@ func appendSellOutFixes(rep *Report, filename string, raw []byte) {
 	if !hasMonthOrDate && monthIdx < 0 && dateIdx < 0 {
 		rep.Fixes = append(rep.Fixes, FixItem{
 			Code:       CodeUnclearMonth,
-			Severity:   "error",
+			Severity:   "warning",
 			MessageAR:  "مفيش عمود شهر أو تاريخ واضح، فمش هينفع نحدد فترة الصفوف.",
 			HowToFixAR: "ضيف عمود Month/الشهر أو Date/التاريخ (وسنة لو مش جوه التاريخ)، واملأ كل صف بقيمة مفهومة.",
 		})
@@ -343,8 +397,6 @@ func appendSellOutFixes(rep *Report, filename string, raw []byte) {
 					ok = true
 				} else if yearIdx < len(row) {
 					if _, yOK := gemini.ParseYearToken(row[yearIdx]); yOK || m > 0 {
-						// Month token alone is enough when year column exists but may be elsewhere;
-						// still require a parseable month name/number.
 						ok = m > 0
 					}
 				} else {
@@ -355,7 +407,6 @@ func appendSellOutFixes(rep *Report, filename string, raw []byte) {
 		if ok {
 			continue
 		}
-		// Row has data but no readable period.
 		if monthIdx >= 0 || dateIdx >= 0 {
 			bad++
 			if len(samples) < 5 {
@@ -376,13 +427,28 @@ func appendSellOutFixes(rep *Report, filename string, raw []byte) {
 	if bad > 0 {
 		rep.Fixes = append(rep.Fixes, FixItem{
 			Code:       CodeUnclearMonth,
-			Severity:   "error",
+			Severity:   "warning",
 			MessageAR:  fmt.Sprintf("%d صف الشهر أو التاريخ فيه مش مفهوم في عيّنة أول الملف.", bad),
 			HowToFixAR: "صحّح قيم الشهر/التاريخ في الصفوف دي (رقم 1–12 أو اسم الشهر، أو تاريخ كامل)، من غير #N/A أو خلايا فاضي في عمود الفترة.",
 			Samples:    samples,
 			Count:      bad,
 		})
 	}
+}
+
+// isWideMatrixHeader detects Fathalla/Adco wide branch-pivot headers (branch columns + totals + MONTH).
+func isWideMatrixHeader(header []string) bool {
+	if len(header) < 8 {
+		return false
+	}
+	joined := strings.ToLower(strings.Join(header, " | "))
+	hasMonth := strings.Contains(joined, "month") || strings.Contains(joined, "شهر")
+	hasYear := strings.Contains(joined, "year") || strings.Contains(joined, "سنة") || strings.Contains(joined, "عام")
+	hasTotal := strings.Contains(joined, "الاجمالى") || strings.Contains(joined, "الاجمالي") ||
+		strings.Contains(joined, "total") || strings.Contains(joined, "اجمالى")
+	hasBarcodeOrItem := strings.Contains(joined, "باركود") || strings.Contains(joined, "barcode") ||
+		strings.Contains(joined, "الصنف") || strings.Contains(joined, "صنف")
+	return hasMonth && (hasYear || hasTotal) && hasBarcodeOrItem && (hasTotal || hasYear)
 }
 
 func findLikelyHeader(rows [][]string) ([]string, int) {
@@ -401,6 +467,7 @@ func findLikelyHeader(rows [][]string) ([]string, int) {
 		for _, kw := range []string{
 			"barcode", "باركود", "store", "فرع", "quantity", "كمية", "month", "شهر",
 			"date", "تاريخ", "value", "قيمة", "sku", "صنف", "year", "سنة", "branch",
+			"الاجمالى", "الاجمالي", "المورد", "المجموعة",
 		} {
 			if strings.Contains(joined, kw) {
 				score++

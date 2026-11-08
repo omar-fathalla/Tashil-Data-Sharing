@@ -44,7 +44,7 @@ class PreuploadFixListPanel extends StatelessWidget {
                     key: const Key('preupload_fix_list_dismiss'),
                     tooltip: 'إخفاء',
                     onPressed: onDismiss,
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close_rounded),
                   ),
               ],
             ),

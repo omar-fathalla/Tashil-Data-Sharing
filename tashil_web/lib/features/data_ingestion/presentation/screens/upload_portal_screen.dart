@@ -563,28 +563,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
     _sheetMonths = const [];
 
     try {
-      // Pre-upload Arabic fix list (missing column / unclear month / unreadable cells).
-      // Isolated from writes — blocks dry-run when the server reports blocking fixes.
-      final pre = await widget.apiClient.precheckUpload(
-        filename,
-        bytes,
-        targetChain: activeChain,
-        targetTenant: _selectedTenant,
-      );
-      if (pre.hasBlockingFixes) {
-        if (mounted) {
-          setState(() {
-            isProcessing = false;
-            _preuploadReport = pre;
-          });
-          M3Feedback.showError(
-            context,
-            'الملف محتاج تصليح قبل الرفع (${pre.blockingCount} مشكلة). مفيش حاجة اتحفظت.',
-          );
-        }
-        return;
-      }
-
+      // Single upload: server folds preupload.Check into dry-run (no second file POST).
       final res = await _withUploadQuestions((replaceConfirmed, periodChoice) => widget.apiClient.uploadFile(
             filename,
             bytes,
@@ -626,6 +605,17 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
             'تم فحص وتحليل ملف $filename بالذكاء الاصطناعي • يرجى مراجعة البيانات والضغط على زر "حفظ واعتماد البيانات"',
           );
         }
+      }
+    } on PreuploadBlockedException catch (e) {
+      if (mounted) {
+        setState(() {
+          isProcessing = false;
+          _preuploadReport = e.report;
+        });
+        M3Feedback.showError(
+          context,
+          'الملف محتاج تصليح قبل الرفع (${e.report.blockingCount} مشكلة). مفيش حاجة اتحفظت.',
+        );
       }
     } catch (e) {
       if (mounted) {

@@ -4045,8 +4045,9 @@ class ApiClient {
     );
   }
 
-  /// Pre-upload checker: Arabic fix list before staging. Never writes on the server.
-  Future<PreuploadCheckReport> precheckUpload(
+  /// Optional standalone precheck. Returns null on non-200/404/network so dry-run can continue.
+  /// Prefer dry-run upload (precheck is folded server-side) to avoid uploading the file twice.
+  Future<PreuploadCheckReport?> precheckUpload(
     String filename,
     List<int> bytes, {
     String? targetChain,
@@ -4061,28 +4062,32 @@ class ApiClient {
       if (targetTenant != null && targetTenant.isNotEmpty) 'tenant': targetTenant,
     };
     final uri = Uri.parse(ApiEndpoints.ingestPrecheck).replace(queryParameters: queryParams);
-    final resp = await BackendHttp.post(
-      uri,
-      headers: {
-        'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
-        'X-Tenant-ID': _asciiSafeHeader(effectiveTenant),
-        if (targetChain != null && targetChain.isNotEmpty)
-          'X-Retail-Chain': _asciiSafeHeader(targetChain),
-        'Content-Type': 'application/octet-stream',
-        if (currentUser != null && currentUser!.role.isNotEmpty)
-          'X-Simulated-Role': _asciiSafeHeader(currentUser!.role),
-      },
-      body: bytes,
-    ).timeout(const Duration(seconds: 60));
-    if (resp.statusCode != 200) {
-      throwIfUploadRefused(
-        resp.statusCode,
-        resp.body,
-        'تعذّر فحص الملف قبل الرفع',
-      );
+    try {
+      final resp = await BackendHttp.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
+          'X-Tenant-ID': _asciiSafeHeader(effectiveTenant),
+          if (targetChain != null && targetChain.isNotEmpty)
+            'X-Retail-Chain': _asciiSafeHeader(targetChain),
+          'Content-Type': 'application/octet-stream',
+          if (currentUser != null && currentUser!.role.isNotEmpty)
+            'X-Simulated-Role': _asciiSafeHeader(currentUser!.role),
+        },
+        body: bytes,
+      ).timeout(const Duration(seconds: 60));
+      if (precheckFailureShouldContinue(resp.statusCode)) {
+        debugPrint(
+          '[ApiClient] precheck soft-fail status=${resp.statusCode}; continuing to dry-run',
+        );
+        return null;
+      }
+      final decoded = jsonDecode(resp.body) as Map<String, dynamic>;
+      return PreuploadCheckReport.fromJson(decoded);
+    } catch (e) {
+      debugPrint('[ApiClient] precheck soft-fail: $e; continuing to dry-run');
+      return null;
     }
-    final decoded = jsonDecode(resp.body) as Map<String, dynamic>;
-    return PreuploadCheckReport.fromJson(decoded);
   }
 
   /// Sends file for Two-Tier Gemini AI ingestion (Tier 1: Gemini 3.8 Flash, Tier 2: Gemini 4 Argon Medium / gemini-1.5-pro).
@@ -4169,10 +4174,16 @@ class ApiClient {
         return model;
       }
       if (resp.statusCode == 422 || resp.statusCode == 409) {
+        final blocked = PreuploadCheckReport.tryParseBlocked(resp.body);
+        if (blocked != null) {
+          throw PreuploadBlockedException(blocked);
+        }
         // The backend validated the sheet and refused to save it (or needs an answer first):
         // surface it instead of falling back to a locally parsed result.
         throwIfUploadRefused(resp.statusCode, resp.body, 'تعذّر قراءة الملف بشكل صحيح ولم يتم حفظه');
       }
+    } on PreuploadBlockedException {
+      rethrow;
     } on UploadRejectedException {
       rethrow;
     } on UploadConfirmationRequiredException {
