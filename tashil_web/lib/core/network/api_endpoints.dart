@@ -42,6 +42,8 @@ class ApiEndpoints {
   static String get pricingCompliance => '$baseUrl/api/v1/analytics/pricing-compliance';
   static String get cpfrDashboard => '$baseUrl/api/v1/analytics/cpfr';
   static String get oosMonitor => '$baseUrl/api/v1/analytics/oos-monitor';
+  static String get analyticsAsk => '$baseUrl/api/v1/analytics/ask';
+  static String get analyticsAskCapabilities => '$baseUrl/api/v1/analytics/ask/capabilities';
   static String get productMaster => '$baseUrl/api/v1/product-master';
   static String get productMasterItem => '$baseUrl/api/v1/product-master/item';
   static String get productMasterUpload => '$baseUrl/api/v1/product-master/upload';
