@@ -57,6 +57,7 @@ export async function probeSemantics(
 export async function clickSemantics(page: Page, id: string) {
   const locator = page.locator(byTestId(id)).first();
   await expect(locator).toBeVisible({ timeout: 60_000 });
+  await locator.scrollIntoViewIfNeeded();
   await locator.click({ timeout: 30_000 });
 }
 
@@ -79,6 +80,7 @@ export async function expectClickableSemanticsButton(page: Page, id: string) {
     `${id} must accept pointer events`,
   ).not.toBe('none');
 
+  await locator.scrollIntoViewIfNeeded();
   await locator.click({ timeout: 30_000 });
   return probe!;
 }

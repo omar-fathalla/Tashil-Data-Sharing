@@ -1,6 +1,7 @@
 name: Playwright Semantics Smoke
 
-# Self-hosted Mac (tashil-mac). Fallback: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
+# Self-hosted Mac (label tashil-mac). Fallback: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
+# See docs/ci-self-hosted.md.
 on:
   push:
     branches: [main]
@@ -29,7 +30,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Detect preinstalled Flutter
+        id: flutter_pre
+        run: |
+          set -euo pipefail
+          if command -v flutter >/dev/null 2>&1; then
+            flutter --version || true
+            if flutter --version 2>/dev/null | grep -q "${{ env.FLUTTER_VERSION }}"; then
+              echo "use_action=false" >> "$GITHUB_OUTPUT"
+              echo "Reusing preinstalled Flutter ${{ env.FLUTTER_VERSION }} at $(command -v flutter)"
+              exit 0
+            fi
+          fi
+          echo "use_action=true" >> "$GITHUB_OUTPUT"
+          echo "Preinstalled Flutter ${{ env.FLUTTER_VERSION }} not found; will use flutter-action"
+
       - uses: subosito/flutter-action@v2
+        if: steps.flutter_pre.outputs.use_action == 'true'
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -39,9 +56,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('tashil_web/pubspec.lock') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-pub-${{ hashFiles('tashil_web/pubspec.lock') }}
           restore-keys: |
-            ${{ runner.os }}-pub-
+            ${{ runner.os }}-${{ runner.arch }}-pub-
 
       - name: flutter pub get
         working-directory: tashil_web
@@ -59,7 +76,7 @@ jobs:
           cache-dependency-path: e2e/package-lock.json
 
       # SPA fallback so /adeco serves index.html (path URL strategy).
-      # Use a workspace-local pid/log so cleanup works on the persistent Mac.
+      # Use RUNNER_TEMP pid/log so cleanup works on the persistent Mac.
       - name: Start static server
         run: |
           mkdir -p "$RUNNER_TEMP/playwright-smoke"
@@ -81,8 +98,12 @@ jobs:
         working-directory: e2e
         run: |
           npm ci
-          # No --with-deps (apt) on macOS self-hosted; browsers only.
-          npx playwright install chromium
+          # Linux (ubuntu-latest fallback) needs OS deps; macOS self-hosted does not.
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            npx playwright install --with-deps chromium
+          else
+            npx playwright install chromium
+          fi
 
       - name: Run read-only login Semantics smoke
         working-directory: e2e
@@ -106,10 +127,14 @@ jobs:
         if: always()
         run: |
           if [ -f "$RUNNER_TEMP/playwright-smoke/serve.pid" ]; then
-            kill "$(cat "$RUNNER_TEMP/playwright-smoke/serve.pid")" 2>/dev/null || true
-            # Kill process group children if serve spawned them
-            pkill -f 'serve@14.*4173' 2>/dev/null || true
-            pkill -f 'node.*serve.*4173' 2>/dev/null || true
+            serve_pid="$(cat "$RUNNER_TEMP/playwright-smoke/serve.pid")"
+            # Kill only the serve process this job started (and its children).
+            if [ -n "$serve_pid" ] && kill -0 "$serve_pid" 2>/dev/null; then
+              pkill -P "$serve_pid" 2>/dev/null || true
+              kill "$serve_pid" 2>/dev/null || true
+              sleep 1
+              kill -9 "$serve_pid" 2>/dev/null || true
+            fi
           fi
           # Drop large local build/report dirs so the persistent runner disk stays lean.
           rm -rf tashil_web/build/web e2e/test-results e2e/playwright-report \

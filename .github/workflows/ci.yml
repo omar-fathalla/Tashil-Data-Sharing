@@ -1,8 +1,9 @@
 # Consolidated CI: backend Go + Flutter + Cloud Run pin guard.
-# Runs on Mohamed's self-hosted Mac (tashil-mac). Deploy stays on deploy.yml (ubuntu-latest).
+# Runs on Mohamed's self-hosted Mac runners (label tashil-mac). Deploy stays on deploy.yml (ubuntu-latest).
 #
 # Fallback if Mac is offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'
 # (Settings → Secrets and variables → Actions → Variables), or change runs-on below.
+# See docs/ci-self-hosted.md.
 name: CI tests
 
 on:
@@ -54,14 +55,24 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend-go/go.mod
+          cache: true
           cache-dependency-path: backend-go/go.sum
 
       - name: go vet
         run: go vet ./...
 
+      # Cap package parallelism so 3 self-hosted runners sharing one Mac stay responsive.
       - name: go test
         id: go_test
-        run: go test ./... -count=1 -timeout 20m
+        run: |
+          set -euo pipefail
+          cores="$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)"
+          # Aim for ~half the machine so sibling runner jobs can progress.
+          p=$(( cores / 2 ))
+          if [ "$p" -lt 2 ]; then p=2; fi
+          if [ "$p" -gt 8 ]; then p=8; fi
+          echo "go test -p=$p GOMAXPROCS=$p (cores=$cores)"
+          GOMAXPROCS="$p" go test ./... -count=1 -timeout 20m -p "$p"
 
       - name: Setup Node (Firestore emulator)
         uses: actions/setup-node@v4
@@ -81,6 +92,16 @@ jobs:
           key: firebase-emulators-${{ runner.os }}-${{ runner.arch }}-v1
           restore-keys: |
             firebase-emulators-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Snapshot pre-existing emulator PIDs
+        working-directory: .
+        run: |
+          mkdir -p "$RUNNER_TEMP/ci-emu"
+          # Do not touch Mohamed's manual emulator — only kill PIDs this job starts.
+          (pgrep -f 'cloud-firestore-emulator|firebase.*emulators:exec|java.*firestore-emulator' || true) \
+            | sort -u > "$RUNNER_TEMP/ci-emu/pre-pids.txt"
+          echo "Pre-existing emulator-related PIDs:"
+          cat "$RUNNER_TEMP/ci-emu/pre-pids.txt" || true
 
       - name: Firestore emulator product-match tests
         id: go_emulator_test
@@ -108,14 +129,31 @@ jobs:
             echo "Proposed next step: inspect the failing package output above, fix on this PR branch, and push — do not push fixes to main."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Cleanup leftover emulator / Java processes
+      - name: Cleanup emulator PIDs started by this job
         if: always()
         working-directory: .
         run: |
-          # emulators:exec normally exits cleanly; belt-and-suspenders on the persistent Mac.
-          pkill -f 'cloud-firestore-emulator' 2>/dev/null || true
-          pkill -f 'firebase.*emulators' 2>/dev/null || true
-          # Do not kill unrelated Java; only firebase-related leftover PIDs above.
+          set +e
+          pre="$RUNNER_TEMP/ci-emu/pre-pids.txt"
+          cur="$RUNNER_TEMP/ci-emu/cur-pids.txt"
+          (pgrep -f 'cloud-firestore-emulator|firebase.*emulators:exec|java.*firestore-emulator' || true) \
+            | sort -u > "$cur"
+          if [ ! -f "$pre" ]; then
+            echo "No pre-PID snapshot; skipping kill (avoid touching host emulators)."
+            exit 0
+          fi
+          # Kill only PIDs that appeared after our snapshot.
+          comm -13 "$pre" "$cur" | while read -r pid; do
+            [ -z "$pid" ] && continue
+            echo "Stopping job-started PID $pid"
+            kill "$pid" 2>/dev/null || true
+          done
+          sleep 1
+          comm -13 "$pre" "$cur" | while read -r pid; do
+            [ -z "$pid" ] && continue
+            kill -9 "$pid" 2>/dev/null || true
+          done
+          rm -rf "$RUNNER_TEMP/ci-emu" 2>/dev/null || true
 
   test-flutter:
     name: Flutter analyze & test
@@ -126,7 +164,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Prefer the Mac's preinstalled Flutter 3.41.2; fall back to flutter-action (+cache).
+      - name: Detect preinstalled Flutter
+        id: flutter_pre
+        working-directory: .
+        run: |
+          set -euo pipefail
+          if command -v flutter >/dev/null 2>&1; then
+            flutter --version || true
+            if flutter --version 2>/dev/null | grep -q "${{ env.FLUTTER_VERSION }}"; then
+              echo "use_action=false" >> "$GITHUB_OUTPUT"
+              echo "Reusing preinstalled Flutter ${{ env.FLUTTER_VERSION }} at $(command -v flutter)"
+              exit 0
+            fi
+          fi
+          echo "use_action=true" >> "$GITHUB_OUTPUT"
+          echo "Preinstalled Flutter ${{ env.FLUTTER_VERSION }} not found; will use flutter-action"
+
       - uses: subosito/flutter-action@v2
+        if: steps.flutter_pre.outputs.use_action == 'true'
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -136,9 +192,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('tashil_web/pubspec.lock') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-pub-${{ hashFiles('tashil_web/pubspec.lock') }}
           restore-keys: |
-            ${{ runner.os }}-pub-
+            ${{ runner.os }}-${{ runner.arch }}-pub-
 
       - run: flutter pub get
       - name: flutter analyze

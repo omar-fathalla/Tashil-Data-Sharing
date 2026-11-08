@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { TENANT_PATH } from '../playwright.config';
+import {
+  assertSemanticsNotDoubleScaled,
+  byTestId,
+  typeIntoSemanticsField,
+  waitForFlutter,
+} from '../helpers/flutter';
 
 /**
  * Read-only smoke against the tenant login shell.
@@ -15,19 +21,6 @@ const LOGIN_IDS = ['login-email', 'login-password', 'login-submit'] as const;
 /** Sentinel that must never appear in page HTML / semantics attributes. */
 const DUMMY_PASSWORD = 'DUMMY_PW_NEVER_LEAK_9x7q';
 
-function byTestId(id: string) {
-  return `[flt-semantics-identifier="${id}"]`;
-}
-
-async function waitForFlutter(page: import('@playwright/test').Page) {
-  await page.waitForSelector('flutter-view, flt-glass-pane, canvas', {
-    timeout: 60_000,
-  });
-  await expect(page.locator('flt-semantics').first()).toBeAttached({
-    timeout: 60_000,
-  });
-}
-
 test.describe('Flutter web Semantics smoke', () => {
   test('tenant path, login ids, typing/click, password never leaks', async ({
     page,
@@ -38,6 +31,9 @@ test.describe('Flutter web Semantics smoke', () => {
 
     await waitForFlutter(page);
 
+    // Guard against Retina 2× semantics offset that puts nodes outside viewport.
+    await assertSemanticsNotDoubleScaled(page, 'login-email');
+
     for (const id of LOGIN_IDS) {
       const locator = page.locator(byTestId(id));
       await expect(
@@ -47,16 +43,10 @@ test.describe('Flutter web Semantics smoke', () => {
       await expect(locator.first()).toBeVisible({ timeout: 60_000 });
     }
 
-    const email = page.locator(byTestId('login-email')).first();
-    const password = page.locator(byTestId('login-password')).first();
     const submit = page.locator(byTestId('login-submit')).first();
 
-    await email.click();
-    await page.waitForTimeout(250);
-    await page.keyboard.type('smoke@example.com', { delay: 40 });
-    await password.click();
-    await page.waitForTimeout(250);
-    await page.keyboard.type(DUMMY_PASSWORD, { delay: 40 });
+    await typeIntoSemanticsField(page, 'login-email', 'smoke@example.com');
+    await typeIntoSemanticsField(page, 'login-password', DUMMY_PASSWORD);
 
     // Dummy password must not appear in DOM text or semantics attributes.
     const html = await page.content();
@@ -78,6 +68,7 @@ test.describe('Flutter web Semantics smoke', () => {
     expect(semanticsDump).not.toContain(DUMMY_PASSWORD);
 
     await expect(submit).toBeEnabled();
+    await submit.scrollIntoViewIfNeeded();
     await submit.click();
     // Failed / local-only auth must never leak the dummy password into the DOM.
     // URL may stay on /adeco or the app may rewrite to `/` when no backend is present;

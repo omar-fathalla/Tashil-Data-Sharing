@@ -7,11 +7,25 @@ import { defineConfig, devices } from '@playwright/test';
  *
  * After deploy:
  *   BASE_ORIGIN=https://www.data.sw-point.com TENANT_PATH=/adeco npx playwright test
+ *
+ * macOS Retina hosts: force DPR=1 via launch args so Flutter web Semantics
+ * hit-targets stay inside the Playwright viewport (avoids "outside of the
+ * viewport" on locator.click).
  */
 const baseOrigin =
   process.env.BASE_ORIGIN?.replace(/\/$/, '') || 'http://127.0.0.1:4173';
 
 export const TENANT_PATH = process.env.TENANT_PATH || '/adeco';
+
+/** Explicit desktop viewport — do not rely on host display metrics. */
+const VIEWPORT = { width: 1440, height: 900 } as const;
+
+const chromiumLaunchArgs = [
+  '--force-device-scale-factor=1',
+  '--high-dpi-support=1',
+  `--window-size=${VIEWPORT.width},${VIEWPORT.height}`,
+  '--disable-dev-shm-usage',
+];
 
 export default defineConfig({
   testDir: './tests',
@@ -28,13 +42,26 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     // Smoke never completes a successful login or mutates prod data.
     navigationTimeout: 60_000,
+    viewport: { ...VIEWPORT },
+    deviceScaleFactor: 1,
+    isMobile: false,
+    hasTouch: false,
+    launchOptions: {
+      args: chromiumLaunchArgs,
+    },
   },
   projects: [
     {
       name: 'chromium-dpr1',
       use: {
         ...devices['Desktop Chrome'],
+        viewport: { ...VIEWPORT },
         deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+        launchOptions: {
+          args: chromiumLaunchArgs,
+        },
       },
     },
     {
@@ -44,9 +71,19 @@ export default defineConfig({
       testMatch: /sellout-semantics-clickable\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
+        viewport: { ...VIEWPORT },
         deviceScaleFactor: 2,
+        isMobile: false,
+        hasTouch: false,
+        launchOptions: {
+          args: [
+            '--force-device-scale-factor=2',
+            '--high-dpi-support=1',
+            `--window-size=${VIEWPORT.width},${VIEWPORT.height}`,
+            '--disable-dev-shm-usage',
+          ],
+        },
       },
     },
   ],
 });
-
