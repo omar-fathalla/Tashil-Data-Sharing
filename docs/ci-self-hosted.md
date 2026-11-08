@@ -40,15 +40,35 @@ Custom label on each: `tashil-mac`. GitHub also applies `self-hosted`, `macOS`, 
 ## Cross-repo Mac lock (`~/mac-resources/mac-lock.sh`)
 
 GitHub `concurrency` only serializes within one workflow/ref. Another repo’s runners on
-the same Mac can still overlap. Heavy jobs therefore book a **global** directory lock:
+the same Mac can still overlap. Heavy jobs therefore book a **global** directory lock.
+
+**Do not edit** `~/mac-resources` from this repo’s CI. Only call the installed script
+(via a private copy — see below).
+
+### Safe invoke (copy then exec)
+
+Another agent may **rewrite** `~/mac-resources/mac-lock.sh` while a waiter is blocked
+inside it. Bash then continues reading the live inode at a shifted offset (looks like a
+spurious `syntax error near unexpected token '('` right after `acquired`). CI therefore:
+
+1. **`cp ~/mac-resources/mac-lock.sh $RUNNER_TEMP/mac-lock-ci-copy.sh`**
+2. Runs **`bash $RUNNER_TEMP/mac-lock-ci-copy.sh acquire|release|status …`**
+3. Never execs the live path for the long-running wait
+
+Repo helper (local / post-checkout): `scripts/mac_lock_ci.sh` (same copy-then-exec rules).
+Tests: `bash scripts/mac_lock_ci_test.sh`.
+
+### Acquire / release rules
 
 ```bash
-~/mac-resources/mac-lock.sh acquire \
-  "ci-Tashil-Data-Sharing-${GITHUB_RUN_ID}-${GITHUB_JOB}" \
-  "omar-fathalla/Tashil-Data-Sharing" \
-  "<task>" <eta_min> <wait_max_min>
+AGENT="ci-Tashil-Data-Sharing-${GITHUB_RUN_ID}-${GITHUB_JOB}"
+cp ~/mac-resources/mac-lock.sh "$RUNNER_TEMP/mac-lock-ci-copy.sh"
+bash "$RUNNER_TEMP/mac-lock-ci-copy.sh" acquire "$AGENT" \
+  "omar-fathalla/Tashil-Data-Sharing" "<task>" <eta_min> <wait_max_min>
 # … work …
-~/mac-resources/mac-lock.sh release "ci-Tashil-Data-Sharing-${GITHUB_RUN_ID}-${GITHUB_JOB}"
+# if: always() — ownership via status, NOT a GITHUB_OUTPUT "acquired" flag:
+status=$(bash "$RUNNER_TEMP/mac-lock-ci-copy.sh" status)
+# release only if $status contains $AGENT (acquire can exit non-zero after taking LOCK.d)
 ```
 
 | Job | Takes lock? | eta_min | wait_max_min |
@@ -60,7 +80,8 @@ the same Mac can still overlap. Heavy jobs therefore book a **global** directory
 | Comment-on-PR-failure | **no** (light) | — | — |
 
 If `~/mac-resources/mac-lock.sh` is missing (ubuntu-latest / github-hosted), acquire/release
-**skip gracefully**.
+**skip gracefully**. Non-zero acquire fails the job; `if: always()` release still runs and
+frees `LOCK.d` when `status` shows our agent.
 
 **Tradeoff:** one global `LOCK.d` means our own heavy jobs also **serialize** with each
 other (and with Tashil App / other agents). Wall-clock CI is longer; machine load stays

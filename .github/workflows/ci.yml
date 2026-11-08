@@ -52,7 +52,8 @@ jobs:
       run:
         working-directory: backend-go
     steps:
-      # First step: shared Mac lock (before checkout — script on Mac). Skip if missing (ubuntu).
+      # First step: shared Mac lock. Copy script to $RUNNER_TEMP before exec so a
+      # mid-wait rewrite of ~/mac-resources/mac-lock.sh cannot shift bash's offset.
       - name: Acquire Mac resource lock
         id: mac_lock
         working-directory: .
@@ -60,14 +61,15 @@ jobs:
           set -euo pipefail
           AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
           echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
-          LOCK="${HOME}/mac-resources/mac-lock.sh"
-          if [ ! -f "$LOCK" ]; then
+          SRC="${HOME}/mac-resources/mac-lock.sh"
+          if [ ! -f "$SRC" ]; then
             echo "mac-lock.sh missing — skip acquire (ubuntu/github-hosted fallback)"
-            echo "acquired=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          bash "$LOCK" acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "backend-go+firestore-emulator" 45 120
-          echo "acquired=true" >> "$GITHUB_OUTPUT"
+          COPY="${RUNNER_TEMP}/mac-lock-ci-copy.sh"
+          cp "$SRC" "$COPY"
+          echo "MAC_LOCK_COPY=${COPY}" >> "$GITHUB_ENV"
+          bash "$COPY" acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "backend-go+firestore-emulator" 45 120
 
       - uses: actions/checkout@v4
 
@@ -178,19 +180,25 @@ jobs:
             echo "Proposed next step: inspect the failing package output above, fix on this PR branch, and push — do not push fixes to main."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # Ownership-based release (if: always). Do not trust GITHUB_OUTPUT — acquire
+      # can exit non-zero after LOCK.d was taken (live script rewritten mid-wait).
       - name: Release Mac resource lock
         if: always()
         working-directory: .
         run: |
           set +e
           AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
-          if [ "${{ steps.mac_lock.outputs.acquired }}" != "true" ]; then
-            echo "lock was not acquired by this job — skip release"
-            exit 0
+          SRC="${HOME}/mac-resources/mac-lock.sh"
+          COPY="${MAC_LOCK_COPY:-${RUNNER_TEMP}/mac-lock-ci-copy.sh}"
+          if [ ! -f "$COPY" ]; then
+            [ -f "$SRC" ] || { echo "mac-lock.sh missing — skip release"; exit 0; }
+            cp "$SRC" "$COPY"
           fi
-          LOCK="${HOME}/mac-resources/mac-lock.sh"
-          [ -f "$LOCK" ] || { echo "mac-lock.sh missing — skip release"; exit 0; }
-          bash "$LOCK" release "$AGENT"
+          status="$(bash "$COPY" status 2>/dev/null || true)"
+          case "$status" in
+            *"$AGENT"*) bash "$COPY" release "$AGENT" ;;
+            *) echo "lock not held by this agent (${AGENT}); status=${status:-free} — skip release" ;;
+          esac
 
   test-flutter:
     name: Flutter analyze & test
@@ -208,14 +216,15 @@ jobs:
           set -euo pipefail
           AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
           echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
-          LOCK="${HOME}/mac-resources/mac-lock.sh"
-          if [ ! -f "$LOCK" ]; then
+          SRC="${HOME}/mac-resources/mac-lock.sh"
+          if [ ! -f "$SRC" ]; then
             echo "mac-lock.sh missing — skip acquire (ubuntu/github-hosted fallback)"
-            echo "acquired=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          bash "$LOCK" acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "flutter-analyze-test" 25 120
-          echo "acquired=true" >> "$GITHUB_OUTPUT"
+          COPY="${RUNNER_TEMP}/mac-lock-ci-copy.sh"
+          cp "$SRC" "$COPY"
+          echo "MAC_LOCK_COPY=${COPY}" >> "$GITHUB_ENV"
+          bash "$COPY" acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "flutter-analyze-test" 25 120
 
       - uses: actions/checkout@v4
 
@@ -281,13 +290,17 @@ jobs:
         run: |
           set +e
           AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
-          if [ "${{ steps.mac_lock.outputs.acquired }}" != "true" ]; then
-            echo "lock was not acquired by this job — skip release"
-            exit 0
+          SRC="${HOME}/mac-resources/mac-lock.sh"
+          COPY="${MAC_LOCK_COPY:-${RUNNER_TEMP}/mac-lock-ci-copy.sh}"
+          if [ ! -f "$COPY" ]; then
+            [ -f "$SRC" ] || { echo "mac-lock.sh missing — skip release"; exit 0; }
+            cp "$SRC" "$COPY"
           fi
-          LOCK="${HOME}/mac-resources/mac-lock.sh"
-          [ -f "$LOCK" ] || { echo "mac-lock.sh missing — skip release"; exit 0; }
-          bash "$LOCK" release "$AGENT"
+          status="$(bash "$COPY" status 2>/dev/null || true)"
+          case "$status" in
+            *"$AGENT"*) bash "$COPY" release "$AGENT" ;;
+            *) echo "lock not held by this agent (${AGENT}); status=${status:-free} — skip release" ;;
+          esac
 
   comment-on-pr-failure:
     name: Comment PR when tests fail

@@ -29,20 +29,22 @@ jobs:
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 45
     steps:
+      # Copy mac-lock.sh to $RUNNER_TEMP before exec (live file may be rewritten mid-wait).
       - name: Acquire Mac resource lock
         id: mac_lock
         run: |
           set -euo pipefail
           AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
           echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
-          LOCK="${HOME}/mac-resources/mac-lock.sh"
-          if [ ! -f "$LOCK" ]; then
+          SRC="${HOME}/mac-resources/mac-lock.sh"
+          if [ ! -f "$SRC" ]; then
             echo "mac-lock.sh missing — skip acquire (ubuntu/github-hosted fallback)"
-            echo "acquired=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          bash "$LOCK" acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "playwright-semantics-smoke" 45 120
-          echo "acquired=true" >> "$GITHUB_OUTPUT"
+          COPY="${RUNNER_TEMP}/mac-lock-ci-copy.sh"
+          cp "$SRC" "$COPY"
+          echo "MAC_LOCK_COPY=${COPY}" >> "$GITHUB_ENV"
+          bash "$COPY" acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "playwright-semantics-smoke" 45 120
 
       - uses: actions/checkout@v4
 
@@ -166,15 +168,20 @@ jobs:
           rm -rf tashil_web/build/web e2e/test-results e2e/playwright-report \
             "$RUNNER_TEMP/playwright-smoke" 2>/dev/null || true
 
+      # Ownership via status — release only if we hold LOCK.d (if: always).
       - name: Release Mac resource lock
         if: always()
         run: |
           set +e
           AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
-          if [ "${{ steps.mac_lock.outputs.acquired }}" != "true" ]; then
-            echo "lock was not acquired by this job — skip release"
-            exit 0
+          SRC="${HOME}/mac-resources/mac-lock.sh"
+          COPY="${MAC_LOCK_COPY:-${RUNNER_TEMP}/mac-lock-ci-copy.sh}"
+          if [ ! -f "$COPY" ]; then
+            [ -f "$SRC" ] || { echo "mac-lock.sh missing — skip release"; exit 0; }
+            cp "$SRC" "$COPY"
           fi
-          LOCK="${HOME}/mac-resources/mac-lock.sh"
-          [ -f "$LOCK" ] || { echo "mac-lock.sh missing — skip release"; exit 0; }
-          bash "$LOCK" release "$AGENT"
+          status="$(bash "$COPY" status 2>/dev/null || true)"
+          case "$status" in
+            *"$AGENT"*) bash "$COPY" release "$AGENT" ;;
+            *) echo "lock not held by this agent (${AGENT}); status=${status:-free} — skip release" ;;
+          esac
