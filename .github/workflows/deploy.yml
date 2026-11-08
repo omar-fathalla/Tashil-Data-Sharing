@@ -38,6 +38,8 @@ env:
 jobs:
   test-backend:
     runs-on: ubuntu-latest
+    # Observed ~6m on success (2026-11-08 deploy); ~20m ceiling.
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend-go
@@ -54,6 +56,8 @@ jobs:
 
   test-web:
     runs-on: ubuntu-latest
+    # Observed ~4.5m on success; ~20m ceiling.
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: tashil_web
@@ -73,6 +77,8 @@ jobs:
   deploy-backend:
     needs: [test-backend, test-web]
     runs-on: ubuntu-latest
+    # Observed ~4.5m; Cloud Run source deploy can spike — 30m ceiling.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -151,6 +157,8 @@ jobs:
   deploy-web:
     needs: [deploy-backend]
     runs-on: ubuntu-latest
+    # Observed ~3m (flutter build + Firebase Hosting); 25m ceiling.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2

@@ -2,18 +2,23 @@ name: Playwright Semantics Smoke
 
 # Self-hosted Mac (label tashil-mac). Fallback: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
 # See docs/ci-self-hosted.md.
+#
+# Workflow always runs (docs ignored) so required check flutter-web-semantics-smoke can report.
+# Heavy smoke job is path-filtered; gate job reports success on backend-only skips.
 on:
   push:
     branches: [main]
-    paths:
-      - "tashil_web/**"
-      - "e2e/**"
-      - ".github/workflows/playwright_smoke.yml"
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
   pull_request:
-    paths:
-      - "tashil_web/**"
-      - "e2e/**"
-      - ".github/workflows/playwright_smoke.yml"
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
 
 # Cancel superseded runs on the same PR/branch. Never cancel main.
 # deploy.yml stays cancel-in-progress: false.
@@ -21,61 +26,103 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+permissions:
+  contents: read
+  pull-requests: read
+
 env:
   FLUTTER_VERSION: "3.41.2"
   MAC_SHARED_LOCK: ${{ vars.MAC_SHARED_LOCK }}
 
 jobs:
-  flutter-web-semantics-smoke:
+  changes:
+    name: Detect path changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      smoke: ${{ steps.filter.outputs.smoke }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            smoke:
+              - 'tashil_web/**'
+              - 'e2e/**'
+              - 'scripts/ci_detect_flutter.sh'
+              - 'scripts/ci_runner_env.sh'
+              - 'scripts/ci_pub_cache_isolation_test.sh'
+              - 'scripts/pick_free_ports.py'
+              - '.github/workflows/playwright_smoke.yml'
+
+  smoke-run:
+    needs: changes
+    if: needs.changes.outputs.smoke == 'true'
     # Fallback if Mac offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
-    # Acquire step timeout (40) < job timeout so if:always release still runs on cancel.
-    timeout-minutes: 90
+    # Build web + Playwright (~15–25m healthy) + lock wait; acquire step < job.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
       - name: Per-runner toolchain / ADB env
         run: bash scripts/ci_runner_env.sh
 
+      - name: Assert PUB_CACHE isolation
+        run: |
+          chmod +x scripts/ci_pub_cache_isolation_test.sh
+          bash scripts/ci_pub_cache_isolation_test.sh --assert
+          bash scripts/ci_pub_cache_isolation_test.sh
+
       - name: Acquire Mac resource lock
         id: mac_lock
-        timeout-minutes: 40
+        timeout-minutes: 15
         run: |
           set -euo pipefail
           AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
           echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
           chmod +x scripts/mac_lock_ci.sh
-          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "playwright-semantics-smoke" 45 120
+          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "playwright-semantics-smoke" 25 15
 
+      # Prefer $HOME/toolchains/flutter (see scripts/ci_detect_flutter.sh). Falling through to
+      # flutter-action+cache has caused self-hosted Mac runners to lose GitHub communication.
+      # PUB_CACHE is forced to $RUNNER_TEMP/pub-cache by scripts/ci_runner_env.sh (ignores presets).
       - name: Detect preinstalled Flutter
         id: flutter_pre
+        env:
+          FLUTTER_VERSION: ${{ env.FLUTTER_VERSION }}
         run: |
-          set -euo pipefail
-          if command -v flutter >/dev/null 2>&1; then
-            flutter --version || true
-            if flutter --version 2>/dev/null | grep -q "${{ env.FLUTTER_VERSION }}"; then
-              echo "use_action=false" >> "$GITHUB_OUTPUT"
-              echo "Reusing preinstalled Flutter ${{ env.FLUTTER_VERSION }} at $(command -v flutter)"
-              exit 0
-            fi
-          fi
-          echo "use_action=true" >> "$GITHUB_OUTPUT"
-          echo "Preinstalled Flutter ${{ env.FLUTTER_VERSION }} not found; will use flutter-action"
+          chmod +x scripts/ci_detect_flutter.sh
+          bash scripts/ci_detect_flutter.sh
+
+      # Fail fast on Mac: downloading the SDK via flutter-action has disconnected runners.
+      - name: Require preinstalled Flutter on self-hosted
+        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment == 'self-hosted'
+        run: |
+          echo "::error::Preinstalled Flutter ${{ env.FLUTTER_VERSION }} missing on self-hosted runner. Install at \$HOME/toolchains/flutter — do not download via flutter-action (drops Mac runners)."
+          exit 1
 
       - uses: subosito/flutter-action@v2
-        if: steps.flutter_pre.outputs.use_action == 'true'
+        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment != 'self-hosted'
+        timeout-minutes: 15
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
-          cache: true
+          # Cache restore/download of the full SDK has starved tashil-mac (lost communication).
+          cache: false
 
+      # Self-hosted: local PUB_CACHE only (skip remote actions/cache — stalls / races on Mac).
+      # GitHub-hosted: cache the same isolated path ci_runner_env.sh sets (never ~/.pub-cache).
       - name: Cache pub dependencies
+        if: runner.environment != 'self-hosted'
         uses: actions/cache@v4
         with:
-          path: ~/.pub-cache
-          key: ${{ runner.os }}-${{ runner.arch }}-pub-${{ hashFiles('tashil_web/pubspec.lock') }}
+          path: ${{ runner.temp }}/pub-cache
+          key: ${{ runner.os }}-${{ runner.arch }}-pub-isolated-v1-${{ hashFiles('tashil_web/pubspec.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-pub-
+            ${{ runner.os }}-${{ runner.arch }}-pub-isolated-v1-
 
       - name: flutter pub get
         working-directory: tashil_web
@@ -155,6 +202,23 @@ jobs:
             e2e/playwright-report
           if-no-files-found: ignore
 
+      - name: Surface failure summary
+        if: failure()
+        run: |
+          {
+            echo "## Playwright Semantics smoke failed"
+            echo ""
+            echo "flutter pub get / build web / Playwright smoke failed on branch \`${{ github.ref_name }}\`."
+            echo "Reproduce locally:"
+            echo ""
+            echo '```bash'
+            echo 'cd tashil_web && flutter pub get && flutter build web --release'
+            echo 'cd e2e && npm ci && npx playwright test'
+            echo '```'
+            echo ""
+            echo "Proposed next step: fix on this PR branch and push — do not auto-push fixes to main."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Stop static server and clean local artifacts
         if: always()
         run: |
@@ -178,3 +242,21 @@ jobs:
           set +e
           AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
           bash scripts/mac_lock_ci.sh release "$AGENT"
+
+  # Required-check gate: job id matches existing check name flutter-web-semantics-smoke.
+  flutter-web-semantics-smoke:
+    needs: [changes, smoke-run]
+    if: always() && !cancelled() && needs.changes.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate smoke path filter / run result
+        run: |
+          set -euo pipefail
+          if [[ "${{ needs.changes.outputs.smoke }}" != "true" ]]; then
+            echo "Skipped — no Flutter/web/e2e/workflow path changes"
+            exit 0
+          fi
+          result="${{ needs.smoke-run.result }}"
+          echo "smoke-run result=${result}"
+          [[ "${result}" == "success" ]]

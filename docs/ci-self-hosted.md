@@ -24,8 +24,10 @@ run as user `tashil-ci`** (`HOME=/Users/tashil-ci`). Toolchains live at
 | `tashil-mac-2` | `tashil-ci`   | `~/actions-runner-2`   | 5038 |
 | `tashil-mac-3` | `tashil-ci`   | `~/actions-runner-3`   | 5039 |
 
-`scripts/ci_runner_env.sh` sets `PATH` (`$HOME/toolchains/bin`), `ANDROID_HOME`,
-`ANDROID_ADB_SERVER_PORT`, and `ADB_SERVER_SOCKET=tcp:localhost:<port>` per runner.
+`scripts/ci_runner_env.sh` sets `PATH` (`$HOME/toolchains/bin` + Flutter), `ANDROID_HOME`,
+`ANDROID_ADB_SERVER_PORT`, `ADB_SERVER_SOCKET=tcp:localhost:<port>`, and forces
+`PUB_CACHE=$RUNNER_TEMP/pub-cache` (ignores any pre-set shared `PUB_CACHE`).
+Isolation is checked by `scripts/ci_pub_cache_isolation_test.sh`.
 
 Custom label on each: `tashil-mac`. GitHub also applies `self-hosted`, `macOS`, `ARM64`.
 
@@ -78,10 +80,18 @@ bash scripts/mac_lock_ci.sh release "$AGENT"
 
 | Job | Lock when `MAC_SHARED_LOCK=1`? | acquire step timeout | job timeout |
 |-----|-------------------------------|----------------------|-------------|
-| Backend Go (+ emulator) | yes | 110m | 240m |
-| Flutter analyze & test | yes | 110m | 180m |
-| Playwright Semantics smoke | yes | 40m | 90m |
-| Cloud Run pin / PR comment | **no** | — | — |
+| Backend Go (+ emulator) | yes | 10m | 25m |
+| Flutter analyze & test (run) | yes | 8m | 20m |
+| Playwright Semantics smoke (run) | yes | 15m | 45m |
+| Cloud Run pin / PR comment / path gates | **no** | — | 5m |
+
+Path filters (`dorny/paths-filter`): Flutter + Playwright heavy jobs run only when
+`tashil_web/` / `e2e/` / related scripts / workflow files change. Required checks still
+report via lightweight gate jobs (`Flutter analyze & test`, `flutter-web-semantics-smoke`).
+
+Self-hosted Flutter: prefer `$HOME/toolchains/flutter` (`scripts/ci_detect_flutter.sh`);
+**fail fast** if missing — never download via `flutter-action` on Mac. `PUB_CACHE` is
+forced to `$RUNNER_TEMP/pub-cache` per job.
 
 **Tradeoff when enabled:** one global `LOCK.d` serializes our heavy jobs with each other
 and with other agents. Waits poll every 30s up to `wait_max_min`.
@@ -154,8 +164,8 @@ Flutter **web** + Go + Playwright Chromium only.
 |-------|------------------|
 | Go modules | Local `~/go/pkg/mod` on self-hosted (remote setup-go cache disabled — was ~880MB / stalled); `cache: true` only on github-hosted |
 | Go build | Local `~/Library/Caches/go-build` on self-hosted; actions/cache only on github-hosted |
-| Pub | `~/.pub-cache` |
-| Flutter SDK | preinstalled 3.41.2, else `flutter-action` + cache |
+| Pub | Per-job `$RUNNER_TEMP/pub-cache` via `PUB_CACHE` (`ci_runner_env.sh`); never shared `~/.pub-cache`. Remote `actions/cache` only on github-hosted |
+| Flutter SDK | preinstalled 3.41.2 at `$HOME/toolchains/flutter` (`scripts/ci_detect_flutter.sh`); else `flutter-action` **without** cache (cache downloads have dropped Mac runners) |
 | Firebase emulator JARs | `~/.cache/firebase/emulators` (shared read; per-job config elsewhere) |
 | npm (e2e) | `setup-node` cache |
 | Playwright browsers | `~/.cache/ms-playwright` + `~/Library/Caches/ms-playwright` |
@@ -199,7 +209,10 @@ Emulator isolation scripts still probe free ports (safe on ubuntu-latest too).
 du -sh ~/actions-runner/_work ~/actions-runner-2/_work ~/actions-runner-3/_work
 # When idle (this account's runners only — do not wipe other users' homes):
 rm -rf ~/actions-runner/_work/* ~/actions-runner-2/_work/* ~/actions-runner-3/_work/*
-du -sh ~/.pub-cache ~/.cache/firebase ~/Library/Caches/ms-playwright 2>/dev/null
+du -sh ~/.cache/firebase ~/Library/Caches/ms-playwright 2>/dev/null
+# Stale shared home pub cache (pre-isolation); safe to remove when idle:
+# rm -rf ~/.pub-cache
+# Optional local toolchains pub dirs: rm -rf ~/toolchains/pub-cache
 ```
 
 Preinstalled: Go 1.26, Flutter 3.41.2, Node 25, Java 21, `gh`, `git`. No Docker.
