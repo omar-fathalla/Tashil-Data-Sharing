@@ -1,8 +1,11 @@
-# Consolidated CI: backend Go + Flutter + Cloud Run pin guard.
-# Runs on Mohamed's self-hosted Mac runners (label tashil-mac). Deploy stays on deploy.yml (ubuntu-latest).
+# Consolidated CI: hybrid runners.
+# Light/fast → GitHub-hosted (vars.CI_HOSTED_RUNNER, default ubuntu-latest).
+# Heavy → Mac self-hosted (vars.CI_RUNS_ON, default ["self-hosted","macOS","tashil-mac"]).
+# NEVER use GitHub-hosted macOS runners (macos-latest) — expensive.
 #
-# Fallback if Mac is offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'
-# (Settings → Secrets and variables → Actions → Variables), or change runs-on below.
+# Budget fallback (no code change): set CI_HOSTED_RUNNER to the same JSON array as
+# CI_RUNS_ON, e.g. ["self-hosted","macOS","tashil-mac"] — ALL light jobs move to Mac.
+# CI_HOSTED_RUNNER accepts a JSON string ("ubuntu-latest") or a JSON label array.
 # See docs/ci-self-hosted.md.
 name: CI tests
 
@@ -30,10 +33,10 @@ env:
 
 jobs:
   # Path filter so Flutter can skip on backend/docs-only PRs while required checks still report.
-  # Must use CI_RUNS_ON (self-hosted): ubuntu-latest failed with no runner assigned (run 42519016115).
+  # Light job → hosted by default (CI_HOSTED_RUNNER).
   changes:
     name: Detect path changes
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     outputs:
       flutter: ${{ steps.filter.outputs.flutter }}
@@ -51,10 +54,9 @@ jobs:
               - '.github/workflows/ci.yml'
 
   # Stopgap until shared storage (#37): refuse deploy commands that omit or change the 1-instance pin.
-  # Fallback if Mac offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
   guard-cloud-run-one-instance:
     name: Cloud Run one-instance pin
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -63,7 +65,7 @@ jobs:
 
   test-backend:
     name: Backend Go tests
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     # ~20m class with emulator headroom (observed github-hosted go ~6m).
     timeout-minutes: 25
     defaults:
@@ -76,7 +78,8 @@ jobs:
         working-directory: .
         run: bash scripts/ci_runner_env.sh
 
-      # Shared Mac lock (opt-in via MAC_SHARED_LOCK). timeout < job so if:always release runs.
+      # Shared Mac lock (opt-in via MAC_SHARED_LOCK). No-ops on hosted / when unset.
+      # timeout < job so if:always release runs.
       - name: Acquire Mac resource lock
         id: mac_lock
         timeout-minutes: 10
@@ -312,7 +315,7 @@ jobs:
     name: Flutter analyze & test
     needs: [changes, test-flutter]
     if: always() && !cancelled()
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
       - name: Evaluate Flutter path filter / run result
@@ -334,7 +337,7 @@ jobs:
     name: Comment PR when tests fail
     needs: [test-backend, test-flutter]
     if: always() && github.event_name == 'pull_request' && (needs.test-backend.result == 'failure' || needs.test-flutter.result == 'failure')
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
       - name: Post failure comment

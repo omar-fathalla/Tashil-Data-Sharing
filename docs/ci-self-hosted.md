@@ -1,9 +1,16 @@
 # Self-hosted CI runbook (tashil-mac)
 
-CI (`ci.yml`) and Playwright smoke (`playwright_smoke.yml`) run on Mohamed’s Mac
-via the shared label **`tashil-mac`**. Production **`deploy.yml` stays on
-`ubuntu-latest`** with `cancel-in-progress: false` so deploys are never cancelled
-mid-flight and do not depend on the Mac being awake.
+CI uses a **hybrid runner split**:
+
+| Class | Jobs | Runner var | Default |
+|-------|------|------------|---------|
+| Light / fast | Go tests, path detect, Cloud Run pin, Flutter/smoke gates, deploy `test-*` | `CI_HOSTED_RUNNER` | `ubuntu-latest` (GitHub-hosted) |
+| Heavy | Flutter analyze/test (35m), Playwright smoke | `CI_RUNS_ON` | `["self-hosted","macOS","tashil-mac"]` |
+| Deploy | `deploy-backend` / `deploy-web` | `CI_RUNS_ON` | Mac (gcloud WIF / toolchains) |
+
+**Never** use GitHub-hosted macOS runners (`macos-latest`) — they are expensive.
+`deploy.yml` keeps `cancel-in-progress: false` so production deploys are never
+cancelled mid-flight.
 
 **This Mac is shared** with other bots/accounts (their own runners, Firestore
 emulators, Flutter/Go builds). CI must never assume exclusive use of the machine.
@@ -40,7 +47,7 @@ Custom label on each: `tashil-mac`. GitHub also applies `self-hosted`, `macOS`, 
 3. **Keep CPU bounded** — see table below. Other bots may be compiling at the same time.
 4. **Per-job temp dirs** under `$RUNNER_TEMP/tashil-emu-…` (sandbox `HOME`/`TMPDIR`).
    Do not write job-specific emulator config into another user’s home.
-5. **Ubuntu fallback** via `CI_RUNS_ON` still works (same scripts; ports still probed).
+5. **Hosted / Mac fallback** via `CI_HOSTED_RUNNER` / `CI_RUNS_ON` still works (same scripts; ports still probed).
 6. **Cross-repo Mac lock** — opt-in via `MAC_SHARED_LOCK` (see below). Do **not** edit
    `~/mac-resources` from CI.
 7. **Paths** use `$HOME` / `ANDROID_HOME` / `$HOME/toolchains` — never `/Users/fathalla`.
@@ -83,12 +90,12 @@ bash scripts/mac_lock_ci.sh release "$AGENT"
 | Backend Go (+ emulator) | yes | 10m | 25m |
 | Flutter analyze & test (run) | yes | 8m | 35m |
 | Playwright Semantics smoke (run) | yes | 15m | 45m |
-| Cloud Run pin / PR comment / path detect & gates | **no** | — | 5m (same `CI_RUNS_ON`, not ubuntu-latest) |
+| Cloud Run pin / PR comment / path detect & gates | **no** | — | 5m (hosted via `CI_HOSTED_RUNNER`) |
 
 Path filters (`dorny/paths-filter`): no workflow-level `paths-ignore` — workflows always
 start so gates report. Flutter + Playwright heavy jobs run only when `tashil_web/` /
 `e2e/` / related scripts / workflow files change. Required checks report via lightweight
-gate jobs on the same `CI_RUNS_ON` runners (`Flutter analyze & test`,
+gate jobs on `CI_HOSTED_RUNNER` (`Flutter analyze & test`,
 `flutter-web-semantics-smoke`).
 
 Self-hosted Flutter: prefer `$HOME/toolchains/flutter` (`scripts/ci_detect_flutter.sh`);
@@ -141,12 +148,12 @@ python3 scripts/pick_free_ports.py --self-test
 
 ```yaml
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 ```
 
-Superseded pushes/PR syncs cancel in-flight CI on that ref. **`deploy.yml` must keep
-`cancel-in-progress: false`** — never cancel a production deploy on `main`.
+Superseded PR syncs cancel in-flight CI; **never cancel `main`**. **`deploy.yml` must
+keep `cancel-in-progress: false`** — never cancel a production deploy.
 
 ## CPU budget (14-core Mac, 3 runners + other bots)
 
@@ -172,17 +179,30 @@ Flutter **web** + Go + Playwright Chromium only.
 | npm (e2e) | `setup-node` cache |
 | Playwright browsers | `~/.cache/ms-playwright` + `~/Library/Caches/ms-playwright` |
 
-## Fallback to ubuntu-latest (Mac offline)
+## Runner variables (hybrid + budget fallback)
 
-Set a repository variable (Settings → Secrets and variables → Actions → Variables):
-
-| Name         | Value               |
-|--------------|---------------------|
-| `CI_RUNS_ON` | `["ubuntu-latest"]` |
+Both expressions use `fromJSON` so a **single variable** can be either a JSON string
+runner name or a JSON label array:
 
 ```yaml
+# Light jobs (default GitHub-hosted ubuntu):
+runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+
+# Heavy + deploy jobs (default Mac self-hosted):
 runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
 ```
+
+Settings → Secrets and variables → Actions → Variables:
+
+| Goal | Variable | Value (exact) |
+|------|----------|---------------|
+| Default (recommended) | leave both unset | light → ubuntu; heavy/deploy → Mac |
+| Force light jobs to Mac (GitHub minutes / spending exhausted) | `CI_HOSTED_RUNNER` | `["self-hosted","macOS","tashil-mac"]` |
+| Explicit ubuntu for light jobs | `CI_HOSTED_RUNNER` | `"ubuntu-latest"` (JSON string — include the quotes) |
+| Move heavy jobs to ubuntu (Mac offline) | `CI_RUNS_ON` | `["ubuntu-latest"]` |
+
+**Important:** values must be valid JSON for `fromJSON`. A bare `ubuntu-latest` (no
+quotes) is **not** valid — use `"ubuntu-latest"` or leave the var unset.
 
 On Linux fallback, Playwright installs with `npx playwright install --with-deps chromium`.
 Emulator isolation scripts still probe free ports (safe on ubuntu-latest too).
