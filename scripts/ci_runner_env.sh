@@ -16,6 +16,20 @@ if [[ -d "${TOOLCHAINS}/bin" ]]; then
   export PATH="${TOOLCHAINS}/bin:${PATH}"
 fi
 
+# Flutter SDK lives at $HOME/toolchains/flutter (not always symlinked into toolchains/bin).
+# Missing this path forces flutter-action downloads that have starved self-hosted Mac runners
+# ("lost communication with the server" mid-setup).
+for flutter_bin in \
+  "${TOOLCHAINS}/flutter/bin" \
+  "${HOME_DIR}/flutter/bin" \
+  "${HOME_DIR}/fvm/default/bin"; do
+  if [[ -x "${flutter_bin}/flutter" ]]; then
+    echo "${flutter_bin}" >>"${GITHUB_PATH:-/dev/null}"
+    export PATH="${flutter_bin}:${PATH}"
+    break
+  fi
+done
+
 # Android SDK: honor existing ANDROID_HOME, else $HOME/toolchains/android-sdk.
 if [[ -z "${ANDROID_HOME:-}" ]]; then
   if [[ -d "${TOOLCHAINS}/android-sdk" ]]; then

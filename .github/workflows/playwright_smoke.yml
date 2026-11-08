@@ -46,27 +46,24 @@ jobs:
           chmod +x scripts/mac_lock_ci.sh
           bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "playwright-semantics-smoke" 45 120
 
+      # Prefer $HOME/toolchains/flutter (see scripts/ci_detect_flutter.sh). Falling through to
+      # flutter-action+cache has caused self-hosted Mac runners to lose GitHub communication.
       - name: Detect preinstalled Flutter
         id: flutter_pre
+        env:
+          FLUTTER_VERSION: ${{ env.FLUTTER_VERSION }}
         run: |
-          set -euo pipefail
-          if command -v flutter >/dev/null 2>&1; then
-            flutter --version || true
-            if flutter --version 2>/dev/null | grep -q "${{ env.FLUTTER_VERSION }}"; then
-              echo "use_action=false" >> "$GITHUB_OUTPUT"
-              echo "Reusing preinstalled Flutter ${{ env.FLUTTER_VERSION }} at $(command -v flutter)"
-              exit 0
-            fi
-          fi
-          echo "use_action=true" >> "$GITHUB_OUTPUT"
-          echo "Preinstalled Flutter ${{ env.FLUTTER_VERSION }} not found; will use flutter-action"
+          chmod +x scripts/ci_detect_flutter.sh
+          bash scripts/ci_detect_flutter.sh
 
       - uses: subosito/flutter-action@v2
         if: steps.flutter_pre.outputs.use_action == 'true'
+        timeout-minutes: 20
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
-          cache: true
+          # Cache restore/download of the full SDK has starved tashil-mac (lost communication).
+          cache: false
 
       - name: Cache pub dependencies
         uses: actions/cache@v4
