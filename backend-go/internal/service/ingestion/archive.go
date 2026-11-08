@@ -233,48 +233,148 @@ type diskTombstoneItem struct {
 	TenantID  string `json:"tenant_id"`
 	ArchiveID string `json:"archive_id"`
 	FileName  string `json:"file_name"`
+	// Cleared marks a durable same-name unmark: peers ForgetArchiveNameDeleted while keeping
+	// prior ArchiveID tombstones. Written on reupload; applied in file order.
+	Cleared bool `json:"cleared,omitempty"`
 }
 
-// applyDiskTombstonesLocked loads deleted_tombstones.json into the in-memory tombstone map
-// (no Firestore write). Shared archive mounts use this so every instance learns deletes.
+const diskTombstoneDir = "deleted_tombstones"
+
+func (p *Processor) diskTombstoneDir() string {
+	return filepath.Join(p.archiveDir, diskTombstoneDir)
+}
+
+func diskTombstoneObjectName(t diskTombstoneItem) string {
+	if t.Cleared {
+		return "clear_" + sanitizeArchiveFilename(normalizeArchiveTenantID(t.TenantID)+"_"+strings.ToLower(strings.TrimSpace(t.FileName))) + ".json"
+	}
+	if strings.TrimSpace(t.ArchiveID) != "" {
+		return "id_" + sanitizeArchiveFilename(t.ArchiveID) + ".json"
+	}
+	return "name_" + sanitizeArchiveFilename(normalizeArchiveTenantID(t.TenantID)+"_"+strings.ToLower(strings.TrimSpace(t.FileName))) + ".json"
+}
+
+func writeDiskTombstoneObject(dir string, t diskTombstoneItem) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(t, "", "  ")
+	if err != nil {
+		return err
+	}
+	final := filepath.Join(dir, diskTombstoneObjectName(t))
+	tmp := final + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, final); err != nil {
+		_ = os.Remove(tmp)
+		return os.WriteFile(final, data, 0o644)
+	}
+	return nil
+}
+
+func loadAllDiskTombstones(archiveDir string) []diskTombstoneItem {
+	var tombs []diskTombstoneItem
+	// Legacy single-file format (pre per-object tombs) — still applied for prod mounts.
+	if raw, err := os.ReadFile(filepath.Join(archiveDir, "deleted_tombstones.json")); err == nil && len(raw) > 0 {
+		var legacy []diskTombstoneItem
+		if json.Unmarshal(raw, &legacy) == nil {
+			tombs = append(tombs, legacy...)
+		}
+	}
+	entries, err := os.ReadDir(filepath.Join(archiveDir, diskTombstoneDir))
+	if err != nil {
+		return tombs
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") || strings.HasSuffix(e.Name(), ".tmp") {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(archiveDir, diskTombstoneDir, e.Name()))
+		if err != nil {
+			continue
+		}
+		var t diskTombstoneItem
+		if json.Unmarshal(raw, &t) != nil {
+			continue
+		}
+		tombs = append(tombs, t)
+	}
+	return tombs
+}
+
+// applyDiskTombstonesLocked loads shared disk tombs into the in-memory map (no Firestore write).
+// Per-object files under deleted_tombstones/ avoid lost updates from concurrent Cloud Run writers.
+// Id-bearing rows tombstone by archive id only; cleared rows drop stale name keys after reupload.
 func (p *Processor) applyDiskTombstonesLocked() {
 	if p.archiveDir == "" || p.fsRepo == nil {
 		return
 	}
-	tombstonePath := filepath.Join(p.archiveDir, "deleted_tombstones.json")
-	rawTomb, err := os.ReadFile(tombstonePath)
-	if err != nil || len(rawTomb) == 0 {
-		return
-	}
-	var tombs []diskTombstoneItem
-	if json.Unmarshal(rawTomb, &tombs) != nil {
-		return
-	}
-	for _, t := range tombs {
+	for _, t := range loadAllDiskTombstones(p.archiveDir) {
+		if t.Cleared {
+			p.fsRepo.ForgetArchiveNameDeleted(t.TenantID, t.FileName)
+			continue
+		}
 		p.fsRepo.RememberArchiveDeleted(t.TenantID, t.ArchiveID, t.FileName)
 	}
+}
+
+// clearDiskNameTombstonesLocked writes a Cleared marker object and strips filenames from id tomb
+// objects so peers forget stale name keys while OLD archive ids stay tombstoned.
+func (p *Processor) clearDiskNameTombstonesLocked(tenantID, fileName string) error {
+	if p.archiveDir == "" || strings.TrimSpace(fileName) == "" {
+		return nil
+	}
+	normTenant := normalizeArchiveTenantID(tenantID)
+	fileName = strings.TrimSpace(fileName)
+	dir := p.diskTombstoneDir()
+	if entries, err := os.ReadDir(dir); err == nil {
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasPrefix(e.Name(), "id_") || !strings.HasSuffix(e.Name(), ".json") {
+				continue
+			}
+			path := filepath.Join(dir, e.Name())
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				continue
+			}
+			var t diskTombstoneItem
+			if json.Unmarshal(raw, &t) != nil {
+				continue
+			}
+			if normalizeArchiveTenantID(t.TenantID) != normTenant ||
+				!strings.EqualFold(strings.TrimSpace(t.FileName), fileName) {
+				continue
+			}
+			t.FileName = ""
+			_ = writeDiskTombstoneObject(dir, t)
+		}
+		// Drop name-only object for this file if present.
+		_ = os.Remove(filepath.Join(dir, diskTombstoneObjectName(diskTombstoneItem{
+			TenantID: normTenant, FileName: fileName,
+		})))
+	}
+	return writeDiskTombstoneObject(dir, diskTombstoneItem{
+		TenantID: normTenant,
+		FileName: fileName,
+		Cleared:  true,
+	})
 }
 
 func (p *Processor) appendDiskTombstoneLocked(tenantID, archiveID, fileName string) error {
 	if p.archiveDir == "" {
 		return nil
 	}
-	tombstonePath := filepath.Join(p.archiveDir, "deleted_tombstones.json")
-	var tombs []diskTombstoneItem
-	if raw, err := os.ReadFile(tombstonePath); err == nil && len(raw) > 0 {
-		_ = json.Unmarshal(raw, &tombs)
-	}
-	tombs = append(tombs, diskTombstoneItem{
+	item := diskTombstoneItem{
 		TenantID:  tenantID,
 		ArchiveID: archiveID,
 		FileName:  fileName,
-	})
-	data, err := json.MarshalIndent(tombs, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal disk tombstones: %w", err)
 	}
-	if err := os.WriteFile(tombstonePath, data, 0o644); err != nil {
-		return fmt.Errorf("write disk tombstones: %w", err)
+	// One object per archive id (or name-only key) — concurrent deletes cannot clobber each other
+	// via read-modify-write of a single JSON array.
+	if err := writeDiskTombstoneObject(p.diskTombstoneDir(), item); err != nil {
+		return fmt.Errorf("write disk tombstone object: %w", err)
 	}
 	if p.fsRepo != nil {
 		p.fsRepo.RememberArchiveDeleted(tenantID, archiveID, fileName)
@@ -529,8 +629,13 @@ func (p *Processor) SaveArchivedFile(
 	p.archivedFiles[archiveID] = entry
 	p.archivedBytes[archiveID] = bytesCopy
 
+	// Durable unmark: clear name tombs in memory/Firestore and strip filenames from shared disk tombs
+	// so peers' list refresh cannot re-hide this new id. OLD deleted archive ids stay tombstoned.
 	if p.fsRepo != nil {
 		_ = p.fsRepo.UnmarkArchiveDeleted(context.Background(), normTenant, archiveID, filename)
+	}
+	if err := p.clearDiskNameTombstonesLocked(normTenant, filename); err != nil {
+		log.Printf("WARN [archive] durable name-unmark on disk failed for %s: %v", filename, err)
 	}
 
 	// Only this upload's sidecar is written. index.json is legacy (read-only on upload): rewriting it from

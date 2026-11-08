@@ -115,8 +115,12 @@ func (p *Processor) refreshArchiveTombstonesAlways(ctx context.Context) {
 	if p.archiveDir == "" && p.fsRepo == nil {
 		return
 	}
+	// Firestore refresh uses its own bounded context and does not hold archiveMu / repo lock
+	// during network I/O. Failures are logged; disk tombs still apply below.
 	if p.fsRepo != nil {
-		p.fsRepo.RefreshDeletedArchives(ctx)
+		if err := p.fsRepo.RefreshDeletedArchives(ctx); err != nil {
+			log.Printf("WARN [archive] RefreshDeletedArchives: %v", err)
+		}
 	}
 	p.archiveMu.Lock()
 	defer p.archiveMu.Unlock()

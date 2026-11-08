@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
@@ -248,17 +249,13 @@ func TestDeleteOtherFileDoesNotResurrectPeerDeletedArchive(t *testing.T) {
 	}
 }
 
-// Live Sell-In 01:45–01:52 Cairo (rev 00062): three Cloud Run instances; DELETE 200 + BQ purge on
-// the handling instance only; peer lists still showed deleted files; one peer DELETE 404 while
-// another still listed the same id. Tombstones must live on the shared archive mount (and Firestore
-// in prod) — not per-instance memory — so every instance's List drops them.
+// Live Sell-In 01:45–01:52 Cairo (rev 00062): three Cloud Run instances with concurrent deletes/lists.
+// Tombstones must live on the shared archive mount so every instance's List drops deleted ids.
 func TestSellInThreeInstancesConvergeOnSharedTombstones(t *testing.T) {
 	dir := t.TempDir()
-	// Separate Firestore clients per instance (as on Cloud Run). Cross-instance hide path in this
-	// mock is the shared deleted_tombstones.json on the archive mount (GCS in prod).
-	inst5aec := newArchiveTestProcessor(dir) // handled most deletes live
-	instD931 := newArchiveTestProcessor(dir) // handled in26 once
-	inst4eb9 := newArchiveTestProcessor(dir) // listed stale copies / 404 on missing
+	inst5aec := newArchiveTestProcessor(dir)
+	instD931 := newArchiveTestProcessor(dir)
+	inst4eb9 := newArchiveTestProcessor(dir)
 
 	type file struct {
 		id, name, batch string
@@ -279,70 +276,145 @@ func TestSellInThreeInstancesConvergeOnSharedTombstones(t *testing.T) {
 		}, []byte(f.name))
 	}
 
-	// Deletes routed like live: 12 + 06 on 5aec; in26 on d931 then again on 5aec.
-	for _, id := range []string{"arch_si_12_unknown", "arch_si_06_form"} {
-		if _, err := inst5aec.DeleteArchivedFile(context.Background(), "tenant-adeco", id); err != nil {
-			t.Fatalf("5aec delete %s: %v", id, err)
-		}
-	}
-	if _, err := instD931.DeleteArchivedFile(context.Background(), "tenant-adeco", "arch_si_in26"); err != nil {
-		t.Fatalf("d931 delete in26: %v", err)
-	}
-	// 5aec still had in26 in memory (pre-list); second DELETE succeeds or is already pruned mid-phase.
-	if _, err := inst5aec.DeleteArchivedFile(context.Background(), "tenant-adeco", "arch_si_in26"); err != nil && !errors.Is(err, ErrArchivedFileNotFound) {
-		t.Fatalf("5aec re-delete in26: %v", err)
-	}
-
-	// Live: 13_fuzzy missing on 4eb9 (DELETE 404) but still listed on 5aec until that instance deletes.
+	// 4eb9 never had 13_fuzzy (live DELETE 404 shape) before the concurrent wave.
 	inst4eb9.archiveMu.Lock()
 	delete(inst4eb9.archivedFiles, "arch_si_13_fuzzy")
 	delete(inst4eb9.archivedBytes, "arch_si_13_fuzzy")
 	inst4eb9.archiveMu.Unlock()
-	if _, err := inst4eb9.DeleteArchivedFile(context.Background(), "tenant-adeco", "arch_si_13_fuzzy"); !errors.Is(err, ErrArchivedFileNotFound) {
-		t.Fatalf("4eb9 delete missing 13_fuzzy want not-found, got %v", err)
-	}
-	if !listHasID(inst5aec.ListArchivedFiles(context.Background(), "tenant-adeco", "", "", "", "sell_in").Files, "arch_si_13_fuzzy") {
-		// 5aec list refreshes tombs for 12/06/in26 only; 13 still local until deleted.
-		t.Fatal("5aec should still list 13_fuzzy before its own delete (4eb9 404 does not tombstone)")
-	}
-	if _, err := inst5aec.DeleteArchivedFile(context.Background(), "tenant-adeco", "arch_si_13_fuzzy"); err != nil {
-		t.Fatalf("5aec delete 13_fuzzy: %v", err)
+
+	var start, deletesDone sync.WaitGroup
+	start.Add(1)
+	deletesDone.Add(3)
+	errCh := make(chan error, 8)
+
+	go func() {
+		defer deletesDone.Done()
+		start.Wait()
+		for _, id := range []string{"arch_si_12_unknown", "arch_si_06_form", "arch_si_13_fuzzy"} {
+			if _, err := inst5aec.DeleteArchivedFile(context.Background(), "tenant-adeco", id); err != nil && !errors.Is(err, ErrArchivedFileNotFound) {
+				errCh <- fmt.Errorf("5aec delete %s: %w", id, err)
+				return
+			}
+		}
+	}()
+	go func() {
+		defer deletesDone.Done()
+		start.Wait()
+		if _, err := instD931.DeleteArchivedFile(context.Background(), "tenant-adeco", "arch_si_in26"); err != nil && !errors.Is(err, ErrArchivedFileNotFound) {
+			errCh <- fmt.Errorf("d931 delete in26: %w", err)
+		}
+	}()
+	go func() {
+		defer deletesDone.Done()
+		start.Wait()
+		// Concurrent list pressure on the peer that did not own the deletes.
+		for i := 0; i < 5; i++ {
+			_ = inst4eb9.ListArchivedFiles(context.Background(), "tenant-adeco", "", "", "", "sell_in")
+		}
+		if _, err := inst4eb9.DeleteArchivedFile(context.Background(), "tenant-adeco", "arch_si_13_fuzzy"); err != nil && !errors.Is(err, ErrArchivedFileNotFound) {
+			errCh <- fmt.Errorf("4eb9 delete 13_fuzzy: %w", err)
+		}
+	}()
+	start.Done()
+	deletesDone.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Fatal(err)
 	}
 
-	// Shared mount must record tombstones (not only the deleting instance's memory).
-	raw, err := os.ReadFile(filepath.Join(dir, "deleted_tombstones.json"))
-	if err != nil || len(raw) == 0 {
-		t.Fatalf("shared deleted_tombstones.json missing after deletes: %v", err)
-	}
-	var tombs []diskTombstoneItem
-	if err := json.Unmarshal(raw, &tombs); err != nil {
-		t.Fatalf("tombstone json: %v", err)
-	}
-	wantTombs := map[string]bool{
-		"arch_si_12_unknown": false, "arch_si_06_form": false, "arch_si_in26": false, "arch_si_13_fuzzy": false,
-	}
-	for _, tmb := range tombs {
-		if _, ok := wantTombs[tmb.ArchiveID]; ok {
-			wantTombs[tmb.ArchiveID] = true
-		}
-	}
-	for id, seen := range wantTombs {
-		if !seen {
-			t.Fatalf("shared tombstone file missing %s: %s", id, raw)
+	wantTombs := []string{"arch_si_12_unknown", "arch_si_06_form", "arch_si_in26", "arch_si_13_fuzzy"}
+	for _, id := range wantTombs {
+		path := filepath.Join(dir, diskTombstoneDir, "id_"+sanitizeArchiveFilename(id)+".json")
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("shared per-id tombstone missing for %s after concurrent deletes: %v", id, err)
 		}
 	}
 
-	// Peer that never handled those deletes (4eb9) must drop them on plain List via shared tombs.
-	// Fresh fourth instance simulates a new Cloud Run replica booting on the same mount.
-	for _, p := range []*Processor{inst4eb9, instD931, inst5aec, newArchiveTestProcessor(dir)} {
+	var listWG sync.WaitGroup
+	listWG.Add(4)
+	listErr := make(chan error, 4)
+	check := func(p *Processor, label string) {
+		defer listWG.Done()
 		listed := p.ListArchivedFiles(context.Background(), "tenant-adeco", "", "", "", "sell_in")
 		for _, gone := range []string{"arch_si_12_unknown", "arch_si_06_form", "arch_si_in26", "arch_si_13_fuzzy"} {
 			if listHasID(listed.Files, gone) {
-				t.Fatalf("instance still lists deleted Sell-In %s: %+v", gone, listed.Files)
+				listErr <- fmt.Errorf("%s still lists deleted Sell-In %s: %+v", label, gone, listed.Files)
+				return
 			}
 		}
 		if listed.TotalCount != 1 || listed.Files[0].ID != "arch_si_adeco_seed" {
-			t.Fatalf("want only Adeco seed Sell-In left, got %+v", listed.Files)
+			listErr <- fmt.Errorf("%s want only Adeco seed Sell-In, got %+v", label, listed.Files)
 		}
+	}
+	go check(inst4eb9, "4eb9")
+	go check(instD931, "d931")
+	go check(inst5aec, "5aec")
+	go check(newArchiveTestProcessor(dir), "fresh")
+	listWG.Wait()
+	close(listErr)
+	for err := range listErr {
+		t.Fatal(err)
+	}
+}
+
+// Delete then same-name reupload must stay visible on the uploading instance, a peer, and a fresh
+// process — while the OLD archive id remains tombstoned (Sell-In and Sell-Out).
+func TestSameNameReuploadVisibleAcrossInstancesAfterDelete(t *testing.T) {
+	for _, fileType := range []string{"sell_in", "sell_out"} {
+		t.Run(fileType, func(t *testing.T) {
+			dir := t.TempDir()
+			a := newArchiveTestProcessor(dir)
+			b := newArchiveTestProcessor(dir)
+
+			oldID := "arch_old_" + fileType
+			fileName := "reupload_same_name.xlsx"
+			batchPrefix := "batch_" + fileType + "_"
+			if fileType == "sell_in" {
+				batchPrefix = "batch_sellin_"
+			}
+			insertSharedArchive(t, []*Processor{a, b}, &ArchivedFile{
+				ID: oldID, BatchID: batchPrefix + "old", FileType: fileType, TenantID: "tenant-adeco",
+				FileName: fileName, RetailChain: "fathalla", TargetYear: "2026",
+				RowsIngested: 10, UploadedAt: "2026-11-07T22:00:00Z",
+			}, []byte("old"))
+
+			if _, err := a.DeleteArchivedFile(context.Background(), "tenant-adeco", oldID); err != nil {
+				t.Fatalf("delete: %v", err)
+			}
+			// Simulate legacy disk tombs that still carry file_name on the id row (prod shape before fix).
+			tombPath := filepath.Join(dir, "deleted_tombstones.json")
+			legacy := []diskTombstoneItem{{
+				TenantID: "tenant-adeco", ArchiveID: oldID, FileName: fileName,
+			}}
+			raw, _ := json.MarshalIndent(legacy, "", "  ")
+			if err := os.WriteFile(tombPath, raw, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			// Peer B already applied a stale name tombstone into memory (pre-fix Remember behavior).
+			b.fsRepo.RememberArchiveDeleted("tenant-adeco", "", fileName)
+
+			newEntry := a.SaveArchivedFile("tenant-adeco", batchPrefix+"new", fileName, []byte("new-bytes"), "fathalla", "2026", "11", 20, 1, 100)
+			if newEntry == nil || newEntry.ID == "" || newEntry.ID == oldID {
+				t.Fatalf("expected new archive id after reupload, got %+v", newEntry)
+			}
+
+			assertVisible := func(p *Processor, label string) {
+				t.Helper()
+				listed := p.ListArchivedFiles(context.Background(), "tenant-adeco", "", "", "", fileType)
+				if listHasID(listed.Files, oldID) {
+					t.Fatalf("%s still lists deleted old id %s", label, oldID)
+				}
+				if !listHasID(listed.Files, newEntry.ID) {
+					t.Fatalf("%s missing reuploaded %s (%s): %+v", label, fileName, newEntry.ID, listed.Files)
+				}
+			}
+			assertVisible(a, "uploader-A")
+			assertVisible(b, "peer-B")
+			fresh := newArchiveTestProcessor(dir)
+			assertVisible(fresh, "fresh-C")
+			if !fresh.fsRepo.IsArchiveDeleted("tenant-adeco", oldID, "") {
+				t.Fatal("old archive id lost its tombstone after same-name reupload")
+			}
+		})
 	}
 }
