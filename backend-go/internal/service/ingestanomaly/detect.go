@@ -99,19 +99,31 @@ func duplicateKey(rec domain.NormalizedRecord) string {
 	}, "|")
 }
 
+type pricedSample struct {
+	idx   int
+	price float64
+}
+
 func detectUnitPriceOutliers(records []domain.NormalizedRecord, appendAnomaly func(domain.IngestionAnomaly)) {
-	type priced struct {
-		idx   int
-		price float64
-	}
-	var samples []priced
+	// Group by barcode so products with different normal prices do not flag each other.
+	byProduct := map[string][]pricedSample{}
 	for i, rec := range records {
+		bc := strings.TrimSpace(rec.Barcode)
+		if bc == "" {
+			continue
+		}
 		p := unitPrice(rec)
 		if p <= 0 || math.IsNaN(p) || math.IsInf(p, 0) {
 			continue
 		}
-		samples = append(samples, priced{idx: i, price: p})
+		byProduct[bc] = append(byProduct[bc], pricedSample{idx: i, price: p})
 	}
+	for _, samples := range byProduct {
+		flagProductPriceOutliers(samples, appendAnomaly)
+	}
+}
+
+func flagProductPriceOutliers(samples []pricedSample, appendAnomaly func(domain.IngestionAnomaly)) {
 	if len(samples) < minOutlierSamples {
 		return
 	}
@@ -140,7 +152,7 @@ func detectUnitPriceOutliers(records []domain.NormalizedRecord, appendAnomaly fu
 		appendAnomaly(domain.IngestionAnomaly{
 			RowNumber:   row,
 			IssueType:   TypeUnitPriceOutlier,
-			Description: fmt.Sprintf("Unit price %.2f in row %d is an outlier vs median %.2f (MAD %.2f)", s.price, row, med, mad),
+			Description: fmt.Sprintf("Unit price %.2f in row %d is an outlier vs product median %.2f (MAD %.2f)", s.price, row, med, mad),
 		})
 	}
 }
@@ -200,7 +212,11 @@ func detectMomSpikes(records []domain.NormalizedRecord, appendAnomaly func(domai
 		}
 		sort.Strings(ordered)
 		for i := 1; i < len(ordered); i++ {
-			prev, cur := months[ordered[i-1]], months[ordered[i]]
+			prevMonth, curMonth := ordered[i-1], ordered[i]
+			if !monthsConsecutive(prevMonth, curMonth) {
+				continue // skip gaps (e.g. Jan → Mar with Feb missing)
+			}
+			prev, cur := months[prevMonth], months[curMonth]
 			if prev.revenue <= 0 {
 				continue
 			}
@@ -222,7 +238,7 @@ func detectMomSpikes(records []domain.NormalizedRecord, appendAnomaly func(domai
 				IssueType: TypeMomSpike,
 				Description: fmt.Sprintf(
 					"MoM spike %s %.0f%% for %s: %s revenue %.2f → %s %.2f",
-					dir, pct, key, ordered[i-1], prev.revenue, ordered[i], cur.revenue,
+					dir, pct, key, prevMonth, prev.revenue, curMonth, cur.revenue,
 				),
 			})
 		}
@@ -239,6 +255,43 @@ func yearMonth(txDate string) string {
 		return ""
 	}
 	return txDate[:7]
+}
+
+// monthsConsecutive reports whether b is exactly one calendar month after a (YYYY-MM).
+func monthsConsecutive(a, b string) bool {
+	ay, am, okA := parseYearMonth(a)
+	by, bm, okB := parseYearMonth(b)
+	if !okA || !okB {
+		return false
+	}
+	am++
+	if am > 12 {
+		am = 1
+		ay++
+	}
+	return ay == by && am == bm
+}
+
+func parseYearMonth(ym string) (year, month int, ok bool) {
+	if len(ym) != 7 || ym[4] != '-' {
+		return 0, 0, false
+	}
+	for _, c := range ym[:4] {
+		if c < '0' || c > '9' {
+			return 0, 0, false
+		}
+		year = year*10 + int(c-'0')
+	}
+	for _, c := range ym[5:] {
+		if c < '0' || c > '9' {
+			return 0, 0, false
+		}
+		month = month*10 + int(c-'0')
+	}
+	if month < 1 || month > 12 {
+		return 0, 0, false
+	}
+	return year, month, true
 }
 
 func median(vals []float64) float64 {

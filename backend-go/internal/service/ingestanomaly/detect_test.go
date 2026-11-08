@@ -62,11 +62,11 @@ func TestDetect_Duplicates(t *testing.T) {
 
 func TestDetect_UnitPriceOutlier(t *testing.T) {
 	records := make([]domain.NormalizedRecord, 0, 10)
-	// Nine normal ~10 EGP unit prices, one extreme.
+	// Nine normal ~10 EGP unit prices for one product, then one extreme on the same barcode.
 	for i := 0; i < 9; i++ {
 		records = append(records, rec("6221001", "crf_maadi", "2026-01-15", 10, 100))
 	}
-	records = append(records, rec("6221999", "crf_maadi", "2026-01-15", 1, 10000)) // 10k unit price
+	records = append(records, rec("6221001", "crf_maadi", "2026-01-16", 1, 10000)) // same product outlier
 
 	got := Detect(records, nil)
 	outs := byType(got, TypeUnitPriceOutlier)
@@ -78,12 +78,35 @@ func TestDetect_UnitPriceOutlier(t *testing.T) {
 func TestDetect_UnitPriceOutlier_SkipsSmallSamples(t *testing.T) {
 	records := []domain.NormalizedRecord{
 		rec("a", "s", "2026-01-01", 1, 10),
-		rec("b", "s", "2026-01-01", 1, 10),
-		rec("c", "s", "2026-01-01", 1, 9999),
+		rec("a", "s", "2026-01-02", 1, 10),
+		rec("a", "s", "2026-01-03", 1, 9999), // same product but < minOutlierSamples
 	}
 	got := Detect(records, nil)
 	if outs := byType(got, TypeUnitPriceOutlier); len(outs) != 0 {
 		t.Fatalf("expected no outlier with < %d samples, got %+v", minOutlierSamples, outs)
+	}
+}
+
+func TestDetect_UnitPriceOutlier_GroupsByProduct(t *testing.T) {
+	// Product A ~10 EGP, product B ~500 EGP — different normals must not cross-flag.
+	records := make([]domain.NormalizedRecord, 0, 20)
+	for i := 0; i < 8; i++ {
+		records = append(records, rec("6221001", "crf_maadi", "2026-01-15", 10, 100)) // ~10
+	}
+	for i := 0; i < 8; i++ {
+		records = append(records, rec("6222002", "crf_maadi", "2026-01-15", 2, 1000)) // ~500
+	}
+	got := Detect(records, nil)
+	if outs := byType(got, TypeUnitPriceOutlier); len(outs) != 0 {
+		t.Fatalf("mixed normal prices across products should not flag outliers, got %+v", outs)
+	}
+
+	// Extreme price on product A only — still flagged within that product's distribution.
+	records = append(records, rec("6221001", "crf_maadi", "2026-01-16", 1, 10000))
+	got = Detect(records, nil)
+	outs := byType(got, TypeUnitPriceOutlier)
+	if len(outs) != 1 || outs[0].RowNumber != len(records) {
+		t.Fatalf("expected one product-A outlier on last row, got %+v", outs)
 	}
 }
 
@@ -110,12 +133,53 @@ func TestDetect_MomSpike(t *testing.T) {
 func TestDetect_MomSpike_Down(t *testing.T) {
 	records := []domain.NormalizedRecord{
 		rec("6221001", "crf_maadi", "2026-01-10", 10, 1000),
-		rec("6221001", "crf_maadi", "2026-02-10", 10, 100), // -90% = 9x relative drop ≥ 300%
+		rec("6221001", "crf_maadi", "2026-02-10", 10, 100), // -90% drop vs prior consecutive month
 	}
 	got := Detect(records, nil)
 	spikes := byType(got, TypeMomSpike)
 	if len(spikes) != 1 || !strings.Contains(spikes[0].Description, "down") {
 		t.Fatalf("expected down mom_spike, got %+v", spikes)
+	}
+}
+
+func TestDetect_MomSpike_RequiresConsecutiveMonths(t *testing.T) {
+	// Jan → Mar with Feb missing: large jump must NOT flag (non-consecutive).
+	records := []domain.NormalizedRecord{
+		rec("6221001", "crf_maadi", "2026-01-10", 10, 100),
+		rec("6221001", "crf_maadi", "2026-03-10", 10, 500), // +400% but gap
+	}
+	got := Detect(records, nil)
+	if spikes := byType(got, TypeMomSpike); len(spikes) != 0 {
+		t.Fatalf("expected no mom_spike across missing month, got %+v", spikes)
+	}
+
+	// Year boundary Dec → Jan is consecutive and should still flag.
+	records = []domain.NormalizedRecord{
+		rec("6221001", "crf_maadi", "2025-12-10", 10, 100),
+		rec("6221001", "crf_maadi", "2026-01-10", 10, 500),
+	}
+	got = Detect(records, nil)
+	spikes := byType(got, TypeMomSpike)
+	if len(spikes) != 1 {
+		t.Fatalf("expected mom_spike across Dec→Jan, got %+v", spikes)
+	}
+}
+
+func TestMonthsConsecutive(t *testing.T) {
+	cases := []struct {
+		a, b string
+		want bool
+	}{
+		{"2026-01", "2026-02", true},
+		{"2025-12", "2026-01", true},
+		{"2026-01", "2026-03", false},
+		{"2026-02", "2026-01", false},
+		{"bad", "2026-02", false},
+	}
+	for _, tc := range cases {
+		if got := monthsConsecutive(tc.a, tc.b); got != tc.want {
+			t.Errorf("monthsConsecutive(%q,%q)=%v want %v", tc.a, tc.b, got, tc.want)
+		}
 	}
 }
 
