@@ -49,6 +49,7 @@ class ApiEndpoints {
   static String get dataQualityIssues => '$baseUrl/api/v1/data-quality/issues';
   static String get dataQualitySummary => '$baseUrl/api/v1/data-quality/summary';
   static String get dataYears => '$baseUrl/api/v1/sell-in/years';
+  static String get dataMonths => '$baseUrl/api/v1/sell-out/months';
   static String get customerRegistry => '$baseUrl/api/v1/customers/registry';
   static String get sellInAssistSuggestions => '$baseUrl/api/v1/sell-in/assist/suggestions';
   static String get sellInAssistSuggestLayout => '$baseUrl/api/v1/sell-in/assist/suggest-layout';

@@ -10419,6 +10419,51 @@ class ApiClient {
     }
   }
 
+  /// Aggregates live sell-out rows into barcode → YYYY-MM → (avg unit price, units).
+  /// Used to extend hardcoded competitive seeds as new months are uploaded.
+  static Map<String, Map<String, ({double price, int units})>> aggregateLiveMonthlyByBarcode(
+    Iterable<SellOutRecordModel> liveRecords,
+  ) {
+    final rev = <String, Map<String, double>>{};
+    final units = <String, Map<String, int>>{};
+    for (final r in liveRecords) {
+      final barcode = r.barcode.trim();
+      if (barcode.isEmpty || r.transactionDate.length < 7) continue;
+      final monthKey = r.transactionDate.substring(0, 7);
+      final qty = r.quantitySold;
+      if (qty <= 0 && r.unitPrice <= 0) continue;
+      rev.putIfAbsent(barcode, () => {})[monthKey] =
+          (rev[barcode]?[monthKey] ?? 0.0) + (r.unitPrice > 0 ? r.unitPrice * qty : r.netRevenue);
+      units.putIfAbsent(barcode, () => {})[monthKey] = (units[barcode]?[monthKey] ?? 0) + qty;
+    }
+    final out = <String, Map<String, ({double price, int units})>>{};
+    for (final barcode in rev.keys) {
+      final months = <String, ({double price, int units})>{};
+      for (final mk in rev[barcode]!.keys) {
+        final u = units[barcode]?[mk] ?? 0;
+        final revenue = rev[barcode]![mk]!;
+        final price = u > 0
+            ? double.parse((revenue / u).toStringAsFixed(2))
+            : double.parse(revenue.toStringAsFixed(2));
+        if (price <= 0 && u <= 0) continue;
+        months[mk] = (price: price, units: u);
+      }
+      if (months.isNotEmpty) out[barcode] = months;
+    }
+    return out;
+  }
+
+  /// Live months override/extend seed months for the same barcode.
+  static Map<String, ({double price, int units})> mergeMonthlyData(
+    Map<String, ({double price, int units})> seed,
+    Map<String, ({double price, int units})>? live,
+  ) {
+    if (live == null || live.isEmpty) return Map<String, ({double price, int units})>.from(seed);
+    final merged = Map<String, ({double price, int units})>.from(seed);
+    live.forEach((k, v) => merged[k] = v);
+    return merged;
+  }
+
   static List<SkuMonthlyPricePointModel> buildMonthlyPriceTrajectory(
     Map<String, ({double price, int units})> rawByMonth, {
     int? filterYear,
@@ -10794,19 +10839,15 @@ class ApiClient {
         ? currentUser!.assignedChain
         : chain;
 
-    // Fetch live records from server (including competitor SKUs via supplier=all_market)
+    // Always pull the full selected year so monthly trajectories auto-extend as
+    // uploads add months (month filter only affects the spotlight metrics).
     List<SellOutRecordModel> liveRecords = const [];
     try {
       String? startDate;
       String? endDate;
       if (year > 0) {
-        if (month > 0) {
-          startDate = DateRangeUtils.monthStart(year, month);
-          endDate = DateRangeUtils.monthEnd(year, month);
-        } else {
-          startDate = '$year-01-01';
-          endDate = '$year-12-31';
-        }
+        startDate = '$year-01-01';
+        endDate = '$year-12-31';
       }
       liveRecords = await getRecords(
         chain: (effectiveChain != null && effectiveChain != 'all' && effectiveChain != 'الكل')
@@ -10816,7 +10857,7 @@ class ApiClient {
         category: (category != null && category != 'all' && category != 'الكل') ? category : null,
         startDate: startDate,
         endDate: endDate,
-        limit: 500,
+        limit: 5000,
       );
     } catch (_) {}
 
@@ -10879,7 +10920,9 @@ class ApiClient {
       }
     }
 
-    // 100% Real Monthly Data extracted directly from Fathalla Market `2025 out.xlsx` & `2026 out.xlsx`
+    final liveByBarcode = aggregateLiveMonthlyByBarcode(liveRecords);
+
+    // Seeded competitive groups (historical Jan–Apr extracts) are extended by live uploads.
     final rawDefs = <_RawCompetitiveGroupSeed>[
       // 1. صابون سائل اطباق - فيبا 3 كجم
       const _RawCompetitiveGroupSeed(
@@ -11722,7 +11765,8 @@ class ApiClient {
 
     for (final seed in rawDefs) {
       final ownPack = extractPackVolume(seed.ownSkuName);
-      final ownResolved = resolvePeriodMetrics(seed.monthlyData, year, month);
+      final ownMonthly = mergeMonthlyData(seed.monthlyData, liveByBarcode[seed.ownBarcode]);
+      final ownResolved = resolvePeriodMetrics(ownMonthly, year, month);
       final effectiveOwnPrice = ownResolved.price;
       if (effectiveOwnPrice <= 0) continue;
 
@@ -11730,8 +11774,8 @@ class ApiClient {
           ? double.parse((effectiveOwnPrice / ownPack.volume).toStringAsFixed(2))
           : effectiveOwnPrice;
 
-      final ownYearTrajectory = buildMonthlyPriceTrajectory(seed.monthlyData, filterYear: year);
-      final ownAllTrajectory = buildMonthlyPriceTrajectory(seed.monthlyData);
+      final ownYearTrajectory = buildMonthlyPriceTrajectory(ownMonthly, filterYear: year);
+      final ownAllTrajectory = buildMonthlyPriceTrajectory(ownMonthly);
 
       double totalCatRev = effectiveOwnPrice * ownResolved.units;
 
@@ -11753,15 +11797,16 @@ class ApiClient {
       })>[];
 
       for (final c in compSeeds) {
-        final cm = resolvePeriodMetrics(c.monthlyData, year, month);
+        final compMonthly = mergeMonthlyData(c.monthlyData, liveByBarcode[c.barcode]);
+        final cm = resolvePeriodMetrics(compMonthly, year, month);
         if (cm.price <= 0) continue;
         totalCatRev += cm.price * cm.units;
         resolvedCompMetrics.add((
           seed: c,
           price: cm.price,
           units: cm.units,
-          yearTrajectory: buildMonthlyPriceTrajectory(c.monthlyData, filterYear: year),
-          allTrajectory: buildMonthlyPriceTrajectory(c.monthlyData),
+          yearTrajectory: buildMonthlyPriceTrajectory(compMonthly, filterYear: year),
+          allTrajectory: buildMonthlyPriceTrajectory(compMonthly),
         ));
       }
 
