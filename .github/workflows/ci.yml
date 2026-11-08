@@ -52,6 +52,23 @@ jobs:
       run:
         working-directory: backend-go
     steps:
+      # First step: shared Mac lock (before checkout — script on Mac). Skip if missing (ubuntu).
+      - name: Acquire Mac resource lock
+        id: mac_lock
+        working-directory: .
+        run: |
+          set -euo pipefail
+          AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
+          echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
+          LOCK="${HOME}/mac-resources/mac-lock.sh"
+          if [ ! -f "$LOCK" ]; then
+            echo "mac-lock.sh missing — skip acquire (ubuntu/github-hosted fallback)"
+            echo "acquired=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          bash "$LOCK" acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "backend-go+firestore-emulator" 45 120
+          echo "acquired=true" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
 
       # On self-hosted Mac, GOMODCACHE/GOCACHE already live on the shared home disk.
@@ -161,13 +178,45 @@ jobs:
             echo "Proposed next step: inspect the failing package output above, fix on this PR branch, and push — do not push fixes to main."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Release Mac resource lock
+        if: always()
+        working-directory: .
+        run: |
+          set +e
+          AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
+          if [ "${{ steps.mac_lock.outputs.acquired }}" != "true" ]; then
+            echo "lock was not acquired by this job — skip release"
+            exit 0
+          fi
+          LOCK="${HOME}/mac-resources/mac-lock.sh"
+          [ -f "$LOCK" ] || { echo "mac-lock.sh missing — skip release"; exit 0; }
+          bash "$LOCK" release "$AGENT"
+
   test-flutter:
     name: Flutter analyze & test
+    # Books the Mac lock so we do not overlap Flutter work with other agents.
+    # Tradeoff: serializes vs our Go/smoke jobs (one global LOCK.d).
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     defaults:
       run:
         working-directory: tashil_web
     steps:
+      - name: Acquire Mac resource lock
+        id: mac_lock
+        working-directory: .
+        run: |
+          set -euo pipefail
+          AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
+          echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
+          LOCK="${HOME}/mac-resources/mac-lock.sh"
+          if [ ! -f "$LOCK" ]; then
+            echo "mac-lock.sh missing — skip acquire (ubuntu/github-hosted fallback)"
+            echo "acquired=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          bash "$LOCK" acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "flutter-analyze-test" 25 120
+          echo "acquired=true" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
 
       # Prefer the Mac's preinstalled Flutter 3.41.2; fall back to flutter-action (+cache).
@@ -225,6 +274,20 @@ jobs:
             echo ""
             echo "Proposed next step: fix on this PR branch and push — do not auto-push fixes to main."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Release Mac resource lock
+        if: always()
+        working-directory: .
+        run: |
+          set +e
+          AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
+          if [ "${{ steps.mac_lock.outputs.acquired }}" != "true" ]; then
+            echo "lock was not acquired by this job — skip release"
+            exit 0
+          fi
+          LOCK="${HOME}/mac-resources/mac-lock.sh"
+          [ -f "$LOCK" ] || { echo "mac-lock.sh missing — skip release"; exit 0; }
+          bash "$LOCK" release "$AGENT"
 
   comment-on-pr-failure:
     name: Comment PR when tests fail

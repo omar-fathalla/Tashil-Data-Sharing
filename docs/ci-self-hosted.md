@@ -34,6 +34,37 @@ Custom label on each: `tashil-mac`. GitHub also applies `self-hosted`, `macOS`, 
 4. **Per-job temp dirs** under `$RUNNER_TEMP/tashil-emu-…` (sandbox `HOME`/`TMPDIR`).
    Do not write job-specific emulator config into another user’s home.
 5. **Ubuntu fallback** via `CI_RUNS_ON` still works (same scripts; ports still probed).
+6. **Cross-repo Mac lock** — see below. Do **not** edit `~/mac-resources` from CI; only call
+   the installed `mac-lock.sh`.
+
+## Cross-repo Mac lock (`~/mac-resources/mac-lock.sh`)
+
+GitHub `concurrency` only serializes within one workflow/ref. Another repo’s runners on
+the same Mac can still overlap. Heavy jobs therefore book a **global** directory lock:
+
+```bash
+~/mac-resources/mac-lock.sh acquire \
+  "ci-Tashil-Data-Sharing-${GITHUB_RUN_ID}-${GITHUB_JOB}" \
+  "omar-fathalla/Tashil-Data-Sharing" \
+  "<task>" <eta_min> <wait_max_min>
+# … work …
+~/mac-resources/mac-lock.sh release "ci-Tashil-Data-Sharing-${GITHUB_RUN_ID}-${GITHUB_JOB}"
+```
+
+| Job | Takes lock? | eta_min | wait_max_min |
+|-----|-------------|---------|--------------|
+| Backend Go (+ Firestore emulator) | yes | 45 | 120 |
+| Flutter analyze & test | yes | 25 | 120 |
+| Playwright Semantics smoke | yes | 45 | 120 |
+| Cloud Run one-instance pin | **no** (light) | — | — |
+| Comment-on-PR-failure | **no** (light) | — | — |
+
+If `~/mac-resources/mac-lock.sh` is missing (ubuntu-latest / github-hosted), acquire/release
+**skip gracefully**.
+
+**Tradeoff:** one global `LOCK.d` means our own heavy jobs also **serialize** with each
+other (and with Tashil App / other agents). Wall-clock CI is longer; machine load stays
+safe. Waits poll every 30s up to `wait_max_min` then fail.
 
 ## Firestore emulator isolation
 
