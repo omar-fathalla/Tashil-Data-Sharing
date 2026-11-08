@@ -3196,8 +3196,17 @@ class ApiClient {
         'limit': limit.toString(),
         'offset': offset.toString(),
       });
-      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 180));
-      if (resp.statusCode == 200) {
+      http.Response? resp;
+      for (var attempt = 0; attempt < 4; attempt++) {
+        resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 180));
+        if (resp.statusCode != 429) break;
+        final parsed = int.tryParse(resp.headers['retry-after'] ?? '');
+        final retryAfter = (parsed ?? (1 << attempt)).clamp(0, 30);
+        if (retryAfter > 0) {
+          await Future<void>.delayed(Duration(seconds: retryAfter));
+        }
+      }
+      if (resp != null && resp.statusCode == 200) {
         isServerOnline.value = true;
         lastConnectionError = null;
         final body = jsonDecode(resp.body) as Map<String, dynamic>;
@@ -3238,9 +3247,11 @@ class ApiClient {
         );
         return list;
       } else {
-        failureError = 'HTTP ${resp.statusCode}: ${resp.body}';
+        lastSellOutSummary = const SellOutRecordsSummaryModel();
+        failureError = 'HTTP ${resp?.statusCode}: ${resp?.body}';
       }
     } catch (e) {
+      lastSellOutSummary = const SellOutRecordsSummaryModel();
       failureError = e;
       debugPrint('[ApiClient] Fallback to mock records: $e');
     }
@@ -3248,6 +3259,7 @@ class ApiClient {
     if (!allowMockFallback) {
       isServerOnline.value = false;
       lastConnectionError = failureError.toString();
+      lastSellOutSummary = const SellOutRecordsSummaryModel();
       throw ServerConnectionException(
         'تعذّر تحميل البيانات من الخادم. حاول مرة أخرى بعد قليل.',
         failureError,

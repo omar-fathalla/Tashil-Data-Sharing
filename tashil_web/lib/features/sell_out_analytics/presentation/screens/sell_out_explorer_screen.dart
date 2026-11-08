@@ -192,7 +192,22 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
 
   Future<void> _loadRecords() async {
     final seq = ++_recordsLoadSeq;
-    if (mounted) setState(() => isLoading = true);
+    if (mounted) {
+      // Drop previous filter numbers immediately so a slow/failed reload (e.g. 429)
+      // cannot leave "الأسعار وهامش السلسلة" showing the prior category's totals.
+      setState(() {
+        isLoading = true;
+        _loadError = null;
+        records = [];
+        _recordsSummary = const SellOutRecordsSummaryModel();
+      });
+      // clearSnackBars after the first frame — initState's first load cannot depend on
+      // ScaffoldMessenger yet.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+      });
+    }
     final effectiveYear = (selectedDateRange == null && _selectedYear > 0) ? _selectedYear : null;
     final effectiveMonth = (selectedDateRange == null && _selectedMonth > 0) ? _selectedMonth : null;
     final activeChartChain = (selectedChain != null && selectedChain!.isNotEmpty)
@@ -217,12 +232,17 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     if (seq != _recordsLoadSeq) return;
     if (loaded case Failure(:final error)) {
       if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+        });
         setState(() {
           isLoading = false;
           _loadError = error.toString();
+          records = [];
+          _recordsSummary = const SellOutRecordsSummaryModel();
         });
         debugPrint('Sell-Out load failed: $error');
-      M3Feedback.showError(context, 'تعذّر تحميل بيانات Sell-Out. حاول مرة أخرى.');
       }
       return;
     }
