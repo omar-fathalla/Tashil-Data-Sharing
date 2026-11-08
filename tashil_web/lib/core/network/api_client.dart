@@ -1665,6 +1665,13 @@ class IngestionResultModel {
   final String validationExplanationAr;
   final List<String> validationDiffReasons;
 
+  /// Phase A5: Arabic branch-name normalization summary from payload.branch_norm.
+  final String branchNormSummaryAr;
+  final int branchNormChanged;
+  final int branchNormEnglish;
+  final int branchNormAbbrev;
+  final int branchNormUnknown;
+
   IngestionResultModel({
     required this.batchId,
     this.archiveId = '',
@@ -1710,6 +1717,11 @@ class IngestionResultModel {
     this.validationStatus = '',
     this.validationExplanationAr = '',
     this.validationDiffReasons = const [],
+    this.branchNormSummaryAr = '',
+    this.branchNormChanged = 0,
+    this.branchNormEnglish = 0,
+    this.branchNormAbbrev = 0,
+    this.branchNormUnknown = 0,
   });
 
   bool get usedAiMapping =>
@@ -1826,6 +1838,49 @@ class IngestionResultModel {
               ?.map((e) => e.toString())
               .toList() ??
           const [],
+      branchNormSummaryAr: () {
+        final bn = payload?['branch_norm'];
+        if (bn is Map<String, dynamic>) {
+          return (bn['summary_ar'] as String?) ?? '';
+        }
+        final top = json['branch_norm'];
+        if (top is Map<String, dynamic>) {
+          return (top['summary_ar'] as String?) ?? '';
+        }
+        return '';
+      }(),
+      branchNormChanged: () {
+        final bn = (payload?['branch_norm'] is Map<String, dynamic>)
+            ? payload!['branch_norm'] as Map<String, dynamic>
+            : (json['branch_norm'] is Map<String, dynamic>)
+                ? json['branch_norm'] as Map<String, dynamic>
+                : null;
+        return (bn?['changed'] as num?)?.toInt() ?? 0;
+      }(),
+      branchNormEnglish: () {
+        final bn = (payload?['branch_norm'] is Map<String, dynamic>)
+            ? payload!['branch_norm'] as Map<String, dynamic>
+            : (json['branch_norm'] is Map<String, dynamic>)
+                ? json['branch_norm'] as Map<String, dynamic>
+                : null;
+        return (bn?['english'] as num?)?.toInt() ?? 0;
+      }(),
+      branchNormAbbrev: () {
+        final bn = (payload?['branch_norm'] is Map<String, dynamic>)
+            ? payload!['branch_norm'] as Map<String, dynamic>
+            : (json['branch_norm'] is Map<String, dynamic>)
+                ? json['branch_norm'] as Map<String, dynamic>
+                : null;
+        return (bn?['abbrev'] as num?)?.toInt() ?? 0;
+      }(),
+      branchNormUnknown: () {
+        final bn = (payload?['branch_norm'] is Map<String, dynamic>)
+            ? payload!['branch_norm'] as Map<String, dynamic>
+            : (json['branch_norm'] is Map<String, dynamic>)
+                ? json['branch_norm'] as Map<String, dynamic>
+                : null;
+        return (bn?['unknown'] as num?)?.toInt() ?? 0;
+      }(),
     );
   }
 
@@ -1864,6 +1919,11 @@ class IngestionResultModel {
     String? validationStatus,
     String? validationExplanationAr,
     List<String>? validationDiffReasons,
+    String? branchNormSummaryAr,
+    int? branchNormChanged,
+    int? branchNormEnglish,
+    int? branchNormAbbrev,
+    int? branchNormUnknown,
   }) {
     return IngestionResultModel(
       batchId: batchId ?? this.batchId,
@@ -1906,6 +1966,11 @@ class IngestionResultModel {
           validationExplanationAr ?? this.validationExplanationAr,
       validationDiffReasons:
           validationDiffReasons ?? this.validationDiffReasons,
+      branchNormSummaryAr: branchNormSummaryAr ?? this.branchNormSummaryAr,
+      branchNormChanged: branchNormChanged ?? this.branchNormChanged,
+      branchNormEnglish: branchNormEnglish ?? this.branchNormEnglish,
+      branchNormAbbrev: branchNormAbbrev ?? this.branchNormAbbrev,
+      branchNormUnknown: branchNormUnknown ?? this.branchNormUnknown,
     );
   }
 }
