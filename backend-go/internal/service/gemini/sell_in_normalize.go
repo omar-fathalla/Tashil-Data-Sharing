@@ -187,8 +187,8 @@ func (p *sellInPeriodResolver) err(filename string) error {
 }
 
 func normalizeHeaderLabel(h string) string {
-	h = strings.ToLower(strings.TrimSpace(normalizeArabicDigitsToASCII(h)))
-	h = strings.NewReplacer("أ", "ا", "إ", "ا", "آ", "ا", "ة", "ه", "ى", "ي", "_", " ").Replace(h)
+	h = strings.ToLower(strings.TrimSpace(normalizeArabicDigitsToASCII(normalizeInvisibleSpaces(h))))
+	h = strings.NewReplacer("أ", "ا", "إ", "ا", "آ", "ا", "ة", "ه", "ى", "ي", "_", " ", ".", " ").Replace(h)
 	h = strings.TrimRight(h, ".:")
 	return strings.Join(strings.Fields(h), " ")
 }
@@ -220,6 +220,36 @@ func mapHeaders(header []string, specs []headerSpec) (map[string]int, []string) 
 			}
 			if idx[sp.key] >= 0 {
 				break
+			}
+		}
+		// Soft match for value/qty aliases (Dynamics renames: "ExtendedPrice", "Ext. Price (EGP)",
+		// "XTNDPRCE"). Exact match stays first. Short aliases like "TO"/"to" are exact-or-compact
+		// only — never substring — so a "Total" column cannot steal the value role.
+		if idx[sp.key] < 0 && (sp.key == "value" || sp.key == "qty") {
+			for _, l := range sp.labels {
+				nl := normalizeHeaderLabel(l)
+				if nl == "" {
+					continue
+				}
+				compactNL := strings.ReplaceAll(nl, " ", "")
+				for i, h := range norm {
+					if used[i] || h == "" {
+						continue
+					}
+					compactH := strings.ReplaceAll(h, " ", "")
+					match := h == nl || compactH == compactNL
+					if !match && len(nl) >= 4 && (strings.Contains(h, nl) || strings.Contains(compactH, compactNL)) {
+						match = true
+					}
+					if match {
+						idx[sp.key] = i
+						used[i] = true
+						break
+					}
+				}
+				if idx[sp.key] >= 0 {
+					break
+				}
 			}
 		}
 		if idx[sp.key] < 0 && sp.required {
@@ -265,21 +295,28 @@ func buildRawPlanHeaderMap(header []string) (map[string]int, []string) {
 }
 
 // GP / Dynamics "SOP" invoice export (in25.xlsx / in26.xlsx).
+// in26 has no "Extended Price"; sales amount is the TO (turnover) column. Extended Price
+// aliases are tried first so older exports keep their previous totals; TO is a synonym
+// applied during mapping, and the required-column check runs after that mapping.
 var gpSOPHeaderSpecs = []headerSpec{
 	{"date", true, []string{"Document Date", "doc date", "invoice date", "تاريخ المستند", "تاريخ الفاتوره"}},
 	{"item_code", true, []string{"Item Number", "item code", "كود الصنف"}},
 	{"customer", true, []string{"Customer Name", "اسم العميل"}},
-	// Served Sell-In has always used the invoice line (QTY, Extended Price). Net Q / TO are read
-	// for the report only so existing totals do not move; switching is an open decision.
 	{"qty", true, []string{"QTY", "quantity", "الكميه"}},
-	{"value", true, []string{"Extended Price", "ext price", "قيمه الفاتوره"}},
+	{"value", true, []string{
+		"Extended Price", "ext price", "ext. price", "extendedprice", "xtndprce",
+		"extended price egp", "line extended price", "قيمه الفاتوره", "القيمه الممتده", "قيمة ممتدة",
+		// in26 synonym — after Extended Price so classic exports still prefer Extended Price.
+		"TO", "t.o", "turnover",
+	}},
 	{"net_q", false, []string{"Net Q", "net qty", "صافي الكميه"}},
-	{"net_to", false, []string{"TO", "t.o", "net value", "صافي القيمه"}},
+	{"net_to", false, []string{"net value", "صافي القيمه"}},
 	{"item_name", false, []string{"Item Description", "item name", "اسم الصنف"}},
 	{"uom", false, []string{"U Of M", "uom"}},
 	{"units_per_carton", false, []string{"U of M2", "units per carton"}},
 	{"customer_number", false, []string{"Customer Number", "رقم العميل"}},
 	{"customer_class", false, []string{"Customer Class"}},
+	// Branch in in26 is a region code (ALX/BHR/…), NOT the store branch — store is Customer Name.
 	{"branch", false, []string{"Branch", "الفرع"}},
 	{"statement", false, []string{"Statement Name"}},
 	{"salesman", false, []string{"SalesManNo", "salesman"}},
@@ -299,6 +336,7 @@ func findGPSOPHeaderRow(rows [][]string) int {
 }
 
 func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain string, report *SellInParseReport) ([]domain.SellInRecord, error) {
+	// Map synonyms first (Extended Price, then TO, …); required-column check runs after mapping.
 	cols, missing := mapHeaders(rows[hdr], gpSOPHeaderSpecs)
 	if len(missing) > 0 {
 		return nil, &SellInLayoutError{Filename: filename, Missing: missing}
@@ -310,7 +348,10 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 	now := time.Now().UTC()
 	out := make([]domain.SellInRecord, 0, len(rows)-hdr-1)
 	monthMismatch := 0
-	seen := map[string]int{}
+	// Store branch lives in Customer Name (full-column scan). The "Branch" column is region codes.
+	storeCol := cols["customer"]
+	dataRows := rows[hdr+1:]
+	applySectionHeaderStoreFill(dataRows, storeCol, cols["item_code"], cols["qty"], cols["value"])
 	for i := hdr + 1; i < len(rows); i++ {
 		r := rows[i]
 		if len(r) == 0 || strings.TrimSpace(getCol(r, cols["item_code"])) == "" && strings.TrimSpace(getCol(r, cols["value"])) == "" {
@@ -325,28 +366,34 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 		if mc, _, ok := ParseMonthToken(getCol(r, cols["month"])); ok && mc != m {
 			monthMismatch++
 		}
-		qty := math.Round(parseFloatDefault(getCol(r, cols["qty"]), 0)) // served Sell-In has always stored whole units per line
-		val := parseFloatDefault(getCol(r, cols["value"]), 0)
-		cust := strings.TrimSpace(getCol(r, cols["customer"]))
-		st := BuildBranchStoreMetadata(chain, cust)
+		qty := math.Round(parseFloatDefault(getCol(r, cols["qty"]), 0)) // QTY = pieces on the invoice line
+		val := parseFloatDefault(getCol(r, cols["value"]), 0)            // Extended Price or TO; keep sign (returns negative)
+		// Collapse whitespace around the chain/branch dash (… -  فلمنج) but keep the upload chain
+		// authoritative — never re-infer retailer from the customer label (zahran/gomla GP SOP).
+		cust := collapseSpace(getCol(r, cols["customer"]))
+		_, branchLabel := ParseChainBranchCell(cust)
+		if branchLabel == "" {
+			branchLabel = cust
+		}
+		// Geo / known-slug from the branch side (دمنهور - الاستاد ≠ دمنهور); identity from the
+		// full Customer Name so "مواد عناية" accounts stay distinct (56 names in in26).
+		geo := BuildBranchStoreMetadata(chain, branchLabel)
+		ident := BuildBranchStoreMetadata(chain, cust)
+		st := geo
+		st.ID = ident.ID
+		region := strings.ToUpper(strings.TrimSpace(getCol(r, cols["branch"])))
+		if region == "" {
+			region = "ALX"
+		}
 		tx := "مسحوبات بيع (Sale)"
 		if qty < 0 || val < 0 {
 			tx = "مرتجع (Return)"
 		}
 		if strings.EqualFold(strings.TrimSpace(getCol(r, cols["sop_type"])), "return") {
 			report.ReturnRows++
+			tx = "مرتجع (Return)"
 		}
-		key := st.ID + "|" + strings.TrimSpace(getCol(r, cols["item_code"])) + "|" + strings.TrimSpace(getCol(r, cols["date"]))
-		if j, ok := seen[key]; ok {
-			out[j].NetQtyCases += qty
-			out[j].NetValueEGP = math.Round((out[j].NetValueEGP+val)*100) / 100
-			out[j].TurnoverEGP = out[j].NetValueEGP
-			out[j].ExpectedQtyCases = out[j].NetQtyCases
-			out[j].ExpectedValueEGP = out[j].NetValueEGP
-			out[j].WeightTons = math.Round(math.Abs(out[j].NetQtyCases)*0.012*10000) / 10000
-			continue
-		}
-		seen[key] = len(out)
+		// One Sell-In record per source row — never collapse lines (in26 acceptance: 40927 rows).
 		rec := domain.SellInRecord{
 			RecordID:           fmt.Sprintf("sellin_%s_%d", tenantID, i),
 			TenantID:           tenantID,
@@ -356,7 +403,7 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 			MonthEN:            monthNumToEN(m),
 			MonthAR:            ArabicMonthName(m),
 			PeriodWeek:         "Full Month",
-			RegionCode:         "ALX", // as served since in25/in26 were first loaded; the Branch column is an open decision
+			RegionCode:         region,
 			Governorate:        st.Governorate,
 			Sector:             "MT",
 			CustomerName:       gpSOPCustomerName(cust, st.BranchName),
