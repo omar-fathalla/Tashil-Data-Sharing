@@ -6,7 +6,13 @@ import (
 )
 
 func applyGuardrailEvents(payload *domain.NormalizedRetailIngestionPayload, ev *guardrails.Events) {
-	if payload == nil || ev == nil {
+	if payload == nil {
+		return
+	}
+	// Phase B anomaly enrichment runs on every successful payload finalize path
+	// that already calls applyGuardrailEvents (deterministic, AI-mapping, mock).
+	attachPhaseBAnomalies(payload)
+	if ev == nil {
 		return
 	}
 	payload.GuardrailTelemetry = &domain.GuardrailTelemetry{

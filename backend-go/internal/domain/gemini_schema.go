@@ -151,10 +151,11 @@ type ColumnMapping struct {
 	SupplierColumn     string `json:"supplier_column,omitempty"`
 }
 
-// IngestionAnomaly indicates a single data quality defect detected by Gemini Agent.
+// IngestionAnomaly indicates a single data quality defect detected by Gemini Agent
+// or Phase B post-parse detectors (ingestanomaly).
 type IngestionAnomaly struct {
 	RowNumber   int    `json:"row_number"`
-	IssueType   string `json:"issue_type"` // invalid_barcode, negative_sales, unmapped_store, missing_price
+	IssueType   string `json:"issue_type"` // invalid_barcode, negative_sales, unmapped_store, missing_price, duplicate_row, unit_price_outlier, mom_spike
 	Description string `json:"description"`
 }
 
