@@ -15,9 +15,10 @@ on:
       - "e2e/**"
       - ".github/workflows/playwright_smoke.yml"
 
+# Cancel superseded runs on the same ref. deploy.yml stays cancel-in-progress: false.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: true
 
 env:
   FLUTTER_VERSION: "3.41.2"
@@ -75,6 +76,27 @@ jobs:
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('e2e/package-lock.json') }}
+          restore-keys: |
+            playwright-chromium-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          # Linux (ubuntu-latest fallback) needs OS deps; macOS self-hosted does not.
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            npx playwright install --with-deps chromium
+          else
+            npx playwright install chromium
+          fi
+
       # SPA fallback so /adeco serves index.html (path URL strategy).
       # Use RUNNER_TEMP pid/log so cleanup works on the persistent Mac.
       - name: Start static server
@@ -93,17 +115,6 @@ jobs:
           echo "static server failed to start"
           cat "$RUNNER_TEMP/playwright-smoke/serve.log" || true
           exit 1
-
-      - name: Install Playwright
-        working-directory: e2e
-        run: |
-          npm ci
-          # Linux (ubuntu-latest fallback) needs OS deps; macOS self-hosted does not.
-          if [ "${{ runner.os }}" = "Linux" ]; then
-            npx playwright install --with-deps chromium
-          else
-            npx playwright install chromium
-          fi
 
       - name: Run read-only login Semantics smoke
         working-directory: e2e

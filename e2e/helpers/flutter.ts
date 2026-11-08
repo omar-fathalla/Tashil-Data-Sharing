@@ -251,20 +251,29 @@ export async function typeIntoSemanticsField(
   await page.keyboard.type(text, { delay: 40 });
 }
 
-/** Login email via ARIA textbox (Retina-safe activate). */
+/** Login email via ARIA textbox (Retina-safe activate + force fill fallback). */
 export async function typeLoginEmail(page: Page, email: string) {
   const box = page.getByRole('textbox', { name: /email/i });
   await activateFlutterControl(page, box);
   await page.waitForTimeout(250);
-  await page.keyboard.type(email, { delay: 40 });
+  try {
+    // force skips Playwright's "inside viewport" check on Retina-misplaced inputs.
+    await box.first().fill(email, { force: true, timeout: 5_000 });
+  } catch {
+    await page.keyboard.type(email, { delay: 40 });
+  }
 }
 
-/** Login password via ARIA textbox (Retina-safe activate). */
+/** Login password via ARIA textbox (Retina-safe activate + force fill fallback). */
 export async function typeLoginPassword(page: Page, password: string) {
   const box = page.getByRole('textbox', { name: /password/i });
   await activateFlutterControl(page, box);
   await page.waitForTimeout(250);
-  await page.keyboard.type(password, { delay: 40 });
+  try {
+    await box.first().fill(password, { force: true, timeout: 5_000 });
+  } catch {
+    await page.keyboard.type(password, { delay: 40 });
+  }
 }
 
 /** Login submit via ARIA button (Retina-safe activate). */

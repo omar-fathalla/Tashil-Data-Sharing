@@ -21,9 +21,11 @@ on:
       - "LICENSE"
       - ".gitignore"
 
+# Cancel superseded runs on the same ref (PR/branch). deploy.yml keeps
+# cancel-in-progress: false so production deploys are never interrupted.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -58,20 +60,31 @@ jobs:
           cache: true
           cache-dependency-path: backend-go/go.sum
 
+      # Persistent Go build cache on the shared Mac home (3 runners → one disk).
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/Library/Caches/go-build
+          key: go-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('backend-go/go.sum') }}
+          restore-keys: |
+            go-build-${{ runner.os }}-${{ runner.arch }}-
+
       - name: go vet
         run: go vet ./...
 
-      # Cap package parallelism so 3 self-hosted runners sharing one Mac stay responsive.
+      # Cap package parallelism: 3 runners share one 14-core Mac (load spiked 31–118
+      # when -p≈7). Keep ≤3 packages / GOMAXPROCS so siblings stay responsive.
       - name: go test
         id: go_test
         run: |
           set -euo pipefail
           cores="$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)"
-          # Aim for ~half the machine so sibling runner jobs can progress.
-          p=$(( cores / 2 ))
+          p=$(( cores / 5 ))
           if [ "$p" -lt 2 ]; then p=2; fi
-          if [ "$p" -gt 8 ]; then p=8; fi
-          echo "go test -p=$p GOMAXPROCS=$p (cores=$cores)"
+          if [ "$p" -gt 3 ]; then p=3; fi
+          echo "go test -p=$p GOMAXPROCS=$p (cores=$cores; capped for 3 runners)"
           GOMAXPROCS="$p" go test ./... -count=1 -timeout 20m -p "$p"
 
       - name: Setup Node (Firestore emulator)
@@ -215,9 +228,10 @@ jobs:
       - run: flutter pub get
       - name: flutter analyze
         run: flutter analyze
+      # Cap concurrency so Go/Flutter/Playwright jobs sharing the Mac don't thrash.
       - name: flutter test
         id: flutter_test
-        run: flutter test
+        run: flutter test --concurrency=2
 
       - name: Surface failure summary
         if: failure() && steps.flutter_test.outcome == 'failure'
