@@ -232,8 +232,9 @@ func parseXLSXMultiSheetRows(filename string, rawContent []byte) ([][]string, ma
 	dataRowOffset := 0
 
 	for _, entry := range sheetEntries {
-		// Same multi-sheet selection as wide matrix: never concat a full-year dump
-		// when month tabs (or a filename-year match) already cover that period.
+		// Open-sheet gate only (other-year full-year leftovers). Same-year monthly
+		// tabs must not silently drop a yearly sheet — empty/partial monthlies still
+		// leave yearly rows available for tabular concat.
 		if !selection.shouldIncludeSheet(entry.name) {
 			continue
 		}

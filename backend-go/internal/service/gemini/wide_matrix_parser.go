@@ -66,6 +66,9 @@ type parsedSheetSummary struct {
 	adcoUnits  int
 	marketRev  float64
 	storeCount int
+	// preferOverFullYear marks summaries from a month-named physical tab; those
+	// win period-coverage dedupe against overlapping full-year / split periods.
+	preferOverFullYear bool
 }
 
 // parseWideMatrixXLSX inspects an .xlsx archive for the Fathalla / Adco Wide Branch-Pivot Matrix structure
@@ -104,8 +107,8 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 	var virtualEntries []wbSheetEntry
 
 	for _, entry := range sheetEntries {
-		// Multi-sheet selection: drop leftover full-year dumps that would double-count
-		// months already covered by month-named tabs (same year or other-year leftovers).
+		// Open-sheet gate only: leftover other-year full-year dumps. Same-year
+		// monthly vs yearly overlap is resolved by period coverage after parse.
 		if !selection.shouldIncludeSheet(entry.name) {
 			continue
 		}
@@ -135,11 +138,14 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		// even if their headers were unlabeled, non-standard, or placed anywhere in the sheet.
 		inferTemporalColumnsFromData(rows, &layout)
 
+		preferMonthly := isMonthNamedSheetName(entry.name)
+
 		// If a single wide sheet contains multiple months/years across rows (e.g. "2025 out.xlsx" with MONTH=jan,feb,mar,apr and YEAR=2025),
 		// split it into virtual chronological monthly sheets so every month is preserved with 100% accuracy!
 		splitSummaries := splitWideSheetByRowPeriods(filename, entry.name, entry.state, rows, layout)
 		if len(splitSummaries) > 0 {
 			for _, sub := range splitSummaries {
+				sub.preferOverFullYear = preferMonthly
 				allWideSheets = append(allWideSheets, sub)
 				if entry.state != "hidden" {
 					visibleWideSheets = append(visibleWideSheets, sub)
@@ -167,13 +173,14 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		}
 
 		summary := parsedSheetSummary{
-			sheetName:  entry.name,
-			sheetDate:  sheetDate,
-			state:      entry.state,
-			rows:       rows,
-			layout:     layout,
-			isWide:     true,
-			storeCount: len(layout.branches),
+			sheetName:          entry.name,
+			sheetDate:          sheetDate,
+			state:              entry.state,
+			rows:               rows,
+			layout:             layout,
+			isWide:             true,
+			storeCount:         len(layout.branches),
+			preferOverFullYear: preferMonthly,
 		}
 		// Compute quick monthly totals for trend & MoM/YoY
 		computeQuickSheetTotals(&summary)
@@ -184,6 +191,13 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		virtualEntries = append(virtualEntries, entry)
 	}
 
+	if len(allWideSheets) == 0 {
+		return nil, false
+	}
+
+	// Prefer valid month-named periods; keep uncovered months from full-year dumps.
+	allWideSheets = dedupeSheetsByPeriodCoverage(allWideSheets)
+	visibleWideSheets = dedupeSheetsByPeriodCoverage(visibleWideSheets)
 	if len(allWideSheets) == 0 {
 		return nil, false
 	}
