@@ -167,7 +167,7 @@ Flutter **web** + Go + Playwright Chromium only.
 | Go modules | Local `~/go/pkg/mod` on self-hosted (remote setup-go cache disabled — was ~880MB / stalled); `cache: true` only on github-hosted |
 | Go build | Local `~/Library/Caches/go-build` on self-hosted; actions/cache only on github-hosted |
 | Pub | Per-job `$RUNNER_TEMP/pub-cache` via `PUB_CACHE` (`ci_runner_env.sh`); never shared `~/.pub-cache`. Remote `actions/cache` only on github-hosted |
-| Flutter SDK | preinstalled 3.41.2 at `$HOME/toolchains/flutter` (`scripts/ci_detect_flutter.sh`); else `flutter-action` **without** cache (cache downloads have dropped Mac runners) |
+| Flutter SDK | **Required** preinstalled 3.41.2 at `$HOME/toolchains/flutter` on self-hosted (`ci_detect_flutter.sh`); missing → fail fast. `flutter-action` only on github-hosted fallback |
 | Firebase emulator JARs | `~/.cache/firebase/emulators` (shared read; per-job config elsewhere) |
 | npm (e2e) | `setup-node` cache |
 | Playwright browsers | `~/.cache/ms-playwright` + `~/Library/Caches/ms-playwright` |
