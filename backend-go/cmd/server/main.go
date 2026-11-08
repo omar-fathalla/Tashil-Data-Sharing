@@ -24,6 +24,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
+	"github.com/tashil/data-sharing/backend/internal/service/sellinassist"
 )
 
 func main() {
@@ -225,6 +226,12 @@ func main() {
 	chainDiscountHandler := handlers.NewChainDiscountHandler(fsRepo, fsRepo, bqRepo)
 	dataQualityHandler := handlers.NewDataQualityHandler(dqService, fsRepo)
 	customerRegistryHandler := handlers.NewCustomerRegistryHandler(ingestProcessor, fsRepo)
+	// Sell-In Gemini assist (layout + SELLIN_CUSTOMER_CHAIN_MAP suggestions). Human approval only;
+	// never mutates production data or env. Own package — no edits to hot Gemini ingest paths.
+	// Decisions are RAM-only: lost on restart / not shared across instances.
+	sellInAssistSvc := sellinassist.New(cfg.GeminiAPIKey, cfg.GeminiModel, cfg.GeminiAPIKey == "").WithTier2Model(cfg.GeminiTier2Model)
+	sellInAssistHandler := handlers.NewSellInAssistHandler(sellInAssistSvc)
+	uploadHandler.WithSellInAssist(sellInAssistSvc)
 
 	// 5. Setup Mux Router (Go 1.22+ method + path patterns)
 	mux := http.NewServeMux()
@@ -295,6 +302,12 @@ func main() {
 	mux.HandleFunc("POST /api/v1/customers/registry/reject", customerRegistryHandler.HandleReject)
 	mux.HandleFunc("POST /api/v1/customers/registry/unmerge", customerRegistryHandler.HandleUnmerge)
 	mux.HandleFunc("GET /api/v1/sell-in/years", customerRegistryHandler.HandleYears)
+	mux.HandleFunc("GET /api/v1/sell-in/assist/suggestions", sellInAssistHandler.HandleList)
+	mux.HandleFunc("POST /api/v1/sell-in/assist/suggest-layout", sellInAssistHandler.HandleSuggestLayout)
+	mux.HandleFunc("POST /api/v1/sell-in/assist/suggest-chains", sellInAssistHandler.HandleSuggestChains)
+	mux.HandleFunc("POST /api/v1/sell-in/assist/approve", sellInAssistHandler.HandleApprove)
+	mux.HandleFunc("POST /api/v1/sell-in/assist/reject", sellInAssistHandler.HandleReject)
+	mux.HandleFunc("GET /api/v1/sell-in/assist/metrics", sellInAssistHandler.HandleMetrics)
 	mux.HandleFunc("GET /api/v1/analytics/oos-monitor", oosHandler.HandleOOSMonitor)
 	mux.HandleFunc("GET /api/v1/stores", storeHandler.HandleGetStores)
 	mux.HandleFunc("GET /api/v1/tenants", storeHandler.HandleGetTenants)

@@ -49,6 +49,12 @@ class ApiEndpoints {
   static String get dataQualitySummary => '$baseUrl/api/v1/data-quality/summary';
   static String get dataYears => '$baseUrl/api/v1/sell-in/years';
   static String get customerRegistry => '$baseUrl/api/v1/customers/registry';
+  static String get sellInAssistSuggestions => '$baseUrl/api/v1/sell-in/assist/suggestions';
+  static String get sellInAssistSuggestLayout => '$baseUrl/api/v1/sell-in/assist/suggest-layout';
+  static String get sellInAssistSuggestChains => '$baseUrl/api/v1/sell-in/assist/suggest-chains';
+  static String get sellInAssistApprove => '$baseUrl/api/v1/sell-in/assist/approve';
+  static String get sellInAssistReject => '$baseUrl/api/v1/sell-in/assist/reject';
+  static String get sellInAssistMetrics => '$baseUrl/api/v1/sell-in/assist/metrics';
   static String get stores => '$baseUrl/api/v1/stores';
   static String get tenants => '$baseUrl/api/v1/tenants';
   static String get batches => '$baseUrl/api/v1/batches';

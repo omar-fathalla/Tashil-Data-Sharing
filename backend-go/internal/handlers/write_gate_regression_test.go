@@ -13,6 +13,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
+	"github.com/tashil/data-sharing/backend/internal/service/sellinassist"
 )
 
 // writeGateMux wires every write route of cmd/server/main.go behind the real AuthMiddleware with demo
@@ -33,6 +34,7 @@ func writeGateMux(t *testing.T) (http.Handler, *middleware.AuthMiddleware) {
 	dq := NewDataQualityHandler(nil, fs)
 	tm := NewTradeMarketingHandler(fs, fs)
 	comp := NewCompetitorHandler(fs, fs)
+	sia := NewSellInAssistHandler(sellinassist.New("", "", true))
 
 	mux := http.NewServeMux()
 	for pattern, h := range map[string]http.HandlerFunc{
@@ -64,6 +66,10 @@ func writeGateMux(t *testing.T) (http.Handler, *middleware.AuthMiddleware) {
 		"POST /api/v1/customers/registry/approve":        cr.HandleApprove,
 		"POST /api/v1/customers/registry/reject":         cr.HandleReject,
 		"POST /api/v1/customers/registry/unmerge":        cr.HandleUnmerge,
+		"POST /api/v1/sell-in/assist/suggest-layout":     sia.HandleSuggestLayout,
+		"POST /api/v1/sell-in/assist/suggest-chains":     sia.HandleSuggestChains,
+		"POST /api/v1/sell-in/assist/approve":            sia.HandleApprove,
+		"POST /api/v1/sell-in/assist/reject":             sia.HandleReject,
 		"POST /api/v1/trade-marketing/expenses":          tm.HandleCreateExpense,
 		"POST /api/v1/trade-marketing/expenses/upload":   tm.HandleUploadExpenses,
 		"PUT /api/v1/trade-marketing/expenses/{id}":      tm.HandleUpdateExpense,
@@ -110,6 +116,8 @@ var writeRoutes = [][2]string{
 	{"POST", "/api/v1/analytics/targets"}, {"DELETE", "/api/v1/analytics/targets"}, {"POST", "/api/v1/analytics/targets/upload"},
 	{"PATCH", "/api/v1/data-quality/issues/i1"},
 	{"POST", "/api/v1/customers/registry/approve"}, {"POST", "/api/v1/customers/registry/reject"}, {"POST", "/api/v1/customers/registry/unmerge"},
+	{"POST", "/api/v1/sell-in/assist/suggest-layout"}, {"POST", "/api/v1/sell-in/assist/suggest-chains"},
+	{"POST", "/api/v1/sell-in/assist/approve"}, {"POST", "/api/v1/sell-in/assist/reject"},
 	{"POST", "/api/v1/trade-marketing/expenses"}, {"POST", "/api/v1/trade-marketing/expenses/upload"},
 	{"PUT", "/api/v1/trade-marketing/expenses/e1"}, {"DELETE", "/api/v1/trade-marketing/expenses/e1"},
 	{"POST", "/api/v1/competitors/custom-skus"}, {"DELETE", "/api/v1/competitors/custom-skus/s1"},
@@ -152,7 +160,9 @@ func TestAdminTenantRoutesIgnoreSimulatedSuperAdmin(t *testing.T) {
 func TestSimulatedVendorAdminCannotDecideOrWriteChains(t *testing.T) {
 	h, mw := writeGateMux(t)
 	routes := [][2]string{{"POST", "/api/v1/customers/registry/approve"}, {"POST", "/api/v1/customers/registry/reject"},
-		{"POST", "/api/v1/customers/registry/unmerge"}, {"POST", "/api/v1/admin/chains"}, {"PUT", "/api/v1/admin/chains/c1"}, {"DELETE", "/api/v1/admin/chains/c1"}}
+		{"POST", "/api/v1/customers/registry/unmerge"},
+		{"POST", "/api/v1/sell-in/assist/approve"}, {"POST", "/api/v1/sell-in/assist/reject"},
+		{"POST", "/api/v1/admin/chains"}, {"PUT", "/api/v1/admin/chains/c1"}, {"DELETE", "/api/v1/admin/chains/c1"}}
 	for _, role := range []domain.UserRole{domain.RoleChainKAM, domain.RoleFieldSupervisor, domain.RoleSalesUser, domain.RoleViewer} {
 		tok := tokenFor(t, mw, role)
 		for _, rt := range routes {
@@ -162,7 +172,10 @@ func TestSimulatedVendorAdminCannotDecideOrWriteChains(t *testing.T) {
 		}
 	}
 	tok := tokenFor(t, mw, "admin")
-	for _, rt := range routes[3:] {
+	// Legacy "admin" is still blocked from chain catalog writes (not from data-quality assist).
+	for _, rt := range [][2]string{
+		{"POST", "/api/v1/admin/chains"}, {"PUT", "/api/v1/admin/chains/c1"}, {"DELETE", "/api/v1/admin/chains/c1"},
+	} {
 		if rec := hit(h, rt[0], rt[1], tok, nil); rec.Code != http.StatusForbidden {
 			t.Errorf("legacy admin %s %s: want 403, got %d", rt[0], rt[1], rec.Code)
 		}

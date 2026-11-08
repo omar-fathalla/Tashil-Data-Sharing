@@ -8,6 +8,7 @@ import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../data/data_quality_repository.dart';
 import '../../../customer_registry/presentation/pending_customers_screen.dart';
+import '../../../sellin_assist/presentation/sellin_assist_screen.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 
 String _egp(double v) {
@@ -172,6 +173,15 @@ class _DataQualityScreenState extends State<DataQualityScreen> with DataRefreshM
                       builder: (_) => PendingCustomersScreen(apiClient: widget.apiClient),
                     )),
                     icon: const Icon(AppIcons.pendingCustomers),
+                  ),
+                if (widget.apiClient != null)
+                  IconButton(
+                    key: const ValueKey('dq_sellin_assist'),
+                    tooltip: 'مساعدة Gemini للتوريد',
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => SellInAssistScreen(apiClient: widget.apiClient),
+                    )),
+                    icon: const Icon(AppIcons.sellInAssist),
                   ),
                 const SizedBox(width: 4.0),
                 FilledButton.tonalIcon(
