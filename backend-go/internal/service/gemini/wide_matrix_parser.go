@@ -93,29 +93,21 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		return nil, false
 	}
 
-	explicitFileYear := inferYearFromText(filename, 0)
-	hasMatchingFileYearSheet := false
-	if explicitFileYear >= 2020 && len(sheetEntries) > 1 {
-		for _, entry := range sheetEntries {
-			if inferYearFromText(entry.name, 0) == explicitFileYear {
-				hasMatchingFileYearSheet = true
-				break
-			}
-		}
+	sheetNames := make([]string, 0, len(sheetEntries))
+	for _, entry := range sheetEntries {
+		sheetNames = append(sheetNames, entry.name)
 	}
+	selection := buildSheetSelectionPlan(filename, sheetNames)
 
 	var visibleWideSheets []parsedSheetSummary
 	var allWideSheets []parsedSheetSummary
 	var virtualEntries []wbSheetEntry
 
 	for _, entry := range sheetEntries {
-		// If the workbook filename explicitly targets a year (e.g. "2026 out.xlsx") and contains a matching sheet ("sale out2026"),
-		// skip leftover full-year sheets from a different year ("sale out2025") so multi-file archives never double-count 2025.
-		if hasMatchingFileYearSheet {
-			entryYear := inferYearFromText(entry.name, 0)
-			if entryYear >= 2020 && entryYear != explicitFileYear && parseSmartMonthToken(entry.name) == 0 {
-				continue
-			}
+		// Multi-sheet selection: drop leftover full-year dumps that would double-count
+		// months already covered by month-named tabs (same year or other-year leftovers).
+		if !selection.shouldIncludeSheet(entry.name) {
+			continue
 		}
 		sampleRows, err := readWorksheetSampleRows(entry.file, sharedStrings, wideMatrixHeaderScanRows+2)
 		if err != nil || len(sampleRows) < 2 {

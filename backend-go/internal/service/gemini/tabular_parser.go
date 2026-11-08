@@ -220,12 +220,23 @@ func parseXLSXMultiSheetRows(filename string, rawContent []byte) ([][]string, ma
 		return rows, nil, err
 	}
 
+	sheetNames := make([]string, 0, len(sheetEntries))
+	for _, entry := range sheetEntries {
+		sheetNames = append(sheetNames, entry.name)
+	}
+	selection := buildSheetSelectionPlan(filename, sheetNames)
+
 	var combinedRows [][]string
 	rowSheetDates := make(map[int]string)
 	primaryHeaderFetched := false
 	dataRowOffset := 0
 
 	for _, entry := range sheetEntries {
+		// Same multi-sheet selection as wide matrix: never concat a full-year dump
+		// when month tabs (or a filename-year match) already cover that period.
+		if !selection.shouldIncludeSheet(entry.name) {
+			continue
+		}
 		sampleRows, err := readWorksheetSampleRows(entry.file, sharedStrings, 16)
 		if err != nil || len(sampleRows) == 0 {
 			continue
