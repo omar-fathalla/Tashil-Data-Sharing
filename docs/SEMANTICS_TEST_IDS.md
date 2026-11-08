@@ -114,11 +114,22 @@ pattern for `file-row-…`). Both segments run through `TestIds.fileToken`
 
 Do not look up by filename alone; always include the archive id.
 
-### Nav hit targets vs `devicePixelRatio` (known, do not block)
+### Nav / login hit targets vs `devicePixelRatio` (known, do not block)
 
-On some live Chrome sessions (Retina / `devicePixelRatio` ≈ 2), Flutter web
-Semantics hit-boxes for `nav-sell-out` / `nav-sell-in` can sit roughly **2×**
-away from the painted control (off-screen or wrong spot for
-`page.locator(...).click()`). Prefer clicking the visible control via role /
-text, or set the automation viewport DPR to `1` when driving Semantics
-geometry. Tracking only — not a merge blocker for archive-delete fixes.
+On some Chrome sessions (Retina Mac / self-hosted `tashil-mac`), Flutter web
+Semantics hit-boxes for `login-email`, `nav-sell-out`, `nav-sell-in`, etc. can
+sit roughly **2×** away from the painted control (Playwright reports
+`outside of the viewport` even when `deviceScaleFactor: 1` and
+`--force-device-scale-factor=1` are set; `window.devicePixelRatio` may still
+read `1` while `getBoundingClientRect().x` is ~`2 × viewportWidth`).
+
+**CI approach (`e2e/`):**
+
+- Assert `flt-semantics-identifier` presence/uniqueness as usual.
+- Drive login typing/click via accessible **roles** (`textbox` Email/Password,
+  `button` Login) — see `typeLoginEmail` / `typeLoginPassword` /
+  `clickLoginSubmit` in `e2e/helpers/flutter.ts`.
+- `clickSemantics` tries a natural locator click first, then role+name, then
+  a DOM `focus`+`click` on the Semantics node (Flutter’s bridge still fires).
+
+Tracking only for a deeper engine fix — not a merge blocker.

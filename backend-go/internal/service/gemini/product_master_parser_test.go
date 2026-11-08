@@ -10,15 +10,15 @@ import (
 )
 
 func TestParseProductMasterWorkbook_SeedFile(t *testing.T) {
-	seedXLSX := "/Users/fathalla/.gemini/antigravity/brain/26f9f76f-c46f-46ac-83aa-5b20f751b218/.user_uploaded/media_1792693286917_0c8098d4.xlsx"
+	// Prefer repo fixture; optional local override via PRODUCT_MASTER_SEED_XLSX (no hardcoded user home).
+	repoCopy := filepath.Join("..", "..", "..", "data", "product_master", "adeco_product_master_2026_08_01.xlsx")
+	seedXLSX := os.Getenv("PRODUCT_MASTER_SEED_XLSX")
+	if seedXLSX == "" {
+		seedXLSX = repoCopy
+	}
 	rawBytes, err := os.ReadFile(seedXLSX)
 	if err != nil {
-		// Fallback to repo copy if running in environment without brain dir
-		repoCopy := filepath.Join("..", "..", "..", "data", "product_master", "adeco_product_master_2026_08_01.xlsx")
-		rawBytes, err = os.ReadFile(repoCopy)
-		if err != nil {
-			t.Skipf("seed xlsx not found at %s or %s: %v", seedXLSX, repoCopy, err)
-		}
+		t.Skipf("seed xlsx not found at %s: %v", seedXLSX, err)
 	}
 
 	if !IsProductMasterWorkbook(rawBytes) {

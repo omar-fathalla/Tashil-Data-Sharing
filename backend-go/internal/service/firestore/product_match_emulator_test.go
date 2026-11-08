@@ -11,6 +11,8 @@ import (
 	"time"
 
 	cloudFirestore "cloud.google.com/go/firestore"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/tashil/data-sharing/backend/internal/service/matcher"
 )
@@ -24,9 +26,20 @@ func openProductMatchEmulatorClient(t *testing.T) *Client {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	fs, err := cloudFirestore.NewClient(ctx, "demo-tashil")
+	// Prefer the per-job demo project from CI (scripts/run_firestore_emulator_tests.sh).
+	project := strings.TrimSpace(os.Getenv("FIRESTORE_EMULATOR_PROJECT"))
+	if project == "" {
+		project = strings.TrimSpace(os.Getenv("GCLOUD_PROJECT"))
+	}
+	if project == "" {
+		project = strings.TrimSpace(os.Getenv("GOOGLE_CLOUD_PROJECT"))
+	}
+	if project == "" {
+		project = "demo-tashil"
+	}
+	fs, err := cloudFirestore.NewClient(ctx, project)
 	if err != nil {
-		t.Fatalf("firestore emulator client: %v", err)
+		t.Fatalf("firestore emulator client (project=%s): %v", project, err)
 	}
 	t.Cleanup(func() { _ = fs.Close() })
 	c := NewClient("emulator-db", true)
@@ -45,6 +58,43 @@ func uniqueTenant(t *testing.T) string {
 	return fmt.Sprintf("emu-%d-%s", time.Now().UnixNano(), name)
 }
 
+func isRetryableEmulatorContention(err error) bool {
+	if err == nil {
+		return false
+	}
+	code := status.Code(err)
+	// Firestore emulator under parallel txn contention often surfaces these
+	// instead of a clean Aborted/AlreadyExists — not a product double-count bug.
+	return code == codes.DeadlineExceeded ||
+		code == codes.Aborted ||
+		code == codes.Unavailable ||
+		code == codes.ResourceExhausted
+}
+
+// decideWithContentionRetry keeps racing workers honest: real bugs fail immediately;
+// emulator DeadlineExceeded/Aborted under load get a few bounded retries.
+func decideWithContentionRetry(
+	ctx context.Context,
+	q *matcher.Queue,
+	tenant, id, st string,
+) error {
+	var last error
+	for attempt := 0; attempt < 8; attempt++ {
+		decideCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		_, err := q.Decide(decideCtx, tenant, id, st, "racer", "بت", "", "", matcher.DecideOptions{})
+		cancel()
+		if err == nil || errors.Is(err, matcher.ErrAlreadyDecided) {
+			return err
+		}
+		if !isRetryableEmulatorContention(err) {
+			return err
+		}
+		last = err
+		time.Sleep(time.Duration(50*(attempt+1)) * time.Millisecond)
+	}
+	return last
+}
+
 func TestEmulatorDecideParallelOneWinsNoDoubleCount(t *testing.T) {
 	c := openProductMatchEmulatorClient(t)
 	ctx := context.Background()
@@ -58,20 +108,21 @@ func TestEmulatorDecideParallelOneWinsNoDoubleCount(t *testing.T) {
 		t.Fatalf("enqueue: %v %+v", err, item)
 	}
 
-	const workers = 20
+	// Enough parallelism to race the txn; 20 workers overwhelmed the Java
+	// emulator on the shared Mac (DeadlineExceeded storms, zero winners).
+	const workers = 8
 	var wg sync.WaitGroup
 	errs := make(chan error, workers)
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
-		status := matcher.StatusApproved
+		st := matcher.StatusApproved
 		if i%2 == 1 {
-			status = matcher.StatusRejected
+			st = matcher.StatusRejected
 		}
 		go func(st string) {
 			defer wg.Done()
-			_, err := q.Decide(ctx, tenant, item.ID, st, "racer", "بت", "", "", matcher.DecideOptions{})
-			errs <- err
-		}(status)
+			errs <- decideWithContentionRetry(ctx, q, tenant, item.ID, st)
+		}(st)
 	}
 	wg.Wait()
 	close(errs)
@@ -89,10 +140,15 @@ func TestEmulatorDecideParallelOneWinsNoDoubleCount(t *testing.T) {
 		}
 	}
 	if ok < 1 {
-		t.Fatal("expected at least one successful decide")
+		t.Fatalf("expected at least one successful decide; ok=%d already=%d other=%d", ok, already, other)
 	}
 	if other != 0 {
 		t.Fatalf("unexpected errors: ok=%d already=%d other=%d", ok, already, other)
+	}
+	// One winner: either exactly one nil and the rest AlreadyDecided, or
+	// idempotent same-status successes plus AlreadyDecided for the opposite.
+	if ok+already != workers {
+		t.Fatalf("worker outcomes incomplete: ok=%d already=%d want sum %d", ok, already, workers)
 	}
 
 	got, err := c.GetItem(ctx, tenant, item.ID)
@@ -109,6 +165,7 @@ func TestEmulatorDecideParallelOneWinsNoDoubleCount(t *testing.T) {
 	if m.Pending != 0 {
 		t.Fatalf("pending want 0 got %d", m.Pending)
 	}
+	// Double-count guard: exactly one decision counter must move.
 	if m.Approved+m.Rejected != 1 {
 		t.Fatalf("exactly one decision counter: approved=%d rejected=%d", m.Approved, m.Rejected)
 	}

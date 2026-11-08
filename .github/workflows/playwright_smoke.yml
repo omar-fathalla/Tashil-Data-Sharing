@@ -1,24 +1,70 @@
 name: Playwright Semantics Smoke
 
-# Runs on every branch push and on PRs targeting main.
+# Self-hosted Mac (label tashil-mac). Fallback: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
+# See docs/ci-self-hosted.md.
 on:
   push:
-  pull_request:
     branches: [main]
+    paths:
+      - "tashil_web/**"
+      - "e2e/**"
+      - ".github/workflows/playwright_smoke.yml"
+  pull_request:
+    paths:
+      - "tashil_web/**"
+      - "e2e/**"
+      - ".github/workflows/playwright_smoke.yml"
 
+# Cancel superseded runs on the same ref. deploy.yml stays cancel-in-progress: false.
 concurrency:
-  group: playwright-smoke-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.41.2"
+  MAC_SHARED_LOCK: ${{ vars.MAC_SHARED_LOCK }}
 
 jobs:
   flutter-web-semantics-smoke:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Fallback if Mac offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    # Acquire step timeout (40) < job timeout so if:always release still runs on cancel.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
+      - name: Per-runner toolchain / ADB env
+        run: bash scripts/ci_runner_env.sh
+
+      - name: Acquire Mac resource lock
+        id: mac_lock
+        timeout-minutes: 40
+        run: |
+          set -euo pipefail
+          AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
+          echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
+          chmod +x scripts/mac_lock_ci.sh
+          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "playwright-semantics-smoke" 45 120
+
+      - name: Detect preinstalled Flutter
+        id: flutter_pre
+        run: |
+          set -euo pipefail
+          if command -v flutter >/dev/null 2>&1; then
+            flutter --version || true
+            if flutter --version 2>/dev/null | grep -q "${{ env.FLUTTER_VERSION }}"; then
+              echo "use_action=false" >> "$GITHUB_OUTPUT"
+              echo "Reusing preinstalled Flutter ${{ env.FLUTTER_VERSION }} at $(command -v flutter)"
+              exit 0
+            fi
+          fi
+          echo "use_action=true" >> "$GITHUB_OUTPUT"
+          echo "Preinstalled Flutter ${{ env.FLUTTER_VERSION }} not found; will use flutter-action"
+
       - uses: subosito/flutter-action@v2
+        if: steps.flutter_pre.outputs.use_action == 'true'
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
@@ -26,9 +72,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('tashil_web/pubspec.lock') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-pub-${{ hashFiles('tashil_web/pubspec.lock') }}
           restore-keys: |
-            ${{ runner.os }}-pub-
+            ${{ runner.os }}-${{ runner.arch }}-pub-
 
       - name: flutter pub get
         working-directory: tashil_web
@@ -41,38 +87,61 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
-      # SPA fallback so /adeco serves index.html (path URL strategy).
-      - name: Start static server
-        run: |
-          npx --yes serve@14 -s tashil_web/build/web -l 4173 >/tmp/serve.log 2>&1 &
-          echo $! > /tmp/serve.pid
-          for i in $(seq 1 60); do
-            if curl -fsS "http://127.0.0.1:4173/" >/dev/null; then
-              echo "static server ready"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "static server failed to start"
-          cat /tmp/serve.log || true
-          exit 1
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('e2e/package-lock.json') }}
+          restore-keys: |
+            playwright-chromium-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Install Playwright
         working-directory: e2e
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          # Linux (ubuntu-latest fallback) needs OS deps; macOS self-hosted does not.
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            npx playwright install --with-deps chromium
+          else
+            npx playwright install chromium
+          fi
+
+      # SPA fallback so /adeco serves index.html (path URL strategy).
+      # Per-run free port in 5600+ (never hardcode 4173; avoid other bot 5570–5580).
+      - name: Start static server
+        id: smoke_server
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/playwright-smoke"
+          PORT="$(python3 scripts/pick_free_ports.py -n 1 --min 5600 --max 5899)"
+          echo "SMOKE_PORT=${PORT}" >> "$GITHUB_ENV"
+          echo "port=${PORT}" >> "$GITHUB_OUTPUT"
+          npx --yes serve@14 -s tashil_web/build/web -l "${PORT}" \
+            >"$RUNNER_TEMP/playwright-smoke/serve.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/playwright-smoke/serve.pid"
+          for i in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:${PORT}/" >/dev/null; then
+              echo "static server ready on ${PORT}"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "static server failed to start on ${PORT}"
+          cat "$RUNNER_TEMP/playwright-smoke/serve.log" || true
+          exit 1
 
       - name: Run read-only login Semantics smoke
         working-directory: e2e
         env:
-          BASE_ORIGIN: http://127.0.0.1:4173
+          BASE_ORIGIN: http://127.0.0.1:${{ steps.smoke_server.outputs.port }}
           TENANT_PATH: /adeco
-          CI: 'true'
+          CI: "true"
         run: npx playwright test
 
       - name: Upload Playwright report on failure
@@ -85,9 +154,26 @@ jobs:
             e2e/playwright-report
           if-no-files-found: ignore
 
-      - name: Stop static server
+      - name: Stop static server and clean local artifacts
         if: always()
         run: |
-          if [ -f /tmp/serve.pid ]; then
-            kill "$(cat /tmp/serve.pid)" || true
+          if [ -f "$RUNNER_TEMP/playwright-smoke/serve.pid" ]; then
+            serve_pid="$(cat "$RUNNER_TEMP/playwright-smoke/serve.pid")"
+            # Kill only the serve process this job started (and its children).
+            if [ -n "$serve_pid" ] && kill -0 "$serve_pid" 2>/dev/null; then
+              pkill -P "$serve_pid" 2>/dev/null || true
+              kill "$serve_pid" 2>/dev/null || true
+              sleep 1
+              kill -9 "$serve_pid" 2>/dev/null || true
+            fi
           fi
+          # Drop large local build/report dirs so the persistent runner disk stays lean.
+          rm -rf tashil_web/build/web e2e/test-results e2e/playwright-report \
+            "$RUNNER_TEMP/playwright-smoke" 2>/dev/null || true
+
+      - name: Release Mac resource lock
+        if: always()
+        run: |
+          set +e
+          AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
+          bash scripts/mac_lock_ci.sh release "$AGENT"

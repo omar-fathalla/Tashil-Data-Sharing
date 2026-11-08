@@ -1328,10 +1328,14 @@ func (p *Processor) replayArchivedFiles(ctx context.Context, writeSink bool) err
 	// Ensure CPFR Sell-In seed dataset is loaded on startup if not already archived and not deleted by the user
 	seedDeleted := p.fsRepo != nil && p.fsRepo.IsArchiveDeleted("tenant-adeco", "", "Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx")
 	if !hasSeedSellIn && !seedDeleted {
+		home, _ := os.UserHomeDir()
+		if home == "" {
+			home = os.Getenv("HOME")
+		}
 		seedPaths := []string{
 			"data/cpfr_seed/Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx",
 			"/app/data/cpfr_seed/Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx",
-			"/Users/fathalla/Downloads/Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx",
+			filepath.Join(home, "Downloads", "Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx"),
 		}
 		for _, sp := range seedPaths {
 			if seedBytes, err := os.ReadFile(sp); err == nil && len(seedBytes) > 0 {

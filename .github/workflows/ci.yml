@@ -1,13 +1,30 @@
-# Run backend and Flutter tests on every push to every branch and on every pull request.
-# Deploy stays on deploy.yml (main only) — this workflow never deploys.
+# Consolidated CI: backend Go + Flutter + Cloud Run pin guard.
+# Runs on Mohamed's self-hosted Mac runners (label tashil-mac). Deploy stays on deploy.yml (ubuntu-latest).
+#
+# Fallback if Mac is offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'
+# (Settings → Secrets and variables → Actions → Variables), or change runs-on below.
+# See docs/ci-self-hosted.md.
 name: CI tests
 
 on:
   push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
 
+# Cancel superseded runs on the same ref (PR/branch). deploy.yml keeps
+# cancel-in-progress: false so production deploys are never interrupted.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -16,12 +33,15 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.41.2"
+  # Opt-in shared Mac lock (unset on dedicated tashil-ci). Set repo variable MAC_SHARED_LOCK=1 to enable.
+  MAC_SHARED_LOCK: ${{ vars.MAC_SHARED_LOCK }}
 
 jobs:
   # Stopgap until shared storage (#37): refuse deploy commands that omit or change the 1-instance pin.
+  # Fallback if Mac offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
   guard-cloud-run-one-instance:
     name: Cloud Run one-instance pin
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     steps:
       - uses: actions/checkout@v4
       - name: Assert deploy pins min/max=1
@@ -29,35 +49,120 @@ jobs:
 
   test-backend:
     name: Backend Go tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    # Room for acquire wait (≤110m) + tests; acquire step has its own shorter timeout.
+    timeout-minutes: 240
     defaults:
       run:
         working-directory: backend-go
     steps:
       - uses: actions/checkout@v4
+
+      - name: Per-runner toolchain / ADB env
+        working-directory: .
+        run: bash scripts/ci_runner_env.sh
+
+      # Shared Mac lock (opt-in via MAC_SHARED_LOCK). timeout < job so if:always release runs.
+      - name: Acquire Mac resource lock
+        id: mac_lock
+        timeout-minutes: 110
+        working-directory: .
+        run: |
+          set -euo pipefail
+          AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
+          echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
+          chmod +x scripts/mac_lock_ci.sh
+          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "backend-go+firestore-emulator" 45 120
+
+      # On self-hosted Mac, GOMODCACHE/GOCACHE already live on the shared home disk.
+      # Remote actions/cache for setup-go was ~880MB and stalled (~10m at 0 B/s).
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend-go/go.mod
+          cache: ${{ runner.environment != 'self-hosted' }}
           cache-dependency-path: backend-go/go.sum
+
+      - name: Cache Go build
+        if: runner.environment != 'self-hosted'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/Library/Caches/go-build
+          key: go-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('backend-go/go.sum') }}
+          restore-keys: |
+            go-build-${{ runner.os }}-${{ runner.arch }}-
+
       - name: go vet
         run: go vet ./...
+
+      # Capped -p/GOMAXPROCS, per-package timeout, slowest-test summary (scripts/run_go_tests_ci.sh).
       - name: go test
         id: go_test
-        run: go test ./... -count=1 -timeout 20m
+        working-directory: .
+        env:
+          CI_GO_TEST_P: ${{ vars.CI_GO_TEST_P }}
+          CI_GO_TEST_GOMAXPROCS: ${{ vars.CI_GO_TEST_GOMAXPROCS }}
+          CI_GO_TEST_PKG_TIMEOUT_MIN: ${{ vars.CI_GO_TEST_PKG_TIMEOUT_MIN }}
+        run: |
+          chmod +x scripts/run_go_tests_ci.sh
+          bash scripts/run_go_tests_ci.sh
+
       - name: Setup Node (Firestore emulator)
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+
+      # Prefer the Mac's preinstalled Java 21 — setup-java downloads have 504'd from Adoptium.
+      - name: Detect preinstalled Java 21
+        id: java_pre
+        working-directory: .
+        run: |
+          set -euo pipefail
+          if command -v java >/dev/null 2>&1 && java -version 2>&1 | grep -Eq 'version "?21([.]|$)'; then
+            echo "use_action=false" >> "$GITHUB_OUTPUT"
+            echo "Reusing preinstalled Java 21:"
+            java -version
+            exit 0
+          fi
+          echo "use_action=true" >> "$GITHUB_OUTPUT"
+          echo "Preinstalled Java 21 not found; will use setup-java"
+
       - name: Setup Java (Firestore emulator)
+        if: steps.java_pre.outputs.use_action == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
+
+      - name: Cache Firebase emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ runner.arch }}-v1
+          restore-keys: |
+            firebase-emulators-${{ runner.os }}-${{ runner.arch }}-
+
+      # Run before emulator so a flaky emulator step cannot skip this check.
+      - name: live-version parse fail-safe tests
+        working-directory: .
+        run: python3 scripts/parse_live_backend_commit_test.py
+
+      # Prove free-port picker works (two concurrent batches get distinct ports).
+      - name: Verify free-port isolation helper
+        working-directory: .
+        run: python3 scripts/pick_free_ports.py --self-test
+
       - name: Firestore emulator product-match tests
         id: go_emulator_test
+        working-directory: .
         run: |
-          npx --yes firebase-tools@13.29.1 emulators:exec --only firestore --project demo-tashil \
-            "go test ./internal/service/firestore/ -count=1 -timeout 10m -run Emulator"
+          # Per-job free ports + unique demo project + PID-only cleanup.
+          # Never assumes 8080/4000/4400/9150; never kills by process name.
+          # Safe alongside other bots/runners on the same Mac (ubuntu fallback OK).
+          chmod +x scripts/run_firestore_emulator_tests.sh
+          GOMAXPROCS=2 bash scripts/run_firestore_emulator_tests.sh
+
       - name: Surface failure summary
         if: failure() && (steps.go_test.outcome == 'failure' || steps.go_emulator_test.outcome == 'failure')
         run: |
@@ -68,31 +173,88 @@ jobs:
             echo "Reproduce locally:"
             echo ""
             echo '```bash'
-            echo 'cd backend-go && go test ./... -count=1 -timeout 20m'
+            echo 'bash scripts/run_go_tests_ci.sh'
+            echo 'bash scripts/run_firestore_emulator_tests.sh'
             echo '```'
             echo ""
             echo "Proposed next step: inspect the failing package output above, fix on this PR branch, and push — do not push fixes to main."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # Ownership-based release (if: always). Parent-alive acquire avoids orphans on cancel.
+      - name: Release Mac resource lock
+        if: always()
+        working-directory: .
+        run: |
+          set +e
+          AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
+          bash scripts/mac_lock_ci.sh release "$AGENT"
+
   test-flutter:
     name: Flutter analyze & test
-    runs-on: ubuntu-latest
+    # Opt-in Mac lock (MAC_SHARED_LOCK). Tradeoff when enabled: serializes vs Go/smoke.
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    timeout-minutes: 180
     defaults:
       run:
         working-directory: tashil_web
     steps:
       - uses: actions/checkout@v4
+
+      - name: Per-runner toolchain / ADB env
+        working-directory: .
+        run: bash scripts/ci_runner_env.sh
+
+      - name: Acquire Mac resource lock
+        id: mac_lock
+        timeout-minutes: 110
+        working-directory: .
+        run: |
+          set -euo pipefail
+          AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
+          echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
+          chmod +x scripts/mac_lock_ci.sh
+          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "flutter-analyze-test" 25 120
+
+      # Prefer the Mac's preinstalled Flutter 3.41.2; fall back to flutter-action (+cache).
+      - name: Detect preinstalled Flutter
+        id: flutter_pre
+        working-directory: .
+        run: |
+          set -euo pipefail
+          if command -v flutter >/dev/null 2>&1; then
+            flutter --version || true
+            if flutter --version 2>/dev/null | grep -q "${{ env.FLUTTER_VERSION }}"; then
+              echo "use_action=false" >> "$GITHUB_OUTPUT"
+              echo "Reusing preinstalled Flutter ${{ env.FLUTTER_VERSION }} at $(command -v flutter)"
+              exit 0
+            fi
+          fi
+          echo "use_action=true" >> "$GITHUB_OUTPUT"
+          echo "Preinstalled Flutter ${{ env.FLUTTER_VERSION }} not found; will use flutter-action"
+
       - uses: subosito/flutter-action@v2
+        if: steps.flutter_pre.outputs.use_action == 'true'
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-${{ runner.arch }}-pub-${{ hashFiles('tashil_web/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-pub-
+
       - run: flutter pub get
       - name: flutter analyze
         run: flutter analyze
+      # Cap concurrency so Go/Flutter/Playwright jobs sharing the Mac don't thrash.
       - name: flutter test
         id: flutter_test
-        run: flutter test
+        run: flutter test --concurrency=2
+
       - name: Surface failure summary
         if: failure() && steps.flutter_test.outcome == 'failure'
         run: |
@@ -109,11 +271,19 @@ jobs:
             echo "Proposed next step: fix on this PR branch and push — do not auto-push fixes to main."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Release Mac resource lock
+        if: always()
+        working-directory: .
+        run: |
+          set +e
+          AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
+          bash scripts/mac_lock_ci.sh release "$AGENT"
+
   comment-on-pr-failure:
     name: Comment PR when tests fail
     needs: [test-backend, test-flutter]
     if: always() && github.event_name == 'pull_request' && (needs.test-backend.result == 'failure' || needs.test-flutter.result == 'failure')
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     steps:
       - name: Post failure comment
         uses: actions/github-script@v7
@@ -133,7 +303,7 @@ jobs:
               '',
               'Reproduce:',
               '```bash',
-              'cd backend-go && go test ./... -count=1 -timeout 20m',
+              'bash scripts/run_go_tests_ci.sh',
               'cd tashil_web && flutter test',
               '```',
             ];
