@@ -237,3 +237,42 @@ func TestTabularKeepsYearlyWhenMonthlyEmpty(t *testing.T) {
 		t.Fatalf("empty monthly must not drop yearly tabular rows: %q", joined)
 	}
 }
+
+func TestTabularPeriodDedupeJanMonthlyPlusYearlyJanFeb(t *testing.T) {
+	// Jan monthly (rev marker 600) + yearly with Jan (100) and Feb (200).
+	// Expect Jan once from monthly + Feb from yearly — no Jan double-count.
+	header := []string{"Store_Name", "Barcode", "Item_Description", "Qty_Sold", "Net_Amount", "Date"}
+	rowJanMonthly := []string{"فتح الله سموحة", "6223000233726", "فلفيتا", "1", "600", "2026-01-15"}
+	rowJanYear := []string{"فتح الله سموحة", "6223000233726", "فلفيتا", "1", "100", "2026-01-31"}
+	rowFebYear := []string{"فتح الله سموحة", "6223000233726", "فلفيتا", "1", "200", "2026-02-28"}
+	x := buildMultiSheetXLSX(t, []string{"يناير 26", "sale out2026"}, map[string][][]string{
+		"يناير 26":     {header, rowJanMonthly},
+		"sale out2026": {header, rowJanYear, rowFebYear},
+	})
+	rows, dates, err := parseXLSXMultiSheetRows("archive.xlsx", x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) < 2 {
+		t.Fatalf("expected header + data rows, got %d", len(rows))
+	}
+	var amounts []string
+	for i, r := range rows[1:] {
+		amt := ""
+		if len(r) > 4 {
+			amt = r[4]
+		}
+		amounts = append(amounts, amt)
+		_ = i
+	}
+	joined := strings.Join(amounts, ",")
+	if strings.Count(joined, "600") != 1 {
+		t.Fatalf("expected monthly Jan (600) once, amounts=%q dates=%v", joined, dates)
+	}
+	if strings.Contains(joined, "100") {
+		t.Fatalf("yearly Jan (100) must be deduped against monthly Jan, amounts=%q", joined)
+	}
+	if !strings.Contains(joined, "200") {
+		t.Fatalf("uncovered yearly Feb (200) must remain, amounts=%q", joined)
+	}
+}

@@ -1,5 +1,7 @@
 package gemini
 
+import "strings"
+
 // sheetSelectionPlan decides which physical workbook sheets to open.
 // Same-year monthly tabs never silently drop a full-year sheet here — overlapping
 // periods are resolved later by dedupeSheetsByPeriodCoverage after parse.
@@ -98,4 +100,26 @@ func dedupeSheetsByPeriodCoverage(sheets []parsedSheetSummary) []parsedSheetSumm
 		out = append(out, sh)
 	}
 	return out
+}
+
+// periodKeyFromRawDateCell normalizes a tabular date cell to "YYYY-MM".
+func periodKeyFromRawDateCell(raw string) string {
+	return periodKeyFromSheetDate(normalizeDateString(strings.TrimSpace(raw), ""))
+}
+
+// rowPeriodCovered reports whether a tabular data row falls in a covered YYYY-MM.
+// Prefers the Date column when present; otherwise falls back to the sheet-level date.
+func rowPeriodCovered(row []string, dateIdx int, sheetDate string, covered map[string]bool) bool {
+	if len(covered) == 0 {
+		return false
+	}
+	if dateIdx >= 0 && dateIdx < len(row) {
+		if pk := periodKeyFromRawDateCell(row[dateIdx]); pk != "" {
+			return covered[pk]
+		}
+	}
+	if pk := periodKeyFromSheetDate(sheetDate); pk != "" {
+		return covered[pk]
+	}
+	return false
 }
