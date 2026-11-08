@@ -21,11 +21,11 @@ on:
       - "LICENSE"
       - ".gitignore"
 
-# Cancel superseded runs on the same ref (PR/branch). deploy.yml keeps
-# cancel-in-progress: false so production deploys are never interrupted.
+# Cancel superseded runs on the same PR/branch. Never cancel main.
+# deploy.yml keeps cancel-in-progress: false so production deploys are never interrupted.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read

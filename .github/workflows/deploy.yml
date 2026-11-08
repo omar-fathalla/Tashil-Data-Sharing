@@ -18,8 +18,9 @@ on:
       - ".gitignore"
   workflow_dispatch:
 
+# One deploy queue for this workflow; never cancel an in-flight production deploy.
 concurrency:
-  group: deploy-production
+  group: ${{ github.workflow }}
   cancel-in-progress: false
 
 permissions:
