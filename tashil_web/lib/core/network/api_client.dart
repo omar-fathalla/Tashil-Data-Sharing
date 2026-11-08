@@ -1714,11 +1714,12 @@ class IngestionResultModel {
     final payload = json['payload'] is Map<String, dynamic>
         ? json['payload'] as Map<String, dynamic>
         : null;
-    final validation = (payload?['validation'] is Map<String, dynamic>
-            ? payload!['validation'] as Map<String, dynamic>
-            : null) ??
-        (json['validation'] is Map<String, dynamic>
+    // Prefer top-level validation (upload JSON contract), fall back to nested payload.
+    final validation = (json['validation'] is Map<String, dynamic>
             ? json['validation'] as Map<String, dynamic>
+            : null) ??
+        (payload?['validation'] is Map<String, dynamic>
+            ? payload!['validation'] as Map<String, dynamic>
             : null);
     return IngestionResultModel(
       batchId: json['batch_id'] as String? ?? '',

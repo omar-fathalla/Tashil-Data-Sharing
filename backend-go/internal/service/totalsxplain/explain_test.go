@@ -21,6 +21,7 @@ func TestExplainReturnsGapGroundedInSheetAndColumns(t *testing.T) {
 		Issues:          []string{"value total 50000.00 is 2.0% off the sheet total column 49000.00"},
 	}
 	p := Provenance{
+		Known:                 true,
 		SheetName:             "مبيعات يناير",
 		HeaderRowIndex:        0,
 		DataRowFirst:          1,
@@ -72,11 +73,12 @@ func TestExplainRounding(t *testing.T) {
 		MonthsDetected:  []string{"2026-02"},
 	}
 	out := Explain(v, Provenance{
-		SheetName:          "Sheet1",
-		HeaderRowIndex:     0,
-		DataRowFirst:       1,
-		DataRowLast:        50,
-		FractionalQtyCells: 12,
+		Known:                 true,
+		SheetName:             "فرع سموحة",
+		HeaderRowIndex:        0,
+		DataRowFirst:          1,
+		DataRowLast:           50,
+		FractionalQtyCells:    12,
 		SheetTotalUnitsColIdx: 3,
 	})
 	if !contains(out.Reasons, ReasonRounding) {
@@ -98,7 +100,7 @@ func TestExplainMissingMonthAndUnread(t *testing.T) {
 			"quantity equals the row count and value is zero: columns were not read",
 		},
 	}
-	out := Explain(v, Provenance{SheetName: "Sheet1", HeaderRowIndex: 0, DataRowFirst: 1, DataRowLast: 50})
+	out := Explain(v, Provenance{Known: true, SheetName: "بيانات", HeaderRowIndex: 0, DataRowFirst: 1, DataRowLast: 50})
 	if !contains(out.Reasons, ReasonMissingMonth) || !contains(out.Reasons, ReasonUnreadColumns) {
 		t.Fatalf("expected missing_month+unread_columns, got %v", out.Reasons)
 	}
@@ -118,17 +120,84 @@ func TestExplainSourceCellGap(t *testing.T) {
 		MonthsDetected: []string{"2026-03"},
 		Issues:         []string{"extracted value 100.00 differs from source cells 5000.00"},
 	}
-	out := Explain(v, Provenance{SheetName: "Data", ValueColumnIndex: 2, UnitsColumnIndex: 3})
+	out := Explain(v, Provenance{Known: true, SheetName: "Data", ValueColumnIndex: 2, UnitsColumnIndex: 3})
 	if !contains(out.Reasons, ReasonSourceCellGap) {
 		t.Fatalf("expected source_cell_gap, got %v", out.Reasons)
 	}
 }
 
-func TestExplainMatchedQuietWithoutProvenance(t *testing.T) {
+func TestExplainUnknownProvenanceNoSheet1OrMatched(t *testing.T) {
+	// Builders historically filled -1 sentinels; without Known that must stay quiet.
 	v := &domain.IngestionValidation{Status: "ok", RecordCount: 10, ExtractedUnits: 10, ExtractedValue: 100}
-	out := Explain(v, Provenance{})
+	out := Explain(v, Provenance{
+		Known:                 false,
+		HeaderRowIndex:        -1,
+		DataRowFirst:          -1,
+		DataRowLast:           -1,
+		ValueColumnIndex:      -1,
+		UnitsColumnIndex:      -1,
+		SheetTotalValueColIdx: -1,
+		SheetTotalUnitsColIdx: -1,
+	})
 	if out.ExplanationAR != "" {
-		t.Fatalf("expected empty for ok without provenance, got %q", out.ExplanationAR)
+		t.Fatalf("expected empty for Known=false sentinels, got %q", out.ExplanationAR)
+	}
+	if contains(out.Reasons, ReasonMatched) {
+		t.Fatalf("must not emit matched without Known: %v", out.Reasons)
+	}
+	if strings.Contains(out.ExplanationAR, "Sheet1") {
+		t.Fatalf("must not invent Sheet1: %q", out.ExplanationAR)
+	}
+}
+
+func TestExplainKnownWithoutSheetNameOmitsSheet1(t *testing.T) {
+	v := &domain.IngestionValidation{
+		Status:          "flagged",
+		RecordCount:     20,
+		ExtractedUnits:  100,
+		ExtractedValue:  1000,
+		SourceUnits:     100,
+		SourceValue:     1000,
+		SheetTotalValue: 900,
+		MonthsDetected:  []string{"2026-01"},
+	}
+	out := Explain(v, Provenance{
+		Known:                 true,
+		HeaderRowIndex:        0,
+		DataRowFirst:          1,
+		DataRowLast:           20,
+		SheetTotalValueColIdx: 9,
+		NegativeValueCells:    3,
+	})
+	if out.ExplanationAR == "" {
+		t.Fatal("expected explanation when Known with row/col provenance")
+	}
+	if strings.Contains(out.ExplanationAR, "Sheet1") {
+		t.Fatalf("must not invent Sheet1 when SheetName empty: %s", out.ExplanationAR)
+	}
+	if !strings.Contains(out.ExplanationAR, "صفوف البيانات") {
+		t.Fatalf("expected row grounding: %s", out.ExplanationAR)
+	}
+}
+
+func TestExplainMatchedOnlyWhenKnown(t *testing.T) {
+	v := &domain.IngestionValidation{Status: "ok", RecordCount: 10, ExtractedUnits: 10, ExtractedValue: 100}
+	quiet := Explain(v, Provenance{})
+	if quiet.ExplanationAR != "" {
+		t.Fatalf("zero Provenance must stay quiet: %q", quiet.ExplanationAR)
+	}
+	out := Explain(v, Provenance{
+		Known:          true,
+		SheetName:      "يناير",
+		HeaderRowIndex: 0,
+		DataRowFirst:   1,
+		DataRowLast:    10,
+	})
+	if !contains(out.Reasons, ReasonMatched) {
+		t.Fatalf("expected matched when Known with location, got %v (%s)", out.Reasons, out.ExplanationAR)
+	}
+	if !strings.Contains(out.ExplanationAR, "يناير") {
+		t.Fatalf("expected real sheet name: %s", out.ExplanationAR)
 	}
 }
 
@@ -145,6 +214,7 @@ func TestApplySetsFields(t *testing.T) {
 		MonthsDetected:  []string{"2026-01"},
 	}
 	Apply(v, Provenance{
+		Known:                 true,
 		SheetName:             "S",
 		HeaderRowIndex:        0,
 		DataRowFirst:          1,

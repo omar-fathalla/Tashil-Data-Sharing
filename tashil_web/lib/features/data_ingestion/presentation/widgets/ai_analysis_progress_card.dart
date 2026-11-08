@@ -365,7 +365,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                           Icon(
                             result!.validationStatus == 'rejected'
                                 ? Icons.error_outline_rounded
-                                : Icons.calculate_outlined,
+                                : Icons.calculate_rounded,
                             size: 18.0,
                             color: result!.validationStatus == 'rejected'
                                 ? colorScheme.error

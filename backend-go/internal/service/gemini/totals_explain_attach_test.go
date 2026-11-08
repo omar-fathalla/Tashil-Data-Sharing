@@ -23,6 +23,7 @@ func TestAttachTotalsExplanationReturnsArabic(t *testing.T) {
 		Issues:          []string{"value total 20000.00 is 2.6% off the sheet total column 19500.00"},
 	}
 	attachTotalsExplanation(v, totalsxplain.Provenance{
+		Known:                 true,
 		SheetName:             "يناير",
 		HeaderRowIndex:        0,
 		DataRowFirst:          1,
@@ -47,25 +48,36 @@ func TestAttachTotalsExplanationReturnsArabic(t *testing.T) {
 	}
 }
 
-func TestValidationErrorPrefersExplanationAR(t *testing.T) {
+func TestValidationErrorAppendsExplanationAR(t *testing.T) {
 	v := &domain.IngestionValidation{
 		Status:        "rejected",
 		Issues:        []string{"no month detected"},
-		ExplanationAR: "الموضع: الورقة «Sheet1». لم يُكتشف عمود/قيمة شهر في الصفوف المقروءة، لذلك لا يمكن اعتماد الإجمالي لفترة محددة.",
+		ExplanationAR: "لم يُكتشف عمود/قيمة شهر في الصفوف المقروءة، لذلك لا يمكن اعتماد الإجمالي لفترة محددة.",
 	}
 	err := validationError("x.xlsx", v)
 	if !errors.Is(err, ErrUploadValidation) {
 		t.Fatalf("wrap: %v", err)
 	}
-	if !strings.Contains(err.Error(), "لم يُكتشف عمود") {
-		t.Fatalf("expected Arabic explanation in error: %v", err)
+	msg := err.Error()
+	if !strings.Contains(msg, "no month detected") {
+		t.Fatalf("expected English issues kept: %v", err)
 	}
-	if strings.Contains(err.Error(), "no month detected") {
-		t.Fatalf("English issue should be replaced by explanation_ar: %v", err)
+	if !strings.Contains(msg, "لم يُكتشف عمود") {
+		t.Fatalf("expected Arabic explanation appended: %v", err)
+	}
+	if !strings.Contains(msg, " — ") {
+		t.Fatalf("expected issues — explanation join: %v", err)
 	}
 }
 
-func TestProvenanceFromPlanCountsNegativesAndFractions(t *testing.T) {
+func TestValidationErrorNilSafe(t *testing.T) {
+	err := validationError("x.xlsx", nil)
+	if !errors.Is(err, ErrUploadValidation) {
+		t.Fatalf("wrap: %v", err)
+	}
+}
+
+func TestProvenanceFromPlanNoHardcodedSheet1(t *testing.T) {
 	rows := [][]string{
 		{"Barcode", "Qty", "Value", "Total"},
 		{"1", "1.5", "10", "10"},
@@ -83,6 +95,12 @@ func TestProvenanceFromPlanCountsNegativesAndFractions(t *testing.T) {
 		},
 	}
 	p := provenanceFromPlan(rows, plan)
+	if !p.Known {
+		t.Fatal("expected Known=true for real plan+rows")
+	}
+	if p.SheetName != "" {
+		t.Fatalf("must not hardcode SheetName, got %q", p.SheetName)
+	}
 	if p.NegativeValueCells != 1 || p.NegativeUnitsCells != 1 {
 		t.Fatalf("neg counts value=%d units=%d", p.NegativeValueCells, p.NegativeUnitsCells)
 	}
@@ -94,5 +112,23 @@ func TestProvenanceFromPlanCountsNegativesAndFractions(t *testing.T) {
 	}
 	if p.SheetTotalValueColIdx != 3 {
 		t.Fatalf("sheet total col %d", p.SheetTotalValueColIdx)
+	}
+
+	empty := provenanceFromPlan(nil, nil)
+	if empty.Known {
+		t.Fatal("nil plan must keep Known=false")
+	}
+}
+
+func TestProvenanceFromPayloadKnownOnlyWithSheetOrLayout(t *testing.T) {
+	unknown := provenanceFromPayload(&domain.NormalizedRetailIngestionPayload{})
+	if unknown.Known {
+		t.Fatal("empty payload must stay Known=false")
+	}
+	known := provenanceFromPayload(&domain.NormalizedRetailIngestionPayload{
+		SheetsProcessed: []string{"مبيعات"},
+	})
+	if !known.Known || known.SheetName != "مبيعات" {
+		t.Fatalf("expected Known with sheet: %+v", known)
 	}
 }

@@ -17,7 +17,6 @@ func attachTotalsExplanation(v *domain.IngestionValidation, p totalsxplain.Prove
 // It inspects mapped columns only; it does not alter extraction or validation thresholds.
 func provenanceFromPlan(rows [][]string, plan *ColumnMapPlan) totalsxplain.Provenance {
 	p := totalsxplain.Provenance{
-		SheetName:             "Sheet1",
 		HeaderRowIndex:        -1,
 		DataRowFirst:          -1,
 		DataRowLast:           -1,
@@ -27,8 +26,10 @@ func provenanceFromPlan(rows [][]string, plan *ColumnMapPlan) totalsxplain.Prove
 		SheetTotalUnitsColIdx: -1,
 	}
 	if plan == nil || len(rows) == 0 {
-		return p
+		return p // Known stays false — sentinel-only must not invent Sheet1/matched
 	}
+	p.Known = true
+	// SheetName left empty unless a caller sets it; do not hardcode "Sheet1".
 	p.Layout = plan.Layout
 	p.HeaderRowIndex = plan.HeaderRowIndex
 	data := rows
@@ -104,6 +105,10 @@ func provenanceFromPayload(payload *domain.NormalizedRetailIngestionPayload) tot
 	}
 	if payload.IsWideMatrixWorkbook {
 		p.Layout = "wide"
+	}
+	// Only mark Known when we actually resolved a sheet or layout from the payload.
+	if p.SheetName != "" || p.Layout != "" {
+		p.Known = true
 	}
 	return p
 }

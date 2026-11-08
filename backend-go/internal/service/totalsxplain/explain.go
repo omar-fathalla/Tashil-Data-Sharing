@@ -25,7 +25,11 @@ const (
 
 // Provenance locates the numbers in the workbook (sheet / column / rows).
 // Indices are 0-based as produced by the mapping plan; Arabic text uses 1-based Excel columns/rows.
+//
+// Known must be set true by builders that actually resolved location. Builders that only
+// fill -1 sentinels with Known=false must not invent "Sheet1" or a matched confirmation.
 type Provenance struct {
+	Known                  bool // false → no location clause / no quiet "matched" text
 	SheetName              string
 	HeaderRowIndex         int // 0-based; -1 if unknown
 	DataRowFirst           int // 0-based inclusive; -1 if unknown
@@ -188,17 +192,13 @@ func Explain(v *domain.IngestionValidation, p Provenance) Outcome {
 }
 
 func locationClause(p Provenance) string {
-	// Zero-value Provenance means "unknown location" (callers that know indices
-	// set sentinels to -1 via provenanceFromPlan, or set SheetName/headers).
-	if p == (Provenance{}) {
+	if !p.Known {
 		return ""
 	}
 	var bits []string
-	sheet := p.SheetName
-	if sheet == "" {
-		sheet = "Sheet1"
+	if strings.TrimSpace(p.SheetName) != "" {
+		bits = append(bits, fmt.Sprintf("الورقة «%s»", strings.TrimSpace(p.SheetName)))
 	}
-	bits = append(bits, fmt.Sprintf("الورقة «%s»", sheet))
 	if p.Layout != "" {
 		bits = append(bits, fmt.Sprintf("التخطيط %s", p.Layout))
 	}
@@ -216,6 +216,9 @@ func locationClause(p Provenance) string {
 	}
 	if p.SheetTotalValueColIdx >= 0 || p.SheetTotalValueHeader != "" {
 		bits = append(bits, "عمود إجمالي القيمة "+columnPhrase(p.SheetTotalValueColIdx, p.SheetTotalValueHeader, "الإجمالي"))
+	}
+	if len(bits) == 0 {
+		return ""
 	}
 	return "الموضع: " + strings.Join(bits, "، ") + "."
 }

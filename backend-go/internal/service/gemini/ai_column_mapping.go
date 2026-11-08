@@ -491,9 +491,16 @@ func validateExtraction(payload *domain.NormalizedRetailIngestionPayload, src *m
 
 // validationError builds the user-facing error for a rejected upload.
 func validationError(filename string, v *domain.IngestionValidation) error {
-	detail := strings.Join(v.Issues, "; ")
-	if v != nil && strings.TrimSpace(v.ExplanationAR) != "" {
-		detail = strings.TrimSpace(v.ExplanationAR)
+	detail := ""
+	if v != nil {
+		detail = strings.Join(v.Issues, "; ")
+		if ar := strings.TrimSpace(v.ExplanationAR); ar != "" {
+			if detail != "" {
+				detail = detail + " — " + ar
+			} else {
+				detail = ar
+			}
+		}
 	}
 	return fmt.Errorf("%w: تعذّر قراءة الملف %q بشكل صحيح ولم يتم حفظه (%s)", ErrUploadValidation, filename, detail)
 }
