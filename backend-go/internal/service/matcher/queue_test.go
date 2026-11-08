@@ -3,6 +3,8 @@ package matcher
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
@@ -292,5 +294,123 @@ func TestStoreTimeoutDeadlineHonored(t *testing.T) {
 func TestNormalizeTenantKey(t *testing.T) {
 	if NormalizeTenantKey("tenant-adeco") != "adeco" || NormalizeTenantKey("Adeco") != "adeco" {
 		t.Fatal(NormalizeTenantKey("tenant-adeco"))
+	}
+}
+
+// TestConcurrentDecideAndEnqueueNoLostWrites races Decide against Enqueue on the same store.
+// MemoryStore serializes under one mutex the way Firestore transactions serialize item+counter writes.
+func TestConcurrentDecideAndEnqueueNoLostWrites(t *testing.T) {
+	store := &MemoryStore{}
+	q := NewQueue(store)
+	const n = 40
+	ids := make([]string, n)
+	for i := 0; i < n; i++ {
+		item, err := q.EnqueueMatch(ctx(), "tenant-adeco", Query{
+			SKUName: fmt.Sprintf("صنف-متزامن-%d", i), SourceFile: "race.xlsx",
+		}, Result{Decision: DecisionNone, ReasonAR: "لا مرشح"})
+		if err != nil || item == nil {
+			t.Fatalf("seed %d: %v %+v", i, err, item)
+		}
+		ids[i] = item.ID
+	}
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, n*3)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			_, err := q.Decide(ctx(), "tenant-adeco", id, StatusRejected, "racer@test", "رفض متزامن", "", "", DecideOptions{})
+			if err != nil {
+				errCh <- err
+			}
+		}(ids[i])
+	}
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			item, err := q.EnqueueMatch(ctx(), "tenant-adeco", Query{
+				SKUName: fmt.Sprintf("صنف-جديد-%d", i), SourceFile: "race2.xlsx",
+			}, Result{Decision: DecisionUncertain, Confidence: 0.6, ReasonAR: "متوسط"})
+			if err != nil {
+				errCh <- err
+				return
+			}
+			if item == nil {
+				errCh <- fmt.Errorf("enqueue %d returned nil item", i)
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Fatalf("concurrent op: %v", err)
+	}
+
+	rejected, err := q.List(ctx(), "tenant-adeco", StatusRejected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pending, err := q.List(ctx(), "tenant-adeco", StatusPending)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rejected) != n {
+		t.Fatalf("lost decides: want %d rejected, got %d", n, len(rejected))
+	}
+	if len(pending) != n {
+		t.Fatalf("lost enqueues: want %d pending, got %d", n, len(pending))
+	}
+	m, err := q.Snapshot(ctx(), "tenant-adeco")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Rejected != n || m.Pending != n {
+		t.Fatalf("counter drift: %+v", m)
+	}
+	if m.TotalMatched != 2*n {
+		t.Fatalf("TotalMatched want %d got %d", 2*n, m.TotalMatched)
+	}
+}
+
+func TestConcurrentDecideSameItemNoDoubleCount(t *testing.T) {
+	store := &MemoryStore{}
+	q := NewQueue(store)
+	item, err := q.EnqueueMatch(ctx(), "tenant-adeco", Query{SKUName: "نفس-العنصر"}, Result{Decision: DecisionNone, ReasonAR: "x"})
+	if err != nil || item == nil {
+		t.Fatal(err)
+	}
+	const workers = 20
+	var wg sync.WaitGroup
+	results := make(chan error, workers)
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := q.Decide(ctx(), "tenant-adeco", item.ID, StatusApproved, "a@b.c", "ok", "", "", DecideOptions{})
+			results <- err
+		}()
+	}
+	wg.Wait()
+	close(results)
+	ok, already := 0, 0
+	for err := range results {
+		if err == nil {
+			ok++
+			continue
+		}
+		if errors.Is(err, ErrAlreadyDecided) {
+			already++
+			continue
+		}
+		t.Fatalf("unexpected: %v", err)
+	}
+	if ok < 1 {
+		t.Fatal("at least one decide must succeed")
+	}
+	m, _ := q.Snapshot(ctx(), "tenant-adeco")
+	if m.Approved != 1 || m.Pending != 0 {
+		t.Fatalf("must not double-count approve under race: %+v (ok=%d already=%d)", m, ok, already)
 	}
 }

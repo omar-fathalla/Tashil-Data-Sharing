@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -142,7 +143,7 @@ func (h *ProductMatchHandler) HandleDecide(w http.ResponseWriter, r *http.Reques
 		Catalog: h.catalog(c.TenantID),
 	})
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
+		writeProductMatchDecideErr(w, err)
 		return
 	}
 	metrics, _ := h.queue.Snapshot(r.Context(), c.TenantID)
@@ -150,6 +151,32 @@ func (h *ProductMatchHandler) HandleDecide(w http.ResponseWriter, r *http.Reques
 		"item":    item,
 		"metrics": metrics,
 	})
+}
+
+// writeProductMatchDecideErr maps domain errors to safe client messages.
+// Raw Firestore / RPC text is never returned to the client.
+func writeProductMatchDecideErr(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, matcher.ErrNotFound):
+		writeErr(w, http.StatusNotFound, "عنصر المراجعة غير موجود")
+	case errors.Is(err, matcher.ErrAlreadyDecided):
+		writeErr(w, http.StatusConflict, err.Error())
+	case errors.Is(err, matcher.ErrInventedBarcode):
+		writeErr(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, matcher.ErrTenantMismatch):
+		writeErr(w, http.StatusForbidden, "غير مسموح عبر المستأجر")
+	default:
+		msg := err.Error()
+		lower := strings.ToLower(msg)
+		if strings.Contains(lower, "firestore") ||
+			strings.Contains(lower, "rpc error") ||
+			strings.Contains(lower, "code =") ||
+			strings.Contains(lower, "google.golang.org") {
+			writeErr(w, http.StatusInternalServerError, "تعذر حفظ قرار المراجعة")
+			return
+		}
+		writeErr(w, http.StatusBadRequest, msg)
+	}
 }
 
 // HandleMetrics serves GET /api/v1/product-match/metrics

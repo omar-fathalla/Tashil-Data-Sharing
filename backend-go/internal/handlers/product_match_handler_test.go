@@ -4,14 +4,28 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/matcher"
 )
+
+type decideErrStore struct {
+	matcher.MemoryStore
+	decideErr error
+}
+
+func (s *decideErrStore) DecideItem(ctx context.Context, tenantID string, patch matcher.DecidePatch) (*matcher.ReviewItem, error) {
+	if s.decideErr != nil {
+		return nil, s.decideErr
+	}
+	return s.MemoryStore.DecideItem(ctx, tenantID, patch)
+}
 
 type fakePM struct {
 	items []domain.ProductMasterItem
@@ -196,5 +210,30 @@ func TestProductMatchDecideWrongPairAndIdempotent(t *testing.T) {
 	mux.ServeHTTP(rec, req)
 	if rec.Code == http.StatusOK {
 		t.Fatal("repeat with different status must fail")
+	}
+}
+
+func TestProductMatchDecideSanitizesFirestoreErrors(t *testing.T) {
+	store := &decideErrStore{}
+	q := matcher.NewQueue(store)
+	item, err := q.EnqueueMatch(context.Background(), "tenant-adeco", matcher.Query{SKUName: "x"}, matcher.Result{Decision: matcher.DecisionNone})
+	if err != nil || item == nil {
+		t.Fatal(err)
+	}
+	store.decideErr = errors.New(`firestore enqueue product match: rpc error: code = Aborted desc = conflict`)
+
+	h := NewProductMatchHandler(q, fakePM{})
+	body := `{"id":"` + item.ID + `","status":"rejected","reason_ar":"رفض"}`
+	req := withClaims(httptest.NewRequest(http.MethodPost, "/api/v1/product-match/review/decide", bytes.NewBufferString(body)), domain.RoleVendorAdmin)
+	rec := httptest.NewRecorder()
+	h.HandleDecide(rec, req)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "rpc error") || strings.Contains(rec.Body.String(), "firestore") {
+		t.Fatalf("must not leak firestore text: %s", rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "تعذر حفظ قرار المراجعة") {
+		t.Fatalf("want safe Arabic message, got %s", rec.Body.String())
 	}
 }

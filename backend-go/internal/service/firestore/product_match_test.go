@@ -9,9 +9,6 @@ import (
 )
 
 func TestProductMatchStateSurvivesClientRestart(t *testing.T) {
-	// Two mock clients share nothing — use matcher.MemoryStore via Queue for restart.
-	// This test verifies the Firestore Client mock path (useMock=true) keeps state on the same client,
-	// and that Queue+Client round-trips tenant-scoped documents.
 	c := NewClient("test-db", true)
 	q1 := matcher.NewQueue(c)
 	ctx := context.Background()
@@ -25,45 +22,52 @@ func TestProductMatchStateSurvivesClientRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Same Client instance (shared mock map) — new Queue simulates process reuse of the store handle.
 	q2 := matcher.NewQueue(c)
 	list, err := q2.List(ctx, "tenant-adeco", matcher.StatusRejected)
 	if err != nil || len(list) != 1 || list[0].ID != item.ID {
 		t.Fatalf("persist via firestore mock: %v %+v", err, list)
 	}
 
-	// Cross-tenant empty
 	other, err := q2.List(ctx, "tenant-pepsi", matcher.StatusRejected)
 	if err != nil || len(other) != 0 {
 		t.Fatalf("tenant isolation: %v %+v", err, other)
 	}
 }
 
-func TestProductMatchSaveRejectsTenantMismatch(t *testing.T) {
+func TestProductMatchGetEmptyMetrics(t *testing.T) {
 	c := NewClient("test-db", true)
-	st := &matcher.State{
-		TenantID: "adeco",
-		Items: []matcher.ReviewItem{{
-			ID: "x", TenantID: "pepsi", Status: matcher.StatusPending, CreatedAt: time.Now().UTC(),
-		}},
+	m, err := c.GetMetrics(context.Background(), "tenant-newco")
+	if err != nil || m.TenantID != "newco" {
+		t.Fatalf("%+v %v", m, err)
 	}
-	// Save uses State.TenantID for the doc; item-level mismatch is filtered on List.
-	if err := c.SaveProductMatchState(context.Background(), st); err != nil {
-		t.Fatal(err)
-	}
-	got, err := c.GetProductMatchState(context.Background(), "tenant-adeco")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.TenantID != "adeco" {
-		t.Fatalf("slug=%s", got.TenantID)
+	it, err := c.GetItem(context.Background(), "tenant-newco", "missing")
+	if err != nil || it != nil {
+		t.Fatalf("%+v %v", it, err)
 	}
 }
 
-func TestProductMatchGetEmpty(t *testing.T) {
+func TestProductMatchDecideIdempotentOnClient(t *testing.T) {
 	c := NewClient("test-db", true)
-	st, err := c.GetProductMatchState(context.Background(), "tenant-newco")
-	if err != nil || st == nil || st.TenantID != "newco" {
-		t.Fatalf("%+v %v", st, err)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	_, err := c.EnqueueBatch(ctx, "tenant-adeco", []matcher.EnqueueOp{{
+		ItemID: "item1", NeedsReview: true,
+		Query: matcher.Query{SKUName: "x"}, Result: matcher.Result{Decision: matcher.DecisionNone},
+		Delta: matcher.MetricsDelta{TotalMatched: 1, None: 1, Queued: 1, Pending: 1},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := c.DecideItem(ctx, "tenant-adeco", matcher.DecidePatch{ID: "item1", Status: matcher.StatusApproved, DecidedBy: "a", Now: now})
+	if err != nil || a.Status != matcher.StatusApproved {
+		t.Fatalf("%v %+v", err, a)
+	}
+	b, err := c.DecideItem(ctx, "tenant-adeco", matcher.DecidePatch{ID: "item1", Status: matcher.StatusApproved, DecidedBy: "a", Now: now})
+	if err != nil || b.Status != matcher.StatusApproved {
+		t.Fatalf("idempotent: %v %+v", err, b)
+	}
+	m, _ := c.GetMetrics(ctx, "tenant-adeco")
+	if m.Approved != 1 || m.Pending != 0 {
+		t.Fatalf("counters: %+v", m)
 	}
 }

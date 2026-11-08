@@ -21,16 +21,12 @@ type Metrics struct {
 	Rejected     int       `json:"rejected" firestore:"rejected"`
 	UpdatedAt    time.Time `json:"updated_at" firestore:"updated_at"`
 
-	// Derived rates (filled by Snapshot; not authoritative in Firestore).
+	// Derived rates (filled by Snapshot; not stored).
 	AutoResolveRate  float64           `json:"auto_resolve_rate" firestore:"-"`
 	ReviewRate       float64           `json:"review_rate" firestore:"-"`
 	ApprovalRate     float64           `json:"approval_rate" firestore:"-"`
 	InventedBarcodes int               `json:"invented_barcodes" firestore:"-"`
 	LabelsAR         map[string]string `json:"labels_ar" firestore:"-"`
-}
-
-func (m *Metrics) touch(t time.Time) {
-	m.UpdatedAt = t.UTC()
 }
 
 func rate(n, d int) float64 {
@@ -54,11 +50,13 @@ func decorateMetrics(src Metrics, tenantID string) Metrics {
 
 // Snapshot returns persisted metrics with derived rates and Arabic labels.
 func (q *Queue) Snapshot(ctx context.Context, tenantID string) (Metrics, error) {
-	st, err := q.load(ctx, tenantID)
+	ctx, cancel := withStoreTimeout(ctx)
+	defer cancel()
+	m, err := q.store.GetMetrics(ctx, tenantID)
 	if err != nil {
 		return Metrics{}, err
 	}
-	return decorateMetrics(st.Metrics, st.TenantID), nil
+	return decorateMetrics(m, tenantID), nil
 }
 
 func metricLabelsAR() map[string]string {
