@@ -277,10 +277,10 @@ class M3ActionButtonGroup extends StatelessWidget {
 
     final id = item.semanticsIdentifier;
     if (id != null && id.isNotEmpty) {
-      return TestSemantics(
+      return TestSemantics.button(
         identifier: id,
         label: item.label,
-        button: true,
+        onPressed: item.isLoading ? null : item.onPressed,
         child: segment,
       );
     }

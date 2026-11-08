@@ -407,7 +407,9 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      // Email field
+                                      // Email field — keep child TextField semantics
+                                      // (excludeSemantics/onTap wrappers make web
+                                      // flt-semantics pointer-events:none → flutter-view intercepts).
                                       TestSemantics(
                                         identifier: TestIds.loginEmail,
                                         label: isArabic
@@ -450,7 +452,8 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
 
                                       const SizedBox(height: 16),
 
-                                      // Password field
+                                      // Password field — same as email: do not
+                                      // exclude child semantics on web.
                                       TestSemantics(
                                         identifier: TestIds.loginPassword,
                                         label: isArabic

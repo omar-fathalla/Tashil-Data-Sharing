@@ -510,19 +510,19 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
             ],
           ),
           actions: [
-            TestSemantics(
+            TestSemantics.button(
               identifier: TestIds.deleteCancel,
               label: 'Cancel delete',
-              button: true,
+              onPressed: () => Navigator.of(ctx).pop(false),
               child: TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
                 child: const Text('إلغاء'),
               ),
             ),
-            TestSemantics(
+            TestSemantics.button(
               identifier: TestIds.deleteConfirm,
               label: 'Confirm delete',
-              button: true,
+              onPressed: () => Navigator.of(ctx).pop(true),
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: cs.error,
@@ -3255,10 +3255,21 @@ onChanged: m3Legacy<int>((v) {
                     spacing: 10.0,
                     runSpacing: 8.0,
                     children: [
-                      TestSemantics(
+                      TestSemantics.button(
                         identifier: TestIds.sellinUploadButton,
                         label: 'Upload Sell-In file',
-                        button: true,
+                        onPressed: _isUploading ||
+                                !isExplicitChain(_archiveUploadChain)
+                            ? null
+                            : () => _pickAndUploadSellInFile(
+                                  forceChain: _archiveUploadChain,
+                                  forceYear: _archiveUploadYear > 0
+                                      ? _archiveUploadYear
+                                      : null,
+                                  forceMonth: _archiveUploadMonth > 0
+                                      ? _archiveUploadMonth
+                                      : null,
+                                ),
                         child: FilledButton.icon(
                           style: FilledButton.styleFrom(
                             minimumSize: const Size(0, 44.0),

@@ -11,6 +11,7 @@ import 'core/storage/session_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/m3_color_roles.dart';
 import 'core/theme/m3_motion.dart';
+import 'core/utils/web_file_helper.dart';
 import 'features/auth/presentation/screens/super_admin_login_screen.dart';
 import 'features/auth/presentation/screens/tenant_login_screen.dart';
 import 'features/auth/presentation/widgets/security_guard.dart';
@@ -35,6 +36,11 @@ void main() {
     // Expose the semantics tree in the DOM (flt-semantics-*) for web
     // automation (Playwright / Maestro / Patrol) without manual activation.
     SemanticsBinding.instance.ensureSemantics();
+    // Mount persistent #tashil-file-input after the first frame so it cannot
+    // disturb Flutter web's initial semantics / hit-test host setup.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WebFileHelper.ensureMounted();
+    });
   }
   runApp(const TashilDataSharingApp());
 }

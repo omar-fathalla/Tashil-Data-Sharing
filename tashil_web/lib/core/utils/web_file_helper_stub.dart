@@ -8,6 +8,9 @@ const String defaultSampleCarrefourCsv =
     'Carrefour City Stars,6221155001258,Adeco Pure Corn Oil 800ml,زيوت طعام,88,10560.0,2026-03-06\n'
     'Carrefour Maadi City Center,1234,Short Barcode Defect Sample,زيوت طعام,15,1500.0,2026-03-06\n';
 
+/// No-op on VM; web implementation mounts `#tashil-file-input`.
+void ensurePersistentFileInput({String accept = '.csv,.xlsx,.xls'}) {}
+
 Future<Map<String, dynamic>?> platformPickFile({
   String accept = '.csv,.xlsx,.xls',
 }) async {

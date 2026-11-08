@@ -66,11 +66,22 @@ void main() {
       expect(TestIds.navSellOut, 'nav-sell-out');
       expect(TestIds.navSellIn, 'nav-sell-in');
       expect(TestIds.selloutUploadButton, 'sellout-upload-button');
+      expect(TestIds.fileInput, 'tashil-file-input');
+      expect(TestIds.uploadCommitConfirm, 'upload-commit-confirm');
+      expect(TestIds.uploadCommitCancel, 'upload-commit-cancel');
       expect(TestIds.deleteConfirm, 'delete-confirm');
       expect(TestIds.snackbarError, 'snackbar-error');
       expect(TestIds.navIdForIndex(1), TestIds.navSellOut);
       expect(TestIds.navIdForIndex(2), TestIds.navSellIn);
       expect(TestIds.navIdForIndex(0), isNull);
+      // file-delete ids are archiveId + '-' + slugified filename
+      expect(
+        TestIds.fileDelete(
+          archiveId: 'AbC_123',
+          fileName: 'QA Sell Out.xlsx',
+        ),
+        'file-delete-abc_123-qa-sell-out.xlsx',
+      );
     });
   });
 

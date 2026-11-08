@@ -31,8 +31,22 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: 'chromium-dpr1',
+      use: {
+        ...devices['Desktop Chrome'],
+        deviceScaleFactor: 1,
+      },
+    },
+    {
+      // Hit-test under Retina-like DPR (natural locator.click, no bypass).
+      // Scoped so login smoke stays on DPR 1 in CI.
+      name: 'chromium-dpr2',
+      testMatch: /sellout-semantics-clickable\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        deviceScaleFactor: 2,
+      },
     },
   ],
 });
+
