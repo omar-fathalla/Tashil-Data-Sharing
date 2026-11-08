@@ -31,6 +31,19 @@ jobs:
         run: go vet ./...
       - name: go test
         run: go test ./... -count=1 -timeout 20m
+      - name: Setup Node (Firestore emulator)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Setup Java (Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Firestore emulator product-match tests
+        run: |
+          npx --yes firebase-tools@13.29.1 emulators:exec --only firestore --project demo-tashil \
+            "go test ./internal/service/firestore/ -count=1 -timeout 10m -run Emulator"
       - name: live-version parse fail-safe tests
         working-directory: .
         run: python3 scripts/parse_live_backend_commit_test.py

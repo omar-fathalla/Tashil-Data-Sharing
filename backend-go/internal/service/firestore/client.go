@@ -123,6 +123,8 @@ type Client struct {
 	dqMu       sync.RWMutex
 	dqStates   map[string]domain.DataQualityState
 	crMem      customers.MemoryStore // customer registry fallback when Firestore is not configured
+	pmOnce     sync.Once
+	pmStates   *productMatchMem // product-match review queue fallback when Firestore is not configured
 
 	dvMu         sync.Mutex
 	dataVersions map[string]string
