@@ -1407,12 +1407,16 @@ func buildPayloadFromWideMatrix(
 				}
 			}
 			if namedRev != 0 || namedQty != 0 {
-				if namedQty <= 0 {
-					namedQty = 1
-				}
+				// Preserve zero / negative aggregated qty on the stored record.
 				uPrice := inferredRRP
-				if uPrice <= 0 {
-					uPrice = math.Round((namedRev/float64(namedQty))*100) / 100
+				if uPrice <= 0 && namedRev != 0 {
+					priceQty := namedQty
+					if priceQty == 0 && namedRev > 0 {
+						priceQty = 1 // unit-price only; not stored
+					}
+					if priceQty != 0 {
+						uPrice = math.Round((namedRev/float64(priceQty))*100) / 100
+					}
 				}
 				records = append(records, domain.NormalizedRecord{
 					RawStoreName:     topBranch.displayName,
@@ -1549,10 +1553,16 @@ func buildPayloadFromWideMatrix(
 					}
 				}
 				if namedRev != 0 || namedQty != 0 {
-					if namedQty <= 0 {
-						namedQty = 1
+					uPrice := 0.0
+					if namedRev != 0 {
+						priceQty := namedQty
+						if priceQty == 0 && namedRev > 0 {
+							priceQty = 1 // unit-price only; not stored
+						}
+						if priceQty != 0 {
+							uPrice = math.Round((namedRev/float64(priceQty))*100) / 100
+						}
 					}
-					uPrice := math.Round((namedRev/float64(namedQty))*100) / 100
 					records = append(records, domain.NormalizedRecord{
 						RawStoreName:     topBranch.displayName,
 						ResolvedStoreID:  topBranch.storeID,

@@ -119,14 +119,15 @@ func collectWideRowBranchObservations(
 			continue
 		}
 
-		// Value-only positive cell with no qty → count as 1 unit for unit-price inference.
-		// Do not invent qty for negative returns (qty stays as parsed, often 0 or negative).
-		if bQty == 0 && bRev > 0 {
-			bQty = 1
+		// Stored/reconciled qty stays as parsed (including 0 and negatives).
+		// Only for unit-price inference: treat positive value with missing qty as 1 unit.
+		priceQty := bQty
+		if priceQty == 0 && bRev > 0 {
+			priceQty = 1
 		}
 		uPrice := 0.0
-		if bQty != 0 && bRev != 0 {
-			uPrice = math.Round((bRev/float64(bQty))*100) / 100
+		if priceQty != 0 && bRev != 0 {
+			uPrice = math.Round((bRev/float64(priceQty))*100) / 100
 		}
 
 		recon.branchValueSum += bRev

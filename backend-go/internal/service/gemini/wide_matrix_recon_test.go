@@ -160,6 +160,110 @@ func TestWideMatrixNoGapNoUnallocated(t *testing.T) {
 	}
 }
 
+func TestWideMatrixZeroQtyValueOnlyNoFalseMismatch(t *testing.T) {
+	rows := [][]string{
+		wideReconHeader(),
+		// Value present, qty cells empty, file qty total 0 — must NOT invent qty=1 or flag mismatch.
+		{"منعمات", "ادكو (1)", "6223000233735", "قيمة فقط", "100", "0", "100", "MAY", "", "", "0", "2026"},
+		// Competitor: value only, qty 0 / file qty 0
+		{"منعمات", "يونيلفر", "6223000233736", "منافس قيمة", "40", "10", "50", "MAY", "0", "0", "0", "2026"},
+	}
+	xlsx, err := BuildSampleXLSX(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, ok := parseFullTabularPayload("recon-zero-qty.xlsx", xlsx)
+	if !ok {
+		t.Fatal("parse failed")
+	}
+	var adecoUnits, competitorUnits int
+	for _, r := range payload.NormalizedRecords {
+		if strings.Contains(r.RawStoreName, UnallocatedBranchName) {
+			t.Fatalf("unexpected unallocated: %+v", r)
+		}
+		switch r.Supplier {
+		case "ادكو (1)":
+			adecoUnits += r.QuantitySold
+			if r.QuantitySold != 0 {
+				t.Fatalf("adeco stored qty must stay 0, got %d on %q", r.QuantitySold, r.RawStoreName)
+			}
+			if r.NetRevenue == 100 && r.UnitPrice != 100 {
+				t.Fatalf("unit price for value-only should use priceQty=1 → 100, got %.2f", r.UnitPrice)
+			}
+		case "يونيلفر":
+			competitorUnits += r.QuantitySold
+		}
+	}
+	if adecoUnits != 0 {
+		t.Fatalf("adeco units %d want 0", adecoUnits)
+	}
+	if competitorUnits != 0 {
+		t.Fatalf("competitor stored qty %d want 0 (not coerced to 1)", competitorUnits)
+	}
+	for _, a := range payload.AnomaliesDetected {
+		if a.IssueType == anomalyQtyTotalMismatch {
+			t.Fatalf("false qty mismatch warning: %s", a.Description)
+		}
+	}
+	v := validateExtraction(payload, nil)
+	mergeWideMatrixReconIntoValidation(v, payload)
+	for _, r := range v.DiffReasons {
+		if r == diffReasonQtyMismatch {
+			t.Fatalf("false qty mismatch in validation: %v", v.DiffReasons)
+		}
+	}
+}
+
+func TestWideMatrixNegativeQtyPreserved(t *testing.T) {
+	rows := [][]string{
+		wideReconHeader(),
+		// Own brand return: negative qty kept; file qty total matches branch sum → no mismatch.
+		{"منعمات", "ادكو (1)", "6223000233737", "مرتجع كمية", "50", "-10", "40", "JUN", "5", "-2", "3", "2026"},
+		// Competitor aggregated negative qty preserved (not forced to 1).
+		{"منعمات", "يونيلفر", "6223000233738", "منافس مرتجع", "-20", "0", "-20", "JUN", "-4", "0", "-4", "2026"},
+	}
+	xlsx, err := BuildSampleXLSX(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, ok := parseFullTabularPayload("recon-neg-qty.xlsx", xlsx)
+	if !ok {
+		t.Fatal("parse failed")
+	}
+	var adecoQty, competitorQty int
+	var adecoRev, competitorRev float64
+	for _, r := range payload.NormalizedRecords {
+		if strings.Contains(r.RawStoreName, UnallocatedBranchName) {
+			t.Fatalf("unexpected unallocated: %+v", r)
+		}
+		switch r.Supplier {
+		case "ادكو (1)":
+			adecoQty += r.QuantitySold
+			adecoRev += r.NetRevenue
+		case "يونيلفر":
+			competitorQty += r.QuantitySold
+			competitorRev += r.NetRevenue
+		}
+	}
+	if adecoQty != 3 {
+		t.Fatalf("adeco qty %d want 3 (5 + -2)", adecoQty)
+	}
+	if math.Abs(adecoRev-40) > 0.01 {
+		t.Fatalf("adeco rev %.2f want 40", adecoRev)
+	}
+	if competitorQty != -4 {
+		t.Fatalf("competitor qty %d want -4 (preserved)", competitorQty)
+	}
+	if math.Abs(competitorRev-(-20)) > 0.01 {
+		t.Fatalf("competitor rev %.2f want -20", competitorRev)
+	}
+	for _, a := range payload.AnomaliesDetected {
+		if a.IssueType == anomalyQtyTotalMismatch {
+			t.Fatalf("unexpected qty mismatch: %s", a.Description)
+		}
+	}
+}
+
 func TestWideMatrixNegativeBranchValuesDoNotInventUnallocated(t *testing.T) {
 	rows := [][]string{
 		wideReconHeader(),
