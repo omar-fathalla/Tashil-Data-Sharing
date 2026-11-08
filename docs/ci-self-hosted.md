@@ -108,4 +108,7 @@ Java 21 (temurin-compatible), `gh`, `git`. Docker is **not** installed.
   product-match tests, `scripts/parse_live_backend_commit_test.py`
 - **Flutter** — `flutter analyze` + `flutter test` (reuses preinstalled SDK when present)
 - **Playwright smoke** — Flutter web build + Chromium Semantics login smoke
-  (explicit 1440×900 viewport, `deviceScaleFactor: 1`, `--force-device-scale-factor=1`)
+  (explicit 1440×900 viewport, `deviceScaleFactor: 1`, `--force-device-scale-factor=1`).
+  On Retina Mac, Semantics boxes can still sit at ~2× CSS coords; login smoke
+  asserts identifiers then types/clicks via accessible roles (see
+  `docs/SEMANTICS_TEST_IDS.md`).
