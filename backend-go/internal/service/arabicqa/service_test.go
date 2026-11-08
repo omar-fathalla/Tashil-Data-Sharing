@@ -201,13 +201,19 @@ func TestAskGeminiPolishUsesGroundedFacts(t *testing.T) {
 		if model != "gemini-3.8-flash" {
 			t.Fatalf("model=%s", model)
 		}
-		if !strings.Contains(prompt, "120000") && !strings.Contains(prompt, "الأدلة") {
-			t.Fatalf("prompt missing grounded evidence: %s", prompt)
+		if !strings.Contains(prompt, "total_revenue") || !strings.Contains(prompt, "claims") {
+			t.Fatalf("prompt missing metric+entity claims: %s", prompt)
 		}
 		if strings.Contains(prompt, "test-key") {
 			t.Fatal("api key leaked into prompt")
 		}
-		b, _ := json.Marshal(map[string]string{"answer_ar": "إيراد المستأجر 120000.00 ج.م هذا الشهر (قراءة فقط)."})
+		payload := map[string]interface{}{
+			"answer_ar": "إيراد المستأجر 120000.00 ج.م هذا الشهر (قراءة فقط).",
+			"claims": []Claim{
+				{Metric: "total_revenue", Entity: "tenant", Value: 120000, Display: "120000.00 ج.م"},
+			},
+		}
+		b, _ := json.Marshal(payload)
 		return string(b), nil
 	})
 	ans, err := svc.Ask(context.Background(), "tenant-adeco", "كام الإيراد؟")
@@ -228,8 +234,13 @@ func TestAskGeminiPolishUsesGroundedFacts(t *testing.T) {
 func TestAskRejectsFabricatedGeminiAnswer(t *testing.T) {
 	f := seedFake()
 	svc := New(f, "test-key", "gemini-3.8-flash", false).WithCaller(func(_ context.Context, _, _ string) (string, error) {
-		// Invents 999999 — not in evidence → must fall back to deterministic.
-		b, _ := json.Marshal(map[string]string{"answer_ar": "إجمالي الإيراد 999999 ج.م فقط."})
+		payload := map[string]interface{}{
+			"answer_ar": "إجمالي الإيراد 999999 ج.م فقط.",
+			"claims": []Claim{
+				{Metric: "total_revenue", Entity: "tenant", Value: 999999, Display: "999999 ج.م"},
+			},
+		}
+		b, _ := json.Marshal(payload)
 		return string(b), nil
 	})
 	ans, err := svc.Ask(context.Background(), "tenant-adeco", "كام الإيراد؟")
@@ -244,6 +255,77 @@ func TestAskRejectsFabricatedGeminiAnswer(t *testing.T) {
 	}
 	if !strings.Contains(ans.AnswerAR, "120000") {
 		t.Fatalf("deterministic revenue missing: %s", ans.AnswerAR)
+	}
+}
+
+func TestAskRejectsEntityValueSwap(t *testing.T) {
+	f := seedFake()
+	svc := New(f, "test-key", "gemini-3.8-flash", false).WithCaller(func(_ context.Context, _, _ string) (string, error) {
+		// Swap: attribute Carrefour's 50000 to Fathalla entity.
+		payload := map[string]interface{}{
+			"answer_ar": "فتح الله: 50000.00 ج.م؛ كارفور: 70000.00 ج.م",
+			"claims": []Claim{
+				{Metric: "total_revenue", Entity: "chain:فتح الله", Value: 50000, Display: "50000.00 ج.م"},
+				{Metric: "total_revenue", Entity: "chain:كارفور", Value: 70000, Display: "70000.00 ج.م"},
+			},
+		}
+		b, _ := json.Marshal(payload)
+		return string(b), nil
+	})
+	ans, err := svc.Ask(context.Background(), "tenant-adeco", "وزّع حصص السلاسل")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ans.MappingSource != sourceDet {
+		t.Fatalf("entity/value swap must fall back to deterministic, got %s answer=%s", ans.MappingSource, ans.AnswerAR)
+	}
+	if !strings.Contains(ans.AnswerAR, "فتح الله") || !strings.Contains(ans.AnswerAR, "70000.00") {
+		t.Fatalf("deterministic chain binding broken: %s", ans.AnswerAR)
+	}
+}
+
+func TestAskTodaySellInUnsupportedExecutiveOK(t *testing.T) {
+	f := seedFake()
+	f.kpisByPeriod = map[string]*domain.ExecutiveKPIs{
+		"tenant-adeco|TODAY": {
+			TotalRevenue: 321, TotalUnitsSold: 3, ActiveStoresCount: 1,
+			TenantMarketSharePct: 2, RevenueMoMPct: 0, Currency: "EGP",
+		},
+	}
+	svc := New(f, "", "", true)
+
+	si, err := svc.Ask(context.Background(), "tenant-adeco", "ملخص سيل إن اليوم")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if si.Intent != IntentUnsupported {
+		t.Fatalf("TODAY sell-in must be unsupported, got %s", si.Intent)
+	}
+	if !strings.Contains(si.AnswerAR, "شهرية") && !strings.Contains(si.AnswerAR, "مش مدعوم") {
+		t.Fatalf("TODAY sell-in message: %s", si.AnswerAR)
+	}
+	if len(f.sellInCalls) != 0 {
+		t.Fatalf("TODAY sell-in must not query BQ: %#v", f.sellInCalls)
+	}
+
+	exec, err := svc.Ask(context.Background(), "tenant-adeco", "كام إجمالي المبيعات اليوم؟")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exec.Period != "TODAY" || exec.Intent != IntentExecutiveKPIs {
+		t.Fatalf("executive TODAY: period=%s intent=%s", exec.Period, exec.Intent)
+	}
+	if !strings.Contains(exec.AnswerAR, "321") {
+		t.Fatalf("TODAY must use real day-filtered KPIs: %s calls=%v", exec.AnswerAR, f.kpiCalls)
+	}
+	foundToday := false
+	for _, c := range f.kpiCalls {
+		if strings.HasSuffix(c, "|TODAY") {
+			foundToday = true
+		}
+	}
+	if !foundToday {
+		t.Fatalf("expected GetExecutiveKPIs(..., TODAY), got %#v", f.kpiCalls)
 	}
 }
 
@@ -360,31 +442,45 @@ func TestCapabilitiesList(t *testing.T) {
 }
 
 func TestPolishPreservesClaims(t *testing.T) {
-	grounded := "إجمالي الإيراد 120000.00 ج.م"
-	ev := map[string]interface{}{"total_revenue": 120000.0}
-	if !polishPreservesClaims("الإيراد بلغ 120000.00 ج.م", grounded, ev) {
-		t.Fatal("valid polish rejected")
+	evidence := []Claim{
+		{Metric: "total_revenue", Entity: "tenant", Value: 120000, Display: "120000.00 ج.م"},
+		{Metric: "total_revenue", Entity: "chain:فتح الله", Value: 70000, Display: "70000.00 ج.م"},
+		{Metric: "total_revenue", Entity: "chain:كارفور", Value: 50000, Display: "50000.00 ج.م"},
 	}
-	if polishPreservesClaims("الإيراد 999999 ج.م", grounded, ev) {
-		t.Fatal("fabricated polish accepted")
+	usedOK := []Claim{{Metric: "total_revenue", Entity: "tenant", Value: 120000, Display: "120000.00 ج.م"}}
+	if !polishPreservesClaims("الإيراد بلغ 120000.00 ج.م", usedOK, evidence) {
+		t.Fatal("valid bound claim rejected")
 	}
-	if polishPreservesClaims("مفيش أرقام هنا", grounded, ev) {
-		t.Fatal("dropped key evidence accepted")
+	usedFab := []Claim{{Metric: "total_revenue", Entity: "tenant", Value: 999999, Display: "999999"}}
+	if polishPreservesClaims("الإيراد 999999 ج.م", usedFab, evidence) {
+		t.Fatal("fabricated claim value accepted")
+	}
+	usedSwap := []Claim{
+		{Metric: "total_revenue", Entity: "chain:فتح الله", Value: 50000, Display: "50000.00 ج.م"},
+	}
+	if polishPreservesClaims("فتح الله: 50000.00 ج.م", usedSwap, evidence) {
+		t.Fatal("entity/value swap accepted")
+	}
+	if polishPreservesClaims("مفيش أرقام هنا", usedOK, evidence) {
+		t.Fatal("narrative without claim numbers accepted")
 	}
 }
 
 func TestSellInFilterForPeriod(t *testing.T) {
 	now := time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC)
-	all := sellInFilterForPeriod("ALL", now)
-	if all.Limit != 0 || all.Year != 0 || all.Month != 0 {
-		t.Fatalf("ALL: %+v", all)
+	all, ok := sellInFilterForPeriod("ALL", now)
+	if !ok || all.Limit != 0 || all.Year != 0 || all.Month != 0 {
+		t.Fatalf("ALL: %+v ok=%v", all, ok)
 	}
-	mtd := sellInFilterForPeriod("MTD", now)
-	if mtd.Limit != 0 || mtd.Year != 2026 || mtd.Month != 11 {
-		t.Fatalf("MTD: %+v", mtd)
+	mtd, ok := sellInFilterForPeriod("MTD", now)
+	if !ok || mtd.Limit != 0 || mtd.Year != 2026 || mtd.Month != 11 {
+		t.Fatalf("MTD: %+v ok=%v", mtd, ok)
 	}
-	ytd := sellInFilterForPeriod("YTD", now)
-	if ytd.Year != 2026 || ytd.Month != 0 {
-		t.Fatalf("YTD: %+v", ytd)
+	ytd, ok := sellInFilterForPeriod("YTD", now)
+	if !ok || ytd.Year != 2026 || ytd.Month != 0 {
+		t.Fatalf("YTD: %+v ok=%v", ytd, ok)
+	}
+	if _, ok := sellInFilterForPeriod("TODAY", now); ok {
+		t.Fatal("TODAY sell-in must be unsupported (no day grain)")
 	}
 }

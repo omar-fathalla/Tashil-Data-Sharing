@@ -7,57 +7,46 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/domain"
 )
 
-func formatEGP(v float64) string {
-	return fmt.Sprintf("%.2f ج.م", v)
-}
-
-func formatPct(v float64) string {
-	return fmt.Sprintf("%.1f%%", v)
-}
-
 func answerExecutive(kpis *domain.ExecutiveKPIs, period string) (string, map[string]interface{}) {
 	if kpis == nil {
-		return "مفيش بيانات أداء متاحة للمستأجر ده في الفترة المطلوبة.", map[string]interface{}{}
+		return "مفيش بيانات أداء متاحة للمستأجر ده في الفترة المطلوبة.", map[string]interface{}{"period": period, "claims": []Claim{}}
 	}
-	ev := map[string]interface{}{
-		"total_revenue":         kpis.TotalRevenue,
-		"total_units_sold":      kpis.TotalUnitsSold,
-		"active_stores_count":   kpis.ActiveStoresCount,
-		"tenant_market_share_pct": kpis.TenantMarketSharePct,
-		"revenue_mom_pct":       kpis.RevenueMoMPct,
-		"period":                period,
-		"currency":              nonzero(kpis.Currency, "EGP"),
+	claims := []Claim{
+		{Metric: "total_revenue", Entity: "tenant", Value: kpis.TotalRevenue, Display: claimDisplayEGP(kpis.TotalRevenue)},
+		{Metric: "total_units_sold", Entity: "tenant", Value: float64(kpis.TotalUnitsSold), Display: claimDisplayInt(float64(kpis.TotalUnitsSold))},
+		{Metric: "active_stores_count", Entity: "tenant", Value: float64(kpis.ActiveStoresCount), Display: claimDisplayInt(float64(kpis.ActiveStoresCount))},
+		{Metric: "tenant_market_share_pct", Entity: "tenant", Value: kpis.TenantMarketSharePct, Display: claimDisplayPct(kpis.TenantMarketSharePct)},
+		{Metric: "revenue_mom_pct", Entity: "tenant", Value: kpis.RevenueMoMPct, Display: claimDisplayPct(kpis.RevenueMoMPct)},
 	}
-	text := fmt.Sprintf(
-		"ملخص الأداء (فترة %s): إجمالي الإيراد %s، الوحدات المباعة %d، المتاجر النشطة %d، حصة السوق %s، نمو الإيراد شهريًا %s. الإجابة مبنية على بيانات BigQuery للمستأجر فقط (قراءة فقط).",
-		periodLabel(period),
-		formatEGP(kpis.TotalRevenue),
-		kpis.TotalUnitsSold,
-		kpis.ActiveStoresCount,
-		formatPct(kpis.TenantMarketSharePct),
-		formatPct(kpis.RevenueMoMPct),
-	)
-	return text, ev
+	text := narrativeFromClaims(period, "ملخص الأداء", claims)
+	return text, claimsToEvidence(period, claims, map[string]interface{}{
+		"currency": nonzero(kpis.Currency, "EGP"),
+	})
 }
 
 func answerChainShares(shares []domain.ChainShareSummary, period string) (string, map[string]interface{}) {
 	if len(shares) == 0 {
-		return "مفيش حصص سلاسل متاحة للمستأجر ده في الفترة دي.", map[string]interface{}{"period": period, "chains": []interface{}{}}
+		return "مفيش حصص سلاسل متاحة للمستأجر ده في الفترة دي.", map[string]interface{}{"period": period, "claims": []Claim{}}
 	}
-	top := shares[0]
-	var parts []string
-	list := make([]map[string]interface{}, 0, len(shares))
 	limit := len(shares)
 	if limit > 5 {
 		limit = 5
 	}
+	claims := make([]Claim, 0, limit)
+	list := make([]map[string]interface{}, 0, limit)
 	for i := 0; i < limit; i++ {
 		s := shares[i]
 		name := s.DisplayName
 		if name == "" {
 			name = s.RetailerChain
 		}
-		parts = append(parts, fmt.Sprintf("%s: %s", name, formatEGP(s.TotalRevenue)))
+		entity := "chain:" + name
+		claims = append(claims, Claim{
+			Metric: "total_revenue", Entity: entity, Value: s.TotalRevenue, Display: claimDisplayEGP(s.TotalRevenue),
+		})
+		claims = append(claims, Claim{
+			Metric: "total_units", Entity: entity, Value: float64(s.TotalUnits), Display: claimDisplayInt(float64(s.TotalUnits)),
+		})
 		list = append(list, map[string]interface{}{
 			"retailer_chain": s.RetailerChain,
 			"display_name":   name,
@@ -65,85 +54,82 @@ func answerChainShares(shares []domain.ChainShareSummary, period string) (string
 			"total_units":    s.TotalUnits,
 		})
 	}
-	topName := top.DisplayName
+	topName := shares[0].DisplayName
 	if topName == "" {
-		topName = top.RetailerChain
+		topName = shares[0].RetailerChain
 	}
-	text := fmt.Sprintf(
-		"حصص السلاسل (فترة %s): أكبر سلسلة هي «%s» بإيراد %s. أعلى السلاسل: %s. قراءة فقط من بيانات المستأجر.",
-		periodLabel(period), topName, formatEGP(top.TotalRevenue), strings.Join(parts, "؛ "),
-	)
-	return text, map[string]interface{}{"period": period, "chains": list, "top_chain": topName}
+	text := narrativeFromClaims(period, "حصص السلاسل — أكبر سلسلة «"+topName+"»", claims)
+	return text, claimsToEvidence(period, claims, map[string]interface{}{
+		"chains":    list,
+		"top_chain": topName,
+	})
 }
 
 func answerTopSKUs(kpis *domain.ExecutiveKPIs, period string) (string, map[string]interface{}) {
 	if kpis == nil || len(kpis.ParetoSKUs) == 0 {
-		return "مفيش قائمة منتجات (باريتو) متاحة للمستأجر ده.", map[string]interface{}{"period": period}
+		return "مفيش قائمة منتجات (باريتو) متاحة للمستأجر ده.", map[string]interface{}{"period": period, "claims": []Claim{}}
 	}
 	limit := len(kpis.ParetoSKUs)
 	if limit > 5 {
 		limit = 5
 	}
-	var parts []string
+	claims := make([]Claim, 0, limit)
 	list := make([]map[string]interface{}, 0, limit)
 	for i := 0; i < limit; i++ {
 		sku := kpis.ParetoSKUs[i]
-		parts = append(parts, fmt.Sprintf("%s (%s)", sku.SKUName, formatEGP(sku.TotalRevenue)))
+		entity := "sku:" + sku.SKUName
+		claims = append(claims, Claim{
+			Metric: "total_revenue", Entity: entity, Value: sku.TotalRevenue, Display: claimDisplayEGP(sku.TotalRevenue),
+		})
 		list = append(list, map[string]interface{}{
-			"sku_name":       sku.SKUName,
-			"barcode":        sku.Barcode,
-			"total_revenue":  sku.TotalRevenue,
-			"total_units":    sku.TotalUnits,
+			"sku_name":      sku.SKUName,
+			"barcode":       sku.Barcode,
+			"total_revenue": sku.TotalRevenue,
+			"total_units":   sku.TotalUnits,
 		})
 	}
-	text := fmt.Sprintf(
-		"أعلى المنتجات (فترة %s): %s. الأرقام من بيانات BigQuery للمستأجر (قراءة فقط).",
-		periodLabel(period), strings.Join(parts, "؛ "),
-	)
-	return text, map[string]interface{}{"period": period, "top_skus": list}
+	text := narrativeFromClaims(period, "أعلى المنتجات", claims)
+	return text, claimsToEvidence(period, claims, map[string]interface{}{"top_skus": list})
 }
 
 func answerCategories(kpis *domain.ExecutiveKPIs, period string) (string, map[string]interface{}) {
 	if kpis == nil || len(kpis.CategoryContributions) == 0 {
-		return "مفيش مساهمات فئات متاحة للمستأجر ده.", map[string]interface{}{"period": period}
+		return "مفيش مساهمات فئات متاحة للمستأجر ده.", map[string]interface{}{"period": period, "claims": []Claim{}}
 	}
 	limit := len(kpis.CategoryContributions)
 	if limit > 5 {
 		limit = 5
 	}
-	var parts []string
+	claims := make([]Claim, 0, limit*2)
 	list := make([]map[string]interface{}, 0, limit)
 	for i := 0; i < limit; i++ {
 		c := kpis.CategoryContributions[i]
-		parts = append(parts, fmt.Sprintf("%s: %s (%s)", c.Category, formatEGP(c.TotalRevenue), formatPct(c.SharePct)))
+		entity := "category:" + c.Category
+		claims = append(claims,
+			Claim{Metric: "total_revenue", Entity: entity, Value: c.TotalRevenue, Display: claimDisplayEGP(c.TotalRevenue)},
+			Claim{Metric: "share_pct", Entity: entity, Value: c.SharePct, Display: claimDisplayPct(c.SharePct)},
+		)
 		list = append(list, map[string]interface{}{
 			"category":      c.Category,
 			"total_revenue": c.TotalRevenue,
 			"share_pct":     c.SharePct,
 		})
 	}
-	text := fmt.Sprintf(
-		"مساهمة الفئات (فترة %s): %s. قراءة فقط من بيانات المستأجر.",
-		periodLabel(period), strings.Join(parts, "؛ "),
-	)
-	return text, map[string]interface{}{"period": period, "categories": list}
+	text := narrativeFromClaims(period, "مساهمة الفئات", claims)
+	return text, claimsToEvidence(period, claims, map[string]interface{}{"categories": list})
 }
 
 func answerSellIn(totalRev float64, totalUnits float64, count int, period string) (string, map[string]interface{}) {
-	ev := map[string]interface{}{
-		"period":           period,
-		"record_count":     count,
-		"total_net_value":  totalRev,
-		"total_units":      totalUnits,
+	claims := []Claim{
+		{Metric: "record_count", Entity: "tenant", Value: float64(count), Display: claimDisplayInt(float64(count))},
+		{Metric: "total_net_value", Entity: "tenant", Value: totalRev, Display: claimDisplayEGP(totalRev)},
+		{Metric: "total_units", Entity: "tenant", Value: totalUnits, Display: claimDisplayInt(totalUnits)},
 	}
 	if count == 0 {
-		return "مفيش سجلات توريد (Sell-In) للمستأجر ده.", ev
+		return "مفيش سجلات توريد (Sell-In) للمستأجر ده.", claimsToEvidence(period, claims, nil)
 	}
-	text := fmt.Sprintf(
-		"ملخص التوريد Sell-In (فترة %s): عدد السجلات %d، إجمالي القيمة %s، إجمالي الوحدات %.0f. قراءة فقط من بيانات المستأجر في BigQuery.",
-		periodLabel(period), count, formatEGP(totalRev), totalUnits,
-	)
-	return text, ev
+	text := narrativeFromClaims(period, "ملخص التوريد Sell-In", claims)
+	return text, claimsToEvidence(period, claims, nil)
 }
 
 func unsupportedAnswer() (string, map[string]interface{}) {
@@ -156,7 +142,17 @@ func unsupportedAnswer() (string, map[string]interface{}) {
 		"السؤال ده مش ضمن الأسئلة المسموحة حاليًا. تقدر تسأل عن: %s. الخدمة قراءة فقط وما بتنفّذش أوامر تعديل ولا SQL حر.",
 		strings.Join(titles, "، "),
 	)
-	return text, map[string]interface{}{"allowed_intents": titles}
+	return text, map[string]interface{}{"allowed_intents": titles, "claims": []Claim{}}
+}
+
+func unsupportedTodaySellIn() (string, map[string]interface{}) {
+	text := "سؤال «اليوم» مش مدعوم لملخص التوريد (Sell-In) لأن البيانات شهرية مش يومية. اسأل عن الشهر الحالي (MTD) أو كل البيانات."
+	return text, map[string]interface{}{
+		"period":    "TODAY",
+		"reason":    "sell_in_no_day_grain",
+		"claims":    []Claim{},
+		"supported": []string{"MTD", "YTD", "ALL"},
+	}
 }
 
 func periodLabel(period string) string {

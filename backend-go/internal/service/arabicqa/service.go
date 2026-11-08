@@ -131,7 +131,15 @@ func (s *Service) Ask(ctx context.Context, tenantID, question string) (*Answer, 
 		ans.Sources = []string{"bigquery.category_contributions"}
 		ans.Confidence = 0.88
 	case IntentSellIn:
-		filter := sellInFilterForPeriod(period, time.Now())
+		filter, okPeriod := sellInFilterForPeriod(period, time.Now())
+		if !okPeriod {
+			// Sell-In is monthly — TODAY has no day grain; do not fake MTD.
+			text, ev = unsupportedTodaySellIn()
+			ans.Intent = IntentUnsupported
+			ans.Confidence = 0.35
+			ans.Sources = []string{"bigquery.sell_in_records"}
+			break
+		}
 		recs, total, e := s.data.GetSellInRecords(ctx, tenantID, filter)
 		err = e
 		var rev, units float64
@@ -143,7 +151,6 @@ func (s *Service) Ask(ctx context.Context, tenantID, question string) (*Answer, 
 				units += r.NetQtyCases
 			}
 		}
-		// Prefer full matched count from querier (not page length).
 		count := total
 		if count == 0 {
 			count = len(recs)
@@ -169,14 +176,14 @@ func (s *Service) Ask(ctx context.Context, tenantID, question string) (*Answer, 
 	ans.AnswerAR = text
 	ans.Evidence = ev
 
-	// Optional Gemini polish — verified against evidence; fabricated numbers → deterministic.
-	if intent != IntentUnsupported && !s.useMock {
-		if polished, ok := s.polishArabic(ctx, question, text, ev); ok && strings.TrimSpace(polished) != "" {
-			if polishPreservesClaims(polished, text, ev) {
+	// Optional Gemini narrative from metric+entity claims; otherwise keep deterministic.
+	if ans.Intent != IntentUnsupported && !s.useMock {
+		evidenceClaims := claimsFromEvidence(ev)
+		if polished, used, ok := s.polishArabic(ctx, question, text, ev); ok && strings.TrimSpace(polished) != "" {
+			if polishPreservesClaims(polished, used, evidenceClaims) {
 				ans.AnswerAR = polished
 				ans.MappingSource = sourceAI
 			}
-			// else keep deterministic text / mapping_source
 		}
 	}
 

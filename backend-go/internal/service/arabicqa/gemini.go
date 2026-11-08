@@ -50,7 +50,8 @@ type geminiResponse struct {
 }
 
 type polishPayload struct {
-	AnswerAR string `json:"answer_ar"`
+	AnswerAR string  `json:"answer_ar"`
+	Claims   []Claim `json:"claims"`
 }
 
 func redactKey(msg, apiKey string) string {
@@ -60,105 +61,110 @@ func redactKey(msg, apiKey string) string {
 	return strings.ReplaceAll(msg, apiKey, "[REDACTED]")
 }
 
-// polishArabic asks Gemini to rephrase a grounded Arabic answer without changing numbers.
-func (s *Service) polishArabic(ctx context.Context, question, grounded string, evidence map[string]interface{}) (string, bool) {
-	evJSON, _ := json.Marshal(evidence)
+// polishArabic asks Gemini to narrate only from metric+entity claims.
+func (s *Service) polishArabic(ctx context.Context, question, grounded string, evidence map[string]interface{}) (string, []Claim, bool) {
+	claims := claimsFromEvidence(evidence)
+	claimsJSON, _ := json.Marshal(claims)
 	prompt := fmt.Sprintf(`أنت مساعد عربي لبيانات مبيعات بالتجزئة.
-أعد صياغة الإجابة التالية بالعربية الفصحى المبسطة دون تغيير أي رقم أو اسم سلسلة أو منتج.
-لو مفيش أرقام في الأدلة، ارفض الاختراع وارجّع نفس النص.
-أرجع JSON فقط بالشكل: {"answer_ar":"..."}.
+اكتب إجابة عربية من الـ claims فقط. كل claim مربوط بـ metric + entity + value.
+ممنوع اختراع أرقام أو نقل قيمة من entity لـ entity تانية.
+أرجع JSON فقط:
+{"answer_ar":"...","claims":[{"metric":"...","entity":"...","value":0,"display":"..."}]}
+claims في الرد لازم تكون subset من claims الأدلة (نفس metric+entity+value).
 
 السؤال: %s
 الإجابة المؤسسة: %s
-الأدلة (JSON): %s`, question, grounded, string(evJSON))
+claims الأدلة: %s`, question, grounded, string(claimsJSON))
 
 	raw, err := s.callGeminiJSON(ctx, s.model, prompt)
 	if err != nil {
-		return "", false
+		return "", nil, false
 	}
 	var p polishPayload
 	if err := json.Unmarshal([]byte(raw), &p); err != nil {
-		// Some models wrap JSON in fences — try a light trim.
 		raw = strings.TrimSpace(raw)
 		raw = strings.TrimPrefix(raw, "```json")
 		raw = strings.TrimPrefix(raw, "```")
 		raw = strings.TrimSuffix(raw, "```")
 		raw = strings.TrimSpace(raw)
 		if err2 := json.Unmarshal([]byte(raw), &p); err2 != nil {
-			return "", false
+			return "", nil, false
 		}
 	}
 	out := strings.TrimSpace(p.AnswerAR)
 	if out == "" {
-		return "", false
+		return "", nil, false
 	}
-	return out, true
+	return out, p.Claims, true
 }
 
-// polishPreservesClaims rejects Gemini output that invents numbers absent from
-// the grounded answer / evidence, or drops every key evidence figure.
-func polishPreservesClaims(polished, grounded string, evidence map[string]interface{}) bool {
-	allowed := map[string]bool{}
-	for _, n := range numberToken.FindAllString(grounded, -1) {
-		allowed[canonicalizeNumber(n)] = true
+// polishPreservesClaims requires Gemini's used claims to be an exact metric+entity
+// subset of evidence claims (same value), and the narrative numbers to come only
+// from those bound claims — so entity/value swaps are rejected.
+func polishPreservesClaims(polished string, used, evidence []Claim) bool {
+	if strings.TrimSpace(polished) == "" {
+		return false
 	}
-	collectEvidenceNumbers(evidence, allowed)
-	if len(allowed) == 0 {
-		// No numeric claims to check — accept non-empty polish.
-		return strings.TrimSpace(polished) != ""
+	idx := claimIndex(evidence)
+	if len(idx) == 0 {
+		return false
 	}
-
-	polishedNums := numberToken.FindAllString(polished, -1)
-	for _, n := range polishedNums {
-		if !allowed[canonicalizeNumber(n)] {
-			return false // fabricated
+	if len(used) == 0 {
+		// No structured claims returned — fall back to number-only check against evidence values.
+		return numbersOnlyFromClaims(polished, evidence)
+	}
+	allowedNums := map[string]bool{}
+	for _, u := range used {
+		ev, ok := idx[u.key()]
+		if !ok || !sameValue(ev.Value, u.Value) {
+			return false // unknown metric+entity or swapped value
+		}
+		for _, n := range numbersFromValue(u.Value) {
+			allowedNums[canonicalizeNumber(n)] = true
+		}
+		for _, n := range numberToken.FindAllString(u.Display, -1) {
+			allowedNums[canonicalizeNumber(n)] = true
 		}
 	}
-
-	// At least one key evidence number must still appear when evidence has keys.
-	keys := []string{"total_revenue", "total_net_value", "total_units_sold", "total_units", "record_count", "active_stores_count"}
-	required := map[string]bool{}
-	for _, k := range keys {
-		if v, ok := evidence[k]; ok {
-			for _, n := range numbersFromValue(v) {
-				required[canonicalizeNumber(n)] = true
+	for _, n := range numberToken.FindAllString(polished, -1) {
+		if !allowedNums[canonicalizeNumber(n)] {
+			return false
+		}
+	}
+	// At least one used claim value must appear in the narrative.
+	for _, u := range used {
+		for _, n := range numbersFromValue(u.Value) {
+			if strings.Contains(polished, n) || strings.Contains(polished, fmt.Sprintf("%.2f", u.Value)) {
+				return true
 			}
-		}
-	}
-	if len(required) == 0 {
-		return true
-	}
-	seen := map[string]bool{}
-	for _, n := range polishedNums {
-		seen[canonicalizeNumber(n)] = true
-	}
-	for n := range required {
-		if seen[n] {
-			return true
+			if canonicalizeNumber(n) != n && strings.Contains(polished, canonicalizeNumber(n)) {
+				return true
+			}
 		}
 	}
 	return false
 }
 
-func collectEvidenceNumbers(v interface{}, into map[string]bool) {
-	switch x := v.(type) {
-	case map[string]interface{}:
-		for _, child := range x {
-			collectEvidenceNumbers(child, into)
-		}
-	case []interface{}:
-		for _, child := range x {
-			collectEvidenceNumbers(child, into)
-		}
-	case []map[string]interface{}:
-		for _, child := range x {
-			collectEvidenceNumbers(child, into)
-		}
-	default:
-		for _, n := range numbersFromValue(x) {
-			into[canonicalizeNumber(n)] = true
+func numbersOnlyFromClaims(polished string, evidence []Claim) bool {
+	allowed := map[string]bool{}
+	for _, c := range evidence {
+		for _, n := range numbersFromValue(c.Value) {
+			allowed[canonicalizeNumber(n)] = true
 		}
 	}
+	if len(allowed) == 0 {
+		return false
+	}
+	nums := numberToken.FindAllString(polished, -1)
+	if len(nums) == 0 {
+		return false
+	}
+	for _, n := range nums {
+		if !allowed[canonicalizeNumber(n)] {
+			return false
+		}
+	}
+	return true
 }
 
 func numbersFromValue(v interface{}) []string {
@@ -186,7 +192,6 @@ func canonicalizeNumber(s string) string {
 		return s
 	}
 	if f, err := strconv.ParseFloat(s, 64); err == nil {
-		// Collapse 120000.00 and 120000.
 		if f == float64(int64(f)) {
 			return strconv.FormatInt(int64(f), 10)
 		}
