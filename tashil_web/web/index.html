@@ -7,18 +7,6 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Tashil Data Sharing Platform">
   <meta name="theme-color" content="#0B57D0">
-  <!-- Logical CSS pixels must match Flutter semantics hit boxes. -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    /* Anchor semantics host at the view origin (WebKit static-position bug).
-       Do not inject inverse-DPR transforms here — that fights the engine and
-       makes Playwright report flutter-view intercepting clicks. */
-    flt-semantics-host {
-      position: absolute;
-      left: 0;
-      top: 0;
-    }
-  </style>
 
   <!-- Favicon & Browser Tab Icons (Cache-busted for immediate browser refresh) -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=20261016b">
@@ -43,6 +31,7 @@
   <link rel="manifest" href="manifest.json?v=20261016b">
 </head>
 <body>
+  <!-- Persistent #tashil-file-input is created by WebFileHelper.ensureMounted after first frame. -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

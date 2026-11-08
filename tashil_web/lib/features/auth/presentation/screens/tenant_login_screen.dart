@@ -34,8 +34,6 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _emailFocus = FocusNode();
-  final _passwordFocus = FocusNode();
   bool _obscurePassword = true;
   bool _rememberMe = false;
   bool _isLoading = false;
@@ -87,8 +85,6 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
     _animationController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _emailFocus.dispose();
-    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -411,17 +407,17 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      // Email field
-                                      TestSemantics.textField(
+                                      // Email field — keep child TextField semantics
+                                      // (excludeSemantics/onTap wrappers make web
+                                      // flt-semantics pointer-events:none → flutter-view intercepts).
+                                      TestSemantics(
                                         identifier: TestIds.loginEmail,
                                         label: isArabic
                                             ? 'البريد الإلكتروني'
                                             : 'Email',
-                                        onFocus: () =>
-                                            _emailFocus.requestFocus(),
+                                        textField: true,
                                         child: TextFormField(
                                           controller: _emailController,
-                                          focusNode: _emailFocus,
                                           keyboardType:
                                               TextInputType.emailAddress,
                                           textInputAction: TextInputAction.next,
@@ -456,17 +452,16 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
 
                                       const SizedBox(height: 16),
 
-                                      // Password field
-                                      TestSemantics.textField(
+                                      // Password field — same as email: do not
+                                      // exclude child semantics on web.
+                                      TestSemantics(
                                         identifier: TestIds.loginPassword,
                                         label: isArabic
                                             ? 'كلمة المرور'
                                             : 'Password',
-                                        onFocus: () =>
-                                            _passwordFocus.requestFocus(),
+                                        textField: true,
                                         child: TextFormField(
                                           controller: _passwordController,
-                                          focusNode: _passwordFocus,
                                           keyboardType:
                                               TextInputType.visiblePassword,
                                           textInputAction: TextInputAction.done,
@@ -598,14 +593,12 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                       // Login Button
                                       SizedBox(
                                         width: double.infinity,
-                                        child: TestSemantics.button(
+                                        child: TestSemantics(
                                           identifier: TestIds.loginSubmit,
                                           label: isArabic
                                               ? 'تسجيل الدخول'
                                               : 'Login',
-                                          onPressed: _isLoading
-                                              ? null
-                                              : _handleLogin,
+                                          button: true,
                                           child: FilledButton(
                                             onPressed: _isLoading
                                                 ? null

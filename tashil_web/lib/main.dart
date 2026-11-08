@@ -36,9 +36,11 @@ void main() {
     // Expose the semantics tree in the DOM (flt-semantics-*) for web
     // automation (Playwright / Maestro / Patrol) without manual activation.
     SemanticsBinding.instance.ensureSemantics();
-    // Persistent hidden <input type="file"> for user-activation picks and
-    // Playwright setInputFiles (see WebFileHelper / #tashil-file-input).
-    WebFileHelper.ensureMounted();
+    // Mount persistent #tashil-file-input after the first frame so it cannot
+    // disturb Flutter web's initial semantics / hit-test host setup.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WebFileHelper.ensureMounted();
+    });
   }
   runApp(const TashilDataSharingApp());
 }
