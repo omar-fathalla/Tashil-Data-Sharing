@@ -25,8 +25,32 @@ void main() {
       );
 
   /// Fake backend storing custom SKUs in memory, like the Go endpoints.
+  /// Sell-out records include one live own-SKU row so production path never falls back to seeds.
   MockClient fakeServer(List<Map<String, dynamic>> store, {bool failWrites = false}) {
     return MockClient((req) async {
+      if (req.url.path.contains('/api/v1/analytics/records')) {
+        return _json(
+          jsonEncode({
+            'records': [
+              {
+                'record_id': 'live-own-1',
+                'retailer_chain': 'fathalla',
+                'store_id': 's1',
+                'store_name': 'فرع',
+                'barcode': ownBarcode,
+                'sku_name': 'فيبا 3 كجم',
+                'category': 'صابون سائل اطباق',
+                'quantity_sold': 10,
+                'net_revenue': 1600.0,
+                'unit_price': 160.0,
+                'transaction_date': '2026-05-15',
+              },
+            ],
+            'total_count': 1,
+          }),
+          200,
+        );
+      }
       if (!req.url.path.startsWith('/api/v1/competitors/custom-skus')) {
         return http.Response('{"records":[]}', 200);
       }

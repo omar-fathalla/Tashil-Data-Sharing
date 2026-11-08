@@ -138,4 +138,64 @@ void main() {
     );
     expect(CompetitorMonthOptions.build(const [], year: 2026), isEmpty);
   });
+
+  test('live set with own May–Oct only → seeded competitors without live have no months', () async {
+    const own = '6223000239438';
+    // Pril competitor barcode from seeds — intentionally absent from live rows.
+    const pril = '6221143099674';
+    await http.runWithClient(() async {
+      final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
+      final groups = await api.getCompetitiveComparisonGroups(chain: 'fathalla', year: 2026, month: 0);
+      final ownGroup = groups.firstWhere((g) => g.ownBarcode == own);
+      expect(ownGroup.monthlyPrices.map((p) => p.monthNum).toList(), [5, 6, 7, 8, 9, 10]);
+      expect(ownGroup.monthlyPrices.any((p) => p.monthNum <= 4), isFalse);
+      // Seeded Pril must not appear with Jan–Apr seed prices when it has no live rows.
+      expect(ownGroup.competitors.any((c) => c.barcode == pril), isFalse);
+    }, () => MockClient((req) async {
+      if (!req.url.path.contains('/api/v1/analytics/records')) {
+        return http.Response(jsonEncode({'custom_skus': [], 'count': 0}), 200);
+      }
+      final records = [
+        for (var m = 5; m <= 10; m++)
+          _rec(m, date: '2026-${m.toString().padLeft(2, '0')}-15', barcode: own),
+      ];
+      return http.Response(
+        jsonEncode({'records': records, 'total_count': records.length}),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    }));
+  });
+
+  test('truncation → partial live + warning, never seed Jan–Apr', () async {
+    const own = '6223000239438';
+    const total = 1500;
+    const cap = 500;
+    await http.runWithClient(() async {
+      final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
+      api.debugSellOutMaxRows = cap;
+      final groups = await api.getCompetitiveComparisonGroups(chain: 'fathalla', year: 2026, month: 0);
+      expect(api.lastSellOutPaginationWarning, isNotNull);
+      expect(groups, isNotEmpty);
+      final g = groups.firstWhere((x) => x.ownBarcode == own);
+      // Partial live is May-only — seed Jan–Apr must never appear after truncation.
+      expect(g.monthlyPrices.map((p) => p.monthNum).toSet(), {5});
+      expect(g.monthlyPrices.any((p) => p.monthNum <= 4), isFalse);
+    }, () => MockClient((req) async {
+      if (!req.url.path.contains('/api/v1/analytics/records')) {
+        return http.Response(jsonEncode({'custom_skus': [], 'count': 0}), 200);
+      }
+      final offset = int.parse(req.url.queryParameters['offset'] ?? '0');
+      final limit = int.parse(req.url.queryParameters['limit'] ?? '50');
+      final page = <Map<String, dynamic>>[];
+      for (var i = 0; i < limit && offset + i < total; i++) {
+        page.add(_rec(offset + i, date: '2026-05-15', barcode: own));
+      }
+      return http.Response(
+        jsonEncode({'records': page, 'total_count': total}),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    }));
+  });
 }

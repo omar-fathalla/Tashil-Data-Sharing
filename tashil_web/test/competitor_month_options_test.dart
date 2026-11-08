@@ -69,6 +69,32 @@ void main() {
     expect(merged.containsKey('2026-04'), isFalse);
   });
 
+  test('competitor with no live in live mode → empty (never seeds)', () {
+    final seedJanApr = <String, ({double price, int units})>{
+      '2026-01': (price: 140, units: 10),
+      '2026-02': (price: 145, units: 10),
+      '2026-03': (price: 150, units: 10),
+      '2026-04': (price: 155, units: 10),
+    };
+    // Live set has other products; this competitor barcode has none.
+    final merged = ApiClient.mergeMonthlyData(seedJanApr, null, allowSeeds: false);
+    expect(merged, isEmpty);
+    expect(
+      ApiClient.buildMonthlyPriceTrajectory(merged, filterYear: 2026),
+      isEmpty,
+    );
+  });
+
+  test('demo/offline allowSeeds still returns seed map when no live', () {
+    final seed = <String, ({double price, int units})>{
+      '2026-01': (price: 100, units: 1),
+    };
+    expect(
+      ApiClient.mergeMonthlyData(seed, null, allowSeeds: true).keys,
+      ['2026-01'],
+    );
+  });
+
   test('empty API → no seed months in picker', () {
     final resolved = CompetitorMonthOptions.resolveDataMonths(apiMonths: const []);
     expect(resolved, isEmpty);

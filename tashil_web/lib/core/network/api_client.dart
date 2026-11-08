@@ -10473,15 +10473,18 @@ class ApiClient {
   }
 
   /// Monthly maps for competitive comparison.
-  /// When live data exists for a barcode, use **only** live months (no seed leftovers).
-  /// Seeds are used only when that barcode has no live rows (offline / empty year).
+  /// - Live rows for the barcode → live-only (never seed leftovers).
+  /// - No live rows + [allowSeeds] false (production / live mode) → empty (never seeds).
+  /// - No live rows + [allowSeeds] true (explicit demo/offline only) → seed map.
   static Map<String, ({double price, int units})> mergeMonthlyData(
     Map<String, ({double price, int units})> seed,
-    Map<String, ({double price, int units})>? live,
-  ) {
+    Map<String, ({double price, int units})>? live, {
+    bool allowSeeds = false,
+  }) {
     if (live != null && live.isNotEmpty) {
       return Map<String, ({double price, int units})>.from(live);
     }
+    if (!allowSeeds) return const {};
     return Map<String, ({double price, int units})>.from(seed);
   }
 
@@ -10494,6 +10497,10 @@ class ApiClient {
 
   /// Set when [getRecordsAllPages] hits [sellOutRecordsMaxRows] with pages still remaining.
   String? lastSellOutPaginationWarning;
+
+  /// Test-only override for the competitive-comparison fetch safety cap.
+  @visibleForTesting
+  int? debugSellOutMaxRows;
 
   /// Whether another offset page is needed after [fetchedSoFar] rows from a page of [pageLength].
   static bool sellOutRecordsHasMorePage({
@@ -10959,11 +10966,12 @@ class ApiClient {
         category: (category != null && category != 'all' && category != 'الكل') ? category : null,
         startDate: startDate,
         endDate: endDate,
+        maxRows: debugSellOutMaxRows ?? sellOutRecordsMaxRows,
       );
     } on SellOutRecordsTruncatedException catch (e) {
-      // Visible warning already set on [lastSellOutPaginationWarning]; do not merge
-      // a silent partial year into competitive series — keep live empty for this load.
-      liveRecords = const [];
+      // Visible warning on [lastSellOutPaginationWarning]; keep partial live so we
+      // never fall through to seed Jan–Apr while claiming a live year.
+      liveRecords = e.partial;
       debugPrint('[ApiClient] competitive comparison: ${e.message}');
     } catch (_) {}
 
@@ -11027,8 +11035,11 @@ class ApiClient {
     }
 
     final liveByBarcode = aggregateLiveMonthlyByBarcode(liveRecords);
+    // Production / live year: never inject seed monthly prices. Seeds only when there is
+    // no live data at all and mock/demo fallback is explicitly enabled.
+    final allowSeedMonths = liveRecords.isEmpty && allowMockFallback;
 
-    // Seeded competitive groups (historical Jan–Apr extracts) are extended by live uploads.
+    // Group structure (barcodes / brands). Monthly prices come from live or gated seeds.
     final rawDefs = <_RawCompetitiveGroupSeed>[
       // 1. صابون سائل اطباق - فيبا 3 كجم
       const _RawCompetitiveGroupSeed(
@@ -11871,7 +11882,11 @@ class ApiClient {
 
     for (final seed in rawDefs) {
       final ownPack = extractPackVolume(seed.ownSkuName);
-      final ownMonthly = mergeMonthlyData(seed.monthlyData, liveByBarcode[seed.ownBarcode]);
+      final ownMonthly = mergeMonthlyData(
+        seed.monthlyData,
+        liveByBarcode[seed.ownBarcode],
+        allowSeeds: allowSeedMonths,
+      );
       final ownResolved = resolvePeriodMetrics(ownMonthly, year, month);
       final effectiveOwnPrice = ownResolved.price;
       if (effectiveOwnPrice <= 0) continue;
@@ -11903,7 +11918,11 @@ class ApiClient {
       })>[];
 
       for (final c in compSeeds) {
-        final compMonthly = mergeMonthlyData(c.monthlyData, liveByBarcode[c.barcode]);
+        final compMonthly = mergeMonthlyData(
+          c.monthlyData,
+          liveByBarcode[c.barcode],
+          allowSeeds: allowSeedMonths,
+        );
         final cm = resolvePeriodMetrics(compMonthly, year, month);
         if (cm.price <= 0) continue;
         totalCatRev += cm.price * cm.units;
