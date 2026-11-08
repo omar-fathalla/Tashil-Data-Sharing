@@ -33,6 +33,13 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Refresh before credential check so peer password/Active changes converge
+	// (single-instance stopgap still applies; see docs/DEPLOY.md).
+	if err := h.fsRepo.EnsureAuthUsersFresh(r.Context()); err != nil {
+		http.Error(w, `{"error":"authentication service unavailable"}`, http.StatusServiceUnavailable)
+		return
+	}
+
 	var req domain.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)

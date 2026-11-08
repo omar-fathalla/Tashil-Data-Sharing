@@ -229,8 +229,8 @@ func main() {
 	// 5. Setup Mux Router (Go 1.22+ method + path patterns)
 	mux := http.NewServeMux()
 
-	// Public Health Probes
-	mux.HandleFunc("GET /healthz", handlers.Healthz)
+	// Public Health Probes — readiness fails closed if auth users did not load safely.
+	mux.HandleFunc("GET /healthz", handlers.HealthzWithAuth(fsRepo))
 	mux.HandleFunc("GET /api/v1/version", handlers.Version)
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

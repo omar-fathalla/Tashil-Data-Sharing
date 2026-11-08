@@ -8,10 +8,28 @@ Pushing to `main` runs `.github/workflows/deploy.yml`:
    (#37); other settings (CPU always on, startup boost, gen2, archive volume, env vars and
    secrets incl. `BIGQUERY_SINK_ENABLED=true`) are kept. The commit SHA is written to
    `backend-go/data/build_commit.txt`, so `/api/v1/version` reports it.
+   **Skip rule:** on `push` to `main`, Cloud Run deploy is skipped only when `backend-go/` and
+   `.github/workflows/deploy.yml` are unchanged versus the **live** `/api/v1/version` `git_commit`
+   (not `github.event.before`). That way a failed backend deploy followed by a web-only push still
+   redeploys the backend. Empty, unreachable, or **malformed** live version JSON fail-safe to
+   redeploy (`deploy=true`); they must not abort the job. `workflow_dispatch` always redeploys.
 3. Web: `flutter build web --dart-define=APP_VERSION=<n>` and `firebase deploy --only hosting`.
 
 Docs-only changes (`**.md`, `docs/**`) do not deploy. Runs are serialized (`deploy-production`
 concurrency group, never cancelled mid-deploy). It can also be started by hand (workflow_dispatch).
+
+## Auth durability (single-instance stopgap)
+
+Login users are hydrated from Firestore `tenant_users` at startup (seed only when the collection
+is empty). Password / Active updates **persist to Firestore before** they become visible to
+`GetUserByEmail` on that instance. Login also calls `EnsureAuthUsersFresh` so a peer (or a
+restarted) instance converges within a few seconds.
+
+**Until Cloud Run stays at one instance**, treat auth as single-writer/single-reader in practice.
+Raising `max-instances` without a durable watch/versioned auth path will leave other instances
+accepting stale passwords/Active until refresh/restart. Keep `--min-instances=1 --max-instances=1`
+when integrating deploy.yml changes (#30 skip logic, #39 pin, #26 memory). The CI pin guard is
+`scripts/check_cloud_run_one_instance.sh` (see `ci.yml`).
 
 ## Web version number
 

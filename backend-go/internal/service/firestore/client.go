@@ -1,11 +1,11 @@
 package firestore
 
 import (
-	"github.com/tashil/data-sharing/backend/internal/service/customers"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/tashil/data-sharing/backend/internal/service/customers"
 	"log"
 	"os"
 	"sort"
@@ -40,6 +40,9 @@ type Repository interface {
 	ListTenantProfiles(ctx context.Context) ([]domain.TenantProfile, error)
 	SaveTenantProfile(ctx context.Context, profile *domain.TenantProfile) error
 	DeleteTenantProfile(ctx context.Context, slug string) error
+	AuthReady() error
+	EnsureAuthUsersFresh(ctx context.Context) error
+	RefreshAuthUsers(ctx context.Context) error
 	GetUserByEmail(ctx context.Context, tenantID string, email string) (*domain.TenantUser, error)
 	GetUserByID(ctx context.Context, userID string) (*domain.TenantUser, error)
 	GetUserByResetToken(ctx context.Context, token string) (*domain.TenantUser, error)
@@ -81,21 +84,31 @@ type Repository interface {
 // Client implements Repository with fast in-memory storage for Cloud Run and local tests,
 // synchronized in real-time with Google Cloud Firestore.
 type Client struct {
-	mu                 sync.RWMutex
-	fsClient           *cloudFirestore.Client
-	projectID          string
-	databaseID         string
-	tenants            map[string]domain.Tenant
-	tenantProfiles     map[string]domain.TenantProfile
-	users              map[string]domain.TenantUser
-	stores             map[string][]domain.Store
-	retailChains       map[string]domain.RetailChain
-	tenantRetailChains map[string]map[string]domain.RetailChain
-	batches            []domain.IngestionBatch
-	alerts             []domain.OOSAlert
-	auditLogs          []domain.AuditLogEntry
-	cleanedTenants     map[string]bool
-	deletedArchives    map[string]bool
+	mu                sync.RWMutex
+	fsClient          *cloudFirestore.Client
+	projectID         string
+	databaseID        string
+	tenants           map[string]domain.Tenant
+	tenantProfiles    map[string]domain.TenantProfile
+	users             map[string]domain.TenantUser
+	userByTenantEmail map[string]string // "tenant|email" → userID (deduped login index)
+	authReady         bool
+	authErr           error
+	authRefreshedAt   time.Time
+	// Per-user write gates serialize persist-then-publish so a failed older
+	// write cannot roll back or race a newer successful update.
+	userWriteGatesMu sync.Mutex
+	userWriteGates   map[string]*sync.Mutex
+	// Optional test seam; when set, replaces the Firestore Set path.
+	persistTenantUserFn func(ctx context.Context, u domain.TenantUser) error
+	stores              map[string][]domain.Store
+	retailChains        map[string]domain.RetailChain
+	tenantRetailChains  map[string]map[string]domain.RetailChain
+	batches             []domain.IngestionBatch
+	alerts              []domain.OOSAlert
+	auditLogs           []domain.AuditLogEntry
+	cleanedTenants      map[string]bool
+	deletedArchives     map[string]bool
 
 	// Trade marketing expenses (see trade_marketing.go)
 	tmMu       sync.RWMutex
@@ -116,6 +129,9 @@ type Client struct {
 	leases       map[string]memLease
 }
 
+// Reserved auth identity that must never be overwritten by Firestore tenant_users docs.
+const reservedSuperAdminUserID = "user-super-admin"
+
 // NewClient constructs the Firestore repository with initial seeded entities and live Cloud Firestore sync.
 func NewClient(databaseID string, useMock bool) *Client {
 	c := &Client{
@@ -123,6 +139,8 @@ func NewClient(databaseID string, useMock bool) *Client {
 		tenants:            make(map[string]domain.Tenant),
 		tenantProfiles:     make(map[string]domain.TenantProfile),
 		users:              make(map[string]domain.TenantUser),
+		userByTenantEmail:  make(map[string]string),
+		userWriteGates:     make(map[string]*sync.Mutex),
 		stores:             make(map[string][]domain.Store),
 		retailChains:       make(map[string]domain.RetailChain),
 		tenantRetailChains: make(map[string]map[string]domain.RetailChain),
@@ -151,27 +169,292 @@ func NewClient(databaseID string, useMock bool) *Client {
 			c.fsClient = fsClient
 			log.Printf("[Firestore] Connected to Cloud Firestore database '%s' in project '%s'", dbID, projectID)
 		} else {
-			log.Printf("[Firestore] Warning: Could not connect to Cloud Firestore (%v). Using memory repository.", err)
+			log.Printf("[Firestore] Error: Could not connect to Cloud Firestore (%v). Auth will not be ready.", err)
+			c.authReady = false
+			c.authErr = fmt.Errorf("firestore unavailable: %w", err)
 		}
 	}
 
-	c.initAndSyncMetadata()
+	c.initAndSyncMetadata(useMock)
 	return c
 }
 
-func (c *Client) initAndSyncMetadata() {
+func (c *Client) initAndSyncMetadata(useMock bool) {
 	c.seedMetadata()
 
-	if c.fsClient != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
+	c.mu.Lock()
+	c.rebuildUserEmailIndexLocked()
+	if useMock {
+		c.authReady = true
+		c.authErr = nil
+		c.authRefreshedAt = time.Now()
+		c.mu.Unlock()
+		return
+	}
+	c.mu.Unlock()
 
-		c.syncRetailChainsFromFirestore(ctx)
-		c.syncTenantProfilesFromFirestore(ctx)
-		if err := c.syncDeletedArchivesFromFirestore(ctx); err != nil {
-			log.Printf("[Firestore] Warning: deleted_archives refresh at startup: %v", err)
+	if c.fsClient == nil {
+		// Production without Firestore: do not serve seed-only auth.
+		c.mu.Lock()
+		c.stripNonReservedUsersLocked()
+		if c.authErr == nil {
+			c.authErr = fmt.Errorf("firestore client not connected")
+		}
+		c.authReady = false
+		c.mu.Unlock()
+		return
+	}
+
+	// Non-auth metadata keeps its own timeout (best-effort).
+	metaCtx, metaCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	c.syncRetailChainsFromFirestore(metaCtx)
+	c.syncTenantProfilesFromFirestore(metaCtx)
+	if err := c.syncDeletedArchivesFromFirestore(metaCtx); err != nil {
+		log.Printf("[Firestore] Warning: deleted_archives refresh at startup: %v", err)
+	}
+	metaCancel()
+
+	// Auth load is atomic, retried, and gates readiness.
+	if err := c.loadAuthUsersWithRetry(); err != nil {
+		log.Printf("[Firestore] Auth user hydration failed: %v", err)
+	}
+}
+
+func isReservedAuthUserID(userID string) bool {
+	return strings.EqualFold(strings.TrimSpace(userID), reservedSuperAdminUserID)
+}
+
+func normalizeAuthTenant(tenantID string) string {
+	return strings.TrimPrefix(strings.ToLower(strings.TrimSpace(tenantID)), "tenant-")
+}
+
+func authEmailKey(tenantID, email string) string {
+	return normalizeAuthTenant(tenantID) + "|" + strings.ToLower(strings.TrimSpace(email))
+}
+
+// preferAuthUser picks a deterministic winner for duplicate tenant+email docs.
+func preferAuthUser(a, b domain.TenantUser) domain.TenantUser {
+	if a.Active != b.Active {
+		if b.Active {
+			return b
+		}
+		return a
+	}
+	if a.UserID <= b.UserID {
+		return a
+	}
+	return b
+}
+
+func (c *Client) stripNonReservedUsersLocked() {
+	for id := range c.users {
+		if !isReservedAuthUserID(id) {
+			delete(c.users, id)
 		}
 	}
+	c.rebuildUserEmailIndexLocked()
+}
+
+func (c *Client) rebuildUserEmailIndexLocked() {
+	c.userByTenantEmail = make(map[string]string, len(c.users))
+	for id, u := range c.users {
+		if isReservedAuthUserID(id) || u.Role == domain.RoleSuperAdmin {
+			continue
+		}
+		key := authEmailKey(u.TenantID, u.Email)
+		if key == "|" || strings.HasSuffix(key, "|") {
+			continue
+		}
+		if prevID, ok := c.userByTenantEmail[key]; ok {
+			c.userByTenantEmail[key] = preferAuthUser(c.users[prevID], u).UserID
+			continue
+		}
+		c.userByTenantEmail[key] = id
+	}
+}
+
+// applyLoadedTenantUsers atomically replaces login users from a successful Firestore read.
+// Empty docs ⇒ seed-only (keep seedMetadata users). Non-empty ⇒ Firestore-only (+ protected super-admin).
+func (c *Client) applyLoadedTenantUsers(docs []domain.TenantUser) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	super, hasSuper := c.users[reservedSuperAdminUserID]
+
+	if len(docs) == 0 {
+		// Successful empty read: seeds remain authoritative.
+		c.rebuildUserEmailIndexLocked()
+		c.authReady = true
+		c.authErr = nil
+		c.authRefreshedAt = time.Now()
+		log.Printf("[Firestore] tenant_users empty; using seed auth users")
+		return
+	}
+
+	next := make(map[string]domain.TenantUser)
+	if hasSuper {
+		next[reservedSuperAdminUserID] = super
+	}
+
+	byKey := make(map[string]domain.TenantUser)
+	skippedReserved := 0
+	for _, u := range docs {
+		if u.UserID == "" || strings.TrimSpace(u.Email) == "" {
+			continue
+		}
+		if isReservedAuthUserID(u.UserID) || u.Role == domain.RoleSuperAdmin {
+			skippedReserved++
+			continue
+		}
+		key := authEmailKey(u.TenantID, u.Email)
+		if prev, ok := byKey[key]; ok {
+			log.Printf("[Firestore] duplicate tenant_users for %s (ids %s, %s); keeping deterministic winner", key, prev.UserID, u.UserID)
+			byKey[key] = preferAuthUser(prev, u)
+			continue
+		}
+		byKey[key] = u
+	}
+	for _, u := range byKey {
+		next[u.UserID] = u
+	}
+
+	c.users = next
+	c.rebuildUserEmailIndexLocked()
+	c.authReady = true
+	c.authErr = nil
+	c.authRefreshedAt = time.Now()
+	log.Printf("[Firestore] Auth users loaded atomically from Firestore: %d unique (skipped_reserved=%d)", len(byKey), skippedReserved)
+}
+
+func (c *Client) markAuthLoadFailed(err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.stripNonReservedUsersLocked()
+	c.authReady = false
+	c.authErr = err
+}
+
+func (c *Client) fetchAllTenantUsers(ctx context.Context) ([]domain.TenantUser, error) {
+	if c.fsClient == nil {
+		return nil, fmt.Errorf("firestore client not connected")
+	}
+	iter := c.fsClient.Collection("tenant_users").Documents(ctx)
+	defer iter.Stop()
+
+	var out []domain.TenantUser
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			return out, nil
+		}
+		if err != nil {
+			// Fail the whole load — never apply a partial snapshot.
+			return nil, err
+		}
+		var u domain.TenantUser
+		if err := doc.DataTo(&u); err != nil {
+			return nil, fmt.Errorf("decode tenant_users/%s: %w", doc.Ref.ID, err)
+		}
+		if u.UserID == "" {
+			u.UserID = doc.Ref.ID
+		}
+		if u.UserID == "" || strings.TrimSpace(u.Email) == "" {
+			continue
+		}
+		out = append(out, u)
+	}
+}
+
+func (c *Client) loadAuthUsersWithRetry() error {
+	const attempts = 3
+	var lastErr error
+	for i := 1; i <= attempts; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		docs, err := c.fetchAllTenantUsers(ctx)
+		cancel()
+		if err == nil {
+			c.applyLoadedTenantUsers(docs)
+			return nil
+		}
+		lastErr = err
+		log.Printf("[Firestore] auth user load attempt %d/%d failed: %v", i, attempts, err)
+		time.Sleep(time.Duration(i) * 400 * time.Millisecond)
+	}
+	err := fmt.Errorf("auth user load failed after %d attempts: %w", attempts, lastErr)
+	c.markAuthLoadFailed(err)
+	return err
+}
+
+// AuthReady reports whether login may proceed against a trusted user snapshot.
+func (c *Client) AuthReady() error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.authReady {
+		return nil
+	}
+	if c.authErr != nil {
+		return c.authErr
+	}
+	return fmt.Errorf("auth users not ready")
+}
+
+const authRefreshTTL = 3 * time.Second
+
+// RefreshAuthUsers reloads tenant_users from Firestore and atomically replaces
+// the in-memory auth snapshot. On refresh failure, a previously ready snapshot
+// is kept (soft) so a transient FS blip does not take login down; if auth was
+// never ready, the error is returned.
+//
+// Multi-instance note: password/Active changes on instance A are visible on B
+// only after B refreshes. Production is pinned to one Cloud Run instance until
+// shared-state work lands; login calls EnsureAuthUsersFresh so peers (if any)
+// converge within authRefreshTTL.
+func (c *Client) RefreshAuthUsers(ctx context.Context) error {
+	if c.fsClient == nil {
+		return c.AuthReady()
+	}
+	loadCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	docs, err := c.fetchAllTenantUsers(loadCtx)
+	if err != nil {
+		if readyErr := c.AuthReady(); readyErr == nil {
+			log.Printf("[Firestore] auth refresh failed (keeping prior snapshot): %v", err)
+			return nil
+		}
+		return err
+	}
+	c.applyLoadedTenantUsers(docs)
+	return nil
+}
+
+// EnsureAuthUsersFresh refreshes auth users when the snapshot is older than
+// authRefreshTTL (or not ready). Safe to call on every login.
+func (c *Client) EnsureAuthUsersFresh(ctx context.Context) error {
+	if err := c.AuthReady(); err != nil {
+		return c.RefreshAuthUsers(ctx)
+	}
+	c.mu.RLock()
+	age := time.Since(c.authRefreshedAt)
+	hasFS := c.fsClient != nil
+	c.mu.RUnlock()
+	if !hasFS || age < authRefreshTTL {
+		return nil
+	}
+	return c.RefreshAuthUsers(ctx)
+}
+
+func (c *Client) userWriteGate(userID string) *sync.Mutex {
+	c.userWriteGatesMu.Lock()
+	defer c.userWriteGatesMu.Unlock()
+	if c.userWriteGates == nil {
+		c.userWriteGates = make(map[string]*sync.Mutex)
+	}
+	m, ok := c.userWriteGates[userID]
+	if !ok {
+		m = &sync.Mutex{}
+		c.userWriteGates[userID] = m
+	}
+	return m
 }
 
 func (c *Client) syncRetailChainsFromFirestore(ctx context.Context) {
@@ -1643,6 +1926,7 @@ func (c *Client) DeleteTenantProfile(ctx context.Context, slug string) error {
 			delete(c.users, uid)
 		}
 	}
+	c.rebuildUserEmailIndexLocked()
 
 	if c.fsClient != nil {
 		go func(s string) {
@@ -1946,30 +2230,36 @@ func (c *Client) GetUserByEmail(ctx context.Context, tenantID string, email stri
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
+	if !c.authReady {
+		if c.authErr != nil {
+			return nil, fmt.Errorf("auth users not ready: %w", c.authErr)
+		}
+		return nil, fmt.Errorf("auth users not ready")
+	}
+
 	cleanEmail := strings.TrimSpace(strings.ToLower(email))
-	cleanTenant := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(tenantID)), "tenant-")
+	cleanTenant := normalizeAuthTenant(tenantID)
 
 	// Zero-plaintext cryptographic digest match for Super Admin
 	if security.IsSuperAdminEmailDigest(cleanEmail) {
-		if u, ok := c.users["user-super-admin"]; ok {
+		if u, ok := c.users[reservedSuperAdminUserID]; ok {
 			copyUser := u
 			copyUser.Email = cleanEmail
 			return &copyUser, nil
 		}
 	}
 
-	for _, u := range c.users {
-		if u.Role == domain.RoleSuperAdmin {
-			continue
-		}
-		if strings.ToLower(u.Email) == cleanEmail {
-			userTenant := strings.TrimPrefix(strings.ToLower(u.TenantID), "tenant-")
-			if cleanTenant != "" && userTenant == cleanTenant {
-				return &u, nil
-			}
+	if cleanTenant == "" {
+		return nil, fmt.Errorf("user not found")
+	}
+	key := authEmailKey(cleanTenant, cleanEmail)
+	if uid, ok := c.userByTenantEmail[key]; ok {
+		if u, ok := c.users[uid]; ok {
+			copyUser := u
+			return &copyUser, nil
 		}
 	}
-	return nil, fmt.Errorf("user not found for email '%s' and tenant '%s'", email, tenantID)
+	return nil, fmt.Errorf("user not found")
 }
 
 func (c *Client) GetUserByID(ctx context.Context, userID string) (*domain.TenantUser, error) {
@@ -2002,41 +2292,78 @@ func (c *Client) GetUserByResetToken(ctx context.Context, token string) (*domain
 	return nil, fmt.Errorf("reset token not recognized")
 }
 
-func (c *Client) SaveUser(ctx context.Context, user *domain.TenantUser) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.users[user.UserID] = *user
-	if c.fsClient != nil {
-		go func(u domain.TenantUser) {
-			bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			_, _ = c.fsClient.Collection("tenant_users").Doc(u.UserID).Set(bgCtx, u)
-		}(*user)
+func (c *Client) persistTenantUser(ctx context.Context, u domain.TenantUser) error {
+	if isReservedAuthUserID(u.UserID) || u.Role == domain.RoleSuperAdmin {
+		// Super Admin is digest/env backed — never write it into tenant_users.
+		return nil
+	}
+	if c.persistTenantUserFn != nil {
+		return c.persistTenantUserFn(ctx, u)
+	}
+	if c.fsClient == nil {
+		return nil
+	}
+	fsCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if _, err := c.fsClient.Collection("tenant_users").Doc(u.UserID).Set(fsCtx, u); err != nil {
+		return fmt.Errorf("persist tenant_users/%s: %w", u.UserID, err)
 	}
 	return nil
 }
 
-func (c *Client) UpdateUserPassword(ctx context.Context, userID string, passwordHash string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+func (c *Client) publishTenantUserLocked(user domain.TenantUser) {
+	c.users[user.UserID] = user
+	c.rebuildUserEmailIndexLocked()
+}
 
+// SaveUser persists the user to Firestore first, then publishes to the
+// in-memory login map. A failed persist never becomes visible to GetUserByEmail.
+// Per-user serialization prevents a failed older write from clobbering a newer success.
+func (c *Client) SaveUser(ctx context.Context, user *domain.TenantUser) error {
+	if user == nil || user.UserID == "" {
+		return fmt.Errorf("user id is required")
+	}
+
+	gate := c.userWriteGate(user.UserID)
+	gate.Lock()
+	defer gate.Unlock()
+
+	snapshot := *user
+	if err := c.persistTenantUser(ctx, snapshot); err != nil {
+		return err
+	}
+
+	c.mu.Lock()
+	c.publishTenantUserLocked(snapshot)
+	c.mu.Unlock()
+	return nil
+}
+
+// UpdateUserPassword persists the new hash before publishing it for login.
+func (c *Client) UpdateUserPassword(ctx context.Context, userID string, passwordHash string) error {
+	gate := c.userWriteGate(userID)
+	gate.Lock()
+	defer gate.Unlock()
+
+	c.mu.Lock()
 	user, ok := c.users[userID]
 	if !ok {
+		c.mu.Unlock()
 		return fmt.Errorf("user not found: %s", userID)
 	}
-	user.PasswordHash = passwordHash
-	user.ResetToken = ""
-	user.TokenExpiry = time.Time{}
-	c.users[userID] = user
+	next := user
+	next.PasswordHash = passwordHash
+	next.ResetToken = ""
+	next.TokenExpiry = time.Time{}
+	c.mu.Unlock()
 
-	if c.fsClient != nil {
-		go func(u domain.TenantUser) {
-			bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			_, _ = c.fsClient.Collection("tenant_users").Doc(u.UserID).Set(bgCtx, u)
-		}(user)
+	if err := c.persistTenantUser(ctx, next); err != nil {
+		return err
 	}
+
+	c.mu.Lock()
+	c.publishTenantUserLocked(next)
+	c.mu.Unlock()
 	return nil
 }
 
