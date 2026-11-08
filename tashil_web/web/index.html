@@ -7,17 +7,16 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Tashil Data Sharing Platform">
   <meta name="theme-color" content="#0B57D0">
-  <!-- Logical CSS pixels must match Flutter semantics; missing viewport can
-       skew hit targets (~2x) vs the canvas on some DPR configurations. -->
+  <!-- Logical CSS pixels must match Flutter semantics hit boxes. -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    /* Anchor semantics host at the view origin (WebKit static-position bug;
-       also keeps Blink hit boxes aligned with the canvas). */
+    /* Anchor semantics host at the view origin (WebKit static-position bug).
+       Do not inject inverse-DPR transforms here — that fights the engine and
+       makes Playwright report flutter-view intercepting clicks. */
     flt-semantics-host {
-      position: absolute !important;
-      left: 0 !important;
-      top: 0 !important;
-      transform-origin: 0 0 !important;
+      position: absolute;
+      left: 0;
+      top: 0;
     }
   </style>
 
@@ -44,114 +43,6 @@
   <link rel="manifest" href="manifest.json?v=20261016b">
 </head>
 <body>
-  <script>
-    // Keep Flutter web semantics hit boxes in CSS pixels when the engine omits
-    // an inverse-DPR scale. Own transforms are tagged (data-tashil-dpr-fix) so
-    // resize/DPR changes can update them; pure translation/identity matrices
-    // are NOT treated as proof the engine already scaled.
-    (function () {
-      function parseScale(transform) {
-        if (!transform) return null;
-        var m = /matrix\(\s*([-.\d]+)\s*,\s*([-.\d]+)\s*,\s*([-.\d]+)\s*,\s*([-.\d]+)/.exec(
-          transform
-        );
-        if (m) return { sx: parseFloat(m[1]), sy: parseFloat(m[4]) };
-        var s = /scale\(\s*([-.\d]+)(?:\s*,\s*([-.\d]+))?/.exec(transform);
-        if (s) return { sx: parseFloat(s[1]), sy: parseFloat(s[2] || s[1]) };
-        return null;
-      }
-
-      function clearOurs(host) {
-        if (!host.hasAttribute('data-tashil-dpr-fix')) return;
-        host.style.removeProperty('transform');
-        host.removeAttribute('data-tashil-dpr-fix');
-        host.removeAttribute('data-tashil-dpr');
-      }
-
-      function hasEngineInverseScale(host) {
-        var list = [host];
-        var styled = host.querySelectorAll('[style]');
-        for (var i = 0; i < styled.length; i++) list.push(styled[i]);
-        for (var j = 0; j < list.length; j++) {
-          var el = list[j];
-          if (el.hasAttribute && el.hasAttribute('data-tashil-dpr-fix')) continue;
-          var sc = parseScale(el.style && el.style.transform);
-          if (!sc) continue;
-          // Identity / pure translation — ignore.
-          if (Math.abs(sc.sx - 1) < 0.02 && Math.abs(sc.sy - 1) < 0.02) continue;
-          // Engine inverse DPR is a shrink (scale < 1).
-          if (sc.sx < 0.95 && sc.sy < 0.95) return true;
-        }
-        return false;
-      }
-
-      function applyInverseDpr(host) {
-        if (!host) return;
-        host.style.setProperty('position', 'absolute', 'important');
-        host.style.setProperty('left', '0', 'important');
-        host.style.setProperty('top', '0', 'important');
-        host.style.setProperty('transform-origin', '0 0', 'important');
-
-        var dpr = window.devicePixelRatio || 1;
-        if (dpr <= 1.01) {
-          clearOurs(host);
-          return;
-        }
-        if (hasEngineInverseScale(host)) {
-          clearOurs(host);
-          return;
-        }
-
-        var prev = parseFloat(host.getAttribute('data-tashil-dpr') || '0');
-        if (
-          host.hasAttribute('data-tashil-dpr-fix') &&
-          Math.abs(prev - dpr) < 0.01
-        ) {
-          return;
-        }
-
-        var s = 1 / dpr;
-        host.style.setProperty(
-          'transform',
-          'matrix(' + s + ', 0, 0, ' + s + ', 0, 0)',
-          'important'
-        );
-        host.setAttribute('data-tashil-dpr-fix', '1');
-        host.setAttribute('data-tashil-dpr', String(dpr));
-      }
-
-      function scan() {
-        document.querySelectorAll('flt-semantics-host').forEach(applyInverseDpr);
-      }
-
-      var scheduled = false;
-      function schedule() {
-        if (scheduled) return;
-        scheduled = true;
-        requestAnimationFrame(function () {
-          scheduled = false;
-          scan();
-        });
-      }
-
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', schedule);
-      } else {
-        schedule();
-      }
-      window.addEventListener('resize', schedule);
-      window.addEventListener('flutter-first-frame', schedule);
-      if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', schedule);
-      }
-      try {
-        new MutationObserver(schedule).observe(document.documentElement, {
-          childList: true,
-          subtree: true,
-        });
-      } catch (_) {}
-    })();
-  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

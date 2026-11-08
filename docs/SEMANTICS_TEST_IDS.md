@@ -79,21 +79,25 @@ page.locator('[flt-semantics-identifier="login-email"]')
 // Tenant path must be explicit (absolute `/` drops `/adeco`):
 await page.goto('/adeco')
 
+// Prefer natural locator.click (hit-tests the semantics node). Controls must
+// own Semantics onTap / TestSemantics.button|textField so flutter-view does
+// not intercept.
+
 // Sell-Out file pick (prefer setInputFiles; do not rely on filechooser alone):
 await page.locator('[flt-semantics-identifier="sellout-upload-button"]').click()
 await expect(page.locator('#tashil-file-input')).toHaveAttribute('data-armed', 'true')
 await page.locator('#tashil-file-input').setInputFiles('fixtures/sellout-qa-preview.xlsx')
 
 // Delete: assert role=button, open dialog, cancel (non-destructive):
-await page.locator('[flt-semantics-identifier^="file-delete-"]').first().evaluate((el) => el.click())
-await page.locator('[flt-semantics-identifier="delete-cancel"]').evaluate((el) => el.click())
+await page.locator('[flt-semantics-identifier^="file-delete-"]').first().click()
+await page.locator('[flt-semantics-identifier="delete-cancel"]').click()
 ```
 
 File-delete / file-row ids are `file-delete-<archiveId>-<slugified-name>` /
 `file-row-<archiveId>-<slugified-name>` via `TestIds.fileToken` (archive id +
 slugified filename).
 
-Playwright projects should keep `deviceScaleFactor: 1` so semantics CSS pixels
-match the canvas (avoids ~2× hit-target offset).
+Playwright smoke uses `deviceScaleFactor: 1`. Hit-test coverage at DPR 2 is
+limited to `sellout-semantics-clickable.spec.ts`.
 
 Constants live in `tashil_web/lib/core/testing/test_semantics.dart` (`TestIds`).

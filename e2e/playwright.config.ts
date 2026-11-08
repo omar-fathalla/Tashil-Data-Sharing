@@ -38,8 +38,10 @@ export default defineConfig({
       },
     },
     {
-      // Hit-test must also succeed under Retina-like DPR (no click bypass).
+      // Hit-test under Retina-like DPR (natural locator.click, no bypass).
+      // Scoped so login smoke stays on DPR 1 in CI.
       name: 'chromium-dpr2',
+      testMatch: /sellout-semantics-clickable\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         deviceScaleFactor: 2,

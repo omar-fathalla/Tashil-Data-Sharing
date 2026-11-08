@@ -32,6 +32,7 @@ html.FileUploadInputElement _resolvePersistentFileInput({
       ..style.padding = '0'
       ..style.border = '0'
       ..style.margin = '0'
+      ..style.pointerEvents = 'none'
       ..setAttribute('data-testid', kTashilFileInputDomId)
       ..setAttribute('aria-hidden', 'true')
       ..tabIndex = -1;

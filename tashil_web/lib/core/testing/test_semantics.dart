@@ -166,6 +166,22 @@ class TestSemantics extends StatelessWidget {
         enabled = onPressed != null,
         onTap = onPressed;
 
+  /// Text field that owns focus via [onFocus] so Playwright
+  /// `locator.click()` hits a real semantics action (not flutter-view).
+  const TestSemantics.textField({
+    super.key,
+    required this.identifier,
+    required this.label,
+    required VoidCallback onFocus,
+    required this.child,
+    bool excludeChildSemantics = true,
+  })  : button = false,
+        textField = true,
+        container = true,
+        excludeSemantics = excludeChildSemantics,
+        enabled = true,
+        onTap = onFocus;
+
   /// Single interactive nav face — callers must attach this to exactly one
   /// child per destination (e.g. only `label` or only `icon`, never both
   /// `icon` + `selectedIcon` + `label`).
@@ -183,11 +199,11 @@ class TestSemantics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Buttons without an explicit container get absorbed by DataTable cell
-    // semantics (role=cell, often pointer-events that miss the action).
-    final effectiveContainer = container || (button && onTap != null);
-    final effectiveExclude =
-        excludeSemantics || (button && onTap != null);
+    // Interactive nodes without an owned action get absorbed (e.g. DataTable
+    // role=cell) or fall through to flutter-view on web.
+    final ownsAction = onTap != null && (button || textField);
+    final effectiveContainer = container || ownsAction;
+    final effectiveExclude = excludeSemantics || ownsAction;
 
     return Semantics(
       identifier: identifier,

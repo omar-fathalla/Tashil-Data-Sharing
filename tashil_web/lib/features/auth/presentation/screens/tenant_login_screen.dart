@@ -34,6 +34,8 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
   bool _obscurePassword = true;
   bool _rememberMe = false;
   bool _isLoading = false;
@@ -85,6 +87,8 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
     _animationController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -408,14 +412,16 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                         CrossAxisAlignment.start,
                                     children: [
                                       // Email field
-                                      TestSemantics(
+                                      TestSemantics.textField(
                                         identifier: TestIds.loginEmail,
                                         label: isArabic
                                             ? 'البريد الإلكتروني'
                                             : 'Email',
-                                        textField: true,
+                                        onFocus: () =>
+                                            _emailFocus.requestFocus(),
                                         child: TextFormField(
                                           controller: _emailController,
+                                          focusNode: _emailFocus,
                                           keyboardType:
                                               TextInputType.emailAddress,
                                           textInputAction: TextInputAction.next,
@@ -451,14 +457,16 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                       const SizedBox(height: 16),
 
                                       // Password field
-                                      TestSemantics(
+                                      TestSemantics.textField(
                                         identifier: TestIds.loginPassword,
                                         label: isArabic
                                             ? 'كلمة المرور'
                                             : 'Password',
-                                        textField: true,
+                                        onFocus: () =>
+                                            _passwordFocus.requestFocus(),
                                         child: TextFormField(
                                           controller: _passwordController,
+                                          focusNode: _passwordFocus,
                                           keyboardType:
                                               TextInputType.visiblePassword,
                                           textInputAction: TextInputAction.done,
@@ -590,12 +598,14 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
                                       // Login Button
                                       SizedBox(
                                         width: double.infinity,
-                                        child: TestSemantics(
+                                        child: TestSemantics.button(
                                           identifier: TestIds.loginSubmit,
                                           label: isArabic
                                               ? 'تسجيل الدخول'
                                               : 'Login',
-                                          button: true,
+                                          onPressed: _isLoading
+                                              ? null
+                                              : _handleLogin,
                                           child: FilledButton(
                                             onPressed: _isLoading
                                                 ? null
