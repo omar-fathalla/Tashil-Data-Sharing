@@ -255,6 +255,7 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 		if fullPayload, ok := parseFullTabularPayload(filename, rawContent); ok {
 			v := validateExtraction(fullPayload, nil)
 			attachTotalsExplanation(v, provenanceFromPayload(fullPayload))
+			mergeWideMatrixReconIntoValidation(v, fullPayload)
 			logValidation(filename, MappingSourceDeterministic, v)
 			if v.Status == "rejected" && !isReplay(ctx) {
 				return nil, validationError(filename, v)
@@ -285,6 +286,7 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 	if fullPayload, ok := parseFullTabularPayload(filename, rawContent); ok {
 		v := validateExtraction(fullPayload, nil)
 		attachTotalsExplanation(v, provenanceFromPayload(fullPayload))
+		mergeWideMatrixReconIntoValidation(v, fullPayload)
 		logValidation(filename, MappingSourceDeterministic, v)
 		if v.Status == "rejected" && !isReplay(ctx) {
 			return nil, validationError(filename, v)

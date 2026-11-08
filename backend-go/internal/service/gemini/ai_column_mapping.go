@@ -353,6 +353,7 @@ func extractWithMapping(filename string, rows [][]string, plan *ColumnMapPlan) (
 			barcodeIdx:  plan.firstIdx(roleBarcode),
 			skuIdx:      plan.firstIdx(roleProductName),
 			totalRevIdx: plan.firstIdx(roleTotalValue),
+			totalQtyIdx: plan.firstIdx(roleTotalQuantity),
 			monthIdx:    plan.firstIdx(roleMonth),
 			yearIdx:     plan.firstIdx(roleYear),
 			dateIdx:     plan.firstIdx(roleDate),
@@ -382,6 +383,11 @@ func extractWithMapping(filename string, rows [][]string, plan *ColumnMapPlan) (
 		}
 		if len(layout.branches) == 0 {
 			return nil, src, fmt.Errorf("wide mapping has no branch value columns")
+		}
+		// Permanent recon rule: imported value equals الاجمالى (incl. غير موزع على فرع).
+		// Prefer the sheet total column as the source-of-truth value when present.
+		if src.sheetValue != 0 {
+			src.value = src.sheetValue
 		}
 		subs := splitWideSheetByRowPeriods(filename, "Sheet1", "visible", rows, layout)
 		if len(subs) == 0 {
@@ -569,6 +575,7 @@ func (c *Client) analyzeWithAIMapping(ctx context.Context, filename string, rawC
 	}
 	v := validateExtraction(payload, &src)
 	attachTotalsExplanation(v, provenanceFromPlan(rows, plan))
+	mergeWideMatrixReconIntoValidation(v, payload)
 	logValidation(filename, "ai", v)
 	if v.Status == "rejected" {
 		return nil, false
