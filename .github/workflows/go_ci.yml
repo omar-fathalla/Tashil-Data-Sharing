@@ -31,3 +31,7 @@ jobs:
         run: go vet ./...
       - name: go test
         run: go test ./... -count=1 -timeout 20m
+      - name: live-version parse fail-safe tests
+        working-directory: .
+        run: python3 scripts/parse_live_backend_commit_test.py
+      # Instance pin guard lives in ci.yml → scripts/check_cloud_run_one_instance.sh (#39).

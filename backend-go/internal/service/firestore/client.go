@@ -41,6 +41,8 @@ type Repository interface {
 	SaveTenantProfile(ctx context.Context, profile *domain.TenantProfile) error
 	DeleteTenantProfile(ctx context.Context, slug string) error
 	AuthReady() error
+	EnsureAuthUsersFresh(ctx context.Context) error
+	RefreshAuthUsers(ctx context.Context) error
 	GetUserByEmail(ctx context.Context, tenantID string, email string) (*domain.TenantUser, error)
 	GetUserByID(ctx context.Context, userID string) (*domain.TenantUser, error)
 	GetUserByResetToken(ctx context.Context, token string) (*domain.TenantUser, error)
@@ -82,24 +84,31 @@ type Repository interface {
 // Client implements Repository with fast in-memory storage for Cloud Run and local tests,
 // synchronized in real-time with Google Cloud Firestore.
 type Client struct {
-	mu                 sync.RWMutex
-	fsClient           *cloudFirestore.Client
-	projectID          string
-	databaseID         string
-	tenants            map[string]domain.Tenant
-	tenantProfiles     map[string]domain.TenantProfile
-	users              map[string]domain.TenantUser
-	userByTenantEmail  map[string]string // "tenant|email" → userID (deduped login index)
-	authReady          bool
-	authErr            error
-	stores             map[string][]domain.Store
-	retailChains       map[string]domain.RetailChain
-	tenantRetailChains map[string]map[string]domain.RetailChain
-	batches            []domain.IngestionBatch
-	alerts             []domain.OOSAlert
-	auditLogs          []domain.AuditLogEntry
-	cleanedTenants     map[string]bool
-	deletedArchives    map[string]bool
+	mu                sync.RWMutex
+	fsClient          *cloudFirestore.Client
+	projectID         string
+	databaseID        string
+	tenants           map[string]domain.Tenant
+	tenantProfiles    map[string]domain.TenantProfile
+	users             map[string]domain.TenantUser
+	userByTenantEmail map[string]string // "tenant|email" → userID (deduped login index)
+	authReady         bool
+	authErr           error
+	authRefreshedAt   time.Time
+	// Per-user write gates serialize persist-then-publish so a failed older
+	// write cannot roll back or race a newer successful update.
+	userWriteGatesMu sync.Mutex
+	userWriteGates   map[string]*sync.Mutex
+	// Optional test seam; when set, replaces the Firestore Set path.
+	persistTenantUserFn func(ctx context.Context, u domain.TenantUser) error
+	stores              map[string][]domain.Store
+	retailChains        map[string]domain.RetailChain
+	tenantRetailChains  map[string]map[string]domain.RetailChain
+	batches             []domain.IngestionBatch
+	alerts              []domain.OOSAlert
+	auditLogs           []domain.AuditLogEntry
+	cleanedTenants      map[string]bool
+	deletedArchives     map[string]bool
 
 	// Trade marketing expenses (see trade_marketing.go)
 	tmMu       sync.RWMutex
@@ -131,6 +140,7 @@ func NewClient(databaseID string, useMock bool) *Client {
 		tenantProfiles:     make(map[string]domain.TenantProfile),
 		users:              make(map[string]domain.TenantUser),
 		userByTenantEmail:  make(map[string]string),
+		userWriteGates:     make(map[string]*sync.Mutex),
 		stores:             make(map[string][]domain.Store),
 		retailChains:       make(map[string]domain.RetailChain),
 		tenantRetailChains: make(map[string]map[string]domain.RetailChain),
@@ -177,6 +187,7 @@ func (c *Client) initAndSyncMetadata(useMock bool) {
 	if useMock {
 		c.authReady = true
 		c.authErr = nil
+		c.authRefreshedAt = time.Now()
 		c.mu.Unlock()
 		return
 	}
@@ -275,6 +286,7 @@ func (c *Client) applyLoadedTenantUsers(docs []domain.TenantUser) {
 		c.rebuildUserEmailIndexLocked()
 		c.authReady = true
 		c.authErr = nil
+		c.authRefreshedAt = time.Now()
 		log.Printf("[Firestore] tenant_users empty; using seed auth users")
 		return
 	}
@@ -310,6 +322,7 @@ func (c *Client) applyLoadedTenantUsers(docs []domain.TenantUser) {
 	c.rebuildUserEmailIndexLocked()
 	c.authReady = true
 	c.authErr = nil
+	c.authRefreshedAt = time.Now()
 	log.Printf("[Firestore] Auth users loaded atomically from Firestore: %d unique (skipped_reserved=%d)", len(byKey), skippedReserved)
 }
 
@@ -383,6 +396,65 @@ func (c *Client) AuthReady() error {
 		return c.authErr
 	}
 	return fmt.Errorf("auth users not ready")
+}
+
+const authRefreshTTL = 3 * time.Second
+
+// RefreshAuthUsers reloads tenant_users from Firestore and atomically replaces
+// the in-memory auth snapshot. On refresh failure, a previously ready snapshot
+// is kept (soft) so a transient FS blip does not take login down; if auth was
+// never ready, the error is returned.
+//
+// Multi-instance note: password/Active changes on instance A are visible on B
+// only after B refreshes. Production is pinned to one Cloud Run instance until
+// shared-state work lands; login calls EnsureAuthUsersFresh so peers (if any)
+// converge within authRefreshTTL.
+func (c *Client) RefreshAuthUsers(ctx context.Context) error {
+	if c.fsClient == nil {
+		return c.AuthReady()
+	}
+	loadCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	docs, err := c.fetchAllTenantUsers(loadCtx)
+	if err != nil {
+		if readyErr := c.AuthReady(); readyErr == nil {
+			log.Printf("[Firestore] auth refresh failed (keeping prior snapshot): %v", err)
+			return nil
+		}
+		return err
+	}
+	c.applyLoadedTenantUsers(docs)
+	return nil
+}
+
+// EnsureAuthUsersFresh refreshes auth users when the snapshot is older than
+// authRefreshTTL (or not ready). Safe to call on every login.
+func (c *Client) EnsureAuthUsersFresh(ctx context.Context) error {
+	if err := c.AuthReady(); err != nil {
+		return c.RefreshAuthUsers(ctx)
+	}
+	c.mu.RLock()
+	age := time.Since(c.authRefreshedAt)
+	hasFS := c.fsClient != nil
+	c.mu.RUnlock()
+	if !hasFS || age < authRefreshTTL {
+		return nil
+	}
+	return c.RefreshAuthUsers(ctx)
+}
+
+func (c *Client) userWriteGate(userID string) *sync.Mutex {
+	c.userWriteGatesMu.Lock()
+	defer c.userWriteGatesMu.Unlock()
+	if c.userWriteGates == nil {
+		c.userWriteGates = make(map[string]*sync.Mutex)
+	}
+	m, ok := c.userWriteGates[userID]
+	if !ok {
+		m = &sync.Mutex{}
+		c.userWriteGates[userID] = m
+	}
+	return m
 }
 
 func (c *Client) syncRetailChainsFromFirestore(ctx context.Context) {
@@ -2178,7 +2250,7 @@ func (c *Client) GetUserByEmail(ctx context.Context, tenantID string, email stri
 	}
 
 	if cleanTenant == "" {
-		return nil, fmt.Errorf("user not found for email '%s' and tenant '%s'", email, tenantID)
+		return nil, fmt.Errorf("user not found")
 	}
 	key := authEmailKey(cleanTenant, cleanEmail)
 	if uid, ok := c.userByTenantEmail[key]; ok {
@@ -2187,7 +2259,7 @@ func (c *Client) GetUserByEmail(ctx context.Context, tenantID string, email stri
 			return &copyUser, nil
 		}
 	}
-	return nil, fmt.Errorf("user not found for email '%s' and tenant '%s'", email, tenantID)
+	return nil, fmt.Errorf("user not found")
 }
 
 func (c *Client) GetUserByID(ctx context.Context, userID string) (*domain.TenantUser, error) {
@@ -2221,11 +2293,14 @@ func (c *Client) GetUserByResetToken(ctx context.Context, token string) (*domain
 }
 
 func (c *Client) persistTenantUser(ctx context.Context, u domain.TenantUser) error {
-	if c.fsClient == nil {
-		return nil
-	}
 	if isReservedAuthUserID(u.UserID) || u.Role == domain.RoleSuperAdmin {
 		// Super Admin is digest/env backed — never write it into tenant_users.
+		return nil
+	}
+	if c.persistTenantUserFn != nil {
+		return c.persistTenantUserFn(ctx, u)
+	}
+	if c.fsClient == nil {
 		return nil
 	}
 	fsCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -2236,51 +2311,59 @@ func (c *Client) persistTenantUser(ctx context.Context, u domain.TenantUser) err
 	return nil
 }
 
+func (c *Client) publishTenantUserLocked(user domain.TenantUser) {
+	c.users[user.UserID] = user
+	c.rebuildUserEmailIndexLocked()
+}
+
+// SaveUser persists the user to Firestore first, then publishes to the
+// in-memory login map. A failed persist never becomes visible to GetUserByEmail.
+// Per-user serialization prevents a failed older write from clobbering a newer success.
 func (c *Client) SaveUser(ctx context.Context, user *domain.TenantUser) error {
 	if user == nil || user.UserID == "" {
 		return fmt.Errorf("user id is required")
 	}
 
-	c.mu.Lock()
-	prev, hadPrev := c.users[user.UserID]
-	c.users[user.UserID] = *user
-	c.rebuildUserEmailIndexLocked()
-	c.mu.Unlock()
+	gate := c.userWriteGate(user.UserID)
+	gate.Lock()
+	defer gate.Unlock()
 
-	if err := c.persistTenantUser(ctx, *user); err != nil {
-		c.mu.Lock()
-		if hadPrev {
-			c.users[user.UserID] = prev
-		} else {
-			delete(c.users, user.UserID)
-		}
-		c.rebuildUserEmailIndexLocked()
-		c.mu.Unlock()
+	snapshot := *user
+	if err := c.persistTenantUser(ctx, snapshot); err != nil {
 		return err
 	}
+
+	c.mu.Lock()
+	c.publishTenantUserLocked(snapshot)
+	c.mu.Unlock()
 	return nil
 }
 
+// UpdateUserPassword persists the new hash before publishing it for login.
 func (c *Client) UpdateUserPassword(ctx context.Context, userID string, passwordHash string) error {
+	gate := c.userWriteGate(userID)
+	gate.Lock()
+	defer gate.Unlock()
+
 	c.mu.Lock()
 	user, ok := c.users[userID]
 	if !ok {
 		c.mu.Unlock()
 		return fmt.Errorf("user not found: %s", userID)
 	}
-	prev := user
-	user.PasswordHash = passwordHash
-	user.ResetToken = ""
-	user.TokenExpiry = time.Time{}
-	c.users[userID] = user
+	next := user
+	next.PasswordHash = passwordHash
+	next.ResetToken = ""
+	next.TokenExpiry = time.Time{}
 	c.mu.Unlock()
 
-	if err := c.persistTenantUser(ctx, user); err != nil {
-		c.mu.Lock()
-		c.users[userID] = prev
-		c.mu.Unlock()
+	if err := c.persistTenantUser(ctx, next); err != nil {
 		return err
 	}
+
+	c.mu.Lock()
+	c.publishTenantUserLocked(next)
+	c.mu.Unlock()
 	return nil
 }
 

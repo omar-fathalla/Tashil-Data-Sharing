@@ -91,11 +91,12 @@ jobs:
 
           # Compare against the commit actually serving production — not github.event.before.
           # That way a failed backend deploy followed by a web-only push still redeploys backend.
+          # Malformed/empty live JSON must fail-safe to deploy=true (never abort the job).
           live_json="$(curl -fsS --retry 5 --retry-delay 3 "$BACKEND_VERSION_URL" || true)"
-          live_commit="$(python3 -c 'import json,sys; d=json.loads(sys.argv[1] or "{}"); print((d.get("git_commit") or "").strip())' "${live_json}")"
+          live_commit="$(printf '%s' "${live_json}" | python3 "${GITHUB_WORKSPACE}/scripts/parse_live_backend_commit.py")"
           if [ -z "${live_commit}" ] || [ "${live_commit}" = "unknown" ]; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
-            echo "Could not read live /api/v1/version git_commit; redeploying backend"
+            echo "Could not read live /api/v1/version git_commit (empty/malformed/unreachable); redeploying backend"
             exit 0
           fi
           if [ "${live_commit}" = "${GITHUB_SHA}" ]; then
