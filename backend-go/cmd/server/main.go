@@ -69,8 +69,8 @@ func main() {
 	// Sell-In customer registry: only exact or admin-approved names count; unknown names are quarantined.
 	customerRegistry := customers.New(fsRepo)
 	ingestProcessor.SetCustomerRegistry(customerRegistry)
-	// Product/barcode matching review queue (Phase A4) — never invents barcodes; uncertain → human review.
-	productMatchQueue := matcher.NewQueue()
+	// Product/barcode matching review queue (Phase A4) — durable in Firestore; never invents barcodes.
+	productMatchQueue := matcher.NewQueue(fsRepo)
 	ingestProcessor.OnUploadIssues(func(ctx context.Context, tenantID, filename string, unknown []ingestion.UnknownBarcode) {
 		items := make([]dataquality.UnknownItem, 0, len(unknown))
 		queries := make([]matcher.Query, 0, len(unknown))
@@ -85,8 +85,10 @@ func main() {
 			log.Printf("[data-quality] unknown items for %s: %v", filename, err)
 		}
 		cat := matcher.NewCatalog(bqRepo.GetProductMasterItems(tenantID))
-		enqueued := productMatchQueue.EnqueueUnknowns(tenantID, filename, queries, cat)
-		if len(enqueued) > 0 {
+		enqueued, err := productMatchQueue.EnqueueUnknowns(ctx, tenantID, filename, queries, cat)
+		if err != nil {
+			log.Printf("[product-match] tenant=%s file=%s enqueue failed: %v", tenantID, filename, err)
+		} else if len(enqueued) > 0 {
 			log.Printf("[product-match] tenant=%s file=%s enqueued %d review item(s)", tenantID, filename, len(enqueued))
 		}
 	})

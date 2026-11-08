@@ -34,7 +34,7 @@ func TestProductMatchAPI_MatchEnqueueReviewDecide(t *testing.T) {
 		OfficialName: "كلوريل 500 جم مبيض", Brand: "كلوريل", ItemType: "عادي",
 		IsPrimaryForBarcode: true,
 	}}}
-	q := matcher.NewQueue()
+	q := matcher.NewQueue(&matcher.MemoryStore{})
 	h := NewProductMatchHandler(q, pm)
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/product-match", h.HandleMatch)
@@ -122,7 +122,7 @@ func TestProductMatchAPI_MatchEnqueueReviewDecide(t *testing.T) {
 }
 
 func TestProductMatchEnqueueForbiddenForViewer(t *testing.T) {
-	h := NewProductMatchHandler(matcher.NewQueue(), fakePM{})
+	h := NewProductMatchHandler(matcher.NewQueue(&matcher.MemoryStore{}), fakePM{})
 	req := withClaims(httptest.NewRequest(http.MethodPost, "/api/v1/product-match/enqueue",
 		bytes.NewBufferString(`{"queries":[{"sku_name":"x"}]}`)), domain.RoleViewer)
 	rec := httptest.NewRecorder()
@@ -137,7 +137,7 @@ func TestProductMatchDecideWrongPairAndIdempotent(t *testing.T) {
 		{ItemCode: "FGCL-0550-0001", Barcode: "6223000231227", OfficialName: "كلوريل 500 جم مبيض", IsPrimaryForBarcode: true},
 		{ItemCode: "FGDW-1000-0010", Barcode: "6223000234001", OfficialName: "فيبا دش", IsPrimaryForBarcode: true},
 	}}
-	q := matcher.NewQueue()
+	q := matcher.NewQueue(&matcher.MemoryStore{})
 	h := NewProductMatchHandler(q, pm)
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/product-match/enqueue", h.HandleEnqueue)

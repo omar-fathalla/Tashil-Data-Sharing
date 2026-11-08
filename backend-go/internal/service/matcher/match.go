@@ -31,39 +31,39 @@ const (
 
 // Query is one product row to resolve against Product Master.
 type Query struct {
-	ItemCode   string  `json:"item_code,omitempty"`
-	Barcode    string  `json:"barcode,omitempty"`
-	SKUName    string  `json:"sku_name,omitempty"`
-	SourceFile string  `json:"source_file,omitempty"`
-	Rows       int     `json:"rows,omitempty"`
-	Value      float64 `json:"value,omitempty"`
+	ItemCode   string  `json:"item_code,omitempty" firestore:"item_code,omitempty"`
+	Barcode    string  `json:"barcode,omitempty" firestore:"barcode,omitempty"`
+	SKUName    string  `json:"sku_name,omitempty" firestore:"sku_name,omitempty"`
+	SourceFile string  `json:"source_file,omitempty" firestore:"source_file,omitempty"`
+	Rows       int     `json:"rows,omitempty" firestore:"rows,omitempty"`
+	Value      float64 `json:"value,omitempty" firestore:"value,omitempty"`
 }
 
 // Candidate is a ranked Product Master suggestion shown in the review UI.
 type Candidate struct {
-	ItemCode     string  `json:"item_code"`
-	Barcode      string  `json:"barcode,omitempty"`
-	OfficialName string  `json:"official_name"`
-	Brand        string  `json:"brand,omitempty"`
-	ItemType     string  `json:"item_type,omitempty"`
-	Confidence   float64 `json:"confidence"`
-	ReasonAR     string  `json:"reason_ar"`
+	ItemCode     string  `json:"item_code" firestore:"item_code"`
+	Barcode      string  `json:"barcode,omitempty" firestore:"barcode,omitempty"`
+	OfficialName string  `json:"official_name" firestore:"official_name"`
+	Brand        string  `json:"brand,omitempty" firestore:"brand,omitempty"`
+	ItemType     string  `json:"item_type,omitempty" firestore:"item_type,omitempty"`
+	Confidence   float64 `json:"confidence" firestore:"confidence"`
+	ReasonAR     string  `json:"reason_ar" firestore:"reason_ar"`
 }
 
 // Result is the matcher outcome. SuggestedBarcode is only filled from Product Master
 // (or preserved from input) — never synthesized.
 type Result struct {
-	Decision         Decision    `json:"decision"`
-	Confidence       float64     `json:"confidence"`
-	ReasonAR         string      `json:"reason_ar"`
-	ReasonEN         string      `json:"reason_en,omitempty"`
-	MatchedItemCode  string      `json:"matched_item_code,omitempty"`
-	MatchedName      string      `json:"matched_name,omitempty"`
-	MatchedBrand     string      `json:"matched_brand,omitempty"`
-	InputBarcode     string      `json:"input_barcode,omitempty"`
-	SuggestedBarcode string      `json:"suggested_barcode,omitempty"`
-	BarcodePolicy    string      `json:"barcode_policy"` // preserved_input | from_master | empty | conflict_review
-	Candidates       []Candidate `json:"candidates,omitempty"`
+	Decision         Decision    `json:"decision" firestore:"decision"`
+	Confidence       float64     `json:"confidence" firestore:"confidence"`
+	ReasonAR         string      `json:"reason_ar" firestore:"reason_ar"`
+	ReasonEN         string      `json:"reason_en,omitempty" firestore:"reason_en,omitempty"`
+	MatchedItemCode  string      `json:"matched_item_code,omitempty" firestore:"matched_item_code,omitempty"`
+	MatchedName      string      `json:"matched_name,omitempty" firestore:"matched_name,omitempty"`
+	MatchedBrand     string      `json:"matched_brand,omitempty" firestore:"matched_brand,omitempty"`
+	InputBarcode     string      `json:"input_barcode,omitempty" firestore:"input_barcode,omitempty"`
+	SuggestedBarcode string      `json:"suggested_barcode,omitempty" firestore:"suggested_barcode,omitempty"`
+	BarcodePolicy    string      `json:"barcode_policy" firestore:"barcode_policy"`
+	Candidates       []Candidate `json:"candidates,omitempty" firestore:"candidates,omitempty"`
 }
 
 // Catalog indexes Product Master items for matching.

@@ -84,11 +84,16 @@ func (h *ProductMatchHandler) HandleEnqueue(w http.ResponseWriter, r *http.Reque
 		writeErr(w, http.StatusBadRequest, "queries required")
 		return
 	}
-	items := h.queue.EnqueueUnknowns(c.TenantID, body.SourceFile, body.Queries, h.catalog(c.TenantID))
+	items, err := h.queue.EnqueueUnknowns(r.Context(), c.TenantID, body.SourceFile, body.Queries, h.catalog(c.TenantID))
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	metrics, _ := h.queue.Snapshot(r.Context(), c.TenantID)
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"enqueued": items,
 		"count":    len(items),
-		"metrics":  h.queue.Snapshot(c.TenantID),
+		"metrics":  metrics,
 	})
 }
 
@@ -99,11 +104,16 @@ func (h *ProductMatchHandler) HandleListReview(w http.ResponseWriter, r *http.Re
 		return
 	}
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
-	items := h.queue.List(c.TenantID, status)
+	items, err := h.queue.List(r.Context(), c.TenantID, status)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	metrics, _ := h.queue.Snapshot(r.Context(), c.TenantID)
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"items":   items,
 		"count":   len(items),
-		"metrics": h.queue.Snapshot(c.TenantID),
+		"metrics": metrics,
 	})
 }
 
@@ -128,16 +138,17 @@ func (h *ProductMatchHandler) HandleDecide(w http.ResponseWriter, r *http.Reques
 		writeErr(w, http.StatusBadRequest, "id and status required")
 		return
 	}
-	item, err := h.queue.Decide(c.TenantID, body.ID, body.Status, c.Email, body.ReasonAR, body.ChosenItemCode, body.ChosenBarcode, matcher.DecideOptions{
+	item, err := h.queue.Decide(r.Context(), c.TenantID, body.ID, body.Status, c.Email, body.ReasonAR, body.ChosenItemCode, body.ChosenBarcode, matcher.DecideOptions{
 		Catalog: h.catalog(c.TenantID),
 	})
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	metrics, _ := h.queue.Snapshot(r.Context(), c.TenantID)
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"item":    item,
-		"metrics": h.queue.Snapshot(c.TenantID),
+		"metrics": metrics,
 	})
 }
 
@@ -147,7 +158,12 @@ func (h *ProductMatchHandler) HandleMetrics(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, h.queue.Snapshot(c.TenantID))
+	metrics, err := h.queue.Snapshot(r.Context(), c.TenantID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, metrics)
 }
 
 // Queue exposes the underlying queue for upload hooks in main.
