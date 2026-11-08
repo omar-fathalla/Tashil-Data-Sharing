@@ -3,6 +3,9 @@ package ingestion
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -71,5 +74,53 @@ func TestSaveApprovedMappingCorrectionThenReuploadReuses(t *testing.T) {
 	}
 	if mapCalls.Load() != 2 || other.MappingSource != gemini.MappingSourceAI {
 		t.Fatalf("tenant isolation broken: calls=%d source=%s", mapCalls.Load(), other.MappingSource)
+	}
+}
+
+func TestCommitSurfacesMappingLearnDiskFailure(t *testing.T) {
+	bq := bigquery.NewClient("test-proj", "test-dataset", true)
+	fs := firestore.NewClient("db", true)
+	x, planJSON := aiWideFixture(t)
+	arch := t.TempDir()
+	planDir := t.TempDir()
+
+	agent := gemini.NewAgent("test-key", "tier1-model", false).
+		WithTier2Model("tier2-model").
+		WithMappingPlanDir(planDir).
+		WithColumnMapper(func(_ context.Context, model, prompt string) (string, error) {
+			return planJSON, nil
+		})
+	p := NewProcessor(agent, bq, fs).WithArchiveDir(arch)
+
+	preview, err := p.ProcessUploadWithDryRun(context.Background(), "tenant-adeco", "Book3.xlsx", x, true, "fathalla")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var corrected gemini.ColumnMapPlan
+	_ = json.Unmarshal([]byte(planJSON), &corrected)
+	if err := p.SaveApprovedMappingCorrection("tenant-adeco", preview.BatchID, &corrected); err != nil {
+		t.Fatal(err)
+	}
+
+	// After a successful save, block further durable writes so commit-time re-learn fails.
+	tenantSeg := filepath.Join(planDir, "adeco")
+	entries, err := os.ReadDir(tenantSeg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		_ = os.Remove(filepath.Join(tenantSeg, e.Name()))
+	}
+	_ = os.Remove(tenantSeg)
+	if err := os.WriteFile(tenantSeg, []byte("block"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = p.CommitStagedUpload(context.Background(), "tenant-adeco", preview.BatchID, "fathalla")
+	if err == nil {
+		t.Fatal("commit must surface mapping learn disk failure")
+	}
+	if !strings.Contains(err.Error(), "فشل حفظ تصحيح الربط") {
+		t.Fatalf("expected learn failure surfaced, got %v", err)
 	}
 }

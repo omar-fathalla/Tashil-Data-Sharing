@@ -746,6 +746,7 @@ func (h *UploadHandler) HandleSaveMappingCorrection(w http.ResponseWriter, r *ht
 	}
 	tenantID = applySystemTenantOverride(tenantID, req.Tenant)
 	if err := h.processor.SaveApprovedMappingCorrection(tenantID, req.BatchID, req.Plan); err != nil {
+		// Surface disk/schema failures clearly (Arabic message from LearnFromCorrection when write fails).
 		writeUploadError(w, err, "mapping_correction_failed")
 		return
 	}

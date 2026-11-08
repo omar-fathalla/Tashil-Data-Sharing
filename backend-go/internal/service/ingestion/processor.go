@@ -1208,7 +1208,9 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		staged.Result.ArchivedFile = updatedArchived
 		staged.Result.ArchiveID = updatedArchived.ID
 	}
-	p.persistApprovedMappingCorrection(tenantID, staged)
+	if err := p.persistApprovedMappingCorrection(tenantID, staged); err != nil {
+		return nil, err
+	}
 	p.removeStaged(tenantID, batchID)
 	return staged.Result, nil
 }
@@ -1814,7 +1816,6 @@ func (p *Processor) SaveApprovedMappingCorrection(tenantID, batchID string, plan
 		return &StagedUploadError{Status: 404, Message: "المعاينة دي مش تبع الحساب ده. مفيش حاجة اتحفظت."}
 	}
 	cp := *plan
-	staged.CorrectedPlan = &cp
 	filename := staged.Filename
 	fileBytes := staged.FileBytes
 	p.stagedMu.Unlock()
@@ -1827,32 +1828,44 @@ func (p *Processor) SaveApprovedMappingCorrection(tenantID, batchID string, plan
 	if !ok {
 		return fmt.Errorf("could not read mapping sample from staged file")
 	}
-	return learner.RememberCorrectedPlan(tenantID, filename, sample, &cp)
+	if err := learner.RememberCorrectedPlan(tenantID, filename, sample, &cp); err != nil {
+		return err
+	}
+	p.stagedMu.Lock()
+	if staged, ok := p.staged[batchID]; ok && staged != nil &&
+		normalizeArchiveTenantID(staged.TenantID) == normalizeArchiveTenantID(tenantID) {
+		staged.CorrectedPlan = &cp
+	}
+	p.stagedMu.Unlock()
+	return nil
 }
 
 // persistApprovedMappingCorrection promotes the staged correction (or the tenant-cached AI plan)
 // into LearnFromCorrection after a successful commit.
-func (p *Processor) persistApprovedMappingCorrection(tenantID string, staged *StagedUpload) {
+func (p *Processor) persistApprovedMappingCorrection(tenantID string, staged *StagedUpload) error {
 	if staged == nil || staged.IsProductMaster || staged.IsSellInPlan {
-		return
+		return nil
 	}
 	learner, ok := p.geminiAgent.(gemini.MappingCorrectionLearner)
 	if !ok {
-		return
+		return nil
 	}
 	sample, ok := gemini.MappingSampleFromFile(staged.FileBytes)
 	if !ok {
-		return
+		return nil
 	}
 	plan := staged.CorrectedPlan
 	if plan == nil {
 		var found bool
 		plan, _, found = learner.LookupCachedMappingPlan(tenantID, staged.Filename, sample)
 		if !found || plan == nil {
-			return
+			return nil
 		}
 	}
-	_ = learner.LearnFromCorrection(tenantID, staged.Filename, sample, plan)
+	if err := learner.LearnFromCorrection(tenantID, staged.Filename, sample, plan); err != nil {
+		return fmt.Errorf("فشل حفظ تصحيح الربط بعد الاعتماد: %w", err)
+	}
+	return nil
 }
 
 // DiscardStagedUpload drops an in-memory staged upload and removes its uncommitted archive entry without modifying any database.

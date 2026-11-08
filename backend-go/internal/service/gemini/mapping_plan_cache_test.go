@@ -392,3 +392,29 @@ func TestLearnFromCorrectionRequiresTenant(t *testing.T) {
 		t.Fatal("empty tenant must be rejected")
 	}
 }
+
+func TestLearnFromCorrectionDiskWriteFailure(t *testing.T) {
+	dir := t.TempDir()
+	// Block the tenant subdirectory with a regular file so MkdirAll/WriteFile fails.
+	blocker := filepath.Join(dir, sanitizeTenantSegment(testTenantA))
+	if err := os.WriteFile(blocker, []byte("not-a-directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var calls []string
+	c := stubClient(map[string]string{}, &calls).WithMappingPlanDir(dir)
+	var plan ColumnMapPlan
+	if err := json.Unmarshal([]byte(book3Plan), &plan); err != nil {
+		t.Fatal(err)
+	}
+	err := c.LearnFromCorrection(testTenantA, "Book3.xlsx", book3LikeRows(), &plan)
+	if err == nil {
+		t.Fatal("disk write failure must not return success")
+	}
+	if !strings.Contains(err.Error(), "فشل حفظ تصحيح الربط") {
+		t.Fatalf("expected clear Arabic failure, got %v", err)
+	}
+	// Must not leave a successful cache entry for this tenant key.
+	if _, _, ok := c.LookupCachedMappingPlan(testTenantA, "Book3.xlsx", book3LikeRows()); ok {
+		t.Fatal("failed write must not populate cache")
+	}
+}

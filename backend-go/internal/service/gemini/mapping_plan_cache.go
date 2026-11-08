@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -165,12 +166,15 @@ func decodeCachedMappingPlan(raw []byte) (*ColumnMapPlan, string, bool) {
 }
 
 func (c *mappingPlanCache) put(key string, plan *ColumnMapPlan) {
-	c.putWithSource(key, plan, planCacheSourceAI, "")
+	// AI infer path cannot fail the upload on a cache write; log only.
+	if err := c.putWithSource(key, plan, planCacheSourceAI, ""); err != nil {
+		log.Printf("[ingest-mapping] plan cache write failed: %v", err)
+	}
 }
 
-func (c *mappingPlanCache) putWithSource(key string, plan *ColumnMapPlan, source, learnedAt string) {
+func (c *mappingPlanCache) putWithSource(key string, plan *ColumnMapPlan, source, learnedAt string) error {
 	if plan == nil {
-		return
+		return fmt.Errorf("mapping plan cache: plan is nil")
 	}
 	env := cachedMappingPlan{
 		Version:   mappingPlanCacheVersion,
@@ -180,31 +184,38 @@ func (c *mappingPlanCache) putWithSource(key string, plan *ColumnMapPlan, source
 	}
 	raw, err := json.Marshal(env)
 	if err != nil {
-		return
+		return fmt.Errorf("mapping plan cache marshal: %w", err)
 	}
 	st := c.ensureState()
 	sk := c.storageKey(key)
+	st.mu.Lock()
+	dir := st.dir
+	st.mu.Unlock()
+
+	// When a shared dir is configured, durable disk write must succeed before mem update
+	// so LearnFromCorrection never reports success without persistence.
+	if dir != "" {
+		p := filepath.Join(dir, sk+".json")
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return fmt.Errorf("mapping plan cache mkdir: %w", err)
+		}
+		if err := os.WriteFile(p, raw, 0o644); err != nil {
+			return fmt.Errorf("mapping plan cache write: %w", err)
+		}
+	}
+
 	st.mu.Lock()
 	if st.mem == nil {
 		st.mem = map[string][]byte{}
 	}
 	st.mem[sk] = raw
-	dir := st.dir
 	st.mu.Unlock()
-	if p := c.path(key); p != "" {
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err == nil {
-			if err := os.WriteFile(p, raw, 0o644); err != nil {
-				log.Printf("[ingest-mapping] plan cache write failed: %v", err)
-			}
-		} else if dir != "" {
-			log.Printf("[ingest-mapping] plan cache mkdir failed: %v", err)
-		}
-	}
+	return nil
 }
 
 // learnCorrection stores a human-corrected plan under the same prompt key, overwriting any AI entry.
-func (c *mappingPlanCache) learnCorrection(key string, plan *ColumnMapPlan) {
-	c.putWithSource(key, plan, planCacheSourceCorrection, time.Now().UTC().Format(time.RFC3339))
+func (c *mappingPlanCache) learnCorrection(key string, plan *ColumnMapPlan) error {
+	return c.putWithSource(key, plan, planCacheSourceCorrection, time.Now().UTC().Format(time.RFC3339))
 }
 
 // forTenant returns a Client view that namespaces the shared plan cache under tenantID.

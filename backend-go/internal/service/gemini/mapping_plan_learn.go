@@ -76,7 +76,9 @@ func (c *Client) LearnFromCorrection(tenantID, filename string, sample [][]strin
 	if learned.Confidence < 1 {
 		learned.Confidence = 1
 	}
-	c.forTenant(tenantID).planCache.learnCorrection(key, &learned)
+	if err := c.forTenant(tenantID).planCache.learnCorrection(key, &learned); err != nil {
+		return fmt.Errorf("فشل حفظ تصحيح الربط على القرص: %w", err)
+	}
 	return nil
 }
 
