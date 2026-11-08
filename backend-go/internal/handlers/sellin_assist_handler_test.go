@@ -125,3 +125,49 @@ func TestSellInAssistForbiddenForViewer(t *testing.T) {
 		t.Fatalf("want 403 got %d", rec.Code)
 	}
 }
+
+func TestSellInAssistCrossTenantApproveNoDisclosure(t *testing.T) {
+	h, mw, svc := sellInAssistMux(t)
+	tokA, _ := mw.GenerateToken(domain.UserClaims{
+		UserID: "a", Email: "a@test", TenantID: "tenant-a", Role: domain.RoleVendorAdmin,
+	}, time.Hour)
+	tokB, _ := mw.GenerateToken(domain.UserClaims{
+		UserID: "b", Email: "b@test", TenantID: "tenant-b", Role: domain.RoleVendorAdmin,
+	}, time.Hour)
+
+	body := `{"upload_chain":"fathalla","customers":["فرع فتح الله - كيه اتش جمله ماركت"]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/sell-in/assist/suggest-chains", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+tokA)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("suggest %d %s", rec.Code, rec.Body.String())
+	}
+	var sugResp struct {
+		Suggestions []sellinassist.Suggestion `json:"suggestions"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &sugResp)
+	if len(sugResp.Suggestions) != 1 {
+		t.Fatalf("want 1 sug, got %+v", sugResp)
+	}
+	id := sugResp.Suggestions[0].ID
+
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/sell-in/assist/approve", strings.NewReader(`{"id":"`+id+`"}`))
+	req.Header.Set("Authorization", "Bearer "+tokB)
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("cross-tenant approve want 404 got %d %s", rec.Code, rec.Body.String())
+	}
+	var errBody map[string]string
+	_ = json.Unmarshal(rec.Body.Bytes(), &errBody)
+	if strings.Contains(errBody["error"], "tenant-a") || strings.Contains(rec.Body.String(), "كيه اتش") {
+		t.Fatalf("response disclosed foreign tenant data: %s", rec.Body.String())
+	}
+	pending := svc.List("tenant-a", sellinassist.StatusPending)
+	if len(pending) != 1 || pending[0].Status != sellinassist.StatusPending {
+		t.Fatalf("state mutated: %+v", pending)
+	}
+}

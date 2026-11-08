@@ -149,17 +149,24 @@ func (h *SellInAssistHandler) decide(w http.ResponseWriter, r *http.Request, app
 		err error
 	)
 	if approve {
-		sug, err = h.svc.Approve(req.ID, actor)
+		sug, err = h.svc.Approve(req.ID, c.TenantID, actor)
 	} else {
-		sug, err = h.svc.Reject(req.ID, actor)
+		sug, err = h.svc.Reject(req.ID, c.TenantID, actor)
 	}
 	if err != nil {
+		// Cross-tenant / missing ID: identical 404, no body disclosure of other tenants.
+		if err == sellinassist.ErrNotFound {
+			writeErr(w, http.StatusNotFound, sellinassist.ErrNotFound.Error())
+			return
+		}
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	resp := map[string]interface{}{
 		"suggestion": sug,
-		"note_ar":    "اتسجل القرار. مفيش تعديل على بيانات الإنتاج ولا على متغير SELLIN_CUSTOMER_CHAIN_MAP.",
+		"note_ar":    "اتسجل القرار في ذاكرة السيرفر فقط (مش durable — بيضيع مع الـ restart ومش متشارك بين النسخ). مفيش تعديل على بيانات الإنتاج ولا على متغير SELLIN_CUSTOMER_CHAIN_MAP.",
+		"durable":    false,
+		"ram_only":   true,
 	}
 	if approve && sug.Kind == sellinassist.KindCustomerChain && sug.EnvFragment != "" {
 		resp["ops_hint_ar"] = "لو حابب تفعّل الربط، ضيف المقطع ده لـ SELLIN_CUSTOMER_CHAIN_MAP بعد المراجعة: " + sug.EnvFragment
@@ -179,11 +186,13 @@ func (h *SellInAssistHandler) HandleMetrics(w http.ResponseWriter, r *http.Reque
 		writeJSON(w, http.StatusOK, sellinassist.Metrics{})
 		return
 	}
-	m := h.svc.GetMetrics()
+	m := h.svc.GetMetrics(c.TenantID)
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"metrics":             m,
-		"approved_fragments":  h.svc.ApprovedEnvFragments(c.TenantID),
-		"success_label_ar":    "نسبة الاعتماد",
-		"note_ar":             "المؤشرات من ذاكرة العملية الحالية فقط — مش بتغيّر الإنتاج",
+		"metrics":            m,
+		"approved_fragments": h.svc.ApprovedEnvFragments(c.TenantID),
+		"success_label_ar":   "نسبة الاعتماد",
+		"durable":            false,
+		"ram_only":           true,
+		"note_ar":            "المؤشرات والقرارات من ذاكرة السيرفر فقط (tenant-scoped) — بتضيع مع الـ restart ومش متشاركة بين النسخ، ومش بتغيّر الإنتاج",
 	})
 }

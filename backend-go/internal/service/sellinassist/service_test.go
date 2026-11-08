@@ -117,7 +117,7 @@ func TestSuggestCustomerChainsSkipsResolvedAndRequiresApproval(t *testing.T) {
 
 	// Approve one — still no prod mutation; only decision recorded.
 	id := sugs[0].ID
-	decided, err := s.Approve(id, "mohamed@test")
+	decided, err := s.Approve(id, "tenant-adeco", "mohamed@test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestSuggestCustomerChainsSkipsResolvedAndRequiresApproval(t *testing.T) {
 	if len(frags) != 1 || frags[0] != decided.EnvFragment {
 		t.Fatalf("fragments=%v", frags)
 	}
-	m := s.GetMetrics()
+	m := s.GetMetrics("tenant-adeco")
 	if m.Approved != 1 || m.Pending < 1 || m.ApprovalRate <= 0 {
 		t.Fatalf("metrics=%+v", m)
 	}
@@ -141,14 +141,101 @@ func TestApproveRejectIdempotentGuard(t *testing.T) {
 	if len(sugs) != 1 {
 		t.Fatalf("got %d", len(sugs))
 	}
-	if _, err := s.Approve(sugs[0].ID, "a"); err != nil {
+	if _, err := s.Approve(sugs[0].ID, "tenant-adeco", "a"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Approve(sugs[0].ID, "a"); err == nil {
+	if _, err := s.Approve(sugs[0].ID, "tenant-adeco", "a"); err == nil {
 		t.Fatal("second approve must fail")
 	}
-	if _, err := s.Reject(sugs[0].ID, "a"); err == nil {
+	if _, err := s.Reject(sugs[0].ID, "tenant-adeco", "a"); err == nil {
 		t.Fatal("reject after approve must fail")
+	}
+}
+
+func TestCrossTenantDecideNoDisclosureNoMutation(t *testing.T) {
+	s := New("", "", true)
+	sugs, err := s.SuggestCustomerChains(context.Background(), "tenant-a", "fathalla",
+		[]string{"فرع فتح الله - كيه اتش جمله ماركت"})
+	if err != nil || len(sugs) != 1 {
+		t.Fatalf("setup: %v %+v", err, sugs)
+	}
+	id := sugs[0].ID
+	before := s.List("tenant-a", StatusPending)
+
+	got, err := s.Approve(id, "tenant-b", "attacker@x")
+	if err != ErrNotFound || got != nil {
+		t.Fatalf("cross-tenant approve: got=%v err=%v want ErrNotFound", got, err)
+	}
+	got, err = s.Reject(id, "tenant-b", "attacker@x")
+	if err != ErrNotFound || got != nil {
+		t.Fatalf("cross-tenant reject: got=%v err=%v want ErrNotFound", got, err)
+	}
+	after := s.List("tenant-a", StatusPending)
+	if len(after) != len(before) || after[0].Status != StatusPending {
+		t.Fatalf("state changed: before=%+v after=%+v", before, after)
+	}
+	// Metrics must be tenant-scoped: tenant-b sees nothing.
+	if m := s.GetMetrics("tenant-b"); m.Suggested != 0 || m.Pending != 0 {
+		t.Fatalf("tenant-b metrics leaked: %+v", m)
+	}
+	if m := s.GetMetrics("tenant-a"); m.Pending != 1 || m.Approved != 0 {
+		t.Fatalf("tenant-a metrics=%+v", m)
+	}
+}
+
+func TestMatchRoleNetVAndBarcodePrecedence(t *testing.T) {
+	if got := matchRole(normalizeHeaderLabel("Net V")); got != roleNetV {
+		t.Fatalf("Net V → %s want net_v", got)
+	}
+	if got := matchRole(normalizeHeaderLabel("صافي القيمه")); got != roleNetV {
+		t.Fatalf("صافي القيمه → %s want net_v", got)
+	}
+	if got := matchRole(normalizeHeaderLabel("Barcode")); got != roleBarcode {
+		t.Fatalf("Barcode → %s want barcode (not item_code)", got)
+	}
+	if got := matchRole(normalizeHeaderLabel("الباركود")); got != roleBarcode {
+		t.Fatalf("الباركود → %s want barcode", got)
+	}
+	if got := matchRole(normalizeHeaderLabel("Extended Price")); got != roleValue {
+		t.Fatalf("Extended Price → %s want value", got)
+	}
+	if got := matchRole(normalizeHeaderLabel("Item Number")); got != roleItemCode {
+		t.Fatalf("Item Number → %s want item_code", got)
+	}
+}
+
+func TestValidateLayoutAIRejectsBadPayload(t *testing.T) {
+	ok := &layoutAIResponse{
+		HeaderRowIndex: 0, Layout: "long", Confidence: 0.9, ReasonAR: "تم",
+		Columns: []ColumnRole{{Index: 0, Role: roleCustomer}},
+	}
+	if err := validateLayoutAI(ok, 3); err != nil {
+		t.Fatal(err)
+	}
+	bad := *ok
+	bad.Confidence = 0.2
+	if err := validateLayoutAI(&bad, 3); err == nil {
+		t.Fatal("low confidence must fail")
+	}
+	bad = *ok
+	bad.Layout = "pivot"
+	if err := validateLayoutAI(&bad, 3); err == nil {
+		t.Fatal("bad layout must fail")
+	}
+	bad = *ok
+	bad.HeaderRowIndex = 99
+	if err := validateLayoutAI(&bad, 3); err == nil {
+		t.Fatal("oob header must fail")
+	}
+	bad = *ok
+	bad.Columns = []ColumnRole{{Index: 0, Role: "made_up"}}
+	if err := validateLayoutAI(&bad, 3); err == nil {
+		t.Fatal("bad role must fail")
+	}
+	bad = *ok
+	bad.ReasonAR = "  "
+	if err := validateLayoutAI(&bad, 3); err == nil {
+		t.Fatal("empty reason must fail")
 	}
 }
 

@@ -136,8 +136,8 @@ class _SellInAssistScreenState extends State<SellInAssistScreen> {
       if (!mounted) return;
       if (action == 'approve') {
         final hint = s.isChain && s.envFragment.isNotEmpty
-            ? 'اتسجل الاعتماد. لتفعيل الربط يدوياً بعد المراجعة: ${s.envFragment} — مفيش تغيير على الإنتاج.'
-            : 'اتسجل الاعتماد. مفيش تغيير على بيانات الإنتاج.';
+            ? 'اتسجل الاعتماد في الذاكرة فقط. لتفعيل الربط يدوياً بعد المراجعة: ${s.envFragment} — مفيش تغيير على الإنتاج.'
+            : 'اتسجل الاعتماد في الذاكرة فقط. مفيش تغيير على بيانات الإنتاج.';
         M3Feedback.showSuccess(context, hint);
       } else {
         M3Feedback.showSuccess(context, 'اترفض الاقتراح');
@@ -186,6 +186,18 @@ class _SellInAssistScreenState extends State<SellInAssistScreen> {
                 'الاقتراحات للتأكيد فقط ومش بتتطبق على الإنتاج غير بعد موافقتك.',
                 style: theme.textTheme.bodyMedium,
               ),
+              const SizedBox(height: M3Spacing.xs),
+              Material(
+                key: const Key('sellin_assist_ram_note'),
+                color: cs.secondaryContainer.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(8),
+                child: const Padding(
+                  padding: EdgeInsets.all(M3Spacing.sm),
+                  child: Text(
+                    'ملاحظة: القرارات والمؤشرات في ذاكرة السيرفر فقط (RAM) — بتضيع لو السيرفر اتعمل له restart ومش متشاركة بين النسخ. مفيش حفظ durable لسه.',
+                  ),
+                ),
+              ),
               const SizedBox(height: M3Spacing.sm),
               Wrap(
                 key: const Key('sellin_assist_metrics'),
@@ -215,9 +227,8 @@ class _SellInAssistScreenState extends State<SellInAssistScreen> {
                     title: Text(f, style: theme.textTheme.bodySmall),
                     onTap: () async {
                       await Clipboard.setData(ClipboardData(text: f));
-                      if (mounted) {
-                        M3Feedback.showSuccess(context, 'اتنسخ المقطع');
-                      }
+                      if (!context.mounted) return;
+                      M3Feedback.showSuccess(context, 'اتنسخ المقطع');
                     },
                   ),
               ],

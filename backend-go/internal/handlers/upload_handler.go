@@ -11,12 +11,14 @@ import (
 	"strconv"
 	"strings"
 
+	"log"
+
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
+	"github.com/tashil/data-sharing/backend/internal/service/sellinassist"
 )
-
 
 const (
 	DefaultAdcoWorkbookPath    = "/Users/fathalla/Downloads/40-Adco -2026.xlsx"
@@ -27,12 +29,40 @@ const (
 
 // UploadHandler manages Excel/CSV uploads, data clearing, and orchestrates Gemini agent ingestion.
 type UploadHandler struct {
-	processor *ingestion.Processor
+	processor     *ingestion.Processor
+	sellInAssist *sellinassist.Service // optional; layout suggestions for review (never auto-applied)
 }
 
 // NewUploadHandler creates a new UploadHandler.
 func NewUploadHandler(processor *ingestion.Processor) *UploadHandler {
 	return &UploadHandler{processor: processor}
+}
+
+// WithSellInAssist wires Phase A3 layout suggestions into the Sell-In upload path (thin hook).
+func (h *UploadHandler) WithSellInAssist(svc *sellinassist.Service) *UploadHandler {
+	h.sellInAssist = svc
+	return h
+}
+
+// enqueueSellInLayoutSuggestion records a pending layout suggestion for human review.
+// Failures are logged only — upload success is never blocked by assist.
+func (h *UploadHandler) enqueueSellInLayoutSuggestion(r *http.Request, tenantID, filename string, fileBytes []byte) *sellinassist.Suggestion {
+	if h.sellInAssist == nil || len(fileBytes) == 0 {
+		return nil
+	}
+	rows, err := gemini.ExtractXLSXOrCSVRows(fileBytes)
+	if err != nil || len(rows) == 0 {
+		return nil
+	}
+	if len(rows) > 12 {
+		rows = rows[:12]
+	}
+	sug, err := h.sellInAssist.SuggestLayout(r.Context(), tenantID, filename, rows)
+	if err != nil {
+		log.Printf("[sellin-assist] layout suggest failed tenant=%s file=%s: %v", tenantID, filename, err)
+		return nil
+	}
+	return sug
 }
 
 // HandleClearData handles POST /api/v1/ingest/clear to wipe fake/previous data to zero.
@@ -223,9 +253,17 @@ func (h *UploadHandler) HandleLoadSellInPlan(w http.ResponseWriter, r *http.Requ
 	}
 	deleteReplacedArchive(r.Context(), h.processor, tenantID, replaceArchiveID, result)
 
+	resp := map[string]interface{}{}
+	b, _ := json.Marshal(result)
+	_ = json.Unmarshal(b, &resp)
+	if sug := h.enqueueSellInLayoutSuggestion(r, tenantID, filename, fileBytes); sug != nil {
+		resp["sellin_assist_layout"] = sug
+		resp["sellin_assist_note_ar"] = "اقتراح تخطيط مضاف للمراجعة — مش متطبق. القرارات في ذاكرة السيرفر فقط."
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // HandleUploadProductMaster handles POST /api/v1/product-master/upload to ingest or update an Adeco Product Master & Price List workbook (.xlsx or .csv).
@@ -521,6 +559,21 @@ func (h *UploadHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		writeUploadError(w, err, "ingestion_failed")
+		return
+	}
+
+	// Sell-In dry-run/upload: enqueue layout suggestion for the review UI (never auto-applied).
+	if gemini.IsSellInPlanWorkbook(fileBytes) {
+		resp := map[string]interface{}{}
+		b, _ := json.Marshal(result)
+		_ = json.Unmarshal(b, &resp)
+		if sug := h.enqueueSellInLayoutSuggestion(r, tenantID, filename, fileBytes); sug != nil {
+			resp["sellin_assist_layout"] = sug
+			resp["sellin_assist_note_ar"] = "اقتراح تخطيط مضاف للمراجعة — مش متطبق. القرارات في ذاكرة السيرفر فقط."
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
 

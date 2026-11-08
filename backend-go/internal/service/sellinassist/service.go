@@ -147,8 +147,8 @@ func (s *Service) inferLayoutAI(ctx context.Context, filename string, sample [][
 			lastErr = err
 			continue
 		}
-		if parsed.Confidence < minLayoutAIConf {
-			lastErr = fmt.Errorf("low confidence %.2f", parsed.Confidence)
+		if err := validateLayoutAI(&parsed, len(sample)); err != nil {
+			lastErr = err
 			continue
 		}
 		return &parsed, a.tier, a.model, nil
@@ -189,19 +189,21 @@ func (s *Service) List(tenantID, status string) []Suggestion {
 	return s.store.list(tenantID, status)
 }
 
-// Approve records human approval. It does NOT mutate SELLIN_CUSTOMER_CHAIN_MAP, BigQuery, or uploads.
-func (s *Service) Approve(id, actor string) (*Suggestion, error) {
-	return s.store.decide(id, StatusApproved, actor)
+// Approve records human approval for the authenticated tenant only.
+// It does NOT mutate SELLIN_CUSTOMER_CHAIN_MAP, BigQuery, or uploads.
+// Cross-tenant UUID probes return ErrNotFound (no disclosure / no state change).
+func (s *Service) Approve(id, tenantID, actor string) (*Suggestion, error) {
+	return s.store.decide(id, tenantID, StatusApproved, actor)
 }
 
-// Reject records human rejection.
-func (s *Service) Reject(id, actor string) (*Suggestion, error) {
-	return s.store.decide(id, StatusRejected, actor)
+// Reject records human rejection for the authenticated tenant only.
+func (s *Service) Reject(id, tenantID, actor string) (*Suggestion, error) {
+	return s.store.decide(id, tenantID, StatusRejected, actor)
 }
 
-// GetMetrics returns funnel success metrics for the in-memory store.
-func (s *Service) GetMetrics() Metrics {
-	pending, approved, rejected, layoutSug, layoutApp, chainSug, chainApp := s.store.snapshotCounts()
+// GetMetrics returns funnel success metrics scoped to one tenant (RAM-only store).
+func (s *Service) GetMetrics(tenantID string) Metrics {
+	pending, approved, rejected, layoutSug, layoutApp, chainSug, chainApp := s.store.snapshotCounts(tenantID)
 	m := Metrics{
 		Suggested:       pending + approved + rejected,
 		Approved:        approved,

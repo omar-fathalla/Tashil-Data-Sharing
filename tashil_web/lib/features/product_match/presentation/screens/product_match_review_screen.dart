@@ -216,6 +216,18 @@ class _ProductMatchReviewScreenState extends State<ProductMatchReviewScreen> {
                 'الأصناف غير المؤكدة أو غير الموجودة في كارتة الأصناف والأسعار تظهر هنا. لا يتم اختراع باركودات — فقط باركود الملف أو باركود الكارتة.',
                 style: theme.textTheme.bodyMedium,
               ),
+              const SizedBox(height: M3Spacing.xs),
+              Material(
+                key: const Key('product_match_ram_note'),
+                color: cs.secondaryContainer.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(8),
+                child: const Padding(
+                  padding: EdgeInsets.all(M3Spacing.sm),
+                  child: Text(
+                    'ملاحظة: قرارات المراجعة في ذاكرة السيرفر فقط (RAM) — بتضيع لو السيرفر اتعمل له restart ومش متشاركة بين النسخ. مفيش حفظ durable لسه.',
+                  ),
+                ),
+              ),
               const SizedBox(height: M3Spacing.sm),
               _MetricsStrip(metrics: _metrics),
               const SizedBox(height: M3Spacing.sm),

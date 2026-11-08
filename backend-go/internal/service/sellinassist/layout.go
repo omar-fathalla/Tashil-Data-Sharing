@@ -7,36 +7,52 @@ import (
 
 // Sell-In column roles Gemini (or heuristics) may assign.
 const (
-	roleCustomer   = "customer"
-	roleItemCode   = "item_code"
-	roleItemName   = "item_name"
-	roleQty        = "qty"
-	roleValue      = "value"
-	roleNetQ       = "net_q"
-	roleNetV       = "net_v"
-	roleDate       = "date"
-	roleMonth      = "month"
-	roleYear       = "year"
-	roleBarcode    = "barcode"
-	roleBranch     = "branch"
-	roleChain      = "chain"
-	roleIgnore     = "ignore"
+	roleCustomer = "customer"
+	roleItemCode = "item_code"
+	roleItemName = "item_name"
+	roleQty      = "qty"
+	roleValue    = "value"
+	roleNetQ     = "net_q"
+	roleNetV     = "net_v"
+	roleDate     = "date"
+	roleMonth    = "month"
+	roleYear     = "year"
+	roleBarcode  = "barcode"
+	roleBranch   = "branch"
+	roleChain    = "chain"
+	roleIgnore   = "ignore"
 )
 
-var roleAliases = map[string][]string{
-	roleCustomer: {"customer name", "customer", "اسم العميل", "العميل"},
-	roleItemCode: {"item number", "item code", "كود الصنف", "barcode", "الباركود"},
-	roleItemName: {"item description", "item name", "اسم الصنف", "item 1"},
-	roleQty:      {"qty", "quantity", "الكميه", "الكمية"},
-	roleValue:    {"extended price", "ext price", "قيمه الفاتوره", "قيمة الفاتورة", "net v", "net value", "صافي القيمه"},
-	roleNetQ:     {"net q", "net qty", "صافي الكميه", "صافي الكمية"},
-	roleNetV:     {"net v", "to", "t.o", "صافي القيمه"},
-	roleDate:     {"document date", "doc date", "invoice date", "تاريخ المستند", "تاريخ الفاتوره", "date"},
-	roleMonth:    {"month", "الشهر", "شهر"},
-	roleYear:     {"year", "السنه", "السنة"},
-	roleBarcode:  {"barcode", "الباركود", "gtin"},
-	roleBranch:   {"branch", "الفرع", "store"},
-	roleChain:    {"chain", "retailer", "السلسله", "السلسلة"},
+// roleMatchOrder is deterministic precedence for header→role matching.
+// More specific aliases (Net V, barcode) must win over broader ones (value, item_code).
+// Never iterate a Go map for matching — map order is non-deterministic.
+var roleMatchOrder = []struct {
+	role    string
+	aliases []string
+}{
+	{roleNetV, []string{"net v", "net value", "to", "t.o", "صافي القيمه", "صافي القيمة"}},
+	{roleNetQ, []string{"net q", "net qty", "صافي الكميه", "صافي الكمية"}},
+	{roleBarcode, []string{"barcode", "الباركود", "gtin"}},
+	{roleCustomer, []string{"customer name", "customer", "اسم العميل", "العميل"}},
+	{roleItemCode, []string{"item number", "item code", "كود الصنف"}},
+	{roleItemName, []string{"item description", "item name", "اسم الصنف", "item 1"}},
+	{roleQty, []string{"qty", "quantity", "الكميه", "الكمية"}},
+	{roleValue, []string{"extended price", "ext price", "قيمه الفاتوره", "قيمة الفاتورة"}},
+	{roleDate, []string{"document date", "doc date", "invoice date", "تاريخ المستند", "تاريخ الفاتوره", "date"}},
+	{roleMonth, []string{"month", "الشهر", "شهر"}},
+	{roleYear, []string{"year", "السنه", "السنة"}},
+	{roleBranch, []string{"branch", "الفرع", "store"}},
+	{roleChain, []string{"chain", "retailer", "السلسله", "السلسلة"}},
+}
+
+var allowedLayouts = map[string]bool{
+	"gp_sop": true, "raw_plan": true, "guided": true, "long": true, "unknown": true,
+}
+
+var allowedRoles = map[string]bool{
+	roleCustomer: true, roleItemCode: true, roleItemName: true, roleQty: true,
+	roleValue: true, roleNetQ: true, roleNetV: true, roleDate: true, roleMonth: true,
+	roleYear: true, roleBarcode: true, roleBranch: true, roleChain: true, roleIgnore: true,
 }
 
 type layoutGuess struct {
@@ -129,7 +145,6 @@ func scoreHeaderRow(row []string) (cols []ColumnRole, missing []string, layout s
 		if okRole(found, r) {
 			continue
 		}
-		// qty/value aliases: net_q can satisfy qty for raw_plan
 		if r == roleQty && okRole(found, roleNetQ) {
 			continue
 		}
@@ -150,15 +165,56 @@ func okRole(found map[string]int, role string) bool {
 	return ok
 }
 
+// matchRole returns the first role in roleMatchOrder whose alias matches.
 func matchRole(norm string) string {
-	for role, aliases := range roleAliases {
-		for _, a := range aliases {
-			if normalizeHeaderLabel(a) == norm || strings.Contains(norm, normalizeHeaderLabel(a)) {
-				return role
+	for _, entry := range roleMatchOrder {
+		for _, a := range entry.aliases {
+			an := normalizeHeaderLabel(a)
+			if an == "" {
+				continue
+			}
+			if norm == an || strings.Contains(norm, an) {
+				return entry.role
 			}
 		}
 	}
 	return roleIgnore
+}
+
+// validateLayoutAI rejects malformed / out-of-range Gemini layout payloads before accept.
+func validateLayoutAI(ai *layoutAIResponse, sampleRows int) error {
+	if ai == nil {
+		return fmt.Errorf("empty layout response")
+	}
+	if ai.Confidence < minLayoutAIConf || ai.Confidence > 1 {
+		return fmt.Errorf("confidence out of range: %v", ai.Confidence)
+	}
+	if !allowedLayouts[ai.Layout] {
+		return fmt.Errorf("unknown layout %q", ai.Layout)
+	}
+	if ai.HeaderRowIndex < 0 || (sampleRows > 0 && ai.HeaderRowIndex >= sampleRows) {
+		return fmt.Errorf("header_row_index %d out of range", ai.HeaderRowIndex)
+	}
+	if len(ai.Columns) == 0 {
+		return fmt.Errorf("columns empty")
+	}
+	seen := map[int]bool{}
+	for _, c := range ai.Columns {
+		if c.Index < 0 {
+			return fmt.Errorf("negative column index")
+		}
+		if seen[c.Index] {
+			return fmt.Errorf("duplicate column index %d", c.Index)
+		}
+		seen[c.Index] = true
+		if !allowedRoles[c.Role] {
+			return fmt.Errorf("unknown role %q", c.Role)
+		}
+	}
+	if strings.TrimSpace(ai.ReasonAR) == "" {
+		return fmt.Errorf("reason_ar required")
+	}
+	return nil
 }
 
 const sellInLayoutSchemaJSON = `{"type":"OBJECT","properties":{
