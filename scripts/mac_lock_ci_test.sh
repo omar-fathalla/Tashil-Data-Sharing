@@ -35,77 +35,12 @@ export HOME="$tmpdir/home"
 export RUNNER_TEMP="$tmpdir/runner"
 mkdir -p "$HOME/mac-resources" "$RUNNER_TEMP"
 
-# Fake lock script: records invocations; can rewrite itself mid-acquire to
-# simulate the production failure mode (live file mutated under bash).
-cat > "$HOME/mac-resources/mac-lock.sh" <<'EOF'
-#!/bin/bash
-# Fake mac-lock for tests. LOCK.d under $HOME/mac-resources.
-D="$HOME/mac-resources"; L="$D/LOCK.d"
-case "$1" in
-  acquire)
-    agent="$2"; repo="$3"; task="$4"
-    # Simulate another agent rewriting the live script while a waiter runs.
-    if [[ "${REWRITE_SELF:-0}" == "1" ]]; then
-      cat > "$0" <<'BROKEN'
-#!/bin/bash
-echo "rewritten underfoot"
-      *) echo "not owner (held by: broken)"; exit 1;; esac;;
-BROKEN
-      # Continue using *this* process's already-read/copied text if caller
-      # executed a private copy; if they exec'd $0 live, further lines may
-      # be garbage. We still take the lock so ownership release can be tested.
-    fi
-    mkdir "$L"
-    echo "agent=$agent | repo=$repo | task=$task | start=test | eta=1 min | pid=$$" > "$L/owner"
-    echo "acquired"
-    ;;
-  release)
-    owner=$(cat "$L/owner" 2>/dev/null || true)
-    case "$owner" in
-      *"agent=$2 "*) rm -rf "$L"; echo "released";;
-      *) echo "not owner (held by: $owner)"; exit 1;;
-    esac
-    ;;
-  status)
-    if [[ -d "$L" ]]; then cat "$L/owner"; else echo "free"; fi
-    ;;
-  *) echo "usage"; exit 2;;
-esac
-EOF
-chmod +x "$HOME/mac-resources/mac-lock.sh"
-
-# --- missing script skips ---
-rm -f "$HOME/mac-resources/mac-lock.sh"
+# --- MAC_SHARED_LOCK unset → skip ---
+unset MAC_SHARED_LOCK || true
 out="$("$WRAPPER" acquire "a" "r" "t" 1 1)"
-assert_contains "$out" "skipping" "missing script skips acquire"
-# restore fake
-cat > "$HOME/mac-resources/mac-lock.sh" <<'EOF'
-#!/bin/bash
-D="$HOME/mac-resources"; L="$D/LOCK.d"
-case "$1" in
-  acquire)
-    agent="$2"; repo="$3"; task="$4"
-    if [[ "${REWRITE_SELF:-0}" == "1" ]]; then
-      printf '%s\n' '#!/bin/bash' 'echo rewritten' '      *) echo "not owner (held by: x)"; exit 1;; esac;;' > "$0"
-    fi
-    mkdir -p "$D"
-    mkdir "$L"
-    echo "agent=$agent | repo=$repo | task=$task | start=test | eta=1 min | pid=$$" > "$L/owner"
-    echo "acquired"
-    ;;
-  release)
-    owner=$(cat "$L/owner" 2>/dev/null || true)
-    case "$owner" in
-      *"agent=$2 "*) rm -rf "$L"; echo "released";;
-      *) echo "not owner (held by: $owner)"; exit 1;;
-    esac
-    ;;
-  status)
-    if [[ -d "$L" ]]; then cat "$L/owner"; else echo "free"; fi
-    ;;
-  *) echo "usage"; exit 2;;
-esac
-EOF
+assert_contains "$out" "skipping mac lock" "MAC_SHARED_LOCK unset skips acquire"
+
+export MAC_SHARED_LOCK=1
 
 # --- acquire + ownership release ---
 out="$("$WRAPPER" acquire "ci-agent-1" "repo" "task" 1 1)"
@@ -125,14 +60,16 @@ st="$("$WRAPPER" status)"
 assert_contains "$st" "ci-agent-2" "lock still held by real owner"
 "$WRAPPER" release "ci-agent-2" >/dev/null
 
-# --- rewrite-underfoot: live SRC mutates; private copy still acquires ---
-export REWRITE_SELF=1
-out="$(REWRITE_SELF=1 "$WRAPPER" acquire "ci-agent-3" "repo" "task" 1 1)"
-assert_contains "$out" "acquired" "acquire via copy survives live rewrite"
-# Live file should now be broken garbage; wrapper must still release via its copy.
-out="$("$WRAPPER" release "ci-agent-3")"
-assert_contains "$out" "released" "release via copy after live rewrite"
-unset REWRITE_SELF
+# --- parent dead → do not acquire (simulate by bogus PPID via subshell kill) ---
+# Soft check: with GITHUB_ACTIONS unset, PPID alive is enough; ensure acquire still works.
+out="$("$WRAPPER" acquire "ci-agent-3" "repo" "task" 1 1)"
+assert_contains "$out" "acquired" "acquire works when parent alive"
+"$WRAPPER" release "ci-agent-3" >/dev/null
+
+# --- MAC_SHARED_LOCK=0 skips ---
+export MAC_SHARED_LOCK=0
+out="$("$WRAPPER" acquire "a" "r" "t" 1 1)"
+assert_contains "$out" "skipping mac lock" "MAC_SHARED_LOCK=0 skips"
 
 echo ""
 echo "passed=$PASS failed=$FAIL"

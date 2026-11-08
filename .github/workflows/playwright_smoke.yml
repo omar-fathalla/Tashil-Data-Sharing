@@ -22,31 +22,29 @@ concurrency:
 
 env:
   FLUTTER_VERSION: "3.41.2"
+  MAC_SHARED_LOCK: ${{ vars.MAC_SHARED_LOCK }}
 
 jobs:
   flutter-web-semantics-smoke:
     # Fallback if Mac offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
-    timeout-minutes: 45
+    # Acquire step timeout (40) < job timeout so if:always release still runs on cancel.
+    timeout-minutes: 90
     steps:
-      # Copy mac-lock.sh to $RUNNER_TEMP before exec (live file may be rewritten mid-wait).
+      - uses: actions/checkout@v4
+
+      - name: Per-runner toolchain / ADB env
+        run: bash scripts/ci_runner_env.sh
+
       - name: Acquire Mac resource lock
         id: mac_lock
+        timeout-minutes: 40
         run: |
           set -euo pipefail
           AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
           echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
-          SRC="${HOME}/mac-resources/mac-lock.sh"
-          if [ ! -f "$SRC" ]; then
-            echo "mac-lock.sh missing — skip acquire (ubuntu/github-hosted fallback)"
-            exit 0
-          fi
-          COPY="${RUNNER_TEMP}/mac-lock-ci-copy.sh"
-          cp "$SRC" "$COPY"
-          echo "MAC_LOCK_COPY=${COPY}" >> "$GITHUB_ENV"
-          bash "$COPY" acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "playwright-semantics-smoke" 45 120
-
-      - uses: actions/checkout@v4
+          chmod +x scripts/mac_lock_ci.sh
+          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "playwright-semantics-smoke" 45 120
 
       - name: Detect preinstalled Flutter
         id: flutter_pre
@@ -115,28 +113,33 @@ jobs:
           fi
 
       # SPA fallback so /adeco serves index.html (path URL strategy).
-      # Use RUNNER_TEMP pid/log so cleanup works on the persistent Mac.
+      # Per-run free port in 5600+ (never hardcode 4173; avoid other bot 5570–5580).
       - name: Start static server
+        id: smoke_server
         run: |
+          set -euo pipefail
           mkdir -p "$RUNNER_TEMP/playwright-smoke"
-          npx --yes serve@14 -s tashil_web/build/web -l 4173 \
+          PORT="$(python3 scripts/pick_free_ports.py -n 1 --min 5600 --max 5899)"
+          echo "SMOKE_PORT=${PORT}" >> "$GITHUB_ENV"
+          echo "port=${PORT}" >> "$GITHUB_OUTPUT"
+          npx --yes serve@14 -s tashil_web/build/web -l "${PORT}" \
             >"$RUNNER_TEMP/playwright-smoke/serve.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/playwright-smoke/serve.pid"
           for i in $(seq 1 60); do
-            if curl -fsS "http://127.0.0.1:4173/" >/dev/null; then
-              echo "static server ready"
+            if curl -fsS "http://127.0.0.1:${PORT}/" >/dev/null; then
+              echo "static server ready on ${PORT}"
               exit 0
             fi
             sleep 1
           done
-          echo "static server failed to start"
+          echo "static server failed to start on ${PORT}"
           cat "$RUNNER_TEMP/playwright-smoke/serve.log" || true
           exit 1
 
       - name: Run read-only login Semantics smoke
         working-directory: e2e
         env:
-          BASE_ORIGIN: http://127.0.0.1:4173
+          BASE_ORIGIN: http://127.0.0.1:${{ steps.smoke_server.outputs.port }}
           TENANT_PATH: /adeco
           CI: "true"
         run: npx playwright test
@@ -168,20 +171,9 @@ jobs:
           rm -rf tashil_web/build/web e2e/test-results e2e/playwright-report \
             "$RUNNER_TEMP/playwright-smoke" 2>/dev/null || true
 
-      # Ownership via status — release only if we hold LOCK.d (if: always).
       - name: Release Mac resource lock
         if: always()
         run: |
           set +e
           AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
-          SRC="${HOME}/mac-resources/mac-lock.sh"
-          COPY="${MAC_LOCK_COPY:-${RUNNER_TEMP}/mac-lock-ci-copy.sh}"
-          if [ ! -f "$COPY" ]; then
-            [ -f "$SRC" ] || { echo "mac-lock.sh missing — skip release"; exit 0; }
-            cp "$SRC" "$COPY"
-          fi
-          status="$(bash "$COPY" status 2>/dev/null || true)"
-          case "$status" in
-            *"$AGENT"*) bash "$COPY" release "$AGENT" ;;
-            *) echo "lock not held by this agent (${AGENT}); status=${status:-free} — skip release" ;;
-          esac
+          bash scripts/mac_lock_ci.sh release "$AGENT"

@@ -33,6 +33,8 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.41.2"
+  # Opt-in shared Mac lock (unset on dedicated tashil-ci). Set repo variable MAC_SHARED_LOCK=1 to enable.
+  MAC_SHARED_LOCK: ${{ vars.MAC_SHARED_LOCK }}
 
 jobs:
   # Stopgap until shared storage (#37): refuse deploy commands that omit or change the 1-instance pin.
@@ -48,30 +50,29 @@ jobs:
   test-backend:
     name: Backend Go tests
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    # Room for acquire wait (≤110m) + tests; acquire step has its own shorter timeout.
+    timeout-minutes: 240
     defaults:
       run:
         working-directory: backend-go
     steps:
-      # First step: shared Mac lock. Copy script to $RUNNER_TEMP before exec so a
-      # mid-wait rewrite of ~/mac-resources/mac-lock.sh cannot shift bash's offset.
+      - uses: actions/checkout@v4
+
+      - name: Per-runner toolchain / ADB env
+        working-directory: .
+        run: bash scripts/ci_runner_env.sh
+
+      # Shared Mac lock (opt-in via MAC_SHARED_LOCK). timeout < job so if:always release runs.
       - name: Acquire Mac resource lock
         id: mac_lock
+        timeout-minutes: 110
         working-directory: .
         run: |
           set -euo pipefail
           AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
           echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
-          SRC="${HOME}/mac-resources/mac-lock.sh"
-          if [ ! -f "$SRC" ]; then
-            echo "mac-lock.sh missing — skip acquire (ubuntu/github-hosted fallback)"
-            exit 0
-          fi
-          COPY="${RUNNER_TEMP}/mac-lock-ci-copy.sh"
-          cp "$SRC" "$COPY"
-          echo "MAC_LOCK_COPY=${COPY}" >> "$GITHUB_ENV"
-          bash "$COPY" acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "backend-go+firestore-emulator" 45 120
-
-      - uses: actions/checkout@v4
+          chmod +x scripts/mac_lock_ci.sh
+          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "backend-go+firestore-emulator" 45 120
 
       # On self-hosted Mac, GOMODCACHE/GOCACHE already live on the shared home disk.
       # Remote actions/cache for setup-go was ~880MB and stalled (~10m at 0 B/s).
@@ -95,18 +96,17 @@ jobs:
       - name: go vet
         run: go vet ./...
 
-      # Cap package parallelism: 3 runners share one 14-core Mac (load spiked 31–118
-      # when -p≈7). Keep ≤3 packages / GOMAXPROCS so siblings stay responsive.
+      # Capped -p/GOMAXPROCS, per-package timeout, slowest-test summary (scripts/run_go_tests_ci.sh).
       - name: go test
         id: go_test
+        working-directory: .
+        env:
+          CI_GO_TEST_P: ${{ vars.CI_GO_TEST_P }}
+          CI_GO_TEST_GOMAXPROCS: ${{ vars.CI_GO_TEST_GOMAXPROCS }}
+          CI_GO_TEST_PKG_TIMEOUT_MIN: ${{ vars.CI_GO_TEST_PKG_TIMEOUT_MIN }}
         run: |
-          set -euo pipefail
-          cores="$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)"
-          p=$(( cores / 5 ))
-          if [ "$p" -lt 2 ]; then p=2; fi
-          if [ "$p" -gt 3 ]; then p=3; fi
-          echo "go test -p=$p GOMAXPROCS=$p (cores=$cores; capped for 3 runners)"
-          GOMAXPROCS="$p" go test ./... -count=1 -timeout 20m -p "$p"
+          chmod +x scripts/run_go_tests_ci.sh
+          bash scripts/run_go_tests_ci.sh
 
       - name: Setup Node (Firestore emulator)
         uses: actions/setup-node@v4
@@ -173,60 +173,47 @@ jobs:
             echo "Reproduce locally:"
             echo ""
             echo '```bash'
-            echo 'cd backend-go && go test ./... -count=1 -timeout 20m'
+            echo 'bash scripts/run_go_tests_ci.sh'
             echo 'bash scripts/run_firestore_emulator_tests.sh'
             echo '```'
             echo ""
             echo "Proposed next step: inspect the failing package output above, fix on this PR branch, and push — do not push fixes to main."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Ownership-based release (if: always). Do not trust GITHUB_OUTPUT — acquire
-      # can exit non-zero after LOCK.d was taken (live script rewritten mid-wait).
+      # Ownership-based release (if: always). Parent-alive acquire avoids orphans on cancel.
       - name: Release Mac resource lock
         if: always()
         working-directory: .
         run: |
           set +e
           AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
-          SRC="${HOME}/mac-resources/mac-lock.sh"
-          COPY="${MAC_LOCK_COPY:-${RUNNER_TEMP}/mac-lock-ci-copy.sh}"
-          if [ ! -f "$COPY" ]; then
-            [ -f "$SRC" ] || { echo "mac-lock.sh missing — skip release"; exit 0; }
-            cp "$SRC" "$COPY"
-          fi
-          status="$(bash "$COPY" status 2>/dev/null || true)"
-          case "$status" in
-            *"$AGENT"*) bash "$COPY" release "$AGENT" ;;
-            *) echo "lock not held by this agent (${AGENT}); status=${status:-free} — skip release" ;;
-          esac
+          bash scripts/mac_lock_ci.sh release "$AGENT"
 
   test-flutter:
     name: Flutter analyze & test
-    # Books the Mac lock so we do not overlap Flutter work with other agents.
-    # Tradeoff: serializes vs our Go/smoke jobs (one global LOCK.d).
+    # Opt-in Mac lock (MAC_SHARED_LOCK). Tradeoff when enabled: serializes vs Go/smoke.
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    timeout-minutes: 180
     defaults:
       run:
         working-directory: tashil_web
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Per-runner toolchain / ADB env
+        working-directory: .
+        run: bash scripts/ci_runner_env.sh
+
       - name: Acquire Mac resource lock
         id: mac_lock
+        timeout-minutes: 110
         working-directory: .
         run: |
           set -euo pipefail
           AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
           echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
-          SRC="${HOME}/mac-resources/mac-lock.sh"
-          if [ ! -f "$SRC" ]; then
-            echo "mac-lock.sh missing — skip acquire (ubuntu/github-hosted fallback)"
-            exit 0
-          fi
-          COPY="${RUNNER_TEMP}/mac-lock-ci-copy.sh"
-          cp "$SRC" "$COPY"
-          echo "MAC_LOCK_COPY=${COPY}" >> "$GITHUB_ENV"
-          bash "$COPY" acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "flutter-analyze-test" 25 120
-
-      - uses: actions/checkout@v4
+          chmod +x scripts/mac_lock_ci.sh
+          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "flutter-analyze-test" 25 120
 
       # Prefer the Mac's preinstalled Flutter 3.41.2; fall back to flutter-action (+cache).
       - name: Detect preinstalled Flutter
@@ -290,17 +277,7 @@ jobs:
         run: |
           set +e
           AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
-          SRC="${HOME}/mac-resources/mac-lock.sh"
-          COPY="${MAC_LOCK_COPY:-${RUNNER_TEMP}/mac-lock-ci-copy.sh}"
-          if [ ! -f "$COPY" ]; then
-            [ -f "$SRC" ] || { echo "mac-lock.sh missing — skip release"; exit 0; }
-            cp "$SRC" "$COPY"
-          fi
-          status="$(bash "$COPY" status 2>/dev/null || true)"
-          case "$status" in
-            *"$AGENT"*) bash "$COPY" release "$AGENT" ;;
-            *) echo "lock not held by this agent (${AGENT}); status=${status:-free} — skip release" ;;
-          esac
+          bash scripts/mac_lock_ci.sh release "$AGENT"
 
   comment-on-pr-failure:
     name: Comment PR when tests fail
@@ -326,7 +303,7 @@ jobs:
               '',
               'Reproduce:',
               '```bash',
-              'cd backend-go && go test ./... -count=1 -timeout 20m',
+              'bash scripts/run_go_tests_ci.sh',
               'cd tashil_web && flutter test',
               '```',
             ];

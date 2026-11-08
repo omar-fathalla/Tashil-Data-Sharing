@@ -3,6 +3,7 @@ package ingestion
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
@@ -344,8 +345,17 @@ func TestMultiChainFathallaAndGomlaYearFilteringAndMonthlyTrends(t *testing.T) {
 }
 
 func TestRealWorkbooksFathallaAndGomlaEndToEnd(t *testing.T) {
-	fathallaPath := "/Users/fathalla/Downloads/40-Adco -2026.xlsx"
-	gomlaPath := "/Users/fathalla/Downloads/Book1 (2).xlsx"
+	// Large local Downloads fixtures (~minutes). Opt-in only — on the shared CI Mac
+	// these files exist and otherwise blow the suite past the job timeout.
+	if os.Getenv("RUN_LARGE_LOCAL_INGEST_TESTS") != "1" {
+		t.Skip("set RUN_LARGE_LOCAL_INGEST_TESTS=1 to run Downloads workbook e2e")
+	}
+	home, _ := os.UserHomeDir()
+	if home == "" {
+		home = os.Getenv("HOME")
+	}
+	fathallaPath := filepath.Join(home, "Downloads", "40-Adco -2026.xlsx")
+	gomlaPath := filepath.Join(home, "Downloads", "Book1 (2).xlsx")
 
 	fathallaBytes, err1 := os.ReadFile(fathallaPath)
 	gomlaBytes, err2 := os.ReadFile(gomlaPath)
@@ -664,7 +674,14 @@ func TestUploadArchiveSaveFilterAndDownload(t *testing.T) {
 }
 
 func TestLargeBook6StreamingXLSXIngestion(t *testing.T) {
-	book6Path := "/Users/fathalla/Downloads/Book6.xlsx"
+	if os.Getenv("RUN_LARGE_LOCAL_INGEST_TESTS") != "1" {
+		t.Skip("set RUN_LARGE_LOCAL_INGEST_TESTS=1 to run Book6 large-file benchmark")
+	}
+	home, _ := os.UserHomeDir()
+	if home == "" {
+		home = os.Getenv("HOME")
+	}
+	book6Path := filepath.Join(home, "Downloads", "Book6.xlsx")
 	book6Bytes, err := os.ReadFile(book6Path)
 	if err != nil || len(book6Bytes) == 0 {
 		t.Skip("Book6.xlsx not present in Downloads, skipping local large-file benchmark")

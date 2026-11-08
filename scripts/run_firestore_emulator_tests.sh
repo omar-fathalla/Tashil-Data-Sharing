@@ -43,7 +43,8 @@ if [[ -d "$REAL_HOME/.cache/firebase/emulators" ]]; then
   ln -sfn "$REAL_HOME/.cache/firebase/emulators" "$JOB_DIR/home/.cache/firebase/emulators"
 fi
 
-read -r FS_PORT HUB_PORT LOG_PORT <<<"$(python3 "$ROOT/scripts/pick_free_ports.py" -n 3)"
+# Ports in 5600+ (avoid other bot's 5570–5580 Android emulator band).
+read -r FS_PORT HUB_PORT LOG_PORT <<<"$(python3 "$ROOT/scripts/pick_free_ports.py" -n 3 --min 5600 --max 5899)"
 echo "Isolated emulator: firestore=127.0.0.1:${FS_PORT} hub=${HUB_PORT} logging=${LOG_PORT} project=${PROJECT}"
 echo "job_dir=${JOB_DIR}"
 

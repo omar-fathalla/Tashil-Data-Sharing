@@ -21,11 +21,21 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/sellinassist"
 )
 
-const (
-	DefaultAdcoWorkbookPath    = "/Users/fathalla/Downloads/40-Adco -2026.xlsx"
-	DefaultGomlaWorkbookPath   = "/Users/fathalla/Downloads/Book1 (2).xlsx"
-	DefaultAdcoSellInCleanPath = "/Users/fathalla/Downloads/Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx"
-	DefaultAdcoSellInRawPath   = "/Users/fathalla/Downloads/plan 10 aswak.xlsx"
+// Default local workbook paths under $HOME/Downloads (never hardcode /Users/fathalla —
+// CI runners may be tashil-ci on the same Mac).
+func downloadsPath(name string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		home = os.Getenv("HOME")
+	}
+	return filepath.Join(home, "Downloads", name)
+}
+
+var (
+	DefaultAdcoWorkbookPath    = downloadsPath("40-Adco -2026.xlsx")
+	DefaultGomlaWorkbookPath   = downloadsPath("Book1 (2).xlsx")
+	DefaultAdcoSellInCleanPath = downloadsPath("Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx")
+	DefaultAdcoSellInRawPath   = downloadsPath("plan 10 aswak.xlsx")
 )
 
 // UploadHandler manages Excel/CSV uploads, data clearing, and orchestrates Gemini agent ingestion.

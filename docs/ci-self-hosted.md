@@ -14,78 +14,95 @@ emulators, Flutter/Go builds). CI must never assume exclusive use of the machine
 runs-on: [self-hosted, macOS, tashil-mac]
 ```
 
-Three runners share that label (parallel jobs OK):
+Three runners share that label (parallel jobs OK). **`tashil-mac-2` / `tashil-mac-3`
+run as user `tashil-ci`** (`HOME=/Users/tashil-ci`). Toolchains live at
+`$HOME/toolchains` — never hardcode `/Users/fathalla`.
 
-| Runner name    | Install dir          |
-|----------------|----------------------|
-| `tashil-mac`   | `~/actions-runner`   |
-| `tashil-mac-2` | `~/actions-runner-2` |
-| `tashil-mac-3` | `~/actions-runner-3` |
+| Runner name    | User (target) | Install dir            | ADB server port |
+|----------------|---------------|------------------------|-----------------|
+| `tashil-mac`   | (legacy / migrating) | `~/actions-runner`   | 5037 |
+| `tashil-mac-2` | `tashil-ci`   | `~/actions-runner-2`   | 5038 |
+| `tashil-mac-3` | `tashil-ci`   | `~/actions-runner-3`   | 5039 |
+
+`scripts/ci_runner_env.sh` sets `PATH` (`$HOME/toolchains/bin`), `ANDROID_HOME`,
+`ANDROID_ADB_SERVER_PORT`, and `ADB_SERVER_SOCKET=tcp:localhost:<port>` per runner.
 
 Custom label on each: `tashil-mac`. GitHub also applies `self-hosted`, `macOS`, `ARM64`.
 
 ## Shared-Mac hard rules
 
-1. **Never assume fixed ports** (`8080`, `4000`, `4400`, `9150`, …). Always probe for a
-   free port (`scripts/pick_free_ports.py`).
+1. **Never assume fixed ports** (`4173`, `8080`, `4000`, …). Probe with
+   `scripts/pick_free_ports.py --min 5600` (our band). **Do not use 5570–5580** (other bot).
 2. **Never kill by process name** (`pkill -f firestore`, etc.). Cleanup may only signal
    the **PID (tree) this job started** (`scripts/run_firestore_emulator_tests.sh`).
 3. **Keep CPU bounded** — see table below. Other bots may be compiling at the same time.
 4. **Per-job temp dirs** under `$RUNNER_TEMP/tashil-emu-…` (sandbox `HOME`/`TMPDIR`).
    Do not write job-specific emulator config into another user’s home.
 5. **Ubuntu fallback** via `CI_RUNS_ON` still works (same scripts; ports still probed).
-6. **Cross-repo Mac lock** — see below. Do **not** edit `~/mac-resources` from CI; only call
-   the installed `mac-lock.sh`.
+6. **Cross-repo Mac lock** — opt-in via `MAC_SHARED_LOCK` (see below). Do **not** edit
+   `~/mac-resources` from CI.
+7. **Paths** use `$HOME` / `ANDROID_HOME` / `$HOME/toolchains` — never `/Users/fathalla`.
 
 ## Cross-repo Mac lock (`~/mac-resources/mac-lock.sh`)
 
 GitHub `concurrency` only serializes within one workflow/ref. Another repo’s runners on
-the same Mac can still overlap. Heavy jobs therefore book a **global** directory lock.
+the same Mac can still overlap. Heavy jobs may book a **global** directory lock.
 
-**Do not edit** `~/mac-resources` from this repo’s CI. Only call the installed script
-(via a private copy — see below).
+**Do not edit** `~/mac-resources` from this repo’s CI.
 
-### Safe invoke (copy then exec)
+### Opt-in (`MAC_SHARED_LOCK`)
 
-Another agent may **rewrite** `~/mac-resources/mac-lock.sh` while a waiter is blocked
-inside it. Bash then continues reading the live inode at a shifted offset (looks like a
-spurious `syntax error near unexpected token '('` right after `acquired`). CI therefore:
+Lock is **off unless** repo variable / env `MAC_SHARED_LOCK=1`. Unset on the dedicated
+`tashil-ci` user/machine (migration). Set `MAC_SHARED_LOCK=1` only while still sharing
+fathalla-mac with other bots. Emulator **free-port** isolation stays on either way.
 
-1. **`cp ~/mac-resources/mac-lock.sh $RUNNER_TEMP/mac-lock-ci-copy.sh`**
-2. Runs **`bash $RUNNER_TEMP/mac-lock-ci-copy.sh acquire|release|status …`**
-3. Never execs the live path for the long-running wait
+### Safe invoke (`scripts/mac_lock_ci.sh`)
 
-Repo helper (local / post-checkout): `scripts/mac_lock_ci.sh` (same copy-then-exec rules).
-Tests: `bash scripts/mac_lock_ci_test.sh`.
-
-### Acquire / release rules
+1. Opt-in check (`MAC_SHARED_LOCK`)
+2. **Native wait loop** on `LOCK.d` (does not exec live `mac-lock.sh` during the wait —
+   another agent rewriting that file mid-wait used to shift bash’s read offset)
+3. **Parent-alive** every poll: if `Runner.Worker` / `$PPID` chain / GITHUB job looks
+   dead, **exit without acquiring**. After acquire, if parent is gone, **release immediately**
+   (stops cancelled jobs from leaving orphan `LOCK.d`)
+4. Release `if: always()` only when we own the lock (agent name in `status` / owner file)
+5. Acquire **step** `timeout-minutes` is **shorter than the job** timeout so cancel still
+   runs the release step
 
 ```bash
+export MAC_SHARED_LOCK=1   # omit on dedicated tashil-ci
 AGENT="ci-Tashil-Data-Sharing-${GITHUB_RUN_ID}-${GITHUB_JOB}"
-cp ~/mac-resources/mac-lock.sh "$RUNNER_TEMP/mac-lock-ci-copy.sh"
-bash "$RUNNER_TEMP/mac-lock-ci-copy.sh" acquire "$AGENT" \
-  "omar-fathalla/Tashil-Data-Sharing" "<task>" <eta_min> <wait_max_min>
+bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "<task>" <eta> <wait>
 # … work …
-# if: always() — ownership via status, NOT a GITHUB_OUTPUT "acquired" flag:
-status=$(bash "$RUNNER_TEMP/mac-lock-ci-copy.sh" status)
-# release only if $status contains $AGENT (acquire can exit non-zero after taking LOCK.d)
+bash scripts/mac_lock_ci.sh release "$AGENT"
 ```
 
-| Job | Takes lock? | eta_min | wait_max_min |
-|-----|-------------|---------|--------------|
-| Backend Go (+ Firestore emulator) | yes | 45 | 120 |
-| Flutter analyze & test | yes | 25 | 120 |
-| Playwright Semantics smoke | yes | 45 | 120 |
-| Cloud Run one-instance pin | **no** (light) | — | — |
-| Comment-on-PR-failure | **no** (light) | — | — |
+| Job | Lock when `MAC_SHARED_LOCK=1`? | acquire step timeout | job timeout |
+|-----|-------------------------------|----------------------|-------------|
+| Backend Go (+ emulator) | yes | 110m | 240m |
+| Flutter analyze & test | yes | 110m | 180m |
+| Playwright Semantics smoke | yes | 40m | 90m |
+| Cloud Run pin / PR comment | **no** | — | — |
 
-If `~/mac-resources/mac-lock.sh` is missing (ubuntu-latest / github-hosted), acquire/release
-**skip gracefully**. Non-zero acquire fails the job; `if: always()` release still runs and
-frees `LOCK.d` when `status` shows our agent.
+**Tradeoff when enabled:** one global `LOCK.d` serializes our heavy jobs with each other
+and with other agents. Waits poll every 30s up to `wait_max_min`.
 
-**Tradeoff:** one global `LOCK.d` means our own heavy jobs also **serialize** with each
-other (and with Tashil App / other agents). Wall-clock CI is longer; machine load stays
-safe. Waits poll every 30s up to `wait_max_min` then fail.
+## Go test caps (self-hosted)
+
+`scripts/run_go_tests_ci.sh`:
+
+| Env | Default | Meaning |
+|-----|---------|---------|
+| `CI_GO_TEST_P` | 2 (Darwin/self-hosted) | max packages in parallel |
+| `CI_GO_TEST_GOMAXPROCS` | same as `-p` | `GOMAXPROCS` per package |
+| `CI_GO_TEST_PKG_TIMEOUT_MIN` | 15 | per-package `-timeout` |
+
+Each package gets its own timeout (avoids one 18m package + another blowing a shared
+20m `go test ./...` wall clock). Runs with `-json` and prints the **slowest 25 tests**.
+
+Large local Downloads workbook tests (`TestRealWorkbooks…`, `TestLargeBook6…`) require
+`RUN_LARGE_LOCAL_INGEST_TESTS=1` — on the shared Mac those files exist and otherwise
+dominate CI. Handlers/ingestion unit tests only use short `time.Sleep` (ms); load comes
+from fixture size, not sleeps.
 
 ## Firestore emulator isolation
 
