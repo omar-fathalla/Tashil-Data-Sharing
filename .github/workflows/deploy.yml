@@ -1,5 +1,9 @@
 # Production deploy on every push to main (backend → Cloud Run, web → Firebase Hosting).
 #
+# Self-hosted Mac (same CI_RUNS_ON / tashil-mac as ci.yml). GitHub-hosted ubuntu was
+# blocked by spending limits — see docs/ci-self-hosted.md / #41.
+# Fallback: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
+#
 # Auth: Workload Identity Federation, no JSON keys. The provider only accepts tokens from
 # omar-fathalla/Tashil-Data-Sharing on refs/heads/main, impersonating tashil-gh-deployer.
 #
@@ -18,8 +22,9 @@ on:
       - ".gitignore"
   workflow_dispatch:
 
+# One deploy queue for this workflow; never cancel an in-flight production deploy.
 concurrency:
-  group: deploy-production
+  group: ${{ github.workflow }}
   cancel-in-progress: false
 
 permissions:
@@ -36,15 +41,21 @@ env:
 
 jobs:
   test-backend:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    # Observed ~6m on success (2026-11-08 deploy); ~20m ceiling.
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend-go
     steps:
       - uses: actions/checkout@v4
+      - name: Per-runner toolchain env
+        working-directory: .
+        run: bash scripts/ci_runner_env.sh
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend-go/go.mod
+          cache: ${{ runner.environment != 'self-hosted' }}
           cache-dependency-path: backend-go/go.sum
       - name: go vet
         run: go vet ./...
@@ -52,17 +63,36 @@ jobs:
         run: go test ./... -count=1 -timeout 20m
 
   test-web:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    # Observed ~4.5m on success; ~20m ceiling.
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: tashil_web
     steps:
       - uses: actions/checkout@v4
+      - name: Per-runner toolchain env
+        working-directory: .
+        run: bash scripts/ci_runner_env.sh
+      - name: Detect preinstalled Flutter
+        id: flutter_pre
+        working-directory: .
+        env:
+          FLUTTER_VERSION: ${{ env.FLUTTER_VERSION }}
+        run: |
+          chmod +x scripts/ci_detect_flutter.sh
+          bash scripts/ci_detect_flutter.sh
+      - name: Require preinstalled Flutter on self-hosted
+        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment == 'self-hosted'
+        run: |
+          echo "::error::Preinstalled Flutter ${{ env.FLUTTER_VERSION }} missing on self-hosted runner. Install at \$HOME/toolchains/flutter — do not download via flutter-action (drops Mac runners)."
+          exit 1
       - uses: subosito/flutter-action@v2
+        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment != 'self-hosted'
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
-          cache: true
+          cache: false
       - run: flutter pub get
       - name: flutter analyze
         run: flutter analyze
@@ -71,12 +101,22 @@ jobs:
 
   deploy-backend:
     needs: [test-backend, test-web]
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    # Observed ~4.5m; Cloud Run source deploy can spike — 30m ceiling.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           # Need the previous commit to decide whether backend sources changed.
           fetch-depth: 0
+      - name: Per-runner toolchain env
+        run: bash scripts/ci_runner_env.sh
+      - name: Isolate gcloud config
+        run: |
+          set -euo pipefail
+          cfg="${RUNNER_TEMP}/cloudsdk-config-deploy-backend"
+          mkdir -p "$cfg"
+          echo "CLOUDSDK_CONFIG=${cfg}" >> "$GITHUB_ENV"
       - name: Detect whether backend must redeploy
         id: backend_paths
         env:
@@ -122,7 +162,30 @@ jobs:
         with:
           workload_identity_provider: ${{ env.WIF_PROVIDER }}
           service_account: ${{ env.DEPLOYER_SA }}
-      - if: steps.backend_paths.outputs.deploy == 'true'
+      # Prefer $HOME/toolchains/google-cloud-sdk (tashil-ci); no apt.
+      - name: Ensure gcloud on PATH
+        id: gcloud_path
+        if: steps.backend_paths.outputs.deploy == 'true'
+        run: |
+          set -euo pipefail
+          SDK="${HOME}/toolchains/google-cloud-sdk"
+          if [ -x "${SDK}/bin/gcloud" ]; then
+            echo "${SDK}/bin" >> "$GITHUB_PATH"
+            echo "Using preinstalled gcloud at ${SDK}"
+            "${SDK}/bin/gcloud" version
+            echo "need_setup_gcloud=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if command -v gcloud >/dev/null 2>&1; then
+            echo "Using gcloud already on PATH: $(command -v gcloud)"
+            gcloud version
+            echo "need_setup_gcloud=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Preinstalled gcloud not found; installing via setup-gcloud action"
+          echo "need_setup_gcloud=true" >> "$GITHUB_OUTPUT"
+      - name: Setup gcloud (fallback)
+        if: steps.backend_paths.outputs.deploy == 'true' && steps.gcloud_path.outputs.need_setup_gcloud == 'true'
         uses: google-github-actions/setup-gcloud@v2
       - name: Record git commit for /api/v1/version
         if: steps.backend_paths.outputs.deploy == 'true'
@@ -149,14 +212,31 @@ jobs:
 
   deploy-web:
     needs: [deploy-backend]
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    # Observed ~3m (flutter build + Firebase Hosting); 25m ceiling.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Per-runner toolchain env
+        run: bash scripts/ci_runner_env.sh
+      - name: Detect preinstalled Flutter
+        id: flutter_pre
+        env:
+          FLUTTER_VERSION: ${{ env.FLUTTER_VERSION }}
+        run: |
+          chmod +x scripts/ci_detect_flutter.sh
+          bash scripts/ci_detect_flutter.sh
+      - name: Require preinstalled Flutter on self-hosted
+        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment == 'self-hosted'
+        run: |
+          echo "::error::Preinstalled Flutter ${{ env.FLUTTER_VERSION }} missing on self-hosted runner. Install at \$HOME/toolchains/flutter — do not download via flutter-action (drops Mac runners)."
+          exit 1
       - uses: subosito/flutter-action@v2
+        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment != 'self-hosted'
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
-          cache: true
+          cache: false
       - name: Compute web version
         id: ver
         run: |
