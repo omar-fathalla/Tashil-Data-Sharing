@@ -66,22 +66,53 @@ func TestFormatCallLine_NoRawPathOrPII(t *testing.T) {
 	LogCallTimed("x.xlsx", "m", "tier1", time.Now().Add(-time.Millisecond), true, nil)
 }
 
-func TestBuildSuccessMetrics_FromEvents(t *testing.T) {
-	t.Setenv("ENVIRONMENT", "production")
+func TestBuildSuccessMetrics_FromObservedEvents(t *testing.T) {
 	d := EvaluateApproval(Input{IsStaged: true, MappingSource: "ai", MappingConfidence: 0.9})
 
-	ai := BuildSuccessMetrics(EventsFromMappingSource("ai"), "ai", 0.9, d)
-	if !ai.SchemaValid || !ai.SchemaChecked || !ai.PerCallLogged || !ai.PIIMinimized {
-		t.Fatalf("ai events: %+v", ai)
+	var ai Events
+	ai.MarkSampleSanitized()
+	ai.MarkSchemaResult(true)
+	ai.MarkGeminiCall(42)
+	mAI := BuildSuccessMetrics(ai, "ai", 0.9, d)
+	if !mAI.SchemaValid || !mAI.SchemaChecked || !mAI.PerCallLogged || !mAI.PIIMinimized || mAI.GeminiLatencyMS != 42 {
+		t.Fatalf("ai events: %+v", mAI)
+	}
+	if mAI.MockBlockedInProd {
+		t.Fatal("mock blocked must not be inferred from ENVIRONMENT alone")
 	}
 
-	cache := BuildSuccessMetrics(EventsFromMappingSource("cache"), "cache", 0.9, d)
-	if !cache.SchemaValid || cache.PerCallLogged {
-		t.Fatalf("cache hit must not count as a Gemini call: %+v", cache)
+	var cache Events
+	cache.MarkSampleSanitized()
+	cache.MarkSchemaResult(true)
+	// no MarkGeminiCall — cache hit
+	mCache := BuildSuccessMetrics(cache, "cache", 0.9, d)
+	if !mCache.SchemaValid || mCache.PerCallLogged || mCache.GeminiCallCount != 0 {
+		t.Fatalf("cache hit must not count as a Gemini call: %+v", mCache)
 	}
 
-	det := BuildSuccessMetrics(EventsFromMappingSource("deterministic"), "deterministic", 0, d)
-	if det.SchemaValid || det.PerCallLogged || det.PIIMinimized {
-		t.Fatalf("deterministic must not hardcode schema/call/pii true: %+v", det)
+	var det Events
+	mDet := BuildSuccessMetrics(det, "deterministic", 0, d)
+	if mDet.SchemaValid || mDet.PerCallLogged || mDet.PIIMinimized || mDet.MockBlockedInProd {
+		t.Fatalf("empty events must stay false: %+v", mDet)
+	}
+
+	var refused Events
+	refused.MarkMockRefused()
+	mRef := BuildSuccessMetrics(refused, "mock", 0, d)
+	if !mRef.MockBlockedInProd {
+		t.Fatal("MockBlockedInProd only when mock refusal ran")
+	}
+}
+
+func TestSummarizeColumnMapJSON_NoBranchPII(t *testing.T) {
+	raw := []byte(`{"header_row_index":2,"layout":"wide","confidence":0.95,"columns":[
+{"index":0,"role":"barcode"},
+{"index":1,"role":"store_value","branch":"ops@tashil.example / 01012345678"}]}`)
+	sum := SummarizeColumnMapJSON(raw)
+	if strings.Contains(sum, "@") || strings.Contains(sum, "01012345678") || strings.Contains(sum, "branch") {
+		t.Fatalf("summary leaked PII: %s", sum)
+	}
+	if !strings.Contains(sum, "layout=wide") || !strings.Contains(sum, "store_value") {
+		t.Fatalf("summary=%s", sum)
 	}
 }

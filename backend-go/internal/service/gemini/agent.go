@@ -218,26 +218,32 @@ func applyMockMetadata(payload *domain.NormalizedRetailIngestionPayload) {
 	}
 }
 
-// logAICall emits a compact per-call log line for ops (model, tier, latency, ok/fail).
-func logAICall(filename, model, tier string, started time.Time, ok bool, callErr error) {
+// logAICall emits a compact per-call log line for ops (model, tier, latency, ok/fail)
+// and records a real GeminiCall counter on ev when provided.
+func logAICall(filename, model, tier string, started time.Time, ok bool, callErr error, ev *guardrails.Events) {
 	errMsg := ""
 	if callErr != nil {
 		errMsg = callErr.Error()
 	}
+	latency := time.Since(started).Milliseconds()
 	guardrails.LogCall(guardrails.CallRecord{
 		Filename:  filename,
 		Model:     model,
 		Tier:      tier,
-		LatencyMS: time.Since(started).Milliseconds(),
+		LatencyMS: latency,
 		OK:        ok,
 		Err:       errMsg,
 	})
+	if ev != nil {
+		ev.MarkGeminiCall(latency)
+	}
 }
 
 // AnalyzeAndNormalize uses the Tier 1 model by default and the Tier 2 model when
 // tier2 is requested or the Tier 1 call fails.
 func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawContent []byte) (*domain.NormalizedRetailIngestionPayload, error) {
 	requestedTier := GetRequestedTier(ctx)
+	var ev guardrails.Events
 	if !isReplay(ctx) {
 		if err := checkSellOutLayout(filename, rawContent); err != nil {
 			return nil, err
@@ -255,24 +261,27 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 			}
 			fullPayload.Validation = v
 			applyDeterministicMetadata(fullPayload)
+			applyGuardrailEvents(fullPayload, &ev)
 			return fullPayload, nil
 		}
-		payload, err := c.mockAnalyze(filename, rawContent)
+		payload, err := c.mockAnalyze(filename, rawContent, &ev)
 		if err != nil {
 			return nil, err
 		}
 		applyMockMetadata(payload)
+		applyGuardrailEvents(payload, &ev)
 		return payload, nil
 	}
 
 	// 1) AI column mapping on a small sample, then deterministic extraction + validation.
 	if !isReplay(ctx) {
-		if payload, ok := c.analyzeWithAIMapping(ctx, filename, rawContent); ok {
+		if payload, ok := c.analyzeWithAIMapping(ctx, filename, rawContent, &ev); ok {
 			return payload, nil
 		}
 	}
 
 	// 2) Deterministic readers, validated before anything is saved.
+	// Preserve any AI-attempt events (failed calls/schema) on the fallback payload.
 	if fullPayload, ok := parseFullTabularPayload(filename, rawContent); ok {
 		v := validateExtraction(fullPayload, nil)
 		attachTotalsExplanation(v, provenanceFromPayload(fullPayload))
@@ -282,6 +291,7 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 		}
 		fullPayload.Validation = v
 		applyDeterministicMetadata(fullPayload)
+		applyGuardrailEvents(fullPayload, &ev)
 		return fullPayload, nil
 	}
 
@@ -290,13 +300,13 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 		tier, activeModel = "tier2", c.tier2Model
 	}
 
-	payload, err := c.invokeGeminiAPI(ctx, activeModel, filename, rawContent, 32000, 0.05)
+	payload, err := c.invokeGeminiAPI(ctx, activeModel, filename, rawContent, 32000, 0.05, &ev)
 	if (err != nil || payload == nil) && tier == "tier1" && c.tier2Model != "" && c.tier2Model != c.model {
 		tier, activeModel = "tier2", c.tier2Model
-		payload, err = c.invokeGeminiAPI(ctx, activeModel, filename, rawContent, 32000, 0.05)
+		payload, err = c.invokeGeminiAPI(ctx, activeModel, filename, rawContent, 32000, 0.05, &ev)
 	}
 	if err != nil || payload == nil {
-		fallbackPayload, mErr := c.mockAnalyze(filename, rawContent)
+		fallbackPayload, mErr := c.mockAnalyze(filename, rawContent, &ev)
 		if mErr != nil {
 			return nil, mErr
 		}
@@ -304,17 +314,23 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 		if fallbackPayload.MappingSource == "" || fallbackPayload.MappingSource == MappingSourceMock {
 			applyMockMetadata(fallbackPayload)
 		}
+		applyGuardrailEvents(fallbackPayload, &ev)
 		return fallbackPayload, nil
 	}
 
 	payload.MappingSource = MappingSourceAI
 	applyTierMetadata(payload, tier, activeModel)
+	applyGuardrailEvents(payload, &ev)
 	return payload, nil
 }
 
-func (c *Client) invokeGeminiAPI(ctx context.Context, modelName, filename string, rawContent []byte, sampleLimit int, temperature float64) (*domain.NormalizedRetailIngestionPayload, error) {
+func (c *Client) invokeGeminiAPI(ctx context.Context, modelName, filename string, rawContent []byte, sampleLimit int, temperature float64, ev *guardrails.Events) (*domain.NormalizedRetailIngestionPayload, error) {
 	started := time.Now()
 	endpoint := fmt.Sprintf("%s/v1beta/models/%s:generateContent", c.geminiAPIBase(), modelName)
+
+	// extractSmartCSVSample sanitizes cells; record that the full-normalize sample was sanitized.
+	sample := extractSmartCSVSample(filename, rawContent, 25)
+	ev.MarkSampleSanitized()
 
 	prompt := fmt.Sprintf(`You are an expert Egyptian Retail Analytics AI Agent for the Tashil Data Sharing Platform (Model: %s).
 Analyze the provided retail sales file ("%s") and normalize it into the exact structured schema.
@@ -329,7 +345,7 @@ Tasks:
 
 File Content Sample:
 %s
-`, modelName, filename, extractSmartCSVSample(filename, rawContent, 25))
+`, modelName, guardrails.FilenameForLog(filename), sample)
 
 	var schemaObj interface{}
 	_ = json.Unmarshal([]byte(domain.GeminiCleanSchemaJSON), &schemaObj)
@@ -366,7 +382,7 @@ File Content Sample:
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
 		safe := fmt.Errorf("gemini request failed: %s", c.redact(err.Error()))
-		logAICall(filename, modelName, "full", started, false, safe)
+		logAICall(filename, modelName, "full", started, false, safe, ev)
 		return nil, safe
 	}
 	defer resp.Body.Close()
@@ -375,28 +391,30 @@ File Content Sample:
 		respBody, _ := io.ReadAll(resp.Body)
 		safeBody := c.redact(string(respBody))
 		callErr := fmt.Errorf("gemini api returned status %d: %s", resp.StatusCode, safeBody)
-		logAICall(filename, modelName, "full", started, false, callErr)
+		logAICall(filename, modelName, "full", started, false, callErr, ev)
 		return nil, callErr
 	}
 
 	var geminiResp geminiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&geminiResp); err != nil {
 		callErr := fmt.Errorf("failed to decode gemini response: %w", err)
-		logAICall(filename, modelName, "full", started, false, callErr)
+		logAICall(filename, modelName, "full", started, false, callErr, ev)
 		return nil, callErr
 	}
 
 	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
 		callErr := fmt.Errorf("gemini returned empty candidates")
-		logAICall(filename, modelName, "full", started, false, callErr)
+		logAICall(filename, modelName, "full", started, false, callErr, ev)
 		return nil, callErr
 	}
 
 	rawJSONText := geminiResp.Candidates[0].Content.Parts[0].Text
 	if err := guardrails.ValidateIngestionPayloadJSON([]byte(rawJSONText)); err != nil {
-		logAICall(filename, modelName, "full", started, false, err)
+		ev.MarkSchemaResult(false)
+		logAICall(filename, modelName, "full", started, false, err, ev)
 		return nil, fmt.Errorf("gemini schema validation failed: %w", err)
 	}
+	ev.MarkSchemaResult(true)
 	payload, err := domain.ParseGeminiPayload([]byte(rawJSONText))
 	if err == nil && payload != nil {
 		if mErr := guardrails.AssertNoMockMappingSource(payload.MappingSource); mErr != nil {
@@ -404,7 +422,7 @@ File Content Sample:
 			payload = nil
 		}
 	}
-	logAICall(filename, modelName, "full", started, err == nil && payload != nil, err)
+	logAICall(filename, modelName, "full", started, err == nil && payload != nil, err, ev)
 	return payload, err
 }
 
@@ -418,13 +436,14 @@ func takeSample(data []byte, limit int) []byte {
 // mockAnalyze parses full CSV/XLSX content when valid retail headers are present,
 // and falls back to heuristic records for tiny synthetic test payloads.
 // In production it never invents sample records — it fails clearly instead.
-func (c *Client) mockAnalyze(filename string, rawContent []byte) (*domain.NormalizedRetailIngestionPayload, error) {
+func (c *Client) mockAnalyze(filename string, rawContent []byte, ev *guardrails.Events) (*domain.NormalizedRetailIngestionPayload, error) {
 	if fullPayload, ok := parseFullTabularPayload(filename, rawContent); ok {
 		applyDeterministicMetadata(fullPayload)
 		return fullPayload, nil
 	}
 
 	if err := guardrails.RefuseMockInProduction(); err != nil {
+		ev.MarkMockRefused()
 		return nil, ErrMockSamplesInProduction
 	}
 

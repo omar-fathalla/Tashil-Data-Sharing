@@ -103,7 +103,8 @@ func assertGoldenPayload(t *testing.T, exp goldenExpected, p *domain.NormalizedR
 		if !d.RequiresHumanApproval {
 			t.Fatalf("expected human approval for staged golden %s", exp.ID)
 		}
-		m := guardrails.BuildSuccessMetrics(guardrails.EventsFromMappingSource(p.MappingSource), p.MappingSource, p.MappingConfidence, d)
+		ev := eventsFromTelemetry(p.GuardrailTelemetry)
+		m := guardrails.BuildSuccessMetrics(ev, p.MappingSource, p.MappingConfidence, d)
 		if m.ArabicSummary == "" || !m.HumanApprovalRequired {
 			t.Fatalf("success metrics incomplete: %+v", m)
 		}

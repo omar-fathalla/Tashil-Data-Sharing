@@ -107,7 +107,7 @@ File: ` + filename + "\nRows:\n")
 
 // callGeminiForMapping is the default columnMapper. The API key travels in a header
 // (never the URL) so transport errors cannot leak it into logs.
-func (c *Client) callGeminiForMapping(ctx context.Context, model, prompt, filename string) (string, error) {
+func (c *Client) callGeminiForMapping(ctx context.Context, model, prompt, filename string, ev *guardrails.Events) (string, error) {
 	started := time.Now()
 	var schemaObj interface{}
 	_ = json.Unmarshal([]byte(columnMapSchemaJSON), &schemaObj)
@@ -132,46 +132,55 @@ func (c *Client) callGeminiForMapping(ctx context.Context, model, prompt, filena
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		safe := fmt.Errorf("gemini mapping request failed: %s", c.redact(err.Error()))
-		logAICall(filename, model, "mapping", started, false, safe)
+		logAICall(filename, model, "mapping", started, false, safe, ev)
 		return "", safe
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		callErr := fmt.Errorf("gemini mapping returned status %d", resp.StatusCode)
-		logAICall(filename, model, "mapping", started, false, callErr)
+		logAICall(filename, model, "mapping", started, false, callErr, ev)
 		return "", callErr
 	}
 	var gr geminiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&gr); err != nil {
-		logAICall(filename, model, "mapping", started, false, err)
+		logAICall(filename, model, "mapping", started, false, err, ev)
 		return "", err
 	}
 	if len(gr.Candidates) == 0 || len(gr.Candidates[0].Content.Parts) == 0 {
 		callErr := fmt.Errorf("gemini mapping returned no candidates")
-		logAICall(filename, model, "mapping", started, false, callErr)
+		logAICall(filename, model, "mapping", started, false, callErr, ev)
 		return "", callErr
 	}
-	logAICall(filename, model, "mapping", started, true, nil)
+	logAICall(filename, model, "mapping", started, true, nil, ev)
 	return gr.Candidates[0].Content.Parts[0].Text, nil
 }
 
 // inferColumnMapping asks the Tier 1 model for a mapping and escalates to Tier 2 on error,
-// invalid JSON or low confidence.
-func (c *Client) inferColumnMapping(ctx context.Context, filename string, sample [][]string) (*ColumnMapPlan, string, string, error) {
+// invalid JSON or low confidence. ev accumulates real sanitize/schema/call counters.
+func (c *Client) inferColumnMapping(ctx context.Context, filename string, sample [][]string, ev *guardrails.Events) (*ColumnMapPlan, string, string, error) {
 	mapper := c.mapper
 	if mapper == nil {
 		mapper = func(ctx context.Context, model, prompt string) (string, error) {
-			return c.callGeminiForMapping(ctx, model, prompt, filename)
+			return c.callGeminiForMapping(ctx, model, prompt, filename, ev)
 		}
 	}
 	sample = guardrails.SanitizeSampleRows(sample)
+	ev.MarkSampleSanitized()
 	safeFile := guardrails.FilenameForLog(filename)
 	prompt := buildColumnMapPrompt(safeFile, sample)
 	key := mappingPlanKey(prompt)
 	if plan, ok := c.planCache.get(key); ok && plan.check(sample) == nil {
-		log.Printf("[ingest-mapping] file=%q reusing stored mapping plan (no Gemini call)", safeFile)
-		return plan, MappingSourceCache, "stored-plan", nil
+		// Re-validate cached plan against schema so SchemaChecked reflects a real check now.
+		raw, _ := json.Marshal(plan)
+		if _, err := guardrails.ValidateColumnMapPlanJSON(raw); err != nil {
+			ev.MarkSchemaResult(false)
+			log.Printf("[ingest-mapping] file=%q cached plan schema rejected: %s", safeFile, guardrails.RedactString(err.Error()))
+		} else {
+			ev.MarkSchemaResult(true)
+			log.Printf("[ingest-mapping] file=%q reusing stored mapping plan (no Gemini call) %s", safeFile, guardrails.SummarizeColumnMapJSON(raw))
+			return plan, MappingSourceCache, "stored-plan", nil
+		}
 	}
 	type attempt struct{ tier, model string }
 	attempts := []attempt{{"tier1", c.model}}
@@ -186,22 +195,28 @@ func (c *Client) inferColumnMapping(ctx context.Context, filename string, sample
 		text, err := mapper(ctx, a.model, prompt)
 		if err != nil {
 			lastErr = err
-			log.Printf("[ingest-mapping] file=%q tier=%s model=%s error=%v", safeFile, a.tier, a.model, err)
+			log.Printf("[ingest-mapping] file=%q tier=%s model=%s error=%s", safeFile, a.tier, a.model, guardrails.RedactString(err.Error()))
 			continue
 		}
 		if _, err := guardrails.ValidateColumnMapPlanJSON([]byte(text)); err != nil {
+			ev.MarkSchemaResult(false)
 			lastErr = err
-			log.Printf("[ingest-mapping] file=%q tier=%s model=%s schema rejected: %v", safeFile, a.tier, a.model, err)
+			log.Printf("[ingest-mapping] file=%q tier=%s model=%s schema rejected: %s", safeFile, a.tier, a.model, guardrails.RedactString(err.Error()))
 			continue
 		}
+		// Schema passed for this attempt — record it even if later semantic checks fail.
+		ev.MarkSchemaResult(true)
 		plan := &ColumnMapPlan{}
 		if err := json.Unmarshal([]byte(text), plan); err != nil {
+			ev.MarkSchemaResult(false)
 			lastErr = fmt.Errorf("invalid mapping json: %w", err)
+			log.Printf("[ingest-mapping] file=%q tier=%s model=%s json rejected: %s", safeFile, a.tier, a.model, guardrails.RedactString(err.Error()))
 			continue
 		}
 		if err := plan.check(sample); err != nil {
 			lastErr = err
-			log.Printf("[ingest-mapping] file=%q tier=%s model=%s rejected plan: %v", safeFile, a.tier, a.model, err)
+			log.Printf("[ingest-mapping] file=%q tier=%s model=%s rejected plan: %s summary=%s",
+				safeFile, a.tier, a.model, guardrails.RedactString(err.Error()), guardrails.SummarizeColumnMapJSON([]byte(text)))
 			continue
 		}
 		if plan.Confidence < minMappingConfidence {
@@ -515,11 +530,11 @@ func validationError(filename string, v *domain.IngestionValidation) error {
 
 func logValidation(filename, source string, v *domain.IngestionValidation) {
 	log.Printf("[ingest-validation] file=%q source=%s status=%s records=%d units=%d value=%.2f source_units=%.0f source_value=%.2f sheet_units=%.0f sheet_value=%.2f months=%v issues=%v",
-		guardrails.FilenameForLog(filename), source, v.Status, v.RecordCount, v.ExtractedUnits, v.ExtractedValue, v.SourceUnits, v.SourceValue, v.SheetTotalUnits, v.SheetTotalValue, v.MonthsDetected, v.Issues)
+		guardrails.FilenameForLog(filename), source, v.Status, v.RecordCount, v.ExtractedUnits, v.ExtractedValue, v.SourceUnits, v.SourceValue, v.SheetTotalUnits, v.SheetTotalValue, v.MonthsDetected, guardrails.SafeIssues(v.Issues))
 }
 
 // analyzeWithAIMapping runs the AI-mapping path. ok=false means fall back to the deterministic readers.
-func (c *Client) analyzeWithAIMapping(ctx context.Context, filename string, rawContent []byte) (*domain.NormalizedRetailIngestionPayload, bool) {
+func (c *Client) analyzeWithAIMapping(ctx context.Context, filename string, rawContent []byte, ev *guardrails.Events) (*domain.NormalizedRetailIngestionPayload, bool) {
 	rows, single := readSingleSheetRows(rawContent)
 	if !single {
 		return nil, false
@@ -529,16 +544,16 @@ func (c *Client) analyzeWithAIMapping(ctx context.Context, filename string, rawC
 		sample = sample[:mappingSampleRows]
 	}
 	safeFile := guardrails.FilenameForLog(filename)
-	plan, tier, model, err := c.inferColumnMapping(ctx, filename, sample)
+	plan, tier, model, err := c.inferColumnMapping(ctx, filename, sample, ev)
 	if err != nil {
-		log.Printf("[ingest-mapping] file=%q falling back to deterministic readers: %v", safeFile, err)
+		log.Printf("[ingest-mapping] file=%q falling back to deterministic readers: %s", safeFile, guardrails.RedactString(err.Error()))
 		return nil, false
 	}
-	planJSON, _ := json.Marshal(plan)
-	log.Printf("[ingest-mapping] file=%q tier=%s model=%s confidence=%.2f plan=%s", safeFile, tier, model, plan.Confidence, planJSON)
+	rawPlan, _ := json.Marshal(plan)
+	log.Printf("[ingest-mapping] file=%q tier=%s model=%s %s", safeFile, tier, model, guardrails.SummarizeColumnMapJSON(rawPlan))
 	payload, src, err := extractWithMapping(filename, rows, plan)
 	if err != nil {
-		log.Printf("[ingest-mapping] file=%q extraction with AI mapping failed: %v", safeFile, err)
+		log.Printf("[ingest-mapping] file=%q extraction with AI mapping failed: %s", safeFile, guardrails.RedactString(err.Error()))
 		return nil, false
 	}
 	v := validateExtraction(payload, &src)
@@ -559,6 +574,7 @@ func (c *Client) analyzeWithAIMapping(ctx context.Context, filename string, rawC
 	}
 	payload.MappingConfidence = plan.Confidence
 	payload.ConfidenceScore = plan.Confidence
+	applyGuardrailEvents(payload, ev)
 	return payload, true
 }
 

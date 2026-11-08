@@ -8,7 +8,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/gemini/guardrails"
 )
 
-// attachGuardrails fills human-approval + success metrics from real mapping events.
+// attachGuardrails fills human-approval + success metrics from observed telemetry on the payload.
 func attachGuardrails(res *IngestionResult, validation *domain.IngestionValidation) {
 	if res == nil {
 		return
@@ -29,9 +29,25 @@ func attachGuardrails(res *IngestionResult, validation *domain.IngestionValidati
 	})
 	res.RequiresHumanApproval = d.RequiresHumanApproval
 	res.GuardrailReasonsAR = d.ArabicReasons
-	ev := guardrails.EventsFromMappingSource(res.MappingSource)
+	ev := eventsFromResult(res)
 	m := guardrails.BuildSuccessMetrics(ev, res.MappingSource, res.MappingConfidence, d)
 	res.GuardrailMetrics = &m
+}
+
+func eventsFromResult(res *IngestionResult) guardrails.Events {
+	if res == nil || res.Payload == nil || res.Payload.GuardrailTelemetry == nil {
+		return guardrails.Events{}
+	}
+	t := res.Payload.GuardrailTelemetry
+	return guardrails.Events{
+		SchemaChecked:    t.SchemaChecked,
+		SchemaValid:      t.SchemaValid,
+		GeminiCallLogged: t.GeminiCallLogged,
+		GeminiCallCount:  t.GeminiCallCount,
+		GeminiLatencyMS:  t.GeminiLatencyMS,
+		SampleSanitized:  t.SampleSanitized,
+		MockRefused:      t.MockRefused,
+	}
 }
 
 // enforceDurableWriteApproval blocks AI/cache/mock/flagged durable writes unless humanApproved.
@@ -41,11 +57,11 @@ func enforceDurableWriteApproval(mappingSource string, validation *domain.Ingest
 		status = validation.Status
 	}
 	err := guardrails.BlockDurableWrite(guardrails.Input{
-		MappingSource:     mappingSource,
-		ValidationStatus:  status,
-		AnomalyCount:      anomalyCount,
-		ChainMismatch:     chainMismatch,
-		HumanApproved:     humanApproved,
+		MappingSource:    mappingSource,
+		ValidationStatus: status,
+		AnomalyCount:     anomalyCount,
+		ChainMismatch:    chainMismatch,
+		HumanApproved:    humanApproved,
 	})
 	if err == nil {
 		return nil
