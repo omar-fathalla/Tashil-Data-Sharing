@@ -40,7 +40,7 @@ var (
 
 // UploadHandler manages Excel/CSV uploads, data clearing, and orchestrates Gemini agent ingestion.
 type UploadHandler struct {
-	processor     *ingestion.Processor
+	processor    *ingestion.Processor
 	sellInAssist *sellinassist.Service // optional; layout suggestions for review (never auto-applied)
 }
 
@@ -715,6 +715,48 @@ func (h *UploadHandler) HandleCommit(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(result)
 }
 
+// HandleSaveMappingCorrection handles POST /api/v1/ingest/mapping-correction.
+// Saves a human-approved column-map correction for the staged preview into the
+// tenant-scoped mapping plan cache (RememberCorrectedPlan / LearnFromCorrection).
+func (h *UploadHandler) HandleSaveMappingCorrection(w http.ResponseWriter, r *http.Request) {
+	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	tenantID, err := middleware.EnforceTenantRLS(r)
+	if err != nil {
+		http.Error(w, `{"error":"unauthorized tenant context"}`, http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		BatchID string                `json:"batch_id"`
+		Tenant  string                `json:"tenant"`
+		Plan    *gemini.ColumnMapPlan `json:"plan"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid json body"}`, http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.BatchID) == "" || req.Plan == nil {
+		http.Error(w, `{"error":"batch_id and plan are required"}`, http.StatusBadRequest)
+		return
+	}
+	tenantID = applySystemTenantOverride(tenantID, req.Tenant)
+	if err := h.processor.SaveApprovedMappingCorrection(tenantID, req.BatchID, req.Plan); err != nil {
+		writeUploadError(w, err, "mapping_correction_failed")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"status":  "saved",
+		"message": "تم حفظ تصحيح الربط لهذا الحساب وسيُعاد استخدامه عند رفع الملف تاني",
+	})
+}
+
 // HandleDiscard handles POST /api/v1/ingest/discard to cancel a reviewed staged upload.
 func (h *UploadHandler) HandleDiscard(w http.ResponseWriter, r *http.Request) {
 	if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
@@ -992,14 +1034,14 @@ func writePreuploadBlocked(w http.ResponseWriter, report preupload.Report) {
 		msg = report.Fixes[0].MessageAR
 	}
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"error":           "preupload_blocked",
-		"message":         msg,
-		"ok":              report.OK,
-		"filename":        report.Filename,
-		"kind":            report.Kind,
-		"wrote_nothing":   true,
-		"blocking_count":  report.Blocking,
-		"fixes":           report.Fixes,
+		"error":          "preupload_blocked",
+		"message":        msg,
+		"ok":             report.OK,
+		"filename":       report.Filename,
+		"kind":           report.Kind,
+		"wrote_nothing":  true,
+		"blocking_count": report.Blocking,
+		"fixes":          report.Fixes,
 	})
 }
 

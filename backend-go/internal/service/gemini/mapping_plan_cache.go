@@ -7,8 +7,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 // mappingPlanCacheVersion is the on-disk envelope version. Bump when the wrapper
@@ -22,24 +24,35 @@ const (
 	planCacheSourceCorrection = "correction"
 )
 
+// mappingPlanCacheState is the shared mem/disk store behind every tenant view.
+type mappingPlanCacheState struct {
+	mu  sync.Mutex
+	mem map[string][]byte
+	dir string
+}
+
 // mappingPlanCache keeps accepted AI column-mapping plans keyed by a hash of the exact prompt (file name + the
 // sampled header rows). Re-reading an archived file (startup archive sync, replays on other instances) reuses
 // the stored interpretation instead of calling Gemini again. With a directory (the shared archive mount) the
 // plans survive restarts and are shared by every instance.
 //
 // On disk (v1+) entries are a versioned envelope; legacy bare ColumnMapPlan JSON is still readable.
+// When tenant is set, keys/paths are namespaced per tenant so corrections cannot leak across tenants.
 type mappingPlanCache struct {
-	mu  sync.Mutex
-	mem map[string][]byte
-	dir string
+	state  *mappingPlanCacheState
+	tenant string
 }
 
 // cachedMappingPlan is the versioned on-disk / in-memory envelope around a ColumnMapPlan.
 type cachedMappingPlan struct {
 	Version   int           `json:"v"`
-	Source    string        `json:"source,omitempty"` // "ai" | "correction"
+	Source    string        `json:"source,omitempty"`     // "ai" | "correction"
 	LearnedAt string        `json:"learned_at,omitempty"` // RFC3339 when source=correction
 	Plan      ColumnMapPlan `json:"plan"`
+}
+
+func newMappingPlanCache() mappingPlanCache {
+	return mappingPlanCache{state: &mappingPlanCacheState{}}
 }
 
 func mappingPlanKey(prompt string) string {
@@ -47,11 +60,54 @@ func mappingPlanKey(prompt string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (c *mappingPlanCache) path(key string) string {
-	if c.dir == "" {
+func normalizeMappingTenant(tenantID string) string {
+	t := strings.TrimSpace(strings.ToLower(tenantID))
+	t = strings.TrimPrefix(t, "tenant-")
+	t = strings.TrimPrefix(t, "tenant_")
+	return strings.TrimSpace(t)
+}
+
+func sanitizeTenantSegment(tenantID string) string {
+	t := normalizeMappingTenant(tenantID)
+	if t == "" {
 		return ""
 	}
-	return filepath.Join(c.dir, key+".json")
+	var b strings.Builder
+	for _, r := range t {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_' {
+			b.WriteRune(r)
+		} else {
+			b.WriteByte('_')
+		}
+	}
+	out := b.String()
+	if out == "" {
+		return "_unknown"
+	}
+	return out
+}
+
+func (c *mappingPlanCache) ensureState() *mappingPlanCacheState {
+	if c.state == nil {
+		c.state = &mappingPlanCacheState{}
+	}
+	return c.state
+}
+
+// storageKey namespaces the content hash under the tenant when set.
+func (c *mappingPlanCache) storageKey(contentKey string) string {
+	if seg := sanitizeTenantSegment(c.tenant); seg != "" {
+		return seg + "/" + contentKey
+	}
+	return contentKey
+}
+
+func (c *mappingPlanCache) path(contentKey string) string {
+	st := c.ensureState()
+	if st.dir == "" {
+		return ""
+	}
+	return filepath.Join(st.dir, c.storageKey(contentKey)+".json")
 }
 
 func (c *mappingPlanCache) get(key string) (*ColumnMapPlan, bool) {
@@ -61,9 +117,11 @@ func (c *mappingPlanCache) get(key string) (*ColumnMapPlan, bool) {
 
 // getEntry returns the plan and its recorded source ("ai", "correction", or "" for legacy).
 func (c *mappingPlanCache) getEntry(key string) (*ColumnMapPlan, string, bool) {
-	c.mu.Lock()
-	raw, ok := c.mem[key]
-	c.mu.Unlock()
+	st := c.ensureState()
+	sk := c.storageKey(key)
+	st.mu.Lock()
+	raw, ok := st.mem[sk]
+	st.mu.Unlock()
 	if !ok {
 		if p := c.path(key); p != "" {
 			if b, err := os.ReadFile(p); err == nil {
@@ -124,17 +182,22 @@ func (c *mappingPlanCache) putWithSource(key string, plan *ColumnMapPlan, source
 	if err != nil {
 		return
 	}
-	c.mu.Lock()
-	if c.mem == nil {
-		c.mem = map[string][]byte{}
+	st := c.ensureState()
+	sk := c.storageKey(key)
+	st.mu.Lock()
+	if st.mem == nil {
+		st.mem = map[string][]byte{}
 	}
-	c.mem[key] = raw
-	c.mu.Unlock()
+	st.mem[sk] = raw
+	dir := st.dir
+	st.mu.Unlock()
 	if p := c.path(key); p != "" {
-		if err := os.MkdirAll(c.dir, 0o755); err == nil {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err == nil {
 			if err := os.WriteFile(p, raw, 0o644); err != nil {
 				log.Printf("[ingest-mapping] plan cache write failed: %v", err)
 			}
+		} else if dir != "" {
+			log.Printf("[ingest-mapping] plan cache mkdir failed: %v", err)
 		}
 	}
 }
@@ -144,10 +207,23 @@ func (c *mappingPlanCache) learnCorrection(key string, plan *ColumnMapPlan) {
 	c.putWithSource(key, plan, planCacheSourceCorrection, time.Now().UTC().Format(time.RFC3339))
 }
 
+// forTenant returns a Client view that namespaces the shared plan cache under tenantID.
+// Same underlying mem/dir; safe for concurrent tenants.
+func (c *Client) forTenant(tenantID string) *Client {
+	if c == nil {
+		return nil
+	}
+	out := *c
+	st := c.planCache.ensureState()
+	out.planCache = mappingPlanCache{state: st, tenant: normalizeMappingTenant(tenantID)}
+	return &out
+}
+
 // WithMappingPlanDir persists accepted column-mapping plans under dir so archive re-reads skip Gemini.
 func (c *Client) WithMappingPlanDir(dir string) *Client {
-	c.planCache.mu.Lock()
-	c.planCache.dir = dir
-	c.planCache.mu.Unlock()
+	st := c.planCache.ensureState()
+	st.mu.Lock()
+	st.dir = dir
+	st.mu.Unlock()
 	return c
 }

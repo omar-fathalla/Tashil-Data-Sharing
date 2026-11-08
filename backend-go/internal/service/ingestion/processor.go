@@ -3,15 +3,15 @@ package ingestion
 import (
 	"errors"
 
-	"github.com/tashil/data-sharing/backend/internal/service/customers"
-	"sync/atomic"
 	"context"
 	"fmt"
+	"github.com/tashil/data-sharing/backend/internal/service/customers"
 	"math"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,11 +26,11 @@ import (
 
 // IngestionResult contains the outcome of an ingestion operation returned to caller.
 type IngestionResult struct {
-	UploadWarnings       []UploadIssue                   `json:"upload_warnings,omitempty"`
-	QuarantinedCustomers []customers.QuarantinedCustomer `json:"quarantined_customers,omitempty"`
-	UnknownBarcodes      []UnknownBarcode                `json:"unknown_barcodes,omitempty"`
-	PeriodBreakdown      []MonthSlice                    `json:"period_breakdown,omitempty"`
-	ParseLayout          string                          `json:"parse_layout,omitempty"`
+	UploadWarnings         []UploadIssue                            `json:"upload_warnings,omitempty"`
+	QuarantinedCustomers   []customers.QuarantinedCustomer          `json:"quarantined_customers,omitempty"`
+	UnknownBarcodes        []UnknownBarcode                         `json:"unknown_barcodes,omitempty"`
+	PeriodBreakdown        []MonthSlice                             `json:"period_breakdown,omitempty"`
+	ParseLayout            string                                   `json:"parse_layout,omitempty"`
 	BatchID                string                                   `json:"batch_id"`
 	ArchiveID              string                                   `json:"archive_id,omitempty"`
 	ArchivedFile           *ArchivedFile                            `json:"archived_file,omitempty"`
@@ -57,16 +57,16 @@ type IngestionResult struct {
 	ProductMasterSummary   *domain.ProductMasterSummaryResponse     `json:"summary,omitempty"`
 
 	// Staging & Review Fields
-	IsStaged              bool   `json:"is_staged"`
-	IsCommitted           bool   `json:"is_committed"`
-	DiscoveredRetailer    string `json:"discovered_retailer"`
-	TargetRetailer        string `json:"target_retailer"`
-	ChainMismatchDetected bool   `json:"chain_mismatch_detected"`
-	SuggestedChain        string `json:"suggested_chain,omitempty"`
-	SuggestedChainName    string `json:"suggested_chain_name,omitempty"`
-	AiModelUsed           string `json:"ai_model_used"`
-	AiTierUsed            string `json:"ai_tier_used"`
-	Tier2Escalated        bool   `json:"tier2_escalated"`
+	IsStaged              bool    `json:"is_staged"`
+	IsCommitted           bool    `json:"is_committed"`
+	DiscoveredRetailer    string  `json:"discovered_retailer"`
+	TargetRetailer        string  `json:"target_retailer"`
+	ChainMismatchDetected bool    `json:"chain_mismatch_detected"`
+	SuggestedChain        string  `json:"suggested_chain,omitempty"`
+	SuggestedChainName    string  `json:"suggested_chain_name,omitempty"`
+	AiModelUsed           string  `json:"ai_model_used"`
+	AiTierUsed            string  `json:"ai_tier_used"`
+	Tier2Escalated        bool    `json:"tier2_escalated"`
 	MappingSource         string  `json:"mapping_source,omitempty"` // ai | deterministic | cache | mock
 	MappingConfidence     float64 `json:"mapping_confidence,omitempty"`
 	// Validation mirrors payload.validation so web clients can read explanation_ar
@@ -74,14 +74,13 @@ type IngestionResult struct {
 	Validation *domain.IngestionValidation `json:"validation,omitempty"`
 
 	// Guardrails (Phase A7): human approval gate + success metrics for Arabic UI.
-	RequiresHumanApproval bool                      `json:"requires_human_approval,omitempty"`
-	GuardrailReasonsAR    []string                  `json:"guardrail_reasons_ar,omitempty"`
+	RequiresHumanApproval bool                       `json:"requires_human_approval,omitempty"`
+	GuardrailReasonsAR    []string                   `json:"guardrail_reasons_ar,omitempty"`
 	GuardrailMetrics      *guardrails.SuccessMetrics `json:"guardrail_metrics,omitempty"`
 
 	// BigQuerySync reports the durable BigQuery write for committed uploads (nil for previews / when not attempted).
 	BigQuerySync *bqsink.Result `json:"bigquery_sync,omitempty"`
 }
-
 
 // StagedUpload holds parsed in-memory workbook data before user explicitly commits.
 type StagedUpload struct {
@@ -115,28 +114,30 @@ type StagedUpload struct {
 	ArchRows       int
 	ArchStores     int
 	ArchRevenue    float64
+	// CorrectedPlan is an optional human column-map correction saved before commit.
+	CorrectedPlan *gemini.ColumnMapPlan
 }
 
 // Processor coordinates parsing, AI normalization, validation, staging, and multi-tenant persistence.
 type Processor struct {
-	geminiAgent   gemini.Agent
-	syncLease     SyncLease // optional: one instance at a time runs the archive sync
-	bqRepo        bigquery.Repository
-	fsRepo        firestore.Repository
-	stagedMu      sync.RWMutex
-	staged        map[string]*StagedUpload
-	archiveMu     sync.RWMutex
+	geminiAgent gemini.Agent
+	syncLease   SyncLease // optional: one instance at a time runs the archive sync
+	bqRepo      bigquery.Repository
+	fsRepo      firestore.Repository
+	stagedMu    sync.RWMutex
+	staged      map[string]*StagedUpload
+	archiveMu   sync.RWMutex
 	// lastArchiveDiskSync throttles syncArchiveFromDisk (unix nanos, guarded by archiveMu).
 	lastArchiveDiskSync int64
-	archiveDir    string
-	archivedFiles map[string]*ArchivedFile
-	archivedBytes map[string][]byte
-	sink          bqsink.Sink
-	sellIn        *durableSync
-	sellOut       *durableSync
-	replaying     atomic.Bool
-	snap          snapshotConfig
-	onRebuilt     func()
+	archiveDir          string
+	archivedFiles       map[string]*ArchivedFile
+	archivedBytes       map[string][]byte
+	sink                bqsink.Sink
+	sellIn              *durableSync
+	sellOut             *durableSync
+	replaying           atomic.Bool
+	snap                snapshotConfig
+	onRebuilt           func()
 
 	onProductMaster func(tenantID, filename string, raw []byte)
 
@@ -298,6 +299,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 	}
 
 	// 1. Call Gemini 3.8 Flash AI Agent for structured output normalization
+	ctx = gemini.WithMappingPlanTenant(ctx, tenantID)
 	payload, err := p.geminiAgent.AnalyzeAndNormalize(ctx, filename, fileBytes)
 	if err != nil {
 		return nil, fmt.Errorf("gemini agent analysis failed: %w", err)
@@ -935,7 +937,6 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 	}
 	attachGuardrails(res, payload.Validation)
 
-
 	if dryRun {
 		p.stagedMu.Lock()
 		p.staged[batchID] = &StagedUpload{
@@ -1207,6 +1208,7 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		staged.Result.ArchivedFile = updatedArchived
 		staged.Result.ArchiveID = updatedArchived.ID
 	}
+	p.persistApprovedMappingCorrection(tenantID, staged)
 	p.removeStaged(tenantID, batchID)
 	return staged.Result, nil
 }
@@ -1395,6 +1397,7 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	}
 	if err != nil || len(records) == 0 {
 		// Intelligent fallback: use Gemini / Wide-Matrix multi-sheet parser so any Excel workbook format works seamlessly in Sell-In!
+		ctx = gemini.WithMappingPlanTenant(ctx, tenantID)
 		payload, aiErr := p.geminiAgent.AnalyzeAndNormalize(ctx, filename, fileBytes)
 		if aiErr != nil || payload == nil || len(payload.NormalizedRecords) == 0 {
 			if err != nil {
@@ -1795,6 +1798,61 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		}
 	}
 	return result, nil
+}
+
+// SaveApprovedMappingCorrection records a human-approved column-map correction for the
+// staged preview (tenant-isolated) and writes it into the mapping plan cache via
+// RememberCorrectedPlan / LearnFromCorrection so a later re-upload reuses it.
+func (p *Processor) SaveApprovedMappingCorrection(tenantID, batchID string, plan *gemini.ColumnMapPlan) error {
+	if plan == nil {
+		return fmt.Errorf("corrected plan is required")
+	}
+	p.stagedMu.Lock()
+	staged, ok := p.staged[batchID]
+	if !ok || staged == nil || normalizeArchiveTenantID(staged.TenantID) != normalizeArchiveTenantID(tenantID) {
+		p.stagedMu.Unlock()
+		return &StagedUploadError{Status: 404, Message: "المعاينة دي مش تبع الحساب ده. مفيش حاجة اتحفظت."}
+	}
+	cp := *plan
+	staged.CorrectedPlan = &cp
+	filename := staged.Filename
+	fileBytes := staged.FileBytes
+	p.stagedMu.Unlock()
+
+	learner, ok := p.geminiAgent.(gemini.MappingCorrectionLearner)
+	if !ok {
+		return fmt.Errorf("mapping correction learning is unavailable")
+	}
+	sample, ok := gemini.MappingSampleFromFile(fileBytes)
+	if !ok {
+		return fmt.Errorf("could not read mapping sample from staged file")
+	}
+	return learner.RememberCorrectedPlan(tenantID, filename, sample, &cp)
+}
+
+// persistApprovedMappingCorrection promotes the staged correction (or the tenant-cached AI plan)
+// into LearnFromCorrection after a successful commit.
+func (p *Processor) persistApprovedMappingCorrection(tenantID string, staged *StagedUpload) {
+	if staged == nil || staged.IsProductMaster || staged.IsSellInPlan {
+		return
+	}
+	learner, ok := p.geminiAgent.(gemini.MappingCorrectionLearner)
+	if !ok {
+		return
+	}
+	sample, ok := gemini.MappingSampleFromFile(staged.FileBytes)
+	if !ok {
+		return
+	}
+	plan := staged.CorrectedPlan
+	if plan == nil {
+		var found bool
+		plan, _, found = learner.LookupCachedMappingPlan(tenantID, staged.Filename, sample)
+		if !found || plan == nil {
+			return
+		}
+	}
+	_ = learner.LearnFromCorrection(tenantID, staged.Filename, sample, plan)
 }
 
 // DiscardStagedUpload drops an in-memory staged upload and removes its uncommitted archive entry without modifying any database.

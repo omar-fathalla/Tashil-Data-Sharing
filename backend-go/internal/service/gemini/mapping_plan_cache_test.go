@@ -11,6 +11,13 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/gemini/guardrails"
 )
 
+const testTenantA = "tenant-adeco"
+const testTenantB = "tenant-other"
+
+func withTenant(ctx context.Context, tenant string) context.Context {
+	return WithMappingPlanTenant(ctx, tenant)
+}
+
 // Re-reading the same archived file (another instance, or after a restart with a shared plan dir) must reuse
 // the stored mapping plan instead of calling Gemini again, and produce the same totals.
 func TestMappingPlanReusedAcrossReadsAndInstances(t *testing.T) {
@@ -18,11 +25,12 @@ func TestMappingPlanReusedAcrossReadsAndInstances(t *testing.T) {
 	dir := t.TempDir()
 	var calls []string
 	c := stubClient(map[string]string{"tier1-model": book3Plan}, &calls).WithMappingPlanDir(dir)
-	first, err := c.AnalyzeAndNormalize(context.Background(), "Book3.xlsx", x)
+	ctx := withTenant(context.Background(), testTenantA)
+	first, err := c.AnalyzeAndNormalize(ctx, "Book3.xlsx", x)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := c.AnalyzeAndNormalize(context.Background(), "Book3.xlsx", x)
+	second, err := c.AnalyzeAndNormalize(ctx, "Book3.xlsx", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +47,7 @@ func TestMappingPlanReusedAcrossReadsAndInstances(t *testing.T) {
 	// A fresh client (another instance) sharing the plan directory also skips Gemini.
 	var calls2 []string
 	other := stubClient(map[string]string{}, &calls2).WithMappingPlanDir(dir)
-	p, err := other.AnalyzeAndNormalize(context.Background(), "Book3.xlsx", x)
+	p, err := other.AnalyzeAndNormalize(ctx, "Book3.xlsx", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,14 +67,15 @@ func TestMappingPlanCacheWritesVersionedEnvelope(t *testing.T) {
 	dir := t.TempDir()
 	var calls []string
 	c := stubClient(map[string]string{"tier1-model": book3Plan}, &calls).WithMappingPlanDir(dir)
-	if _, err := c.AnalyzeAndNormalize(context.Background(), "Book3.xlsx", x); err != nil {
+	if _, err := c.AnalyzeAndNormalize(withTenant(context.Background(), testTenantA), "Book3.xlsx", x); err != nil {
 		t.Fatal(err)
 	}
-	entries, err := os.ReadDir(dir)
+	tenantDir := filepath.Join(dir, sanitizeTenantSegment(testTenantA))
+	entries, err := os.ReadDir(tenantDir)
 	if err != nil || len(entries) != 1 {
-		t.Fatalf("expected one cache file, got %v err=%v", entries, err)
+		t.Fatalf("expected one cache file under tenant dir, got %v err=%v", entries, err)
 	}
-	raw, err := os.ReadFile(filepath.Join(dir, entries[0].Name()))
+	raw, err := os.ReadFile(filepath.Join(tenantDir, entries[0].Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,8 +108,9 @@ func TestLearnFromCorrectionOverwritesAIAndSkipsGemini(t *testing.T) {
 	dir := t.TempDir()
 	var calls []string
 	c := stubClient(map[string]string{"tier1-model": book3Plan}, &calls).WithMappingPlanDir(dir)
+	ctx := withTenant(context.Background(), testTenantA)
 
-	first, err := c.AnalyzeAndNormalize(context.Background(), "Book3.xlsx", x)
+	first, err := c.AnalyzeAndNormalize(ctx, "Book3.xlsx", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,15 +133,16 @@ func TestLearnFromCorrectionOverwritesAIAndSkipsGemini(t *testing.T) {
 	if len(sample) > mappingSampleRows {
 		sample = sample[:mappingSampleRows]
 	}
-	if err := c.RememberCorrectedPlan("Book3.xlsx", sample, &corrected); err != nil {
+	if err := c.RememberCorrectedPlan(testTenantA, "Book3.xlsx", sample, &corrected); err != nil {
 		t.Fatal(err)
 	}
 
-	entries, err := os.ReadDir(dir)
+	tenantDir := filepath.Join(dir, sanitizeTenantSegment(testTenantA))
+	entries, err := os.ReadDir(tenantDir)
 	if err != nil || len(entries) != 1 {
 		t.Fatalf("expected one cache file after correction, got %v err=%v", entries, err)
 	}
-	raw, _ := os.ReadFile(filepath.Join(dir, entries[0].Name()))
+	raw, _ := os.ReadFile(filepath.Join(tenantDir, entries[0].Name()))
 	var env cachedMappingPlan
 	if err := json.Unmarshal(raw, &env); err != nil {
 		t.Fatal(err)
@@ -153,7 +164,7 @@ func TestLearnFromCorrectionOverwritesAIAndSkipsGemini(t *testing.T) {
 		t.Fatalf("corrected branch not stored: %+v", env.Plan.Columns)
 	}
 
-	second, err := c.AnalyzeAndNormalize(context.Background(), "Book3.xlsx", x)
+	second, err := c.AnalyzeAndNormalize(ctx, "Book3.xlsx", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +177,7 @@ func TestLearnFromCorrectionOverwritesAIAndSkipsGemini(t *testing.T) {
 
 	var calls2 []string
 	other := stubClient(map[string]string{}, &calls2).WithMappingPlanDir(dir)
-	third, err := other.AnalyzeAndNormalize(context.Background(), "Book3.xlsx", x)
+	third, err := other.AnalyzeAndNormalize(ctx, "Book3.xlsx", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,11 +186,120 @@ func TestLearnFromCorrectionOverwritesAIAndSkipsGemini(t *testing.T) {
 	}
 }
 
+func TestMappingPlanCacheTenantIsolation(t *testing.T) {
+	rows := book3LikeRows()
+	x, _ := BuildSampleXLSX(rows)
+	dir := t.TempDir()
+	var calls []string
+	c := stubClient(map[string]string{"tier1-model": book3Plan}, &calls).WithMappingPlanDir(dir)
+
+	ctxA := withTenant(context.Background(), testTenantA)
+	if _, err := c.AnalyzeAndNormalize(ctxA, "Book3.xlsx", x); err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 1 {
+		t.Fatalf("tenant A first read calls=%v", calls)
+	}
+
+	var corrected ColumnMapPlan
+	_ = json.Unmarshal([]byte(book3Plan), &corrected)
+	for i := range corrected.Columns {
+		if corrected.Columns[i].Branch == "سموحة" {
+			corrected.Columns[i].Branch = "tenant-a-only"
+		}
+	}
+	sample := rows
+	if len(sample) > mappingSampleRows {
+		sample = sample[:mappingSampleRows]
+	}
+	if err := c.LearnFromCorrection(testTenantA, "Book3.xlsx", sample, &corrected); err != nil {
+		t.Fatal(err)
+	}
+
+	// Tenant B must not see A's correction — Gemini is called again.
+	ctxB := withTenant(context.Background(), testTenantB)
+	pB, err := c.AnalyzeAndNormalize(ctxB, "Book3.xlsx", x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 2 || pB.MappingSource != MappingSourceAI {
+		t.Fatalf("tenant B must miss A's cache: calls=%v source=%s", calls, pB.MappingSource)
+	}
+
+	// Tenant A still hits correction cache.
+	pA, err := c.AnalyzeAndNormalize(ctxA, "Book3.xlsx", x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 2 || pA.MappingSource != MappingSourceCache {
+		t.Fatalf("tenant A should stay on correction cache: calls=%v source=%s", calls, pA.MappingSource)
+	}
+}
+
+func TestCorrectionThenReuploadReusesMapping(t *testing.T) {
+	rows := book3LikeRows()
+	x, _ := BuildSampleXLSX(rows)
+	dir := t.TempDir()
+	var calls []string
+	c := stubClient(map[string]string{"tier1-model": book3Plan}, &calls).WithMappingPlanDir(dir)
+	ctx := withTenant(context.Background(), testTenantA)
+
+	if _, err := c.AnalyzeAndNormalize(ctx, "Book3.xlsx", x); err != nil {
+		t.Fatal(err)
+	}
+
+	var corrected ColumnMapPlan
+	_ = json.Unmarshal([]byte(book3Plan), &corrected)
+	for i := range corrected.Columns {
+		if corrected.Columns[i].Role == "product_name" {
+			corrected.Columns[i].Role = "ignore"
+		}
+	}
+	// Keep barcode so plan.check still passes; product_name may be absent if barcode present.
+	sample, ok := MappingSampleFromFile(x)
+	if !ok {
+		t.Fatal("sample from xlsx")
+	}
+	if err := c.RememberCorrectedPlan(testTenantA, "Book3.xlsx", sample, &corrected); err != nil {
+		t.Fatal(err)
+	}
+	afterCorrect := len(calls)
+
+	// Re-upload same bytes: must reuse correction, no new Gemini call.
+	re, err := c.AnalyzeAndNormalize(ctx, "Book3.xlsx", x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != afterCorrect {
+		t.Fatalf("re-upload must not call Gemini, calls before=%d after=%d", afterCorrect, len(calls))
+	}
+	if re.MappingSource != MappingSourceCache {
+		t.Fatalf("re-upload source=%s", re.MappingSource)
+	}
+	plan, source, ok := c.LookupCachedMappingPlan(testTenantA, "Book3.xlsx", sample)
+	if !ok || source != planCacheSourceCorrection {
+		t.Fatalf("lookup: ok=%v source=%s", ok, source)
+	}
+	hasIgnoreProduct := false
+	for _, col := range plan.Columns {
+		if col.Index == 3 && col.Role == "ignore" {
+			hasIgnoreProduct = true
+		}
+	}
+	if !hasIgnoreProduct {
+		t.Fatalf("corrected plan not what re-upload would use: %+v", plan.Columns)
+	}
+}
+
 func TestMappingPlanCacheReadsLegacyBarePlan(t *testing.T) {
 	rows := book3LikeRows()
 	x, _ := BuildSampleXLSX(rows)
 	dir := t.TempDir()
 	key := book3MappingCacheKey(t, "Book3.xlsx", rows)
+	tenantDir := filepath.Join(dir, sanitizeTenantSegment(testTenantA))
+	if err := os.MkdirAll(tenantDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	var plan ColumnMapPlan
 	if err := json.Unmarshal([]byte(book3Plan), &plan); err != nil {
@@ -189,13 +309,13 @@ func TestMappingPlanCacheReadsLegacyBarePlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, key+".json"), bare, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tenantDir, key+".json"), bare, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	var calls []string
 	c := stubClient(map[string]string{}, &calls).WithMappingPlanDir(dir)
-	p, err := c.AnalyzeAndNormalize(context.Background(), "Book3.xlsx", x)
+	p, err := c.AnalyzeAndNormalize(withTenant(context.Background(), testTenantA), "Book3.xlsx", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,6 +329,10 @@ func TestMappingPlanCacheIgnoresUnsupportedVersion(t *testing.T) {
 	x, _ := BuildSampleXLSX(rows)
 	dir := t.TempDir()
 	key := book3MappingCacheKey(t, "Book3.xlsx", rows)
+	tenantDir := filepath.Join(dir, sanitizeTenantSegment(testTenantA))
+	if err := os.MkdirAll(tenantDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	var plan ColumnMapPlan
 	if err := json.Unmarshal([]byte(book3Plan), &plan); err != nil {
@@ -219,20 +343,20 @@ func TestMappingPlanCacheIgnoresUnsupportedVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, key+".json"), raw, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tenantDir, key+".json"), raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	var calls []string
 	c := stubClient(map[string]string{"tier1-model": book3Plan}, &calls).WithMappingPlanDir(dir)
-	p, err := c.AnalyzeAndNormalize(context.Background(), "Book3.xlsx", x)
+	p, err := c.AnalyzeAndNormalize(withTenant(context.Background(), testTenantA), "Book3.xlsx", x)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(calls) != 1 || p.MappingSource != MappingSourceAI {
 		t.Fatalf("unsupported version must miss cache: calls=%v source=%s", calls, p.MappingSource)
 	}
-	updated, err := os.ReadFile(filepath.Join(dir, key+".json"))
+	updated, err := os.ReadFile(filepath.Join(tenantDir, key+".json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +372,7 @@ func TestMappingPlanCacheIgnoresUnsupportedVersion(t *testing.T) {
 func TestLearnFromCorrectionRejectsInvalidPlan(t *testing.T) {
 	var calls []string
 	c := stubClient(map[string]string{}, &calls).WithMappingPlanDir(t.TempDir())
-	err := c.LearnFromCorrection("x.xlsx", book3LikeRows(), &ColumnMapPlan{
+	err := c.LearnFromCorrection(testTenantA, "x.xlsx", book3LikeRows(), &ColumnMapPlan{
 		HeaderRowIndex: 0,
 		Layout:         "wide",
 		Confidence:     0.9,
@@ -256,5 +380,15 @@ func TestLearnFromCorrectionRejectsInvalidPlan(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected schema rejection")
+	}
+}
+
+func TestLearnFromCorrectionRequiresTenant(t *testing.T) {
+	var calls []string
+	c := stubClient(map[string]string{}, &calls).WithMappingPlanDir(t.TempDir())
+	var plan ColumnMapPlan
+	_ = json.Unmarshal([]byte(book3Plan), &plan)
+	if err := c.LearnFromCorrection("", "Book3.xlsx", book3LikeRows(), &plan); err == nil {
+		t.Fatal("empty tenant must be rejected")
 	}
 }
