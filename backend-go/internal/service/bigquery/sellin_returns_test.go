@@ -139,6 +139,47 @@ func TestAggregateSellInReturns_ProductGroupFilter(t *testing.T) {
 	}
 }
 
+func TestAggregateSellInReturns_NetsByStableIdentityNotDisplayName(t *testing.T) {
+	// Same branch + ItemCode; return carries a renamed ItemName — must net +80, not
+	// emit a false net-negative advisory for the −20 alone.
+	recs := []domain.SellInRecord{
+		{
+			Year: 2026, MonthNum: 1,
+			CustomerName: "فرع أ", CustomerBranchCode: "b-a",
+			ItemName: "صنف أ", ItemCode: "FG-1",
+			NetValueEGP: 100, NetQtyCases: 10,
+			TransactionType: "مسحوبات بيع (Sale)",
+		},
+		{
+			Year: 2026, MonthNum: 1,
+			CustomerName: "فرع أ", CustomerBranchCode: "b-a",
+			ItemName: "صنف أ الجديد", ItemCode: "FG-1",
+			NetValueEGP: -20, NetQtyCases: -2,
+			TransactionType: "مرتجع (Return)",
+		},
+	}
+	rep := AggregateSellInReturns(recs, SellInReturnsFilter{Year: 2026})
+	if math.Abs(rep.KPIs.NetValueEGP-80) > 0.01 {
+		t.Fatalf("net: got %v want 80", rep.KPIs.NetValueEGP)
+	}
+	if math.Abs(rep.KPIs.ReturnsValueEGP-20) > 0.01 {
+		t.Fatalf("returns: got %v want 20", rep.KPIs.ReturnsValueEGP)
+	}
+	if len(rep.Advisories) != 0 {
+		t.Fatalf("expected no net-negative advisory when same ItemCode nets +80, got %+v", rep.Advisories)
+	}
+
+	// Barcode-only identity (no ItemCode) should also net across renamed names.
+	byBarcode := []domain.SellInRecord{
+		{Year: 2026, MonthNum: 2, CustomerName: "فرع ب", CustomerBranchCode: "b-b", ItemName: "قديم", Barcode: "6220001", NetValueEGP: 50, NetQtyCases: 5},
+		{Year: 2026, MonthNum: 2, CustomerName: "فرع ب", CustomerBranchCode: "b-b", ItemName: "جديد", Barcode: "6220001", NetValueEGP: -10, NetQtyCases: -1, TransactionType: "مرتجع (Return)"},
+	}
+	rep2 := AggregateSellInReturns(byBarcode, SellInReturnsFilter{Year: 2026, Month: 2})
+	if math.Abs(rep2.KPIs.NetValueEGP-40) > 0.01 || len(rep2.Advisories) != 0 {
+		t.Fatalf("barcode identity: net=%v advisories=%+v", rep2.KPIs.NetValueEGP, rep2.Advisories)
+	}
+}
+
 func TestIsSellInReturn(t *testing.T) {
 	if !IsSellInReturn(domain.SellInRecord{NetValueEGP: -1}) {
 		t.Fatal("negative value")

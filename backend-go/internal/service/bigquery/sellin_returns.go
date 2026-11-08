@@ -132,6 +132,18 @@ func branchKeyOf(r domain.SellInRecord) string {
 	return strings.TrimSpace(r.CustomerName)
 }
 
+// productKeyOf is the stable product identity for netting advisories.
+// Prefer ItemCode, then Barcode; display names are never used as the key.
+func productKeyOf(r domain.SellInRecord) string {
+	if c := strings.TrimSpace(r.ItemCode); c != "" {
+		return c
+	}
+	if b := strings.TrimSpace(r.Barcode); b != "" {
+		return b
+	}
+	return strings.TrimSpace(r.ItemName)
+}
+
 func finalizeCell(c *SellInReturnsCell) {
 	c.GrossValueEGP = round2(c.GrossValueEGP)
 	c.ReturnsValueEGP = round2(c.ReturnsValueEGP)
@@ -250,11 +262,15 @@ func AggregateSellInReturns(records []domain.SellInRecord, f SellInReturnsFilter
 
 	type netKey struct {
 		month   int
-		branch  string
-		product string
-		code    string
+		branch  string // CustomerBranchCode (stable)
+		product string // ItemCode / Barcode (stable); never display name
 	}
-	type netSum struct{ val, qty float64 }
+	type netSum struct {
+		val, qty    float64
+		branchName  string // display only
+		productName string
+		productCode string
+	}
 	netAgg := map[netKey]*netSum{}
 
 	for _, r := range dimFiltered {
@@ -264,18 +280,36 @@ func AggregateSellInReturns(records []domain.SellInRecord, f SellInReturnsFilter
 		monthSet[r.MonthNum] = true
 		mk := r.MonthNum
 
-		// Advisories always consider full year (dim filters); net-negative kept.
-		nk := netKey{month: mk, branch: strings.TrimSpace(r.CustomerName), product: strings.TrimSpace(r.ItemName), code: strings.TrimSpace(r.ItemCode)}
-		if nk.product == "" {
-			nk.product = nk.code
-		}
+		// Net advisories by stable branch+product identity so renamed ItemName
+		// on a return does not split from the invoice (false net-negative).
+		nk := netKey{month: mk, branch: branchKeyOf(r), product: productKeyOf(r)}
 		na := netAgg[nk]
 		if na == nil {
-			na = &netSum{}
+			na = &netSum{
+				branchName:  strings.TrimSpace(r.CustomerName),
+				productName: strings.TrimSpace(r.ItemName),
+				productCode: strings.TrimSpace(r.ItemCode),
+			}
+			if na.branchName == "" {
+				na.branchName = nk.branch
+			}
+			if na.productName == "" {
+				na.productName = nk.product
+			}
+			if na.productCode == "" {
+				na.productCode = strings.TrimSpace(r.Barcode)
+			}
 			netAgg[nk] = na
 		}
 		na.val += r.NetValueEGP
 		na.qty += r.NetQtyCases
+		// Prefer a non-empty display name if a later row has one.
+		if name := strings.TrimSpace(r.CustomerName); name != "" {
+			na.branchName = name
+		}
+		if name := strings.TrimSpace(r.ItemName); name != "" {
+			na.productName = name
+		}
 
 		bk := branchKeyOf(r)
 		br := branchRows[bk]
@@ -448,14 +482,14 @@ func AggregateSellInReturns(records []domain.SellInRecord, f SellInReturnsFilter
 		advisories = append(advisories, SellInReturnsAdvisory{
 			Year:        f.Year,
 			MonthNum:    k.month,
-			BranchName:  k.branch,
-			ProductCode: k.code,
-			ProductName: k.product,
+			BranchName:  v.branchName,
+			ProductCode: v.productCode,
+			ProductName: v.productName,
 			NetValueEGP: round2(v.val),
 			NetQty:      round2(v.qty),
 			MessageAR: fmt.Sprintf(
 				"صافي التوريد سالب للصنف «%s» في فرع «%s» خلال %s (%.2f ج.م) — الصفوف محفوظة ولم تُخفَ.",
-				k.product, k.branch, arabicMonthNamesReturns[k.month], v.val,
+				v.productName, v.branchName, arabicMonthNamesReturns[k.month], v.val,
 			),
 		})
 	}
