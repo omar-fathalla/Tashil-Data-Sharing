@@ -78,7 +78,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
         for (final y in AvailableYears.current.including(_selectedYear)) (year: y, labelAr: 'سنة $y'),
       ];
 
-  /// Months that have data for the selected year (series first, then API).
+  /// Months that have data for the selected year.
+  /// Prefer the sell-out months API (complete) over seed-truncated series labels.
   List<int> get _dataMonths {
     final fromSeries = <int>{};
     for (final g in _allGroups) {
@@ -89,9 +90,13 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
         CompetitorMonthOptions.monthsFromSeries(g.allMonthlyPrices, year: _selectedYear),
       );
     }
-    if (fromSeries.isNotEmpty) return fromSeries.toList()..sort();
-    if (_apiMonths.isNotEmpty) return List<int>.from(_apiMonths);
-    return AvailableMonths.currentFor(_selectedYear).months;
+    final api = _apiMonths.isNotEmpty
+        ? _apiMonths
+        : AvailableMonths.currentFor(_selectedYear).months;
+    return CompetitorMonthOptions.resolveDataMonths(
+      apiMonths: api,
+      seriesMonths: fromSeries.toList(),
+    );
   }
 
   List<({int month, String labelAr})> get _monthOptions =>

@@ -64,4 +64,16 @@ void main() {
     final traj = ApiClient.buildMonthlyPriceTrajectory(merged, filterYear: 2026);
     expect(traj.map((p) => p.monthNum).toList(), [1, 4, 5, 6, 7, 8, 9, 10]);
   });
+
+  test('API-vs-series mismatch: picker uses full API list', () {
+    final opts = CompetitorMonthOptions.build(
+      CompetitorMonthOptions.resolveDataMonths(
+        apiMonths: List<int>.generate(10, (i) => i + 1),
+        seriesMonths: const [1, 2, 3, 4],
+      ),
+      year: 2026,
+    );
+    expect(opts.first.labelAr, 'كل الشهور (يناير - أكتوبر) — 2026');
+    expect(opts.where((o) => o.month > 0), hasLength(10));
+  });
 }

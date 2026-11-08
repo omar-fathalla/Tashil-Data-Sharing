@@ -57,4 +57,15 @@ class CompetitorMonthOptions {
     }
     return set.toList()..sort();
   }
+
+  /// Picker months: prefer the server sell-out month list (complete for the year)
+  /// over a possibly seed-truncated series. Fall back to series only when API is empty.
+  static List<int> resolveDataMonths({
+    List<int> apiMonths = const [],
+    List<int> seriesMonths = const [],
+  }) {
+    final api = [...apiMonths.where((m) => m >= 1 && m <= 12)]..sort();
+    if (api.isNotEmpty) return api;
+    return [...seriesMonths.where((m) => m >= 1 && m <= 12)]..sort();
+  }
 }

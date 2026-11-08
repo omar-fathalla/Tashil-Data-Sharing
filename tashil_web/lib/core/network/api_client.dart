@@ -10464,6 +10464,69 @@ class ApiClient {
     return merged;
   }
 
+  /// Backend [HandleRecords] clamps page size to ≤500; requesting more silently becomes 50.
+  static const int sellOutRecordsPageSize = 500;
+
+  /// Whether another offset page is needed after [fetchedSoFar] rows from a page of [pageLength].
+  static bool sellOutRecordsHasMorePage({
+    required int fetchedSoFar,
+    required int pageLength,
+    required int pageSize,
+    required int totalCount,
+  }) {
+    if (pageLength <= 0) return false;
+    if (fetchedSoFar >= totalCount) return false;
+    if (pageLength < pageSize) return false;
+    return true;
+  }
+
+  /// Walks every sell-out page for the filter (offset += page length) until total_count is covered.
+  Future<List<SellOutRecordModel>> getRecordsAllPages({
+    String? chain,
+    String? storeId,
+    String? category,
+    String? supplier,
+    String? query,
+    String? startDate,
+    String? endDate,
+    int? year,
+    int? month,
+    int pageSize = sellOutRecordsPageSize,
+  }) async {
+    final effPage = pageSize.clamp(1, sellOutRecordsPageSize);
+    final all = <SellOutRecordModel>[];
+    var offset = 0;
+    // Hard stop against a runaway loop if total_count is wrong.
+    const maxRows = 250000;
+    while (all.length < maxRows) {
+      final page = await getRecords(
+        chain: chain,
+        storeId: storeId,
+        category: category,
+        supplier: supplier,
+        query: query,
+        startDate: startDate,
+        endDate: endDate,
+        year: year,
+        month: month,
+        limit: effPage,
+        offset: offset,
+      );
+      all.addAll(page);
+      final total = lastSellOutSummary?.totalCount ?? all.length;
+      if (!sellOutRecordsHasMorePage(
+        fetchedSoFar: all.length,
+        pageLength: page.length,
+        pageSize: effPage,
+        totalCount: total,
+      )) {
+        break;
+      }
+      offset += page.length;
+    }
+    return all;
+  }
+
   static List<SkuMonthlyPricePointModel> buildMonthlyPriceTrajectory(
     Map<String, ({double price, int units})> rawByMonth, {
     int? filterYear,
@@ -10839,8 +10902,8 @@ class ApiClient {
         ? currentUser!.assignedChain
         : chain;
 
-    // Always pull the full selected year so monthly trajectories auto-extend as
-    // uploads add months (month filter only affects the spotlight metrics).
+    // Always pull the full selected year (paginated — server caps each page at 500)
+    // so monthly trajectories auto-extend as uploads add months.
     List<SellOutRecordModel> liveRecords = const [];
     try {
       String? startDate;
@@ -10849,7 +10912,7 @@ class ApiClient {
         startDate = '$year-01-01';
         endDate = '$year-12-31';
       }
-      liveRecords = await getRecords(
+      liveRecords = await getRecordsAllPages(
         chain: (effectiveChain != null && effectiveChain != 'all' && effectiveChain != 'الكل')
             ? effectiveChain
             : null,
@@ -10857,7 +10920,6 @@ class ApiClient {
         category: (category != null && category != 'all' && category != 'الكل') ? category : null,
         startDate: startDate,
         endDate: endDate,
-        limit: 5000,
       );
     } catch (_) {}
 
