@@ -233,7 +233,9 @@ jobs:
           channel: stable
           cache: false
 
+      # Self-hosted: PUB_CACHE=$HOME/toolchains/pub-cache (ci_runner_env.sh); skip remote cache.
       - name: Cache pub dependencies
+        if: runner.environment != 'self-hosted'
         uses: actions/cache@v4
         with:
           path: ~/.pub-cache

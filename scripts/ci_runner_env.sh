@@ -30,6 +30,16 @@ for flutter_bin in \
   fi
 done
 
+# Shared pub cache on the Mac home disk (same idea as local GOMODCACHE).
+# Remote actions/cache for ~/.pub-cache stalls / fights concurrent Flutter jobs;
+# point PUB_CACHE at a stable toolchains path instead.
+PUB_CACHE_DIR="${PUB_CACHE:-${TOOLCHAINS}/pub-cache}"
+mkdir -p "${PUB_CACHE_DIR}"
+export PUB_CACHE="${PUB_CACHE_DIR}"
+if [[ -n "${GITHUB_ENV:-}" ]]; then
+  echo "PUB_CACHE=${PUB_CACHE}" >>"${GITHUB_ENV}"
+fi
+
 # Android SDK: honor existing ANDROID_HOME, else $HOME/toolchains/android-sdk.
 if [[ -z "${ANDROID_HOME:-}" ]]; then
   if [[ -d "${TOOLCHAINS}/android-sdk" ]]; then
@@ -58,4 +68,4 @@ if [[ -n "${GITHUB_ENV:-}" ]]; then
   } >>"$GITHUB_ENV"
 fi
 
-echo "ci_runner_env: HOME=${HOME_DIR} runner=${runner} ANDROID_HOME=${ANDROID_HOME:-unset} ADB=${ANDROID_ADB_SERVER_PORT}"
+echo "ci_runner_env: HOME=${HOME_DIR} runner=${runner} ANDROID_HOME=${ANDROID_HOME:-unset} ADB=${ANDROID_ADB_SERVER_PORT} PUB_CACHE=${PUB_CACHE}"
