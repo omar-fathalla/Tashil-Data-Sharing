@@ -3,6 +3,7 @@ package gemini
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -335,6 +336,42 @@ func findGPSOPHeaderRow(rows [][]string) int {
 	return -1
 }
 
+// adjustCycleYear fixes year-boundary sales cycles when the resolved year came from Document Date
+// (resolvedYear == docYear): a Jan cycle that starts in late December belongs to the next calendar
+// year; a Dec cycle that spills into early January belongs to the previous year. Years carried by
+// the month token itself (e.g. "Jan-26") are left unchanged.
+func adjustCycleYear(resolvedYear, docYear, docMonth, cycleMonth int) int {
+	if resolvedYear <= 0 || cycleMonth < 1 || cycleMonth > 12 {
+		return resolvedYear
+	}
+	if docYear <= 0 || resolvedYear != docYear {
+		return resolvedYear
+	}
+	if cycleMonth == 1 && docMonth == 12 {
+		return resolvedYear + 1
+	}
+	if cycleMonth == 12 && docMonth == 1 {
+		return resolvedYear - 1
+	}
+	return resolvedYear
+}
+
+// gpSOPPeriodWeek keeps the file's week column when present (W1..W5 or the trimmed cell), else Full Month.
+func gpSOPPeriodWeek(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" || strings.HasPrefix(s, "#") {
+		return "Full Month"
+	}
+	if n, err := strconv.Atoi(s); err == nil && n >= 1 && n <= 5 {
+		return fmt.Sprintf("W%d", n)
+	}
+	u := strings.ToUpper(s)
+	if strings.HasPrefix(u, "W") {
+		return u
+	}
+	return s
+}
+
 func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain string, report *SellInParseReport) ([]domain.SellInRecord, error) {
 	// Map synonyms first (Extended Price, then TO, …); required-column check runs after mapping.
 	cols, missing := mapHeaders(rows[hdr], gpSOPHeaderSpecs)
@@ -347,7 +384,9 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 	periods := newSellInPeriodResolver(fileYear)
 	now := time.Now().UTC()
 	out := make([]domain.SellInRecord, 0, len(rows)-hdr-1)
+	monthFromColUsed := 0
 	monthMismatch := 0
+	hasMonthCol := cols["month"] >= 0
 	// Store branch lives in Customer Name (full-column scan). The "Branch" column is region codes.
 	storeCol := cols["customer"]
 	dataRows := rows[hdr+1:]
@@ -358,13 +397,31 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 			continue
 		}
 		periods.startRow()
-		// The invoice date is authoritative; the "month" column is a lookup that is often #N/A.
-		y, m, _ := periods.resolve(i+1, "", "", "", getCol(r, cols["date"]))
+		dateRaw := getCol(r, cols["date"])
+		// Company sales-month cycle lives in the month column (JAN/Feb/…, Arabic names). Prefer it
+		// over Document Date. Unparseable / #N/A / empty month cells fall back to Document Date.
+		// When the file has no month column at all, Document Date alone drives period_month.
+		monthRaw := ""
+		usedMonthCol := false
+		if hasMonthCol {
+			cell := getCol(r, cols["month"])
+			if _, _, ok := ParseMonthToken(cell); ok {
+				monthRaw = cell
+				usedMonthCol = true
+			}
+		}
+		y, m, _ := periods.resolve(i+1, "", "", monthRaw, dateRaw)
 		if !periods.accept(i + 1) {
 			continue
 		}
-		if mc, _, ok := ParseMonthToken(getCol(r, cols["month"])); ok && mc != m {
-			monthMismatch++
+		if usedMonthCol {
+			monthFromColUsed++
+			if dy, dm, ok := ParseDateToken(dateRaw); ok {
+				y = adjustCycleYear(y, dy, dm, m)
+				if dm != m {
+					monthMismatch++
+				}
+			}
 		}
 		qty := math.Round(parseFloatDefault(getCol(r, cols["qty"]), 0)) // QTY = pieces on the invoice line
 		val := parseFloatDefault(getCol(r, cols["value"]), 0)            // Extended Price or TO; keep sign (returns negative)
@@ -393,6 +450,10 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 			report.ReturnRows++
 			tx = "مرتجع (Return)"
 		}
+		periodWeek := "Full Month"
+		if cols["week"] >= 0 {
+			periodWeek = gpSOPPeriodWeek(getCol(r, cols["week"]))
+		}
 		// One Sell-In record per source row — never collapse lines (in26 acceptance: 40927 rows).
 		rec := domain.SellInRecord{
 			RecordID:           fmt.Sprintf("sellin_%s_%d", tenantID, i),
@@ -402,7 +463,7 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 			MonthNum:           m,
 			MonthEN:            monthNumToEN(m),
 			MonthAR:            ArabicMonthName(m),
-			PeriodWeek:         "Full Month",
+			PeriodWeek:         periodWeek,
 			RegionCode:         region,
 			Governorate:        st.Governorate,
 			Sector:             "MT",
@@ -426,8 +487,8 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 	if err := periods.err(filename); err != nil {
 		return nil, err
 	}
-	if monthMismatch > 0 {
-		report.MonthCheck = fmt.Sprintf("%d صف عمود الشهر فيه مختلف عن تاريخ الفاتورة؛ اتاخد تاريخ الفاتورة", monthMismatch)
+	if monthFromColUsed > 0 && monthMismatch > 0 {
+		report.MonthCheck = fmt.Sprintf("%d صف عمود الشهر فيه مختلف عن تاريخ الفاتورة؛ اتاخد عمود الشهر (دورة مبيعات الشركة)", monthMismatch)
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("no valid sell-in records found in %s", filename)
