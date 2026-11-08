@@ -65,6 +65,17 @@ type Repository interface {
 	MarkArchiveDeleted(ctx context.Context, tenantID, archiveID, fileName string) error
 	UnmarkArchiveDeleted(ctx context.Context, tenantID, archiveID, fileName string) error
 	IsArchiveDeleted(tenantID, archiveID, fileName string) bool
+	// RememberArchiveDeleted applies a tombstone to the in-memory map only (no remote write).
+	// When archiveID is set, only the id key is recorded (not the filename) so a later same-name
+	// reupload is not hidden by stale name tombs. Name keys are for archiveID-empty tombs only.
+	RememberArchiveDeleted(tenantID, archiveID, fileName string)
+	// ForgetArchiveNameDeleted clears a filename tombstone in memory (durable disk/Firestore unmark
+	// already recorded). Does not un-delete archive ids.
+	ForgetArchiveNameDeleted(tenantID, fileName string)
+	// RefreshDeletedArchives re-reads deleted_archives from Cloud Firestore into memory.
+	// No-op when Firestore is not configured. Fetch runs outside the repo mutex with a bounded
+	// context; returns a non-nil error when the remote read fails (callers may still apply disk tombs).
+	RefreshDeletedArchives(ctx context.Context) error
 }
 
 // Client implements Repository with fast in-memory storage for Cloud Run and local tests,
@@ -157,7 +168,9 @@ func (c *Client) initAndSyncMetadata() {
 
 		c.syncRetailChainsFromFirestore(ctx)
 		c.syncTenantProfilesFromFirestore(ctx)
-		c.syncDeletedArchivesFromFirestore(ctx)
+		if err := c.syncDeletedArchivesFromFirestore(ctx); err != nil {
+			log.Printf("[Firestore] Warning: deleted_archives refresh at startup: %v", err)
+		}
 	}
 }
 
@@ -2124,38 +2137,74 @@ func archiveTombstoneKeyByName(tenantID, fileName string) string {
 	return "name:" + slug + ":" + name
 }
 
-func (c *Client) syncDeletedArchivesFromFirestore(ctx context.Context) {
+const deletedArchivesRefreshTimeout = 5 * time.Second
+
+func (c *Client) syncDeletedArchivesFromFirestore(ctx context.Context) error {
 	if c.fsClient == nil {
-		return
+		return nil
 	}
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, deletedArchivesRefreshTimeout)
+		defer cancel()
+	}
+
+	// Network I/O outside c.mu so login and other repo users are not blocked on a slow query.
 	iter := c.fsClient.Collection("deleted_archives").Documents(ctx)
 	defer iter.Stop()
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	next := make(map[string]bool)
+	var fetchErr error
 	for {
 		doc, err := iter.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
+			fetchErr = err
 			break
 		}
 		data := doc.Data()
-		if id, ok := data["archive_id"].(string); ok && id != "" {
-			c.deletedArchives["id:"+id] = true
+		id, _ := data["archive_id"].(string)
+		id = strings.TrimSpace(id)
+		if id != "" {
+			// Id-bearing tombs hide that archive only — never the filename — so a later same-name
+			// reupload is not re-hidden when this doc is re-synced.
+			next["id:"+id] = true
+			continue
 		}
 		tenantID, _ := data["tenant_id"].(string)
 		fileName, _ := data["file_name"].(string)
 		if k := archiveTombstoneKeyByName(tenantID, fileName); k != "" {
-			c.deletedArchives[k] = true
+			next[k] = true
 		}
 	}
+	if fetchErr != nil && len(next) == 0 {
+		return fmt.Errorf("firestore deleted_archives refresh: %w", fetchErr)
+	}
+
+	c.mu.Lock()
+	for k := range c.deletedArchives {
+		if strings.HasPrefix(k, "id:") || strings.HasPrefix(k, "name:") {
+			delete(c.deletedArchives, k)
+		}
+	}
+	for k, v := range next {
+		c.deletedArchives[k] = v
+	}
+	c.mu.Unlock()
+	if fetchErr != nil {
+		return fmt.Errorf("firestore deleted_archives refresh partial: %w", fetchErr)
+	}
+	return nil
 }
 
 // MarkArchiveDeleted records a permanent deletion tombstone for an archived file in memory and Cloud Firestore.
 // Cloud Firestore is written first when a client is configured; the in-memory tombstone is applied only
 // after a successful write so a failed remote tombstone does not hide the file from ListArchivedFiles.
+//
+// When archiveID is set, only the id tombstone is active in memory (filename is stored on the doc for
+// audit). Name-key tombs are reserved for archiveID-empty deletes so same-name reuploads stay visible.
 func (c *Client) MarkArchiveDeleted(ctx context.Context, tenantID, archiveID, fileName string) error {
 	nameKey := archiveTombstoneKeyByName(tenantID, fileName)
 
@@ -2181,15 +2230,15 @@ func (c *Client) MarkArchiveDeleted(ctx context.Context, tenantID, archiveID, fi
 	c.mu.Lock()
 	if archiveID != "" {
 		c.deletedArchives["id:"+archiveID] = true
-	}
-	if nameKey != "" {
+	} else if nameKey != "" {
 		c.deletedArchives[nameKey] = true
 	}
 	c.mu.Unlock()
 	return nil
 }
 
-// UnmarkArchiveDeleted removes any deletion tombstone when a file is freshly uploaded by a user.
+// UnmarkArchiveDeleted removes name (and new-id) tombstones when a file is freshly uploaded.
+// Old deleted archive ids are intentionally left tombstoned so they stay hidden.
 func (c *Client) UnmarkArchiveDeleted(ctx context.Context, tenantID, archiveID, fileName string) error {
 	c.mu.Lock()
 	if archiveID != "" {
@@ -2206,9 +2255,8 @@ func (c *Client) UnmarkArchiveDeleted(ctx context.Context, tenantID, archiveID, 
 	if c.fsClient != nil {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if archiveID != "" {
-			_, _ = c.fsClient.Collection("deleted_archives").Doc(archiveID).Delete(bgCtx)
-		}
+		// Do not delete the OLD archive's id doc — that id must remain deleted.
+		// Clear any name-only tombstone doc so the new upload is not hidden by filename.
 		if nameKey != "" {
 			docID := strings.ReplaceAll(strings.ReplaceAll(nameKey, "/", "_"), ":", "_")
 			_, _ = c.fsClient.Collection("deleted_archives").Doc(docID).Delete(bgCtx)
@@ -2228,6 +2276,37 @@ func (c *Client) IsArchiveDeleted(tenantID, archiveID, fileName string) bool {
 		return true
 	}
 	return false
+}
+
+// RememberArchiveDeleted records a tombstone in memory only. Does not write Cloud Firestore.
+// Id-bearing tombs do not set a name key (same-name reupload safety).
+func (c *Client) RememberArchiveDeleted(tenantID, archiveID, fileName string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if archiveID != "" {
+		c.deletedArchives["id:"+archiveID] = true
+		return
+	}
+	if k := archiveTombstoneKeyByName(tenantID, fileName); k != "" {
+		c.deletedArchives[k] = true
+	}
+}
+
+// ForgetArchiveNameDeleted drops a name-key tombstone after a durable same-name reupload unmark.
+func (c *Client) ForgetArchiveNameDeleted(tenantID, fileName string) {
+	k := archiveTombstoneKeyByName(tenantID, fileName)
+	if k == "" {
+		return
+	}
+	c.mu.Lock()
+	delete(c.deletedArchives, k)
+	c.mu.Unlock()
+}
+
+// RefreshDeletedArchives re-syncs deleted_archives from Cloud Firestore so running instances
+// learn about deletes performed by other Cloud Run instances after startup.
+func (c *Client) RefreshDeletedArchives(ctx context.Context) error {
+	return c.syncDeletedArchivesFromFirestore(ctx)
 }
 
 // seedPasswordHashFromEnv returns a bcrypt hash of the password held in the named environment

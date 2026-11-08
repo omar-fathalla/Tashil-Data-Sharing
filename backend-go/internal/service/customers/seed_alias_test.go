@@ -68,10 +68,15 @@ func TestSeedAliasDecisionOnOldNameWins(t *testing.T) {
 // Aliases are exact (normalized) matches only: a near spelling is not aliased, and other tenants are untouched.
 func TestSeedAliasExactOnlyAndSeedTenantOnly(t *testing.T) {
 	ctx := context.Background()
-	var newName string
-	for n := range loadAliases(t) {
-		newName = n
-		break
+	// Pin a fixed alias. Map iteration previously picked «كيه اتش جمله ماركت - الغردقة», whose
+	// «… الغردقة 2» form is ALSO a real alias — so near-spelling quarantine was empty (flake).
+	const newName = "زهران - البيطاش"
+	aliases := loadAliases(t)
+	if _, ok := aliases[newName]; !ok {
+		t.Fatalf("%q must be a seed alias", newName)
+	}
+	if _, ok := aliases[newName+" 2"]; ok {
+		t.Fatalf("%q 2 must not itself be an alias (test would be invalid)", newName)
 	}
 	r := New(&MemoryStore{})
 	if _, q := r.PartitionLayout(ctx, "tenant-adeco", "x.xlsx", "fathalla", AliasLayout, []domain.SellInRecord{chainRec(newName+" 2", "fathalla")}, false); len(q) != 1 {

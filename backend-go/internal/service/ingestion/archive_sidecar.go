@@ -1,6 +1,7 @@
 package ingestion
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"os"
@@ -103,15 +104,50 @@ func archiveEntryKind(entry *ArchivedFile) string {
 	return "sell_out"
 }
 
-// syncArchiveFromDisk picks up archive entries written by OTHER Cloud Run instances.
+// refreshArchiveTombstonesAlways applies deletion tombstones from shared storage and prunes matching
+// in-memory entries. Source of truth across Cloud Run replicas:
+//   1. Firestore collection deleted_archives (RefreshDeletedArchives when configured)
+//   2. GCS archive mount file deleted_tombstones.json (applyDiskTombstonesLocked)
+// Per-instance memory alone is never enough — live Sell-In showed DELETE 200 on one revision
+// while peer revisions kept listing the same ids until shared tombs were re-read.
+// Runs on every list/delete (not throttled) so a page refresh cannot flap a just-deleted row.
+func (p *Processor) refreshArchiveTombstonesAlways(ctx context.Context) {
+	if p.archiveDir == "" && p.fsRepo == nil {
+		return
+	}
+	// Firestore refresh uses its own bounded context and does not hold archiveMu / repo lock
+	// during network I/O. Failures are logged; disk tombs still apply below.
+	if p.fsRepo != nil {
+		if err := p.fsRepo.RefreshDeletedArchives(ctx); err != nil {
+			log.Printf("WARN [archive] RefreshDeletedArchives: %v", err)
+		}
+	}
+	p.archiveMu.Lock()
+	defer p.archiveMu.Unlock()
+	p.applyDiskTombstonesLocked()
+	p.pruneTombstonedArchivesLocked()
+}
+
+// syncArchiveFromDisk picks up archive entries written by OTHER Cloud Run instances and drops
+// entries deleted by other instances (including seed-index rows).
 //
 // Each instance keeps its own in-memory archive map, filled once at startup. The archive directory is a
 // shared GCS mount, so an upload handled by instance A writes its sidecar there, but instances B and C kept
 // listing their startup copy and the new sheet never showed in the tab until a restart. This merges new
-// sidecars (metadata only; bytes are read lazily from StoragePath on download), skips Firestore tombstones,
-// and when the same (tenant, type, chain, file name) exists twice keeps only the newest upload.
+// sidecars (metadata only; bytes are read lazily from StoragePath on download), refreshes deletion
+// tombstones from disk (+ Firestore when configured), prunes tombstoned in-memory entries, and when the
+// same (tenant, type, chain, file name) exists twice keeps only the newest upload.
+//
+// Tombstone refresh/prune is NOT gated by archiveDiskSyncInterval (see refreshArchiveTombstonesAlways);
+// only the sidecar merge is throttled.
 func (p *Processor) syncArchiveFromDisk(normTenant string, force bool) {
-	if p.archiveDir == "" || normTenant == "" {
+	if normTenant == "" {
+		return
+	}
+	// Always hide deletes from peer instances before any list filter runs.
+	p.refreshArchiveTombstonesAlways(context.Background())
+
+	if p.archiveDir == "" {
 		return
 	}
 	now := time.Now().UnixNano()
@@ -128,8 +164,14 @@ func (p *Processor) syncArchiveFromDisk(normTenant string, force bool) {
 	p.archiveMu.Lock()
 	defer p.archiveMu.Unlock()
 	p.lastArchiveDiskSync = now
+	// Re-apply after merge window: a concurrent delete may have landed while we read sidecars.
+	p.applyDiskTombstonesLocked()
+	p.pruneTombstonedArchivesLocked()
 	for _, item := range disk {
 		if item == nil || item.ID == "" || item.TenantID != normTenant {
+			continue
+		}
+		if p.fsRepo != nil && p.fsRepo.IsArchiveDeleted(item.TenantID, item.ID, item.FileName) {
 			continue
 		}
 		if cur, ok := p.archivedFiles[item.ID]; ok {
@@ -140,9 +182,6 @@ func (p *Processor) syncArchiveFromDisk(normTenant string, force bool) {
 				p.archivedFiles[item.ID] = &copyItem
 				delete(p.archivedBytes, item.ID)
 			}
-			continue
-		}
-		if p.fsRepo != nil && p.fsRepo.IsArchiveDeleted(item.TenantID, item.ID, item.FileName) {
 			continue
 		}
 		kind := archiveEntryKind(item)
