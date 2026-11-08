@@ -54,14 +54,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # On self-hosted Mac, GOMODCACHE/GOCACHE already live on the shared home disk.
+      # Remote actions/cache for setup-go was ~880MB and stalled (~10m at 0 B/s).
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend-go/go.mod
-          cache: true
+          cache: ${{ runner.environment != 'self-hosted' }}
           cache-dependency-path: backend-go/go.sum
 
-      # Persistent Go build cache on the shared Mac home (3 runners → one disk).
       - name: Cache Go build
+        if: runner.environment != 'self-hosted'
         uses: actions/cache@v4
         with:
           path: |
@@ -122,6 +124,11 @@ jobs:
           restore-keys: |
             firebase-emulators-${{ runner.os }}-${{ runner.arch }}-
 
+      # Run before emulator so a flaky emulator step cannot skip this check.
+      - name: live-version parse fail-safe tests
+        working-directory: .
+        run: python3 scripts/parse_live_backend_commit_test.py
+
       - name: Snapshot pre-existing emulator PIDs
         working-directory: .
         run: |
@@ -135,12 +142,9 @@ jobs:
       - name: Firestore emulator product-match tests
         id: go_emulator_test
         run: |
-          npx --yes firebase-tools@13.29.1 emulators:exec --only firestore --project demo-tashil \
-            "go test ./internal/service/firestore/ -count=1 -timeout 10m -run Emulator"
-
-      - name: live-version parse fail-safe tests
-        working-directory: .
-        run: python3 scripts/parse_live_backend_commit_test.py
+          # Keep emulator JVM + go test from oversubscribing the shared Mac.
+          GOMAXPROCS=2 npx --yes firebase-tools@13.29.1 emulators:exec --only firestore --project demo-tashil \
+            "go test ./internal/service/firestore/ -count=1 -timeout 10m -parallel 1 -run Emulator"
 
       - name: Surface failure summary
         if: failure() && (steps.go_test.outcome == 'failure' || steps.go_emulator_test.outcome == 'failure')
