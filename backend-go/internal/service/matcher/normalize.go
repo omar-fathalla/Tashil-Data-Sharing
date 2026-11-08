@@ -78,6 +78,8 @@ func coreTokens(tokens []string) []string {
 	return out
 }
 
+// jaccard is set-based: repeated tokens in either slice do not inflate the score.
+// Intersection and union count unique tokens only.
 func jaccard(a, b []string) float64 {
 	if len(a) == 0 || len(b) == 0 {
 		return 0
@@ -86,11 +88,13 @@ func jaccard(a, b []string) float64 {
 	for _, t := range a {
 		setA[t] = struct{}{}
 	}
-	inter := 0
 	setB := make(map[string]struct{}, len(b))
 	for _, t := range b {
 		setB[t] = struct{}{}
-		if _, ok := setA[t]; ok {
+	}
+	inter := 0
+	for t := range setA {
+		if _, ok := setB[t]; ok {
 			inter++
 		}
 	}

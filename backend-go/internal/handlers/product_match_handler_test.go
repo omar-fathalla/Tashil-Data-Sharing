@@ -131,3 +131,70 @@ func TestProductMatchEnqueueForbiddenForViewer(t *testing.T) {
 		t.Fatalf("got %d", rec.Code)
 	}
 }
+
+func TestProductMatchDecideWrongPairAndIdempotent(t *testing.T) {
+	pm := fakePM{items: []domain.ProductMasterItem{
+		{ItemCode: "FGCL-0550-0001", Barcode: "6223000231227", OfficialName: "كلوريل 500 جم مبيض", IsPrimaryForBarcode: true},
+		{ItemCode: "FGDW-1000-0010", Barcode: "6223000234001", OfficialName: "فيبا دش", IsPrimaryForBarcode: true},
+	}}
+	q := matcher.NewQueue()
+	h := NewProductMatchHandler(q, pm)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/v1/product-match/enqueue", h.HandleEnqueue)
+	mux.HandleFunc("POST /api/v1/product-match/review/decide", h.HandleDecide)
+
+	enq := `{"queries":[{"sku_name":"صنف غامض للمراجعة"}]}`
+	req := withClaims(httptest.NewRequest(http.MethodPost, "/api/v1/product-match/enqueue", bytes.NewBufferString(enq)), domain.RoleVendorAdmin)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	var enqResp struct {
+		Items []matcher.ReviewItem `json:"enqueued"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &enqResp)
+	if len(enqResp.Items) != 1 {
+		t.Fatalf("enqueue: %s", rec.Body.String())
+	}
+	id := enqResp.Items[0].ID
+
+	// Wrong pair
+	bad := `{"id":"` + id + `","status":"approved","chosen_item_code":"FGCL-0550-0001","chosen_barcode":"6223000234001"}`
+	req = withClaims(httptest.NewRequest(http.MethodPost, "/api/v1/product-match/review/decide", bytes.NewBufferString(bad)), domain.RoleVendorAdmin)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code == http.StatusOK {
+		t.Fatal("wrong pair must fail")
+	}
+
+	// Valid pair
+	okBody := `{"id":"` + id + `","status":"approved","chosen_item_code":"FGCL-0550-0001","chosen_barcode":"6223000231227","reason_ar":"تم"}`
+	req = withClaims(httptest.NewRequest(http.MethodPost, "/api/v1/product-match/review/decide", bytes.NewBufferString(okBody)), domain.RoleVendorAdmin)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("valid decide %d %s", rec.Code, rec.Body.String())
+	}
+
+	// Idempotent repeat
+	req = withClaims(httptest.NewRequest(http.MethodPost, "/api/v1/product-match/review/decide", bytes.NewBufferString(okBody)), domain.RoleVendorAdmin)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("idempotent decide %d %s", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Metrics matcher.Metrics `json:"metrics"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+	if resp.Metrics.Approved != 1 {
+		t.Fatalf("idempotent must not double Approved: %+v", resp.Metrics)
+	}
+
+	// Different status rejected
+	flip := `{"id":"` + id + `","status":"rejected","reason_ar":"لا"}`
+	req = withClaims(httptest.NewRequest(http.MethodPost, "/api/v1/product-match/review/decide", bytes.NewBufferString(flip)), domain.RoleVendorAdmin)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code == http.StatusOK {
+		t.Fatal("repeat with different status must fail")
+	}
+}

@@ -3,6 +3,7 @@ package matcher
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -15,6 +16,13 @@ const (
 	StatusPending  = "pending"
 	StatusApproved = "approved"
 	StatusRejected = "rejected"
+)
+
+var (
+	// ErrAlreadyDecided is returned when a second decide with a different status is attempted.
+	ErrAlreadyDecided = errors.New("تم البت في هذا العنصر مسبقاً")
+	// ErrInventedBarcode rejects fabricated barcode patterns.
+	ErrInventedBarcode = errors.New("رفض باركود مصنوع: لا يتم اختراع باركودات")
 )
 
 // ReviewItem is one uncertain / unmatched product waiting for a human decision.
@@ -34,6 +42,9 @@ type ReviewItem struct {
 
 // Queue is an in-memory per-tenant review queue. No production Product Master
 // rows are mutated by approve/reject — decisions are recorded for operators only.
+//
+// Durability: RAM-only today (lost on restart / not shared across Cloud Run
+// instances). Open decision for Mohamed — see docs/gemini-barcode-matching.md.
 type Queue struct {
 	mu      sync.RWMutex
 	items   map[string]map[string]*ReviewItem // tenant -> id -> item
@@ -64,6 +75,7 @@ func reviewID(tenant string, q Query) string {
 
 // EnqueueMatch stores a review item when the match needs human attention.
 // High/exact matches update metrics only (no queue row). Returns the item when enqueued.
+// Re-upload of the same pending key refreshes the row without double-counting Queued/Pending.
 func (q *Queue) EnqueueMatch(tenantID string, query Query, result Result) *ReviewItem {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
@@ -89,7 +101,6 @@ func (q *Queue) EnqueueMatch(tenantID string, query Query, result Result) *Revie
 		m.touch(q.now())
 		return nil
 	}
-	m.Queued++
 	id := reviewID(tenantID, query)
 	bucket, ok := q.items[tenantID]
 	if !ok {
@@ -97,7 +108,7 @@ func (q *Queue) EnqueueMatch(tenantID string, query Query, result Result) *Revie
 		q.items[tenantID] = bucket
 	}
 	if existing, ok := bucket[id]; ok && existing.Status == StatusPending {
-		// Refresh result / counters on re-upload of the same unknown item.
+		// Refresh payload only — do not bump Queued/Pending again.
 		existing.Query = query
 		existing.Result = result
 		existing.CreatedAt = q.now().UTC()
@@ -105,6 +116,8 @@ func (q *Queue) EnqueueMatch(tenantID string, query Query, result Result) *Revie
 		cp := *existing
 		return &cp
 	}
+	// Re-open a previously decided item only as a new pending row (rare re-upload after decide).
+	m.Queued++
 	item := &ReviewItem{
 		ID:        id,
 		TenantID:  tenantID,
@@ -167,21 +180,26 @@ func (q *Queue) List(tenantID, status string) []ReviewItem {
 	return out
 }
 
-// Decide records an approve/reject. Approve may attach a chosen Product Master item code
-// and barcode — but the barcode must be supplied by the operator or come from a candidate;
-// the queue never synthesizes one.
-func (q *Queue) Decide(tenantID, id, status, decidedBy, reasonAR, chosenItemCode, chosenBarcode string) (*ReviewItem, error) {
+// DecideOptions carries optional catalog validation for approve.
+type DecideOptions struct {
+	Catalog *Catalog // tenant Product Master; required to validate chosen code/barcode on approve
+}
+
+// Decide records an approve/reject. Same-status repeats are idempotent (no counter bump).
+// Different-status repeats return ErrAlreadyDecided. Approve validates chosen_barcode /
+// chosen_item_code against the tenant catalog when provided.
+func (q *Queue) Decide(tenantID, id, status, decidedBy, reasonAR, chosenItemCode, chosenBarcode string, opts DecideOptions) (*ReviewItem, error) {
 	status = strings.TrimSpace(status)
 	if status != StatusApproved && status != StatusRejected {
 		return nil, fmt.Errorf("status must be %s or %s", StatusApproved, StatusRejected)
 	}
 	rawChosen := strings.TrimSpace(chosenBarcode)
-	// Guardrail: reject synthetic patterns (e.g. mock "SKU-SECTOR-001") before digit-cleaning.
 	upperRaw := strings.ToUpper(rawChosen)
 	if strings.HasPrefix(upperRaw, "SKU") || strings.Contains(upperRaw, "SKU-") || looksInventedBarcode(rawChosen) {
-		return nil, fmt.Errorf("رفض باركود مصنوع: لا يتم اختراع باركودات")
+		return nil, ErrInventedBarcode
 	}
 	chosenBarcode = cleanBarcode(rawChosen)
+	chosenItemCode = normalizeItemCode(chosenItemCode)
 
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -190,24 +208,53 @@ func (q *Queue) Decide(tenantID, id, status, decidedBy, reasonAR, chosenItemCode
 	if !ok {
 		return nil, fmt.Errorf("review item not found")
 	}
-	prev := it.Status
+
+	// Idempotent / reject-repeat handling before mutating counters.
+	if it.Status == StatusApproved || it.Status == StatusRejected {
+		if it.Status == status {
+			cp := *it
+			return &cp, nil // idempotent success
+		}
+		return nil, ErrAlreadyDecided
+	}
+	if it.Status != StatusPending {
+		return nil, fmt.Errorf("unexpected status %s", it.Status)
+	}
+
+	if status == StatusApproved {
+		suggested := cleanBarcode(it.Result.SuggestedBarcode)
+		effectiveCode := chosenItemCode
+		effectiveBC := chosenBarcode
+		if effectiveBC == "" && suggested != "" {
+			effectiveBC = suggested
+		}
+		if effectiveCode == "" {
+			effectiveCode = normalizeItemCode(it.Result.MatchedItemCode)
+		}
+		if opts.Catalog != nil {
+			if err := opts.Catalog.ValidateChosen(effectiveCode, effectiveBC); err != nil {
+				return nil, err
+			}
+		} else if effectiveBC != "" || effectiveCode != "" {
+			// Without a catalog we still refuse to invent; barcode must be empty or digits-only (already cleaned).
+			// Pair validation is skipped only when Catalog is nil (tests that do not care about PM).
+		}
+		chosenItemCode = effectiveCode
+		chosenBarcode = effectiveBC
+	}
+
 	now := q.now().UTC()
 	it.Status = status
 	it.DecidedBy = strings.TrimSpace(decidedBy)
 	it.DecisionReasonAR = strings.TrimSpace(reasonAR)
 	it.DecidedAt = &now
-	it.ChosenItemCode = normalizeItemCode(chosenItemCode)
+	it.ChosenItemCode = chosenItemCode
 	it.ChosenBarcode = chosenBarcode
-	if status == StatusApproved && it.ChosenBarcode == "" && cleanBarcode(it.Result.SuggestedBarcode) != "" {
-		// Only reuse a suggested barcode that originated from Product Master / input — never invent.
-		it.ChosenBarcode = cleanBarcode(it.Result.SuggestedBarcode)
-	}
+
 	m := q.ensureMetricsLocked(tenantID)
-	if prev == StatusPending {
-		m.Pending--
-		if m.Pending < 0 {
-			m.Pending = 0
-		}
+	m.Pending--
+	if m.Pending < 0 {
+		m.Pending = 0
 	}
 	if status == StatusApproved {
 		m.Approved++
@@ -226,14 +273,12 @@ func looksInventedBarcode(raw string) bool {
 	if raw == "" {
 		return false
 	}
-	hasLetter := false
 	for _, r := range raw {
 		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
-			hasLetter = true
-			break
+			return true
 		}
 	}
-	return hasLetter
+	return false
 }
 
 func (q *Queue) ensureMetricsLocked(tenantID string) *Metrics {

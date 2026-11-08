@@ -6,10 +6,10 @@ import 'package:tashil_web/features/product_match/presentation/screens/product_m
 
 class _FakeMatchSource implements ProductMatchDataSource {
   List<ProductMatchReviewItem> items;
-  ProductMatchMetrics metrics;
+  ProductMatchMetrics currentMetrics;
   final List<String> calls = [];
 
-  _FakeMatchSource(this.items, this.metrics);
+  _FakeMatchSource(this.items, this.currentMetrics);
 
   @override
   Future<List<ProductMatchReviewItem>> list({String status = 'pending'}) async {
@@ -18,7 +18,7 @@ class _FakeMatchSource implements ProductMatchDataSource {
   }
 
   @override
-  Future<ProductMatchMetrics> metrics() async => metrics;
+  Future<ProductMatchMetrics> metrics() async => currentMetrics;
 
   @override
   Future<ProductMatchMetrics> decide({
@@ -48,16 +48,16 @@ class _FakeMatchSource implements ProductMatchDataSource {
         else
           e,
     ];
-    metrics = ProductMatchMetrics(
-      totalMatched: metrics.totalMatched,
+    currentMetrics = ProductMatchMetrics(
+      totalMatched: currentMetrics.totalMatched,
       pending: 0,
-      approved: status == 'approved' ? 1 : metrics.approved,
-      rejected: status == 'rejected' ? 1 : metrics.rejected,
+      approved: status == 'approved' ? 1 : currentMetrics.approved,
+      rejected: status == 'rejected' ? 1 : currentMetrics.rejected,
       inventedBarcodes: 0,
       autoResolveRate: 0.5,
       labelsAr: const {'pending': 'بانتظار المراجعة'},
     );
-    return metrics;
+    return currentMetrics;
   }
 }
 

@@ -128,7 +128,9 @@ func (h *ProductMatchHandler) HandleDecide(w http.ResponseWriter, r *http.Reques
 		writeErr(w, http.StatusBadRequest, "id and status required")
 		return
 	}
-	item, err := h.queue.Decide(c.TenantID, body.ID, body.Status, c.Email, body.ReasonAR, body.ChosenItemCode, body.ChosenBarcode)
+	item, err := h.queue.Decide(c.TenantID, body.ID, body.Status, c.Email, body.ReasonAR, body.ChosenItemCode, body.ChosenBarcode, matcher.DecideOptions{
+		Catalog: h.catalog(c.TenantID),
+	})
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
