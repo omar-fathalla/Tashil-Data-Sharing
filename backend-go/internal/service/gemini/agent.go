@@ -27,7 +27,8 @@ const defaultGeminiAPIBase = "https://generativelanguage.googleapis.com"
 
 // ErrMockSamplesInProduction is returned when Gemini is unavailable and inventing
 // fixed sample records would be required while ENVIRONMENT=production.
-var ErrMockSamplesInProduction = fmt.Errorf("gemini analysis unavailable: refusing mock sample records in production")
+// Message is Arabic so upload clients can surface it directly.
+var ErrMockSamplesInProduction = fmt.Errorf("تعذّر تحليل الملف: خدمة الذكاء الاصطناعي غير متاحة، ومفيش بيانات تجريبية في بيئة الإنتاج. مفيش حاجة اتحفظت — حاول تاني أو راجع إعدادات GEMINI_API_KEY")
 
 func isProductionEnv() bool {
 	return strings.EqualFold(strings.TrimSpace(os.Getenv("ENVIRONMENT")), "production")

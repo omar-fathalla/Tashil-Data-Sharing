@@ -149,6 +149,9 @@ func TestMockSamplesRefusedInProduction(t *testing.T) {
 	if err == nil || !errors.Is(err, ErrMockSamplesInProduction) {
 		t.Fatalf("expected ErrMockSamplesInProduction, got %v", err)
 	}
+	if !strings.Contains(err.Error(), "مفيش حاجة اتحفظت") || !strings.Contains(err.Error(), "الذكاء الاصطناعي") {
+		t.Fatalf("expected clear Arabic user-facing message, got %v", err)
+	}
 }
 
 func TestGeminiAgentExcelSerialDateAndHeaderDisambiguation(t *testing.T) {

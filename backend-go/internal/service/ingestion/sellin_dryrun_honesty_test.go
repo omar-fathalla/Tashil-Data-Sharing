@@ -197,6 +197,34 @@ func TestSellInDryRunUnknownBarcodeViaEnrichment(t *testing.T) {
 	}
 }
 
+func TestSellInDiscardClearsStagedDisk(t *testing.T) {
+	dir := t.TempDir()
+	p := NewProcessor(gemini.NewAgent("", "m", true), bigquery.NewClient("test-proj", "test-dataset", true), firestore.NewClient("db", true)).WithArchiveDir(dir)
+	p.SetCustomerRegistry(customers.New(&customers.MemoryStore{}))
+	x := sopWorkbook(t,
+		[]string{"Invoice", "1", "2026-07-05", "FG-1", "صنف", "CTN", "1", "L", "C1", "عائله فتح الله ماركت - طنطا", "KA", "15", "ALX"},
+	)
+	res, err := p.ProcessSellInPlan(interactive(context.Background(), UploadGuards{}), "tenant-adeco", "discard_si.xlsx", x, true, "fathalla")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := p.loadStaged("tenant-adeco", res.BatchID); err != nil {
+		t.Fatalf("expected disk staging before discard: %v", err)
+	}
+	if err := p.DiscardStagedUpload(context.Background(), "tenant-adeco", res.BatchID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := p.loadStaged("tenant-adeco", res.BatchID); err == nil {
+		t.Fatal("discard must delete _staged disk files")
+	}
+	p.stagedMu.Lock()
+	_, still := p.staged[res.BatchID]
+	p.stagedMu.Unlock()
+	if still {
+		t.Fatal("discard must clear in-memory staging")
+	}
+}
+
 func TestSellInCommitFailureKeepsStaged(t *testing.T) {
 	dir := t.TempDir()
 	bq := bigquery.NewClient("test-proj", "test-dataset", true)

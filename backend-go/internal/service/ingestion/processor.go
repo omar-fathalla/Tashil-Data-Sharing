@@ -1096,20 +1096,30 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		sinkMeta.ArchiveID = updatedArchived.ID
 	}
 	var commitSync *bqsink.Result
+	// markPrimaryCommitted flips commitOK and clears _staged disk immediately after the
+	// main durable write so a later secondary failure cannot restore a preview that would
+	// double-write on retry.
+	markPrimaryCommitted := func() {
+		commitOK = true
+		p.removeStaged(tenantID, batchID)
+	}
 	if staged.IsProductMaster {
 		if _, err := p.bqRepo.SetProductMaster(ctx, tenantID, staged.ProductMasterSummary); err != nil {
 			return nil, fmt.Errorf("failed to persist product master items: %w", err)
 		}
+		markPrimaryCommitted()
 		commitSync = p.sinkProductMaster(ctx, sinkMeta, staged.ProductMasterSummary)
 	} else if staged.IsSellInPlan {
 		if err := p.bqRepo.SetSellInRecords(ctx, tenantID, staged.Filename, staged.SellInRecords); err != nil {
 			return nil, fmt.Errorf("failed to persist sell-in records: %w", err)
 		}
+		markPrimaryCommitted()
 		commitSync = p.sinkSellIn(ctx, sinkMeta, staged.SellInRecords)
 	} else if staged.IsWideMatrix {
 		if err := p.bqRepo.ReplaceTenantFacts(ctx, tenantID, staged.ValidFacts); err != nil {
 			return nil, fmt.Errorf("failed to replace tenant facts in bigquery: %w", err)
 		}
+		markPrimaryCommitted()
 		commitSync = p.sinkSellOut(ctx, sinkMeta, staged.ValidFacts, bqsink.ModeReplacePeriods)
 		if err := p.bqRepo.SetTenantWorkbookAnalytics(ctx, tenantID, staged.WBMeta); err != nil {
 			return nil, fmt.Errorf("failed to store workbook analytics in bigquery: %w", err)
@@ -1121,13 +1131,12 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		if err := p.bqRepo.InsertSellOutFacts(ctx, staged.ValidFacts); err != nil {
 			return nil, fmt.Errorf("failed to stream facts to bigquery: %w", err)
 		}
+		markPrimaryCommitted()
 		commitSync = p.sinkSellOut(ctx, sinkMeta, staged.ValidFacts, bqsink.ModeUpsertRecords)
 		if len(staged.WBMeta.PricingItems) > 0 || len(staged.WBMeta.SupplierShares) > 0 {
 			_ = p.bqRepo.SetTenantWorkbookAnalytics(ctx, tenantID, staged.WBMeta)
 		}
 	}
-	// Durable write succeeded — drop the deferred restore of in-memory staging.
-	commitOK = true
 
 	// Save batch record
 	batch := domain.IngestionBatch{

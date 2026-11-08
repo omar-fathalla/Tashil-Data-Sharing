@@ -247,8 +247,8 @@ func TestHTTPMissingAPIKeyRefusesMockInProduction(t *testing.T) {
 	t.Setenv("ENVIRONMENT", "production")
 	c := NewAgent("", "gemini-3.8-flash", false)
 	_, err := c.AnalyzeAndNormalize(context.Background(), "carrefour_x.csv", []byte{9, 9, 9})
-	if err == nil || !strings.Contains(err.Error(), "refusing mock sample") {
-		t.Fatalf("expected production refusal, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "مفيش حاجة اتحفظت") {
+		t.Fatalf("expected Arabic production refusal, got %v", err)
 	}
 }
 
