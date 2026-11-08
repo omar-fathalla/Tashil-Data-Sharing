@@ -193,6 +193,63 @@ func writeProductMatchDecideErr(w http.ResponseWriter, tenantSlug string, err er
 	}
 }
 
+// HandleBulkDecide serves POST /api/v1/product-match/review/bulk-decide
+// Body: {ids:[], status:"approved"|"rejected", reason_ar?:string}
+// Approve uses each item's matched Product Master suggestion only (never invents barcodes).
+func (h *ProductMatchHandler) HandleBulkDecide(w http.ResponseWriter, r *http.Request) {
+	c, ok := tmWriteClaims(w, r)
+	if !ok {
+		return
+	}
+	if !productMatchWriteRoles[c.Role] {
+		writeErr(w, http.StatusForbidden, "role not allowed to decide product match reviews")
+		return
+	}
+	var body struct {
+		IDs      []string `json:"ids"`
+		Status   string   `json:"status"`
+		ReasonAR string   `json:"reason_ar"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.IDs) == 0 {
+		writeErr(w, http.StatusBadRequest, "ids and status required")
+		return
+	}
+	results, err := h.queue.DecideBulk(r.Context(), c.TenantID, body.IDs, body.Status, c.Email, body.ReasonAR, matcher.DecideOptions{
+		Catalog: h.catalog(c.TenantID),
+	})
+	if err != nil {
+		log.Printf("[product-match] bulk-decide failed tenant=%s: %v", productMatchTenantSlug(c.TenantID), err)
+		msg := "تعذر تنفيذ الاعتماد الجماعي"
+		if strings.Contains(strings.ToLower(err.Error()), "status must be") {
+			msg = "الحالة يجب أن تكون اعتماد أو رفض"
+			writeErr(w, http.StatusBadRequest, msg)
+			return
+		}
+		writeErr(w, http.StatusBadRequest, msg)
+		return
+	}
+	approved, skipped, failed := 0, 0, 0
+	for _, row := range results {
+		switch {
+		case row.OK:
+			approved++
+		case row.Skipped:
+			skipped++
+		default:
+			failed++
+		}
+	}
+	metrics, _ := h.queue.Snapshot(r.Context(), c.TenantID)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"results":  results,
+		"count":    len(results),
+		"approved": approved,
+		"skipped":  skipped,
+		"failed":   failed,
+		"metrics":  metrics,
+	})
+}
+
 // HandleMetrics serves GET /api/v1/product-match/metrics
 func (h *ProductMatchHandler) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 	c, ok := tmClaims(w, r)

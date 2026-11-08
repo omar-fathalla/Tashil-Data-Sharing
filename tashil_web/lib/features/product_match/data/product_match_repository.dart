@@ -168,6 +168,70 @@ class ProductMatchReviewItem {
   }
 }
 
+/// Coarse priority for Phase B prioritized review UI.
+enum ProductMatchPriority { high, medium, low }
+
+extension ProductMatchReviewItemPriority on ProductMatchReviewItem {
+  ProductMatchPriority get priority {
+    if (value >= 10000 || rows >= 50) return ProductMatchPriority.high;
+    if (value >= 1000 || rows >= 10) return ProductMatchPriority.medium;
+    return ProductMatchPriority.low;
+  }
+
+  String get priorityLabelAr {
+    switch (priority) {
+      case ProductMatchPriority.high:
+        return 'أولوية عالية';
+      case ProductMatchPriority.medium:
+        return 'أولوية متوسطة';
+      case ProductMatchPriority.low:
+        return 'أولوية منخفضة';
+    }
+  }
+
+  /// Bulk-approve only when a Product Master suggestion already carries a barcode.
+  bool get bulkApproveEligible =>
+      status == 'pending' &&
+      decision == 'uncertain' &&
+      matchedItemCode.isNotEmpty &&
+      suggestedBarcode.isNotEmpty;
+
+  double get priorityScore {
+    final band = switch (priority) {
+      ProductMatchPriority.high => 3e12,
+      ProductMatchPriority.medium => 2e12,
+      ProductMatchPriority.low => 1e12,
+    };
+    final conf = confidence.clamp(0.0, 1.0);
+    return band + value * 1e6 + rows * 1e3 + (1 - conf) * 100;
+  }
+}
+
+/// Sorts review rows: high impact first (matches backend SortReviewItemsByPriority).
+List<ProductMatchReviewItem> sortProductMatchByPriority(List<ProductMatchReviewItem> items) {
+  final out = List<ProductMatchReviewItem>.from(items);
+  out.sort((a, b) {
+    final c = b.priorityScore.compareTo(a.priorityScore);
+    if (c != 0) return c;
+    return a.id.compareTo(b.id);
+  });
+  return out;
+}
+
+class ProductMatchBulkDecideResult {
+  final int approved;
+  final int skipped;
+  final int failed;
+  final ProductMatchMetrics metrics;
+
+  const ProductMatchBulkDecideResult({
+    this.approved = 0,
+    this.skipped = 0,
+    this.failed = 0,
+    this.metrics = const ProductMatchMetrics(),
+  });
+}
+
 abstract class ProductMatchDataSource {
   Future<List<ProductMatchReviewItem>> list({String status = 'pending'});
   Future<ProductMatchMetrics> metrics();
@@ -177,6 +241,11 @@ abstract class ProductMatchDataSource {
     String reasonAr = '',
     String chosenItemCode = '',
     String chosenBarcode = '',
+  });
+  Future<ProductMatchBulkDecideResult> bulkDecide({
+    required List<String> ids,
+    required String status,
+    String reasonAr = '',
   });
 }
 
@@ -193,10 +262,11 @@ class HttpProductMatchDataSource implements ProductMatchDataSource {
       throw Exception('تعذر تحميل قائمة مراجعة الأصناف (HTTP ${res.statusCode})');
     }
     final j = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-    return [
+    final items = [
       for (final e in (j['items'] as List?) ?? const [])
         if (e is Map) ProductMatchReviewItem.fromJson(Map<String, dynamic>.from(e)),
     ];
+    return sortProductMatchByPriority(items);
   }
 
   @override
@@ -242,6 +312,40 @@ class HttpProductMatchDataSource implements ProductMatchDataSource {
     final j = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
     return ProductMatchMetrics.fromJson(
       j['metrics'] is Map ? Map<String, dynamic>.from(j['metrics'] as Map) : null,
+    );
+  }
+
+  @override
+  Future<ProductMatchBulkDecideResult> bulkDecide({
+    required List<String> ids,
+    required String status,
+    String reasonAr = '',
+  }) async {
+    final res = await BackendHttp.post(
+      Uri.parse(ApiEndpoints.productMatchBulkDecide),
+      headers: api.requestHeaders,
+      body: jsonEncode({
+        'ids': ids,
+        'status': status,
+        'reason_ar': reasonAr,
+      }),
+    ).timeout(const Duration(seconds: 60));
+    if (res.statusCode != 200) {
+      String msg = 'تعذر الاعتماد الجماعي (HTTP ${res.statusCode})';
+      try {
+        final j = jsonDecode(utf8.decode(res.bodyBytes));
+        if (j is Map && j['error'] != null) msg = '${j['error']}';
+      } catch (_) {}
+      throw Exception(msg);
+    }
+    final j = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    return ProductMatchBulkDecideResult(
+      approved: _i(j['approved']),
+      skipped: _i(j['skipped']),
+      failed: _i(j['failed']),
+      metrics: ProductMatchMetrics.fromJson(
+        j['metrics'] is Map ? Map<String, dynamic>.from(j['metrics'] as Map) : null,
+      ),
     );
   }
 }

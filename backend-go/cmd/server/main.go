@@ -322,6 +322,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/product-match/enqueue", productMatchHandler.HandleEnqueue)
 	mux.HandleFunc("GET /api/v1/product-match/review", productMatchHandler.HandleListReview)
 	mux.HandleFunc("POST /api/v1/product-match/review/decide", productMatchHandler.HandleDecide)
+	mux.HandleFunc("POST /api/v1/product-match/review/bulk-decide", productMatchHandler.HandleBulkDecide)
 	mux.HandleFunc("GET /api/v1/product-match/metrics", productMatchHandler.HandleMetrics)
 	mux.HandleFunc("GET /api/v1/sell-in/years", customerRegistryHandler.HandleYears)
 	mux.HandleFunc("GET /api/v1/sell-in/assist/suggestions", sellInAssistHandler.HandleList)

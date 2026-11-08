@@ -60,6 +60,7 @@ class ApiEndpoints {
   static String get productMatchEnqueue => '$baseUrl/api/v1/product-match/enqueue';
   static String get productMatchReview => '$baseUrl/api/v1/product-match/review';
   static String get productMatchDecide => '$baseUrl/api/v1/product-match/review/decide';
+  static String get productMatchBulkDecide => '$baseUrl/api/v1/product-match/review/bulk-decide';
   static String get productMatchMetrics => '$baseUrl/api/v1/product-match/metrics';
   static String get stores => '$baseUrl/api/v1/stores';
   static String get tenants => '$baseUrl/api/v1/tenants';
