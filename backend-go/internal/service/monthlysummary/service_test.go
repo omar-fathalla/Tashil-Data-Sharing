@@ -173,9 +173,50 @@ func TestAIGroundedAccepted(t *testing.T) {
 	if sum.ModelUsed != "gemini-test" || !sum.Grounded {
 		t.Fatalf("model/grounded: %+v", sum)
 	}
-	wantNar, _ := ParseAIPayload(aiJSON)
-	if sum.NarrativeAR != wantNar.NarrativeAR {
-		t.Fatalf("narrative mismatch")
+	payload, _ := ParseAIPayload(aiJSON)
+	want := NarrateFromClaims(payload.Claims, agg)
+	if sum.NarrativeAR != want {
+		t.Fatalf("shipped narrative must be claim-built\ngot:  %s\nwant: %s", sum.NarrativeAR, want)
+	}
+	if sum.NarrativeAR == payload.NarrativeAR {
+		t.Fatal("must not ship independent AI narrative_ar prose")
+	}
+}
+
+func TestValidClaimsFabricatedNarrativeNumberRejected(t *testing.T) {
+	kpis := fixtureKPIs()
+	agg := BuildAggregates(kpis)
+	// Claims are fully valid, but narrative_ar sneaks in a fabricated figure.
+	payload := AINarrativePayload{
+		NarrativeAR: fmt.Sprintf(
+			"المبيعات %.0f والوحدات %d و%s لكن الربح السري 7777777 جنيه.",
+			agg.TotalRevenue, agg.TotalUnits, agg.TopChains[0].Name,
+		),
+		Claims: []Claim{
+			{Key: ClaimTotalRevenue, Number: agg.TotalRevenue},
+			{Key: ClaimTotalUnits, Number: float64(agg.TotalUnits)},
+			{Key: ClaimTopChain, Name: agg.TopChains[0].Name},
+		},
+	}
+	if !ValidateClaims(payload.Claims, agg) {
+		t.Fatal("precondition: claims must be valid")
+	}
+	if !NarrativeHasFabricatedNumbers(payload.NarrativeAR, payload.Claims, agg) {
+		t.Fatal("precondition: narrative must contain fabricated number")
+	}
+	if AcceptAIClaims(payload.NarrativeAR, payload.Claims, agg) {
+		t.Fatal("valid claims + fabricated narrative number must be rejected")
+	}
+	b, _ := json.Marshal(payload)
+	gen := func(ctx context.Context, model, prompt string) (string, error) {
+		return string(b), nil
+	}
+	sum := Build(context.Background(), kpis, Options{Generator: gen, Model: "gemini-test"})
+	if sum.MappingSource != SourceDeterministic {
+		t.Fatalf("want deterministic fallback, got %s", sum.MappingSource)
+	}
+	if strings.Contains(sum.NarrativeAR, "7777777") {
+		t.Fatal("fabricated narrative number leaked into shipped text")
 	}
 }
 

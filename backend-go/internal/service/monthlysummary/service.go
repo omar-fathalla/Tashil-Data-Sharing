@@ -64,11 +64,14 @@ func Build(ctx context.Context, kpis *domain.ExecutiveKPIs, opts Options) *domai
 		// Free-form prose without structured claims → deterministic only.
 		return out
 	}
-	if !GroundedStructured(payload.NarrativeAR, payload.Claims, agg) {
-		// Honesty: correct numbers + fabricated claim (or missing evidence) fail grounding.
+	if !AcceptAIClaims(payload.NarrativeAR, payload.Claims, agg) {
+		// Honesty: fabricated claim keys OR fabricated numbers in narrative_ar
+		// (even when claims are valid) → deterministic fallback.
 		return out
 	}
-	out.NarrativeAR = payload.NarrativeAR
+	// Ship narrative rebuilt ONLY from validated claims — never model prose.
+	built := NarrateFromClaims(payload.Claims, agg)
+	out.NarrativeAR = built
 	out.MappingSource = SourceAI
 	out.ModelUsed = opts.Model
 	out.Grounded = true
@@ -84,7 +87,7 @@ func buildGeminiPrompt(agg domain.MonthlySummaryAggregates) string {
 القواعد الصارمة:
 1) claims يجب أن تطابق JSON الحقائق حرفياً — لا تختلق مفاتيح أو أرقاماً أو أسماء.
 2) المفاتيح المسموحة فقط: total_revenue, total_units, revenue_mom_pct, units_mom_pct, revenue_yoy_pct, market_share_pct, active_stores, top_chain, top_product, top_category, prior_month_key, current_month_key, prior_month_revenue.
-3) narrative_ar فقرة عربية قصيرة تذكر إجمالي المبيعات والوحدات وأعلى سلسلة إن وُجدت بنفس الأرقام.
+3) narrative_ar للتحقق فقط ويجب ألا يحتوي أي رقم غير موجود في الحقائق؛ النص النهائي يُبنى من claims فقط على الخادم.
 4) أي ادعاء غير موجود في الحقائق مرفوض.
 
 JSON الحقائق المحسوبة مسبقاً:
