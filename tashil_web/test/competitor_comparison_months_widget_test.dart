@@ -180,7 +180,7 @@ void main() {
 
     AvailableMonths.setForTest(const MonthOptions(year: 2026, months: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]));
     final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
-    // Seed-like series: only through April — previously this truncated the picker label.
+    // Seed-like series: only through April — picker must still follow API months.
     final repo = _FakeRepo([_groupWithMonths(4)]);
 
     await tester.pumpWidget(
@@ -195,5 +195,36 @@ void main() {
     expect(find.text('كل الشهور (يناير - أكتوبر) — 2026'), findsWidgets);
     expect(find.text('أكتوبر (10)'), findsOneWidget);
     expect(find.text('كل الشهور (يناير - أبريل) — 2026'), findsNothing);
+  });
+
+  testWidgets('empty API months → empty state, no seed Jan–Apr chips', (tester) async {
+    tester.view.physicalSize = const Size(1600, 3200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final previous = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (details.exceptionAsString().contains('A RenderFlex overflowed')) return;
+      previous?.call(details);
+    };
+    addTearDown(() => FlutterError.onError = previous);
+
+    AvailableMonths.setForTest(const MonthOptions(year: 2026, months: []));
+    final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
+    final repo = _FakeRepo([_groupWithMonths(4)]);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CompetitorComparisonScreen(apiClient: api, repository: repo),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('لا توجد شهور بيانات لهذه السنة'), findsOneWidget);
+    expect(find.textContaining('يناير'), findsNothing);
+    expect(find.textContaining('أبريل'), findsNothing);
+    expect(find.text('كل الشهور (يناير - أبريل)'), findsNothing);
   });
 }

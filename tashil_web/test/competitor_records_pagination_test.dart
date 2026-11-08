@@ -60,10 +60,10 @@ void main() {
         endDate: '2026-12-31',
       );
       expect(all, hasLength(total));
+      expect(api.lastSellOutPaginationWarning, isNull);
       expect(offsets.first, 0);
       expect(offsets.last, 5000);
-      expect(offsets, hasLength(11)); // 0..5000 step 500
-      // Last page carries October — would be missed without pagination.
+      expect(offsets, hasLength(11));
       expect(all.last.transactionDate.startsWith('2026-10'), isTrue);
     }, () => MockClient((req) async {
       expect(req.url.path, contains('/api/v1/analytics/records'));
@@ -74,7 +74,6 @@ void main() {
       final page = <Map<String, dynamic>>[];
       for (var i = 0; i < limit && offset + i < total; i++) {
         final idx = offset + i;
-        // Put October only on the last rows so a single 5000-cap would miss it.
         final date = idx >= 5000 ? '2026-10-15' : '2026-01-15';
         page.add(_rec(idx, date: date));
       }
@@ -86,28 +85,57 @@ void main() {
     }));
   });
 
+  test('safety cap → warning + SellOutRecordsTruncatedException (never silent)', () async {
+    const total = 5000;
+    const cap = 1000; // small cap for the test
+    await http.runWithClient(() async {
+      final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
+      try {
+        await api.getRecordsAllPages(
+          chain: 'fathalla',
+          startDate: '2026-01-01',
+          endDate: '2026-12-31',
+          maxRows: cap,
+        );
+        fail('expected SellOutRecordsTruncatedException');
+      } on SellOutRecordsTruncatedException catch (e) {
+        expect(e.partial, hasLength(cap));
+        expect(e.totalCount, total);
+        expect(e.maxRows, cap);
+        expect(api.lastSellOutPaginationWarning, isNotNull);
+        expect(api.lastSellOutPaginationWarning, contains('$cap'));
+        expect(api.lastSellOutPaginationWarning, contains('incomplete'));
+      }
+    }, () => MockClient((req) async {
+      final offset = int.parse(req.url.queryParameters['offset'] ?? '0');
+      final limit = int.parse(req.url.queryParameters['limit'] ?? '50');
+      final page = <Map<String, dynamic>>[];
+      for (var i = 0; i < limit && offset + i < total; i++) {
+        page.add(_rec(offset + i));
+      }
+      return http.Response(
+        jsonEncode({'records': page, 'total_count': total}),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    }));
+  });
+
   test('API months win over shorter seed series (no partial Jan–Apr label)', () {
-    final seriesOnly = List<int>.generate(4, (i) => i + 1); // Jan–Apr seeds
-    final api = List<int>.generate(10, (i) => i + 1); // Jan–Oct from sell-out
-    final resolved = CompetitorMonthOptions.resolveDataMonths(
-      apiMonths: api,
-      seriesMonths: seriesOnly,
-    );
+    final api = List<int>.generate(10, (i) => i + 1);
+    final resolved = CompetitorMonthOptions.resolveDataMonths(apiMonths: api);
     expect(resolved, api);
     expect(
       CompetitorMonthOptions.allMonthsLabel(resolved, year: 2026),
       'كل الشهور (يناير - أكتوبر) — 2026',
     );
-    expect(
-      CompetitorMonthOptions.allMonthsLabel(seriesOnly, year: 2026),
-      isNot(CompetitorMonthOptions.allMonthsLabel(resolved, year: 2026)),
-    );
   });
 
-  test('resolveDataMonths falls back to series when API empty', () {
+  test('empty API → no seed months', () {
     expect(
-      CompetitorMonthOptions.resolveDataMonths(apiMonths: const [], seriesMonths: const [1, 2, 4]),
-      [1, 2, 4],
+      CompetitorMonthOptions.resolveDataMonths(apiMonths: const []),
+      isEmpty,
     );
+    expect(CompetitorMonthOptions.build(const [], year: 2026), isEmpty);
   });
 }

@@ -78,25 +78,12 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
         for (final y in AvailableYears.current.including(_selectedYear)) (year: y, labelAr: 'سنة $y'),
       ];
 
-  /// Months that have data for the selected year.
-  /// Prefer the sell-out months API (complete) over seed-truncated series labels.
+  /// Months that have data for the selected year — sell-out API only (never seed series).
   List<int> get _dataMonths {
-    final fromSeries = <int>{};
-    for (final g in _allGroups) {
-      fromSeries.addAll(
-        CompetitorMonthOptions.monthsFromSeries(g.monthlyPrices, year: _selectedYear),
-      );
-      fromSeries.addAll(
-        CompetitorMonthOptions.monthsFromSeries(g.allMonthlyPrices, year: _selectedYear),
-      );
-    }
     final api = _apiMonths.isNotEmpty
         ? _apiMonths
         : AvailableMonths.currentFor(_selectedYear).months;
-    return CompetitorMonthOptions.resolveDataMonths(
-      apiMonths: api,
-      seriesMonths: fromSeries.toList(),
-    );
+    return CompetitorMonthOptions.resolveDataMonths(apiMonths: api);
   }
 
   List<({int month, String labelAr})> get _monthOptions =>
@@ -182,17 +169,24 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
 
     if (!mounted) return;
     result.when(
-      success: (groups) => setState(() {
-        _allGroups = groups;
-        _applyLocalFilters();
-        // Drop a stale month pick if the year no longer has that month.
-        if (_selectedMonth > 0 &&
-            _dataMonths.isNotEmpty &&
-            !_dataMonths.contains(_selectedMonth)) {
-          _selectedMonth = 0;
+      success: (groups) {
+        setState(() {
+          _allGroups = groups;
+          _applyLocalFilters();
+          // Drop a stale month pick if the year no longer has that month.
+          if (_selectedMonth > 0 &&
+              (_dataMonths.isEmpty || !_dataMonths.contains(_selectedMonth))) {
+            _selectedMonth = 0;
+          }
+          _isLoading = false;
+        });
+        final warn = widget.apiClient.lastSellOutPaginationWarning;
+        if (warn != null && warn.isNotEmpty && mounted) {
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            SnackBar(content: Text('تحذير: $warn')),
+          );
         }
-        _isLoading = false;
-      }),
+      },
       failure: (error) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
@@ -846,19 +840,28 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    for (final m in _monthOptions)
-                      ChoiceChip(
-                        label: Text(m.labelAr),
-                        selected: _selectedMonth == m.month,
-                        onSelected: (sel) {
-                          if (!sel || _selectedMonth == m.month) return;
-                          setState(() {
-                            _selectedMonth = m.month;
-                            _simulatedOwnPrice = null;
-                          });
-                          _loadCompetitiveData();
-                        },
-                      ),
+                    if (_monthOptions.isEmpty)
+                      Text(
+                        'لا توجد شهور بيانات لهذه السنة',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      )
+                    else
+                      for (final m in _monthOptions)
+                        ChoiceChip(
+                          label: Text(m.labelAr),
+                          selected: _selectedMonth == m.month,
+                          onSelected: (sel) {
+                            if (!sel || _selectedMonth == m.month) return;
+                            setState(() {
+                              _selectedMonth = m.month;
+                              _simulatedOwnPrice = null;
+                            });
+                            _loadCompetitiveData();
+                          },
+                        ),
                   ],
                 ),
               ],

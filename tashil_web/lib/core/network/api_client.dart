@@ -2172,6 +2172,25 @@ class ServerConnectionException implements Exception {
   String toString() => message;
 }
 
+/// Thrown by [ApiClient.getRecordsAllPages] when the safety row cap is hit while
+/// [totalCount] says more pages remain — never a silent truncated success.
+class SellOutRecordsTruncatedException implements Exception {
+  final String message;
+  final List<SellOutRecordModel> partial;
+  final int totalCount;
+  final int maxRows;
+
+  SellOutRecordsTruncatedException(
+    this.message, {
+    required this.partial,
+    required this.totalCount,
+    required this.maxRows,
+  });
+
+  @override
+  String toString() => message;
+}
+
 /// ApiClient communicates with the Cloud Run backend.
 /// Automatically injects JWT Bearer tokens and handles tenant RLS headers.
 class ApiClient {
@@ -10453,19 +10472,28 @@ class ApiClient {
     return out;
   }
 
-  /// Live months override/extend seed months for the same barcode.
+  /// Monthly maps for competitive comparison.
+  /// When live data exists for a barcode, use **only** live months (no seed leftovers).
+  /// Seeds are used only when that barcode has no live rows (offline / empty year).
   static Map<String, ({double price, int units})> mergeMonthlyData(
     Map<String, ({double price, int units})> seed,
     Map<String, ({double price, int units})>? live,
   ) {
-    if (live == null || live.isEmpty) return Map<String, ({double price, int units})>.from(seed);
-    final merged = Map<String, ({double price, int units})>.from(seed);
-    live.forEach((k, v) => merged[k] = v);
-    return merged;
+    if (live != null && live.isNotEmpty) {
+      return Map<String, ({double price, int units})>.from(live);
+    }
+    return Map<String, ({double price, int units})>.from(seed);
   }
 
   /// Backend [HandleRecords] clamps page size to ≤500; requesting more silently becomes 50.
   static const int sellOutRecordsPageSize = 500;
+
+  /// Safety ceiling for paginated sell-out fetches. Hitting this while more pages remain
+  /// is never silent — see [SellOutRecordsTruncatedException] / [lastSellOutPaginationWarning].
+  static const int sellOutRecordsMaxRows = 250000;
+
+  /// Set when [getRecordsAllPages] hits [sellOutRecordsMaxRows] with pages still remaining.
+  String? lastSellOutPaginationWarning;
 
   /// Whether another offset page is needed after [fetchedSoFar] rows from a page of [pageLength].
   static bool sellOutRecordsHasMorePage({
@@ -10480,7 +10508,9 @@ class ApiClient {
     return true;
   }
 
-  /// Walks every sell-out page for the filter (offset += page length) until total_count is covered.
+  /// Walks every sell-out page for the filter until [total_count] is covered.
+  /// If the safety cap is hit while more rows remain, sets [lastSellOutPaginationWarning]
+  /// and throws [SellOutRecordsTruncatedException] (never a silent partial success).
   Future<List<SellOutRecordModel>> getRecordsAllPages({
     String? chain,
     String? storeId,
@@ -10492,13 +10522,13 @@ class ApiClient {
     int? year,
     int? month,
     int pageSize = sellOutRecordsPageSize,
+    int maxRows = sellOutRecordsMaxRows,
   }) async {
+    lastSellOutPaginationWarning = null;
     final effPage = pageSize.clamp(1, sellOutRecordsPageSize);
     final all = <SellOutRecordModel>[];
     var offset = 0;
-    // Hard stop against a runaway loop if total_count is wrong.
-    const maxRows = 250000;
-    while (all.length < maxRows) {
+    while (true) {
       final page = await getRecords(
         chain: chain,
         storeId: storeId,
@@ -10514,17 +10544,26 @@ class ApiClient {
       );
       all.addAll(page);
       final total = lastSellOutSummary?.totalCount ?? all.length;
-      if (!sellOutRecordsHasMorePage(
+      final more = sellOutRecordsHasMorePage(
         fetchedSoFar: all.length,
         pageLength: page.length,
         pageSize: effPage,
         totalCount: total,
-      )) {
-        break;
+      );
+      if (!more) return all;
+      if (all.length >= maxRows) {
+        final msg =
+            'Sell-out fetch stopped at $maxRows rows (total_count=$total). Data is incomplete.';
+        lastSellOutPaginationWarning = msg;
+        throw SellOutRecordsTruncatedException(
+          msg,
+          partial: List<SellOutRecordModel>.unmodifiable(all),
+          totalCount: total,
+          maxRows: maxRows,
+        );
       }
       offset += page.length;
     }
-    return all;
   }
 
   static List<SkuMonthlyPricePointModel> buildMonthlyPriceTrajectory(
@@ -10903,7 +10942,7 @@ class ApiClient {
         : chain;
 
     // Always pull the full selected year (paginated — server caps each page at 500)
-    // so monthly trajectories auto-extend as uploads add months.
+    // so monthly trajectories come from real uploads, not seed Jan–Apr leftovers.
     List<SellOutRecordModel> liveRecords = const [];
     try {
       String? startDate;
@@ -10921,6 +10960,11 @@ class ApiClient {
         startDate: startDate,
         endDate: endDate,
       );
+    } on SellOutRecordsTruncatedException catch (e) {
+      // Visible warning already set on [lastSellOutPaginationWarning]; do not merge
+      // a silent partial year into competitive series — keep live empty for this load.
+      liveRecords = const [];
+      debugPrint('[ApiClient] competitive comparison: ${e.message}');
     } catch (_) {}
 
     if (syncCustomSkus) await _syncCustomCompetitorSkus(chain: effectiveChain);

@@ -38,6 +38,8 @@ class CompetitorMonthOptions {
 
   static List<({int month, String labelAr})> build(List<int> months, {int? year}) {
     final sorted = [...months.where((m) => m >= 1 && m <= 12)]..sort();
+    // Empty API month list → empty picker (no seed chips / no fake "كل الشهور" range).
+    if (sorted.isEmpty) return const [];
     return [
       (month: 0, labelAr: allMonthsLabel(sorted, year: year)),
       for (final m in sorted)
@@ -58,14 +60,9 @@ class CompetitorMonthOptions {
     return set.toList()..sort();
   }
 
-  /// Picker months: prefer the server sell-out month list (complete for the year)
-  /// over a possibly seed-truncated series. Fall back to series only when API is empty.
-  static List<int> resolveDataMonths({
-    List<int> apiMonths = const [],
-    List<int> seriesMonths = const [],
-  }) {
-    final api = [...apiMonths.where((m) => m >= 1 && m <= 12)]..sort();
-    if (api.isNotEmpty) return api;
-    return [...seriesMonths.where((m) => m >= 1 && m <= 12)]..sort();
+  /// Picker months come only from the sell-out months API.
+  /// An empty API list is an empty state — never fall back to seed/series months.
+  static List<int> resolveDataMonths({List<int> apiMonths = const []}) {
+    return [...apiMonths.where((m) => m >= 1 && m <= 12)]..sort();
   }
 }

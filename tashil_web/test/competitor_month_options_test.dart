@@ -51,9 +51,11 @@ void main() {
     expect(CompetitorMonthOptions.monthsFromSeries(points, year: 2026), [1, 2, 3, 10]);
   });
 
-  test('mergeMonthlyData live extends seed past April', () {
+  test('live covers subset → no leftover seed months', () {
     final seed = <String, ({double price, int units})>{
       '2026-01': (price: 100, units: 10),
+      '2026-02': (price: 105, units: 11),
+      '2026-03': (price: 108, units: 11),
       '2026-04': (price: 110, units: 12),
     };
     final live = <String, ({double price, int units})>{
@@ -62,14 +64,21 @@ void main() {
     };
     final merged = ApiClient.mergeMonthlyData(seed, live);
     final traj = ApiClient.buildMonthlyPriceTrajectory(merged, filterYear: 2026);
-    expect(traj.map((p) => p.monthNum).toList(), [1, 4, 5, 6, 7, 8, 9, 10]);
+    expect(traj.map((p) => p.monthNum).toList(), [5, 6, 7, 8, 9, 10]);
+    expect(merged.containsKey('2026-01'), isFalse);
+    expect(merged.containsKey('2026-04'), isFalse);
   });
 
-  test('API-vs-series mismatch: picker uses full API list', () {
+  test('empty API → no seed months in picker', () {
+    final resolved = CompetitorMonthOptions.resolveDataMonths(apiMonths: const []);
+    expect(resolved, isEmpty);
+    expect(CompetitorMonthOptions.build(resolved, year: 2026), isEmpty);
+  });
+
+  test('API-vs-series mismatch: picker uses full API list only', () {
     final opts = CompetitorMonthOptions.build(
       CompetitorMonthOptions.resolveDataMonths(
         apiMonths: List<int>.generate(10, (i) => i + 1),
-        seriesMonths: const [1, 2, 3, 4],
       ),
       year: 2026,
     );
