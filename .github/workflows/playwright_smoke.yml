@@ -47,6 +47,7 @@ jobs:
               - 'scripts/ci_runner_env.sh'
               - 'scripts/ci_pub_cache_isolation_test.sh'
               - 'scripts/pick_free_ports.py'
+              - 'scripts/spa_http_server.py'
               - '.github/workflows/playwright_smoke.yml'
 
   smoke-run:
@@ -152,6 +153,8 @@ jobs:
           fi
 
       # SPA fallback so /adeco serves index.html (path URL strategy).
+      # Prefer python3 (always on Mac self-hosted) over npx serve@14, which has
+      # failed with `ERROR invalid addKeywords parameters` and never bound :5600+.
       # Per-run free port in 5600+ (never hardcode 4173; avoid other bot 5570–5580).
       - name: Start static server
         id: smoke_server
@@ -161,7 +164,9 @@ jobs:
           PORT="$(python3 scripts/pick_free_ports.py -n 1 --min 5600 --max 5899)"
           echo "SMOKE_PORT=${PORT}" >> "$GITHUB_ENV"
           echo "port=${PORT}" >> "$GITHUB_OUTPUT"
-          npx --yes serve@14 -s tashil_web/build/web -l "${PORT}" \
+          python3 scripts/spa_http_server.py \
+            --root tashil_web/build/web \
+            --port "${PORT}" \
             >"$RUNNER_TEMP/playwright-smoke/serve.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/playwright-smoke/serve.pid"
           for i in $(seq 1 60); do
@@ -215,7 +220,7 @@ jobs:
         run: |
           if [ -f "$RUNNER_TEMP/playwright-smoke/serve.pid" ]; then
             serve_pid="$(cat "$RUNNER_TEMP/playwright-smoke/serve.pid")"
-            # Kill only the serve process this job started (and its children).
+            # Kill only the spa_http_server process this job started (and its children).
             if [ -n "$serve_pid" ] && kill -0 "$serve_pid" 2>/dev/null; then
               pkill -P "$serve_pid" 2>/dev/null || true
               kill "$serve_pid" 2>/dev/null || true
