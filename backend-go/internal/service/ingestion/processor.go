@@ -68,6 +68,9 @@ type IngestionResult struct {
 	Tier2Escalated        bool   `json:"tier2_escalated"`
 	MappingSource         string  `json:"mapping_source,omitempty"` // ai | deterministic | cache | mock
 	MappingConfidence     float64 `json:"mapping_confidence,omitempty"`
+	// Validation mirrors payload.validation so web clients can read explanation_ar
+	// without digging only into the nested payload (still also present on Payload).
+	Validation *domain.IngestionValidation `json:"validation,omitempty"`
 
 	// BigQuerySync reports the durable BigQuery write for committed uploads (nil for previews / when not attempted).
 	BigQuerySync *bqsink.Result `json:"bigquery_sync,omitempty"`
@@ -913,6 +916,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 		Tier2Escalated:         payload.Tier2Escalated,
 		MappingSource:          payload.MappingSource,
 		MappingConfidence:      payload.MappingConfidence,
+		Validation:             payload.Validation,
 		BigQuerySync:           directSync,
 	}
 

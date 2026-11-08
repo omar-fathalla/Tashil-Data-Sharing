@@ -1649,6 +1649,12 @@ class IngestionResultModel {
   final List<Map<String, dynamic>> unknownBarcodes;
   final List<UploadMonthSlice> periodBreakdown;
 
+  /// Pre-save totals check from payload.validation (ok|flagged|rejected).
+  final String validationStatus;
+  /// Arabic totals-difference explanation grounded in computed numbers.
+  final String validationExplanationAr;
+  final List<String> validationDiffReasons;
+
   IngestionResultModel({
     required this.batchId,
     this.archiveId = '',
@@ -1685,6 +1691,9 @@ class IngestionResultModel {
     this.quarantinedCustomers = const [],
     this.unknownBarcodes = const [],
     this.periodBreakdown = const [],
+    this.validationStatus = '',
+    this.validationExplanationAr = '',
+    this.validationDiffReasons = const [],
   });
 
   bool get usedAiMapping =>
@@ -1702,6 +1711,16 @@ class IngestionResultModel {
             .toList() ??
         [];
     final retailer = json['retailer_detected'] as String? ?? 'unknown';
+    final payload = json['payload'] is Map<String, dynamic>
+        ? json['payload'] as Map<String, dynamic>
+        : null;
+    // Prefer top-level validation (upload JSON contract), fall back to nested payload.
+    final validation = (json['validation'] is Map<String, dynamic>
+            ? json['validation'] as Map<String, dynamic>
+            : null) ??
+        (payload?['validation'] is Map<String, dynamic>
+            ? payload!['validation'] as Map<String, dynamic>
+            : null);
     return IngestionResultModel(
       batchId: json['batch_id'] as String? ?? '',
       archiveId: json['archive_id'] as String? ?? '',
@@ -1748,6 +1767,12 @@ class IngestionResultModel {
       quarantinedCustomers: parseList(json['quarantined_customers'], QuarantinedCustomerInfo.fromJson),
       unknownBarcodes: parseList(json['unknown_barcodes'], (m) => m),
       periodBreakdown: parseList(json['period_breakdown'], UploadMonthSlice.fromJson),
+      validationStatus: (validation?['status'] as String?) ?? '',
+      validationExplanationAr: (validation?['explanation_ar'] as String?) ?? '',
+      validationDiffReasons: (validation?['diff_reasons'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
     );
   }
 
@@ -1783,6 +1808,9 @@ class IngestionResultModel {
     bool? tier2Escalated,
     String? mappingSource,
     double? mappingConfidence,
+    String? validationStatus,
+    String? validationExplanationAr,
+    List<String>? validationDiffReasons,
   }) {
     return IngestionResultModel(
       batchId: batchId ?? this.batchId,
@@ -1820,6 +1848,11 @@ class IngestionResultModel {
       quarantinedCustomers: quarantinedCustomers,
       unknownBarcodes: unknownBarcodes,
       periodBreakdown: periodBreakdown,
+      validationStatus: validationStatus ?? this.validationStatus,
+      validationExplanationAr:
+          validationExplanationAr ?? this.validationExplanationAr,
+      validationDiffReasons:
+          validationDiffReasons ?? this.validationDiffReasons,
     );
   }
 }

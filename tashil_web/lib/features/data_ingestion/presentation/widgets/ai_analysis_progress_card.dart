@@ -63,6 +63,28 @@ class AiAnalysisProgressCard extends StatelessWidget {
     return 'درجة ثقة الذكاء الاصطناعي: ${(conf * 100).toStringAsFixed(1)}%';
   }
 
+  /// Arabic totals-difference explanation from payload.validation.explanation_ar.
+  static String? totalsExplanationLabel(IngestionResultModel result) {
+    final text = result.validationExplanationAr.trim();
+    if (text.isEmpty) return null;
+    return text;
+  }
+
+  static String? validationStatusLabel(IngestionResultModel result) {
+    switch (result.validationStatus) {
+      case 'flagged':
+        return 'تنبيه على الإجماليات';
+      case 'rejected':
+        return 'رفض بسبب الإجماليات';
+      case 'ok':
+        return result.validationExplanationAr.trim().isEmpty
+            ? null
+            : 'الإجماليات متطابقة';
+      default:
+        return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -314,6 +336,63 @@ class AiAnalysisProgressCard extends StatelessWidget {
                             ),
                           );
                         }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (totalsExplanationLabel(result!) != null) ...[
+                M3Spacing.gapMD,
+                Container(
+                  width: double.infinity,
+                  padding: M3Spacing.pSm,
+                  decoration: BoxDecoration(
+                    color: result!.validationStatus == 'rejected'
+                        ? colorScheme.errorContainer.withOpacity(0.35)
+                        : colorScheme.tertiaryContainer.withOpacity(0.28),
+                    borderRadius: M3Shape.radiusMd,
+                    border: Border.all(
+                      color: result!.validationStatus == 'rejected'
+                          ? colorScheme.error.withOpacity(0.45)
+                          : colorScheme.tertiary.withOpacity(0.35),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            result!.validationStatus == 'rejected'
+                                ? Icons.error_outline_rounded
+                                : Icons.calculate_rounded,
+                            size: 18.0,
+                            color: result!.validationStatus == 'rejected'
+                                ? colorScheme.error
+                                : colorScheme.tertiary,
+                          ),
+                          const SizedBox(width: 6.0),
+                          Expanded(
+                            child: Text(
+                              validationStatusLabel(result!) ??
+                                  'تفسير فرق الإجماليات',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: result!.validationStatus == 'rejected'
+                                    ? colorScheme.error
+                                    : colorScheme.tertiary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6.0),
+                      Text(
+                        totalsExplanationLabel(result!)!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          height: 1.45,
+                          color: colorScheme.onSurface,
+                        ),
                       ),
                     ],
                   ),
