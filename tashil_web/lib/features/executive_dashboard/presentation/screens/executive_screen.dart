@@ -10,6 +10,7 @@ import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../widgets/bento_kpi_grid.dart';
 import '../widgets/chain_share_pie.dart';
+import '../widgets/monthly_summary_card.dart';
 import '../widgets/pareto_category_section.dart';
 import '../widgets/sellout_trend_chart.dart';
 import '../widgets/market_share_section.dart';
@@ -677,6 +678,11 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
                           children: [
                             // Original top summary: the four KPI cards.
                             BentoKpiGrid(kpis: kpis!),
+                            if (kpis!.monthlySummary != null &&
+                                kpis!.monthlySummary!.narrativeAr.trim().isNotEmpty) ...[
+                              M3Spacing.gapMD,
+                              MonthlySummaryCard(summary: kpis!.monthlySummary!),
+                            ],
 
                             M3Spacing.gapMD,
 
