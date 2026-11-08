@@ -18,6 +18,15 @@ env:
   FLUTTER_VERSION: "3.41.2"
 
 jobs:
+  # Stopgap until shared storage (#37): refuse deploy commands that omit or change the 1-instance pin.
+  guard-cloud-run-one-instance:
+    name: Cloud Run one-instance pin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert deploy pins min/max=1
+        run: bash scripts/check_cloud_run_one_instance.sh
+
   test-backend:
     name: Backend Go tests
     runs-on: ubuntu-latest
