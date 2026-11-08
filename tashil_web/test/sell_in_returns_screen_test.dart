@@ -13,11 +13,11 @@ class _FakeReturnsRepo implements SellInReturnsRepository {
   @override
   Future<Result<SellInReturnsReport>> load(SellInReturnsQuery q, {bool forceRefresh = false}) async {
     const cell = SellInReturnsCell(grossValueEgp: 100, returnsValueEgp: 20, returnsQty: 2, netValueEgp: 80, returnPctOfGross: 20);
-    return Success(
+    return const Success(
       SellInReturnsReport(
         year: 2026,
-        months: const [2, 3, 5],
-        kpis: const SellInReturnsKpis(
+        months: [2, 3, 5],
+        kpis: SellInReturnsKpis(
           returnsValueEgp: 60,
           returnsQty: 6,
           grossValueEgp: 300,
@@ -27,7 +27,7 @@ class _FakeReturnsRepo implements SellInReturnsRepository {
           momDirection: 'up',
           focusMonth: 5,
         ),
-        monthly: const [
+        monthly: [
           SellInReturnsMonthPoint(monthNum: 2, monthAr: 'فبراير', monthEn: 'Feb', grossValueEgp: 100, returnsValueEgp: 20, netValueEgp: 80),
           SellInReturnsMonthPoint(monthNum: 3, monthAr: 'مارس', monthEn: 'Mar', grossValueEgp: 100, returnsValueEgp: 20, netValueEgp: 80),
           SellInReturnsMonthPoint(monthNum: 5, monthAr: 'مايو', monthEn: 'May', grossValueEgp: 100, returnsValueEgp: 20, netValueEgp: 80),
@@ -36,23 +36,23 @@ class _FakeReturnsRepo implements SellInReturnsRepository {
           SellInReturnsBranchRow(
             branchKey: 'b1',
             branchName: 'فرع QA تجريبي',
-            byMonth: const {2: cell, 3: cell, 5: cell},
-            total: const SellInReturnsCell(returnsValueEgp: 60, grossValueEgp: 300, netValueEgp: 240, returnPctOfGross: 20),
+            byMonth: {2: cell, 3: cell, 5: cell},
+            total: SellInReturnsCell(returnsValueEgp: 60, grossValueEgp: 300, netValueEgp: 240, returnPctOfGross: 20),
           ),
         ],
-        columnTotals: const {
+        columnTotals: {
           2: cell,
           3: cell,
           5: cell,
         },
-        grandTotal: const SellInReturnsCell(returnsValueEgp: 60, grossValueEgp: 300, netValueEgp: 240, returnPctOfGross: 20),
-        filterOptions: const SellInReturnsFilterOptions(
+        grandTotal: SellInReturnsCell(returnsValueEgp: 60, grossValueEgp: 300, netValueEgp: 240, returnPctOfGross: 20),
+        filterOptions: SellInReturnsFilterOptions(
           years: [2026],
           branches: ['فرع QA تجريبي'],
           products: ['صنف QA'],
           productGroups: ['مجموعة QA'],
         ),
-        advisories: const [
+        advisories: [
           SellInReturnsAdvisory(
             year: 2026,
             monthNum: 5,
