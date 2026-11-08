@@ -21,6 +21,7 @@ class ApiEndpoints {
 
   static String get health => '$baseUrl/healthz';
   static String get upload => '$baseUrl/api/v1/ingest/upload';
+  static String get ingestPrecheck => '$baseUrl/api/v1/ingest/precheck';
   static String get ingestCommit => '$baseUrl/api/v1/ingest/commit';
   static String get ingestDiscard => '$baseUrl/api/v1/ingest/discard';
   static String get ingestArchive => '$baseUrl/api/v1/ingest/archive';

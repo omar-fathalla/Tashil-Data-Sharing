@@ -264,6 +264,7 @@ func main() {
 
 	// Protected Data, Analytics & Enterprise Audit Log Routes
 	mux.HandleFunc("POST /api/v1/ingest/upload", uploadHandler.HandleUpload)
+	mux.HandleFunc("POST /api/v1/ingest/precheck", uploadHandler.HandlePrecheck)
 	mux.HandleFunc("POST /api/v1/ingest/commit", uploadHandler.HandleCommit)
 	mux.HandleFunc("POST /api/v1/ingest/discard", uploadHandler.HandleDiscard)
 	mux.HandleFunc("POST /api/v1/ingest/clear", uploadHandler.HandleClearData)
