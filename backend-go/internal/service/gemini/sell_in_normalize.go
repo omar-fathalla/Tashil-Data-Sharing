@@ -3,7 +3,6 @@ package gemini
 import (
 	"fmt"
 	"math"
-	"strconv"
 	"strings"
 	"time"
 
@@ -69,28 +68,44 @@ func (e *SellInPeriodError) Error() string {
 		e.Filename, strings.Join(parts, "؛ "), strings.Join(rows, "، "))
 }
 
+// sellInYearSource records where resolve got the calendar year so cycle nudges only apply
+// when the year came from Document Date (not "Jan-25" / filename / explicit year column).
+type sellInYearSource int
+
+const (
+	sellInYearNone sellInYearSource = iota
+	sellInYearExplicit
+	sellInYearMonthToken
+	sellInYearDate
+	sellInYearFilename
+)
+
 type sellInPeriodResolver struct {
-	fileYear int
-	pending  string // failure reason for the current row
-	sample   string
-	perr     SellInPeriodError
-	samples  map[string]bool
+	fileYear   int
+	pending    string // failure reason for the current row
+	sample     string
+	yearSource sellInYearSource
+	perr       SellInPeriodError
+	samples    map[string]bool
 }
 
 func newSellInPeriodResolver(fileYear int) *sellInPeriodResolver {
 	return &sellInPeriodResolver{fileYear: fileYear, samples: map[string]bool{}}
 }
 
-func (p *sellInPeriodResolver) startRow() { p.pending, p.sample = "", "" }
+func (p *sellInPeriodResolver) startRow() {
+	p.pending, p.sample, p.yearSource = "", "", sellInYearNone
+}
 
 // resolve reads (year, month) from a row. Precedence: explicit month number / name / date, explicit
-// year, then a year carried by the date, then a year written in the filename. Never a default.
+// year, then a year carried by the month token, then Document Date, then a year written in the
+// filename. Never a default. yearSource is set for the successful path.
 func (p *sellInPeriodResolver) resolve(row int, yearRaw, monthNumRaw, monthNameRaw, dateRaw string) (int, int, bool) {
-	month, tokYear := 0, 0
+	month, monthTokYear, dateYear := 0, 0, 0
 	var fromNum, fromName int
 	if strings.TrimSpace(monthNumRaw) != "" {
 		if m, y, ok := ParseMonthToken(monthNumRaw); ok {
-			fromNum, tokYear = m, y
+			fromNum, monthTokYear = m, y
 		} else {
 			p.pending, p.sample = "month", monthNumRaw
 			return 0, 0, false
@@ -99,8 +114,8 @@ func (p *sellInPeriodResolver) resolve(row int, yearRaw, monthNumRaw, monthNameR
 	if strings.TrimSpace(monthNameRaw) != "" {
 		if m, y, ok := ParseMonthToken(monthNameRaw); ok {
 			fromName = m
-			if tokYear == 0 {
-				tokYear = y
+			if monthTokYear == 0 {
+				monthTokYear = y
 			}
 		} else if fromNum == 0 {
 			p.pending, p.sample = "month", monthNameRaw
@@ -120,9 +135,7 @@ func (p *sellInPeriodResolver) resolve(row int, yearRaw, monthNumRaw, monthNameR
 			if month == 0 {
 				month = m
 			}
-			if tokYear == 0 {
-				tokYear = y
-			}
+			dateYear = y
 		}
 	}
 	if month == 0 {
@@ -140,12 +153,19 @@ func (p *sellInPeriodResolver) resolve(row int, yearRaw, monthNumRaw, monthNameR
 			return 0, 0, false
 		}
 		year = y
+		p.yearSource = sellInYearExplicit
 	}
-	if year == 0 {
-		year = tokYear
+	if year == 0 && monthTokYear > 0 {
+		year = monthTokYear
+		p.yearSource = sellInYearMonthToken
 	}
-	if year == 0 {
+	if year == 0 && dateYear > 0 {
+		year = dateYear
+		p.yearSource = sellInYearDate
+	}
+	if year == 0 && p.fileYear > 0 {
 		year = p.fileYear
+		p.yearSource = sellInYearFilename
 	}
 	if year == 0 {
 		p.pending = "year"
@@ -336,15 +356,12 @@ func findGPSOPHeaderRow(rows [][]string) int {
 	return -1
 }
 
-// adjustCycleYear fixes year-boundary sales cycles when the resolved year came from Document Date
-// (resolvedYear == docYear): a Jan cycle that starts in late December belongs to the next calendar
-// year; a Dec cycle that spills into early January belongs to the previous year. Years carried by
-// the month token itself (e.g. "Jan-26") are left unchanged.
-func adjustCycleYear(resolvedYear, docYear, docMonth, cycleMonth int) int {
-	if resolvedYear <= 0 || cycleMonth < 1 || cycleMonth > 12 {
-		return resolvedYear
-	}
-	if docYear <= 0 || resolvedYear != docYear {
+// adjustCycleYear fixes year-boundary sales cycles only when the year came from Document Date:
+// a Jan cycle that starts in late December belongs to the next calendar year; a Dec cycle that
+// spills into early January belongs to the previous year. Years from month tokens (e.g. "Jan-25"),
+// an explicit year column, or the filename are left unchanged.
+func adjustCycleYear(resolvedYear, docMonth, cycleMonth int, yearFromDocDate bool) int {
+	if !yearFromDocDate || resolvedYear <= 0 || cycleMonth < 1 || cycleMonth > 12 {
 		return resolvedYear
 	}
 	if cycleMonth == 1 && docMonth == 12 {
@@ -354,22 +371,6 @@ func adjustCycleYear(resolvedYear, docYear, docMonth, cycleMonth int) int {
 		return resolvedYear - 1
 	}
 	return resolvedYear
-}
-
-// gpSOPPeriodWeek keeps the file's week column when present (W1..W5 or the trimmed cell), else Full Month.
-func gpSOPPeriodWeek(raw string) string {
-	s := strings.TrimSpace(raw)
-	if s == "" || strings.HasPrefix(s, "#") {
-		return "Full Month"
-	}
-	if n, err := strconv.Atoi(s); err == nil && n >= 1 && n <= 5 {
-		return fmt.Sprintf("W%d", n)
-	}
-	u := strings.ToUpper(s)
-	if strings.HasPrefix(u, "W") {
-		return u
-	}
-	return s
 }
 
 func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain string, report *SellInParseReport) ([]domain.SellInRecord, error) {
@@ -386,6 +387,7 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 	out := make([]domain.SellInRecord, 0, len(rows)-hdr-1)
 	monthFromColUsed := 0
 	monthMismatch := 0
+	monthUnparseable := 0
 	hasMonthCol := cols["month"] >= 0
 	// Store branch lives in Customer Name (full-column scan). The "Branch" column is region codes.
 	storeCol := cols["customer"]
@@ -405,9 +407,13 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 		usedMonthCol := false
 		if hasMonthCol {
 			cell := getCol(r, cols["month"])
+			trimmed := strings.TrimSpace(cell)
 			if _, _, ok := ParseMonthToken(cell); ok {
 				monthRaw = cell
 				usedMonthCol = true
+			} else if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+				// Empty / #N/A fall back silently; other garbage is noted in MonthCheck.
+				monthUnparseable++
 			}
 		}
 		y, m, _ := periods.resolve(i+1, "", "", monthRaw, dateRaw)
@@ -416,8 +422,8 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 		}
 		if usedMonthCol {
 			monthFromColUsed++
-			if dy, dm, ok := ParseDateToken(dateRaw); ok {
-				y = adjustCycleYear(y, dy, dm, m)
+			if _, dm, ok := ParseDateToken(dateRaw); ok {
+				y = adjustCycleYear(y, dm, m, periods.yearSource == sellInYearDate)
 				if dm != m {
 					monthMismatch++
 				}
@@ -450,10 +456,8 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 			report.ReturnRows++
 			tx = "مرتجع (Return)"
 		}
-		periodWeek := "Full Month"
-		if cols["week"] >= 0 {
-			periodWeek = gpSOPPeriodWeek(getCol(r, cols["week"]))
-		}
+		// GP SOP week column is not period_week status (W1/W2 would flip مغلق → قيد الإغلاق).
+		// Always Full Month for this layout; week stays unused by status logic.
 		// One Sell-In record per source row — never collapse lines (in26 acceptance: 40927 rows).
 		rec := domain.SellInRecord{
 			RecordID:           fmt.Sprintf("sellin_%s_%d", tenantID, i),
@@ -463,7 +467,7 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 			MonthNum:           m,
 			MonthEN:            monthNumToEN(m),
 			MonthAR:            ArabicMonthName(m),
-			PeriodWeek:         periodWeek,
+			PeriodWeek:         "Full Month",
 			RegionCode:         region,
 			Governorate:        st.Governorate,
 			Sector:             "MT",
@@ -487,8 +491,15 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 	if err := periods.err(filename); err != nil {
 		return nil, err
 	}
+	var monthNotes []string
 	if monthFromColUsed > 0 && monthMismatch > 0 {
-		report.MonthCheck = fmt.Sprintf("%d صف عمود الشهر فيه مختلف عن تاريخ الفاتورة؛ اتاخد عمود الشهر (دورة مبيعات الشركة)", monthMismatch)
+		monthNotes = append(monthNotes, fmt.Sprintf("%d صف عمود الشهر فيه مختلف عن تاريخ الفاتورة؛ اتاخد عمود الشهر (دورة مبيعات الشركة)", monthMismatch))
+	}
+	if monthUnparseable > 0 {
+		monthNotes = append(monthNotes, fmt.Sprintf("%d صف عمود الشهر فيه مش مفهوم (مش فاضي/#N/A)؛ اتاخد تاريخ الفاتورة", monthUnparseable))
+	}
+	if len(monthNotes) > 0 {
+		report.MonthCheck = strings.Join(monthNotes, "؛ ")
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("no valid sell-in records found in %s", filename)
