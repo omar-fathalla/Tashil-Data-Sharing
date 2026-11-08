@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/gemini/guardrails"
 )
 
 type xlsxSST struct {
@@ -534,10 +535,19 @@ func ConvertXLSXToCSVBytes(rawContent []byte) ([]byte, error) {
 }
 
 // extractSmartCSVSample extracts up to maxRows (including headers) as clean CSV text from either .xlsx or .csv bytes
-// so Gemini 4 Argon receives human-readable UTF-8 tabular sample rows instead of raw binary ZIP bytes.
+// so Gemini receives human-readable UTF-8 tabular sample rows instead of raw binary ZIP bytes.
+// Cells are PII-minimized (truncated + redacted) before leaving this function.
 func extractSmartCSVSample(filename string, rawContent []byte, maxRows int) string {
 	if maxRows <= 0 {
 		maxRows = 25
+	}
+	encode := func(rows [][]string) string {
+		safe := guardrails.SanitizeSampleRowsLimit(rows, maxRows)
+		var buf bytes.Buffer
+		cw := csv.NewWriter(&buf)
+		_ = cw.WriteAll(safe)
+		cw.Flush()
+		return buf.String()
 	}
 	if isZipArchive(rawContent) {
 		zr, err := zip.NewReader(bytes.NewReader(rawContent), int64(len(rawContent)))
@@ -559,16 +569,16 @@ func extractSmartCSVSample(filename string, rawContent []byte, maxRows int) stri
 			for _, sf := range sheetFiles {
 				sampleRows, sErr := readWorksheetSampleRows(sf, sharedStrings, maxRows)
 				if sErr == nil && len(sampleRows) > 0 {
-					var buf bytes.Buffer
-					cw := csv.NewWriter(&buf)
-					_ = cw.WriteAll(sampleRows)
-					cw.Flush()
-					return buf.String()
+					return encode(sampleRows)
 				}
 			}
 		}
 	}
-	return string(takeSample(rawContent, 32000))
+	if rows, err := parseCSVRows(rawContent); err == nil && len(rows) > 0 {
+		return encode(rows)
+	}
+	// Opaque bytes: still redact/truncate before sending toward the model prompt.
+	return guardrails.RedactString(string(takeSample(rawContent, 32000)))
 }
 
 func parseXLSXColIndex(cellRef string, fallback int) int {

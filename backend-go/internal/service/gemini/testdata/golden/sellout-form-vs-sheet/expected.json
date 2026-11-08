@@ -1,0 +1,10 @@
+{
+  "id": "sellout-form-vs-sheet",
+  "description": "Historical Sell-Out form-vs-sheet conflict fixture from livetest",
+  "filename": "15_sellout_form_vs_sheet.xlsx",
+  "source": "livetest",
+  "kind": "sell_out",
+  "min_records": 1,
+  "mapping_source": "deterministic",
+  "requires_human_approval_when_staged": true
+}

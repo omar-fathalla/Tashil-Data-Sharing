@@ -21,6 +21,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
+	"github.com/tashil/data-sharing/backend/internal/service/gemini/guardrails"
 )
 
 // IngestionResult contains the outcome of an ingestion operation returned to caller.
@@ -71,6 +72,11 @@ type IngestionResult struct {
 	// Validation mirrors payload.validation so web clients can read explanation_ar
 	// without digging only into the nested payload (still also present on Payload).
 	Validation *domain.IngestionValidation `json:"validation,omitempty"`
+
+	// Guardrails (Phase A7): human approval gate + success metrics for Arabic UI.
+	RequiresHumanApproval bool                      `json:"requires_human_approval,omitempty"`
+	GuardrailReasonsAR    []string                  `json:"guardrail_reasons_ar,omitempty"`
+	GuardrailMetrics      *guardrails.SuccessMetrics `json:"guardrail_metrics,omitempty"`
 
 	// BigQuerySync reports the durable BigQuery write for committed uploads (nil for previews / when not attempted).
 	BigQuerySync *bqsink.Result `json:"bigquery_sync,omitempty"`
@@ -653,6 +659,14 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 
 	// Auto-create / upsert discovered branches in Firestore
 	autoCreatedCount := len(discoveredStores)
+	// P1: AI/cache/mock/flagged durable writes require explicit human approval (staged commit).
+	// Archive replay is already-approved historical data and skips the gate.
+	if !dryRun && !gemini.IsReplay(ctx) {
+		valStatus := payload.Validation
+		if err := enforceDurableWriteApproval(payload.MappingSource, valStatus, len(payload.AnomaliesDetected), mismatch, false); err != nil {
+			return nil, err
+		}
+	}
 	if !dryRun && len(discoveredStores) > 0 {
 		cnt, err := p.fsRepo.UpsertStoresByTenant(ctx, tenantID, discoveredStores, payload.IsWideMatrixWorkbook)
 		if err == nil && cnt > 0 {
@@ -919,6 +933,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 		Validation:             payload.Validation,
 		BigQuerySync:           directSync,
 	}
+	attachGuardrails(res, payload.Validation)
 
 
 	if dryRun {
@@ -1636,6 +1651,12 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	if dryRun {
 		prevArch, prevBytes = p.SnapshotExistingArchivedFile(tenantID, effectiveChain, filename)
 	}
+	// Block AI/cache/mock/flagged Sell-In direct commits before archive or BQ writes.
+	if !dryRun {
+		if err := enforceDurableWriteApproval(mappingSource, nil, 0, false, false); err != nil {
+			return nil, err
+		}
+	}
 	archivedEntry := p.SaveArchivedFile(
 		tenantID,
 		batchID,
@@ -1694,6 +1715,7 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		IsStaged:          dryRun,
 		IsCommitted:       !dryRun,
 	}
+	attachGuardrails(result, nil)
 	result.UploadWarnings = warnings
 	result.QuarantinedCustomers = quarantined
 	result.PeriodBreakdown = sellInBreakdown(records)

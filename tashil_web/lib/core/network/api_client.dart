@@ -1645,6 +1645,14 @@ class IngestionResultModel {
   final String mappingSource;
   final double mappingConfidence;
 
+  /// Phase A7 guardrails: human approval + Arabic reasons + success metrics.
+  final bool requiresHumanApproval;
+  final List<String> guardrailReasonsAr;
+  final String guardrailArabicSummary;
+  final bool guardrailSchemaValid;
+  final bool guardrailPiiMinimized;
+  final bool guardrailPerCallLogged;
+
   // Upload checks (warnings never block; held-out customers are not in any total).
   final List<UploadWarning> uploadWarnings;
   final List<QuarantinedCustomerInfo> quarantinedCustomers;
@@ -1689,6 +1697,12 @@ class IngestionResultModel {
     this.tier2Escalated = false,
     this.mappingSource = '',
     this.mappingConfidence = 0.0,
+    this.requiresHumanApproval = false,
+    this.guardrailReasonsAr = const [],
+    this.guardrailArabicSummary = '',
+    this.guardrailSchemaValid = false,
+    this.guardrailPiiMinimized = false,
+    this.guardrailPerCallLogged = false,
     this.uploadWarnings = const [],
     this.quarantinedCustomers = const [],
     this.unknownBarcodes = const [],
@@ -1700,6 +1714,10 @@ class IngestionResultModel {
 
   bool get usedAiMapping =>
       mappingSource == 'ai' || mappingSource == 'cache';
+
+  /// True when the API flagged approval or the preview is still staged.
+  bool get needsHumanApproval =>
+      requiresHumanApproval || (isStaged && !isCommitted);
 
   factory IngestionResultModel.fromJson(Map<String, dynamic> json) {
     final rawBranches = json['discovered_branches'] as List<dynamic>? ?? [];
@@ -1765,6 +1783,39 @@ class IngestionResultModel {
       tier2Escalated: json['tier2_escalated'] as bool? ?? false,
       mappingSource: (json['mapping_source'] as String?) ?? '',
       mappingConfidence: (json['mapping_confidence'] as num?)?.toDouble() ?? 0.0,
+      requiresHumanApproval: json['requires_human_approval'] as bool? ?? false,
+      guardrailReasonsAr: (json['guardrail_reasons_ar'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      guardrailArabicSummary: () {
+        final metrics = json['guardrail_metrics'];
+        if (metrics is Map<String, dynamic>) {
+          return (metrics['arabic_summary'] as String?) ?? '';
+        }
+        return '';
+      }(),
+      guardrailSchemaValid: () {
+        final metrics = json['guardrail_metrics'];
+        if (metrics is Map<String, dynamic>) {
+          return metrics['schema_valid'] as bool? ?? false;
+        }
+        return false;
+      }(),
+      guardrailPiiMinimized: () {
+        final metrics = json['guardrail_metrics'];
+        if (metrics is Map<String, dynamic>) {
+          return metrics['pii_minimized'] as bool? ?? false;
+        }
+        return false;
+      }(),
+      guardrailPerCallLogged: () {
+        final metrics = json['guardrail_metrics'];
+        if (metrics is Map<String, dynamic>) {
+          return metrics['per_call_logged'] as bool? ?? false;
+        }
+        return false;
+      }(),
       uploadWarnings: parseList(json['upload_warnings'], UploadWarning.fromJson),
       quarantinedCustomers: parseList(json['quarantined_customers'], QuarantinedCustomerInfo.fromJson),
       unknownBarcodes: parseList(json['unknown_barcodes'], (m) => m),

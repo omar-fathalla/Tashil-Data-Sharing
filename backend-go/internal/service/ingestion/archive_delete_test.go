@@ -18,16 +18,13 @@ func TestDeleteArchivedFileFailsWhenSinkFailsAndKeepsFileListed(t *testing.T) {
 	p := newTestProcessor(t, dir).WithSink(fs)
 	ctx := context.Background()
 
-	res, err := p.ProcessUpload(ctx, "tenant-adeco", "fathalla_weekly.csv", sampleCSV)
-	if err != nil {
-		t.Fatal(err)
-	}
+	res := processUploadApproved(t, p, ctx, "tenant-adeco", "fathalla_weekly.csv", sampleCSV)
 	before := p.ListArchivedFiles(ctx, "tenant-adeco", "", "", "", "sell_out")
 	if before.TotalCount == 0 {
 		t.Fatal("expected archive entry before delete")
 	}
 
-	_, err = p.DeleteArchivedFile(ctx, "tenant-adeco", res.ArchiveID)
+	_, err := p.DeleteArchivedFile(ctx, "tenant-adeco", res.ArchiveID)
 	if err == nil {
 		t.Fatal("expected BigQuery delete failure to surface")
 	}
@@ -60,10 +57,7 @@ func TestDeleteArchivedFileSucceedsOnlyAfterSinkDelete(t *testing.T) {
 	fs := &fakeSink{}
 	p := newTestProcessor(t, dir).WithSink(fs)
 	ctx := context.Background()
-	res, err := p.ProcessUpload(ctx, "tenant-adeco", "gomla_weekly.csv", sampleCSV)
-	if err != nil {
-		t.Fatal(err)
-	}
+	res := processUploadApproved(t, p, ctx, "tenant-adeco", "gomla_weekly.csv", sampleCSV)
 	deleted, err := p.DeleteArchivedFile(ctx, "tenant-adeco", res.ArchiveID)
 	if err != nil {
 		t.Fatal(err)

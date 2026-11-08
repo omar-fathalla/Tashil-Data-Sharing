@@ -1,0 +1,10 @@
+{
+  "id": "sellin-sop-qa",
+  "description": "QA Sell-In SOP layout (mirrors livetest 01_month_formats historical shape)",
+  "filename": "01_month_formats.xlsx",
+  "source": "livetest",
+  "kind": "sell_in",
+  "min_records": 6,
+  "extracted_value": 600,
+  "requires_human_approval_when_staged": true
+}

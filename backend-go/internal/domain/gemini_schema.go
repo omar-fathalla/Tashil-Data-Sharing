@@ -222,6 +222,20 @@ type NormalizedRetailIngestionPayload struct {
 	MappingSource        string                  `json:"mapping_source,omitempty"` // "ai" | "deterministic" | "cache" | "mock"
 	MappingConfidence    float64                 `json:"mapping_confidence,omitempty"`
 	Validation           *IngestionValidation    `json:"validation,omitempty"`
+	// GuardrailTelemetry is filled only when the corresponding operation actually ran.
+	GuardrailTelemetry   *GuardrailTelemetry     `json:"guardrail_telemetry,omitempty"`
+}
+
+// GuardrailTelemetry records observed guardrail operations for one AnalyzeAndNormalize.
+// Fields stay false/zero until the matching code path executes (never inferred from mapping_source).
+type GuardrailTelemetry struct {
+	SchemaChecked    bool  `json:"schema_checked,omitempty"`
+	SchemaValid      bool  `json:"schema_valid,omitempty"`
+	GeminiCallLogged bool  `json:"gemini_call_logged,omitempty"`
+	GeminiCallCount  int   `json:"gemini_call_count,omitempty"`
+	GeminiLatencyMS  int64 `json:"gemini_latency_ms,omitempty"`
+	SampleSanitized  bool  `json:"sample_sanitized,omitempty"`
+	MockRefused      bool  `json:"mock_refused,omitempty"`
 }
 
 // IngestionValidation records the pre-save totals check for an upload.

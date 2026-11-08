@@ -12,6 +12,9 @@ IngestionResultModel _result({
   String validationStatus = '',
   String validationExplanationAr = '',
   List<String> validationDiffReasons = const [],
+  bool requiresHumanApproval = false,
+  List<String> guardrailReasonsAr = const [],
+  String guardrailArabicSummary = '',
 }) {
   return IngestionResultModel(
     batchId: 'b1',
@@ -32,6 +35,12 @@ IngestionResultModel _result({
     validationStatus: validationStatus,
     validationExplanationAr: validationExplanationAr,
     validationDiffReasons: validationDiffReasons,
+    requiresHumanApproval: requiresHumanApproval || isStaged,
+    guardrailReasonsAr: guardrailReasonsAr,
+    guardrailArabicSummary: guardrailArabicSummary,
+    guardrailSchemaValid: mappingSource == 'ai' || mappingSource == 'cache',
+    guardrailPiiMinimized: mappingSource == 'ai' || mappingSource == 'cache',
+    guardrailPerCallLogged: mappingSource == 'ai',
   );
 }
 
@@ -178,5 +187,57 @@ void main() {
     );
     expect(find.textContaining('تنبيه على الإجماليات'), findsOneWidget);
     expect(find.textContaining('مرتجعات'), findsOneWidget);
+  });
+
+  test('IngestionResultModel reads guardrail approval + Arabic metrics', () {
+    final m = IngestionResultModel.fromJson({
+      'batch_id': 'b',
+      'filename': 'f.xlsx',
+      'is_staged': true,
+      'mapping_source': 'ai',
+      'requires_human_approval': true,
+      'guardrail_reasons_ar': ['راجع التخطيط قبل الاعتماد'],
+      'guardrail_metrics': {
+        'schema_valid': true,
+        'human_approval_required': true,
+        'pii_minimized': true,
+        'per_call_logged': true,
+        'arabic_summary': 'جاهز للمراجعة البشرية قبل الحفظ',
+      },
+    });
+    expect(m.needsHumanApproval, isTrue);
+    expect(m.guardrailReasonsAr, contains('راجع التخطيط قبل الاعتماد'));
+    expect(m.guardrailArabicSummary, contains('مراجعة البشرية'));
+    expect(AiAnalysisProgressCard.humanApprovalBanner(m), contains('مراجعة البشرية'));
+    expect(AiAnalysisProgressCard.successMetricsLine(m), contains('المخطط سليم'));
+  });
+
+  testWidgets('staged card shows Arabic human-approval banner', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 720,
+            child: AiAnalysisProgressCard(
+              isAnalyzing: false,
+              result: _result(
+                mappingSource: 'ai',
+                aiModelUsed: 'gemini-3.8-flash',
+                mappingConfidence: 0.9,
+                guardrailArabicSummary: 'جاهز للمراجعة البشرية قبل الحفظ',
+                guardrailReasonsAr: const ['تم الاستخراج بالذكاء الاصطناعي — راجع التخطيط قبل الاعتماد'],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.textContaining('مراجعة البشرية'), findsWidgets);
+    expect(find.textContaining('المخطط سليم'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

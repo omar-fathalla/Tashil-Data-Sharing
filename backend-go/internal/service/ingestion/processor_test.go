@@ -19,9 +19,14 @@ func TestProcessorUploadCarrefourFile(t *testing.T) {
 	processor := NewProcessor(agent, bqRepo, fsRepo)
 
 	fileContent := []byte("Header1,Header2\nSample1,Sample2\n")
-	res, err := processor.ProcessUpload(ctx, "tenant-adeco", "carrefour_weekly.csv", fileContent)
+	// Invented mock samples require staged human approval before durable write.
+	staged, err := processor.ProcessUploadWithDryRun(ctx, "tenant-adeco", "carrefour_weekly.csv", fileContent, true)
 	if err != nil {
-		t.Fatalf("ProcessUpload failed: %v", err)
+		t.Fatalf("ProcessUpload preview failed: %v", err)
+	}
+	res, err := processor.CommitStagedUpload(ctx, "tenant-adeco", staged.BatchID, "")
+	if err != nil {
+		t.Fatalf("ProcessUpload commit failed: %v", err)
 	}
 
 	if res.RetailerDetected != "carrefour" {

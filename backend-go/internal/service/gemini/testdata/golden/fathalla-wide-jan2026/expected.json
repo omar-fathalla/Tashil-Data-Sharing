@@ -1,0 +1,14 @@
+{
+  "id": "fathalla-wide-jan2026",
+  "description": "Historical Fathalla wide-matrix layout (Book3-shaped): title row, header, branch value/qty columns",
+  "filename": "fathalla_wide_jan2026.xlsx",
+  "mapping_source": "deterministic",
+  "retailer_detected": "fathalla",
+  "min_records": 4,
+  "extracted_units": 30,
+  "extracted_value": 4500,
+  "months_detected": ["2026-01"],
+  "validation_status": "ok",
+  "requires_human_approval_when_staged": true,
+  "schema_plan_file": "mapping_plan.json"
+}
