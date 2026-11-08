@@ -1863,7 +1863,8 @@ func (p *Processor) persistApprovedMappingCorrection(tenantID string, staged *St
 		}
 	}
 	if err := learner.LearnFromCorrection(tenantID, staged.Filename, sample, plan); err != nil {
-		return fmt.Errorf("فشل حفظ تصحيح الربط بعد الاعتماد: %w", err)
+		// Durable sell-out/sell-in data already committed above — do not imply nothing was saved.
+		return fmt.Errorf("البيانات اتحفظت بنجاح، لكن تصحيح الربط ما اتسجلش للتعلم التلقائي: %w", err)
 	}
 	return nil
 }

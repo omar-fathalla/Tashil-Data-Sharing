@@ -120,7 +120,11 @@ func TestCommitSurfacesMappingLearnDiskFailure(t *testing.T) {
 	if err == nil {
 		t.Fatal("commit must surface mapping learn disk failure")
 	}
-	if !strings.Contains(err.Error(), "فشل حفظ تصحيح الربط") {
-		t.Fatalf("expected learn failure surfaced, got %v", err)
+	msg := err.Error()
+	if !strings.Contains(msg, "البيانات اتحفظت بنجاح") || !strings.Contains(msg, "تصحيح الربط ما اتسجلش") {
+		t.Fatalf("must say data saved but correction not learned, got %v", err)
+	}
+	if strings.Contains(msg, "مفيش حاجة اتحفظت") {
+		t.Fatalf("must not imply nothing was saved: %v", err)
 	}
 }
