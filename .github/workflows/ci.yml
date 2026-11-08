@@ -79,7 +79,23 @@ jobs:
         with:
           node-version: "20"
 
+      # Prefer the Mac's preinstalled Java 21 — setup-java downloads have 504'd from Adoptium.
+      - name: Detect preinstalled Java 21
+        id: java_pre
+        working-directory: .
+        run: |
+          set -euo pipefail
+          if command -v java >/dev/null 2>&1 && java -version 2>&1 | grep -Eq 'version "?21([.]|$)'; then
+            echo "use_action=false" >> "$GITHUB_OUTPUT"
+            echo "Reusing preinstalled Java 21:"
+            java -version
+            exit 0
+          fi
+          echo "use_action=true" >> "$GITHUB_OUTPUT"
+          echo "Preinstalled Java 21 not found; will use setup-java"
+
       - name: Setup Java (Firestore emulator)
+        if: steps.java_pre.outputs.use_action == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin

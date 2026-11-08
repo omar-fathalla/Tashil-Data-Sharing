@@ -101,6 +101,9 @@ du -sh ~/.pub-cache ~/.cache/firebase 2>/dev/null
 Preinstalled toolchains (do not delete casually): Go 1.26, Flutter 3.41.2, Node 25,
 Java 21 (temurin-compatible), `gh`, `git`. Docker is **not** installed.
 
+CI reuses preinstalled Flutter/Java when versions match (avoids Adoptium/`flutter-action`
+download stalls). `setup-java` / `flutter-action` run only as fallback.
+
 ## What CI covers
 
 - **Cloud Run one-instance pin** — `scripts/check_cloud_run_one_instance.sh`

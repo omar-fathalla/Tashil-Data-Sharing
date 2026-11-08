@@ -5,6 +5,50 @@ export function byTestId(id: string) {
   return `[flt-semantics-identifier="${id}"]`;
 }
 
+/**
+ * Freeze DPR/screen metrics before Flutter boots. On Retina Mac hosts,
+ * Flutter web otherwise places Semantics/input hit-boxes at ~2× CSS x
+ * (e.g. x=2880 on a 1440-wide viewport) even when Playwright reports dpr=1.
+ */
+export async function installRetinaGuards(
+  page: Page,
+  viewport: { width: number; height: number } = { width: 1440, height: 900 },
+) {
+  await page.addInitScript(
+    ({ width, height }) => {
+      try {
+        Object.defineProperty(window, 'devicePixelRatio', {
+          configurable: true,
+          get: () => 1,
+        });
+      } catch {
+        /* ignore */
+      }
+      try {
+        Object.defineProperty(window.screen, 'width', {
+          configurable: true,
+          get: () => width,
+        });
+        Object.defineProperty(window.screen, 'height', {
+          configurable: true,
+          get: () => height,
+        });
+        Object.defineProperty(window.screen, 'availWidth', {
+          configurable: true,
+          get: () => width,
+        });
+        Object.defineProperty(window.screen, 'availHeight', {
+          configurable: true,
+          get: () => height,
+        });
+      } catch {
+        /* ignore */
+      }
+    },
+    viewport,
+  );
+}
+
 /** Wait until Flutter has painted and exposed at least one semantics node. */
 export async function waitForFlutter(page: Page) {
   await page.waitForSelector('flutter-view, flt-glass-pane, canvas', {
@@ -31,6 +75,56 @@ export type SemanticsProbe = {
 
 function viewportOf(page: Page) {
   return page.viewportSize() ?? { width: 1280, height: 720 };
+}
+
+function boxInViewport(
+  bb: { x: number; y: number; width: number; height: number } | null,
+  vw: number,
+  vh: number,
+): boolean {
+  if (!bb || bb.width <= 0 || bb.height <= 0) return false;
+  return (
+    bb.x >= -1 &&
+    bb.y >= -1 &&
+    bb.x + bb.width <= vw + 2 &&
+    bb.y + bb.height <= vh + 2
+  );
+}
+
+/**
+ * Activate a Flutter control for keyboard input.
+ * Prefers an in-viewport hit-test click; on Retina Mac, Flutter often leaves
+ * Semantics-backed <input> nodes outside the Playwright viewport — then focus
+ * via DOM events (Flutter's bridge still receives them).
+ */
+export async function activateFlutterControl(page: Page, locator: Locator) {
+  await expect(locator.first()).toBeAttached({ timeout: 60_000 });
+  const { width: vw, height: vh } = viewportOf(page);
+  const count = await locator.count();
+
+  for (let i = 0; i < count; i++) {
+    const el = locator.nth(i);
+    const bb = await el.boundingBox();
+    if (!boxInViewport(bb, vw, vh)) continue;
+    try {
+      await el.click({ timeout: 5_000 });
+      return 'click';
+    } catch {
+      // try next / fall through
+    }
+  }
+
+  await locator.first().evaluate((el: HTMLElement) => {
+    el.focus();
+    el.dispatchEvent(new Event('focus', { bubbles: true }));
+    el.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    for (const type of ['mousedown', 'mouseup', 'click'] as const) {
+      el.dispatchEvent(
+        new MouseEvent(type, { bubbles: true, cancelable: true, view: window }),
+      );
+    }
+  });
+  return 'dom-focus';
 }
 
 /** Read geometry + ARIA role for a semantics id (for offset / role asserts). */
@@ -76,56 +170,11 @@ export async function probeSemantics(
 /**
  * Activate a Semantics node. Prefers a natural locator.click when the box is
  * inside the viewport; on macOS Retina, Flutter web often places Semantics at
- * ~2× CSS coords (see docs/SEMANTICS_TEST_IDS.md) so hit-testing fails with
- * "outside of the viewport". In that case:
- *   1) click the painted control via accessible role + name when available
- *   2) otherwise dispatch focus+click on the Semantics DOM node (Flutter listens)
+ * ~2× CSS coords so hit-testing fails with "outside of the viewport".
  */
 export async function clickSemantics(page: Page, id: string) {
-  const locator = page.locator(byTestId(id)).first();
-  await expect(locator).toBeAttached({ timeout: 60_000 });
-
-  const probe = await probeSemantics(page, id);
-  expect(probe, `missing semantics node ${id}`).not.toBeNull();
-
-  if (!probe!.outsideViewport) {
-    try {
-      await locator.scrollIntoViewIfNeeded();
-      await locator.click({ timeout: 8_000 });
-      return;
-    } catch {
-      // Fall through to Retina-safe paths.
-    }
-  }
-
-  // Prefer the visible AX control (correct hit target on Retina).
-  if (probe!.role && probe!.name) {
-    const role = probe!.role as
-      | 'button'
-      | 'textbox'
-      | 'checkbox'
-      | 'link'
-      | 'radio';
-    try {
-      await page
-        .getByRole(role, { name: probe!.name, exact: false })
-        .first()
-        .click({ timeout: 8_000 });
-      return;
-    } catch {
-      // Fall through.
-    }
-  }
-
-  // Last resort: DOM activate — Flutter's Semantics bridge handles this even
-  // when the node's getBoundingClientRect is outside the Playwright viewport.
-  await locator.evaluate((el: HTMLElement) => {
-    el.scrollIntoView({ block: 'center', inline: 'center' });
-    el.focus();
-    el.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true, view: window }),
-    );
-  });
+  const locator = page.locator(byTestId(id));
+  await activateFlutterControl(page, locator);
 }
 
 /**
@@ -154,8 +203,6 @@ export async function expectClickableSemanticsButton(page: Page, id: string) {
 /**
  * Soft diagnostic for ~2× semantics offset. Does not fail the suite — Retina
  * Mac hosts often report outside-viewport boxes even when DPR is forced to 1.
- * Returns whether geometry looks double-scaled for logging/assertions callers
- * may opt into.
  */
 export async function assertSemanticsNotDoubleScaled(
   page: Page,
@@ -198,35 +245,30 @@ export async function typeIntoSemanticsField(
   await clickSemantics(page, id);
   const field = page.locator(byTestId(id)).first();
   await expect(field).toBeFocused({ timeout: 10_000 }).catch(async () => {
-    // Flutter web may put focus on an inner input; wait briefly then type.
     await page.waitForTimeout(250);
   });
   await page.waitForTimeout(250);
   await page.keyboard.type(text, { delay: 40 });
 }
 
-/**
- * Login-shell helpers: drive the painted controls via accessible roles.
- * Semantics ids are still asserted separately; geometry on Retina Mac is unreliable.
- */
+/** Login email via ARIA textbox (Retina-safe activate). */
 export async function typeLoginEmail(page: Page, email: string) {
-  const box = page.getByRole('textbox', { name: /email/i }).first();
-  await expect(box).toBeVisible({ timeout: 60_000 });
-  await box.click();
+  const box = page.getByRole('textbox', { name: /email/i });
+  await activateFlutterControl(page, box);
   await page.waitForTimeout(250);
   await page.keyboard.type(email, { delay: 40 });
 }
 
+/** Login password via ARIA textbox (Retina-safe activate). */
 export async function typeLoginPassword(page: Page, password: string) {
-  const box = page.getByRole('textbox', { name: /password/i }).first();
-  await expect(box).toBeVisible({ timeout: 60_000 });
-  await box.click();
+  const box = page.getByRole('textbox', { name: /password/i });
+  await activateFlutterControl(page, box);
   await page.waitForTimeout(250);
   await page.keyboard.type(password, { delay: 40 });
 }
 
+/** Login submit via ARIA button (Retina-safe activate). */
 export async function clickLoginSubmit(page: Page) {
-  const btn = page.getByRole('button', { name: /^login$/i }).first();
-  await expect(btn).toBeVisible({ timeout: 60_000 });
-  await btn.click();
+  const btn = page.getByRole('button', { name: /^login$/i });
+  await activateFlutterControl(page, btn);
 }

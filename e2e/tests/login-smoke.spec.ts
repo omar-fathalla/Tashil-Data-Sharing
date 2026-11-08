@@ -1,9 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { TENANT_PATH } from '../playwright.config';
 import {
+  activateFlutterControl,
   assertSemanticsNotDoubleScaled,
   byTestId,
   clickLoginSubmit,
+  installRetinaGuards,
   typeLoginEmail,
   typeLoginPassword,
   waitForFlutter,
@@ -15,11 +17,10 @@ import {
  * Locators use Flutter web `flt-semantics-identifier` (requires
  * `ensureSemantics` at app startup) for presence/uniqueness.
  *
- * Interaction uses accessible roles (Email / Password / Login) because on
- * macOS Retina hosts Flutter web Semantics hit-boxes can sit at ~2× CSS
- * coords even when Playwright forces deviceScaleFactor=1 — see
- * docs/SEMANTICS_TEST_IDS.md. That keeps the smoke green on tashil-mac
- * without bypassing the identifier contract.
+ * Interaction uses accessible roles + Retina-safe activate (in-viewport click
+ * or DOM focus) because on macOS Retina hosts Flutter web Semantics /
+ * semantics-backed <input> hit-boxes can sit at ~2× CSS coords — see
+ * docs/SEMANTICS_TEST_IDS.md.
  *
  * Does not complete a successful login. A dummy password is typed only to
  * verify it never leaks into the Semantics tree / DOM text.
@@ -33,6 +34,8 @@ test.describe('Flutter web Semantics smoke', () => {
   test('tenant path, login ids, typing/click, password never leaks', async ({
     page,
   }) => {
+    await installRetinaGuards(page);
+
     // Absolute tenant path — do NOT use '/' (that strips /adeco from the URL).
     await page.goto(TENANT_PATH, { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(new RegExp(`${TENANT_PATH}/?(\\?.*)?$`));
@@ -51,7 +54,6 @@ test.describe('Flutter web Semantics smoke', () => {
       await expect(locator.first()).toBeAttached({ timeout: 60_000 });
     }
 
-    // Role-based interaction (Retina-safe painted controls).
     await typeLoginEmail(page, 'smoke@example.com');
     await typeLoginPassword(page, DUMMY_PASSWORD);
 
@@ -76,8 +78,6 @@ test.describe('Flutter web Semantics smoke', () => {
 
     await clickLoginSubmit(page);
     // Failed / local-only auth must never leak the dummy password into the DOM.
-    // URL may stay on /adeco or the app may rewrite to `/` when no backend is present;
-    // either way this smoke stays non-destructive (no successful login).
     await expect
       .poll(async () => (await page.content()).includes(DUMMY_PASSWORD), {
         timeout: 5_000,
@@ -103,12 +103,32 @@ test.describe('Flutter web Semantics smoke', () => {
   test('login catalog identifiers remain unique after interaction', async ({
     page,
   }) => {
+    await installRetinaGuards(page);
     await page.goto(TENANT_PATH, { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(new RegExp(`${TENANT_PATH}/?`));
     await waitForFlutter(page);
 
     for (const id of LOGIN_IDS) {
       await expect(page.locator(byTestId(id))).toHaveCount(1);
+    }
+  });
+
+  test('activateFlutterControl falls back when geometry is outside viewport', async ({
+    page,
+  }) => {
+    await installRetinaGuards(page);
+    await page.goto(TENANT_PATH, { waitUntil: 'domcontentloaded' });
+    await waitForFlutter(page);
+
+    const probe = await assertSemanticsNotDoubleScaled(page, 'login-email');
+    // On tashil-mac this is often outside; either way activate must not hang.
+    const mode = await activateFlutterControl(
+      page,
+      page.locator(byTestId('login-email')),
+    );
+    expect(['click', 'dom-focus']).toContain(mode);
+    if (probe.outsideViewport) {
+      expect(mode).toBe('dom-focus');
     }
   });
 });
