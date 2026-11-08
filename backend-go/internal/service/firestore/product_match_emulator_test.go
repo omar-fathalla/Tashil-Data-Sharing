@@ -26,9 +26,20 @@ func openProductMatchEmulatorClient(t *testing.T) *Client {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	fs, err := cloudFirestore.NewClient(ctx, "demo-tashil")
+	// Prefer the per-job demo project from CI (scripts/run_firestore_emulator_tests.sh).
+	project := strings.TrimSpace(os.Getenv("FIRESTORE_EMULATOR_PROJECT"))
+	if project == "" {
+		project = strings.TrimSpace(os.Getenv("GCLOUD_PROJECT"))
+	}
+	if project == "" {
+		project = strings.TrimSpace(os.Getenv("GOOGLE_CLOUD_PROJECT"))
+	}
+	if project == "" {
+		project = "demo-tashil"
+	}
+	fs, err := cloudFirestore.NewClient(ctx, project)
 	if err != nil {
-		t.Fatalf("firestore emulator client: %v", err)
+		t.Fatalf("firestore emulator client (project=%s): %v", project, err)
 	}
 	t.Cleanup(func() { _ = fs.Close() })
 	c := NewClient("emulator-db", true)

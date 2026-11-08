@@ -5,6 +5,9 @@ via the shared label **`tashil-mac`**. Production **`deploy.yml` stays on
 `ubuntu-latest`** with `cancel-in-progress: false` so deploys are never cancelled
 mid-flight and do not depend on the Mac being awake.
 
+**This Mac is shared** with other bots/accounts (their own runners, Firestore
+emulators, Flutter/Go builds). CI must never assume exclusive use of the machine.
+
 ## Runner labels
 
 ```yaml
@@ -21,6 +24,36 @@ Three runners share that label (parallel jobs OK):
 
 Custom label on each: `tashil-mac`. GitHub also applies `self-hosted`, `macOS`, `ARM64`.
 
+## Shared-Mac hard rules
+
+1. **Never assume fixed ports** (`8080`, `4000`, `4400`, `9150`, …). Always probe for a
+   free port (`scripts/pick_free_ports.py`).
+2. **Never kill by process name** (`pkill -f firestore`, etc.). Cleanup may only signal
+   the **PID (tree) this job started** (`scripts/run_firestore_emulator_tests.sh`).
+3. **Keep CPU bounded** — see table below. Other bots may be compiling at the same time.
+4. **Per-job temp dirs** under `$RUNNER_TEMP/tashil-emu-…` (sandbox `HOME`/`TMPDIR`).
+   Do not write job-specific emulator config into another user’s home.
+5. **Ubuntu fallback** via `CI_RUNS_ON` still works (same scripts; ports still probed).
+
+## Firestore emulator isolation
+
+`scripts/run_firestore_emulator_tests.sh`:
+
+- Picks **3 free ports** (firestore + hub + logging); **UI disabled**
+- Unique demo project: `demo-ci-<run_id>-<attempt>` (≤30 chars, `demo-` prefix)
+- Writes a per-job `firebase.json` under `$RUNNER_TEMP/...`
+- Sets `FIRESTORE_EMULATOR_HOST` (via `emulators:exec`) and
+  `FIRESTORE_EMULATOR_PROJECT` / `GCLOUD_PROJECT` for Go tests
+- Symlinks only the shared emulator **JAR cache**; config/logs stay in the job dir
+- On EXIT/INT/TERM: kills **only** the wrapper PID recorded in `wrapper.pid`
+
+Two backend jobs (or another bot’s emulator) can run concurrently because ports and
+project IDs do not collide. Verify the port helper locally / in CI:
+
+```bash
+python3 scripts/pick_free_ports.py --self-test
+```
+
 ## Concurrency
 
 `ci.yml` and `playwright_smoke.yml`:
@@ -34,16 +67,14 @@ concurrency:
 Superseded pushes/PR syncs cancel in-flight CI on that ref. **`deploy.yml` must keep
 `cancel-in-progress: false`** — never cancel a production deploy on `main`.
 
-## CPU budget (14-core Mac, 3 runners)
-
-When all three runners are busy, uncapped `go test -p` / Flutter concurrency drove
-host load into the 30–100+ range. Caps in workflows:
+## CPU budget (14-core Mac, 3 runners + other bots)
 
 | Job | Cap |
 |-----|-----|
 | `go test` | `-p` / `GOMAXPROCS` ≤ **3** (`cores/5`, clamped 2–3) |
+| Emulator `go test` | `GOMAXPROCS=2`, `-parallel 1` |
 | `flutter test` | `--concurrency=2` |
-| Playwright | `workers: 1` (already) |
+| Playwright | `workers: 1` |
 
 Do **not** boot Android emulators or the iOS Simulator from CI. This Mac CI is
 Flutter **web** + Go + Playwright Chromium only.
@@ -56,7 +87,7 @@ Flutter **web** + Go + Playwright Chromium only.
 | Go build | Local `~/Library/Caches/go-build` on self-hosted; actions/cache only on github-hosted |
 | Pub | `~/.pub-cache` |
 | Flutter SDK | preinstalled 3.41.2, else `flutter-action` + cache |
-| Firebase emulators | `~/.cache/firebase/emulators` |
+| Firebase emulator JARs | `~/.cache/firebase/emulators` (shared read; per-job config elsewhere) |
 | npm (e2e) | `setup-node` cache |
 | Playwright browsers | `~/.cache/ms-playwright` + `~/Library/Caches/ms-playwright` |
 
@@ -68,20 +99,14 @@ Set a repository variable (Settings → Secrets and variables → Actions → Va
 |--------------|---------------------|
 | `CI_RUNS_ON` | `["ubuntu-latest"]` |
 
-Both workflows resolve:
-
 ```yaml
 runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
 ```
 
-Remove the variable (or set it back to `["self-hosted", "macOS", "tashil-mac"]`) to
-return to the Mac. One-line alternative: hardcode `runs-on: ubuntu-latest`.
-
 On Linux fallback, Playwright installs with `npx playwright install --with-deps chromium`.
+Emulator isolation scripts still probe free ports (safe on ubuntu-latest too).
 
 ## Check / restart / re-register runners
-
-On the Mac (as the runner user):
 
 ```bash
 ~/actions-runner/svc.sh status
@@ -89,55 +114,31 @@ On the Mac (as the runner user):
 ~/actions-runner-3/svc.sh status
 
 ~/actions-runner/svc.sh stop && ~/actions-runner/svc.sh start
-~/actions-runner-2/svc.sh stop && ~/actions-runner-2/svc.sh start
-~/actions-runner-3/svc.sh stop && ~/actions-runner-3/svc.sh start
-```
-
-Re-register (token from GitHub → Settings → Actions → Runners):
-
-```bash
-cd ~/actions-runner   # or -2 / -3
-./svc.sh stop
-./config.sh remove --token <REMOVE_TOKEN>
-./config.sh --url https://github.com/omar-fathalla/Tashil-Data-Sharing \
-  --token <REG_TOKEN> \
-  --name tashil-mac \          # or tashil-mac-2 / tashil-mac-3
-  --labels self-hosted,macOS,ARM64,tashil-mac \
-  --work _work
-./svc.sh install && ./svc.sh start
+# … same for -2 / -3
 ```
 
 ## Work directories
 
 - `~/actions-runner/_work/Tashil-Data-Sharing/Tashil-Data-Sharing`
-- `~/actions-runner-2/_work/Tashil-Data-Sharing/Tashil-Data-Sharing`
-- `~/actions-runner-3/_work/Tashil-Data-Sharing/Tashil-Data-Sharing`
-
-Jobs clean large artifacts they create (Flutter `build/web`, Playwright reports,
-job-started Firebase emulator PIDs). They must **not** kill a manually started
-Firestore emulator outside the job’s PID snapshot.
+- `~/actions-runner-2/_work/...`
+- `~/actions-runner-3/_work/...`
+- Emulator sandboxes: `$RUNNER_TEMP/tashil-emu-<run>-<job>-<pid>/`
 
 ## Clean disk
 
 ```bash
 du -sh ~/actions-runner/_work ~/actions-runner-2/_work ~/actions-runner-3/_work
-# When idle:
+# When idle (this account's runners only — do not wipe other users' homes):
 rm -rf ~/actions-runner/_work/* ~/actions-runner-2/_work/* ~/actions-runner-3/_work/*
 du -sh ~/.pub-cache ~/.cache/firebase ~/Library/Caches/ms-playwright 2>/dev/null
 ```
 
-Preinstalled toolchains (do not delete casually): Go 1.26, Flutter 3.41.2, Node 25,
-Java 21 (temurin-compatible), `gh`, `git`. Docker is **not** installed.
-
-CI reuses preinstalled Flutter/Java when versions match (avoids Adoptium /
-`flutter-action` download stalls).
+Preinstalled: Go 1.26, Flutter 3.41.2, Node 25, Java 21, `gh`, `git`. No Docker.
 
 ## What CI covers
 
-- **Cloud Run one-instance pin** — `scripts/check_cloud_run_one_instance.sh`
-- **Backend** — `go vet`, capped `go test`, Firestore emulator product-match tests,
-  `scripts/parse_live_backend_commit_test.py`
-- **Flutter** — `flutter analyze` + `flutter test --concurrency=2`
-- **Playwright smoke** — Flutter web + Chromium Semantics login smoke
-  (1440×900, `deviceScaleFactor: 1`, DPR init guards, Retina-safe DOM focus when
-  Semantics inputs sit outside the viewport — see `docs/SEMANTICS_TEST_IDS.md`)
+- Cloud Run one-instance pin
+- Backend: `go vet`, capped `go test`, isolated Firestore emulator product-match tests,
+  `parse_live_backend_commit_test.py`
+- Flutter: analyze + `flutter test --concurrency=2`
+- Playwright Semantics smoke (Retina-safe activate)

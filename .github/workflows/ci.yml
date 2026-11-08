@@ -129,22 +129,20 @@ jobs:
         working-directory: .
         run: python3 scripts/parse_live_backend_commit_test.py
 
-      - name: Snapshot pre-existing emulator PIDs
+      # Prove free-port picker works (two concurrent batches get distinct ports).
+      - name: Verify free-port isolation helper
         working-directory: .
-        run: |
-          mkdir -p "$RUNNER_TEMP/ci-emu"
-          # Do not touch Mohamed's manual emulator — only kill PIDs this job starts.
-          (pgrep -f 'cloud-firestore-emulator|firebase.*emulators:exec|java.*firestore-emulator' || true) \
-            | sort -u > "$RUNNER_TEMP/ci-emu/pre-pids.txt"
-          echo "Pre-existing emulator-related PIDs:"
-          cat "$RUNNER_TEMP/ci-emu/pre-pids.txt" || true
+        run: python3 scripts/pick_free_ports.py --self-test
 
       - name: Firestore emulator product-match tests
         id: go_emulator_test
+        working-directory: .
         run: |
-          # Keep emulator JVM + go test from oversubscribing the shared Mac.
-          GOMAXPROCS=2 npx --yes firebase-tools@13.29.1 emulators:exec --only firestore --project demo-tashil \
-            "go test ./internal/service/firestore/ -count=1 -timeout 10m -parallel 1 -run Emulator"
+          # Per-job free ports + unique demo project + PID-only cleanup.
+          # Never assumes 8080/4000/4400/9150; never kills by process name.
+          # Safe alongside other bots/runners on the same Mac (ubuntu fallback OK).
+          chmod +x scripts/run_firestore_emulator_tests.sh
+          GOMAXPROCS=2 bash scripts/run_firestore_emulator_tests.sh
 
       - name: Surface failure summary
         if: failure() && (steps.go_test.outcome == 'failure' || steps.go_emulator_test.outcome == 'failure')
@@ -157,36 +155,11 @@ jobs:
             echo ""
             echo '```bash'
             echo 'cd backend-go && go test ./... -count=1 -timeout 20m'
+            echo 'bash scripts/run_firestore_emulator_tests.sh'
             echo '```'
             echo ""
             echo "Proposed next step: inspect the failing package output above, fix on this PR branch, and push — do not push fixes to main."
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Cleanup emulator PIDs started by this job
-        if: always()
-        working-directory: .
-        run: |
-          set +e
-          pre="$RUNNER_TEMP/ci-emu/pre-pids.txt"
-          cur="$RUNNER_TEMP/ci-emu/cur-pids.txt"
-          (pgrep -f 'cloud-firestore-emulator|firebase.*emulators:exec|java.*firestore-emulator' || true) \
-            | sort -u > "$cur"
-          if [ ! -f "$pre" ]; then
-            echo "No pre-PID snapshot; skipping kill (avoid touching host emulators)."
-            exit 0
-          fi
-          # Kill only PIDs that appeared after our snapshot.
-          comm -13 "$pre" "$cur" | while read -r pid; do
-            [ -z "$pid" ] && continue
-            echo "Stopping job-started PID $pid"
-            kill "$pid" 2>/dev/null || true
-          done
-          sleep 1
-          comm -13 "$pre" "$cur" | while read -r pid; do
-            [ -z "$pid" ] && continue
-            kill -9 "$pid" 2>/dev/null || true
-          done
-          rm -rf "$RUNNER_TEMP/ci-emu" 2>/dev/null || true
 
   test-flutter:
     name: Flutter analyze & test
