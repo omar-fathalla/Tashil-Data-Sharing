@@ -30,13 +30,17 @@ for flutter_bin in \
   fi
 done
 
-# Never share ~/.pub-cache across concurrent Mac runners (Bad file descriptor / File exists).
-# Prefer $RUNNER_TEMP/pub-cache (per job). Else per-runner dir under toolchains. Honor PUB_CACHE=.
+# Never share ~/.pub-cache (or a pre-set shared toolchains pub-cache) across concurrent Mac
+# runners — that caused Bad file descriptor / File exists under parallel pub get.
+# When RUNNER_TEMP is set (Actions), always force $RUNNER_TEMP/pub-cache and ignore any
+# pre-set PUB_CACHE (runner/machine env, prior jobs, or #51-style $HOME/toolchains/pub-cache).
 runner="${RUNNER_NAME:-unknown}"
-if [[ -n "${PUB_CACHE:-}" ]]; then
-  PUB_CACHE_DIR="${PUB_CACHE}"
-elif [[ -n "${RUNNER_TEMP:-}" ]]; then
+preset_pub_cache="${PUB_CACHE:-}"
+if [[ -n "${RUNNER_TEMP:-}" ]]; then
   PUB_CACHE_DIR="${RUNNER_TEMP}/pub-cache"
+  if [[ -n "${preset_pub_cache}" && "${preset_pub_cache}" != "${PUB_CACHE_DIR}" ]]; then
+    echo "ci_runner_env: ignoring pre-set PUB_CACHE=${preset_pub_cache}; forcing ${PUB_CACHE_DIR}"
+  fi
 else
   runner_slug="$(printf '%s' "${runner}" | tr -c 'A-Za-z0-9._-' '_')"
   PUB_CACHE_DIR="${TOOLCHAINS}/pub-cache/${runner_slug}"

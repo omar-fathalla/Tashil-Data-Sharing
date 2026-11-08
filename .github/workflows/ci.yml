@@ -204,6 +204,13 @@ jobs:
         working-directory: .
         run: bash scripts/ci_runner_env.sh
 
+      - name: Assert PUB_CACHE isolation
+        working-directory: .
+        run: |
+          chmod +x scripts/ci_pub_cache_isolation_test.sh
+          bash scripts/ci_pub_cache_isolation_test.sh --assert
+          bash scripts/ci_pub_cache_isolation_test.sh
+
       - name: Acquire Mac resource lock
         id: mac_lock
         timeout-minutes: 110
@@ -216,7 +223,7 @@ jobs:
           bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "flutter-analyze-test" 25 120
 
       # Prefer $HOME/toolchains/flutter; avoid flutter-action+cache on self-hosted (runner dropouts).
-      # PUB_CACHE is set by scripts/ci_runner_env.sh ($RUNNER_TEMP/pub-cache per job).
+      # PUB_CACHE is forced to $RUNNER_TEMP/pub-cache by scripts/ci_runner_env.sh (ignores presets).
       - name: Detect preinstalled Flutter
         id: flutter_pre
         working-directory: .

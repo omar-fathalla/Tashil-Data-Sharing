@@ -24,8 +24,10 @@ run as user `tashil-ci`** (`HOME=/Users/tashil-ci`). Toolchains live at
 | `tashil-mac-2` | `tashil-ci`   | `~/actions-runner-2`   | 5038 |
 | `tashil-mac-3` | `tashil-ci`   | `~/actions-runner-3`   | 5039 |
 
-`scripts/ci_runner_env.sh` sets `PATH` (`$HOME/toolchains/bin`), `ANDROID_HOME`,
-`ANDROID_ADB_SERVER_PORT`, and `ADB_SERVER_SOCKET=tcp:localhost:<port>` per runner.
+`scripts/ci_runner_env.sh` sets `PATH` (`$HOME/toolchains/bin` + Flutter), `ANDROID_HOME`,
+`ANDROID_ADB_SERVER_PORT`, `ADB_SERVER_SOCKET=tcp:localhost:<port>`, and forces
+`PUB_CACHE=$RUNNER_TEMP/pub-cache` (ignores any pre-set shared `PUB_CACHE`).
+Isolation is checked by `scripts/ci_pub_cache_isolation_test.sh`.
 
 Custom label on each: `tashil-mac`. GitHub also applies `self-hosted`, `macOS`, `ARM64`.
 

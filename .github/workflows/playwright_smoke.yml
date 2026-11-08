@@ -36,6 +36,12 @@ jobs:
       - name: Per-runner toolchain / ADB env
         run: bash scripts/ci_runner_env.sh
 
+      - name: Assert PUB_CACHE isolation
+        run: |
+          chmod +x scripts/ci_pub_cache_isolation_test.sh
+          bash scripts/ci_pub_cache_isolation_test.sh --assert
+          bash scripts/ci_pub_cache_isolation_test.sh
+
       - name: Acquire Mac resource lock
         id: mac_lock
         timeout-minutes: 40
@@ -48,7 +54,7 @@ jobs:
 
       # Prefer $HOME/toolchains/flutter (see scripts/ci_detect_flutter.sh). Falling through to
       # flutter-action+cache has caused self-hosted Mac runners to lose GitHub communication.
-      # PUB_CACHE is set by scripts/ci_runner_env.sh ($RUNNER_TEMP/pub-cache per job).
+      # PUB_CACHE is forced to $RUNNER_TEMP/pub-cache by scripts/ci_runner_env.sh (ignores presets).
       - name: Detect preinstalled Flutter
         id: flutter_pre
         env:
