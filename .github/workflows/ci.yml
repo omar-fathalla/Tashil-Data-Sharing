@@ -1,14 +1,28 @@
-# Run backend and Flutter tests on every push to every branch and on every pull request.
-# Deploy stays on deploy.yml (main only) — this workflow never deploys.
+# Consolidated CI: backend Go + Flutter + Cloud Run pin guard.
+# Runs on Mohamed's self-hosted Mac (tashil-mac). Deploy stays on deploy.yml (ubuntu-latest).
+#
+# Fallback if Mac is offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'
+# (Settings → Secrets and variables → Actions → Variables), or change runs-on below.
 name: CI tests
 
 on:
   push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -19,9 +33,10 @@ env:
 
 jobs:
   # Stopgap until shared storage (#37): refuse deploy commands that omit or change the 1-instance pin.
+  # Fallback if Mac offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
   guard-cloud-run-one-instance:
     name: Cloud Run one-instance pin
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     steps:
       - uses: actions/checkout@v4
       - name: Assert deploy pins min/max=1
@@ -29,35 +44,54 @@ jobs:
 
   test-backend:
     name: Backend Go tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     defaults:
       run:
         working-directory: backend-go
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend-go/go.mod
           cache-dependency-path: backend-go/go.sum
+
       - name: go vet
         run: go vet ./...
+
       - name: go test
         id: go_test
         run: go test ./... -count=1 -timeout 20m
+
       - name: Setup Node (Firestore emulator)
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+
       - name: Setup Java (Firestore emulator)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
+
+      - name: Cache Firebase emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ runner.arch }}-v1
+          restore-keys: |
+            firebase-emulators-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Firestore emulator product-match tests
         id: go_emulator_test
         run: |
           npx --yes firebase-tools@13.29.1 emulators:exec --only firestore --project demo-tashil \
             "go test ./internal/service/firestore/ -count=1 -timeout 10m -run Emulator"
+
+      - name: live-version parse fail-safe tests
+        working-directory: .
+        run: python3 scripts/parse_live_backend_commit_test.py
+
       - name: Surface failure summary
         if: failure() && (steps.go_test.outcome == 'failure' || steps.go_emulator_test.outcome == 'failure')
         run: |
@@ -74,25 +108,45 @@ jobs:
             echo "Proposed next step: inspect the failing package output above, fix on this PR branch, and push — do not push fixes to main."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Cleanup leftover emulator / Java processes
+        if: always()
+        working-directory: .
+        run: |
+          # emulators:exec normally exits cleanly; belt-and-suspenders on the persistent Mac.
+          pkill -f 'cloud-firestore-emulator' 2>/dev/null || true
+          pkill -f 'firebase.*emulators' 2>/dev/null || true
+          # Do not kill unrelated Java; only firebase-related leftover PIDs above.
+
   test-flutter:
     name: Flutter analyze & test
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     defaults:
       run:
         working-directory: tashil_web
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('tashil_web/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
       - run: flutter pub get
       - name: flutter analyze
         run: flutter analyze
       - name: flutter test
         id: flutter_test
         run: flutter test
+
       - name: Surface failure summary
         if: failure() && steps.flutter_test.outcome == 'failure'
         run: |
@@ -113,7 +167,7 @@ jobs:
     name: Comment PR when tests fail
     needs: [test-backend, test-flutter]
     if: always() && github.event_name == 'pull_request' && (needs.test-backend.result == 'failure' || needs.test-flutter.result == 'failure')
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     steps:
       - name: Post failure comment
         uses: actions/github-script@v7

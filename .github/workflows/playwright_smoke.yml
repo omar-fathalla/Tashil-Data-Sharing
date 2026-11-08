@@ -1,24 +1,37 @@
 name: Playwright Semantics Smoke
 
-# Runs on every branch push and on PRs targeting main.
+# Self-hosted Mac (tashil-mac). Fallback: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
 on:
   push:
-  pull_request:
     branches: [main]
+    paths:
+      - "tashil_web/**"
+      - "e2e/**"
+      - ".github/workflows/playwright_smoke.yml"
+  pull_request:
+    paths:
+      - "tashil_web/**"
+      - "e2e/**"
+      - ".github/workflows/playwright_smoke.yml"
 
 concurrency:
-  group: playwright-smoke-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  FLUTTER_VERSION: "3.41.2"
 
 jobs:
   flutter-web-semantics-smoke:
-    runs-on: ubuntu-latest
+    # Fallback if Mac offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
@@ -41,15 +54,18 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
       # SPA fallback so /adeco serves index.html (path URL strategy).
+      # Use a workspace-local pid/log so cleanup works on the persistent Mac.
       - name: Start static server
         run: |
-          npx --yes serve@14 -s tashil_web/build/web -l 4173 >/tmp/serve.log 2>&1 &
-          echo $! > /tmp/serve.pid
+          mkdir -p "$RUNNER_TEMP/playwright-smoke"
+          npx --yes serve@14 -s tashil_web/build/web -l 4173 \
+            >"$RUNNER_TEMP/playwright-smoke/serve.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/playwright-smoke/serve.pid"
           for i in $(seq 1 60); do
             if curl -fsS "http://127.0.0.1:4173/" >/dev/null; then
               echo "static server ready"
@@ -58,21 +74,22 @@ jobs:
             sleep 1
           done
           echo "static server failed to start"
-          cat /tmp/serve.log || true
+          cat "$RUNNER_TEMP/playwright-smoke/serve.log" || true
           exit 1
 
       - name: Install Playwright
         working-directory: e2e
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          # No --with-deps (apt) on macOS self-hosted; browsers only.
+          npx playwright install chromium
 
       - name: Run read-only login Semantics smoke
         working-directory: e2e
         env:
           BASE_ORIGIN: http://127.0.0.1:4173
           TENANT_PATH: /adeco
-          CI: 'true'
+          CI: "true"
         run: npx playwright test
 
       - name: Upload Playwright report on failure
@@ -85,9 +102,15 @@ jobs:
             e2e/playwright-report
           if-no-files-found: ignore
 
-      - name: Stop static server
+      - name: Stop static server and clean local artifacts
         if: always()
         run: |
-          if [ -f /tmp/serve.pid ]; then
-            kill "$(cat /tmp/serve.pid)" || true
+          if [ -f "$RUNNER_TEMP/playwright-smoke/serve.pid" ]; then
+            kill "$(cat "$RUNNER_TEMP/playwright-smoke/serve.pid")" 2>/dev/null || true
+            # Kill process group children if serve spawned them
+            pkill -f 'serve@14.*4173' 2>/dev/null || true
+            pkill -f 'node.*serve.*4173' 2>/dev/null || true
           fi
+          # Drop large local build/report dirs so the persistent runner disk stays lean.
+          rm -rf tashil_web/build/web e2e/test-results e2e/playwright-report \
+            "$RUNNER_TEMP/playwright-smoke" 2>/dev/null || true
