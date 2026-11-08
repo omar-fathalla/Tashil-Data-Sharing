@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:tashil_web/core/network/backend_http.dart';
 import '../../features/cpfr_replenishment/domain/cpfr_models.dart';
+import '../../features/sell_in_returns/domain/sell_in_returns_models.dart';
 import '../security/zero_trust_digest.dart';
 import '../utils/date_range.dart';
 import '../storage/session_storage.dart';
@@ -9270,6 +9271,46 @@ class ApiClient {
       totalWeightTons: 0,
       totalExpectedEgp: 0,
     );
+  }
+
+  /// Phase-1 Sell-In returns report (المرتجعات): branch×month matrix, KPIs, monthly gross/returns/net.
+  Future<SellInReturnsReport> getSellInReturns({
+    int? year,
+    int? month,
+    String? chain,
+    String? branch,
+    String? product,
+    String? productGroup,
+  }) async {
+    Object? failure;
+    try {
+      final params = <String, String>{};
+      if (year != null && year > 0) params['year'] = year.toString();
+      if (month != null && month > 0) params['month'] = month.toString();
+      if (chain != null && chain.isNotEmpty && chain != 'all') params['chain'] = chain;
+      if (branch != null && branch.isNotEmpty && branch != 'all') params['branch'] = branch;
+      if (product != null && product.isNotEmpty && product != 'all') params['product'] = product;
+      if (productGroup != null && productGroup.isNotEmpty && productGroup != 'all') {
+        params['product_group'] = productGroup;
+      }
+      final uri = Uri.parse(ApiEndpoints.sellInReturns).replace(
+        queryParameters: params.isEmpty ? null : params,
+      );
+      final response = await BackendHttp
+          .get(uri, headers: _headers)
+          .timeout(const Duration(seconds: 60));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        return SellInReturnsReport.fromJson(data);
+      }
+      failure = 'HTTP ${response.statusCode}';
+    } catch (e) {
+      failure = e;
+    }
+    if (!allowMockFallback) {
+      throw ServerConnectionException('تعذر تحميل تقرير المرتجعات من الخادم.', failure);
+    }
+    return const SellInReturnsReport();
   }
 
   /// Net Sell-In (EGP) per chain and month: `{chain(lowercase): {'YYYY-MM': value}}`.
