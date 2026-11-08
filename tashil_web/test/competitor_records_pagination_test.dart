@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -277,5 +278,62 @@ void main() {
         headers: {'content-type': 'application/json'},
       );
     }));
+  });
+
+  Future<void> expectNoMockMonthsOnFailure(MockClient Function() clientFactory) async {
+    await http.runWithClient(() async {
+      final api = ApiClient(
+        tenantId: 'tenant-adeco',
+        allowMockFallback: true,
+        allowDemoSeedData: false,
+      );
+      // Direct page fetch for other dashboards may still mock…
+      final otherPage = await api.getRecords(chain: 'fathalla', limit: 10);
+      expect(otherPage, isNotEmpty, reason: 'allowMockFallback still serves other pages');
+
+      // …but comparison must not ingest mocks / invent months.
+      final groups = await api.getCompetitiveComparisonGroups(chain: 'fathalla', year: 2026, month: 0);
+      for (final g in groups) {
+        expect(g.monthlyPrices, isEmpty);
+        expect(g.allMonthlyPrices, isEmpty);
+        for (final c in g.competitors) {
+          expect(c.monthlyPrices, isEmpty);
+          expect(c.allMonthlyPrices, isEmpty);
+        }
+      }
+      final seriesMonths = groups
+          .expand((g) => g.monthlyPrices)
+          .map((p) => p.monthNum)
+          .toSet();
+      expect(seriesMonths, isEmpty);
+    }, clientFactory);
+  }
+
+  test('HTTP 500 + allowMockFallback + !allowDemoSeedData → comparison empty, no mock months', () async {
+    await expectNoMockMonthsOnFailure(
+      () => MockClient((req) async {
+        if (req.url.path.startsWith('/api/v1/competitors/custom-skus')) {
+          return http.Response(jsonEncode({'custom_skus': [], 'count': 0}), 200);
+        }
+        if (req.url.path.contains('/api/v1/analytics/records')) {
+          return http.Response('{"error":"boom"}', 500);
+        }
+        return http.Response('{}', 200);
+      }),
+    );
+  });
+
+  test('timeout + allowMockFallback + !allowDemoSeedData → comparison empty, no mock months', () async {
+    await expectNoMockMonthsOnFailure(
+      () => MockClient((req) async {
+        if (req.url.path.startsWith('/api/v1/competitors/custom-skus')) {
+          return http.Response(jsonEncode({'custom_skus': [], 'count': 0}), 200);
+        }
+        if (req.url.path.contains('/api/v1/analytics/records')) {
+          throw TimeoutException('sell-out timed out');
+        }
+        return http.Response('{}', 200);
+      }),
+    );
   });
 }

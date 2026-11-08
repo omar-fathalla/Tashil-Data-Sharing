@@ -3177,6 +3177,11 @@ class ApiClient {
   SellOutRecordsSummaryModel? lastSellOutSummary;
 
   /// Queries paginated sell-out transaction records.
+  ///
+  /// [allowMockRecords] controls whether HTTP failure may return [_mockRecords].
+  /// Defaults to [allowMockFallback] (other dashboards OK). Competitive comparison
+  /// / month-series paths pass `allowDemoSeedData` so mocks never invent months
+  /// unless the explicit demo flag is on.
   Future<List<SellOutRecordModel>> getRecords({
     String? chain,
     String? storeId,
@@ -3189,6 +3194,7 @@ class ApiClient {
     int? month,
     int limit = 50,
     int offset = 0,
+    bool? allowMockRecords,
   }) async {
     final effectiveChain = (currentUser?.role == 'chain_kam' &&
             currentUser?.assignedChain != null &&
@@ -3273,7 +3279,8 @@ class ApiClient {
       debugPrint('[ApiClient] Fallback to mock records: $e');
     }
 
-    if (!allowMockFallback) {
+    final useMocks = allowMockRecords ?? allowMockFallback;
+    if (!useMocks) {
       isServerOnline.value = false;
       lastConnectionError = failureError.toString();
       throw ServerConnectionException(
@@ -10527,6 +10534,9 @@ class ApiClient {
   /// Walks every sell-out page for the filter until [total_count] is covered.
   /// If the safety cap is hit while more rows remain, sets [lastSellOutPaginationWarning]
   /// and throws [SellOutRecordsTruncatedException] (never a silent partial success).
+  ///
+  /// [allowMockRecords] is forwarded to [getRecords]. Comparison callers pass
+  /// [allowDemoSeedData] so HTTP failure cannot inject [_mockRecords] months.
   Future<List<SellOutRecordModel>> getRecordsAllPages({
     String? chain,
     String? storeId,
@@ -10539,6 +10549,7 @@ class ApiClient {
     int? month,
     int pageSize = sellOutRecordsPageSize,
     int maxRows = sellOutRecordsMaxRows,
+    bool? allowMockRecords,
   }) async {
     lastSellOutPaginationWarning = null;
     final effPage = pageSize.clamp(1, sellOutRecordsPageSize);
@@ -10557,6 +10568,7 @@ class ApiClient {
         month: month,
         limit: effPage,
         offset: offset,
+        allowMockRecords: allowMockRecords,
       );
       all.addAll(page);
       final total = lastSellOutSummary?.totalCount ?? all.length;
@@ -10971,6 +10983,8 @@ class ApiClient {
         startDate: startDate,
         endDate: endDate,
         maxRows: debugSellOutMaxRows ?? sellOutRecordsMaxRows,
+        // Never let dashboard mock sell-out rows invent comparison months.
+        allowMockRecords: allowDemoSeedData,
       );
     } on SellOutRecordsTruncatedException catch (e) {
       // Visible warning on [lastSellOutPaginationWarning]; keep partial live so we
