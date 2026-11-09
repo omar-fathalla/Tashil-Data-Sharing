@@ -167,6 +167,16 @@ filters true). Required checks report via lightweight gate jobs on `CI_HOSTED_RU
 `flutter-web-semantics-smoke`) so skips still show **success** (never hang required
 checks / merge queue).
 
+**Hosted work jobs stay in the graph:** `test-backend`, `guard-cloud-run-one-instance`,
+and smoke `wait-ci-flutter` use `if: always() && !cancelled() && needs.changes.result == 'success'`
+and path-skip inside the job. That avoids `needs.*.result=abandoned` when a job-level
+path `if:` drops the node (seen on main `db5888d` / #71 and smoke on #72/#73).
+`smoke-run` (Mac) schedules only when `wait-ci-flutter.outputs.run_smoke == 'true'`
+so docs-only PRs do not spin a Mac runner. `test-flutter` keeps its job-level path
+`if:`. Gates fail clearly on `abandoned` / `cancelled` and tell you to use
+**Re-run all jobs** (not Re-run failed jobs — successful deps like `changes` become
+`abandoned` on failed-only re-runs).
+
 **Merge queue:** `ci.yml` and `playwright_smoke.yml` listen for `merge_group` so
 required checks run in the queue. `deploy.yml` does **not** — production stays
 one-deploy-per-merged-PR via `push` to `main` (`await-ci` → deploy → livez/health).

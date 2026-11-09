@@ -59,16 +59,32 @@ jobs:
               - 'scripts/wait_mac_heavy_free.sh'
               - '.github/workflows/**'
 
-  # Hosted: wait until CI test-flutter is in_progress/done/skipped (not cancelled).
+  # Hosted wait: always join after `changes` succeeds so the smoke gate never sees
+  # needs.wait-ci-flutter.result=abandoned (main #72 / PR #73). Path skip is a
+  # cheap no-op; output run_smoke drives whether Mac smoke-run is scheduled.
   wait-ci-flutter:
     name: Wait for CI Flutter before Mac smoke
     needs: changes
-    if: needs.changes.outputs.smoke == 'true'
+    if: always() && !cancelled() && needs.changes.result == 'success'
     runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 100
+    outputs:
+      run_smoke: ${{ steps.want.outputs.run }}
     steps:
+      - name: Path filter
+        id: want
+        run: |
+          set -euo pipefail
+          if [[ "${{ needs.changes.outputs.smoke }}" == "true" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipped — no Flutter/web/e2e/workflow path changes"
+          fi
       - uses: actions/checkout@v4
+        if: steps.want.outputs.run == 'true'
       - name: Yield to CI test-flutter on this SHA
+        if: steps.want.outputs.run == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           WAIT_CI_FLUTTER_DEADLINE_MIN: "90"
@@ -78,9 +94,13 @@ jobs:
           chmod +x scripts/wait_ci_flutter_before_smoke.sh
           bash scripts/wait_ci_flutter_before_smoke.sh
 
+  # Mac smoke: schedule only when wait-ci-flutter said run_smoke=true (keeps
+  # docs-only PRs off Mac). Depend on wait result/output — not a sibling path
+  # `if:` on changes.outputs — so the job cannot drop out as abandoned while
+  # the always() gate still runs (seen on #73 tip b3b9ca5).
   smoke-run:
-    needs: [changes, wait-ci-flutter]
-    if: needs.changes.outputs.smoke == 'true'
+    needs: [wait-ci-flutter]
+    if: always() && !cancelled() && needs.wait-ci-flutter.result == 'success' && needs.wait-ci-flutter.outputs.run_smoke == 'true'
     # No job concurrency group: pending-slot eviction cancels waiters. Native
     # runner queue never cancels. Cross-repo: MAC_SHARED_LOCK=1.
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
@@ -279,22 +299,40 @@ jobs:
       - name: Evaluate smoke path filter / run result
         run: |
           set -euo pipefail
-          if [[ "${{ needs.changes.result }}" != "success" ]]; then
-            echo "::error::Detect path changes failed (${{ needs.changes.result }})"
+          changes_result="${{ needs.changes.result }}"
+          if [[ "${changes_result}" == "abandoned" ]]; then
+            echo "::error::needs.changes.result=abandoned (not in this attempt). Use 'Re-run all jobs', not 'Re-run failed jobs'."
+            exit 1
+          fi
+          if [[ "${changes_result}" != "success" ]]; then
+            echo "::error::Detect path changes failed (${changes_result})"
             exit 1
           fi
           if [[ "${{ needs.changes.outputs.smoke }}" != "true" ]]; then
             echo "Skipped — no Flutter/web/e2e/workflow path changes"
             exit 0
           fi
-          if [[ "${{ needs.wait-ci-flutter.result }}" != "success" ]]; then
-            echo "::error::wait-ci-flutter failed (${{ needs.wait-ci-flutter.result }})"
+          wait_result="${{ needs.wait-ci-flutter.result }}"
+          if [[ "${wait_result}" == "abandoned" ]]; then
+            echo "::error::wait-ci-flutter was abandoned (never ran). abandoned ≠ success. Re-run all jobs."
+            exit 1
+          fi
+          if [[ "${wait_result}" != "success" ]]; then
+            echo "::error::wait-ci-flutter failed (${wait_result})"
             exit 1
           fi
           result="${{ needs.smoke-run.result }}"
           echo "smoke-run result=${result}"
+          if [[ "${result}" == "abandoned" ]]; then
+            echo "::error::smoke-run was abandoned (never ran). abandoned ≠ success. Re-run all jobs."
+            exit 1
+          fi
           if [[ "${result}" == "cancelled" ]]; then
             echo "::error::smoke-run was cancelled (not success). cancelled ≠ success."
+            exit 1
+          fi
+          if [[ "${result}" == "skipped" ]]; then
+            echo "::error::smoke-run was skipped but smoke path filter was true."
             exit 1
           fi
           [[ "${result}" == "success" ]]
