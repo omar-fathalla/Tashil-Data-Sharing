@@ -28,8 +28,8 @@
 2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-3. صافي Sell-In (بدون الضريبة) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-3. صافي Sell-In (بدون الضريبة) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+3. صافي Sell-In بعد المرتجعات (بدون الضريبة) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
+3. صافي Sell-In بعد المرتجعات (بدون الضريبة) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 4. ضريبة القيمة المضافة (14%) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 4. ضريبة القيمة المضافة (14%) | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
 5. قيمة الفواتير | 11.5 | FontWeight.w700 | ff45464f | 0.25 | 1.43
@@ -68,8 +68,8 @@ Month | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Month | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Month | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 Month | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Net Sell-In (excl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-Net Sell-In (excl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Net Sell-In after returns (excl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
+Net Sell-In after returns (excl. VAT) | 11.5 | FontWeight.w600 | ff45464f | 0.5 | 1.45
 November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 October (10) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
@@ -102,8 +102,6 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 إجمالي المطالبة المالية على السلسلة | 10.5 | FontWeight.w600 | ff45464f | 0.25 | 1.43
 إجمالي الوزن الفعلي | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 إجمالي الوزن الفعلي | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
-إجمالي صافي التوريد (غير شامل الضريبة) | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
-إجمالي صافي التوريد (غير شامل الضريبة) | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
 ابحث بالصنف أو الكود أو الباركود | 13.0 | FontWeight.w300 | b345464f | 0.25 | 1.43
 ابحث بالصنف أو الكود أو الباركود | 13.0 | FontWeight.w300 | b345464f | 0.25 | 1.43
 اضغط على الصنف لعرض بياناته. | 11.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
@@ -133,8 +131,10 @@ Year | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 رفع ملف Sell-In | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
 رفع ملف Sell-In | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
 رفع ملف Sell-In | 11.5 | FontWeight.w700 | ffffffff | 0.5 | 1.33
-شامل الضريبة: 0 ج.م • 0 صف | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-شامل الضريبة: 0 ج.م • 0 صف | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+صافي التوريد بعد المرتجعات (غير شامل الضريبة) | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+صافي التوريد بعد المرتجعات (غير شامل الضريبة) | 13.0 | FontWeight.w800 | ff1a1b21 | 0.1 | 1.43
+صافي بعد المرتجعات · شامل الضريبة: 0 ج.م • 0 صف | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
+صافي بعد المرتجعات · شامل الضريبة: 0 ج.م • 0 صف | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 ضريبة القيمة المضافة: 0 ج.م • المتوقع: 0 ج.م | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 ضريبة القيمة المضافة: 0 ج.م • المتوقع: 0 ج.م | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
 طباعة | 11.0 | FontWeight.w700 | ffffffff | 0.5 | 1.33

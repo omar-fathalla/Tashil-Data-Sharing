@@ -40,6 +40,15 @@ func TestHandleSellInReturns_SyntheticAggregation(t *testing.T) {
 	if len(rep.Advisories) == 0 {
 		t.Fatal("expected net-negative advisory for branch B Feb (100-120)")
 	}
+	if len(rep.TopReturnedProducts) == 0 {
+		t.Fatal("expected Phase-2 top returned products")
+	}
+	if rep.TopReturnedProducts[0].ReturnsValueEGP <= 0 {
+		t.Fatalf("top product returns: %+v", rep.TopReturnedProducts[0])
+	}
+	if len(rep.Alerts) == 0 {
+		t.Fatal("expected Phase-2 threshold alerts (high return %)")
+	}
 
 	w2 := httptest.NewRecorder()
 	h.HandleSellInReturns(w2, authenticatedRequest(http.MethodGet, "/api/v1/analytics/sell-in-returns?year=2026", "tenant-other"))
@@ -47,5 +56,8 @@ func TestHandleSellInReturns_SyntheticAggregation(t *testing.T) {
 	_ = json.NewDecoder(w2.Body).Decode(&empty)
 	if empty.KPIs.ReturnsValueEGP != 0 || len(empty.Branches) != 0 {
 		t.Fatalf("cross-tenant leak: %+v", empty.KPIs)
+	}
+	if len(empty.TopReturnedProducts) != 0 || len(empty.Alerts) != 0 {
+		t.Fatalf("cross-tenant Phase-2 leak: top=%v alerts=%v", empty.TopReturnedProducts, empty.Alerts)
 	}
 }

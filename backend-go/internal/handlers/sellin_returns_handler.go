@@ -11,7 +11,9 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 )
 
-// HandleSellInReturns serves GET /api/v1/analytics/sell-in-returns (Phase-1 المرتجعات report).
+// HandleSellInReturns serves GET /api/v1/analytics/sell-in-returns (المرتجعات report).
+// Phase-1: KPIs, matrix, chart, net-negative advisories.
+// Phase-2: top returned products, threshold alerts, (Excel is client-side).
 // Read-only, tenant-scoped. Negatives stay as stored; response returns amounts are positive.
 func (h *AnalyticsHandler) HandleSellInReturns(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := middleware.EnforceTenantRLS(r)

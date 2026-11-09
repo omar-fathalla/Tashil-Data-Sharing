@@ -85,4 +85,29 @@ class ExportColumns {
     'تاريخ البيع',
   ];
 
+  /// Used by sell_in_returns_screen.dart (Phase-2 Excel export — branch×month matrix).
+  static const List<String> sellInReturnsMatrix = [
+    'الفرع (Branch)',
+    'الشهر (Month)',
+    'إجمالي التوريد (Gross EGP)',
+    'قيمة المرتجع (Returns EGP)',
+    'كمية المرتجع (Returns Qty)',
+    'صافي التوريد بعد المرتجعات (Net EGP)',
+    'نسبة المرتجع من الإجمالي %',
+  ];
+
+  /// Used by sell_in_returns_screen.dart (Phase-2 Excel export — top returned products).
+  static const List<String> sellInReturnsTopProducts = [
+    'الترتيب (Rank)',
+    'كود الصنف (Item Code)',
+    'اسم الصنف (Product)',
+    'مجموعة الصنف (Group)',
+    'قيمة المرتجع (Returns EGP)',
+    'كمية المرتجع (Returns Qty)',
+    'إجمالي التوريد (Gross EGP)',
+    'صافي بعد المرتجعات (Net EGP)',
+    'نسبة المرتجع من الإجمالي %',
+    'حصة من إجمالي المرتجعات %',
+  ];
+
 }

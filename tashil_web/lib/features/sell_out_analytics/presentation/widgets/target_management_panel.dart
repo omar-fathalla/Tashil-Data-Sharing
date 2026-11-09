@@ -996,10 +996,11 @@ onChanged: m3Legacy<int>((v) {
             final card2 = _buildKpiCard(
               context,
               titleAr: _isSellIn
-                  ? 'المحقق (Sell-In)'
+                  ? 'المحقق صافي بعد المرتجعات (Sell-In)'
                   : 'المحقق (Sell-Out)',
-              titleEn:
-                  _isSellIn ? 'Actual Sell-In (EGP)' : 'Actual Sell-Out (EGP)',
+              titleEn: _isSellIn
+                  ? 'Actual net Sell-In after returns (EGP)'
+                  : 'Actual Sell-Out (EGP)',
               value: CurrencyFormatter.formatCompactEGP(
                 summary.totalActualRevenueEgp,
               ),

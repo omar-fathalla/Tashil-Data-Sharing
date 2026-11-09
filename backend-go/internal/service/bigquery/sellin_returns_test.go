@@ -191,3 +191,78 @@ func TestIsSellInReturn(t *testing.T) {
 		t.Fatal("invoice")
 	}
 }
+
+func TestAggregateSellInReturns_TopProductsAndAlerts(t *testing.T) {
+	recs := []domain.SellInRecord{
+		// P1: heavy returns → top #1, product alert (20/100 = 20%)
+		{Year: 2026, MonthNum: 4, CustomerName: "فرع أ", CustomerBranchCode: "b-a", ItemName: "صنف ثقيل", ItemCode: "P1", ItemGroup: "مجموعة1", NetValueEGP: 100, NetQtyCases: 10},
+		{Year: 2026, MonthNum: 4, CustomerName: "فرع أ", CustomerBranchCode: "b-a", ItemName: "صنف ثقيل", ItemCode: "P1", ItemGroup: "مجموعة1", NetValueEGP: -20, NetQtyCases: -2, TransactionType: "مرتجع (Return)"},
+		// P2: smaller returns
+		{Year: 2026, MonthNum: 4, CustomerName: "فرع ب", CustomerBranchCode: "b-b", ItemName: "صنف خفيف", ItemCode: "P2", ItemGroup: "مجموعة2", NetValueEGP: 200, NetQtyCases: 20},
+		{Year: 2026, MonthNum: 4, CustomerName: "فرع ب", CustomerBranchCode: "b-b", ItemName: "صنف خفيف", ItemCode: "P2", ItemGroup: "مجموعة2", NetValueEGP: -5, NetQtyCases: -1, TransactionType: "مرتجع (Return)"},
+		// Prior month smaller returns → MoM spike for April focus
+		{Year: 2026, MonthNum: 3, CustomerName: "فرع أ", CustomerBranchCode: "b-a", ItemName: "صنف ثقيل", ItemCode: "P1", ItemGroup: "مجموعة1", NetValueEGP: 50, NetQtyCases: 5},
+		{Year: 2026, MonthNum: 3, CustomerName: "فرع أ", CustomerBranchCode: "b-a", ItemName: "صنف ثقيل", ItemCode: "P1", ItemGroup: "مجموعة1", NetValueEGP: -2, NetQtyCases: -1, TransactionType: "مرتجع (Return)"},
+	}
+
+	rep := AggregateSellInReturns(recs, SellInReturnsFilter{Year: 2026, Month: 4})
+	if len(rep.TopReturnedProducts) < 2 {
+		t.Fatalf("expected >=2 top products, got %+v", rep.TopReturnedProducts)
+	}
+	top := rep.TopReturnedProducts[0]
+	if top.Rank != 1 || top.ProductCode != "P1" || math.Abs(top.ReturnsValueEGP-20) > 0.01 {
+		t.Fatalf("top product: %+v", top)
+	}
+	if top.ShareOfReturns < 70 {
+		t.Fatalf("P1 should dominate share of returns: %+v", top)
+	}
+
+	// Overall return % for April: returns 25 / gross 300 ≈ 8.3% → warning (>=5, <10)
+	if math.Abs(rep.KPIs.ReturnPctOfGross-round2(25.0/300.0*100)) > 0.05 {
+		t.Fatalf("kpi return pct: %v", rep.KPIs.ReturnPctOfGross)
+	}
+	hasReturnPct := false
+	hasMom := false
+	hasProduct := false
+	for _, a := range rep.Alerts {
+		switch a.Code {
+		case "return_pct":
+			hasReturnPct = true
+			if a.Severity != "warning" {
+				t.Fatalf("overall return_pct severity: %+v", a)
+			}
+		case "mom_spike":
+			hasMom = true
+		case "product_pct":
+			if a.Context == "صنف ثقيل" {
+				hasProduct = true
+			}
+		}
+	}
+	if !hasReturnPct {
+		t.Fatalf("expected return_pct alert, got %+v", rep.Alerts)
+	}
+	if !hasMom {
+		t.Fatalf("expected mom_spike (Apr returns 25 vs Mar 2), got %+v", rep.Alerts)
+	}
+	if !hasProduct {
+		t.Fatalf("expected product_pct for صنف ثقيل, got %+v", rep.Alerts)
+	}
+}
+
+func TestAggregateSellInReturns_CriticalAlertAt10Pct(t *testing.T) {
+	recs := []domain.SellInRecord{
+		{Year: 2026, MonthNum: 1, CustomerName: "فرع أ", CustomerBranchCode: "b-a", ItemName: "صنف", ItemCode: "X1", NetValueEGP: 100, NetQtyCases: 10},
+		{Year: 2026, MonthNum: 1, CustomerName: "فرع أ", CustomerBranchCode: "b-a", ItemName: "صنف", ItemCode: "X1", NetValueEGP: -15, NetQtyCases: -2, TransactionType: "مرتجع (Return)"},
+	}
+	rep := AggregateSellInReturns(recs, SellInReturnsFilter{Year: 2026, Month: 1})
+	found := false
+	for _, a := range rep.Alerts {
+		if a.Code == "return_pct" && a.Severity == "critical" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected critical return_pct at 15%%, got %+v", rep.Alerts)
+	}
+}

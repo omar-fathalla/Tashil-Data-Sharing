@@ -1357,11 +1357,11 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
           builder: (context, constraints) {
             final card1 = _buildSummaryCard(
               context,
-              titleAr: 'إجمالي صافي التوريد (غير شامل الضريبة)',
-              titleEn: 'Net Sell-In (excl. VAT)',
+              titleAr: 'صافي التوريد بعد المرتجعات (غير شامل الضريبة)',
+              titleEn: 'Net Sell-In after returns (excl. VAT)',
               value: CurrencyFormatter.formatCompactEGP(netExclVat),
               subtitle:
-                  'شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(grossInclVat)} • ${_data.totalCount} صف',
+                  'صافي بعد المرتجعات · شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(grossInclVat)} • ${_data.totalCount} صف',
               icon: Icons.payments_rounded,
               color: colorScheme.primary,
             );
@@ -1501,7 +1501,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                   const SizedBox(width: 10.0),
                   _buildWaterfallMetricPill(
                     context,
-                    labelAr: '3. صافي Sell-In (بدون الضريبة)',
+                    labelAr: '3. صافي Sell-In بعد المرتجعات (بدون الضريبة)',
                     valueText: CurrencyFormatter.formatCompactEGP(netExclVat),
                     subText:
                         '${CurrencyFormatter.formatNumber(_data.totalCases.round())} كرتونة • ${CurrencyFormatter.formatNumber(_data.totalUnitsPieces)} وحدة',

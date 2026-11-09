@@ -8,8 +8,11 @@ import 'package:tashil_web/core/theme/m3_shape.dart';
 import 'package:tashil_web/core/theme/m3_spacing.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
+import 'package:tashil_web/core/utils/excel_export_service.dart';
+import 'package:tashil_web/core/utils/export_columns.dart';
 import 'package:tashil_web/core/widgets/kpi_card.dart';
 import 'package:tashil_web/core/widgets/m3_dropdown.dart';
+import 'package:tashil_web/core/widgets/m3_feedback.dart';
 import 'package:tashil_web/core/widgets/m3_states.dart';
 import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 
@@ -17,7 +20,7 @@ import '../../data/sell_in_returns_repository.dart';
 import '../../domain/sell_in_returns_models.dart';
 import '../widgets/returns_monthly_chart.dart';
 
-/// Phase-1 المرتجعات page: KPIs, branch×month heatmap matrix, value/% toggle, monthly chart.
+/// المرتجعات page: Phase-1 KPIs/matrix/chart + Phase-2 top products, alerts, Excel.
 class SellInReturnsScreen extends StatefulWidget {
   final ApiClient apiClient;
   final SellInReturnsRepository? repository;
@@ -151,12 +154,20 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
                 )
               else ...[
                 _buildKpis(theme, cs),
+                if (_report.alerts.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _buildThresholdAlerts(theme, cs),
+                ],
                 if (_report.advisories.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   _buildAdvisories(theme, cs),
                 ],
                 const SizedBox(height: 16),
                 ReturnsMonthlyChart(points: _report.monthly),
+                if (_report.topReturnedProducts.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  _buildTopProducts(theme, cs),
+                ],
                 const SizedBox(height: 16),
                 _buildMatrixCard(theme, cs),
               ],
@@ -164,6 +175,74 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
           ),
         ),
       ),
+    );
+  }
+
+  void _handleExportExcel() {
+    if (widget.apiClient.currentUser?.canExportFinancials == false) {
+      M3Feedback.showError(context, 'ليس لديك صلاحية تصدير التقارير.');
+      return;
+    }
+    if (_loading || _error != null) {
+      M3Feedback.showWarning(context, 'انتظر تحميل البيانات قبل التصدير.');
+      return;
+    }
+
+    final matrixRows = <List<Object?>>[];
+    for (final b in _report.branches) {
+      for (final m in _report.months) {
+        final cell = b.byMonth[m] ?? const SellInReturnsCell();
+        matrixRows.add([
+          b.branchName,
+          _monthLabelsAr[m],
+          cell.grossValueEgp.toStringAsFixed(2),
+          cell.returnsValueEgp.toStringAsFixed(2),
+          cell.returnsQty.toStringAsFixed(2),
+          cell.netValueEgp.toStringAsFixed(2),
+          cell.returnPctOfGross.toStringAsFixed(1),
+        ]);
+      }
+    }
+    final matrixCsv = ExcelExportService.generateCsv(
+      headers: ExportColumns.sellInReturnsMatrix,
+      rows: matrixRows,
+    );
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    ExcelExportService.downloadCsv(
+      'tashil_sellin_returns_matrix_$stamp.csv',
+      matrixCsv,
+    );
+
+    if (_report.topReturnedProducts.isNotEmpty) {
+      final topRows = _report.topReturnedProducts
+          .map(
+            (p) => [
+              p.rank,
+              p.productCode,
+              p.productName,
+              p.productGroup,
+              p.returnsValueEgp.toStringAsFixed(2),
+              p.returnsQty.toStringAsFixed(2),
+              p.grossValueEgp.toStringAsFixed(2),
+              p.netValueEgp.toStringAsFixed(2),
+              p.returnPctOfGross.toStringAsFixed(1),
+              p.shareOfReturns.toStringAsFixed(1),
+            ],
+          )
+          .toList();
+      final topCsv = ExcelExportService.generateCsv(
+        headers: ExportColumns.sellInReturnsTopProducts,
+        rows: topRows,
+      );
+      ExcelExportService.downloadCsv(
+        'tashil_sellin_returns_top_products_$stamp.csv',
+        topCsv,
+      );
+    }
+
+    M3Feedback.showSuccess(
+      context,
+      'تم تصدير تقرير المرتجعات (CSV).',
     );
   }
 
@@ -190,6 +269,16 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
             ],
           ),
         ),
+        TestSemantics(
+          identifier: 'returns-export-excel',
+          label: 'تصدير Excel',
+          child: OutlinedButton.icon(
+            onPressed: _handleExportExcel,
+            icon: const Icon(Icons.download_rounded, size: 18),
+            label: const Text('تصدير Excel'),
+          ),
+        ),
+        const SizedBox(width: 12),
         SegmentedButton<bool>(
           segments: const [
             ButtonSegment(value: false, label: Text('قيمة'), icon: Icon(Icons.payments_rounded, size: 18)),
@@ -375,6 +464,54 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
     );
   }
 
+  Widget _buildThresholdAlerts(ThemeData theme, ColorScheme cs) {
+    final status = M3StatusColors.of(context);
+    final hasCritical = _report.alerts.any((a) => a.isCritical);
+    return Card.outlined(
+      color: hasCritical
+          ? cs.errorContainer.withOpacity(0.4)
+          : status.warningContainer.withOpacity(0.55),
+      child: Padding(
+        padding: M3Spacing.pSm,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  hasCritical ? Icons.warning_rounded : Icons.notification_important_rounded,
+                  size: 20,
+                  color: hasCritical ? cs.onErrorContainer : status.onWarningContainer,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'تنبيهات تجاوز الحد المعتاد للمرتجعات',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: hasCritical ? cs.onErrorContainer : status.onWarningContainer,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            for (final a in _report.alerts.take(8))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '${a.isCritical ? 'حرج' : 'تحذير'}: ${a.messageAr}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: hasCritical ? cs.onErrorContainer : status.onWarningContainer,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildAdvisories(ThemeData theme, ColorScheme cs) {
     return Card.outlined(
       color: cs.errorContainer.withOpacity(0.35),
@@ -401,6 +538,66 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
                   style: theme.textTheme.bodySmall?.copyWith(color: cs.onErrorContainer),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopProducts(ThemeData theme, ColorScheme cs) {
+    return Card.outlined(
+      child: Padding(
+        padding: M3Spacing.pMd,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'أعلى الأصناف المرتجعة',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Top returned products · مرتّبة حسب قيمة المرتجع',
+              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            TableScrollContainer(
+              child: DataTable(
+                headingRowHeight: 44,
+                dataRowMinHeight: 40,
+                dataRowMaxHeight: 52,
+                columns: const [
+                  DataColumn(label: Text('#')),
+                  DataColumn(label: Text('الصنف')),
+                  DataColumn(label: Text('قيمة المرتجع'), numeric: true),
+                  DataColumn(label: Text('الكمية'), numeric: true),
+                  DataColumn(label: Text('نسبة من الإجمالي'), numeric: true),
+                  DataColumn(label: Text('حصة المرتجعات %'), numeric: true),
+                  DataColumn(label: Text('صافي بعد المرتجعات'), numeric: true),
+                ],
+                rows: [
+                  for (final p in _report.topReturnedProducts)
+                    DataRow(
+                      cells: [
+                        DataCell(Text('${p.rank}')),
+                        DataCell(
+                          Text(
+                            p.productCode.isEmpty
+                                ? p.productName
+                                : '${p.productName} (${p.productCode})',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DataCell(Text(CurrencyFormatter.formatCompactEGP(p.returnsValueEgp))),
+                        DataCell(Text(CurrencyFormatter.formatNumber(p.returnsQty.round()))),
+                        DataCell(Text('${p.returnPctOfGross.toStringAsFixed(1)}%')),
+                        DataCell(Text('${p.shareOfReturns.toStringAsFixed(1)}%')),
+                        DataCell(Text(CurrencyFormatter.formatCompactEGP(p.netValueEgp))),
+                      ],
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

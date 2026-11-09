@@ -164,6 +164,80 @@ class SellInReturnsAdvisory {
   }
 }
 
+/// Phase-2 top returned product row.
+class SellInReturnsTopProduct {
+  final int rank;
+  final String productCode;
+  final String productName;
+  final String productGroup;
+  final double returnsValueEgp;
+  final double returnsQty;
+  final double grossValueEgp;
+  final double netValueEgp;
+  final double returnPctOfGross;
+  final double shareOfReturns;
+
+  const SellInReturnsTopProduct({
+    this.rank = 0,
+    this.productCode = '',
+    this.productName = '',
+    this.productGroup = '',
+    this.returnsValueEgp = 0,
+    this.returnsQty = 0,
+    this.grossValueEgp = 0,
+    this.netValueEgp = 0,
+    this.returnPctOfGross = 0,
+    this.shareOfReturns = 0,
+  });
+
+  factory SellInReturnsTopProduct.fromJson(Map<String, dynamic> json) {
+    return SellInReturnsTopProduct(
+      rank: (json['rank'] as num?)?.toInt() ?? 0,
+      productCode: '${json['product_code'] ?? ''}',
+      productName: '${json['product_name'] ?? ''}',
+      productGroup: '${json['product_group'] ?? ''}',
+      returnsValueEgp: (json['returns_value_egp'] as num?)?.toDouble() ?? 0,
+      returnsQty: (json['returns_qty'] as num?)?.toDouble() ?? 0,
+      grossValueEgp: (json['gross_value_egp'] as num?)?.toDouble() ?? 0,
+      netValueEgp: (json['net_value_egp'] as num?)?.toDouble() ?? 0,
+      returnPctOfGross: (json['return_pct_of_gross'] as num?)?.toDouble() ?? 0,
+      shareOfReturns: (json['share_of_returns'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
+/// Phase-2 threshold alert when returns exceed normal levels.
+class SellInReturnsAlert {
+  final String severity; // warning | critical
+  final String code;
+  final String messageAr;
+  final double value;
+  final double threshold;
+  final String context;
+
+  const SellInReturnsAlert({
+    this.severity = 'warning',
+    this.code = '',
+    this.messageAr = '',
+    this.value = 0,
+    this.threshold = 0,
+    this.context = '',
+  });
+
+  bool get isCritical => severity == 'critical';
+
+  factory SellInReturnsAlert.fromJson(Map<String, dynamic> json) {
+    return SellInReturnsAlert(
+      severity: '${json['severity'] ?? 'warning'}',
+      code: '${json['code'] ?? ''}',
+      messageAr: '${json['message_ar'] ?? ''}',
+      value: (json['value'] as num?)?.toDouble() ?? 0,
+      threshold: (json['threshold'] as num?)?.toDouble() ?? 0,
+      context: '${json['context'] ?? ''}',
+    );
+  }
+}
+
 class SellInReturnsFilterOptions {
   final List<int> years;
   final List<String> branches;
@@ -200,6 +274,8 @@ class SellInReturnsReport {
   final SellInReturnsCell grandTotal;
   final SellInReturnsFilterOptions filterOptions;
   final List<SellInReturnsAdvisory> advisories;
+  final List<SellInReturnsTopProduct> topReturnedProducts;
+  final List<SellInReturnsAlert> alerts;
 
   const SellInReturnsReport({
     this.year = 0,
@@ -212,6 +288,8 @@ class SellInReturnsReport {
     this.grandTotal = const SellInReturnsCell(),
     this.filterOptions = const SellInReturnsFilterOptions(),
     this.advisories = const [],
+    this.topReturnedProducts = const [],
+    this.alerts = const [],
   });
 
   factory SellInReturnsReport.fromJson(Map<String, dynamic> json) {
@@ -255,6 +333,14 @@ class SellInReturnsReport {
       advisories: ((json['advisories'] as List?) ?? const [])
           .whereType<Map>()
           .map((e) => SellInReturnsAdvisory.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      topReturnedProducts: ((json['top_returned_products'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => SellInReturnsTopProduct.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      alerts: ((json['alerts'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => SellInReturnsAlert.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
     );
   }
