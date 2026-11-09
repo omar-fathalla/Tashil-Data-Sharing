@@ -374,6 +374,9 @@ func main() {
 	mux.HandleFunc("GET /api/v1/competitors/custom-skus", competitorHandler.HandleListCustomSkus)
 	mux.HandleFunc("POST /api/v1/competitors/custom-skus", competitorHandler.HandleSaveCustomSku)
 	mux.HandleFunc("DELETE /api/v1/competitors/custom-skus/{id}", competitorHandler.HandleDeleteCustomSku)
+	mux.HandleFunc("GET /api/v1/competitors/mappings", competitorHandler.HandleListCompetitorMappings)
+	mux.HandleFunc("POST /api/v1/competitors/mappings", competitorHandler.HandleSaveCompetitorMapping)
+	mux.HandleFunc("DELETE /api/v1/competitors/mappings/{id}", competitorHandler.HandleDeleteCompetitorMapping)
 
 	// 6. Wrap Middleware Chain: CORS -> Data-ready gate -> Auth -> Snapshot hook -> Router
 	protectedHandler := authMiddleware.Handler(middleware.ETag(newAsyncJobs(archDir).wrap(snapshotOnMutation(mux, ingestProcessor))))

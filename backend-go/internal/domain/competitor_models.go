@@ -32,3 +32,26 @@ type CustomCompetitorSkuFilter struct {
 	Chain    string
 	Category string
 }
+
+// CompetitorMapping is an owner-approved own→competitor barcode pin for Compare.
+// Never auto-matched: only persisted when an owner saves one. Seed defaults stay
+// client-side until explicitly migrated — this PR does not write production data.
+type CompetitorMapping struct {
+	ID                   string    `json:"id" firestore:"id"`
+	TenantID             string    `json:"tenant_id" firestore:"tenant_id"`
+	OwnBarcode           string    `json:"own_barcode" firestore:"own_barcode"`
+	CompetitorBarcode    string    `json:"competitor_barcode" firestore:"competitor_barcode"`
+	CompetitorSkuName    string    `json:"competitor_sku_name" firestore:"competitor_sku_name"`
+	CompetitorBrand      string    `json:"competitor_brand" firestore:"competitor_brand"`
+	CompetitorSupplier   string    `json:"competitor_supplier" firestore:"competitor_supplier"`
+	RetailerChain        string    `json:"retailer_chain" firestore:"retailer_chain"`
+	CreatedBy            string    `json:"created_by" firestore:"created_by"`
+	CreatedAt            time.Time `json:"created_at" firestore:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at" firestore:"updated_at"`
+}
+
+// CompetitorMappingFilter narrows list results. Empty fields match everything.
+type CompetitorMappingFilter struct {
+	Chain      string
+	OwnBarcode string
+}

@@ -22,11 +22,25 @@ func TestHandleCompetitiveMonthlyJanThroughOct(t *testing.T) {
 			TenantID:        "tenant-adeco",
 			RetailerChain:   "fathalla",
 			Barcode:         "6223000239438",
-			SKUName:         "فيبا 3 كجم",
+			SKUName:         "عرض شرنك فيبا بلس + 3 كجم",
+			Category:        "منظف ارضيات",
 			QuantitySold:    10,
 			UnitPrice:       float64(100 + m),
 			NetRevenue:      10 * float64(100+m),
 			TransactionDate: fmt.Sprintf("2026-%02d-15", m),
+			IsOwnBrand:      true,
+		})
+		facts = append(facts, domain.SellOutFact{
+			RecordID:        fmt.Sprintf("r2-%d", m),
+			TenantID:        "tenant-adeco",
+			RetailerChain:   "fathalla",
+			Barcode:         "6223000232514",
+			SKUName:         "فيبا اطباق",
+			Category:        "صابون سائل اطباق",
+			QuantitySold:    4,
+			UnitPrice:       50,
+			NetRevenue:      200,
+			TransactionDate: fmt.Sprintf("2026-%02d-16", m),
 			IsOwnBrand:      true,
 		})
 	}
@@ -56,11 +70,23 @@ func TestHandleCompetitiveMonthlyJanThroughOct(t *testing.T) {
 			t.Fatalf("month[%d]=%d want %d", i, resp.Months[i], want)
 		}
 	}
-	if len(resp.Items) != 1 || resp.Items[0].Barcode != "6223000239438" {
-		t.Fatalf("items=%+v", resp.Items)
+	if len(resp.Items) != 2 {
+		t.Fatalf("items=%d want 2", len(resp.Items))
 	}
-	if len(resp.Items[0].Months) != 10 {
-		t.Fatalf("series len=%d", len(resp.Items[0].Months))
+	if len(resp.OwnSkus) != 2 {
+		t.Fatalf("own_skus=%d want 2; %+v", len(resp.OwnSkus), resp.OwnSkus)
+	}
+	foundFloor := false
+	for _, o := range resp.OwnSkus {
+		if o.Barcode == "6223000239438" {
+			foundFloor = true
+			if o.Category != "منظف ارضيات" {
+				t.Fatalf("handler own category=%q want live منظف ارضيات", o.Category)
+			}
+		}
+	}
+	if !foundFloor {
+		t.Fatal("missing 6223000239438 in own_skus")
 	}
 	if resp.Source != "memory" {
 		t.Fatalf("source=%s", resp.Source)

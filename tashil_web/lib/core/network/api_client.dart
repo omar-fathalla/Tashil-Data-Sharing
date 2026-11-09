@@ -10597,6 +10597,10 @@ class ApiClient {
   /// Custom field competitor entries added or pinned by the user during the session.
   final Map<String, List<CompetitorSkuComparisonModel>> _customPinnedCompetitors = {};
 
+  /// Owner-approved durable own→competitor barcode pins from Firestore (never auto-matched).
+  /// Seed hardcoded pins stay client-side until an owner saves; this cache starts empty.
+  final Map<String, List<_ApprovedCompetitorPin>> _durableCompetitorPins = {};
+
   /// Helper to infer brand name from Arabic SKU name or supplier name.
   static String inferBrandFromSkuOrSupplier(String skuName, String supplier, {bool isOwn = false}) {
     final s = skuName.trim();
@@ -11003,6 +11007,40 @@ class ApiClient {
     }
   }
 
+  /// Loads owner-approved durable competitor barcode mappings (empty until owner saves).
+  /// Never invents matches — failure leaves the previous cache untouched.
+  Future<void> _syncCompetitorMappings({String? chain}) async {
+    try {
+      final params = <String, String>{};
+      if (chain != null && chain.isNotEmpty && chain != 'all' && chain != 'الكل') {
+        params['chain'] = chain;
+      }
+      final uri = Uri.parse(ApiEndpoints.competitorMappings)
+          .replace(queryParameters: params.isEmpty ? null : params);
+      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 6));
+      if (resp.statusCode != 200) return;
+      final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      final rows = (data['mappings'] as List?) ?? const [];
+      final fresh = <String, List<_ApprovedCompetitorPin>>{};
+      for (final raw in rows) {
+        if (raw is! Map) continue;
+        final r = Map<String, dynamic>.from(raw);
+        final own = '${r['own_barcode'] ?? ''}'.trim();
+        final comp = '${r['competitor_barcode'] ?? ''}'.trim();
+        if (own.isEmpty || comp.isEmpty) continue;
+        fresh.putIfAbsent(own, () => []).add(_ApprovedCompetitorPin(
+          barcode: comp,
+          skuName: '${r['competitor_sku_name'] ?? ''}'.trim(),
+          brand: '${r['competitor_brand'] ?? ''}'.trim(),
+          supplierName: '${r['competitor_supplier'] ?? ''}'.trim(),
+        ));
+      }
+      _durableCompetitorPins
+        ..clear()
+        ..addAll(fresh);
+    } catch (_) {}
+  }
+
   /// Loads persisted custom competitor SKUs from the server and replaces the local cache.
   /// On failure the in-memory list is kept as is.
   Future<void> _syncCustomCompetitorSkus({String? chain}) async {
@@ -11166,10 +11204,12 @@ class ApiClient {
     return (volume: 1.0, unitLabel: 'عبوة', badgeLabel: '1 عبوة قياسية');
   }
 
-  /// One-shot server aggregate for Compare: barcode → YYYY-MM → (avg unit price, units).
-  /// Replaces [getRecordsAllPages] so the browser never pages ~80k raw sell-out rows.
+  /// One-shot server aggregate for Compare: barcode → YYYY-MM → (avg unit price, units),
+  /// plus live own-SKU name/category metadata (is_own_brand). No raw row paging.
   Future<({
     Map<String, Map<String, ({double price, int units})>> byBarcode,
+    Map<String, ({String skuName, String category, bool isOwnBrand})> metaByBarcode,
+    List<({String barcode, String skuName, String category})> ownSkus,
     List<int> months,
   })> getCompetitiveMonthly({
     String? chain,
@@ -11198,11 +11238,16 @@ class ApiClient {
     lastCompetitiveMonths = sortedMonths;
 
     final byBarcode = <String, Map<String, ({double price, int units})>>{};
+    final metaByBarcode = <String, ({String skuName, String category, bool isOwnBrand})>{};
     for (final raw in (body['items'] as List?) ?? const []) {
       if (raw is! Map) continue;
       final item = Map<String, dynamic>.from(raw);
       final barcode = '${item['barcode'] ?? ''}'.trim();
       if (barcode.isEmpty) continue;
+      final skuName = '${item['sku_name'] ?? ''}'.trim();
+      final category = normalizeCategoryName('${item['category'] ?? ''}'.trim());
+      final isOwn = item['is_own_brand'] == true;
+      metaByBarcode[barcode] = (skuName: skuName, category: category, isOwnBrand: isOwn);
       final monthMap = <String, ({double price, int units})>{};
       for (final ptRaw in (item['months'] as List?) ?? const []) {
         if (ptRaw is! Map) continue;
@@ -11222,9 +11267,47 @@ class ApiClient {
       }
       if (monthMap.isNotEmpty) byBarcode[barcode] = monthMap;
     }
+
+    final ownSkus = <({String barcode, String skuName, String category})>[];
+    final ownSeen = <String>{};
+    for (final raw in (body['own_skus'] as List?) ?? const []) {
+      if (raw is! Map) continue;
+      final row = Map<String, dynamic>.from(raw);
+      final barcode = '${row['barcode'] ?? ''}'.trim();
+      if (barcode.isEmpty || !ownSeen.add(barcode)) continue;
+      ownSkus.add((
+        barcode: barcode,
+        skuName: '${row['sku_name'] ?? ''}'.trim(),
+        category: normalizeCategoryName('${row['category'] ?? ''}'.trim()),
+      ));
+      final prev = metaByBarcode[barcode];
+      metaByBarcode[barcode] = (
+        skuName: ownSkus.last.skuName.isNotEmpty ? ownSkus.last.skuName : (prev?.skuName ?? ''),
+        category: ownSkus.last.category.isNotEmpty ? ownSkus.last.category : (prev?.category ?? ''),
+        isOwnBrand: true,
+      );
+    }
+    if (ownSkus.isEmpty) {
+      final fromItems = metaByBarcode.entries
+          .where((e) => e.value.isOwnBrand && byBarcode.containsKey(e.key))
+          .map((e) => (
+                barcode: e.key,
+                skuName: e.value.skuName,
+                category: e.value.category,
+              ))
+          .toList()
+        ..sort((a, b) => a.barcode.compareTo(b.barcode));
+      ownSkus.addAll(fromItems);
+    }
+
     final mergedMonths = months.toList()..sort();
     lastCompetitiveMonths = mergedMonths;
-    return (byBarcode: byBarcode, months: mergedMonths);
+    return (
+      byBarcode: byBarcode,
+      metaByBarcode: metaByBarcode,
+      ownSkus: ownSkus,
+      months: mergedMonths,
+    );
   }
 
   /// Retrieves competitive SKU comparison groups (Own SKUs + mapped Competitor SKUs)
@@ -11246,6 +11329,8 @@ class ApiClient {
 
     // Single aggregated request — never page raw sell-out records for Compare.
     var liveByBarcode = <String, Map<String, ({double price, int units})>>{};
+    var metaByBarcode = <String, ({String skuName, String category, bool isOwnBrand})>{};
+    var ownSkus = <({String barcode, String skuName, String category})>[];
     try {
       final agg = await getCompetitiveMonthly(
         chain: (effectiveChain != null && effectiveChain != 'all' && effectiveChain != 'الكل')
@@ -11254,15 +11339,22 @@ class ApiClient {
         year: year,
       );
       liveByBarcode = agg.byBarcode;
+      metaByBarcode = agg.metaByBarcode;
+      ownSkus = agg.ownSkus;
     } catch (e) {
       debugPrint('[ApiClient] competitive-monthly failed: $e');
       lastCompetitiveMonths = const [];
     }
 
-    if (syncCustomSkus) await _syncCustomCompetitorSkus(chain: effectiveChain);
+    if (syncCustomSkus) {
+      await _syncCustomCompetitorSkus(chain: effectiveChain);
+      await _syncCompetitorMappings(chain: effectiveChain);
+    }
 
     final groups = _buildRichCompetitiveGroups(
       liveByBarcode: liveByBarcode,
+      metaByBarcode: metaByBarcode,
+      ownSkus: ownSkus,
       chainFilter: effectiveChain,
       year: year,
       month: month,
@@ -11298,6 +11390,8 @@ class ApiClient {
 
   List<OwnSkuCompetitiveGroupModel> _buildRichCompetitiveGroups({
     required Map<String, Map<String, ({double price, int units})>> liveByBarcode,
+    Map<String, ({String skuName, String category, bool isOwnBrand})> metaByBarcode = const {},
+    List<({String barcode, String skuName, String category})> ownSkus = const [],
     String? chainFilter,
     int year = 2026,
     int month = 0,
@@ -12160,13 +12254,77 @@ class ApiClient {
       return (price: activePrice, units: totalUnits, recommendedPrice: avgPrice);
     }
 
+    // Seeds are initial owner-approved competitor mappings keyed by own barcode.
+    // Live Sell-Out own SKUs drive the list; seed name/category never override live.
+    final seedByOwn = <String, _RawCompetitiveGroupSeed>{
+      for (final s in rawDefs) s.ownBarcode: s,
+    };
+
+    final ownEntries = <({String barcode, String skuName, String category})>[];
+    final seenOwn = <String>{};
+    for (final o in ownSkus) {
+      final b = o.barcode.trim();
+      if (b.isEmpty || !seenOwn.add(b)) continue;
+      ownEntries.add(o);
+    }
+    if (ownEntries.isEmpty) {
+      for (final e in metaByBarcode.entries) {
+        if (!e.value.isOwnBrand) continue;
+        if (!liveByBarcode.containsKey(e.key)) continue;
+        if (!seenOwn.add(e.key)) continue;
+        ownEntries.add((barcode: e.key, skuName: e.value.skuName, category: e.value.category));
+      }
+      ownEntries.sort((a, b) => a.barcode.compareTo(b.barcode));
+    }
+    // Compat: older competitive-monthly payloads without own_skus / is_own_brand —
+    // keep showing seed own barcodes that have live series (still mapping-only for competitors).
+    final anyOwnFlag = metaByBarcode.values.any((m) => m.isOwnBrand) || ownSkus.isNotEmpty;
+    if (ownEntries.isEmpty && !anyOwnFlag) {
+      for (final s in rawDefs) {
+        if (!liveByBarcode.containsKey(s.ownBarcode)) continue;
+        if (!seenOwn.add(s.ownBarcode)) continue;
+        final meta = metaByBarcode[s.ownBarcode];
+        ownEntries.add((
+          barcode: s.ownBarcode,
+          skuName: meta?.skuName ?? '',
+          category: meta?.category ?? '',
+        ));
+      }
+    }
+    // Demo/offline only: when there is no live own data, fall back to seed own list.
+    if (ownEntries.isEmpty && allowSeedMonths) {
+      for (final s in rawDefs) {
+        if (!seenOwn.add(s.ownBarcode)) continue;
+        ownEntries.add((barcode: s.ownBarcode, skuName: s.ownSkuName, category: s.category));
+      }
+    }
+
     final result = <OwnSkuCompetitiveGroupModel>[];
 
-    for (final seed in rawDefs) {
-      final ownPack = extractPackVolume(seed.ownSkuName);
+    for (final own in ownEntries) {
+      final seed = seedByOwn[own.barcode];
+      final liveMeta = metaByBarcode[own.barcode];
+      // Live name/category win. Seed is mapping-only (never overrides live category/name).
+      final liveName = (own.skuName.isNotEmpty
+              ? own.skuName
+              : (liveMeta?.skuName ?? ''))
+          .trim();
+      final liveCategory = (own.category.isNotEmpty
+              ? own.category
+              : (liveMeta?.category ?? ''))
+          .trim();
+      final ownSkuName = liveName.isNotEmpty
+          ? liveName
+          : (allowSeedMonths ? (seed?.ownSkuName ?? own.barcode) : own.barcode);
+      final category = liveCategory.isNotEmpty
+          ? liveCategory
+          : (allowSeedMonths ? (seed?.category ?? '') : '');
+      final ownBrand = inferBrandFromSkuOrSupplier(ownSkuName, '', isOwn: true);
+
+      final ownPack = extractPackVolume(ownSkuName);
       final ownMonthly = mergeMonthlyData(
-        seed.monthlyData,
-        liveByBarcode[seed.ownBarcode],
+        seed?.monthlyData ?? const {},
+        liveByBarcode[own.barcode],
         allowSeeds: allowSeedMonths,
       );
       final ownResolved = resolvePeriodMetrics(ownMonthly, year, month);
@@ -12182,13 +12340,41 @@ class ApiClient {
 
       double totalCatRev = effectiveOwnPrice * ownResolved.units;
 
-      // Strictly keep 1 direct competitor card per rival Brand (no duplicate brand cards)
+      // Approved competitor pins: hardcoded seed (initial) ∪ durable Firestore mappings.
+      // Never auto-matched from Sell-Out.
+      final seenCompBarcodes = <String>{};
       final seenBrands = <String>{};
       final compSeeds = <_RawCompetitorSeed>[];
-      for (final c in seed.competitors) {
-        if (seenBrands.add(c.brand.trim().toLowerCase())) {
-          compSeeds.add(c);
+
+      void addApprovedPin(_RawCompetitorSeed c) {
+        final b = c.barcode.trim();
+        if (b.isEmpty || !seenCompBarcodes.add(b)) return;
+        final brandKey = c.brand.trim().toLowerCase();
+        if (brandKey.isNotEmpty && !seenBrands.add(brandKey)) return;
+        compSeeds.add(c);
+      }
+
+      if (seed != null) {
+        for (final c in seed.competitors) {
+          addApprovedPin(c);
         }
+      }
+      for (final pin in _durableCompetitorPins[own.barcode] ?? const <_ApprovedCompetitorPin>[]) {
+        final meta = metaByBarcode[pin.barcode];
+        final pinName = pin.skuName.isNotEmpty
+            ? pin.skuName
+            : (meta?.skuName.isNotEmpty == true ? meta!.skuName : pin.barcode);
+        final pinBrand = pin.brand.isNotEmpty
+            ? pin.brand
+            : inferBrandFromSkuOrSupplier(pinName, pin.supplierName);
+        addApprovedPin(_RawCompetitorSeed(
+          barcode: pin.barcode,
+          skuName: pinName,
+          brand: pinBrand,
+          supplierName: pin.supplierName,
+          isPinnedDirect: true,
+          monthlyData: const {},
+        ));
       }
 
       final resolvedCompMetrics = <({
@@ -12217,8 +12403,8 @@ class ApiClient {
         ));
       }
 
-      final customList = _customPinnedCompetitors[seed.ownBarcode] ??
-          _customPinnedCompetitors[seed.ownSkuName] ??
+      final customList = _customPinnedCompetitors[own.barcode] ??
+          _customPinnedCompetitors[ownSkuName] ??
           const [];
       for (final custom in customList) {
         totalCatRev += custom.netRevenue;
@@ -12270,17 +12456,17 @@ class ApiClient {
             ? double.parse(((cRev / totalCatRev) * 100.0).toStringAsFixed(1))
             : 15.0;
 
-        // Check if competitor dropped price in latest month (active promo signal)
         final hasRecentDiscount = item.yearTrajectory.isNotEmpty &&
             item.yearTrajectory.last.priceChangePct < -1.5;
 
+        // Competitor category follows the live own category (not a hardcoded seed category).
         builtCompetitors.add(
           CompetitorSkuComparisonModel(
             skuName: c.skuName,
             barcode: c.barcode,
             supplierName: c.supplierName,
             brand: c.brand,
-            category: seed.category,
+            category: category,
             packSizeLabel: cPack.badgeLabel,
             packVolumeUnits: cPack.volume,
             volumeUnitLabel: cPack.unitLabel,
@@ -12321,10 +12507,10 @@ class ApiClient {
 
       result.add(
         OwnSkuCompetitiveGroupModel(
-          ownBarcode: seed.ownBarcode,
-          ownSkuName: seed.ownSkuName,
-          ownBrand: seed.ownBrand,
-          category: seed.category,
+          ownBarcode: own.barcode,
+          ownSkuName: ownSkuName,
+          ownBrand: ownBrand,
+          category: category,
           packSizeLabel: ownPack.badgeLabel,
           packVolumeUnits: ownPack.volume,
           volumeUnitLabel: ownPack.unitLabel,
@@ -12350,6 +12536,21 @@ class ApiClient {
 
     return result;
   }
+}
+
+
+class _ApprovedCompetitorPin {
+  final String barcode;
+  final String skuName;
+  final String brand;
+  final String supplierName;
+
+  const _ApprovedCompetitorPin({
+    required this.barcode,
+    required this.skuName,
+    required this.brand,
+    required this.supplierName,
+  });
 }
 
 class _RawCompetitorSeed {

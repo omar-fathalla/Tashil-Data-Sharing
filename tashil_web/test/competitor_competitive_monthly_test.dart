@@ -20,15 +20,26 @@ Map<String, dynamic> _aggBody({
   required List<int> months,
   required String barcode,
   List<int>? seriesMonths,
+  String skuName = 'فيبا 3 كجم',
+  String category = 'صابون سائل اطباق',
+  bool isOwnBrand = true,
 }) {
   final series = seriesMonths ?? months;
   return {
     'year': 2026,
     'months': months,
     'source': 'memory',
+    'own_skus': isOwnBrand
+        ? [
+            {'barcode': barcode, 'sku_name': skuName, 'category': category},
+          ]
+        : const [],
     'items': [
       {
         'barcode': barcode,
+        'sku_name': skuName,
+        'category': category,
+        'is_own_brand': isOwnBrand,
         'months': [for (final m in series) _monthPt(m, price: 100.0 + m)],
       },
     ],

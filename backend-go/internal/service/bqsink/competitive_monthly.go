@@ -17,10 +17,13 @@ import (
 
 // CompetitiveMonthlyRow is one barcode × month aggregate from BigQuery.
 type CompetitiveMonthlyRow struct {
-	Barcode  string  `bigquery:"barcode"`
-	MonthKey string  `bigquery:"month_key"`
-	Revenue  float64 `bigquery:"revenue"`
-	Units    int64   `bigquery:"units"`
+	Barcode    string  `bigquery:"barcode"`
+	MonthKey   string  `bigquery:"month_key"`
+	Revenue    float64 `bigquery:"revenue"`
+	Units      int64   `bigquery:"units"`
+	SKUName    string  `bigquery:"sku_name"`
+	Category   string  `bigquery:"category"`
+	IsOwnBrand bool    `bigquery:"is_own_brand"`
 }
 
 // CompetitiveMonthlyQuerier aggregates Compare series in BigQuery (no raw row paging).
@@ -29,13 +32,17 @@ type CompetitiveMonthlyQuerier interface {
 	QuerySellOutMonths(ctx context.Context, tenantID string, year int) ([]int, error)
 }
 
-// CompetitiveMonthlySQL groups filtered sell-out rows by barcode and YYYY-MM.
+// CompetitiveMonthlySQL groups filtered sell-out rows by barcode and YYYY-MM,
+// carrying live sku_name / category / is_own_brand for Compare own-SKU listing.
 func CompetitiveMonthlySQL(tableRef, where string) string {
 	base := "WITH m AS (SELECT * FROM (" + servingView(tableRef) + ") WHERE " + where + ")"
 	return base + " SELECT TRIM(IFNULL(barcode, '')) barcode," +
 		" SUBSTR(transaction_date, 1, 7) month_key," +
 		" IFNULL(SUM(IF(unit_price > 0, unit_price * quantity_sold, net_revenue)), 0) revenue," +
-		" IFNULL(SUM(quantity_sold), 0) units" +
+		" IFNULL(SUM(quantity_sold), 0) units," +
+		" IFNULL(ARRAY_AGG(IFNULL(sku_name, '') ORDER BY transaction_date DESC LIMIT 1)[SAFE_OFFSET(0)], '') sku_name," +
+		" IFNULL(ARRAY_AGG(IFNULL(category, '') ORDER BY transaction_date DESC LIMIT 1)[SAFE_OFFSET(0)], '') category," +
+		" LOGICAL_OR(IFNULL(is_own_brand, FALSE) OR TRIM(IFNULL(supplier, '')) = '') is_own_brand" +
 		" FROM m WHERE TRIM(IFNULL(barcode, '')) != '' AND LENGTH(IFNULL(transaction_date, '')) >= 7" +
 		" GROUP BY 1, 2 ORDER BY 1, 2"
 }
@@ -61,7 +68,14 @@ func (s *BigQuerySink) QueryCompetitiveMonthly(ctx context.Context, rq RecordsQu
 	if err != nil {
 		return nil, err
 	}
+	type meta struct {
+		skuName    string
+		category   string
+		isOwnBrand bool
+		monthKey   string
+	}
 	byBarcode := map[string][]bqsvc.CompetitiveMonthPoint{}
+	metaBy := map[string]*meta{}
 	monthSet := map[int]bool{}
 	for {
 		var row CompetitiveMonthlyRow
@@ -98,6 +112,24 @@ func (s *BigQuerySink) QueryCompetitiveMonthly(ctx context.Context, rq RecordsQu
 			Units:      units,
 			NetRevenue: math.Round(row.Revenue*100) / 100,
 		})
+		m := metaBy[barcode]
+		if m == nil {
+			m = &meta{}
+			metaBy[barcode] = m
+		}
+		if row.IsOwnBrand {
+			m.isOwnBrand = true
+		}
+		// Prefer metadata from the newest month_key with non-empty live fields.
+		if row.MonthKey >= m.monthKey {
+			m.monthKey = row.MonthKey
+			if name := strings.TrimSpace(row.SKUName); name != "" {
+				m.skuName = name
+			}
+			if cat := strings.TrimSpace(row.Category); cat != "" {
+				m.category = cat
+			}
+		}
 	}
 	months := make([]int, 0, len(monthSet))
 	for m := range monthSet {
@@ -110,15 +142,29 @@ func (s *BigQuerySink) QueryCompetitiveMonthly(ctx context.Context, rq RecordsQu
 	}
 	sort.Strings(barcodes)
 	items := make([]bqsvc.CompetitiveMonthlyItem, 0, len(barcodes))
+	ownSkus := make([]bqsvc.CompetitiveOwnSku, 0)
 	for _, b := range barcodes {
-		items = append(items, bqsvc.CompetitiveMonthlyItem{Barcode: b, Months: byBarcode[b]})
+		item := bqsvc.CompetitiveMonthlyItem{Barcode: b, Months: byBarcode[b]}
+		if m := metaBy[b]; m != nil {
+			item.SKUName = m.skuName
+			item.Category = m.category
+			item.IsOwnBrand = m.isOwnBrand
+		}
+		items = append(items, item)
+		if item.IsOwnBrand {
+			ownSkus = append(ownSkus, bqsvc.CompetitiveOwnSku{
+				Barcode: b, SKUName: item.SKUName, Category: item.Category,
+			})
+		}
 	}
 	year := 0
 	if len(rq.StartDate) >= 4 {
 		year, _ = strconv.Atoi(rq.StartDate[:4])
 	}
 	_ = start
-	return &bqsvc.CompetitiveMonthlyResult{Year: year, Months: months, Items: items, Source: "bigquery"}, nil
+	return &bqsvc.CompetitiveMonthlyResult{
+		Year: year, Months: months, Items: items, OwnSkus: ownSkus, Source: "bigquery",
+	}, nil
 }
 
 // QuerySellOutMonths returns distinct Sell-Out months for tenant/year from BigQuery.
