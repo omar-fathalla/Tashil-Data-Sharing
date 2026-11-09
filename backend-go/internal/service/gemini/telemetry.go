@@ -6,9 +6,15 @@ import (
 )
 
 func applyGuardrailEvents(payload *domain.NormalizedRetailIngestionPayload, ev *guardrails.Events) {
+	if payload == nil {
+		return
+	}
 	// Branch-norm summary is cheap and useful on AI-mapped payloads too.
 	attachBranchNormSummary(payload)
-	if payload == nil || ev == nil {
+	// Phase B anomaly enrichment runs on every successful payload finalize path
+	// that already calls applyGuardrailEvents (deterministic, AI-mapping, mock).
+	attachPhaseBAnomalies(payload)
+	if ev == nil {
 		return
 	}
 	payload.GuardrailTelemetry = &domain.GuardrailTelemetry{

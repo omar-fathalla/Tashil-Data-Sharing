@@ -71,6 +71,36 @@ func TestValidateIngestionPayloadJSON_OK(t *testing.T) {
 	}
 }
 
+func TestValidateIngestionPayloadJSON_AllowsPhaseBTypes(t *testing.T) {
+	raw := `{
+		"retailer_detected":"carrefour",
+		"confidence_score":0.91,
+		"mapping_source":"ai",
+		"mapping_confidence":0.91,
+		"column_mapping":{
+			"barcode_column":"Barcode",
+			"store_name_column":"Branch",
+			"quantity_sold_column":"Qty",
+			"net_revenue_column":"Net"
+		},
+		"anomalies_detected":[
+			{"row_number":2,"issue_type":"duplicate_row","description":"dup"},
+			{"row_number":3,"issue_type":"unit_price_outlier","description":"price"},
+			{"row_number":4,"issue_type":"mom_spike","description":"spike"}
+		],
+		"normalized_records":[{
+			"resolved_store_id":"crf_maadi",
+			"barcode":"6221155001234",
+			"quantity_sold":10,
+			"net_revenue":100.5,
+			"transaction_date":"2026-01-15"
+		}]
+	}`
+	if err := ValidateIngestionPayloadJSON([]byte(raw)); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestValidateIngestionPayloadJSON_Rejects(t *testing.T) {
 	cases := []struct {
 		name string
@@ -81,6 +111,7 @@ func TestValidateIngestionPayloadJSON_Rejects(t *testing.T) {
 		{"bad_retailer", `{"retailer_detected":"nope","column_mapping":{"barcode_column":"a","store_name_column":"b","quantity_sold_column":"c","net_revenue_column":"d"},"normalized_records":[{"resolved_store_id":"s","barcode":"1","quantity_sold":1,"net_revenue":1,"transaction_date":"2026-01-01"}]}`, "unrecognized"},
 		{"empty_records", `{"retailer_detected":"fathalla","column_mapping":{"barcode_column":"a","store_name_column":"b","quantity_sold_column":"c","net_revenue_column":"d"},"normalized_records":[]}`, "non-empty"},
 		{"bad_source", `{"retailer_detected":"fathalla","mapping_source":"invented","column_mapping":{"barcode_column":"a","store_name_column":"b","quantity_sold_column":"c","net_revenue_column":"d"},"normalized_records":[{"resolved_store_id":"s","barcode":"1","quantity_sold":1,"net_revenue":1,"transaction_date":"2026-01-01"}]}`, "mapping_source"},
+		{"bad_anomaly", `{"retailer_detected":"fathalla","column_mapping":{"barcode_column":"a","store_name_column":"b","quantity_sold_column":"c","net_revenue_column":"d"},"anomalies_detected":[{"row_number":1,"issue_type":"made_up","description":"x"}],"normalized_records":[{"resolved_store_id":"s","barcode":"1","quantity_sold":1,"net_revenue":1,"transaction_date":"2026-01-01"}]}`, "issue_type"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
