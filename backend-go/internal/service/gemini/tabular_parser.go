@@ -220,17 +220,33 @@ func parseXLSXMultiSheetRows(filename string, rawContent []byte) ([][]string, ma
 		return rows, nil, err
 	}
 
-	var combinedRows [][]string
-	rowSheetDates := make(map[int]string)
-	primaryHeaderFetched := false
-	dataRowOffset := 0
+	sheetNames := make([]string, 0, len(sheetEntries))
+	for _, entry := range sheetEntries {
+		sheetNames = append(sheetNames, entry.name)
+	}
+	selection := buildSheetSelectionPlan(filename, sheetNames)
+
+	type tabularChunk struct {
+		name      string
+		prefer    bool
+		sheetDate string
+		headerIdx int
+		rows      [][]string
+		dateIdx   int
+	}
+	var chunks []tabularChunk
 
 	for _, entry := range sheetEntries {
+		// Open-sheet gate only (other-year full-year leftovers). Period overlap
+		// with month-named tabs is resolved below via covered YYYY-MM filtering.
+		if !selection.shouldIncludeSheet(entry.name) {
+			continue
+		}
 		sampleRows, err := readWorksheetSampleRows(entry.file, sharedStrings, 16)
 		if err != nil || len(sampleRows) == 0 {
 			continue
 		}
-		_, headerIdx, ok := findHeaderRow(sampleRows)
+		cols, headerIdx, ok := findHeaderRow(sampleRows)
 		if !ok || headerIdx >= len(sampleRows)-1 {
 			continue
 		}
@@ -238,21 +254,76 @@ func parseXLSXMultiSheetRows(filename string, rawContent []byte) ([][]string, ma
 		if err != nil || len(sheetRows) <= headerIdx+1 {
 			continue
 		}
+		// Re-detect columns on the real header row (sample may be truncated).
+		if headerIdx < len(sheetRows) {
+			if c2, _, ok2 := findHeaderRow(sheetRows[headerIdx : headerIdx+1]); ok2 {
+				cols = c2
+			}
+		}
 		sheetDate := tryParseArabicSheetMonthDate(entry.name, fileYear)
 		if sheetDate == "" && len(sheetEntries) == 1 {
 			sheetDate = tryParseArabicSheetMonthDate(filename, fileYear)
 		}
+		chunks = append(chunks, tabularChunk{
+			name:      entry.name,
+			prefer:    isMonthNamedSheetName(entry.name),
+			sheetDate: sheetDate,
+			headerIdx: headerIdx,
+			rows:      sheetRows,
+			dateIdx:   cols.dateIdx,
+		})
+	}
 
+	// Periods claimed by valid month-named sheets (non-empty data).
+	covered := make(map[string]bool)
+	for _, ch := range chunks {
+		if !ch.prefer {
+			continue
+		}
+		data := ch.rows[ch.headerIdx+1:]
+		hasData := false
+		for _, dr := range data {
+			if !isRowEmpty(dr) {
+				hasData = true
+				break
+			}
+		}
+		if !hasData {
+			continue
+		}
+		if pk := periodKeyFromSheetDate(ch.sheetDate); pk != "" {
+			covered[pk] = true
+		}
+	}
+
+	var combinedRows [][]string
+	rowSheetDates := make(map[int]string)
+	primaryHeaderFetched := false
+	dataRowOffset := 0
+
+	for _, ch := range chunks {
 		if !primaryHeaderFetched {
-			combinedRows = append(combinedRows, sheetRows[:headerIdx+1]...)
+			combinedRows = append(combinedRows, ch.rows[:ch.headerIdx+1]...)
 			primaryHeaderFetched = true
 		}
-
-		sheetDataRows := sheetRows[headerIdx+1:]
-		for _, dr := range sheetDataRows {
+		for _, dr := range ch.rows[ch.headerIdx+1:] {
+			if isRowEmpty(dr) {
+				continue
+			}
+			// Full-year / non-preferred sheets: skip rows already covered by a
+			// valid month-named tab (e.g. Jan monthly + yearly Jan/Feb → drop Jan).
+			if !ch.prefer && rowPeriodCovered(dr, ch.dateIdx, ch.sheetDate, covered) {
+				continue
+			}
 			combinedRows = append(combinedRows, dr)
-			if sheetDate != "" {
-				rowSheetDates[dataRowOffset] = sheetDate
+			fallback := ch.sheetDate
+			if ch.dateIdx >= 0 && ch.dateIdx < len(dr) {
+				if d := normalizeDateString(strings.TrimSpace(dr[ch.dateIdx]), ""); d != "" {
+					fallback = d
+				}
+			}
+			if fallback != "" {
+				rowSheetDates[dataRowOffset] = fallback
 			}
 			dataRowOffset++
 		}

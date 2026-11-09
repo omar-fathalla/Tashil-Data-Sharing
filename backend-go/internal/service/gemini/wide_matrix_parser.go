@@ -68,6 +68,9 @@ type parsedSheetSummary struct {
 	adcoUnits  int
 	marketRev  float64
 	storeCount int
+	// preferOverFullYear marks summaries from a month-named physical tab; those
+	// win period-coverage dedupe against overlapping full-year / split periods.
+	preferOverFullYear bool
 }
 
 // parseWideMatrixXLSX inspects an .xlsx archive for the Fathalla / Adco Wide Branch-Pivot Matrix structure
@@ -95,29 +98,21 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		return nil, false
 	}
 
-	explicitFileYear := inferYearFromText(filename, 0)
-	hasMatchingFileYearSheet := false
-	if explicitFileYear >= 2020 && len(sheetEntries) > 1 {
-		for _, entry := range sheetEntries {
-			if inferYearFromText(entry.name, 0) == explicitFileYear {
-				hasMatchingFileYearSheet = true
-				break
-			}
-		}
+	sheetNames := make([]string, 0, len(sheetEntries))
+	for _, entry := range sheetEntries {
+		sheetNames = append(sheetNames, entry.name)
 	}
+	selection := buildSheetSelectionPlan(filename, sheetNames)
 
 	var visibleWideSheets []parsedSheetSummary
 	var allWideSheets []parsedSheetSummary
 	var virtualEntries []wbSheetEntry
 
 	for _, entry := range sheetEntries {
-		// If the workbook filename explicitly targets a year (e.g. "2026 out.xlsx") and contains a matching sheet ("sale out2026"),
-		// skip leftover full-year sheets from a different year ("sale out2025") so multi-file archives never double-count 2025.
-		if hasMatchingFileYearSheet {
-			entryYear := inferYearFromText(entry.name, 0)
-			if entryYear >= 2020 && entryYear != explicitFileYear && parseSmartMonthToken(entry.name) == 0 {
-				continue
-			}
+		// Open-sheet gate only: leftover other-year full-year dumps. Same-year
+		// monthly vs yearly overlap is resolved by period coverage after parse.
+		if !selection.shouldIncludeSheet(entry.name) {
+			continue
 		}
 		sampleRows, err := readWorksheetSampleRows(entry.file, sharedStrings, wideMatrixHeaderScanRows+2)
 		if err != nil || len(sampleRows) < 2 {
@@ -145,11 +140,14 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		// even if their headers were unlabeled, non-standard, or placed anywhere in the sheet.
 		inferTemporalColumnsFromData(rows, &layout)
 
+		preferMonthly := isMonthNamedSheetName(entry.name)
+
 		// If a single wide sheet contains multiple months/years across rows (e.g. "2025 out.xlsx" with MONTH=jan,feb,mar,apr and YEAR=2025),
 		// split it into virtual chronological monthly sheets so every month is preserved with 100% accuracy!
 		splitSummaries := splitWideSheetByRowPeriods(filename, entry.name, entry.state, rows, layout)
 		if len(splitSummaries) > 0 {
 			for _, sub := range splitSummaries {
+				sub.preferOverFullYear = preferMonthly
 				allWideSheets = append(allWideSheets, sub)
 				if entry.state != "hidden" {
 					visibleWideSheets = append(visibleWideSheets, sub)
@@ -177,13 +175,14 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		}
 
 		summary := parsedSheetSummary{
-			sheetName:  entry.name,
-			sheetDate:  sheetDate,
-			state:      entry.state,
-			rows:       rows,
-			layout:     layout,
-			isWide:     true,
-			storeCount: len(layout.branches),
+			sheetName:          entry.name,
+			sheetDate:          sheetDate,
+			state:              entry.state,
+			rows:               rows,
+			layout:             layout,
+			isWide:             true,
+			storeCount:         len(layout.branches),
+			preferOverFullYear: preferMonthly,
 		}
 		// Compute quick monthly totals for trend & MoM/YoY
 		computeQuickSheetTotals(&summary)
@@ -194,6 +193,13 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		virtualEntries = append(virtualEntries, entry)
 	}
 
+	if len(allWideSheets) == 0 {
+		return nil, false
+	}
+
+	// Prefer valid month-named periods; keep uncovered months from full-year dumps.
+	allWideSheets = dedupeSheetsByPeriodCoverage(allWideSheets)
+	visibleWideSheets = dedupeSheetsByPeriodCoverage(visibleWideSheets)
 	if len(allWideSheets) == 0 {
 		return nil, false
 	}
