@@ -86,7 +86,7 @@ func TestDefaultCategoryEquivalenceApprovedPairs(t *testing.T) {
 	if len(got) != 1 || got[0].Candidate.Barcode != "A" {
 		t.Fatalf("approved gel-auto pair only, got %#v", got)
 	}
-	// #2 يدوى (approved spelling) — يدوي (dot ي) still NOT merged
+	// #2 full manual gel group (يدوى/يدوي × singular/plural)
 	ownManual := SkuCandidate{Barcode: "M", SKUName: "جيل يدوى", Category: "مساحيق جيل يدوى", IsOwnBrand: true}
 	poolManual := []SkuCandidate{
 		{Barcode: "D", SKUName: "منافس مسحوق يدوى", Category: "مسحوق جيل يدوى"},
@@ -94,10 +94,12 @@ func TestDefaultCategoryEquivalenceApprovedPairs(t *testing.T) {
 		{Barcode: "F", SKUName: "اتوماتيك", Category: "مساحيق جيل اتوماتيك"},
 	}
 	got = PreFilterCandidates(ownManual, poolManual, eq)
-	if len(got) != 1 || got[0].Candidate.Barcode != "D" {
-		t.Fatalf("approved gel-manual pair only (not يدوي/اتوماتيك), got %#v", got)
+	if len(got) != 2 {
+		t.Fatalf("manual gel group should include يدوى+يدوي, got %#v", got)
 	}
-	if len(PendingCategoryEquivalencePairs) == 0 {
-		t.Fatal("unapproved يدوي lookalikes must remain listed as pending")
+	for _, g := range got {
+		if g.Candidate.Barcode == "F" {
+			t.Fatal("اتوماتيك must not merge with يدوى")
+		}
 	}
 }
