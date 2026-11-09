@@ -190,34 +190,39 @@ class _ReturnsHeatmapMatrixState extends State<ReturnsHeatmapMatrix> {
       );
     }
 
+    // Sticky columns must be width-bounded: a bare Column in a Row gets
+    // maxWidth=Infinity, and CrossAxisAlignment.stretch then asserts.
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            labelCell(
-              text: 'الفرع',
-              width: ReturnsHeatmapMatrix.branchW,
-              style: headerStyle,
-              bg: cs.surfaceContainerHighest.withOpacity(0.45),
-              boldEdge: true,
-            ),
-            for (final b in branches)
+        SizedBox(
+          width: ReturnsHeatmapMatrix.branchW,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               labelCell(
-                text: b.branchName,
+                text: 'الفرع',
                 width: ReturnsHeatmapMatrix.branchW,
-                style: bodyStyle,
+                style: headerStyle,
+                bg: cs.surfaceContainerHighest.withOpacity(0.45),
                 boldEdge: true,
               ),
-            labelCell(
-              text: 'الإجمالي',
-              width: ReturnsHeatmapMatrix.branchW,
-              style: boldStyle,
-              bg: cs.surfaceContainerHighest.withOpacity(0.5),
-              boldEdge: true,
-            ),
-          ],
+              for (final b in branches)
+                labelCell(
+                  text: b.branchName,
+                  width: ReturnsHeatmapMatrix.branchW,
+                  style: bodyStyle,
+                  boldEdge: true,
+                ),
+              labelCell(
+                text: 'الإجمالي',
+                width: ReturnsHeatmapMatrix.branchW,
+                style: boldStyle,
+                bg: cs.surfaceContainerHighest.withOpacity(0.5),
+                boldEdge: true,
+              ),
+            ],
+          ),
         ),
         Expanded(
           child: TableScrollContainer(
@@ -226,6 +231,7 @@ class _ReturnsHeatmapMatrixState extends State<ReturnsHeatmapMatrix> {
             showSwipeHint: months.length > 4,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 monthsStrip(isHeader: true),
                 for (final b in branches) monthsStrip(isHeader: false, branch: b),
@@ -234,34 +240,37 @@ class _ReturnsHeatmapMatrixState extends State<ReturnsHeatmapMatrix> {
             ),
           ),
         ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            labelCell(
-              text: 'الإجمالي',
-              width: ReturnsHeatmapMatrix.totalW,
-              style: headerStyle,
-              bg: cs.surfaceContainerHighest.withOpacity(0.45),
-              align: TextAlign.center,
-              boldEdge: true,
-            ),
-            for (final b in branches)
+        SizedBox(
+          width: ReturnsHeatmapMatrix.totalW,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               labelCell(
-                text: _fmt(b.total),
+                text: 'الإجمالي',
                 width: ReturnsHeatmapMatrix.totalW,
-                style: boldStyle,
+                style: headerStyle,
+                bg: cs.surfaceContainerHighest.withOpacity(0.45),
                 align: TextAlign.center,
                 boldEdge: true,
               ),
-            labelCell(
-              text: _fmt(widget.grandTotal),
-              width: ReturnsHeatmapMatrix.totalW,
-              style: boldStyle,
-              bg: cs.surfaceContainerHighest.withOpacity(0.5),
-              align: TextAlign.center,
-              boldEdge: true,
-            ),
-          ],
+              for (final b in branches)
+                labelCell(
+                  text: _fmt(b.total),
+                  width: ReturnsHeatmapMatrix.totalW,
+                  style: boldStyle,
+                  align: TextAlign.center,
+                  boldEdge: true,
+                ),
+              labelCell(
+                text: _fmt(widget.grandTotal),
+                width: ReturnsHeatmapMatrix.totalW,
+                style: boldStyle,
+                bg: cs.surfaceContainerHighest.withOpacity(0.5),
+                align: TextAlign.center,
+                boldEdge: true,
+              ),
+            ],
+          ),
         ),
       ],
     );
