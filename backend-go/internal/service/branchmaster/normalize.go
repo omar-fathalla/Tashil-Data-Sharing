@@ -15,6 +15,8 @@ const UnallocatedBranchName = "غير موزع على فرع"
 
 // Normalize builds a stable comparison key:
 // strip chain prefixes/separators; Arabic أ/إ/آ→ا, ة→ه, ى→ي; whitespace; digits.
+// Trailing branch numbers keep their value: كفر الدوار ≠ كفر الدوار 2 ≠ الغردقة 2,
+// but whitespace-only variants of the SAME number merge (كفر الدوار 2 = كفر الدوار2).
 func Normalize(s string) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -44,7 +46,32 @@ func Normalize(s string) string {
 			prevSpace = false
 		}
 	}
-	return strings.Join(strings.Fields(b.String()), " ")
+	s = strings.Join(strings.Fields(b.String()), " ")
+	return unifyTrailingNumberSpacing(s)
+}
+
+// unifyTrailingNumberSpacing inserts a single space before a trailing number when it
+// was glued to letters (كفر الدوار2 → كفر الدوار 2). Different numbers stay different.
+func unifyTrailingNumberSpacing(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return s
+	}
+	runes := []rune(s)
+	// Find trailing digit run.
+	i := len(runes) - 1
+	for i >= 0 && runes[i] >= '0' && runes[i] <= '9' {
+		i--
+	}
+	if i < 0 || i == len(runes)-1 {
+		return s // no trailing digits, or entire string is digits
+	}
+	// i points at last non-digit. If it is not already a space, insert one.
+	if unicode.IsSpace(runes[i]) {
+		// Normalize multiple spaces before the number to one (already collapsed).
+		return s
+	}
+	return string(runes[:i+1]) + " " + string(runes[i+1:])
 }
 
 // ShortDisplay strips the chain prefix for a human-facing short branch name.

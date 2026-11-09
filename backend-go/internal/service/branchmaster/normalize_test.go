@@ -69,6 +69,31 @@ func TestNormalize_LegalEntityBeforeShortBanner(t *testing.T) {
 	}
 }
 
+func TestNormalize_TrailingNumberWhitespaceOnly(t *testing.T) {
+	// Same number, whitespace variants → merge.
+	a := LinkNormalize("عائله فتح الله ماركت - كفر الدوار 2")
+	b := LinkNormalize("عائله فتح الله ماركت مواد عناية - كفر الدوار2")
+	if a != b {
+		t.Fatalf("same-number whitespace must merge: %q vs %q", a, b)
+	}
+	if a != "كفر الدوار 2" {
+		t.Fatalf("normalized=%q want كفر الدوار 2", a)
+	}
+	// Different numbers (or number vs none) → never merge.
+	pairs := [][2]string{
+		{"كفر الدوار", "كفر الدوار 2"},
+		{"الغردقة", "الغردقة 2"},
+		{"نيس", "نيس2"},
+		{"كفر الدوار 2", "كفر الدوار 3"},
+	}
+	for _, p := range pairs {
+		x, y := LinkNormalize("عائله فتح الله ماركت - "+p[0]), LinkNormalize("عائله فتح الله ماركت - "+p[1])
+		if x == y {
+			t.Fatalf("different numbers must stay distinct: %q and %q both → %q", p[0], p[1], x)
+		}
+	}
+}
+
 func TestLinkNormalize_HanovilleBridge(t *testing.T) {
 	a := LinkNormalize("هانوفيل")
 	b := LinkNormalize("عائله فتح الله ماركت - الهانوفيل")

@@ -109,6 +109,28 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 		b.WriteString("\n")
 	}
 
+	if len(r.SourceReconcile) > 0 {
+		b.WriteString("## Per-source branch count reconciliation\n\n")
+		b.WriteString("| Source file | Table | Raw spellings | Care | Grocery/other | Unique locations | Note |\n")
+		b.WriteString("| --- | --- | ---: | ---: | ---: | ---: | --- |\n")
+		for _, s := range r.SourceReconcile {
+			b.WriteString(fmt.Sprintf("| `%s` | `%s` | %d | %d | %d | %d | %s |\n",
+				s.SourceFile, s.SourceTable, s.RawSpellings, s.CareSpellings, s.GrocerySpellings, s.UniqueLocations, s.NoteAR))
+		}
+		b.WriteString("\n")
+		for _, n := range r.ReconcileNotesAR {
+			b.WriteString("- " + n + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	unmappedPlan := 0
+	for _, p := range r.UnmappedPlanCodes {
+		if p.Status == "unmapped_owner_to_name" {
+			unmappedPlan++
+		}
+	}
+
 	b.WriteString("## Top summary\n\n")
 	b.WriteString("| Metric | Count |\n| --- | ---: |\n")
 	b.WriteString(fmt.Sprintf("| Sell-In **and** Sell-Out | %d |\n", r.SellInAndOut))
@@ -117,6 +139,7 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 	b.WriteString(fmt.Sprintf("| Multi-spelling merges | %d |\n", r.MultiSpelling))
 	b.WriteString(fmt.Sprintf("| Branches with Returns coverage | %d |\n", r.ReturnsCovered))
 	b.WriteString(fmt.Sprintf("| Unmatched Sell-Out (no Sell-In counterpart) | %d |\n", len(r.UnmatchedSellOut)))
+	b.WriteString(fmt.Sprintf("| Unmapped Plan branch codes (owner to name) | %d |\n", unmappedPlan))
 	b.WriteString(fmt.Sprintf("| Likely misspelling pairs | %d |\n", len(r.LikelyMisspellings)))
 	b.WriteString(fmt.Sprintf("| Owner questions / ambiguous | %d / %d |\n\n", len(r.OwnerQuestions), len(r.AmbiguousPending)))
 
@@ -144,6 +167,24 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 		b.WriteString("Kept as separate proposed codes until owner confirms merge:\n\n")
 		for _, m := range r.LikelyMisspellings {
 			b.WriteString("- " + m + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	if len(r.UnmappedPlanCodes) > 0 {
+		b.WriteString("### Plan_2026_Clean Customer_Branch_Code\n\n")
+		b.WriteString("File has **no branch-name column**. `Customer_Name` = parent only. Codes below are live BQ `customer_branch_code` — ")
+		b.WriteString("**do not guess names**. Regional is its own FTH bucket; the other 16 await owner name/map.\n\n")
+		b.WriteString("| Code | Rows | Value EGP | Status |\n| --- | ---: | ---: | --- |\n")
+		for _, p := range r.UnmappedPlanCodes {
+			status := p.Status
+			if status == "unmapped_owner_to_name" {
+				status = "unmapped Plan branch codes — owner to name/map"
+			}
+			if status == "regional_bucket" {
+				status = "Regional bucket (own FTH code)"
+			}
+			b.WriteString(fmt.Sprintf("| `%s` | %d | %.2f | %s |\n", p.Code, p.RowCount, p.ValueEGP, status))
 		}
 		b.WriteString("\n")
 	}

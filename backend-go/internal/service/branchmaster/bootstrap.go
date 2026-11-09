@@ -5,17 +5,20 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"unicode"
 )
 
 // RawOccurrence is one observed store/customer name from facts (dry-run / bootstrap).
 type RawOccurrence struct {
 	RawName     string `json:"raw_name"`
 	ChainSlug   string `json:"chain_slug,omitempty"` // optional hint; inferred when empty
-	Source      string `json:"source"`               // sell_out | sell_in | returns
+	Source      string `json:"source"`               // sell_out | sell_in | returns | plan_branch_code
 	SourceTable string `json:"source_table,omitempty"`
 	SourceFile  string `json:"source_file,omitempty"`
 	ArchiveID   string `json:"archive_id,omitempty"`
+	// Optional Plan_2026 Customer_Branch_Code stats (Source=plan_branch_code).
+	PlanCode   string  `json:"plan_code,omitempty"`
+	RowCount   int     `json:"row_count,omitempty"`
+	ValueEGP   float64 `json:"value_egp,omitempty"`
 }
 
 // RawSourceCite cites the live table/file that produced one raw spelling.
@@ -43,7 +46,35 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 	sellOutRaw := map[string]string{} // normalize(raw) → original sell-out raw (for unmatched list)
 
 	provenance := map[string]struct{}{}
+	var planCodeProps []PlanBranchCodeRow
 	for _, o := range occ {
+		src := strings.ToLower(strings.TrimSpace(o.Source))
+		if src == "plan_branch_code" {
+			code := strings.TrimSpace(o.PlanCode)
+			if code == "" {
+				code = strings.TrimSpace(o.RawName)
+			}
+			if code == "" {
+				continue
+			}
+			status := "unmapped_owner_to_name"
+			if isRegionalPlanCode(code) {
+				status = "regional_bucket"
+			}
+			planCodeProps = append(planCodeProps, PlanBranchCodeRow{
+				Code: code, RowCount: o.RowCount, ValueEGP: o.ValueEGP,
+				Status: status, SourceFile: o.SourceFile, ArchiveID: o.ArchiveID,
+			})
+			// Regional stays as its own proposed bucket; numbered/coded Plan codes are NOT
+			// assigned FTH names (owner must name/map — do not guess).
+			if !isRegionalPlanCode(code) {
+				continue
+			}
+			// Fall through: treat Regional as a sell_in raw name for an FTH bucket.
+			o.RawName = code
+			o.Source = "sell_in"
+			src = "sell_in"
+		}
 		raw := strings.TrimSpace(o.RawName)
 		if raw == "" {
 			continue
@@ -58,7 +89,9 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 		}
 		// Chain-scoped key so same short name under different chains stay separate.
 		key := ChainCodeForSlug(slug) + "|" + norm
-		src := strings.ToLower(strings.TrimSpace(o.Source))
+		if src == "" {
+			src = strings.ToLower(strings.TrimSpace(o.Source))
+		}
 		if src == "sell_out" {
 			sellOutRaw[key] = raw
 		}
@@ -220,6 +253,7 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 	}
 
 	misspellings := detectLikelyMisspellings(rows)
+	reconcile, reconcileNotes := buildSourceReconcile(occ)
 
 	var summaries []DryRunChainSummary
 	for _, cc := range sortedKeys(func() map[string]struct{} {
@@ -234,7 +268,19 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 	sort.Strings(unmatchedSO)
 	sort.Strings(ambiguous)
 
+	unmappedPlan := 0
+	for _, p := range planCodeProps {
+		if p.Status == "unmapped_owner_to_name" {
+			unmappedPlan++
+		}
+	}
+
 	var ownerQ []string
+	if unmappedPlan > 0 {
+		ownerQ = append(ownerQ, fmt.Sprintf(
+			"Plan_2026_Clean: %d Customer_Branch_Code بلا اسم فرع في الملف (لا عمود branch-name) — سمِّ/اربط كل كود بفرع FTH (انظر unmapped_plan_branch_codes). لا تخمين.",
+			unmappedPlan))
+	}
 	if len(misspellings) > 0 {
 		ownerQ = append(ownerQ, fmt.Sprintf(
 			"أزواج أسماء متقاربة قد تكون إملاءً مختلفًا لنفس الفرع — أكّد الدمج أو أبقِها منفصلة (انظر likely_misspellings): %s",
@@ -250,6 +296,8 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 		"هذا تقرير تجريبي (dry-run) فقط — لم يُكتب أي شيء في الإنتاج.",
 		"المصادر = بيانات Adeco الحية فقط (BigQuery). لا seed_customers / seed_aliases / ملفات أرشيف قديمة.",
 		"قرار المالك (9 Nov): «عائله فتح الله ماركت مواد عناية - X» = نفس فرع «عائله فتح الله ماركت - X» تحت كود FTH واحد؛ التقارير تجمع الاثنين وتعرض الاسم القصير فقط.",
+		"قرار المالك: أرقام مختلفة = فروع مختلفة دائمًا (كفر الدوار ≠ كفر الدوار 2، نيس ≠ نيس2)؛ المسافة فقط مع نفس الرقم تُدمَج (كفر الدوار 2 = كفر الدوار2).",
+		"Plan_2026_Clean: لا عمود اسم فرع — Customer_Name = أب فقط؛ Customer_Branch_Code = مجمع الإقليم + أكواد مرمّزة. ليس خطأ ingestion.",
 		fmt.Sprintf("عدد الفروع التي دُمجت فيها مواد عناية + بقالة في هذا dry-run: %d.", careMerged),
 		"بعد موافقة المالك على بقية الأسئلة تُحفظ الجداول (سلاسل / فروع / أسماء مستعارة) مرة واحدة.",
 		"«غير موزع على فرع» يظهر فقط إن وُجد في الحقائق الحية؛ لا يُختلق هنا.",
@@ -276,10 +324,32 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 		UnmatchedSellOut:   unmatchedSO,
 		AmbiguousPending:   ambiguous,
 		LikelyMisspellings: misspellings,
-		DataProvenance:     sortedKeys(provenance),
-		Rows:               rows,
-		NotesAR:            notes,
+		DataProvenance:    sortedKeys(provenance),
+		SourceReconcile:   reconcile,
+		ReconcileNotesAR:  reconcileNotes,
+		UnmappedPlanCodes: sortPlanCodeProps(planCodeProps),
+		Rows:              rows,
+		NotesAR:           notes,
 	}
+}
+
+func isRegionalPlanCode(code string) bool {
+	c := strings.ToLower(code)
+	return strings.Contains(code, "الإقليم") || strings.Contains(c, "regional") || strings.Contains(code, "مجمع")
+}
+
+func sortPlanCodeProps(in []PlanBranchCodeRow) []PlanBranchCodeRow {
+	sort.Slice(in, func(i, j int) bool {
+		ri, rj := isRegionalPlanCode(in[i].Code), isRegionalPlanCode(in[j].Code)
+		if ri != rj {
+			return ri // regional first
+		}
+		if in[i].ValueEGP != in[j].ValueEGP {
+			return in[i].ValueEGP > in[j].ValueEGP
+		}
+		return in[i].Code < in[j].Code
+	})
+	return in
 }
 
 // ApplyProposal materializes a confirmed proposal into State (idempotent merge).
@@ -397,6 +467,83 @@ func countRaws(byNorm map[string]*proposalGroup) int {
 	return n
 }
 
+// buildSourceReconcile counts raw spellings and unique locations per live source file.
+func buildSourceReconcile(occ []RawOccurrence) ([]SourceReconcileRow, []string) {
+	type agg struct {
+		table, arch string
+		raws        map[string]struct{}
+		locs        map[string]struct{}
+		care, groc  int
+	}
+	byFile := map[string]*agg{}
+	for _, o := range occ {
+		raw := strings.TrimSpace(o.RawName)
+		file := strings.TrimSpace(o.SourceFile)
+		if raw == "" || file == "" {
+			continue
+		}
+		// Count each source stream once per file (sell_in primary; skip returns + plan codes).
+		src := strings.ToLower(strings.TrimSpace(o.Source))
+		if src == "returns" || src == "plan_branch_code" {
+			continue
+		}
+		a := byFile[file]
+		if a == nil {
+			a = &agg{table: o.SourceTable, arch: o.ArchiveID, raws: map[string]struct{}{}, locs: map[string]struct{}{}}
+			byFile[file] = a
+		}
+		if _, ok := a.raws[raw]; ok {
+			continue
+		}
+		a.raws[raw] = struct{}{}
+		if HasCareLine(raw) {
+			a.care++
+		} else {
+			a.groc++
+		}
+		if n := LinkNormalize(raw); n != "" {
+			a.locs[n] = struct{}{}
+		}
+	}
+	var rows []SourceReconcileRow
+	for _, file := range sortedKeys(func() map[string]struct{} {
+		m := map[string]struct{}{}
+		for k := range byFile {
+			m[k] = struct{}{}
+		}
+		return m
+	}()) {
+		a := byFile[file]
+		note := ""
+		switch {
+		case strings.Contains(strings.ToLower(file), "out26"):
+			note = fmt.Sprintf("Sell-Out wide-matrix stores = %d (this is the «35» live branch count from out26).", len(a.locs))
+		case strings.Contains(strings.ToLower(file), "in26"):
+			note = fmt.Sprintf("in26: %d grocery + %d care spellings → %d locations after مواد عناية merge with grocery (طنطا Out Let care-only stays separate).",
+				a.groc, a.care, len(a.locs))
+		case strings.Contains(file, "Plan_2026") || strings.Contains(file, "Sell_In_Plan"):
+			note = "Plan_2026_Clean: NO branch-name column. Customer_Name = parent only (2 values). Customer_Branch_Code = Regional bucket + 16 coded branches (listed separately; owner names — do not guess)."
+		}
+		rows = append(rows, SourceReconcileRow{
+			SourceFile:       file,
+			SourceTable:      a.table,
+			ArchiveID:        a.arch,
+			RawSpellings:     len(a.raws),
+			CareSpellings:    a.care,
+			GrocerySpellings: a.groc,
+			UniqueLocations:  len(a.locs),
+			NoteAR:           note,
+		})
+	}
+	notes := []string{
+		"«35» (Sell-Out) = distinct store_name in live sell_out_facts for out26 archive arch_adeco_fathalla_1794146334922507694.",
+		"in26: ~29 grocery + care-only طنطا Out Let ≈ 30 locations after owner care=grocery merge.",
+		"Plan_2026_Clean: no branch-name column (ingestion correct). Parent Customer_Name (2) + Customer_Branch_Code Regional (~116.5M EGP) + 16 coded branches — unmapped until owner names them.",
+		"Proposed FTH codes = in26/out26 locations + Regional bucket + Plan parent spellings; numbered branches stay separate.",
+	}
+	return rows, notes
+}
+
 func dedupeCites(in []RawSourceCite) []RawSourceCite {
 	if len(in) == 0 {
 		return nil
@@ -458,6 +605,10 @@ func likelyMisspellingPair(a, b string) bool {
 	if a == "" || b == "" || a == b {
 		return false
 	}
+	// Owner: different numbers = different branches (نيس ≠ نيس2, كفر الدوار ≠ كفر الدوار 2).
+	if trailingNumber(a) != trailingNumber(b) {
+		return false
+	}
 	// Mini / مول / ريفيرا / المحطة are real distinct sites — never flag as typos.
 	distinct := []string{"ميني", "mini", "مول", "ريفيرا", "المحطه", "المحطة", "استاد", "اندلس", "out let", "اوت ليت"}
 	for _, d := range distinct {
@@ -466,41 +617,21 @@ func likelyMisspellingPair(a, b string) bool {
 			return false
 		}
 	}
-	// Same after removing spaces only (e.g. كفر الدوار2 vs كفر الدوار 2).
-	nospace := func(s string) string { return strings.ReplaceAll(s, " ", "") }
-	if nospace(a) == nospace(b) {
-		return true
-	}
-	// Same letters ignoring trailing/embedded digits (نيس vs نيس2) — owner confirm.
-	letters := func(s string) string {
-		var b strings.Builder
-		for _, r := range s {
-			if r >= '0' && r <= '9' || unicode.IsSpace(r) {
-				continue
-			}
-			b.WriteRune(r)
-		}
-		return b.String()
-	}
-	la, lb := letters(a), letters(b)
-	if la != "" && la == lb {
-		// Digit on one side only — flag short stems (نيس vs نيس2), not numbered
-		// sites like كفر الدوار vs كفر الدوار 2.
-		da, db := hasDigit(a), hasDigit(b)
-		if da != db && len([]rune(la)) <= 5 {
-			return true
-		}
-	}
-	return false
+	// Same after removing spaces only (e.g. residual whitespace variants).
+	return strings.ReplaceAll(a, " ", "") == strings.ReplaceAll(b, " ", "")
 }
 
-func hasDigit(s string) bool {
-	for _, r := range s {
-		if r >= '0' && r <= '9' {
-			return true
-		}
+// trailingNumber returns the trailing digit run, or "" if none (نيس vs نيس2 → "", "2").
+func trailingNumber(s string) string {
+	runes := []rune(strings.TrimSpace(s))
+	i := len(runes) - 1
+	for i >= 0 && runes[i] >= '0' && runes[i] <= '9' {
+		i--
 	}
-	return false
+	if i == len(runes)-1 {
+		return ""
+	}
+	return string(runes[i+1:])
 }
 
 func min(a, b int) int {

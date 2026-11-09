@@ -170,8 +170,33 @@ type DryRunReport struct {
 	OwnerQuestions     []string            `json:"owner_questions,omitempty"`
 	UnmatchedSellOut   []string            `json:"unmatched_sell_out,omitempty"` // sell-out names with no Sell-In counterpart
 	AmbiguousPending   []string            `json:"ambiguous_pending,omitempty"`
-	LikelyMisspellings []string            `json:"likely_misspellings,omitempty"`
-	DataProvenance     []string            `json:"data_provenance,omitempty"` // how raw names were sourced
-	Rows               []ProposalRow       `json:"rows"`
-	NotesAR            []string            `json:"notes_ar,omitempty"`
+	LikelyMisspellings []string              `json:"likely_misspellings,omitempty"`
+	DataProvenance     []string              `json:"data_provenance,omitempty"` // how raw names were sourced
+	SourceReconcile       []SourceReconcileRow   `json:"source_reconcile,omitempty"`
+	ReconcileNotesAR      []string               `json:"reconcile_notes_ar,omitempty"`
+	UnmappedPlanCodes     []PlanBranchCodeRow    `json:"unmapped_plan_branch_codes,omitempty"`
+	Rows                  []ProposalRow          `json:"rows"`
+	NotesAR               []string               `json:"notes_ar,omitempty"`
+}
+
+// SourceReconcileRow is one live source file's raw vs location counts for the dry-run.
+type SourceReconcileRow struct {
+	SourceFile       string `json:"source_file"`
+	SourceTable      string `json:"source_table"`
+	ArchiveID        string `json:"archive_id,omitempty"`
+	RawSpellings     int    `json:"raw_spellings"`
+	CareSpellings    int    `json:"care_spellings,omitempty"`
+	GrocerySpellings int    `json:"grocery_spellings,omitempty"`
+	UniqueLocations  int    `json:"unique_locations_after_normalize"`
+	NoteAR           string `json:"note_ar,omitempty"`
+}
+
+// PlanBranchCodeRow is one Customer_Branch_Code from Plan_2026_Clean awaiting owner naming.
+type PlanBranchCodeRow struct {
+	Code       string  `json:"code"`
+	RowCount   int     `json:"row_count"`
+	ValueEGP   float64 `json:"value_egp"`
+	Status     string  `json:"status"` // regional_bucket | unmapped_owner_to_name
+	SourceFile string  `json:"source_file"`
+	ArchiveID  string  `json:"archive_id,omitempty"`
 }
