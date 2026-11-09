@@ -2,8 +2,81 @@ package competitorsuggest
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
+
+func TestGeminiRankerTrimsAPIKeyNewlineBeforeHeader(t *testing.T) {
+	var gotKey string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotKey = r.Header.Get("x-goog-api-key")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"candidates":[{"content":{"parts":[{"text":"{\"suggestions\":[{\"competitor_barcode\":\"A\",\"reason_ar\":\"مناسب\",\"confidence\":0.9,\"rank\":1}]}"}]}}]}`)
+	}))
+	defer srv.Close()
+
+	r := &GeminiRanker{
+		APIKey:     "secret-key-with-newline\n",
+		Model:      "gemini-3.8-flash",
+		APIBase:    srv.URL,
+		HTTPClient: srv.Client(),
+	}
+	own := SkuCandidate{Barcode: "O", SKUName: "فيبا", Category: "صابون سائل اطباق"}
+	cands := []PrefScore{{Candidate: SkuCandidate{Barcode: "A", SKUName: "بريل"}}}
+	got, _, err := r.Rank(context.Background(), own, cands)
+	if err != nil {
+		t.Fatalf("Rank with trailing newline key should trim and succeed: %v", err)
+	}
+	if gotKey != "secret-key-with-newline" {
+		t.Fatalf("header key not trimmed: %q", gotKey)
+	}
+	if len(got) != 1 || got[0].CompetitorBarcode != "A" {
+		t.Fatalf("unexpected rank result: %#v", got)
+	}
+}
+
+func TestGeminiRankerFallsBackOnModelNotFound(t *testing.T) {
+	var models []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// path: /v1beta/models/{model}:generateContent
+		path := r.URL.Path
+		models = append(models, path)
+		if strings.Contains(path, "missing-model") {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `{"error":{"message":"models/missing-model is not found"}}`)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"candidates":[{"content":{"parts":[{"text":"{\"suggestions\":[{\"competitor_barcode\":\"A\",\"reason_ar\":\"مناسب\",\"confidence\":0.8,\"rank\":1}]}"}]}}]}`)
+	}))
+	defer srv.Close()
+
+	r := &GeminiRanker{
+		APIKey:     "k",
+		Model:      "missing-model",
+		Tier2Model: "gemini-pro-latest",
+		APIBase:    srv.URL,
+		HTTPClient: srv.Client(),
+	}
+	own := SkuCandidate{Barcode: "O", SKUName: "فيبا", Category: "صابون سائل اطباق"}
+	cands := []PrefScore{{Candidate: SkuCandidate{Barcode: "A", SKUName: "بريل"}}}
+	got, _, err := r.Rank(context.Background(), own, cands)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(models) != 2 {
+		t.Fatalf("want primary then tier2, got %v", models)
+	}
+	if !strings.Contains(models[0], "missing-model") || !strings.Contains(models[1], "gemini-pro-latest") {
+		t.Fatalf("fallback order: %v", models)
+	}
+	if len(got) != 1 {
+		t.Fatalf("want 1 suggestion after fallback, got %#v", got)
+	}
+}
 
 func TestParseAndValidateRankRejectsHallucinated(t *testing.T) {
 	allowed := map[string]bool{"C1": true, "C2": true}

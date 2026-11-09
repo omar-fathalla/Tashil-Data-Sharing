@@ -80,18 +80,39 @@ class CompetitorSuggestionsReviewState
       _error = null;
     });
     try {
-      await widget.apiClient.runCompetitorSuggestions(
+      final result = await widget.apiClient.runCompetitorSuggestions(
         chain: widget.chain,
         limit: _batchSize,
         year: widget.year,
       );
+      final created = (result['created_count'] as num?)?.toInt() ?? 0;
+      final summary = (result['summary_ar'] ?? result['error'])?.toString();
+      final rankFailures = (result['rank_failures'] as num?)?.toInt() ?? 0;
+      if (!mounted) return;
+      final hasSummary = summary != null && summary.isNotEmpty;
+      if (created == 0 && (hasSummary || rankFailures > 0)) {
+        final detail = hasSummary ? summary! : 'لم يتم إنشاء اقتراحات';
+        _showRunFailure(detail);
+        setState(() => _error = detail);
+      }
       await _reload();
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      final detail = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+      _showRunFailure(detail);
+      setState(() => _error = detail);
     } finally {
       if (mounted) setState(() => _running = false);
     }
+  }
+
+  void _showRunFailure(String detail) {
+    final message = detail.startsWith('تعذر تشغيل الاقتراحات')
+        ? detail
+        : 'تعذر تشغيل الاقتراحات: $detail';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<void> _approve(CompetitorSuggestionModel s) async {

@@ -112,6 +112,71 @@ void main() {
       expect(find.text('لا توجد اقتراحات بانتظار الموافقة'), findsOneWidget);
     }, fake);
   });
+
+  testWidgets('run failure shows Arabic snackbar instead of empty silence',
+      (tester) async {
+    MockClient fake() => MockClient((req) async {
+          if (req.url.path.contains('/competitors/suggestions/run') &&
+              req.method == 'POST') {
+            return _json(
+              jsonEncode({
+                'error':
+                    'فشل ترتيب كل الأصناف (1). تعذر ترتيب المرشحين: 1',
+                'summary_ar':
+                    'فشل ترتيب كل الأصناف (1). تعذر ترتيب المرشحين: 1',
+                'created_count': 0,
+                'suggestions': [],
+                'skipped': [
+                  {
+                    'barcode': 'OWN1',
+                    'reason_ar': 'تعذر ترتيب المرشحين',
+                  }
+                ],
+                'skipped_reason_counts': {'تعذر ترتيب المرشحين': 1},
+                'rank_attempts': 1,
+                'rank_failures': 1,
+              }),
+              502,
+            );
+          }
+          if (req.url.path.contains('/competitors/suggestions') &&
+              req.method == 'GET') {
+            return _json(
+              jsonEncode({'suggestions': [], 'count': 0}),
+              200,
+            );
+          }
+          return _json('{"error":"unhandled"}', 500);
+        });
+
+    await http.runWithClient(() async {
+      final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: CompetitorSuggestionsReview(
+                apiClient: api,
+                chain: 'fathalla',
+                year: 2026,
+                isOwner: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.textContaining('تشغيل دفعة'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(
+        find.textContaining('تعذر تشغيل الاقتراحات'),
+        findsWidgets,
+      );
+    }, fake);
+  });
 }
 
 http.Response _json(String body, int status) => http.Response.bytes(

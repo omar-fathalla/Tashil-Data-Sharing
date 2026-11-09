@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -235,6 +236,38 @@ func TestCompetitorSuggestionsAIRejectsHallucination(t *testing.T) {
 	}
 	if len(sugs) != 1 {
 		t.Fatalf("want only COMP-PRIL, got %v", mustJSON(sugs))
+	}
+}
+
+func TestCompetitorSuggestionsAllRanksFailedReturnsError(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	ranker := &competitorsuggest.GeminiRanker{
+		CallJSON: func(ctx context.Context, model, prompt string) (string, competitorsuggest.TokenUsage, error) {
+			return "", competitorsuggest.TokenUsage{}, context.Canceled
+		},
+	}
+	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), ranker)
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+	rec, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 5, "own_skus": []string{"OWN-DISH"},
+	})
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("all ranks failed: want 502, got %d %s", rec.Code, rec.Body.String())
+	}
+	if int(out["created_count"].(float64)) != 0 {
+		t.Fatalf("created_count: %v", out["created_count"])
+	}
+	if int(out["rank_failures"].(float64)) < 1 {
+		t.Fatalf("rank_failures: %v", out)
+	}
+	errMsg, _ := out["error"].(string)
+	if !strings.Contains(errMsg, "فشل ترتيب") {
+		t.Fatalf("error summary missing Arabic failure text: %v", out)
+	}
+	counts, _ := out["skipped_reason_counts"].(map[string]interface{})
+	if counts == nil || counts["تعذر ترتيب المرشحين"] == nil {
+		t.Fatalf("skipped_reason_counts missing rank failure: %v", out)
 	}
 }
 

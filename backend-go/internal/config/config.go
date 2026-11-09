@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config holds runtime configuration parameters for the Tashil Cloud Run service.
@@ -25,9 +26,18 @@ func Load() *Config {
 	projectID := getEnv("PROJECT_ID", "tashil-data-sharing")
 	dataset := getEnv("BIGQUERY_DATASET", "tashil_analytics")
 	firestoreDB := getEnv("FIRESTORE_DATABASE", "(default)")
-	geminiKey := getEnv("GEMINI_API_KEY", "")
-	geminiModel := getEnv("GEMINI_MODEL", "gemini-pro-latest")
-	geminiTier2Model := getEnv("GEMINI_TIER2_MODEL", "gemini-pro-latest")
+	// Secret Manager / Cloud Run secret mounts often append a trailing newline.
+	// Go's net/http rejects header values with \n (x-goog-api-key), which made
+	// Gemini calls fail before any network I/O and surfaced as empty /run batches.
+	geminiKey := strings.TrimSpace(getEnv("GEMINI_API_KEY", ""))
+	geminiModel := strings.TrimSpace(getEnv("GEMINI_MODEL", "gemini-pro-latest"))
+	geminiTier2Model := strings.TrimSpace(getEnv("GEMINI_TIER2_MODEL", "gemini-pro-latest"))
+	if geminiModel == "" {
+		geminiModel = "gemini-pro-latest"
+	}
+	if geminiTier2Model == "" {
+		geminiTier2Model = "gemini-pro-latest"
+	}
 	jwtSecret := getEnv("JWT_SECRET", "tashil-enterprise-secret-key-adeco-2026")
 	env := getEnv("ENVIRONMENT", "development")
 

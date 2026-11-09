@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -212,6 +213,8 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 	skipped := make([]skipInfo, 0)
 	var promptTok, completionTok int
 	processed := 0
+	rankAttempts := 0
+	rankFailures := 0
 
 	for _, own := range ownPool {
 		if processed >= limit {
@@ -243,10 +246,12 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 			processed++
 			continue
 		}
+		rankAttempts++
 		ranked, usage, err := h.ranker.Rank(r.Context(), own, filtered)
 		promptTok += usage.PromptTokens
 		completionTok += usage.CompletionTokens
 		if err != nil {
+			rankFailures++
 			log.Printf("[competitor-suggest] rank failed own=%s: %v", own.Barcode, err)
 			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: "تعذر ترتيب المرشحين"})
 			processed++
@@ -295,21 +300,51 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 		processed++
 	}
 
-	log.Printf("[competitor-suggest] run tenant=%s chain=%s processed=%d created=%d prompt_tokens=%d completion_tokens=%d",
-		normalizeAuditTenantID(c.TenantID), p.Chain, processed, len(created), promptTok, completionTok)
+	log.Printf("[competitor-suggest] run tenant=%s chain=%s processed=%d created=%d prompt_tokens=%d completion_tokens=%d rank_fail=%d/%d",
+		normalizeAuditTenantID(c.TenantID), p.Chain, processed, len(created), promptTok, completionTok, rankFailures, rankAttempts)
 	h.recordAudit(r, c, "RUN_COMPETITOR_SUGGESTIONS",
-		fmt.Sprintf("chain=%s processed=%d created=%d tokens=%d/%d", p.Chain, processed, len(created), promptTok, completionTok))
+		fmt.Sprintf("chain=%s processed=%d created=%d tokens=%d/%d rank_fail=%d/%d", p.Chain, processed, len(created), promptTok, completionTok, rankFailures, rankAttempts))
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"suggestions":      created,
-		"created_count":    len(created),
-		"processed_own":    processed,
-		"skipped":          skipped,
-		"prompt_tokens":    promptTok,
-		"completion_tokens": completionTok,
-		"limit":            limit,
+	reasonCounts := map[string]int{}
+	for _, s := range skipped {
+		reasonCounts[s.Reason]++
+	}
+	payload := map[string]interface{}{
+		"suggestions":                  created,
+		"created_count":                len(created),
+		"processed_own":                processed,
+		"skipped":                      skipped,
+		"skipped_reason_counts":        reasonCounts,
+		"rank_attempts":                rankAttempts,
+		"rank_failures":                rankFailures,
+		"prompt_tokens":                promptTok,
+		"completion_tokens":            completionTok,
+		"limit":                        limit,
 		"pending_category_equivalence": competitorsuggest.PendingCategoryEquivalencePairs,
-	})
+	}
+	// Prod silence: Gemini key/header failures yielded HTTP 200 + created_count=0.
+	// Surface a clear Arabic error when every ranking attempt failed.
+	if len(created) == 0 && rankAttempts > 0 && rankFailures == rankAttempts {
+		summary := fmt.Sprintf("فشل ترتيب كل الأصناف (%d). %s",
+			rankFailures, formatSkippedReasonSummary(reasonCounts))
+		payload["error"] = summary
+		payload["summary_ar"] = summary
+		writeJSON(w, http.StatusBadGateway, payload)
+		return
+	}
+	writeJSON(w, http.StatusOK, payload)
+}
+
+func formatSkippedReasonSummary(counts map[string]int) string {
+	if len(counts) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(counts))
+	for reason, n := range counts {
+		parts = append(parts, fmt.Sprintf("%s: %d", reason, n))
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, "؛ ")
 }
 
 // HandleApproveSuggestion serves POST /api/v1/competitors/suggestions/approve
