@@ -172,14 +172,16 @@ void main() {
       );
       await tester.pump();
       expect(find.byKey(const ValueKey('compare_kpi_skeleton')), findsNWidgets(4));
-      expect(find.textContaining('1 صنف'), findsNothing);
+      expect(find.text('1 صنف'), findsNothing);
+      expect(find.text('106.7%'), findsNothing);
 
       gate.complete();
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('compare_kpi_skeleton')), findsNothing);
-      expect(find.textContaining('1 صنف'), findsOneWidget);
-      expect(find.textContaining('106.7%'), findsOneWidget);
+      // KPI value + filtered-groups count chip both read "1 صنف".
+      expect(find.text('1 صنف'), findsNWidgets(2));
+      expect(find.text('106.7%'), findsOneWidget);
     },
   );
 }
