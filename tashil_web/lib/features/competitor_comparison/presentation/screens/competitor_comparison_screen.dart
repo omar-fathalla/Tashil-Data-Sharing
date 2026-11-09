@@ -1943,11 +1943,11 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                       horizontal: 14.0,
                       vertical: 8.0,
                     ),
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: M3Palette.successSurface,
                       borderRadius: M3Shape.radiusFull,
                       border:
-                          Border.all(color: _ownBrandGreen, width: 1.5),
+                          Border.fromBorderSide(BorderSide(color: _ownBrandGreen, width: 1.5)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -2366,7 +2366,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
               // Row 1: Our Default SKU in this month
               Container(
                 padding: const EdgeInsets.all(10.0),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: M3Palette.successSurface,
                   borderRadius: M3Shape.radiusMd,
                 ),
@@ -2586,7 +2586,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                             horizontal: 10.0,
                             vertical: 4.0,
                           ),
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: _ownBrandGreen,
                             borderRadius: M3Shape.radiusFull,
                           ),
