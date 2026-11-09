@@ -2186,6 +2186,25 @@ class ServerConnectionException implements Exception {
   String toString() => message;
 }
 
+/// Thrown by [ApiClient.getRecordsAllPages] when the safety row cap is hit while
+/// [totalCount] says more pages remain — never a silent truncated success.
+class SellOutRecordsTruncatedException implements Exception {
+  final String message;
+  final List<SellOutRecordModel> partial;
+  final int totalCount;
+  final int maxRows;
+
+  SellOutRecordsTruncatedException(
+    this.message, {
+    required this.partial,
+    required this.totalCount,
+    required this.maxRows,
+  });
+
+  @override
+  String toString() => message;
+}
+
 /// ApiClient communicates with the Cloud Run backend.
 /// Automatically injects JWT Bearer tokens and handles tenant RLS headers.
 class ApiClient {
@@ -2209,6 +2228,13 @@ class ApiClient {
   /// strictly preventing any fake or fabricated mock data from being displayed.
   static bool defaultAllowMockFallback = !kIsWeb;
   bool allowMockFallback;
+
+  /// Explicit demo/offline flag for competitor seed monthly series.
+  /// Default OFF everywhere (including non-web). Never derived from
+  /// [allowMockFallback] — non-web mock fallback must not invent Jan–Apr history.
+  static bool defaultAllowDemoSeedData = false;
+  bool allowDemoSeedData;
+
   final ValueNotifier<bool> isServerOnline = ValueNotifier<bool>(true);
 
   /// Called when the backend rejects the session (HTTP 401/403), e.g. a stale
@@ -2244,8 +2270,10 @@ class ApiClient {
     this.tenantId = 'tenant-adeco',
     String? authToken,
     bool? allowMockFallback,
+    bool? allowDemoSeedData,
   })  : _authToken = authToken ?? '',
-        allowMockFallback = allowMockFallback ?? defaultAllowMockFallback {
+        allowMockFallback = allowMockFallback ?? defaultAllowMockFallback,
+        allowDemoSeedData = allowDemoSeedData ?? defaultAllowDemoSeedData {
     if (_authToken.isNotEmpty) _currentAuthToken = _authToken;
   }
 
@@ -3163,6 +3191,11 @@ class ApiClient {
   SellOutRecordsSummaryModel? lastSellOutSummary;
 
   /// Queries paginated sell-out transaction records.
+  ///
+  /// [allowMockRecords] controls whether HTTP failure may return [_mockRecords].
+  /// Defaults to [allowMockFallback] (other dashboards OK). Competitive comparison
+  /// / month-series paths pass `allowDemoSeedData` so mocks never invent months
+  /// unless the explicit demo flag is on.
   Future<List<SellOutRecordModel>> getRecords({
     String? chain,
     String? storeId,
@@ -3175,6 +3208,7 @@ class ApiClient {
     int? month,
     int limit = 50,
     int offset = 0,
+    bool? allowMockRecords,
   }) async {
     final effectiveChain = (currentUser?.role == 'chain_kam' &&
             currentUser?.assignedChain != null &&
@@ -3270,7 +3304,8 @@ class ApiClient {
       debugPrint('[ApiClient] Fallback to mock records: $e');
     }
 
-    if (!allowMockFallback) {
+    final useMocks = allowMockRecords ?? allowMockFallback;
+    if (!useMocks) {
       isServerOnline.value = false;
       lastConnectionError = failureError.toString();
       lastSellOutSummary = const SellOutRecordsSummaryModel();
@@ -10452,6 +10487,146 @@ class ApiClient {
     }
   }
 
+  /// Aggregates live sell-out rows into barcode → YYYY-MM → (avg unit price, units).
+  /// Used to extend hardcoded competitive seeds as new months are uploaded.
+  static Map<String, Map<String, ({double price, int units})>> aggregateLiveMonthlyByBarcode(
+    Iterable<SellOutRecordModel> liveRecords,
+  ) {
+    final rev = <String, Map<String, double>>{};
+    final units = <String, Map<String, int>>{};
+    for (final r in liveRecords) {
+      final barcode = r.barcode.trim();
+      if (barcode.isEmpty || r.transactionDate.length < 7) continue;
+      final monthKey = r.transactionDate.substring(0, 7);
+      final qty = r.quantitySold;
+      if (qty <= 0 && r.unitPrice <= 0) continue;
+      rev.putIfAbsent(barcode, () => {})[monthKey] =
+          (rev[barcode]?[monthKey] ?? 0.0) + (r.unitPrice > 0 ? r.unitPrice * qty : r.netRevenue);
+      units.putIfAbsent(barcode, () => {})[monthKey] = (units[barcode]?[monthKey] ?? 0) + qty;
+    }
+    final out = <String, Map<String, ({double price, int units})>>{};
+    for (final barcode in rev.keys) {
+      final months = <String, ({double price, int units})>{};
+      for (final mk in rev[barcode]!.keys) {
+        final u = units[barcode]?[mk] ?? 0;
+        final revenue = rev[barcode]![mk]!;
+        final price = u > 0
+            ? double.parse((revenue / u).toStringAsFixed(2))
+            : double.parse(revenue.toStringAsFixed(2));
+        if (price <= 0 && u <= 0) continue;
+        months[mk] = (price: price, units: u);
+      }
+      if (months.isNotEmpty) out[barcode] = months;
+    }
+    return out;
+  }
+
+  /// Monthly maps for competitive comparison.
+  /// - Live rows for the barcode → live-only (never seed leftovers).
+  /// - No live rows + [allowSeeds] false (production / live mode) → empty (never seeds).
+  /// - No live rows + [allowSeeds] true (explicit demo/offline only) → seed map.
+  static Map<String, ({double price, int units})> mergeMonthlyData(
+    Map<String, ({double price, int units})> seed,
+    Map<String, ({double price, int units})>? live, {
+    bool allowSeeds = false,
+  }) {
+    if (live != null && live.isNotEmpty) {
+      return Map<String, ({double price, int units})>.from(live);
+    }
+    if (!allowSeeds) return const {};
+    return Map<String, ({double price, int units})>.from(seed);
+  }
+
+  /// Backend [HandleRecords] clamps page size to ≤500; requesting more silently becomes 50.
+  static const int sellOutRecordsPageSize = 500;
+
+  /// Safety ceiling for paginated sell-out fetches. Hitting this while more pages remain
+  /// is never silent — see [SellOutRecordsTruncatedException] / [lastSellOutPaginationWarning].
+  static const int sellOutRecordsMaxRows = 250000;
+
+  /// Set when [getRecordsAllPages] hits [sellOutRecordsMaxRows] with pages still remaining.
+  String? lastSellOutPaginationWarning;
+
+  /// Test-only override for the competitive-comparison fetch safety cap.
+  @visibleForTesting
+  int? debugSellOutMaxRows;
+
+  /// Whether another offset page is needed after [fetchedSoFar] rows from a page of [pageLength].
+  static bool sellOutRecordsHasMorePage({
+    required int fetchedSoFar,
+    required int pageLength,
+    required int pageSize,
+    required int totalCount,
+  }) {
+    if (pageLength <= 0) return false;
+    if (fetchedSoFar >= totalCount) return false;
+    if (pageLength < pageSize) return false;
+    return true;
+  }
+
+  /// Walks every sell-out page for the filter until [total_count] is covered.
+  /// If the safety cap is hit while more rows remain, sets [lastSellOutPaginationWarning]
+  /// and throws [SellOutRecordsTruncatedException] (never a silent partial success).
+  ///
+  /// [allowMockRecords] is forwarded to [getRecords]. Comparison callers pass
+  /// [allowDemoSeedData] so HTTP failure cannot inject [_mockRecords] months.
+  Future<List<SellOutRecordModel>> getRecordsAllPages({
+    String? chain,
+    String? storeId,
+    String? category,
+    String? supplier,
+    String? query,
+    String? startDate,
+    String? endDate,
+    int? year,
+    int? month,
+    int pageSize = sellOutRecordsPageSize,
+    int maxRows = sellOutRecordsMaxRows,
+    bool? allowMockRecords,
+  }) async {
+    lastSellOutPaginationWarning = null;
+    final effPage = pageSize.clamp(1, sellOutRecordsPageSize);
+    final all = <SellOutRecordModel>[];
+    var offset = 0;
+    while (true) {
+      final page = await getRecords(
+        chain: chain,
+        storeId: storeId,
+        category: category,
+        supplier: supplier,
+        query: query,
+        startDate: startDate,
+        endDate: endDate,
+        year: year,
+        month: month,
+        limit: effPage,
+        offset: offset,
+        allowMockRecords: allowMockRecords,
+      );
+      all.addAll(page);
+      final total = lastSellOutSummary?.totalCount ?? all.length;
+      final more = sellOutRecordsHasMorePage(
+        fetchedSoFar: all.length,
+        pageLength: page.length,
+        pageSize: effPage,
+        totalCount: total,
+      );
+      if (!more) return all;
+      if (all.length >= maxRows) {
+        final msg =
+            'Sell-out fetch stopped at $maxRows rows (total_count=$total). Data is incomplete.';
+        lastSellOutPaginationWarning = msg;
+        throw SellOutRecordsTruncatedException(
+          msg,
+          partial: List<SellOutRecordModel>.unmodifiable(all),
+          totalCount: total,
+          maxRows: maxRows,
+        );
+      }
+      offset += page.length;
+    }
+  }
+
   static List<SkuMonthlyPricePointModel> buildMonthlyPriceTrajectory(
     Map<String, ({double price, int units})> rawByMonth, {
     int? filterYear,
@@ -10724,13 +10899,8 @@ class ApiClient {
     }
     final pricePerVol = packVolumeUnits > 0 ? competitorPrice / packVolumeUnits : competitorPrice;
 
-    final monthlyPts = buildMonthlyPriceTrajectory({
-      '2026-01': (price: competitorPrice, units: estimatedMonthlyUnits),
-      '2026-02': (price: competitorPrice, units: estimatedMonthlyUnits),
-      '2026-03': (price: competitorPrice, units: estimatedMonthlyUnits),
-      '2026-04': (price: competitorPrice, units: estimatedMonthlyUnits),
-    }, filterYear: 2026);
-
+    // Current shelf price stays on [unitPrice]. Do not invent Jan–Apr (or any)
+    // monthly history when the custom competitor has no real sell-out series.
     return CompetitorSkuComparisonModel(
       skuName: competitorSkuName,
       barcode: serverId != null && serverId.isNotEmpty
@@ -10755,8 +10925,8 @@ class ApiClient {
       chainPrices: {
         (retailerChain.trim().isNotEmpty ? retailerChain.trim() : 'fathalla'): competitorPrice,
       },
-      monthlyPrices: monthlyPts,
-      allMonthlyPrices: monthlyPts,
+      monthlyPrices: const [],
+      allMonthlyPrices: const [],
     );
   }
 
@@ -10827,21 +10997,17 @@ class ApiClient {
         ? currentUser!.assignedChain
         : chain;
 
-    // Fetch live records from server (including competitor SKUs via supplier=all_market)
+    // Always pull the full selected year (paginated — server caps each page at 500)
+    // so monthly trajectories come from real uploads, not seed Jan–Apr leftovers.
     List<SellOutRecordModel> liveRecords = const [];
     try {
       String? startDate;
       String? endDate;
       if (year > 0) {
-        if (month > 0) {
-          startDate = DateRangeUtils.monthStart(year, month);
-          endDate = DateRangeUtils.monthEnd(year, month);
-        } else {
-          startDate = '$year-01-01';
-          endDate = '$year-12-31';
-        }
+        startDate = '$year-01-01';
+        endDate = '$year-12-31';
       }
-      liveRecords = await getRecords(
+      liveRecords = await getRecordsAllPages(
         chain: (effectiveChain != null && effectiveChain != 'all' && effectiveChain != 'الكل')
             ? effectiveChain
             : null,
@@ -10849,8 +11015,15 @@ class ApiClient {
         category: (category != null && category != 'all' && category != 'الكل') ? category : null,
         startDate: startDate,
         endDate: endDate,
-        limit: 500,
+        maxRows: debugSellOutMaxRows ?? sellOutRecordsMaxRows,
+        // Never let dashboard mock sell-out rows invent comparison months.
+        allowMockRecords: allowDemoSeedData,
       );
+    } on SellOutRecordsTruncatedException catch (e) {
+      // Visible warning on [lastSellOutPaginationWarning]; keep partial live so we
+      // never fall through to seed Jan–Apr while claiming a live year.
+      liveRecords = e.partial;
+      debugPrint('[ApiClient] competitive comparison: ${e.message}');
     } catch (_) {}
 
     if (syncCustomSkus) await _syncCustomCompetitorSkus(chain: effectiveChain);
@@ -10912,7 +11085,12 @@ class ApiClient {
       }
     }
 
-    // 100% Real Monthly Data extracted directly from Fathalla Market `2025 out.xlsx` & `2026 out.xlsx`
+    final liveByBarcode = aggregateLiveMonthlyByBarcode(liveRecords);
+    // Production / live year: never inject seed monthly prices. Seeds only when there is
+    // no live data at all and the explicit demo flag is on (not [allowMockFallback]).
+    final allowSeedMonths = liveRecords.isEmpty && allowDemoSeedData;
+
+    // Group structure (barcodes / brands). Monthly prices come from live or gated seeds.
     final rawDefs = <_RawCompetitiveGroupSeed>[
       // 1. صابون سائل اطباق - فيبا 3 كجم
       const _RawCompetitiveGroupSeed(
@@ -11755,7 +11933,12 @@ class ApiClient {
 
     for (final seed in rawDefs) {
       final ownPack = extractPackVolume(seed.ownSkuName);
-      final ownResolved = resolvePeriodMetrics(seed.monthlyData, year, month);
+      final ownMonthly = mergeMonthlyData(
+        seed.monthlyData,
+        liveByBarcode[seed.ownBarcode],
+        allowSeeds: allowSeedMonths,
+      );
+      final ownResolved = resolvePeriodMetrics(ownMonthly, year, month);
       final effectiveOwnPrice = ownResolved.price;
       if (effectiveOwnPrice <= 0) continue;
 
@@ -11763,8 +11946,8 @@ class ApiClient {
           ? double.parse((effectiveOwnPrice / ownPack.volume).toStringAsFixed(2))
           : effectiveOwnPrice;
 
-      final ownYearTrajectory = buildMonthlyPriceTrajectory(seed.monthlyData, filterYear: year);
-      final ownAllTrajectory = buildMonthlyPriceTrajectory(seed.monthlyData);
+      final ownYearTrajectory = buildMonthlyPriceTrajectory(ownMonthly, filterYear: year);
+      final ownAllTrajectory = buildMonthlyPriceTrajectory(ownMonthly);
 
       double totalCatRev = effectiveOwnPrice * ownResolved.units;
 
@@ -11786,15 +11969,20 @@ class ApiClient {
       })>[];
 
       for (final c in compSeeds) {
-        final cm = resolvePeriodMetrics(c.monthlyData, year, month);
+        final compMonthly = mergeMonthlyData(
+          c.monthlyData,
+          liveByBarcode[c.barcode],
+          allowSeeds: allowSeedMonths,
+        );
+        final cm = resolvePeriodMetrics(compMonthly, year, month);
         if (cm.price <= 0) continue;
         totalCatRev += cm.price * cm.units;
         resolvedCompMetrics.add((
           seed: c,
           price: cm.price,
           units: cm.units,
-          yearTrajectory: buildMonthlyPriceTrajectory(c.monthlyData, filterYear: year),
-          allTrajectory: buildMonthlyPriceTrajectory(c.monthlyData),
+          yearTrajectory: buildMonthlyPriceTrajectory(compMonthly, filterYear: year),
+          allTrajectory: buildMonthlyPriceTrajectory(compMonthly),
         ));
       }
 
