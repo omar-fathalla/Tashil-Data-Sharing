@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Serialize joining concurrency group tashil-mac-heavy.
+# LEGACY — unused after dropping shared job group tashil-mac-heavy.
 #
+# Formerly: serialize joining concurrency group tashil-mac-heavy.
 # GitHub keeps only ONE pending job per concurrency group even when
 # cancel-in-progress: false (that flag only protects the *running* job).
 # A second pending job cancels the first (pending-slot eviction).
-#
-# Run on GitHub-hosted ubuntu *before* a Mac job sets
-# concurrency.group: tashil-mac-heavy.
+# Check-then-enter still races (two waiters both see idle → both pending).
+# PR/test heavies now use the native Mac runner queue; deploys use
+# tashil-deploy only. Kept for reference / emergency revive.
 set -euo pipefail
 
 REPO="${GITHUB_REPOSITORY:?}"

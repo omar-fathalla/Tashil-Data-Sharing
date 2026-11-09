@@ -10,8 +10,9 @@
 #
 # tashil-mac … tashil-mac-4 are four runners on one Mac — over-parallel heavy jobs
 # thrash Setup Node / flutter build. Keep light jobs on CI_HOSTED_RUNNER; heavy Mac
-# jobs use job concurrency group tashil-mac-heavy + opt-in MAC_SHARED_LOCK=1.
-# See docs/ci-self-hosted.md (Mac contention).
+# test/smoke jobs queue natively on the runners (no shared concurrency group —
+# GitHub pending-slot eviction cancels the second waiter). Deploys use
+# tashil-deploy only. Prefer MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
 #
 # merge_group: required checks must run in the GitHub merge queue. Deploy stays on
 # push-to-main only (see deploy.yml) — never on merge_group.
@@ -282,33 +283,13 @@ jobs:
           echo "test-backend result=${result}"
           [[ "${result}" == "success" ]]
 
-  # Hosted gate: do not join tashil-mac-heavy until no other Mac heavy is active
-  # (avoids GitHub pending-slot eviction: 1 running + 1 pending only).
-  wait-mac-free:
-    name: Wait for Mac heavy free
-    needs: changes
-    if: needs.changes.outputs.flutter == 'true'
-    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
-    timeout-minutes: 130
-    steps:
-      - uses: actions/checkout@v4
-      - name: Wait until Mac heavies idle before joining tashil-mac-heavy
-        env:
-          GH_TOKEN: ${{ github.token }}
-          WAIT_MAC_HEAVY_DEADLINE_MIN: "120"
-        run: |
-          chmod +x scripts/wait_mac_heavy_free.sh
-          bash scripts/wait_mac_heavy_free.sh
-
   test-flutter:
     # Heavy run only when Flutter/web/CI paths change. Required check is the gate job below.
-    needs: [changes, wait-mac-free]
+    # No job concurrency group: GitHub keeps only one pending slot per group and
+    # cancels the rest (pending-slot eviction). Let the 4 tashil-mac runners queue
+    # natively instead. Cross-repo: MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
+    needs: changes
     if: needs.changes.outputs.flutter == 'true'
-    # Serialize with other Mac heavies in this repo (smoke / deploy). Does not cancel.
-    # Cross-repo: also set MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
-    concurrency:
-      group: tashil-mac-heavy
-      cancel-in-progress: false
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # 35m: up to 8m lock wait + pub/analyze/test (20m was too tight with lock).
     timeout-minutes: 35
@@ -411,7 +392,7 @@ jobs:
   # Required-check gate: always reports "Flutter analyze & test" (success on path skip).
   test-flutter-gate:
     name: Flutter analyze & test
-    needs: [changes, wait-mac-free, test-flutter]
+    needs: [changes, test-flutter]
     if: always() && !cancelled()
     runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
@@ -427,14 +408,10 @@ jobs:
             echo "Skipped — no Flutter/web/workflow path changes"
             exit 0
           fi
-          if [[ "${{ needs.wait-mac-free.result }}" != "success" ]]; then
-            echo "::error::wait-mac-free failed (${{ needs.wait-mac-free.result }})"
-            exit 1
-          fi
           result="${{ needs.test-flutter.result }}"
           echo "test-flutter result=${result}"
           if [[ "${result}" == "cancelled" ]]; then
-            echo "::error::test-flutter was cancelled (not success). tashil-mac-heavy pending-slot eviction — cancelled ≠ success."
+            echo "::error::test-flutter was cancelled (not success). cancelled ≠ success."
             exit 1
           fi
           [[ "${result}" == "success" ]]

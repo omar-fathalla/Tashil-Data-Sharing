@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Avoid GitHub concurrency pending-eviction on group tashil-mac-heavy.
+# Yield smoke until CI test-flutter for this SHA is underway or done
+# (avoids thrashing the shared Mac with Flutter + Playwright at once).
 #
 # Waits until CI test-flutter for the PR *head* SHA is in_progress, terminal
 # success/failure/skipped, or absent after CI finished (path-filter skip).
@@ -22,7 +23,7 @@ if [ -z "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
 fi
 export GH_TOKEN="${GH_TOKEN:-$GITHUB_TOKEN}"
 
-echo "Waiting for CI tests / test-flutter on ${SHA} (deadline ${DEADLINE_MIN}m) before joining tashil-mac-heavy"
+echo "Waiting for CI tests / test-flutter on ${SHA} (deadline ${DEADLINE_MIN}m) before Mac smoke"
 if [ -n "${GITHUB_SHA:-}" ] && [ "$SHA" != "$GITHUB_SHA" ]; then
   echo "Note: HEAD_SHA=${SHA:0:7} ≠ GITHUB_SHA=${GITHUB_SHA:0:7} (PR virtual merge) — polling head"
 fi
@@ -62,7 +63,7 @@ while (( SECONDS < deadline )); do
   echo "CI run=${run_id} status=${ci_status} conclusion=${ci_conclusion:-none}; test-flutter status=${flutter_status} conclusion=${flutter_conclusion:-none}"
 
   if [ "$flutter_status" = "in_progress" ]; then
-    echo "CI test-flutter in progress — safe to queue smoke after wait-mac-free"
+    echo "CI test-flutter in progress — safe to queue smoke on Mac runners"
     exit 0
   fi
 
@@ -101,7 +102,7 @@ while (( SECONDS < deadline )); do
     exit 0
   fi
 
-  # queued / waiting / pending / requested — do not join tashil-mac-heavy yet
+  # queued / waiting / pending / requested — wait before starting Mac smoke
   echo "CI test-flutter not ready (status=${flutter_status}); sleeping ${POLL_SEC}s"
   sleep "$POLL_SEC"
 done
