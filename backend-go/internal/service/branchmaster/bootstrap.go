@@ -16,9 +16,9 @@ type RawOccurrence struct {
 	SourceFile  string `json:"source_file,omitempty"`
 	ArchiveID   string `json:"archive_id,omitempty"`
 	// Optional Plan_2026 Customer_Branch_Code stats (Source=plan_branch_code).
-	PlanCode   string  `json:"plan_code,omitempty"`
-	RowCount   int     `json:"row_count,omitempty"`
-	ValueEGP   float64 `json:"value_egp,omitempty"`
+	PlanCode string  `json:"plan_code,omitempty"`
+	RowCount int     `json:"row_count,omitempty"`
+	ValueEGP float64 `json:"value_egp,omitempty"`
 }
 
 // RawSourceCite cites the live table/file that produced one raw spelling.
@@ -47,6 +47,24 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 
 	provenance := map[string]struct{}{}
 	var planCodeProps []PlanBranchCodeRow
+	parentAgg := map[string]*ParentLevelRow{} // key = kind|display
+	var quarantined []QuarantinedRow
+	policiesUsed := map[string]ChainPolicy{}
+
+	addProvenance := func(src string, cite RawSourceCite) {
+		if cite.SourceTable == "" && cite.SourceFile == "" && cite.ArchiveID == "" {
+			return
+		}
+		prov := fmt.Sprintf("%s ← %s", src, cite.SourceTable)
+		if cite.SourceFile != "" {
+			prov += " / " + cite.SourceFile
+		}
+		if cite.ArchiveID != "" {
+			prov += " (" + cite.ArchiveID + ")"
+		}
+		provenance[prov] = struct{}{}
+	}
+
 	for _, o := range occ {
 		src := strings.ToLower(strings.TrimSpace(o.Source))
 		if src == "plan_branch_code" {
@@ -57,40 +75,100 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 			if code == "" {
 				continue
 			}
-			status := "unmapped_owner_to_name"
 			if isRegionalPlanCode(code) {
-				status = "regional_bucket"
+				// Regional is parent-level / unallocated — NOT a proposed branch.
+				planCodeProps = append(planCodeProps, PlanBranchCodeRow{
+					Code: code, RowCount: o.RowCount, ValueEGP: o.ValueEGP,
+					Status: "regional_parent_level", SourceFile: o.SourceFile, ArchiveID: o.ArchiveID,
+				})
+				pk := "regional|" + code
+				if parentAgg[pk] == nil {
+					parentAgg[pk] = &ParentLevelRow{
+						Kind: "regional", DisplayName: code,
+						NoteAR:     "مجمع إقليم / Regional — ليس فرعًا مقترحًا؛ بانتظار قرار المالك",
+						SourceFile: o.SourceFile, ArchiveID: o.ArchiveID,
+					}
+				}
+				pr := parentAgg[pk]
+				pr.RawNames = appendUnique(pr.RawNames, code)
+				pr.RowCount = o.RowCount
+				pr.ValueEGP = o.ValueEGP
+				pr.SourceCites = append(pr.SourceCites, RawSourceCite{
+					RawName: code, Source: "plan_branch_code",
+					SourceTable: o.SourceTable, SourceFile: o.SourceFile, ArchiveID: o.ArchiveID,
+				})
+				continue
 			}
 			planCodeProps = append(planCodeProps, PlanBranchCodeRow{
 				Code: code, RowCount: o.RowCount, ValueEGP: o.ValueEGP,
-				Status: status, SourceFile: o.SourceFile, ArchiveID: o.ArchiveID,
+				Status: "unmapped_owner_to_name", SourceFile: o.SourceFile, ArchiveID: o.ArchiveID,
 			})
-			// Regional stays as its own proposed bucket; numbered/coded Plan codes are NOT
-			// assigned FTH names (owner must name/map — do not guess).
-			if !isRegionalPlanCode(code) {
-				continue
-			}
-			// Fall through: treat Regional as a sell_in raw name for an FTH bucket.
-			o.RawName = code
-			o.Source = "sell_in"
-			src = "sell_in"
-		}
-		raw := strings.TrimSpace(o.RawName)
-		if raw == "" {
 			continue
 		}
-		norm := LinkNormalize(raw)
-		if norm == "" {
+
+		raw := strings.TrimSpace(o.RawName)
+		if raw == "" {
 			continue
 		}
 		slug := strings.ToLower(strings.TrimSpace(o.ChainSlug))
 		if slug == "" {
 			slug = InferChainSlug(raw)
 		}
-		// Chain-scoped key so same short name under different chains stay separate.
-		key := ChainCodeForSlug(slug) + "|" + norm
-		if src == "" {
-			src = strings.ToLower(strings.TrimSpace(o.Source))
+		pol := PolicyForSlug(slug)
+		policiesUsed[slug] = pol
+
+		cite := RawSourceCite{
+			RawName: raw, Source: src,
+			SourceTable: strings.TrimSpace(o.SourceTable),
+			SourceFile:  strings.TrimSpace(o.SourceFile),
+			ArchiveID:   strings.TrimSpace(o.ArchiveID),
+		}
+		addProvenance(src, cite)
+
+		// Parent-company / legal-entity / regional → separate section (not proposed branches).
+		if IsParentLevelRaw(raw) {
+			kind := ParentLevelKind(raw)
+			display := raw
+			if kind == "parent_mini" {
+				display = raw // keep full spelling; short «ميني» alone is misleading
+			}
+			pk := kind + "|" + display
+			if parentAgg[pk] == nil {
+				note := "مستوى أب / غير موزع كفرع — بانتظار قرار المالك"
+				switch kind {
+				case "parent_company":
+					note = "اسم الشركة الأم (ليست فرعًا) — بانتظار قرار المالك"
+				case "parent_mini":
+					note = "أب - ميني (ليست فرعًا مقترحًا) — بانتظار قرار المالك"
+				case "regional":
+					note = "مجمع إقليم / Regional — ليست فرعًا مقترحًا"
+				}
+				parentAgg[pk] = &ParentLevelRow{
+					Kind: kind, DisplayName: display, NoteAR: note,
+					SourceFile: o.SourceFile, ArchiveID: o.ArchiveID,
+				}
+			}
+			pr := parentAgg[pk]
+			pr.RawNames = appendUnique(pr.RawNames, raw)
+			if o.RowCount > 0 {
+				pr.RowCount = o.RowCount
+				pr.ValueEGP = o.ValueEGP
+			}
+			pr.SourceCites = append(pr.SourceCites, cite)
+			continue
+		}
+
+		if pol.QuarantineUnknown && !MatchesKnownChainBanner(raw, slug) && !IsUnallocated(raw) {
+			quarantined = append(quarantined, QuarantinedRow{
+				RawName: raw, ChainSlug: slug, SourceCites: []RawSourceCite{cite},
+				ReasonAR: "اسم غير معروف لهذه السلسلة — محجور (quarantine) حتى يقرّر المالك",
+			})
+			continue
+		}
+
+		key := GroupingKey(slug, raw, pol)
+		if key == "" {
+			continue
 		}
 		if src == "sell_out" {
 			sellOutRaw[key] = raw
@@ -108,24 +186,7 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 		if src != "" {
 			g.sources[src] = struct{}{}
 		}
-		cite := RawSourceCite{
-			RawName:     raw,
-			Source:      src,
-			SourceTable: strings.TrimSpace(o.SourceTable),
-			SourceFile:  strings.TrimSpace(o.SourceFile),
-			ArchiveID:   strings.TrimSpace(o.ArchiveID),
-		}
-		if cite.SourceTable != "" || cite.SourceFile != "" || cite.ArchiveID != "" {
-			g.cites = append(g.cites, cite)
-			prov := fmt.Sprintf("%s ← %s", src, cite.SourceTable)
-			if cite.SourceFile != "" {
-				prov += " / " + cite.SourceFile
-			}
-			if cite.ArchiveID != "" {
-				prov += " (" + cite.ArchiveID + ")"
-			}
-			provenance[prov] = struct{}{}
-		}
+		g.cites = append(g.cites, cite)
 	}
 
 	type keyed struct {
@@ -167,17 +228,35 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 		ca := chainAgg[cc]
 		ca.Branches++
 
+		raws := sortedKeys(g.raws)
+		multi := len(raws) > 1
+		srcHint := joinSources(g.sources)
+		_, hasSI := g.sources["sell_in"]
+		_, hasSO := g.sources["sell_out"]
+		_, hasRet := g.sources["returns"]
+		unmappedPending := hasSO && !hasSI // Sell-Out-only until owner maps
 		displayRaw := firstRaw(g)
 		// Prefer a non-care spelling for the short display when grocery+care share a code
-		// (owner: show short location name only).
-		for _, r := range sortedKeys(g.raws) {
-			if !HasCareLine(r) && !IsUnallocated(r) {
-				if displayRaw == "" || HasCareLine(displayRaw) || len([]rune(ShortDisplay(r))) <= len([]rune(ShortDisplay(displayRaw))) {
-					displayRaw = r
+		// (owner: show short location name only) — except unmapped pending rows keep ORIGINAL raw.
+		if !unmappedPending {
+			for _, r := range sortedKeys(g.raws) {
+				if !HasCareLine(r) && !IsUnallocated(r) {
+					if displayRaw == "" || HasCareLine(displayRaw) || len([]rune(ShortDisplay(r))) <= len([]rune(ShortDisplay(displayRaw))) {
+						displayRaw = r
+					}
 				}
 			}
 		}
-		display := ShortDisplay(displayRaw)
+		var display string
+		if unmappedPending {
+			// Owner: unmapped keeps ORIGINAL raw as display — never hide / never guess-merge.
+			display = strings.TrimSpace(displayRaw)
+			if display == "" && len(raws) > 0 {
+				display = raws[0]
+			}
+		} else {
+			display = ShortDisplay(displayRaw)
+		}
 		unalloc := IsUnallocated(display) || IsUnallocated(firstRaw(g))
 		var code string
 		if unalloc {
@@ -187,15 +266,10 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 			seq[cc]++
 			code = formatBranchCode(cc, seq[cc])
 		}
-		raws := sortedKeys(g.raws)
-		srcHint := joinSources(g.sources)
-		_, hasSI := g.sources["sell_in"]
-		_, hasSO := g.sources["sell_out"]
-		_, hasRet := g.sources["returns"]
-		multi := len(raws) > 1
+		pol := PolicyForSlug(g.slug)
 		care, grocery, kh := false, false, false
 		for _, r := range raws {
-			if HasCareLine(r) {
+			if IsCareLineForPolicy(r, pol) {
 				care = true
 			} else if !IsUnallocated(r) {
 				grocery = true
@@ -205,14 +279,17 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 			}
 		}
 		note := ""
-		if care && grocery {
-			// Owner (Mohamed, 9 Nov): care-line + grocery at same location = ONE branch.
-			note = "owner: مواد عناية + بقالة = نفس الفرع (مجموع في التقارير؛ الاسم القصير فقط)"
+		if care && grocery && pol.MergeCareWithGrocery {
+			note = "policy: care+grocery same location → one branch (sum in reports; short display)"
 			careMerged++
 		}
-		// Sell-out with no Sell-In counterpart
+		locType := InferLocationType(raws)
+		// Sell-Out = POS only; every SO branch must have a Sell-In counterpart.
+		// Never auto-link SO-only to warehouses or Regional.
 		if hasSO && !hasSI && !unalloc {
-			unmatchedSO = append(unmatchedSO, fmt.Sprintf("%s → proposed %s (%s)", sellOutRaw[k.key], code, display))
+			unmatchedSO = append(unmatchedSO, fmt.Sprintf(
+				"%s → proposed %s (%s) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
+				sellOutRaw[k.key], code, display))
 		}
 
 		switch {
@@ -249,6 +326,7 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 			HasKHBanner:    kh,
 			MultiSpelling:  multi,
 			AmbiguousNote:  note,
+			LocationType:   locType,
 		})
 	}
 
@@ -288,29 +366,55 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 	}
 	if len(unmatchedSO) > 0 {
 		ownerQ = append(ownerQ, fmt.Sprintf(
-			"هناك %d اسم Sell-Out من out26 بلا مقابل Sell-In بعد التوحيد — اعتماد كفروع جديدة أم ربط يدوي؟ (انظر unmatched_sell_out)",
+			"missing Sell-In counterpart: %d Sell-Out POS names have no Sell-In match (never auto-link to warehouses/Regional). انظر unmatched_sell_out",
 			len(unmatchedSO)))
+	}
+
+	var parentRows []ParentLevelRow
+	for _, k := range sortedKeys(func() map[string]struct{} {
+		m := map[string]struct{}{}
+		for id := range parentAgg {
+			m[id] = struct{}{}
+		}
+		return m
+	}()) {
+		pr := parentAgg[k]
+		pr.RawNames = uniqueSorted(pr.RawNames)
+		pr.SourceCites = dedupeCites(pr.SourceCites)
+		parentRows = append(parentRows, *pr)
+	}
+
+	var policyList []ChainPolicy
+	for _, slug := range sortedKeys(func() map[string]struct{} {
+		m := map[string]struct{}{}
+		for s := range policiesUsed {
+			m[s] = struct{}{}
+		}
+		return m
+	}()) {
+		policyList = append(policyList, policiesUsed[slug])
 	}
 
 	notes := []string{
 		"هذا تقرير تجريبي (dry-run) فقط — لم يُكتب أي شيء في الإنتاج.",
-		"المصادر = بيانات Adeco الحية فقط (BigQuery). لا seed_customers / seed_aliases / ملفات أرشيف قديمة.",
-		"قرار المالك (9 Nov): «عائله فتح الله ماركت مواد عناية - X» = نفس فرع «عائله فتح الله ماركت - X» تحت كود FTH واحد؛ التقارير تجمع الاثنين وتعرض الاسم القصير فقط.",
-		"قرار المالك: أرقام مختلفة = فروع مختلفة دائمًا (كفر الدوار ≠ كفر الدوار 2، نيس ≠ نيس2)؛ المسافة فقط مع نفس الرقم تُدمَج (كفر الدوار 2 = كفر الدوار2).",
-		"Plan_2026_Clean: لا عمود اسم فرع — Customer_Name = أب فقط؛ Customer_Branch_Code = مجمع الإقليم + أكواد مرمّزة. ليس خطأ ingestion.",
+		"المصادر = بيانات Adeco الحية فقط (BigQuery). لا seed_customers / seed_aliases / ملفات أرشيف قديمة (مسار dry-run يرفضها).",
+		"قواعد السلسلة قابلة للضبط لكل chain (care+grocery merge، أرقام الفروع، quarantine للأسماء المجهولة).",
+		"قرار المالك: مواد عناية + بقالة لنفس الموقع = فرع واحد (FTH)؛ أرقام مختلفة = فروع مختلفة؛ المسافة فقط مع نفس الرقم تُدمَج.",
+		"أسماء الشركة الأم / مجمع الإقليم / أب-ميني ليست فروعًا مقترحة — انظر parent_level_rows (القيم والصفوف محفوظة).",
+		"Sell-In = شحنات الشركة وقد يشمل مواقع إضافية (مخازن مثل مخزن الافوجادو) — Sell-In-only صحيح؛ يُعلَّم type=warehouse.",
+		"Sell-Out = نقاط البيع فقط؛ كل فرع Sell-Out يجب أن يكون له مقابل Sell-In. Sell-Out-only = missing Sell-In counterpart (لا ربط تلقائي بمخزن أو Regional).",
+		"أي اسم/كود غير مربوط بعد (Sell-Out-only، أكواد Plan، …) يبقى ظاهرًا ومعدودًا كصف مستقل بالاسم الخام الأصلي حتى يربطه المالك — لا إخفاء ولا تخمين دمج.",
+		"Plan_2026_Clean: لا عمود اسم فرع — ليس خطأ ingestion. 16 كودًا بلا اسم بانتظار المالك (تُعرض بالكود الخام).",
 		fmt.Sprintf("عدد الفروع التي دُمجت فيها مواد عناية + بقالة في هذا dry-run: %d.", careMerged),
-		"بعد موافقة المالك على بقية الأسئلة تُحفظ الجداول (سلاسل / فروع / أسماء مستعارة) مرة واحدة.",
-		"«غير موزع على فرع» يظهر فقط إن وُجد في الحقائق الحية؛ لا يُختلق هنا.",
-		"التجميع في التقارير يتم بكود الفرع مع الاسم القصير؛ الأسماء الخام في الحقائق لا تُمس.",
-		"أسماء Sell-Out رُبطت بأكواد Sell-In عند تطابق الاسم القصير بعد التوحيد؛ غير المطابق مذكور في unmatched_sell_out.",
-		"مصدر Returns = صفوف sell_in_records ذات قيمة سالبة أو نوع مرتجع (نفس عمود customer_name).",
-		"سلسلة واحدة حاليًا: أسواق فتح الله (FTH) حسب chain_key الحي وقرار المالك.",
+		"بعد موافقة المالك على بقية الأسئلة تُحفظ الجداول مرة واحدة.",
+		"أسماء Sell-Out تُربط عند تطابق الاسم القصير فقط؛ لا تخمين (الإبراهيمية ≠ الإبراهيمية ريفيرا).",
+		"مصدر Returns = صفوف sell_in_records ذات قيمة سالبة أو نوع مرتجع.",
 	}
 
 	return DryRunReport{
 		TenantID:           tenantID,
 		GeneratedAt:        now,
-		RawNameCount:       countRaws(byNorm),
+		RawNameCount:       countRaws(byNorm) + parentRawCount(parentRows),
 		UniqueNormCount:    len(byNorm),
 		ChainCount:         len(chainSet),
 		BranchCount:        len(rows),
@@ -324,12 +428,15 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 		UnmatchedSellOut:   unmatchedSO,
 		AmbiguousPending:   ambiguous,
 		LikelyMisspellings: misspellings,
-		DataProvenance:    sortedKeys(provenance),
-		SourceReconcile:   reconcile,
-		ReconcileNotesAR:  reconcileNotes,
-		UnmappedPlanCodes: sortPlanCodeProps(planCodeProps),
-		Rows:              rows,
-		NotesAR:           notes,
+		DataProvenance:     sortedKeys(provenance),
+		SourceReconcile:    reconcile,
+		ReconcileNotesAR:   reconcileNotes,
+		UnmappedPlanCodes:  sortPlanCodeProps(planCodeProps),
+		ParentLevelRows:    parentRows,
+		QuarantinedRows:    quarantined,
+		ChainPolicies:      policyList,
+		Rows:               rows,
+		NotesAR:            notes,
 	}
 }
 
@@ -538,10 +645,35 @@ func buildSourceReconcile(occ []RawOccurrence) ([]SourceReconcileRow, []string) 
 	notes := []string{
 		"«35» (Sell-Out) = distinct store_name in live sell_out_facts for out26 archive arch_adeco_fathalla_1794146334922507694.",
 		"in26: ~29 grocery + care-only طنطا Out Let ≈ 30 locations after owner care=grocery merge.",
-		"Plan_2026_Clean: no branch-name column (ingestion correct). Parent Customer_Name (2) + Customer_Branch_Code Regional (~116.5M EGP) + 16 coded branches — unmapped until owner names them.",
-		"Proposed FTH codes = in26/out26 locations + Regional bucket + Plan parent spellings; numbered branches stay separate.",
+		"Plan_2026_Clean: no branch-name column (ingestion correct). Parent Customer_Name (2) + Regional + 16 coded branches. Parents/Regional are parent_level_rows (not proposed branches); 16 codes unmapped until owner names them.",
+		"Proposed branch codes = in26/out26 store locations only under chain policy; numbered branches stay separate.",
 	}
 	return rows, notes
+}
+
+func appendUnique(in []string, v string) []string {
+	for _, x := range in {
+		if x == v {
+			return in
+		}
+	}
+	return append(in, v)
+}
+
+func uniqueSorted(in []string) []string {
+	m := map[string]struct{}{}
+	for _, s := range in {
+		m[s] = struct{}{}
+	}
+	return sortedKeys(m)
+}
+
+func parentRawCount(rows []ParentLevelRow) int {
+	n := 0
+	for _, r := range rows {
+		n += len(r.RawNames)
+	}
+	return n
 }
 
 func dedupeCites(in []RawSourceCite) []RawSourceCite {

@@ -26,9 +26,10 @@ func main() {
 	flag.Parse()
 
 	if strings.TrimSpace(*liveJSON) == "" {
-		fmt.Fprintf(os.Stderr, "refusing to run without -live-json (seed/fixtures are not allowed for Adeco dry-run)\n")
+		fmt.Fprintf(os.Stderr, "refusing to run without -live-json (seed_customers/seed_aliases permanently disabled for dry-run)\n")
 		os.Exit(2)
 	}
+	// Permanent guard: this command must never import or call customers.Seed*.
 	raw, err := os.ReadFile(*liveJSON)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "read live-json: %v\n", err)
@@ -154,6 +155,37 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 		b.WriteString("\n")
 	}
 
+	if len(r.ParentLevelRows) > 0 {
+		b.WriteString("## Unallocated / parent-level (NOT proposed branches)\n\n")
+		b.WriteString("Parent company names and Regional are **not** store branches. Totals kept for reconcile; owner decides mapping later.\n\n")
+		b.WriteString("| Kind | Display | Rows | Value EGP | Source file | Note |\n")
+		b.WriteString("| --- | --- | ---: | ---: | --- | --- |\n")
+		for _, p := range r.ParentLevelRows {
+			b.WriteString(fmt.Sprintf("| `%s` | %s | %d | %.2f | `%s` | %s |\n",
+				p.Kind, p.DisplayName, p.RowCount, p.ValueEGP, p.SourceFile, p.NoteAR))
+		}
+		b.WriteString("\n")
+	}
+
+	if len(r.ChainPolicies) > 0 {
+		b.WriteString("### Chain policies in effect\n\n")
+		b.WriteString("| Slug | Care+grocery merge | Numbered distinct | Quarantine unknown |\n")
+		b.WriteString("| --- | --- | --- | --- |\n")
+		for _, p := range r.ChainPolicies {
+			b.WriteString(fmt.Sprintf("| `%s` | %v | %v | %v |\n",
+				p.Slug, p.MergeCareWithGrocery, p.KeepNumberedDistinct, p.QuarantineUnknown))
+		}
+		b.WriteString("\n")
+	}
+
+	if len(r.QuarantinedRows) > 0 {
+		b.WriteString("### Quarantined unknown names\n\n")
+		for _, q := range r.QuarantinedRows {
+			b.WriteString(fmt.Sprintf("- `%s` (%s): %s\n", q.RawName, q.ChainSlug, q.ReasonAR))
+		}
+		b.WriteString("\n")
+	}
+
 	if len(r.OwnerQuestions) > 0 {
 		b.WriteString("### Owner questions (do not guess)\n\n")
 		for i, q := range r.OwnerQuestions {
@@ -174,15 +206,15 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 	if len(r.UnmappedPlanCodes) > 0 {
 		b.WriteString("### Plan_2026_Clean Customer_Branch_Code\n\n")
 		b.WriteString("File has **no branch-name column**. `Customer_Name` = parent only. Codes below are live BQ `customer_branch_code` — ")
-		b.WriteString("**do not guess names**. Regional is its own FTH bucket; the other 16 await owner name/map.\n\n")
-		b.WriteString("| Code | Rows | Value EGP | Status |\n| --- | ---: | ---: | --- |\n")
+		b.WriteString("**do not guess names**. Each unmapped code stays listed and counted under its **original raw code** as display until the owner names/maps it.\n\n")
+		b.WriteString("| Code (raw display) | Rows | Value EGP | Status |\n| --- | ---: | ---: | --- |\n")
 		for _, p := range r.UnmappedPlanCodes {
 			status := p.Status
 			if status == "unmapped_owner_to_name" {
-				status = "unmapped Plan branch codes — owner to name/map"
+				status = "unmapped — keep raw code as display until owner maps"
 			}
-			if status == "regional_bucket" {
-				status = "Regional bucket (own FTH code)"
+			if status == "regional_parent_level" || status == "regional_bucket" {
+				status = "Regional → parent-level (not a proposed branch)"
 			}
 			b.WriteString(fmt.Sprintf("| `%s` | %d | %.2f | %s |\n", p.Code, p.RowCount, p.ValueEGP, status))
 		}
@@ -191,7 +223,8 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 
 	if len(r.UnmatchedSellOut) > 0 {
 		b.WriteString("### Unmatched Sell-Out names\n\n")
-		b.WriteString("Present in live `sell_out_facts` (out26) but no Sell-In customer normalized to the same short name:\n\n")
+		b.WriteString("Present in live `sell_out_facts` (out26) but **missing Sell-In counterpart**. ")
+		b.WriteString("Each stays visible as its **own row** with the **original raw** display name until the owner maps it — never hidden, never guess-merged to a warehouse/Regional:\n\n")
 		for _, u := range r.UnmatchedSellOut {
 			b.WriteString("- " + u + "\n")
 		}
@@ -211,9 +244,15 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 		b.WriteString("- " + n + "\n")
 	}
 
-	b.WriteString("\n## Proposed branches\n\n")
-	b.WriteString("| Code | Chain | Display (short) | Raw spellings (with source) | Sources |\n")
-	b.WriteString("| --- | --- | --- | --- | --- |\n")
+	b.WriteString("\n## Sell-In vs Sell-Out rules\n\n")
+	b.WriteString("- **Sell-In** = company shipments; may include extra locations (warehouses / مخزن*). SI-only is valid; those rows are typed `warehouse`.\n")
+	b.WriteString("- **Sell-Out** = points of sale only; every SO branch must have a Sell-In counterpart.\n")
+	b.WriteString("- **Sell-Out-only** = `missing Sell-In counterpart` (owner question). Never auto-link to warehouses or Regional.\n")
+	b.WriteString("- **Unmapped** names/codes keep their **original raw** as display, stay visible and counted as their own row until the owner maps them — never hidden, never guess-merged.\n\n")
+
+	b.WriteString("## Proposed branches\n\n")
+	b.WriteString("| Code | Chain | Type | Display | Raw spellings (with source) | Sources |\n")
+	b.WriteString("| --- | --- | --- | --- | --- | --- |\n")
 	rows := append([]branchmaster.ProposalRow(nil), r.Rows...)
 	sort.Slice(rows, func(i, j int) bool { return rows[i].BranchCode < rows[j].BranchCode })
 	for _, row := range rows {
@@ -222,8 +261,12 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 		if row.Unallocated {
 			display = "**" + display + "**"
 		}
-		b.WriteString(fmt.Sprintf("| `%s` | %s (`%s`) | %s | %s | %s |\n",
-			row.BranchCode, row.ChainSlug, row.ChainCode, display, raws, row.SourceHint))
+		loc := row.LocationType
+		if loc == "" {
+			loc = "store"
+		}
+		b.WriteString(fmt.Sprintf("| `%s` | %s (`%s`) | %s | %s | %s | %s |\n",
+			row.BranchCode, row.ChainSlug, row.ChainCode, loc, display, raws, row.SourceHint))
 	}
 	b.WriteString("\n## Next step\n\n")
 	b.WriteString("Owner answers the PENDING questions above, then `POST /api/v1/branches/bootstrap/confirm` ")
