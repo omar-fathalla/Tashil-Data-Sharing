@@ -402,6 +402,25 @@ func (p *Processor) pruneTombstonedArchivesLocked() {
 	}
 }
 
+// writeArchiveFileAtomic writes data via temp+rename so concurrent readers never see a torn
+// file. Multi-instance deletes used to os.WriteFile index.json directly; overlapping truncates
+// produced concatenated/invalid JSON and fresh Cloud Run processes loaded an empty archive list.
+func writeArchiveFileAtomic(path string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		// Some FUSE mounts reject rename-over; fall back to a direct write.
+		return os.WriteFile(path, data, 0o644)
+	}
+	return nil
+}
+
 func (p *Processor) persistTenantArchiveIndexLocked(normTenant string) error {
 	if p.archiveDir == "" {
 		return nil
@@ -410,32 +429,69 @@ func (p *Processor) persistTenantArchiveIndexLocked(normTenant string) error {
 	if err := os.MkdirAll(tenantDir, 0o755); err != nil {
 		return fmt.Errorf("mkdir archive tenant dir: %w", err)
 	}
-	var list []*ArchivedFile
-	for _, item := range p.archivedFiles {
-		if item.TenantID != normTenant {
+	indexPath := filepath.Join(tenantDir, "index.json")
+
+	// Union memory with on-disk index+sidecars before rewrite. Last-writer-wins of a single
+	// instance's memory alone can drop live peer entries; concurrent non-atomic WriteFile
+	// also tore the JSON (deploy run 42544194056 / TestSellInThreeInstancesConvergeOnSharedTombstones).
+	byID := make(map[string]*ArchivedFile)
+	var diskList []*ArchivedFile
+	if raw, err := os.ReadFile(indexPath); err == nil && len(raw) > 0 {
+		if json.Unmarshal(raw, &diskList) != nil {
+			diskList = nil // corrupt/torn → rebuild from memory + sidecars
+		}
+	}
+	diskList = mergeArchiveSidecars(diskList, tenantDir)
+	for _, item := range diskList {
+		if item == nil || item.ID == "" {
+			continue
+		}
+		if item.TenantID != "" && item.TenantID != normTenant {
 			continue
 		}
 		// Never rewrite a tombstoned id back into index.json (other-instance delete race).
 		if p.fsRepo != nil && p.fsRepo.IsArchiveDeleted(item.TenantID, item.ID, item.FileName) {
 			continue
 		}
+		copyItem := *item
+		if copyItem.TenantID == "" {
+			copyItem.TenantID = normTenant
+		}
+		byID[copyItem.ID] = &copyItem
+	}
+	for _, item := range p.archivedFiles {
+		if item == nil || item.TenantID != normTenant {
+			continue
+		}
+		if p.fsRepo != nil && p.fsRepo.IsArchiveDeleted(item.TenantID, item.ID, item.FileName) {
+			continue
+		}
+		copyItem := *item
+		byID[copyItem.ID] = &copyItem
+	}
+
+	list := make([]*ArchivedFile, 0, len(byID))
+	for _, item := range byID {
 		list = append(list, item)
 	}
 	sort.Slice(list, func(i, j int) bool {
 		return list[i].UploadedAt > list[j].UploadedAt
 	})
-	indexPath := filepath.Join(tenantDir, "index.json")
+
+	var data []byte
+	var err error
 	if len(list) == 0 {
-		if err := os.Remove(indexPath); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("remove empty archive index: %w", err)
+		// Prefer atomic empty array over Remove so concurrent readers never race a missing file
+		// against a peer rewrite.
+		data = []byte("[]\n")
+	} else {
+		data, err = json.MarshalIndent(list, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshal archive index: %w", err)
 		}
-		return nil
+		data = append(data, '\n')
 	}
-	data, err := json.MarshalIndent(list, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal archive index: %w", err)
-	}
-	if err := os.WriteFile(indexPath, data, 0o644); err != nil {
+	if err := writeArchiveFileAtomic(indexPath, data); err != nil {
 		return fmt.Errorf("write archive index: %w", err)
 	}
 	return nil

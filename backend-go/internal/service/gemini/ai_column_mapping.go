@@ -353,6 +353,7 @@ func extractWithMapping(filename string, rows [][]string, plan *ColumnMapPlan) (
 			barcodeIdx:  plan.firstIdx(roleBarcode),
 			skuIdx:      plan.firstIdx(roleProductName),
 			totalRevIdx: plan.firstIdx(roleTotalValue),
+			totalQtyIdx: plan.firstIdx(roleTotalQuantity),
 			monthIdx:    plan.firstIdx(roleMonth),
 			yearIdx:     plan.firstIdx(roleYear),
 			dateIdx:     plan.firstIdx(roleDate),
@@ -383,6 +384,11 @@ func extractWithMapping(filename string, rows [][]string, plan *ColumnMapPlan) (
 		if len(layout.branches) == 0 {
 			return nil, src, fmt.Errorf("wide mapping has no branch value columns")
 		}
+		// Permanent recon rule: imported value equals الاجمالى (incl. غير موزع على فرع).
+		// Prefer the sheet total column as the source-of-truth value when present.
+		if src.sheetValue != 0 {
+			src.value = src.sheetValue
+		}
 		subs := splitWideSheetByRowPeriods(filename, "Sheet1", "visible", rows, layout)
 		if len(subs) == 0 {
 			fileYear := inferYearFromText(filename, 0)
@@ -406,7 +412,13 @@ func extractWithMapping(filename string, rows [][]string, plan *ColumnMapPlan) (
 		return payload, src, nil
 	}
 
-	// Long layout: rename the mapped headers to canonical names and reuse the deterministic tabular reader.
+	// Long layout: AI sample only identified column roles. Scan the ENTIRE store column
+	// (all rows below the header) for distinct branches — never infer a single branch from the sample.
+	storeIdx := plan.firstIdx(roleStore)
+	dataRows := rows[1:]
+	applySectionHeaderStoreFill(dataRows, storeIdx, plan.firstIdx(roleBarcode), plan.firstIdx(roleQuantity), plan.firstIdx(roleValue))
+	distinctBranches := collectDistinctBranches(dataRows, storeIdx)
+
 	canon := map[string]string{
 		roleBarcode: "Barcode", roleProductName: "Item_Description", roleStore: "Store_Name",
 		roleQuantity: "Qty_Sold", roleValue: "Net_Amount", roleMonth: "Month", roleYear: "Year",
@@ -426,10 +438,15 @@ func extractWithMapping(filename string, rows [][]string, plan *ColumnMapPlan) (
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
 	_ = w.Write(header)
-	_ = w.WriteAll(rows[1:])
+	_ = w.WriteAll(dataRows)
 	payload, ok := parseFullTabularPayload(filename, buf.Bytes())
 	if !ok {
 		return nil, src, fmt.Errorf("long extraction failed")
+	}
+	// Prefer the deterministic full-column branch list so a leading sample of one city
+	// cannot collapse DiscoveredBranches to a single store.
+	if len(distinctBranches) > 0 {
+		payload.DiscoveredBranches = distinctBranches
 	}
 	return payload, src, nil
 }
@@ -558,6 +575,7 @@ func (c *Client) analyzeWithAIMapping(ctx context.Context, filename string, rawC
 	}
 	v := validateExtraction(payload, &src)
 	attachTotalsExplanation(v, provenanceFromPlan(rows, plan))
+	mergeWideMatrixReconIntoValidation(v, payload)
 	logValidation(filename, "ai", v)
 	if v.Status == "rejected" {
 		return nil, false

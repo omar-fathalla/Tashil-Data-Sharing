@@ -33,6 +33,68 @@ func TestExtendedPriceIsReadAsValue(t *testing.T) {
 	}
 }
 
+// in26-style Dynamics exports sometimes rename the value header (no space / dotted /
+// parenthetical EGP) or ship only TO (turnover) with no Extended Price column.
+func TestExtendedPriceAliasHeadersMapForGPSOP(t *testing.T) {
+	aliases := []string{
+		"ExtendedPrice",
+		"Ext. Price",
+		"Ext. Price (EGP)",
+		"XTNDPRCE",
+		"Extended\u00a0Price", // NBSP between words
+		"TO",                 // real in26.xlsx value column
+	}
+	for _, alias := range aliases {
+		t.Run(alias, func(t *testing.T) {
+			rows := [][]string{
+				{"SOP Type", "SOP Number", "Document Date", "Item Number", "Item Description", "U Of M", "QTY", "Location Code", "Customer Number", "Customer Name", "Customer Class", alias, "Branch"},
+				{"Invoice", "INV-1", "2026-01-05", "FG-1", "صنف", "CTN", "2", "L1", "C1", "عائله فتح الله ماركت - طنطا", "KA", "150", "TNT"},
+				{"Return", "INV-2", "2026-01-06", "FG-1", "صنف", "CTN", "-1", "L1", "C1", "عائله فتح الله ماركت - طنطا", "KA", "-25", "TNT"},
+			}
+			x, err := BuildSampleXLSX(rows)
+			if err != nil {
+				t.Fatal(err)
+			}
+			recs, _, err := ParseSellInPlanWorkbookWithReport("tenant-adeco", "in26.xlsx", x, "fathalla")
+			if err != nil {
+				t.Fatalf("alias %q should map as Extended Price/TO: %v", alias, err)
+			}
+			if len(recs) != 2 {
+				t.Fatalf("alias %q: expected 2 rows, got %d", alias, len(recs))
+			}
+			var sum float64
+			for _, r := range recs {
+				sum += r.NetValueEGP
+			}
+			if sum != 125 {
+				t.Fatalf("alias %q: expected signed TO sum 125, got %v (%+v)", alias, sum, recs)
+			}
+			if recs[1].NetValueEGP >= 0 {
+				t.Fatalf("alias %q: return row must keep negative TO", alias)
+			}
+		})
+	}
+}
+
+// Extended Price wins over TO when both columns exist (older in25-style exports).
+func TestExtendedPricePreferredOverTO(t *testing.T) {
+	rows := [][]string{
+		{"SOP Type", "SOP Number", "Document Date", "Item Number", "Item Description", "U Of M", "QTY", "Customer Name", "Extended Price", "TO"},
+		{"Invoice", "INV-1", "2026-01-05", "FG-1", "صنف", "CTN", "1", "عائله فتح الله ماركت - طنطا", "100", "999"},
+	}
+	x, err := BuildSampleXLSX(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recs, _, err := ParseSellInPlanWorkbookWithReport("tenant-adeco", "in25.xlsx", x, "fathalla")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recs) != 1 || recs[0].NetValueEGP != 100 {
+		t.Fatalf("Extended Price must win over TO: %+v", recs)
+	}
+}
+
 func TestNewAgentTrimsKeyWhitespace(t *testing.T) {
 	c := NewAgent("abc\n", "", false)
 	if strings.ContainsAny(c.apiKey, "\n ") {

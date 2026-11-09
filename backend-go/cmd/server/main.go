@@ -253,7 +253,12 @@ func main() {
 	mux := http.NewServeMux()
 
 	// Public Health Probes — readiness fails closed if auth users did not load safely.
-	mux.HandleFunc("GET /healthz", handlers.HealthzWithAuth(fsRepo))
+	// Prefer /livez and /api/v1/health: Cloud Run reserves /healthz for its own probes
+	// (external GET /healthz returns Google's 404 and never reaches the container).
+	health := handlers.HealthzWithAuth(fsRepo)
+	mux.HandleFunc("GET /livez", health)
+	mux.HandleFunc("GET /api/v1/health", health)
+	mux.HandleFunc("GET /healthz", health) // local/legacy; not reachable via Cloud Run ingress
 	mux.HandleFunc("GET /api/v1/version", handlers.Version)
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -303,6 +308,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/analytics/records", analyticsHandler.HandleRecords)
 	mux.HandleFunc("GET /api/v1/analytics/sell-in-records", analyticsHandler.HandleSellInRecords)
 	mux.HandleFunc("GET /api/v1/analytics/sell-in-monthly", analyticsHandler.HandleSellInMonthly)
+	mux.HandleFunc("GET /api/v1/analytics/sell-in-returns", analyticsHandler.HandleSellInReturns)
 	mux.HandleFunc("GET /api/v1/analytics/targets", analyticsHandler.HandleTargets)
 	mux.HandleFunc("POST /api/v1/analytics/targets", analyticsHandler.HandleTargets)
 	mux.HandleFunc("DELETE /api/v1/analytics/targets", analyticsHandler.HandleTargets)
@@ -325,6 +331,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/product-match/review/bulk-decide", productMatchHandler.HandleBulkDecide)
 	mux.HandleFunc("GET /api/v1/product-match/metrics", productMatchHandler.HandleMetrics)
 	mux.HandleFunc("GET /api/v1/sell-in/years", customerRegistryHandler.HandleYears)
+	mux.HandleFunc("GET /api/v1/sell-out/months", customerRegistryHandler.HandleMonths)
 	mux.HandleFunc("GET /api/v1/sell-in/assist/suggestions", sellInAssistHandler.HandleList)
 	mux.HandleFunc("POST /api/v1/sell-in/assist/suggest-layout", sellInAssistHandler.HandleSuggestLayout)
 	mux.HandleFunc("POST /api/v1/sell-in/assist/suggest-chains", sellInAssistHandler.HandleSuggestChains)
@@ -393,7 +400,8 @@ func waitForData(next http.Handler, ready <-chan struct{}) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
 		if !strings.HasPrefix(p, "/api/v1/") || strings.HasPrefix(p, "/api/v1/auth/") ||
-			strings.HasPrefix(p, "/api/v1/portal/") || p == "/api/v1/version" {
+			strings.HasPrefix(p, "/api/v1/portal/") || p == "/api/v1/version" ||
+			p == "/api/v1/health" {
 			next.ServeHTTP(w, r)
 			return
 		}

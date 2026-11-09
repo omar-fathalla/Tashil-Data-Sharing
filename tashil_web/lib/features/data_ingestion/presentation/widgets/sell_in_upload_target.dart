@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/data/available_years.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/backend_http.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_icons.dart';
@@ -170,29 +171,47 @@ String describeSheetPeriod(Iterable<String> months) {
 /// Shown under the year/month fields of the upload dialog.
 const sellInPeriodHelpText = 'سيبها "من الملف" (موصى بيه). لو اخترت شهر والملف فيه شهور تانية، هنسألك تختار.';
 
-/// The longest the screen waits for a Sell-In upload job before it stops the spinner.
-const sellInUploadTimeout = Duration(minutes: 5);
+/// Client-side ceiling while following a Sell-In background job. Prefer a terminal
+/// job status; this bound only stops the spinner if the server never answers.
+/// Matches [BackendHttp.defaultJobMaxWait] so the UI `.timeout` does not cut polling short.
+const sellInUploadTimeout = BackendHttp.defaultJobMaxWait;
+
+/// Neutral copy when the client stops waiting while the server may still be saving.
+const sellInUploadStillProcessingMessage =
+    'الملف لسه بيتعالج على السيرفر. شوف قائمة الملفات بعد شوية — متترفعش تاني لو لقيته هناك.';
+
+/// Dialog title when the wait stopped without a server rejection (not "nothing was saved").
+const sellInUploadStillProcessingTitle = 'الملف لسه بيتعالج';
+
+/// True when the error means the client stopped waiting — not that the server rejected the file.
+bool isUploadWaitTimeout(Object error) =>
+    error is TimeoutException || error is UploadStillProcessingException;
 
 /// Arabic text for an upload failure. The server's own Arabic message wins when there is one.
 String uploadFailureMessage(Object error) {
   if (error is UploadRejectedException) return error.message;
-  if (error is TimeoutException) {
-    return 'الرفع أخد وقت أطول من المتوقع، فوقفنا الانتظار. راجع أرشيف الملفات بعد شوية قبل ما ترفع تاني.';
-  }
+  if (isUploadWaitTimeout(error)) return sellInUploadStillProcessingMessage;
   if (error is ServerConnectionException) return error.message;
   return 'تعذّر رفع الملف. حاول تاني.';
 }
 
 /// Shows an upload failure in an M3 dialog that stays until the user closes it.
-/// [title] defaults to the rejected-upload title; a failed commit passes its own.
+/// Wait-timeouts use a neutral title — never "nothing was saved" unless the server rejected.
+/// [title] defaults from the error kind; a failed commit may pass its own.
 Future<void> showUploadFailureDialog(BuildContext context, String fileName, Object error, {String? title}) {
+  final waitTimeout = isUploadWaitTimeout(error);
   return showDialog<void>(
     context: context,
     builder: (ctx) {
       final theme = Theme.of(ctx);
+      final scheme = theme.colorScheme;
       return AlertDialog(
-        icon: Icon(AppIcons.error, color: theme.colorScheme.error),
-        title: Text(title ?? 'الملف اترفض ومفيش حاجة اتحفظت'),
+        icon: Icon(
+          waitTimeout ? AppIcons.info : AppIcons.error,
+          color: waitTimeout ? scheme.tertiary : scheme.error,
+        ),
+        title: Text(title ??
+            (waitTimeout ? sellInUploadStillProcessingTitle : 'الملف اترفض ومفيش حاجة اتحفظت')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

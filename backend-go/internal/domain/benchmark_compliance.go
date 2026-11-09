@@ -99,10 +99,64 @@ func CalculatePromoUpliftPct(promoQty, baselineQty int) float64 {
 	return math.Round(uplift*10) / 10
 }
 
-// NormalizeProductCategory canonicalizes product category names across different retail Excel sheets
-// (e.g. unifying Fathalla and Gomla spelling variations so categories are cleanly deduplicated).
-func NormalizeProductCategory(raw string) string {
-	// Trim spaces
+// productCategoryAliases maps known retail spelling variants to their canonical category.
+// Keys and values are whitespace-collapsed (see collapseCategoryWhitespace).
+var productCategoryAliases = map[string]string{
+	"صابون سائل للاطباق":      "صابون سائل اطباق",
+	"صابون سائل للأطباق":      "صابون سائل اطباق",
+	"سائل اطباق":              "صابون سائل اطباق",
+	"سائل أطباق":              "صابون سائل اطباق",
+	"كلور الوان":              "كلور ألوان",
+	"كلور ألوان":              "كلور ألوان",
+	"كلور عادي":               "كلور عادى",
+	"كلور عادى":               "كلور عادى",
+	"هاند ووش":                "هاند وواش",
+	"هاند وواش":               "هاند وواش",
+	"مطهرعام":                 "مطهر عام",
+	"مطهر عام":                "مطهر عام",
+	"منظف ارضيات":             "منظف ارضيات",
+	"كلور ارضيات":             "منظف ارضيات",
+	"صابون سائل للارضيات":     "منظف ارضيات",
+	"صابون سائل للأرضيات":     "منظف ارضيات",
+	"مطهر ارضيات":             "منظف ارضيات",
+	"منظفات أرضيات وحوائط":    "منظف ارضيات",
+	"منعمات ملابس عادية":      "منعمات ملابس",
+	"منعمات ملابس مركزة":      "منعمات ملابس",
+	"منعم ملابس":              "منعمات ملابس",
+	"مسحوق جيل":               "مساحيق جيل اتوماتيك",
+	"مساحيق جيل اوتوماتيك":    "مساحيق جيل اتوماتيك",
+	"مساحيق جيل اتوماتيك":     "مساحيق جيل اتوماتيك",
+	"مسحوق بودر غسالات اطباق": "مسحوق غسالات اطباق",
+	"منظفات غسالات الاطباق":   "مسحوق غسالات اطباق",
+	"مسحوق غسالات اطباق":      "مسحوق غسالات اطباق",
+	"مسلكات احواض":            "مسلك احواض وبالوعات",
+	"مسلك احواض":              "مسلك احواض وبالوعات",
+	"مسلك احواض وبالوعات":     "مسلك احواض وبالوعات",
+	"ملمع زجاج - نجف":         "ملمع زجاج وكريستال",
+	"ملمع زجاج":               "ملمع زجاج وكريستال",
+	"ملمع زجاج وكريستال":      "ملمع زجاج وكريستال",
+	"ملمع اخشاب - باركيه":     "ملمع اخشاب وباركيه",
+	"ملمع اخشاب وباركيه":      "ملمع اخشاب وباركيه",
+	"منظفات مطابخ":            "منظفات مطبخ",
+	"منظف مطبخ":              "منظفات مطبخ",
+	"منظفات مطبخ":            "منظفات مطبخ",
+	"منظفات سجاد":             "منظفات سجاد ومفروشات",
+	"منظف سجاد":              "منظفات سجاد ومفروشات",
+	"منظفات سجاد ومفروشات":   "منظفات سجاد ومفروشات",
+	"مطهر تواليت":             "منظفات تواليت",
+	"منظف تواليت":            "منظفات تواليت",
+	"منظفات التواليت":         "منظفات تواليت",
+	"منظفات تواليت":           "منظفات تواليت",
+	"مزيلات بقع":              "مزيلات بقع ملابس",
+	"مزيل بقع":               "مزيلات بقع ملابس",
+	"مزيلات بقع ملابس":        "مزيلات بقع ملابس",
+	"معطر جو سائل":            "معطر جو",
+	"معطر جو":                "معطر جو",
+	"شاور جل":                "شاور جيل",
+	"شاور جيل":               "شاور جيل",
+}
+
+func collapseCategoryWhitespace(raw string) string {
 	clean := ""
 	inSpace := false
 	for _, r := range raw {
@@ -119,49 +173,41 @@ func NormalizeProductCategory(raw string) string {
 	if len(clean) > 0 && clean[len(clean)-1] == ' ' {
 		clean = clean[:len(clean)-1]
 	}
+	return clean
+}
+
+// NormalizeProductCategory canonicalizes product category names across different retail Excel sheets
+// (e.g. unifying Fathalla and Gomla spelling variations so categories are cleanly deduplicated).
+func NormalizeProductCategory(raw string) string {
+	clean := collapseCategoryWhitespace(raw)
 	if clean == "" {
 		return ""
 	}
-
-	switch clean {
-	case "صابون سائل للاطباق", "صابون سائل للأطباق", "سائل اطباق", "سائل أطباق":
-		return "صابون سائل اطباق"
-	case "كلور الوان", "كلور ألوان":
-		return "كلور ألوان"
-	case "كلور عادي", "كلور عادى":
-		return "كلور عادى"
-	case "هاند ووش", "هاند وواش":
-		return "هاند وواش"
-	case "مطهرعام", "مطهر عام":
-		return "مطهر عام"
-	case "منظف ارضيات", "كلور ارضيات", "صابون سائل للارضيات", "صابون سائل للأرضيات", "مطهر ارضيات", "منظفات أرضيات وحوائط":
-		return "منظف ارضيات"
-	case "منعمات ملابس عادية", "منعمات ملابس مركزة", "منعم ملابس":
-		return "منعمات ملابس"
-	case "مسحوق جيل", "مساحيق جيل اوتوماتيك", "مساحيق جيل اتوماتيك":
-		return "مساحيق جيل اتوماتيك"
-	case "مسحوق بودر غسالات اطباق", "منظفات غسالات الاطباق", "مسحوق غسالات اطباق":
-		return "مسحوق غسالات اطباق"
-	case "مسلكات احواض", "مسلك احواض", "مسلك احواض وبالوعات":
-		return "مسلك احواض وبالوعات"
-	case "ملمع زجاج - نجف", "ملمع زجاج", "ملمع زجاج وكريستال":
-		return "ملمع زجاج وكريستال"
-	case "ملمع اخشاب - باركيه", "ملمع اخشاب وباركيه":
-		return "ملمع اخشاب وباركيه"
-	case "منظفات مطابخ", "منظف مطبخ", "منظفات مطبخ":
-		return "منظفات مطبخ"
-	case "منظفات سجاد", "منظف سجاد", "منظفات سجاد ومفروشات":
-		return "منظفات سجاد ومفروشات"
-	case "مطهر تواليت", "منظف تواليت", "منظفات التواليت", "منظفات تواليت":
-		return "منظفات تواليت"
-	case "مزيلات بقع", "مزيل بقع", "مزيلات بقع ملابس":
-		return "مزيلات بقع ملابس"
-	case "معطر جو سائل", "معطر جو":
-		return "معطر جو"
-	case "شاور جل", "شاور جيل":
-		return "شاور جيل"
-	default:
-		return clean
+	if canon, ok := productCategoryAliases[clean]; ok {
+		return canon
 	}
+	return clean
+}
+
+// ProductCategoryMatchValues returns every known raw spelling (plus the canonical form) that
+// NormalizeProductCategory maps to the same target as raw. Used by BigQuery IN UNNEST filters.
+func ProductCategoryMatchValues(raw string) []string {
+	target := NormalizeProductCategory(raw)
+	if target == "" {
+		return nil
+	}
+	seen := map[string]struct{}{target: {}}
+	out := []string{target}
+	for alias, canon := range productCategoryAliases {
+		if canon != target {
+			continue
+		}
+		if _, ok := seen[alias]; ok {
+			continue
+		}
+		seen[alias] = struct{}{}
+		out = append(out, alias)
+	}
+	return out
 }
 

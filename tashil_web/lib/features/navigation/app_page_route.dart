@@ -7,6 +7,7 @@ class AppPageRoute {
     'dashboard',
     'sell-out',
     'sell-in',
+    'returns',
     'oos',
     'store-matrix',
     'pricing',
