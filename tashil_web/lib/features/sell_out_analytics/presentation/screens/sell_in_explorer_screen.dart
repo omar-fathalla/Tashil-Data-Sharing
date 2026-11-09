@@ -439,12 +439,19 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       }
       await _loadAllData();
     } catch (e) {
-      // Stop the spinner first, then show the server's Arabic reason (or the timeout) in a dialog.
+      // Stop the spinner first, then show the server's Arabic reason (or the wait-timeout) in a dialog.
       if (!mounted) return;
       setState(() {
         _isUploading = false;
         _replacingFileId = null;
       });
+      // Wait-timeout is not a rejection: refresh the files list in case the job already finished.
+      if (isUploadWaitTimeout(e)) {
+        try {
+          await _loadAllData();
+        } catch (_) {}
+        if (!mounted) return;
+      }
       await showUploadFailureDialog(context, picked.name, e);
     } finally {
       if (mounted) {
