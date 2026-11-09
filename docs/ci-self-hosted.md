@@ -23,10 +23,29 @@ runs-on: [self-hosted, macOS, tashil-mac]
 
 **`tashil-mac` … `tashil-mac-4` are four GitHub runner processes on one physical Mac.**
 They share CPU, disk, and toolchains — when all four pick up jobs at once the machine
-thrashes (slow Flutter/Go/Playwright, lost communication). Prefer hosted ubuntu for
-light gates (`CI_HOSTED_RUNNER`); keep only heavy/deploy work on Mac. For overlapping
-heavy jobs, enable `MAC_SHARED_LOCK=1` (below) or reduce how many Mac runners are
-online so GitHub queues instead of over-paralleling one host.
+thrashes (observed under contention: **Setup Node ~10m**, **`flutter build web` ~7–12m**,
+plus lost communication). Prefer hosted ubuntu for light gates (`CI_HOSTED_RUNNER`);
+keep only heavy/deploy work on Mac; serialize heavies (below).
+
+## Mac contention — recommended fix (combine)
+
+Do **all three** while four runners share one host; drop levers only after the Mac is
+dedicated / single-runner:
+
+| Lever | What it does | Who sets it |
+|-------|--------------|-------------|
+| **Hosted light gates** | Path detect, Cloud Run pin, Backend Go, Flutter/smoke gates, deploy `test-*` stay on `CI_HOSTED_RUNNER` (default `ubuntu-latest`) so they never compete for Mac CPU/disk | Already in workflows — leave `CI_HOSTED_RUNNER` unset (or `"ubuntu-latest"`). **Do not** point it at Mac unless GitHub minutes are exhausted |
+| **Job group `tashil-mac-heavy`** | In-repo: only one of `test-flutter` / `smoke-run` / `deploy-backend` / `deploy-web` runs at a time (`cancel-in-progress: false`). Pending heavies wait in GitHub’s queue and **do not occupy a Mac runner** | Wired in workflows (this repo) |
+| **`MAC_SHARED_LOCK=1`** | Cross-repo directory lock (`~/mac-resources/LOCK.d`) so other bots/repos on the same Mac serialize with our heavies | Repo variable (Actions → Variables) |
+| **Fewer online runners** | Stop `tashil-mac-3` / `tashil-mac-4` (leave 1–2 online) so the label cannot schedule four heavies even if a job skips the group | On the Mac host (`svc.sh stop`) |
+
+**Ops checklist (shared Mac):**
+
+1. Confirm light jobs are hosted (variable unset or `"ubuntu-latest"`).
+2. Set **`MAC_SHARED_LOCK=1`** on this repo while multiple runners share the box.
+3. Prefer **1–2** online Mac runners; use 4 only when load is proven quiet.
+4. Expect heavies to queue (wall-clock longer, step times healthy) instead of
+   10m Setup Node / 12m flutter builds from thrash.
 
 **`tashil-mac-2` / `tashil-mac-3` / `tashil-mac-4` run as user `tashil-ci`**
 (`HOME=/Users/tashil-ci`). Toolchains live at `$HOME/toolchains` — never hardcode
@@ -56,22 +75,55 @@ Custom label on each: `tashil-mac`. GitHub also applies `self-hosted`, `macOS`, 
 4. **Per-job temp dirs** under `$RUNNER_TEMP/tashil-emu-…` (sandbox `HOME`/`TMPDIR`).
    Do not write job-specific emulator config into another user’s home.
 5. **Hosted / Mac fallback** via `CI_HOSTED_RUNNER` / `CI_RUNS_ON` still works (same scripts; ports still probed).
-6. **Cross-repo Mac lock** — opt-in via `MAC_SHARED_LOCK` (see below). Do **not** edit
-   `~/mac-resources` from CI.
+6. **Serialize Mac heavies** — in-repo via job concurrency `tashil-mac-heavy`;
+   cross-repo via `MAC_SHARED_LOCK` (see below). Do **not** edit `~/mac-resources` from CI.
 7. **Paths** use `$HOME` / `ANDROID_HOME` / `$HOME/toolchains` — never `/Users/fathalla`.
+
+## In-repo Mac job concurrency (`tashil-mac-heavy`)
+
+Workflow-level `concurrency` only serializes **one workflow + one ref** (and cancels
+superseded PR runs). It does **not** stop PR-A’s Flutter job and PR-B’s Playwright
+smoke from both landing on `tashil-mac` at once.
+
+Heavy Mac jobs therefore also set **job-level** concurrency:
+
+```yaml
+concurrency:
+  group: tashil-mac-heavy
+  cancel-in-progress: false
+```
+
+| Job | Workflow |
+|-----|----------|
+| `test-flutter` | `ci.yml` |
+| `smoke-run` | `playwright_smoke.yml` |
+| `deploy-backend` / `deploy-web` | `deploy.yml` |
+
+`cancel-in-progress: false` is required so a new heavy does not kill an in-flight
+deploy or flutter build. Superseded **PR** workflow runs still cancel via the
+workflow-level group (non-`main` only).
+
+This is complementary to `MAC_SHARED_LOCK`: the job group covers **this repo**; the
+directory lock covers **other repos/bots** on the same Mac.
 
 ## Cross-repo Mac lock (`~/mac-resources/mac-lock.sh`)
 
-GitHub `concurrency` only serializes within one workflow/ref. Another repo’s runners on
-the same Mac can still overlap. Heavy jobs may book a **global** directory lock.
+Another repo’s runners on the same Mac can still overlap with our heavies. Heavy jobs
+may book a **global** directory lock when opted in.
 
 **Do not edit** `~/mac-resources` from this repo’s CI.
 
 ### Opt-in (`MAC_SHARED_LOCK`)
 
-Lock is **off unless** repo variable / env `MAC_SHARED_LOCK=1`. Unset on the dedicated
-`tashil-ci` user/machine (migration). Set `MAC_SHARED_LOCK=1` only while still sharing
-fathalla-mac with other bots. Emulator **free-port** isolation stays on either way.
+Lock is **off unless** repo variable / env `MAC_SHARED_LOCK=1`.
+
+**Set `MAC_SHARED_LOCK=1` whenever multiple runner processes share one physical Mac**
+(including `tashil-ci` with `tashil-mac`…`tashil-mac-4`). The old “unset on dedicated
+tashil-ci” advice assumed exclusive single-runner use — four runners on one box still
+need serialization (same-repo group + this lock for cross-repo).
+
+Unset / omit the variable only when the Mac has a **single** online runner and no
+other bots. Emulator **free-port** isolation stays on either way.
 
 ### Safe invoke (`scripts/mac_lock_ci.sh`)
 
@@ -86,19 +138,20 @@ fathalla-mac with other bots. Emulator **free-port** isolation stays on either w
    runs the release step
 
 ```bash
-export MAC_SHARED_LOCK=1   # omit on dedicated tashil-ci
+export MAC_SHARED_LOCK=1   # recommended while 2+ runners share one Mac
 AGENT="ci-Tashil-Data-Sharing-${GITHUB_RUN_ID}-${GITHUB_JOB}"
 bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "<task>" <eta> <wait>
 # … work …
 bash scripts/mac_lock_ci.sh release "$AGENT"
 ```
 
-| Job | Lock when `MAC_SHARED_LOCK=1`? | acquire step timeout | job timeout |
-|-----|-------------------------------|----------------------|-------------|
-| Backend Go (+ emulator) | yes | 10m | 25m |
-| Flutter analyze & test (run) | yes | 8m | 35m |
-| Playwright Semantics smoke (run) | yes | 15m | 45m |
-| Cloud Run pin / PR comment / path detect & gates | **no** | — | 5m (hosted via `CI_HOSTED_RUNNER`) |
+| Job | `tashil-mac-heavy`? | Lock when `MAC_SHARED_LOCK=1`? | acquire step timeout | job timeout |
+|-----|---------------------|-------------------------------|----------------------|-------------|
+| Backend Go (+ emulator) | no (hosted by default) | yes (no-op on ubuntu) | 10m | 25m |
+| Flutter analyze & test (run) | **yes** | yes | 8m | 35m |
+| Playwright Semantics smoke (run) | **yes** | yes | 15m | 45m |
+| Deploy backend / web | **yes** | no (group + deploy workflow queue) | — | 30m / 25m |
+| Cloud Run pin / PR comment / path detect & gates | no | **no** | — | 5m (hosted via `CI_HOSTED_RUNNER`) |
 
 Path filters (`dorny/paths-filter`): no workflow-level `paths-ignore` — workflows always
 start so gates report. Flutter + Playwright heavy jobs run only when `tashil_web/` /
@@ -152,6 +205,8 @@ python3 scripts/pick_free_ports.py --self-test
 
 ## Concurrency
 
+### Workflow-level (cancel superseded PR runs)
+
 `ci.yml` and `playwright_smoke.yml`:
 
 ```yaml
@@ -163,11 +218,12 @@ concurrency:
 Superseded PR syncs cancel in-flight CI; **never cancel `main`**. **`deploy.yml` must
 keep `cancel-in-progress: false`** — never cancel a production deploy.
 
-GitHub workflow concurrency only serializes within one workflow/ref — it does **not**
-stop `tashil-mac`…`tashil-mac-4` from all running different workflows at once on the
-same Mac. Queueing levers: keep light jobs on `CI_HOSTED_RUNNER`, enable
-`MAC_SHARED_LOCK=1` for heavies, or take runners offline so the label has fewer
-slots.
+### Job-level (Mac heavy serialize)
+
+See **In-repo Mac job concurrency (`tashil-mac-heavy`)** above. Workflow concurrency
+alone does **not** stop `tashil-mac`…`tashil-mac-4` from running different workflows
+at once. Queueing levers: hosted lights, `tashil-mac-heavy`, `MAC_SHARED_LOCK=1`,
+fewer online runners.
 
 ## CPU budget (14-core Mac, up to 4 runners + other bots)
 
@@ -210,8 +266,9 @@ Settings → Secrets and variables → Actions → Variables:
 
 | Goal | Variable | Value (exact) |
 |------|----------|---------------|
-| Default (recommended) | leave both unset | light → ubuntu; heavy/deploy → Mac |
-| Force light jobs to Mac (GitHub minutes / spending exhausted) | `CI_HOSTED_RUNNER` | `["self-hosted","macOS","tashil-mac"]` |
+| Default (recommended) | leave `CI_*` unset | light → ubuntu; heavy/deploy → Mac |
+| Serialize vs other bots on shared Mac | `MAC_SHARED_LOCK` | `1` (recommended while 2+ runners share one host) |
+| Force light jobs to Mac (GitHub minutes / spending exhausted) | `CI_HOSTED_RUNNER` | `["self-hosted","macOS","tashil-mac"]` — also set `MAC_SHARED_LOCK=1` and/or reduce online runners |
 | Explicit ubuntu for light jobs | `CI_HOSTED_RUNNER` | `"ubuntu-latest"` (JSON string — include the quotes) |
 | Move heavy jobs to ubuntu (Mac offline) | `CI_RUNS_ON` | `["ubuntu-latest"]` |
 
@@ -229,8 +286,8 @@ Hybrid (#56) + await-ci (#41). Concurrency `group: ${{ github.workflow }}` with
 | Job | Runner | Notes |
 |-----|--------|-------|
 | `await-ci` | `CI_HOSTED_RUNNER` (ubuntu) | `if: github.ref == 'refs/heads/main'`; waits for `ci.yml` success; runs smoke unit test — **no** `test-backend` / `test-web` Mac duplicate |
-| `deploy-backend` | `CI_RUNS_ON` (Mac) | gcloud WIF; `CLOUDSDK_CONFIG` under `$RUNNER_TEMP`; hard-fail smoke `/api/v1/version` + `/livez` + `/api/v1/health`; timeout 30m |
-| `deploy-web` | `CI_RUNS_ON` (Mac) | Flutter detect/require-preinstalled; gcloud isolation; timeout 25m |
+| `deploy-backend` | `CI_RUNS_ON` (Mac) | job concurrency `tashil-mac-heavy` (`cancel-in-progress: false`); gcloud WIF; `CLOUDSDK_CONFIG` under `$RUNNER_TEMP`; hard-fail smoke `/api/v1/version` + `/livez` + `/api/v1/health`; timeout 30m |
+| `deploy-web` | `CI_RUNS_ON` (Mac) | same `tashil-mac-heavy` group; Flutter detect/require-preinstalled; gcloud isolation; timeout 25m |
 
 ## Check / restart / re-register runners
 
@@ -245,7 +302,18 @@ Hybrid (#56) + await-ci (#41). Concurrency `group: ${{ github.workflow }}` with
 ```
 
 If the Mac is saturated, stop one or two runner services so GitHub queues jobs
-instead of scheduling four heavy workloads onto one host.
+instead of scheduling four heavy workloads onto one host:
+
+```bash
+# Example: leave tashil-mac + tashil-mac-2 online
+~/actions-runner-3/svc.sh stop
+~/actions-runner-4/svc.sh stop
+```
+
+With `tashil-mac-heavy` + `MAC_SHARED_LOCK=1`, two online runners is usually enough
+(one busy on the heavy, one free for rare non-grouped Mac work / faster pickup after
+release). Four online runners without those levers recreates Setup Node / flutter
+build thrash.
 
 ## Work directories
 

@@ -9,7 +9,9 @@
 # See docs/ci-self-hosted.md.
 #
 # tashil-mac … tashil-mac-4 are four runners on one Mac — over-parallel heavy jobs
-# slow everything. Keep light jobs hosted; use MAC_SHARED_LOCK=1 to queue heavies.
+# thrash Setup Node / flutter build. Keep light jobs on CI_HOSTED_RUNNER; heavy Mac
+# jobs use job concurrency group tashil-mac-heavy + opt-in MAC_SHARED_LOCK=1.
+# See docs/ci-self-hosted.md (Mac contention).
 name: CI tests
 
 # No workflow-level paths-ignore: docs-only PRs still start the workflow so required
@@ -31,7 +33,8 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.41.2"
-  # Opt-in shared Mac lock (unset on dedicated tashil-ci). Set repo variable MAC_SHARED_LOCK=1 to enable.
+  # Opt-in shared Mac directory lock (cross-repo). Set repo variable MAC_SHARED_LOCK=1
+  # while multiple runners share one physical Mac — see docs/ci-self-hosted.md.
   MAC_SHARED_LOCK: ${{ vars.MAC_SHARED_LOCK }}
 
 jobs:
@@ -213,7 +216,11 @@ jobs:
     # Heavy run only when Flutter/web/CI paths change. Required check is the gate job below.
     needs: changes
     if: needs.changes.outputs.flutter == 'true'
-    # Opt-in Mac lock (MAC_SHARED_LOCK). Tradeoff when enabled: serializes vs Go/smoke.
+    # Serialize with other Mac heavies in this repo (smoke / deploy). Does not cancel.
+    # Cross-repo: also set MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
+    concurrency:
+      group: tashil-mac-heavy
+      cancel-in-progress: false
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # 35m: up to 8m lock wait + pub/analyze/test (20m was too tight with lock).
     timeout-minutes: 35
