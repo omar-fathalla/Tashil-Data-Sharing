@@ -235,6 +235,111 @@ func TestClearTenantDataAndWideMatrixExcelIngestion(t *testing.T) {
 	}
 }
 
+// Regression: wide-matrix row-total gap (الاجمالى − Σ branches) must persist under
+// غير موزع على فرع (qty 0, revenue ≠ 0) so BQ / KPI totals match the file. Named
+// branches with qty≤0 stay dropped by the anomaly gate.
+func TestProcessorPersistsUnallocatedWideMatrixGap(t *testing.T) {
+	ctx := context.Background()
+	agent := gemini.NewAgent("", "gemini-3.8-flash", true)
+	bqRepo := bigquery.NewClient("test-proj", "test-dataset", true)
+	fsRepo := firestore.NewClient("test-db", true)
+	processor := NewProcessor(agent, bqRepo, fsRepo)
+
+	tenantID := "tenant-adeco-unalloc-persist"
+	if err := processor.ClearTenantData(ctx, tenantID); err != nil {
+		t.Fatalf("ClearTenantData: %v", err)
+	}
+
+	// Row 1: branches 100+50=150, الاجمالى 200 → unallocated +50 (qty 0)
+	// Row 2: branches 80+40=120, الاجمالى 100 → unallocated -20 (qty 0)
+	// Row 3: balanced named branches (no gap) — control
+	// Row 4: named value-only (qty 0, rev 25) must still be anomaly-dropped; no gap vs الاجمالى
+	wideCSV := []byte(
+		"المجموعة,المورد,الباركود,الصنف,سموحة,ستانلى,الاجمالى,MONTH,كمية سموحة,كمية ستانلى,اجمالى كميات,YEAR\n" +
+			"منعمات,ادكو (1),6223000233701,منتج أ,100,50,200,JAN,10,5,15,2026\n" +
+			"منعمات,ادكو (1),6223000233702,منتج ب,80,40,100,FEB,8,4,12,2026\n" +
+			"منعمات,ادكو (1),6223000233703,منتج ج,60,40,100,MAR,6,4,10,2026\n" +
+			"منعمات,ادكو (1),6223000233704,منتج د,25,0,25,APR,0,0,0,2026\n",
+	)
+
+	// Gap recon flags validation → durable write requires staged preview + human commit.
+	staged, err := processor.ProcessUploadWithDryRun(ctx, tenantID, "wide-unalloc-gap.csv", wideCSV, true, "fathalla")
+	if err != nil {
+		t.Fatalf("ProcessUploadWithDryRun: %v", err)
+	}
+	res, err := processor.CommitStagedUpload(ctx, tenantID, staged.BatchID, "fathalla")
+	if err != nil {
+		t.Fatalf("CommitStagedUpload: %v", err)
+	}
+
+	// Parser SupplierShares includes all observations (incl. value-only named + unallocated).
+	const wantParseTotal = 425.0 // 200+100+100+25
+	if res.TotalRevenue != wantParseTotal {
+		t.Errorf("upload TotalRevenue %.2f want %.2f (parser/file الاجمالى)", res.TotalRevenue, wantParseTotal)
+	}
+
+	persisted, total, err := bqRepo.GetSellOutRecords(ctx, tenantID, bigquery.RecordFilter{Limit: 50})
+	if err != nil {
+		t.Fatalf("GetSellOutRecords: %v", err)
+	}
+
+	var unallocCount int
+	var unallocSum float64
+	var namedZeroQtyLeak bool
+	var bqOwnSum float64
+	for _, r := range persisted {
+		bqOwnSum += r.NetRevenue
+		if gemini.IsUnallocatedBranchName(r.StoreName) {
+			unallocCount++
+			unallocSum += r.NetRevenue
+			if r.QuantitySold != 0 {
+				t.Errorf("unallocated fact should keep qty 0, got %d: %+v", r.QuantitySold, r)
+			}
+		}
+		if r.Barcode == "6223000233704" {
+			namedZeroQtyLeak = true
+		}
+	}
+	if unallocCount != 2 {
+		t.Fatalf("expected 2 persisted unallocated facts (+50 and -20), got %d (total facts=%d)", unallocCount, total)
+	}
+	if unallocSum != 30.0 { // +50 -20
+		t.Errorf("unallocated sum %.2f want 30", unallocSum)
+	}
+	if namedZeroQtyLeak {
+		t.Errorf("named-branch qty=0 value-only row must stay anomaly-dropped")
+	}
+	// Named with qty>0: 150+120+100=370; unallocated 30; value-only 25 dropped → BQ 400
+	const wantBQTotal = 400.0
+	if bqOwnSum != wantBQTotal {
+		t.Errorf("BQ own-brand sum %.2f want %.2f (gap rows persisted; named qty0 still dropped)", bqOwnSum, wantBQTotal)
+	}
+
+	kpis, err := bqRepo.GetExecutiveKPIs(ctx, tenantID, "CUSTOM", "2026-01-01", "2026-12-31")
+	if err != nil {
+		t.Fatalf("GetExecutiveKPIs: %v", err)
+	}
+	if kpis.TotalRevenue != wantBQTotal {
+		t.Errorf("KPI TotalRevenue %.2f want %.2f (persisted facts incl. unallocated)", kpis.TotalRevenue, wantBQTotal)
+	}
+
+	// Gap-only subset (rows 1–3): file الاجمالى 400 == BQ after persist.
+	gapOnlyFileTotal := 400.0
+	if bqOwnSum != gapOnlyFileTotal {
+		t.Errorf("gap-only file total %.2f should equal BQ after unallocated persist", gapOnlyFileTotal)
+	}
+
+	sawUnallocBranch := false
+	for _, st := range res.DiscoveredBranches {
+		if gemini.IsUnallocatedBranchName(st.BranchName) {
+			sawUnallocBranch = true
+		}
+	}
+	if !sawUnallocBranch {
+		t.Errorf("discoveredBranches should still list %s", gemini.UnallocatedBranchName)
+	}
+}
+
 func TestProcessorGomlaUploadWithGomlaTargetDoesNotTriggerMismatch(t *testing.T) {
 	ctx := context.Background()
 	agent := gemini.NewAgent("", "gemini-3.8-flash", true)

@@ -2044,6 +2044,8 @@ class ArchivedExcelFileModel {
   final double totalCases;
   final double totalWeightTons;
   final String uploadedAt;
+  /// Always refreshed on re-ingest; [uploadedAt] may keep the original first upload.
+  final String lastIngestedAt;
 
   const ArchivedExcelFileModel({
     required this.id,
@@ -2064,6 +2066,7 @@ class ArchivedExcelFileModel {
     this.totalCases = 0.0,
     this.totalWeightTons = 0.0,
     required this.uploadedAt,
+    this.lastIngestedAt = '',
   });
 
   factory ArchivedExcelFileModel.fromJson(Map<String, dynamic> json) {
@@ -2099,6 +2102,7 @@ class ArchivedExcelFileModel {
       totalCases: (json['total_cases'] as num?)?.toDouble() ?? 0.0,
       totalWeightTons: (json['total_weight_tons'] as num?)?.toDouble() ?? 0.0,
       uploadedAt: json['uploaded_at'] as String? ?? '',
+      lastIngestedAt: json['last_ingested_at'] as String? ?? '',
     );
   }
 
@@ -2121,6 +2125,7 @@ class ArchivedExcelFileModel {
         'total_cases': totalCases,
         'total_weight_tons': totalWeightTons,
         'uploaded_at': uploadedAt,
+        'last_ingested_at': lastIngestedAt,
       };
 
   ArchivedExcelFileModel copyWith({
@@ -2133,6 +2138,7 @@ class ArchivedExcelFileModel {
     double? totalCases,
     double? totalWeightTons,
     String? uploadedAt,
+    String? lastIngestedAt,
   }) {
     return ArchivedExcelFileModel(
       id: id,
@@ -2153,6 +2159,7 @@ class ArchivedExcelFileModel {
       totalCases: totalCases ?? this.totalCases,
       totalWeightTons: totalWeightTons ?? this.totalWeightTons,
       uploadedAt: uploadedAt ?? this.uploadedAt,
+      lastIngestedAt: lastIngestedAt ?? this.lastIngestedAt,
     );
   }
 }

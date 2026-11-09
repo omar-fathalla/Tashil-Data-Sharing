@@ -3236,9 +3236,21 @@ onChanged: m3Legacy<int>((v) {
                                 ),
                                 DataCell(
                                   Text(
-                                    file.uploadedAt.length >= 16
-                                        ? file.uploadedAt.substring(0, 16).replaceAll('T', ' ')
-                                        : file.uploadedAt,
+                                    () {
+                                      final uploaded = file.uploadedAt.length >= 16
+                                          ? file.uploadedAt.substring(0, 16).replaceAll('T', ' ')
+                                          : file.uploadedAt;
+                                      if (file.lastIngestedAt.isEmpty ||
+                                          file.lastIngestedAt == file.uploadedAt) {
+                                        return uploaded;
+                                      }
+                                      final ingested = file.lastIngestedAt.length >= 16
+                                          ? file.lastIngestedAt
+                                              .substring(0, 16)
+                                              .replaceAll('T', ' ')
+                                          : file.lastIngestedAt;
+                                      return '$uploaded\nآخر استيراد: $ingested';
+                                    }(),
                                     style: M3TextVariants.cell.copyWith(color: colorScheme.onSurfaceVariant),
                                   ),
                                 ),

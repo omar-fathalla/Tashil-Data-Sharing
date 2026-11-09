@@ -41,7 +41,10 @@ type ArchivedFile struct {
 	TotalCases      float64 `json:"total_cases,omitempty"`
 	TotalWeightTons float64 `json:"total_weight_tons,omitempty"`
 	UploadedAt      string  `json:"uploaded_at"`
-	StoragePath     string  `json:"storage_path,omitempty"`
+	// LastIngestedAt is always refreshed on save/re-upload. UploadedAt keeps the original
+	// first-upload time when the same bytes are replayed (reapply order depends on it).
+	LastIngestedAt string `json:"last_ingested_at,omitempty"`
+	StoragePath    string `json:"storage_path,omitempty"`
 }
 
 func isProductMasterArchiveEntry(entry *ArchivedFile) bool {
@@ -511,8 +514,12 @@ func (p *Processor) InsertArchivedFileEntry(entry *ArchivedFile, fileBytes []byt
 	if copyEntry.FileType == "" {
 		copyEntry.FileType = "sell_out"
 	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
 	if copyEntry.UploadedAt == "" {
-		copyEntry.UploadedAt = time.Now().UTC().Format(time.RFC3339Nano)
+		copyEntry.UploadedAt = now
+	}
+	if copyEntry.LastIngestedAt == "" {
+		copyEntry.LastIngestedAt = now
 	}
 	bytesCopy := make([]byte, len(fileBytes))
 	copy(bytesCopy, fileBytes)
@@ -653,7 +660,8 @@ func (p *Processor) SaveArchivedFile(
 		}
 	}
 
-	uploadedAt := time.Now().UTC().Format(time.RFC3339Nano)
+	nowStamp := time.Now().UTC().Format(time.RFC3339Nano)
+	uploadedAt := nowStamp
 	if existingUploadedAt != "" {
 		uploadedAt = existingUploadedAt
 	}
@@ -677,6 +685,7 @@ func (p *Processor) SaveArchivedFile(
 		TotalCases:      totalCases,
 		TotalWeightTons: totalTons,
 		UploadedAt:      uploadedAt,
+		LastIngestedAt:  nowStamp,
 		StoragePath:     storagePath,
 	}
 
@@ -743,7 +752,9 @@ func (p *Processor) UpdateArchivedFileByBatch(batchID, retailChain, targetYear, 
 			if targetMonth != "" && targetMonth != "auto" {
 				entry.TargetMonth = targetMonth
 			}
-			entry.UploadedAt = time.Now().UTC().Format(time.RFC3339Nano)
+			nowStamp := time.Now().UTC().Format(time.RFC3339Nano)
+			entry.UploadedAt = nowStamp
+			entry.LastIngestedAt = nowStamp
 			p.writeArchiveSidecarLocked(entry)
 			copyEntry := *entry
 			return &copyEntry
