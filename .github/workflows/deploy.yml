@@ -1,11 +1,11 @@
 # Production deploy on every push to main (backend → Cloud Run, web → Firebase Hosting).
 #
-# Hybrid runners (same pattern as ci.yml / playwright_smoke.yml):
-#   Light gates (test-backend / test-web) → CI_HOSTED_RUNNER (default ubuntu-latest)
+# Hybrid runners (same pattern as ci.yml / #56):
+#   Light gate (await-ci) → CI_HOSTED_RUNNER (default ubuntu-latest) — no duplicate Mac test load
 #   deploy-backend / deploy-web → CI_RUNS_ON Mac self-hosted (gcloud WIF / toolchains)
 # NEVER use GitHub-hosted macOS runners.
-# Budget fallback: set CI_HOSTED_RUNNER to the same JSON array as CI_RUNS_ON so light
-# jobs also land on Mac with no code change. See docs/ci-self-hosted.md / #41 / #55.
+# Budget fallback: set CI_HOSTED_RUNNER to the same JSON array as CI_RUNS_ON so the light
+# gate also lands on Mac. See docs/ci-self-hosted.md / #41 / #55 / #56.
 #
 # Note: tashil-mac … tashil-mac-4 share one physical Mac. Keep light gates on hosted
 # ubuntu so deploy Mac jobs are not starved. Workflow concurrency queues deploys;
@@ -14,6 +14,9 @@
 #
 # Auth: Workload Identity Federation, no JSON keys. The provider only accepts tokens from
 # omar-fathalla/Tashil-Data-Sharing on refs/heads/main, impersonating tashil-gh-deployer.
+#
+# Tests: do not duplicate ci.yml go/flutter on Mac — await-ci waits for CI tests green.
+# Smoke: hard-fail /api/v1/version + /livez + /api/v1/health (public probes; not /healthz).
 #
 # Web version: CI never commits back to main (that would re-trigger this workflow). The version
 # shown in the sidebar is computed as  <tashil_web/deploy_version.txt> + <github.run_number>,
@@ -30,7 +33,7 @@ on:
       - ".gitignore"
   workflow_dispatch:
 
-# One deploy queue for this workflow; never cancel an in-flight production deploy.
+# One deploy queue for this workflow; never cancel an in-flight production deploy (#55).
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
@@ -38,6 +41,7 @@ concurrency:
 permissions:
   contents: read
   id-token: write
+  actions: read
 
 env:
   PROJECT_ID: tashil-data-sharing
@@ -48,87 +52,61 @@ env:
   FLUTTER_VERSION: "3.41.2"
 
 jobs:
-  # Light gate on hosted ubuntu so deploy is not blocked by Mac load / queue.
-  test-backend:
+  # Light gate on hosted ubuntu — replaces duplicate test-backend/test-web Mac load (#41).
+  # Guard: never schedule on non-main pushes.
+  await-ci:
+    name: Await CI tests
+    if: github.ref == 'refs/heads/main'
     runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
-    # Observed ~6m on success (2026-11-08 deploy); ~20m ceiling.
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: backend-go
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
-      - name: Per-runner toolchain env
-        working-directory: .
-        run: bash scripts/ci_runner_env.sh
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: backend-go/go.mod
-          cache: ${{ runner.environment != 'self-hosted' }}
-          cache-dependency-path: backend-go/go.sum
-      - name: Cache Go build
-        if: runner.environment != 'self-hosted'
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/Library/Caches/go-build
-          key: go-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('backend-go/go.sum') }}
-          restore-keys: |
-            go-build-${{ runner.os }}-${{ runner.arch }}-
-      - name: go vet
-        run: go vet ./...
-      - name: go test
-        run: go test ./... -count=1 -timeout 20m
 
-  test-web:
-    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
-    # Observed ~4.5m on success; ~20m ceiling.
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: tashil_web
-    steps:
-      - uses: actions/checkout@v4
-      - name: Per-runner toolchain env
-        working-directory: .
-        run: bash scripts/ci_runner_env.sh
-      - name: Detect preinstalled Flutter
-        id: flutter_pre
-        working-directory: .
+      - name: Deploy backend smoke unit test
+        run: |
+          chmod +x scripts/deploy_backend_smoke.sh scripts/deploy_backend_smoke_test.sh
+          bash scripts/deploy_backend_smoke_test.sh
+
+      - name: Wait for CI tests workflow success
         env:
-          FLUTTER_VERSION: ${{ env.FLUTTER_VERSION }}
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
         run: |
-          chmod +x scripts/ci_detect_flutter.sh
-          bash scripts/ci_detect_flutter.sh
-      - name: Require preinstalled Flutter on self-hosted
-        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment == 'self-hosted'
-        run: |
-          echo "::error::Preinstalled Flutter ${{ env.FLUTTER_VERSION }} missing on self-hosted runner. Install at \$HOME/toolchains/flutter — do not download via flutter-action (drops Mac runners)."
+          set -euo pipefail
+          echo "Waiting for workflow 'CI tests' success on ${SHA}"
+          deadline=$((SECONDS + 220 * 60))
+          while (( SECONDS < deadline )); do
+            conclusion="$(gh run list \
+              --repo "${{ github.repository }}" \
+              --workflow "ci.yml" \
+              --commit "$SHA" \
+              --json databaseId,conclusion,status,event \
+              --limit 20 \
+              --jq '[.[] | select(.status == "completed")] | .[0].conclusion // empty')"
+            if [ -n "${conclusion}" ]; then
+              echo "CI tests conclusion=${conclusion}"
+              if [ "${conclusion}" = "success" ]; then
+                exit 0
+              fi
+              echo "::error::CI tests finished with conclusion=${conclusion}; refusing deploy"
+              exit 1
+            fi
+            status="$(gh run list \
+              --repo "${{ github.repository }}" \
+              --workflow "ci.yml" \
+              --commit "$SHA" \
+              --json status \
+              --limit 5 \
+              --jq '[.[].status] | join(",")')"
+            echo "No completed CI run yet (status=${status:-none}); sleeping 60s"
+            sleep 60
+          done
+          echo "::error::Timed out waiting for CI tests on ${SHA}"
           exit 1
-      - uses: subosito/flutter-action@v2
-        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment != 'self-hosted'
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: false
-      - name: Cache pub dependencies
-        if: runner.environment != 'self-hosted'
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/pub-cache
-          key: ${{ runner.os }}-${{ runner.arch }}-pub-isolated-v1-${{ hashFiles('tashil_web/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-pub-isolated-v1-
-      - run: flutter pub get
-      - name: flutter analyze
-        run: flutter analyze
-      - name: flutter test
-        run: flutter test
 
   deploy-backend:
-    needs: [test-backend, test-web]
-    # Stay on Mac/self-hosted where gcloud WIF + toolchains work (#41 / #55).
+    needs: [await-ci]
+    # Stay on Mac/self-hosted where gcloud WIF + toolchains work (#41 / #55 / #56).
     # Serialize with Flutter/smoke heavies; never cancel an in-flight deploy job.
     concurrency:
       group: tashil-mac-heavy
@@ -141,14 +119,18 @@ jobs:
         with:
           # Need the previous commit to decide whether backend sources changed.
           fetch-depth: 0
+
       - name: Per-runner toolchain env
         run: bash scripts/ci_runner_env.sh
+
+      # runner.* is not allowed in jobs.*.env — set via $RUNNER_TEMP in a step.
       - name: Isolate gcloud config
         run: |
           set -euo pipefail
           cfg="${RUNNER_TEMP}/cloudsdk-config-deploy-backend"
           mkdir -p "$cfg"
           echo "CLOUDSDK_CONFIG=${cfg}" >> "$GITHUB_ENV"
+
       - name: Detect whether backend must redeploy
         id: backend_paths
         env:
@@ -188,12 +170,14 @@ jobs:
             echo "deploy=true" >> "$GITHUB_OUTPUT"
             echo "Backend paths differ from live ${live_commit:0:7}; redeploying Cloud Run"
           fi
+
       - id: auth
         if: steps.backend_paths.outputs.deploy == 'true'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ env.WIF_PROVIDER }}
           service_account: ${{ env.DEPLOYER_SA }}
+
       # Prefer $HOME/toolchains/google-cloud-sdk (tashil-ci); no apt.
       - name: Ensure gcloud on PATH
         id: gcloud_path
@@ -216,12 +200,15 @@ jobs:
           fi
           echo "Preinstalled gcloud not found; installing via setup-gcloud action"
           echo "need_setup_gcloud=true" >> "$GITHUB_OUTPUT"
+
       - name: Setup gcloud (fallback)
         if: steps.backend_paths.outputs.deploy == 'true' && steps.gcloud_path.outputs.need_setup_gcloud == 'true'
         uses: google-github-actions/setup-gcloud@v2
+
       - name: Record git commit for /api/v1/version
         if: steps.backend_paths.outputs.deploy == 'true'
         run: echo "${GITHUB_SHA}" > backend-go/data/build_commit.txt
+
       - name: Deploy to Cloud Run (from source, existing settings and env vars are kept)
         if: steps.backend_paths.outputs.deploy == 'true'
         working-directory: backend-go
@@ -233,13 +220,16 @@ jobs:
             --memory=2Gi \
             --min-instances=1 \
             --max-instances=1
+
       - name: Smoke check
         if: steps.backend_paths.outputs.deploy == 'true'
         run: |
+          set -euo pipefail
           url="$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT_ID" --format='value(status.url)')"
-          # /livez is public and Cloud Run-safe (/healthz is reserved by Google ingress).
-          curl -fsS --retry 5 --retry-delay 10 "$url/livez"
-          curl -fsS --retry 5 --retry-delay 10 "$url/api/v1/health"
+          chmod +x scripts/deploy_backend_smoke.sh
+          # Hard-fail non-200 on /api/v1/version, /livez, /api/v1/health (public; not /healthz).
+          bash scripts/deploy_backend_smoke.sh "$url"
+
       - name: Skip summary
         if: steps.backend_paths.outputs.deploy != 'true'
         run: echo "Skipped Cloud Run deploy (web-only / non-backend change)." >> "$GITHUB_STEP_SUMMARY"
@@ -254,8 +244,18 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+
       - name: Per-runner toolchain env
         run: bash scripts/ci_runner_env.sh
+
+      # runner.* is not allowed in jobs.*.env — set via $RUNNER_TEMP in a step.
+      - name: Isolate gcloud config
+        run: |
+          set -euo pipefail
+          cfg="${RUNNER_TEMP}/cloudsdk-config-deploy-web"
+          mkdir -p "$cfg"
+          echo "CLOUDSDK_CONFIG=${cfg}" >> "$GITHUB_ENV"
+
       - name: Detect preinstalled Flutter
         id: flutter_pre
         env:
@@ -263,32 +263,39 @@ jobs:
         run: |
           chmod +x scripts/ci_detect_flutter.sh
           bash scripts/ci_detect_flutter.sh
+
       - name: Require preinstalled Flutter on self-hosted
         if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment == 'self-hosted'
         run: |
           echo "::error::Preinstalled Flutter ${{ env.FLUTTER_VERSION }} missing on self-hosted runner. Install at \$HOME/toolchains/flutter — do not download via flutter-action (drops Mac runners)."
           exit 1
+
       - uses: subosito/flutter-action@v2
         if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment != 'self-hosted'
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: false
+
       - name: Compute web version
         id: ver
         run: |
           base="$(tr -dc '0-9' < tashil_web/deploy_version.txt)"
           echo "version=$(( ${base:-0} + GITHUB_RUN_NUMBER ))" >> "$GITHUB_OUTPUT"
+
       - name: Build web
         working-directory: tashil_web
         run: |
           flutter pub get
           flutter build web --release --dart-define=APP_VERSION="${{ steps.ver.outputs.version }}"
+
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ env.WIF_PROVIDER }}
           service_account: ${{ env.DEPLOYER_SA }}
+
       - name: Deploy to Firebase Hosting
         run: npx --yes firebase-tools@14 deploy --only hosting --project "$PROJECT_ID" --non-interactive
+
       - name: Summary
         run: echo "Deployed web v${{ steps.ver.outputs.version }} (commit ${GITHUB_SHA::7})" >> "$GITHUB_STEP_SUMMARY"

@@ -244,7 +244,7 @@ Flutter **web** + Go + Playwright Chromium only.
 | Go modules | Local `~/go/pkg/mod` on self-hosted (remote setup-go cache disabled — was ~880MB / stalled); `cache: true` only on github-hosted |
 | Go build | Local `~/Library/Caches/go-build` on self-hosted; actions/cache only on github-hosted |
 | Pub | Per-job `$RUNNER_TEMP/pub-cache` via `PUB_CACHE` (`ci_runner_env.sh`); never shared `~/.pub-cache`. Remote `actions/cache` only on github-hosted |
-| Flutter SDK | preinstalled 3.41.2 at `$HOME/toolchains/flutter` (`scripts/ci_detect_flutter.sh`); else `flutter-action` **without** cache (cache downloads have dropped Mac runners) |
+| Flutter SDK | **Required** preinstalled 3.41.2 at `$HOME/toolchains/flutter` on self-hosted (`ci_detect_flutter.sh`); missing → fail fast. `flutter-action` only on github-hosted fallback |
 | Firebase emulator JARs | `~/.cache/firebase/emulators` (shared read; per-job config elsewhere) |
 | npm (e2e) | `setup-node` cache |
 | Playwright browsers | `~/.cache/ms-playwright` + `~/Library/Caches/ms-playwright` |
@@ -277,6 +277,17 @@ quotes) is **not** valid — use `"ubuntu-latest"` or leave the var unset.
 
 On Linux fallback, Playwright installs with `npx playwright install --with-deps chromium`.
 Emulator isolation scripts still probe free ports (safe on ubuntu-latest too).
+
+## Production deploy (`deploy.yml`)
+
+Hybrid (#56) + await-ci (#41). Concurrency `group: ${{ github.workflow }}` with
+`cancel-in-progress: false` (#55).
+
+| Job | Runner | Notes |
+|-----|--------|-------|
+| `await-ci` | `CI_HOSTED_RUNNER` (ubuntu) | `if: github.ref == 'refs/heads/main'`; waits for `ci.yml` success; runs smoke unit test — **no** `test-backend` / `test-web` Mac duplicate |
+| `deploy-backend` | `CI_RUNS_ON` (Mac) | job concurrency `tashil-mac-heavy` (`cancel-in-progress: false`); gcloud WIF; `CLOUDSDK_CONFIG` under `$RUNNER_TEMP`; hard-fail smoke `/api/v1/version` + `/livez` + `/api/v1/health`; timeout 30m |
+| `deploy-web` | `CI_RUNS_ON` (Mac) | same `tashil-mac-heavy` group; Flutter detect/require-preinstalled; gcloud isolation; timeout 25m |
 
 ## Check / restart / re-register runners
 

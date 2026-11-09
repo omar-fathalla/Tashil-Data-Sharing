@@ -1572,7 +1572,7 @@ func parseFullTabularPayload(filename string, rawContent []byte) (*domain.Normal
 		}
 	}
 
-	return &domain.NormalizedRetailIngestionPayload{
+	payload := &domain.NormalizedRetailIngestionPayload{
 		RetailerDetected:     retailer,
 		ReportingPeriodStart: minDate,
 		ReportingPeriodEnd:   maxDate,
@@ -1588,7 +1588,9 @@ func parseFullTabularPayload(filename string, rawContent []byte) (*domain.Normal
 		MonthlyTrends:        monthlyTrends,
 		DetectedSheets:       discoveredSheets,
 		ComputedPricingItems: computedPricing,
-	}, true
+	}
+	attachBranchNormSummary(payload)
+	return payload, true
 }
 
 func inferTabularTemporalColumnsFromData(dataRows [][]string, cols *discoveredColumns) {

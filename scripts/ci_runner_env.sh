@@ -16,6 +16,13 @@ if [[ -d "${TOOLCHAINS}/bin" ]]; then
   export PATH="${TOOLCHAINS}/bin:${PATH}"
 fi
 
+# gcloud SDK (deploy.yml Cloud Run / Firebase). Prefer $HOME/toolchains — never hardcode user paths.
+GCLOUD_SDK="${TOOLCHAINS}/google-cloud-sdk"
+if [[ -x "${GCLOUD_SDK}/bin/gcloud" ]]; then
+  echo "${GCLOUD_SDK}/bin" >>"${GITHUB_PATH:-/dev/null}"
+  export PATH="${GCLOUD_SDK}/bin:${PATH}"
+fi
+
 # Flutter SDK lives at $HOME/toolchains/flutter (not always symlinked into toolchains/bin).
 # Missing this path forces flutter-action downloads that have starved self-hosted Mac runners
 # ("lost communication with the server" mid-setup).
