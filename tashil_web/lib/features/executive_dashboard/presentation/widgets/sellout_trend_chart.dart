@@ -319,7 +319,9 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                     ),
                     const SizedBox(height: 2.0),
                     Text(
-                      showSellIn ? 'Monthly Sell-Out & Sell-In Trend' : 'Monthly Sell-Out Trend',
+                      showSellIn
+                          ? 'Monthly Sell-Out & Net Sell-In (after returns)'
+                          : 'Monthly Sell-Out Trend',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: colorScheme.primary,
                         fontWeight: FontWeight.w700,
@@ -399,7 +401,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                     ..addAll(showSellIn
                         ? [
                             _lineStyleKey(theme, 'Sell-Out', dashed: false),
-                            _lineStyleKey(theme, 'Sell-In', dashed: true),
+                            _lineStyleKey(theme, 'Sell-In صافي', dashed: true),
                           ]
                         : const <Widget>[]),
                 ),
@@ -655,7 +657,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                 final valueLabel = showSellIn ? 'Sell-Out: $sellOutText' : sellOutText;
                 final sellIn = idx < s.sellInValues.length ? s.sellInValues[idx] : null;
                 final sellInLabel =
-                    'Sell-In: ${sellIn != null ? CurrencyFormatter.formatEGP(sellIn) : 'لا توجد بيانات'}';
+                    'Sell-In (صافي بعد المرتجعات): ${sellIn != null ? CurrencyFormatter.formatEGP(sellIn) : 'لا توجد بيانات'}';
                 final parts = ChainSharePie.splitBilingualLabel(s.displayName);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 5.0),

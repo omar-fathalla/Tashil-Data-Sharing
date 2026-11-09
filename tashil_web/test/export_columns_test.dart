@@ -79,12 +79,35 @@ void main() {
       'صافي المبيعات (ج.م)',
       'تاريخ البيع',
     ],
+    'sellInReturnsMatrix': [
+      'الفرع (Branch)',
+      'الشهر (Month)',
+      'إجمالي التوريد (Gross EGP)',
+      'قيمة المرتجع (Returns EGP)',
+      'كمية المرتجع (Returns Qty)',
+      'صافي التوريد بعد المرتجعات (Net EGP)',
+      'نسبة المرتجع من الإجمالي %',
+    ],
+    'sellInReturnsTopProducts': [
+      'الترتيب (Rank)',
+      'كود الصنف (Item Code)',
+      'اسم الصنف (Product)',
+      'مجموعة الصنف (Group)',
+      'قيمة المرتجع (Returns EGP)',
+      'كمية المرتجع (Returns Qty)',
+      'إجمالي التوريد (Gross EGP)',
+      'صافي بعد المرتجعات (Net EGP)',
+      'نسبة المرتجع من الإجمالي %',
+      'حصة من إجمالي المرتجعات %',
+    ],
   };
   final actual = <String, List<String>>{
     'cpfrReplenishment': ExportColumns.cpfrReplenishment,
     'sellInReconciliation': ExportColumns.sellInReconciliation,
     'sellInRecords': ExportColumns.sellInRecords,
     'sellOutRecords': ExportColumns.sellOutRecords,
+    'sellInReturnsMatrix': ExportColumns.sellInReturnsMatrix,
+    'sellInReturnsTopProducts': ExportColumns.sellInReturnsTopProducts,
   };
 
   for (final name in expected.keys) {

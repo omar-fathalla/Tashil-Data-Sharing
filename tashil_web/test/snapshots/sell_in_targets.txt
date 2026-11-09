@@ -18,8 +18,8 @@
 2027 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2028 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
 2028 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Actual Sell-In (EGP) | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
-Actual Sell-In (EGP) | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
+Actual net Sell-In after returns (EGP) | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
+Actual net Sell-In after returns (EGP) | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 Overall Achievement % | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 Overall Achievement % | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 Sell-In Data | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
@@ -69,8 +69,8 @@ Variance | 11.5 | FontWeight.w600 | d945464f | 0.4 | 1.33
 السنة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
 الفرق | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
 الفرق | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-المحقق (Sell-In) | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
-المحقق (Sell-In) | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
+المحقق صافي بعد المرتجعات (Sell-In) | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
+المحقق صافي بعد المرتجعات (Sell-In) | 13.0 | FontWeight.w800 | ff1a1b21 | -0.2 | 1.43
 المخزون وإعادة الطلب | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 المخزون وإعادة الطلب | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
 المستهدفات | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
