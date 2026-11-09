@@ -88,19 +88,46 @@ func TestRealIn26Acceptance(t *testing.T) {
 	if rep == nil || rep.Layout != "gp_sop_export" {
 		t.Fatalf("expected gp_sop_export, got %+v", rep)
 	}
-	if len(recs) != 40927 {
-		t.Fatalf("expected 40927 rows, got %d", len(recs))
+	if len(recs) != monthCycleExpectedTotalRows {
+		t.Fatalf("expected %d rows, got %d", monthCycleExpectedTotalRows, len(recs))
 	}
 	names := map[string]bool{}
 	var to float64
+	byMonth := map[int]struct {
+		rows int
+		net  float64
+	}{}
 	for _, r := range recs {
 		names[r.CustomerName] = true
 		to += r.NetValueEGP
+		m := byMonth[r.MonthNum]
+		m.rows++
+		m.net += r.NetValueEGP
+		byMonth[r.MonthNum] = m
+		if r.PeriodWeek != "Full Month" {
+			t.Fatalf("PeriodWeek %q want Full Month (month=%d)", r.PeriodWeek, r.MonthNum)
+		}
 	}
 	if len(names) != 56 {
 		t.Fatalf("expected 56 branches, got %d", len(names))
 	}
-	if math.Abs(to-133191402.85) > 0.02 {
-		t.Fatalf("TO sum: got %.2f want 133191402.85", to)
+	if math.Abs(to-monthCycleExpectedTotalNet) > 0.02 {
+		t.Fatalf("TO sum: got %.2f want %.2f", to, monthCycleExpectedTotalNet)
+	}
+	for _, want := range monthCycleExpectedTotals {
+		var monthNum int
+		for _, b := range monthCycleBoundaries {
+			if b.label == want.label {
+				monthNum = b.monthNum
+				break
+			}
+		}
+		got := byMonth[monthNum]
+		if got.rows != want.rows {
+			t.Fatalf("%s rows: got %d want %d", want.label, got.rows, want.rows)
+		}
+		if math.Abs(got.net-want.net) > 0.02 {
+			t.Fatalf("%s net: got %.2f want %.2f", want.label, got.net, want.net)
+		}
 	}
 }

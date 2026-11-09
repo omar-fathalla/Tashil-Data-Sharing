@@ -125,6 +125,32 @@ func TestAIMappingFullColumnBranchesAfterSample(t *testing.T) {
 	}
 }
 
+func TestKnownBranchSlugMapStableIDs(t *testing.T) {
+	// Package-level map must keep deterministic store IDs for known Adeco branches.
+	a := BuildBranchStoreMetadata("fathalla", "دمنهور - الاستاد")
+	b := BuildBranchStoreMetadata("fathalla", "دمنهور - الاستاد")
+	if a.ID != b.ID || a.ID != "fat_damanhour_stadium" {
+		t.Fatalf("stable known slug id: got %q / %q", a.ID, b.ID)
+	}
+	if len(knownBranchSlugMap) < 30 {
+		t.Fatalf("expected cached known-branch map, got %d entries", len(knownBranchSlugMap))
+	}
+}
+
+func BenchmarkBuildBranchStoreMetadata(b *testing.B) {
+	// in26 calls this twice per row (~80k×); the cached knownBranchSlugMap keeps this cheap.
+	names := []string{
+		"عائله فتح الله ماركت - دمنهور - الاستاد",
+		"عائله فتح الله ماركت - طنطا",
+		"عائله فتح الله ماركت - فلمنج",
+		"عائله فتح الله ماركت - كفر الشيخ",
+	}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = BuildBranchStoreMetadata("fathalla", names[i%len(names)])
+	}
+}
+
 func TestGPSOPFullColumnChainBranchParse(t *testing.T) {
 	hdr := []string{"SOP Type", "SOP Number", "Document Date", "Item Number", "Item Description", "U Of M", "QTY", "Location Code", "Customer Number", "Customer Name", "Customer Class", "TO", "Branch"}
 	rows := [][]string{hdr}

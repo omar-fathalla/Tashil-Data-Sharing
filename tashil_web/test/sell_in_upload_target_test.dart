@@ -66,9 +66,32 @@ void main() {
     expect(_chooseButton(tester).onPressed, isNull);
   });
 
-  test('the server Arabic message is shown as is', () {
+  test('the server Arabic message is shown as is; wait-timeouts stay neutral', () {
     expect(uploadFailureMessage(UploadRejectedException('الملف اترفض: 6 صف من غير شهر')), 'الملف اترفض: 6 صف من غير شهر');
-    expect(uploadFailureMessage(TimeoutException('x')), contains('وقت أطول'));
+    expect(uploadFailureMessage(TimeoutException('x')), sellInUploadStillProcessingMessage);
+    expect(uploadFailureMessage(UploadStillProcessingException()), sellInUploadStillProcessingMessage);
+    expect(isUploadWaitTimeout(TimeoutException('x')), isTrue);
+    expect(isUploadWaitTimeout(UploadStillProcessingException()), isTrue);
+    expect(isUploadWaitTimeout(UploadRejectedException('x')), isFalse);
+  });
+
+  testWidgets('wait-timeout dialog never says nothing was saved', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: TextButton(
+            onPressed: () => showUploadFailureDialog(
+                context, 'in26.xlsx', UploadStillProcessingException()),
+            child: const Text('fail'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('fail'));
+    await tester.pumpAndSettle();
+    expect(find.text(sellInUploadStillProcessingTitle), findsOneWidget);
+    expect(find.textContaining('مفيش حاجة اتحفظت'), findsNothing);
+    expect(find.textContaining('اترفض'), findsNothing);
   });
 
   testWidgets('a rejected upload shows the server message in a dialog', (tester) async {

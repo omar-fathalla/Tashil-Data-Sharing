@@ -13,12 +13,13 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/domain"
 )
 
-// RecordsQuery is the SQL-expressible subset of the Sell-Out explorer filter. Search text and category
-// filters need Go-side normalisation and are served from memory instead (see CanQueryRecords).
+// RecordsQuery is the SQL-expressible subset of the Sell-Out explorer filter. Search text still
+// needs Go-side matching and is served from memory; category uses NormalizeProductCategory aliases.
 type RecordsQuery struct {
 	TenantID  string
 	Chain     string
 	Store     string
+	Category  string
 	Supplier  string
 	StartDate string
 	EndDate   string
@@ -106,6 +107,14 @@ func RecordsFilterSQL(q RecordsQuery) (string, []bigquery.QueryParameter) {
 		conds = append(conds, "(IFNULL(store_id, '') = @store OR LOWER(IFNULL(store_name, '')) = LOWER(@store)"+
 			" OR STRPOS(IFNULL(store_name, ''), @store) > 0 OR STRPOS(@store, IFNULL(store_id, '')) > 0)")
 		params = append(params, bigquery.QueryParameter{Name: "store", Value: strings.TrimSpace(q.Store)})
+	}
+	if !isAllValue(q.Category) {
+		cats := domain.ProductCategoryMatchValues(q.Category)
+		if len(cats) == 0 {
+			cats = []string{strings.TrimSpace(q.Category)}
+		}
+		conds = append(conds, "REGEXP_REPLACE(TRIM(IFNULL(category, '')), r'\\s+', ' ') IN UNNEST(@categories)")
+		params = append(params, bigquery.QueryParameter{Name: "categories", Value: cats})
 	}
 	if q.StartDate != "" {
 		conds = append(conds, "transaction_date >= @start_date")
