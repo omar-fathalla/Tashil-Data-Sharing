@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -16,17 +17,29 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/monthlysummary"
 )
 
+// branchReportResolver is the optional query-time branch master mapping layer.
+type branchReportResolver interface {
+	ResolveForReport(ctx context.Context, tenantID, chainSlug, rawStoreName string) (code, display string)
+}
+
 // AnalyticsHandler serves high-speed OLAP aggregates to Flutter Web.
 type AnalyticsHandler struct {
 	bqRepo             bigquery.Repository
 	records            bqsink.RecordsQuerier
 	sellIn             SellInTotalsQuerier
 	monthlySummaryOpts monthlysummary.Options
+	branchResolver     branchReportResolver
 }
 
 // NewAnalyticsHandler creates a new AnalyticsHandler.
 func NewAnalyticsHandler(bqRepo bigquery.Repository) *AnalyticsHandler {
 	return &AnalyticsHandler{bqRepo: bqRepo}
+}
+
+// WithBranchResolver attaches branch master mapping for report grouping/display.
+func (h *AnalyticsHandler) WithBranchResolver(r branchReportResolver) *AnalyticsHandler {
+	h.branchResolver = r
+	return h
 }
 
 // WithMonthlySummary configures Phase C automatic monthly narrative generation.
@@ -199,14 +212,23 @@ func (h *AnalyticsHandler) HandleRecords(w http.ResponseWriter, r *http.Request)
 		}
 
 		storeKey := rec.StoreID
+		storeLabel := rec.StoreName
 		if storeKey == "" {
 			storeKey = rec.StoreName
+		}
+		if h.branchResolver != nil && strings.TrimSpace(rec.StoreName) != "" {
+			if code, display := h.branchResolver.ResolveForReport(r.Context(), tenantID, rec.RetailerChain, rec.StoreName); code != "" {
+				storeKey = code
+				if display != "" {
+					storeLabel = display
+				}
+			}
 		}
 		if storeKey != "" {
 			storesSet[storeKey] = true
 			branchRev[storeKey] += rec.NetRevenue
-			if rec.StoreName != "" {
-				branchNames[storeKey] = rec.StoreName
+			if storeLabel != "" {
+				branchNames[storeKey] = storeLabel
 			} else {
 				branchNames[storeKey] = storeKey
 			}

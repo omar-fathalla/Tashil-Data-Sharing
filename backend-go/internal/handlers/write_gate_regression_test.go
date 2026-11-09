@@ -35,6 +35,7 @@ func writeGateMux(t *testing.T) (http.Handler, *middleware.AuthMiddleware) {
 	tm := NewTradeMarketingHandler(fs, fs)
 	comp := NewCompetitorHandler(fs, fs)
 	sia := NewSellInAssistHandler(sellinassist.New("", "", true))
+	bm := NewBranchMasterHandler(nil)
 
 	mux := http.NewServeMux()
 	for pattern, h := range map[string]http.HandlerFunc{
@@ -68,6 +69,10 @@ func writeGateMux(t *testing.T) (http.Handler, *middleware.AuthMiddleware) {
 		"POST /api/v1/customers/registry/approve":        cr.HandleApprove,
 		"POST /api/v1/customers/registry/reject":         cr.HandleReject,
 		"POST /api/v1/customers/registry/unmerge":        cr.HandleUnmerge,
+		"PUT /api/v1/branches":                           bm.HandleUpdateBranch,
+		"POST /api/v1/branches/pending/confirm":          bm.HandleConfirmPending,
+		"POST /api/v1/branches/pending/reject":           bm.HandleRejectPending,
+		"POST /api/v1/branches/bootstrap/confirm":        bm.HandleConfirmBootstrap,
 		"POST /api/v1/sell-in/assist/suggest-layout":     sia.HandleSuggestLayout,
 		"POST /api/v1/sell-in/assist/suggest-chains":     sia.HandleSuggestChains,
 		"POST /api/v1/sell-in/assist/approve":            sia.HandleApprove,
@@ -118,6 +123,8 @@ var writeRoutes = [][2]string{
 	{"POST", "/api/v1/analytics/targets"}, {"DELETE", "/api/v1/analytics/targets"}, {"POST", "/api/v1/analytics/targets/upload"},
 	{"PATCH", "/api/v1/data-quality/issues/i1"},
 	{"POST", "/api/v1/customers/registry/approve"}, {"POST", "/api/v1/customers/registry/reject"}, {"POST", "/api/v1/customers/registry/unmerge"},
+	{"PUT", "/api/v1/branches"}, {"POST", "/api/v1/branches/pending/confirm"}, {"POST", "/api/v1/branches/pending/reject"},
+	{"POST", "/api/v1/branches/bootstrap/confirm"},
 	{"POST", "/api/v1/sell-in/assist/suggest-layout"}, {"POST", "/api/v1/sell-in/assist/suggest-chains"},
 	{"POST", "/api/v1/sell-in/assist/approve"}, {"POST", "/api/v1/sell-in/assist/reject"},
 	{"POST", "/api/v1/trade-marketing/expenses"}, {"POST", "/api/v1/trade-marketing/expenses/upload"},

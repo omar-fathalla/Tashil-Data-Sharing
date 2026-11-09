@@ -155,11 +155,32 @@ func productGroupOf(r domain.SellInRecord) string {
 	return ""
 }
 
+// BranchMapFunc remaps a raw customer/store name to (branch code, short display).
+// Nil / empty code keeps the legacy keying behaviour.
+type BranchMapFunc func(chain, rawName string) (code, display string)
+
 func branchKeyOf(r domain.SellInRecord) string {
 	if id := strings.TrimSpace(r.CustomerBranchCode); id != "" {
 		return id
 	}
 	return strings.TrimSpace(r.CustomerName)
+}
+
+func branchKeyMapped(r domain.SellInRecord, mapFn BranchMapFunc) (key, name string) {
+	raw := strings.TrimSpace(r.CustomerName)
+	name = raw
+	key = branchKeyOf(r)
+	if mapFn == nil || raw == "" {
+		return key, name
+	}
+	code, display := mapFn(r.RetailerChain, raw)
+	if code != "" {
+		key = code
+	}
+	if display != "" {
+		name = display
+	}
+	return key, name
 }
 
 // productKeyOf is the stable product identity for netting advisories.
@@ -237,7 +258,11 @@ func matchesReturnsFilter(r domain.SellInRecord, f SellInReturnsFilter, applyMon
 
 // AggregateSellInReturns builds the Phase-1 returns report from in-memory Sell-In rows.
 // Negatives are kept; monthly netting uses each row's Document Date month (Year/MonthNum).
-func AggregateSellInReturns(records []domain.SellInRecord, f SellInReturnsFilter) SellInReturnsReport {
+func AggregateSellInReturns(records []domain.SellInRecord, f SellInReturnsFilter, mapFn ...BranchMapFunc) SellInReturnsReport {
+	var mapper BranchMapFunc
+	if len(mapFn) > 0 {
+		mapper = mapFn[0]
+	}
 	yearSet := map[int]bool{}
 	branchSet := map[string]bool{}
 	productSet := map[string]bool{}
@@ -258,7 +283,12 @@ func AggregateSellInReturns(records []domain.SellInRecord, f SellInReturnsFilter
 			continue
 		}
 		if name := strings.TrimSpace(r.CustomerName); name != "" {
-			branchSet[name] = true
+			_, display := branchKeyMapped(r, mapper)
+			if display != "" {
+				branchSet[display] = true
+			} else {
+				branchSet[name] = true
+			}
 		}
 		if name := strings.TrimSpace(r.ItemName); name != "" {
 			productSet[name] = true
@@ -342,12 +372,12 @@ func AggregateSellInReturns(records []domain.SellInRecord, f SellInReturnsFilter
 			}
 		}
 
-		bk := branchKeyOf(r)
+		bk, bname := branchKeyMapped(r, mapper)
 		br := branchRows[bk]
 		if br == nil {
 			br = &SellInReturnsBranchRow{
 				BranchKey:  bk,
-				BranchName: strings.TrimSpace(r.CustomerName),
+				BranchName: bname,
 				Chain:      strings.TrimSpace(r.RetailerChain),
 				ByMonth:    map[string]SellInReturnsCell{},
 			}

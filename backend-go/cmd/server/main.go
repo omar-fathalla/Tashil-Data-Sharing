@@ -19,6 +19,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/arabicqa"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
+	"github.com/tashil/data-sharing/backend/internal/service/branchmaster"
 	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 	"github.com/tashil/data-sharing/backend/internal/service/customers"
 	"github.com/tashil/data-sharing/backend/internal/service/dataquality"
@@ -71,6 +72,10 @@ func main() {
 	// Sell-In customer registry: only exact or admin-approved names count; unknown names are quarantined.
 	customerRegistry := customers.New(fsRepo)
 	ingestProcessor.SetCustomerRegistry(customerRegistry)
+	// Branch master: durable chain/branch/alias tables; report-time mapping only (facts untouched).
+	branchMasterSvc := branchmaster.New(fsRepo)
+	bqRepo.WithBranchResolver(branchMasterSvc)
+	ingestProcessor.SetBranchMaster(branchMasterSvc)
 	// Product/barcode matching review queue (Phase A4) — durable in Firestore; never invents barcodes.
 	productMatchQueue := matcher.NewQueue(fsRepo)
 	ingestProcessor.OnUploadIssues(func(ctx context.Context, tenantID, filename string, unknown []ingestion.UnknownBarcode) {
@@ -211,7 +216,8 @@ func main() {
 		Generator: monthlysummary.NewGeminiGenerator(cfg.GeminiAPIKey, "", nil),
 		Model:     cfg.GeminiModel,
 		UseMock:   cfg.UseMockServices || strings.TrimSpace(cfg.GeminiAPIKey) == "",
-	})
+	}).WithBranchResolver(branchMasterSvc)
+	branchMasterHandler := handlers.NewBranchMasterHandler(branchMasterSvc)
 	// Sell-Out explorer totals/SKU summaries/paging run in BigQuery when the sink is live
 	// (RECORDS_SOURCE=memory forces the in-memory path).
 	if bqs, ok := sink.(*bqsink.BigQuerySink); ok && os.Getenv("RECORDS_SOURCE") != "memory" {
@@ -340,6 +346,15 @@ func main() {
 	mux.HandleFunc("POST /api/v1/customers/registry/approve", customerRegistryHandler.HandleApprove)
 	mux.HandleFunc("POST /api/v1/customers/registry/reject", customerRegistryHandler.HandleReject)
 	mux.HandleFunc("POST /api/v1/customers/registry/unmerge", customerRegistryHandler.HandleUnmerge)
+	mux.HandleFunc("GET /api/v1/branches/master", branchMasterHandler.HandleGet)
+	mux.HandleFunc("GET /api/v1/branches", branchMasterHandler.HandleListBranches)
+	mux.HandleFunc("GET /api/v1/branches/aliases", branchMasterHandler.HandleListAliases)
+	mux.HandleFunc("GET /api/v1/branches/pending", branchMasterHandler.HandleListPending)
+	mux.HandleFunc("PUT /api/v1/branches", branchMasterHandler.HandleUpdateBranch)
+	mux.HandleFunc("POST /api/v1/branches/pending/confirm", branchMasterHandler.HandleConfirmPending)
+	mux.HandleFunc("POST /api/v1/branches/pending/reject", branchMasterHandler.HandleRejectPending)
+	mux.HandleFunc("POST /api/v1/branches/bootstrap/confirm", branchMasterHandler.HandleConfirmBootstrap)
+	mux.HandleFunc("POST /api/v1/branches/dry-run", branchMasterHandler.HandleDryRun)
 	mux.HandleFunc("POST /api/v1/product-match", productMatchHandler.HandleMatch)
 	mux.HandleFunc("POST /api/v1/product-match/enqueue", productMatchHandler.HandleEnqueue)
 	mux.HandleFunc("GET /api/v1/product-match/review", productMatchHandler.HandleListReview)

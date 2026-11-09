@@ -47,7 +47,9 @@ func (c *Client) GetSellInReturnsCached(ctx context.Context, tenantID string, fi
 	c.returnsCacheMu.RUnlock()
 
 	recs := c.sellInRecordsForReturns(tenantID, filter.Year, filter.Chain)
-	rep := AggregateSellInReturns(recs, filter)
+	rep := AggregateSellInReturns(recs, filter, func(chain, raw string) (string, string) {
+		return c.mapBranch(ctx, tenantID, chain, raw)
+	})
 
 	c.returnsCacheMu.Lock()
 	if c.returnsCache == nil {

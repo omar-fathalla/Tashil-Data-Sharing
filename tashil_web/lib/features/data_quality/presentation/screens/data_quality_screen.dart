@@ -8,6 +8,7 @@ import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../data/data_quality_repository.dart';
 import '../../../customer_registry/presentation/pending_customers_screen.dart';
+import '../../../branch_master/presentation/screens/branch_master_screen.dart';
 import '../../../sellin_assist/presentation/sellin_assist_screen.dart';
 import '../../../product_match/presentation/screens/product_match_review_screen.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
@@ -174,6 +175,15 @@ class _DataQualityScreenState extends State<DataQualityScreen> with DataRefreshM
                       builder: (_) => PendingCustomersScreen(apiClient: widget.apiClient),
                     )),
                     icon: const Icon(AppIcons.pendingCustomers),
+                  ),
+                if (widget.apiClient != null)
+                  IconButton(
+                    key: const ValueKey('dq_branch_master'),
+                    tooltip: 'إدارة الفروع',
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => BranchMasterScreen(apiClient: widget.apiClient),
+                    )),
+                    icon: const Icon(AppIcons.branchMaster),
                   ),
                 if (widget.apiClient != null)
                   IconButton(

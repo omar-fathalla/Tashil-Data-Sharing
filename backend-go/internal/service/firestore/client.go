@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/tashil/data-sharing/backend/internal/service/branchmaster"
 	"github.com/tashil/data-sharing/backend/internal/service/customers"
 	"log"
 	"os"
@@ -122,7 +123,8 @@ type Client struct {
 	cdProfiles map[string]domain.ChainDiscountProfiles
 	dqMu       sync.RWMutex
 	dqStates   map[string]domain.DataQualityState
-	crMem      customers.MemoryStore // customer registry fallback when Firestore is not configured
+	crMem      customers.MemoryStore    // customer registry fallback when Firestore is not configured
+	bmMem      branchmaster.MemoryStore // branch master fallback when Firestore is not configured
 	pmOnce     sync.Once
 	pmStates   *productMatchMem // product-match review queue fallback when Firestore is not configured
 

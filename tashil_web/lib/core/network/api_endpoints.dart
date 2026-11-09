@@ -55,6 +55,12 @@ class ApiEndpoints {
   static String get dataYears => '$baseUrl/api/v1/sell-in/years';
   static String get dataMonths => '$baseUrl/api/v1/sell-out/months';
   static String get customerRegistry => '$baseUrl/api/v1/customers/registry';
+  static String get branchMaster => '$baseUrl/api/v1/branches/master';
+  static String get branches => '$baseUrl/api/v1/branches';
+  static String get branchAliases => '$baseUrl/api/v1/branches/aliases';
+  static String get branchPending => '$baseUrl/api/v1/branches/pending';
+  static String get branchPendingConfirm => '$baseUrl/api/v1/branches/pending/confirm';
+  static String get branchPendingReject => '$baseUrl/api/v1/branches/pending/reject';
   static String get sellInAssistSuggestions => '$baseUrl/api/v1/sell-in/assist/suggestions';
   static String get sellInAssistSuggestLayout => '$baseUrl/api/v1/sell-in/assist/suggest-layout';
   static String get sellInAssistSuggestChains => '$baseUrl/api/v1/sell-in/assist/suggest-chains';

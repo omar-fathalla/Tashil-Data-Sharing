@@ -240,6 +240,13 @@ func New(store Store) *Registry {
 	return r
 }
 
+// SeedCustomerNames returns the embedded Adeco Sell-In seed customer names (read-only).
+func SeedCustomerNames() []string {
+	var names []string
+	_ = json.Unmarshal(seedJSON, &names)
+	return names
+}
+
 // AliasCount is the number of embedded permanent aliases.
 func (r *Registry) AliasCount() int { return len(r.alias) }
 

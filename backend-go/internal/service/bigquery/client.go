@@ -155,6 +155,9 @@ type Client struct {
 	// Per-chain discount profiles (chain_discounts.go) and precomputed analytics (analytics_precompute.go).
 	chainDisc  chainDiscountStore
 	precompute precomputeStore
+
+	// Optional query-time branch master mapping (raw facts untouched).
+	branchResolver BranchResolver
 }
 
 func (c *Client) invalidateKPICache() {
@@ -2588,15 +2591,26 @@ func (c *Client) GetStoreBenchmarkMatrix(ctx context.Context, tenantID string, f
 			}
 		}
 
-		agg, exists := storeMap[r.StoreID]
+		storeKey := r.StoreID
+		storeName := r.StoreName
+		if mappedCode, mappedName := c.mapBranch(context.Background(), tenantID, r.RetailerChain, r.StoreName); mappedCode != "" {
+			// Prefer branch master code as the aggregation key when mapping exists.
+			if mappedCode != r.StoreName {
+				storeKey = mappedCode
+				storeName = mappedName
+			} else if mappedName != "" && mappedName != r.StoreName {
+				storeName = mappedName
+			}
+		}
+		agg, exists := storeMap[storeKey]
 		if !exists {
 			agg = &storeAgg{
-				id:      r.StoreID,
-				name:    r.StoreName,
+				id:      storeKey,
+				name:    storeName,
 				chain:   r.RetailerChain,
 				daysMap: make(map[string]bool),
 			}
-			storeMap[r.StoreID] = agg
+			storeMap[storeKey] = agg
 		}
 		agg.revenue += r.NetRevenue
 		agg.units += r.QuantitySold

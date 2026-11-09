@@ -1,0 +1,149 @@
+package branchmaster
+
+import "time"
+
+// Status values for pending proposals and alias confirmation.
+const (
+	StatusConfirmed = "confirmed"
+	StatusPending   = "pending"
+	StatusRejected  = "rejected"
+)
+
+// Match kinds returned by Resolve.
+const (
+	KindExact      = "exact"
+	KindAlias      = "alias"
+	KindNormalized = "normalized"
+	KindHigh       = "high"       // auto-linked via AI/similarity
+	KindAmbiguous  = "ambiguous"  // close to two+ → pending
+	KindLow        = "low"        // low confidence → pending
+	KindNew        = "new"        // genuinely new branch
+	KindUnallocated = "unallocated"
+	KindIdentity   = "identity" // no master yet / unmapped raw passthrough
+)
+
+// Alias sources.
+const (
+	SourceUpload   = "upload"
+	SourceBootstrap = "bootstrap"
+	SourceAuto     = "auto"
+	SourceOwner    = "owner"
+	SourceAI       = "ai"
+)
+
+// Chain is one retail banner under a tenant (internal chain code, e.g. FTH).
+type Chain struct {
+	Code      string    `json:"code" firestore:"code"`
+	Slug      string    `json:"slug" firestore:"slug"` // fathalla / carrefour / …
+	NameAR    string    `json:"name_ar" firestore:"name_ar"`
+	NameEN    string    `json:"name_en,omitempty" firestore:"name_en,omitempty"`
+	CreatedAt time.Time `json:"created_at" firestore:"created_at"`
+}
+
+// Branch is one physical/logical store under a chain (e.g. FTH-001).
+type Branch struct {
+	Code        string    `json:"code" firestore:"code"`
+	ChainCode   string    `json:"chain_code" firestore:"chain_code"`
+	DisplayName string    `json:"display_name" firestore:"display_name"` // short Arabic name
+	Active      bool      `json:"active" firestore:"active"`
+	Unallocated bool      `json:"unallocated,omitempty" firestore:"unallocated,omitempty"`
+	CreatedAt   time.Time `json:"created_at" firestore:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at" firestore:"updated_at"`
+}
+
+// Alias maps a raw store/customer name → branch code.
+type Alias struct {
+	RawName       string    `json:"raw_name" firestore:"raw_name"`
+	NormalizedKey string    `json:"normalized_key" firestore:"normalized_key"`
+	BranchCode    string    `json:"branch_code" firestore:"branch_code"`
+	Source        string    `json:"source" firestore:"source"`
+	Confidence    float64   `json:"confidence" firestore:"confidence"`
+	ConfirmedBy   string    `json:"confirmed_by,omitempty" firestore:"confirmed_by,omitempty"`
+	ConfirmedAt   *time.Time `json:"confirmed_at,omitempty" firestore:"confirmed_at,omitempty"`
+	CreatedAt     time.Time `json:"created_at" firestore:"created_at"`
+}
+
+// Pending is an unresolved raw name awaiting owner confirmation.
+type Pending struct {
+	ID              string    `json:"id" firestore:"id"`
+	RawName         string    `json:"raw_name" firestore:"raw_name"`
+	NormalizedKey   string    `json:"normalized_key" firestore:"normalized_key"`
+	ChainSlug       string    `json:"chain_slug" firestore:"chain_slug"`
+	SuggestedCode   string    `json:"suggested_code,omitempty" firestore:"suggested_code,omitempty"`
+	SuggestedName   string    `json:"suggested_name,omitempty" firestore:"suggested_name,omitempty"`
+	AltSuggestedCode string   `json:"alt_suggested_code,omitempty" firestore:"alt_suggested_code,omitempty"`
+	AltSuggestedName string   `json:"alt_suggested_name,omitempty" firestore:"alt_suggested_name,omitempty"`
+	Confidence      float64   `json:"confidence" firestore:"confidence"`
+	AltConfidence   float64   `json:"alt_confidence,omitempty" firestore:"alt_confidence,omitempty"`
+	ReasonAR        string    `json:"reason_ar" firestore:"reason_ar"`
+	Kind            string    `json:"kind" firestore:"kind"` // ambiguous | low | new
+	Status          string    `json:"status" firestore:"status"`
+	CreatedAt       time.Time `json:"created_at" firestore:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at" firestore:"updated_at"`
+	DecidedBy       string    `json:"decided_by,omitempty" firestore:"decided_by,omitempty"`
+}
+
+// Notice is a lightweight owner notification (auto-link / new branch).
+type Notice struct {
+	ID        string    `json:"id" firestore:"id"`
+	Kind      string    `json:"kind" firestore:"kind"` // auto_link | new_branch | pending
+	MessageAR string    `json:"message_ar" firestore:"message_ar"`
+	RawName   string    `json:"raw_name,omitempty" firestore:"raw_name,omitempty"`
+	BranchCode string   `json:"branch_code,omitempty" firestore:"branch_code,omitempty"`
+	CreatedAt time.Time `json:"created_at" firestore:"created_at"`
+	Read      bool      `json:"read" firestore:"read"`
+}
+
+// State is the persisted master for one tenant.
+type State struct {
+	TenantID  string    `json:"tenant_id" firestore:"tenant_id"`
+	Chains    []Chain   `json:"chains" firestore:"chains"`
+	Branches  []Branch  `json:"branches" firestore:"branches"`
+	Aliases   []Alias   `json:"aliases" firestore:"aliases"`
+	Pending   []Pending `json:"pending" firestore:"pending"`
+	Notices   []Notice  `json:"notices,omitempty" firestore:"notices,omitempty"`
+	UpdatedAt time.Time `json:"updated_at" firestore:"updated_at"`
+	// BootstrapDone is true after the owner confirmed the first proposal sheet.
+	BootstrapDone bool `json:"bootstrap_done" firestore:"bootstrap_done"`
+}
+
+// Resolution is the outcome of resolving one raw name against the master.
+type Resolution struct {
+	RawName       string  `json:"raw_name"`
+	NormalizedKey string  `json:"normalized_key"`
+	BranchCode    string  `json:"branch_code,omitempty"`
+	DisplayName   string  `json:"display_name,omitempty"`
+	ChainCode     string  `json:"chain_code,omitempty"`
+	Kind          string  `json:"kind"`
+	Confidence    float64 `json:"confidence"`
+	ReasonAR      string  `json:"reason_ar"`
+	PendingID     string  `json:"pending_id,omitempty"`
+	AutoLinked    bool    `json:"auto_linked,omitempty"`
+	AltCode       string  `json:"alt_code,omitempty"`
+	AltName       string  `json:"alt_name,omitempty"`
+	AltConfidence float64 `json:"alt_confidence,omitempty"`
+}
+
+// ProposalRow is one row in a bootstrap / dry-run proposal (not written until owner approves).
+type ProposalRow struct {
+	RawNames      []string `json:"raw_names"`
+	NormalizedKey string   `json:"normalized_key"`
+	ChainSlug     string   `json:"chain_slug"`
+	ChainCode     string   `json:"chain_code"`
+	BranchCode    string   `json:"branch_code"`
+	DisplayName   string   `json:"display_name"`
+	Unallocated   bool     `json:"unallocated,omitempty"`
+	SourceHint    string   `json:"source_hint,omitempty"` // sell_out | sell_in | returns | mixed
+}
+
+// DryRunReport is the one-time Adeco (or any tenant) proposal artifact.
+type DryRunReport struct {
+	TenantID       string        `json:"tenant_id"`
+	GeneratedAt    time.Time     `json:"generated_at"`
+	RawNameCount   int           `json:"raw_name_count"`
+	UniqueNormCount int          `json:"unique_norm_count"`
+	ChainCount     int           `json:"chain_count"`
+	BranchCount    int           `json:"branch_count"`
+	Rows           []ProposalRow `json:"rows"`
+	NotesAR        []string      `json:"notes_ar,omitempty"`
+}

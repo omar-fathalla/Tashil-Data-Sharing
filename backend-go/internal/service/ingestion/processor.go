@@ -18,6 +18,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
+	"github.com/tashil/data-sharing/backend/internal/service/branchmaster"
 	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
@@ -145,6 +146,7 @@ type Processor struct {
 	onProductMaster func(tenantID, filename string, raw []byte)
 
 	customers      *customers.Registry
+	branchMaster   *branchmaster.Service
 	onUploadIssues func(ctx context.Context, tenantID, filename string, unknown []UnknownBarcode)
 }
 
@@ -158,6 +160,12 @@ func (p *Processor) SetCustomerRegistry(r *customers.Registry) {
 
 // CustomerRegistry returns the registry (nil when disabled).
 func (p *Processor) CustomerRegistry() *customers.Registry { return p.customers }
+
+// SetBranchMaster enables post-commit branch alias observation (report-time mapping layer).
+func (p *Processor) SetBranchMaster(s *branchmaster.Service) { p.branchMaster = s }
+
+// BranchMaster returns the branch master service (nil when disabled).
+func (p *Processor) BranchMaster() *branchmaster.Service { return p.branchMaster }
 
 // OnUploadIssues registers a hook that records upload findings (unknown barcodes) on the data-quality page.
 func (p *Processor) OnUploadIssues(fn func(ctx context.Context, tenantID, filename string, unknown []UnknownBarcode)) {
@@ -1117,6 +1125,9 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 	if len(staged.DiscoveredStores) > 0 {
 		_, _ = p.fsRepo.UpsertStoresByTenant(ctx, tenantID, staged.DiscoveredStores, staged.IsWideMatrix)
 	}
+	// Branch master: observe raw names after commit (exact/alias hit, high auto-link, else pending).
+	// Never rewrites facts — mapping is query/report-time only.
+	p.observeBranchNames(ctx, tenantID, chainToUse, staged)
 
 	// Persist facts and analytics to BigQuery
 	sinkMeta := bqsink.Meta{TenantID: tenantID, BatchID: batchID, SourceFile: staged.Filename}
@@ -1935,4 +1946,39 @@ func appendUniqueAnomaly(list *[]domain.IngestionAnomaly, anomaly domain.Ingesti
 		}
 	}
 	*list = append(*list, anomaly)
+}
+
+// observeBranchNames feeds distinct raw store/customer names into branch master after a successful commit.
+func (p *Processor) observeBranchNames(ctx context.Context, tenantID, chain string, staged *StagedUpload) {
+	if p == nil || p.branchMaster == nil || staged == nil {
+		return
+	}
+	seen := map[string]struct{}{}
+	observe := func(raw, ch string) {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			return
+		}
+		key := strings.ToLower(ch) + "|" + branchmaster.Normalize(raw)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		if ch == "" {
+			ch = chain
+		}
+		if _, err := p.branchMaster.ObserveRaw(ctx, tenantID, ch, raw, "upload"); err != nil {
+			// Non-fatal: mapping layer must never block ingest.
+			return
+		}
+	}
+	for _, s := range staged.DiscoveredStores {
+		observe(s.BranchName, s.Chain)
+	}
+	for _, f := range staged.ValidFacts {
+		observe(f.StoreName, f.RetailerChain)
+	}
+	for _, r := range staged.SellInRecords {
+		observe(r.CustomerName, r.RetailerChain)
+	}
 }
