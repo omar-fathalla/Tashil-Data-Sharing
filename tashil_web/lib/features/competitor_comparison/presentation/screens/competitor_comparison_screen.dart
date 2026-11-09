@@ -14,6 +14,7 @@ import '../../domain/competitor_month_options.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/widgets/m3_states.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 
 /// CompetitorComparisonScreen (Compare)
@@ -641,6 +642,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     icon: Icons.calendar_month_rounded,
                     containerColor: colorScheme.primaryContainer,
                     onContainerColor: colorScheme.onPrimaryContainer,
+                    isLoading: _isLoading,
                   ),
                   _buildKpiCard(
                     context: context,
@@ -650,6 +652,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     icon: Icons.trending_down_rounded,
                     containerColor: M3Palette.successSurface,
                     onContainerColor: M3Palette.onSuccessSurface,
+                    isLoading: _isLoading,
                   ),
                   _buildKpiCard(
                     context: context,
@@ -660,6 +663,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     icon: Icons.show_chart_rounded,
                     containerColor: M3Palette.warningSurface,
                     onContainerColor: M3Palette.onWarningSurface,
+                    isLoading: _isLoading,
                   ),
                   _buildKpiCard(
                     context: context,
@@ -670,6 +674,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     icon: Icons.speed_rounded,
                     containerColor: colorScheme.secondaryContainer,
                     onContainerColor: colorScheme.onSecondaryContainer,
+                    isLoading: _isLoading,
                   ),
                 ];
 
@@ -2979,6 +2984,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     required IconData icon,
     required Color containerColor,
     required Color onContainerColor,
+    bool isLoading = false,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -3016,20 +3022,31 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                   ),
                 ),
                 const SizedBox(height: 4.0),
-                Text(
-                  value,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: colorScheme.onSurface,
+                // Never flash computed zeros (or stale KPIs) while competitive-monthly loads.
+                if (isLoading) ...[
+                  const M3SkeletonBox(
+                    key: ValueKey('compare_kpi_skeleton'),
+                    width: 120.0,
+                    height: 28.0,
                   ),
-                ),
-                const SizedBox(height: 2.0),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 6.0),
+                  const M3SkeletonBox(width: 180.0, height: 12.0),
+                ] else ...[
+                  Text(
+                    value,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 2.0),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
