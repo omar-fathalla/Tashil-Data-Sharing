@@ -106,6 +106,7 @@ func NewAgent(apiKey, model string, useMock bool) *Client {
 		tier2Model: DefaultModel,
 		httpClient: &http.Client{Timeout: 90 * time.Second},
 		useMock:    useMock || apiKey == "",
+		planCache:  newMappingPlanCache(),
 	}
 }
 
@@ -242,6 +243,10 @@ func logAICall(filename, model, tier string, started time.Time, ok bool, callErr
 // AnalyzeAndNormalize uses the Tier 1 model by default and the Tier 2 model when
 // tier2 is requested or the Tier 1 call fails.
 func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawContent []byte) (*domain.NormalizedRetailIngestionPayload, error) {
+	// Tenant-scope the shared plan cache without editing ai_column_mapping.go call sites.
+	if t := MappingPlanTenantFromContext(ctx); t != "" && c.planCache.tenant == "" {
+		return c.forTenant(t).AnalyzeAndNormalize(ctx, filename, rawContent)
+	}
 	requestedTier := GetRequestedTier(ctx)
 	var ev guardrails.Events
 	if !isReplay(ctx) {
@@ -255,6 +260,7 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 		if fullPayload, ok := parseFullTabularPayload(filename, rawContent); ok {
 			v := validateExtraction(fullPayload, nil)
 			attachTotalsExplanation(v, provenanceFromPayload(fullPayload))
+			mergeWideMatrixReconIntoValidation(v, fullPayload)
 			logValidation(filename, MappingSourceDeterministic, v)
 			if v.Status == "rejected" && !isReplay(ctx) {
 				return nil, validationError(filename, v)
@@ -285,6 +291,7 @@ func (c *Client) AnalyzeAndNormalize(ctx context.Context, filename string, rawCo
 	if fullPayload, ok := parseFullTabularPayload(filename, rawContent); ok {
 		v := validateExtraction(fullPayload, nil)
 		attachTotalsExplanation(v, provenanceFromPayload(fullPayload))
+		mergeWideMatrixReconIntoValidation(v, fullPayload)
 		logValidation(filename, MappingSourceDeterministic, v)
 		if v.Status == "rejected" && !isReplay(ctx) {
 			return nil, validationError(filename, v)

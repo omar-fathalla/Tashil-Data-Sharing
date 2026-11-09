@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/data/available_months.dart';
 import '../../../../core/data/available_years.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -9,6 +10,7 @@ import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/data/result.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/competitor_comparison_repository.dart';
+import '../../domain/competitor_month_options.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
@@ -20,12 +22,12 @@ import '../../../../core/data/data_refresh_mixin.dart';
 /// - Displays each competing brand ONCE as a clean M3 selector card with its pack volume
 ///   (e.g., Fairy 2L, Pril 4Kg, Wafeer 4Kg — never duplicated).
 /// - Clicking any competitor immediately displays its 1-vs-1 Monthly Price Trajectory
-///   (Jan, Feb, Mar, Apr) against the default Own SKU without visual clutter.
+///   for every month that has data against the default Own SKU without visual clutter.
 class CompetitorComparisonScreen extends StatefulWidget {
   final ApiClient apiClient;
 
   /// Optional injected repository (tests); defaults to one wrapping [apiClient].
-  final CompetitorComparisonRepository? repository;
+  final CompetitorComparisonSource? repository;
 
   const CompetitorComparisonScreen({
     super.key,
@@ -41,11 +43,12 @@ class CompetitorComparisonScreen extends StatefulWidget {
 class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen> with DataRefreshMixin<CompetitorComparisonScreen> {
   @override
   void onBackendDataChanged() {
-    _loadCompetitiveData();
+    _loadAvailableMonths(force: true);
+    _loadCompetitiveData(forceRefresh: true);
   }
 
   bool _isLoading = true;
-  late CompetitorComparisonRepository _repo;
+  late CompetitorComparisonSource _repo;
   List<OwnSkuCompetitiveGroupModel> _allGroups = [];
   List<OwnSkuCompetitiveGroupModel> _filteredGroups = [];
   String? _selectedOwnBarcode;
@@ -54,8 +57,9 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
   // Temporal State: latest year with data (from the backend year list).
   int _selectedYear = AvailableYears.current.defaultYear;
   bool _yearTouched = false;
-  int _selectedMonth = 0; // 0 = All Months (Jan - Apr), 1..4 = specific month
+  int _selectedMonth = 0; // 0 = all months with data; >0 = specific month
   bool _showFullTwoYearTimeline = false;
+  List<int> _apiMonths = const [];
 
   String _selectedChain = 'fathalla';
   String _selectedCategory = 'الكل';
@@ -74,13 +78,20 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
         for (final y in AvailableYears.current.including(_selectedYear)) (year: y, labelAr: 'سنة $y'),
       ];
 
-  static const List<({int month, String labelAr})> _monthOptions = [
-    (month: 0, labelAr: 'كل الشهور (يناير - أبريل)'),
-    (month: 1, labelAr: 'يناير (01)'),
-    (month: 2, labelAr: 'فبراير (02)'),
-    (month: 3, labelAr: 'مارس (03)'),
-    (month: 4, labelAr: 'أبريل (04)'),
-  ];
+  /// Months that have data for the selected year — sell-out API only (never seed series).
+  List<int> get _dataMonths {
+    final api = _apiMonths.isNotEmpty
+        ? _apiMonths
+        : AvailableMonths.currentFor(_selectedYear).months;
+    return CompetitorMonthOptions.resolveDataMonths(apiMonths: api);
+  }
+
+  List<({int month, String labelAr})> get _monthOptions =>
+      CompetitorMonthOptions.build(_dataMonths, year: _selectedYear);
+
+  String get _monthRangeLabel => CompetitorMonthOptions.rangeLabel(_dataMonths);
+
+  String get _monthEnumeratedLabel => CompetitorMonthOptions.enumeratedLabel(_dataMonths);
 
   @override
   void initState() {
@@ -88,10 +99,15 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     _repo = widget.repository ?? CompetitorComparisonRepository(widget.apiClient);
     _lastTenantId = widget.apiClient.tenantId;
     _loadCompetitiveData();
+    _loadAvailableMonths();
     AvailableYears.load(widget.apiClient).then((o) {
       if (!mounted) return;
       if (!_yearTouched && o.defaultYear != _selectedYear) {
-        setState(() => _selectedYear = o.defaultYear);
+        setState(() {
+          _selectedYear = o.defaultYear;
+          _selectedMonth = 0;
+        });
+        _loadAvailableMonths();
         _loadCompetitiveData();
       } else {
         setState(() {});
@@ -115,14 +131,31 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       _selectedYear = AvailableYears.current.defaultYear;
       _yearTouched = false;
       _selectedMonth = 0;
+      _apiMonths = const [];
       _selectedChain = 'fathalla';
       _selectedCategory = 'الكل';
       _searchQuery = '';
       _searchController.clear();
       _simulatedOwnPrice = null;
       _selectedCompetitorBarcode = null;
+      _loadAvailableMonths();
       _loadCompetitiveData();
     }
+  }
+
+  Future<void> _loadAvailableMonths({bool force = false}) async {
+    final opts = await AvailableMonths.load(widget.apiClient, _selectedYear, force: force);
+    if (!mounted) return;
+    setState(() {
+      _apiMonths = opts.months;
+      if (_selectedMonth > 0 &&
+          _apiMonths.isNotEmpty &&
+          !_apiMonths.contains(_selectedMonth) &&
+          _dataMonths.isNotEmpty &&
+          !_dataMonths.contains(_selectedMonth)) {
+        _selectedMonth = 0;
+      }
+    });
   }
 
   Future<void> _loadCompetitiveData({bool forceRefresh = false}) async {
@@ -136,11 +169,24 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
 
     if (!mounted) return;
     result.when(
-      success: (groups) => setState(() {
-        _allGroups = groups;
-        _applyLocalFilters();
-        _isLoading = false;
-      }),
+      success: (groups) {
+        setState(() {
+          _allGroups = groups;
+          _applyLocalFilters();
+          // Drop a stale month pick if the year no longer has that month.
+          if (_selectedMonth > 0 &&
+              (_dataMonths.isEmpty || !_dataMonths.contains(_selectedMonth))) {
+            _selectedMonth = 0;
+          }
+          _isLoading = false;
+        });
+        final warn = widget.apiClient.lastSellOutPaginationWarning;
+        if (warn != null && warn.isNotEmpty && mounted) {
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            SnackBar(content: Text('تحذير: $warn')),
+          );
+        }
+      },
       failure: (error) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
@@ -263,6 +309,9 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
   }
 
   String get _activePeriodLabelAr {
+    if (_selectedMonth == 0) {
+      return CompetitorMonthOptions.allMonthsLabel(_dataMonths, year: _selectedYear);
+    }
     final monthName = _monthOptions
         .firstWhere(
           (m) => m.month == _selectedMonth,
@@ -589,7 +638,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     title: 'حركة الأسعار عبر شهور $_selectedYear',
                     value:
                         '▲ $priceIncreasedSkusCount زاد | ▼ $priceDecreasedSkusCount نزل',
-                    subtitle: 'تتبع شهري لارتفاع وانخفاض الأسعار (يناير - أبريل)',
+                    subtitle: 'تتبع شهري لارتفاع وانخفاض الأسعار ($_monthRangeLabel)',
                     icon: Icons.show_chart_rounded,
                     containerColor: M3Palette.warningSurface,
                     onContainerColor: M3Palette.onWarningSurface,
@@ -766,8 +815,10 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                           setState(() {
                             _selectedYear = yr.year;
                             _yearTouched = true;
+                            _selectedMonth = 0;
                             _simulatedOwnPrice = null;
                           });
+                          _loadAvailableMonths();
                           _loadCompetitiveData();
                         },
                       ),
@@ -789,19 +840,28 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    for (final m in _monthOptions)
-                      ChoiceChip(
-                        label: Text(m.labelAr),
-                        selected: _selectedMonth == m.month,
-                        onSelected: (sel) {
-                          if (!sel || _selectedMonth == m.month) return;
-                          setState(() {
-                            _selectedMonth = m.month;
-                            _simulatedOwnPrice = null;
-                          });
-                          _loadCompetitiveData();
-                        },
-                      ),
+                    if (_monthOptions.isEmpty)
+                      Text(
+                        'لا توجد شهور بيانات لهذه السنة',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      )
+                    else
+                      for (final m in _monthOptions)
+                        ChoiceChip(
+                          label: Text(m.labelAr),
+                          selected: _selectedMonth == m.month,
+                          onSelected: (sel) {
+                            if (!sel || _selectedMonth == m.month) return;
+                            setState(() {
+                              _selectedMonth = m.month;
+                              _simulatedOwnPrice = null;
+                            });
+                            _loadCompetitiveData();
+                          },
+                        ),
                   ],
                 ),
               ],
@@ -1444,7 +1504,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     ),
                     const SizedBox(height: 6.0),
                     Text(
-                      'اضغط على أي منافس بالأسفل لمقارنة حركة سعره في (يناير، فبراير، مارس، أبريل) مع صنفك الأساسي',
+                      'اضغط على أي منافس بالأسفل لمقارنة حركة سعره في ($_monthEnumeratedLabel) مع صنفك الأساسي',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                         height: 1.5,
@@ -1749,8 +1809,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
   /// Focused 1-vs-1 Monthly Trajectory Card:
   /// - Does NOT show the deleted title "منحنى حركة الأسعار الشهرية المقارن لسنة 2026".
   /// - Gives generous line-height and top spacing to the description text.
-  /// - Plots ONLY 2 lines: Default Own SKU (Blue) vs. Selected Competitor (Red/Orange) across Jan, Feb, Mar, Apr.
-  /// - Displays 4 clean M3 Month Cards (يناير، فبراير، مارس، أبريل) comparing both SKUs side-by-side.
+  /// - Plots ONLY 2 lines: Default Own SKU (Blue) vs. Selected Competitor across every month with data.
+  /// - Displays one M3 month card per returned series point.
   Widget _buildFocusedOneVsOneTrajectoryCard(
     BuildContext context, {
     required OwnSkuCompetitiveGroupModel group,
@@ -1885,8 +1945,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                 ),
                 label: Text(
                   _showFullTwoYearTimeline
-                      ? 'عرض شهور $_selectedYear فقط (يناير - أبريل)'
-                      : 'دمج مسار 2025 + 2026 (8 شهور)',
+                      ? 'عرض شهور $_selectedYear فقط ($_monthRangeLabel)'
+                      : 'دمج مسار السنتين (كل الشهور المتاحة)',
                 ),
                 selected: _showFullTwoYearTimeline,
                 onSelected: (v) {
@@ -1901,7 +1961,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4.0),
             child: Text(
-              'يرسم اتجاه سعر بيع صنفك (خط أزرق عريض) أمام سعر المنافس المختار (${selectedCompetitor.brand} — ${selectedCompetitor.packSizeLabel}) شهراً بشهر خلال (يناير، فبراير، مارس، أبريل) مع نسب الارتفاع (▲) والانخفاض (▼).',
+              'يرسم اتجاه سعر بيع صنفك (خط أزرق عريض) أمام سعر المنافس المختار (${selectedCompetitor.brand} — ${selectedCompetitor.packSizeLabel}) شهراً بشهر خلال ($_monthEnumeratedLabel) مع نسب الارتفاع (▲) والانخفاض (▼).',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 height: 1.8,
@@ -1975,17 +2035,21 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
 
           const SizedBox(height: 22.0),
 
-          // Month-by-Month Side-by-Side Breakdown (Jan, Feb, Mar, Apr) for Own SKU vs Selected Competitor
+          // Month-by-Month Side-by-Side Breakdown for Own SKU vs Selected Competitor
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'مقارنة الشهور (${_showFullTwoYearTimeline ? "2025 - 2026" : "يناير، فبراير، مارس، أبريل $_selectedYear"}) — ${group.ownBrand} مقابل ${selectedCompetitor.brand}:',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: colorScheme.onSurface,
+              Expanded(
+                child: Text(
+                  'مقارنة الشهور (${_showFullTwoYearTimeline ? "كل السنوات المتاحة" : "$_monthRangeLabel $_selectedYear"}) — ${group.ownBrand} مقابل ${selectedCompetitor.brand}:',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: colorScheme.onSurface,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8.0),
               Text(
                 'اضغط على أي شهر لتصفية المؤشرات به',
                 style: theme.textTheme.labelSmall?.copyWith(
@@ -1998,6 +2062,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
 
           LayoutBuilder(
             builder: (context, constraints) {
+              // Keep month cards at a readable width; scroll when more than four.
               final isDesktop =
                   constraints.maxWidth >= 820.0 && ownSeries.length <= 4;
               if (isDesktop) {
@@ -2164,42 +2229,53 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             children: [
               // Month Header
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    ownPoint.monthLabelAr,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: colorScheme.onSurface,
+                  Flexible(
+                    child: Text(
+                      ownPoint.monthLabelAr,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: colorScheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8.0,
-                      vertical: 2.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: compHigher
-                          ? M3Palette.successSurface
-                          : compLower
-                              ? M3Palette.dangerSurface
-                              : colorScheme.surfaceContainerHighest,
-                      borderRadius: M3Shape.radiusSm,
-                    ),
-                    child: Text(
-                      compHigher
-                          ? 'المنافس +${gapEgp.toStringAsFixed(1)} ج'
-                          : compLower
-                              ? 'المنافس ${gapEgp.toStringAsFixed(1)} ج'
-                              : 'سعر متقارب',
-                      style: TextStyle(
-                        fontSize: M3FontSize.tinyPlus,
-                        fontWeight: FontWeight.w900,
-                        color: compHigher
-                            ? M3Palette.onSuccessSurface
-                            : compLower
-                                ? M3Palette.onDangerSurface
-                                : colorScheme.onSurfaceVariant,
+                  const SizedBox(width: 6.0),
+                  Flexible(
+                    child: Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8.0,
+                          vertical: 2.0,
+                        ),
+                        decoration: BoxDecoration(
+                          color: compHigher
+                              ? M3Palette.successSurface
+                              : compLower
+                                  ? M3Palette.dangerSurface
+                                  : colorScheme.surfaceContainerHighest,
+                          borderRadius: M3Shape.radiusSm,
+                        ),
+                        child: Text(
+                          compHigher
+                              ? 'المنافس +${gapEgp.toStringAsFixed(1)} ج'
+                              : compLower
+                                  ? 'المنافس ${gapEgp.toStringAsFixed(1)} ج'
+                                  : 'سعر متقارب',
+                          style: TextStyle(
+                            fontSize: M3FontSize.tinyPlus,
+                            fontWeight: FontWeight.w900,
+                            color: compHigher
+                                ? M3Palette.onSuccessSurface
+                                : compLower
+                                    ? M3Palette.onDangerSurface
+                                    : colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
                   ),
@@ -2223,11 +2299,15 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'صنفنا ($ownBrand)',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: colorScheme.primary,
+                        Flexible(
+                          child: Text(
+                            'صنفنا ($ownBrand)',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: colorScheme.primary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Text(
@@ -2244,11 +2324,15 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          '${ownPoint.unitPrice.toStringAsFixed(2)} ج.م',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            color: colorScheme.primary,
+                        Flexible(
+                          child: Text(
+                            '${ownPoint.unitPrice.toStringAsFixed(2)} ج.م',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: colorScheme.primary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Text(
@@ -2304,11 +2388,15 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            '${compPoint.unitPrice.toStringAsFixed(2)} ج.م',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              color: colorScheme.onSurface,
+                          Flexible(
+                            child: Text(
+                              '${compPoint.unitPrice.toStringAsFixed(2)} ج.م',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                color: colorScheme.onSurface,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Text(
@@ -2505,7 +2593,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     value:
                         '${group.periodPriceChangePct >= 0 ? '+' : ''}${group.periodPriceChangePct.toStringAsFixed(1)}%',
                     subValue:
-                        '${group.periodPriceChangeEgp >= 0 ? '+' : ''}${group.periodPriceChangeEgp.toStringAsFixed(1)} ج.م (يناير ← أبريل)',
+                        '${group.periodPriceChangeEgp >= 0 ? '+' : ''}${group.periodPriceChangeEgp.toStringAsFixed(1)} ج.م (${_monthRangeLabel.replaceFirst(' - ', ' ← ')})',
                   ),
                   _buildSpotlightMetricBox(
                     context,
@@ -2876,7 +2964,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
 
 /// Focused 2-Line Monthly Price Trajectory Painter:
 /// Draws ONLY our Default Own SKU (Thick Primary Blue Line) and the Selected Competitor SKU (Thick Accent Line)
-/// with clear price callouts and ▲/▼ badges at each month (يناير، فبراير، مارس، أبريل).
+/// with clear price callouts and ▲/▼ badges at each month in the returned series.
 class _MonthlyPriceTrajectoryPainter extends CustomPainter {
   final List<SkuMonthlyPricePointModel> ownSeries;
   final List<SkuMonthlyPricePointModel> competitorSeries;

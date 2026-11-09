@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:tashil_web/core/data/available_years.dart';
 import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/core/network/backend_http.dart';
 import 'package:tashil_web/features/data_ingestion/presentation/screens/upload_portal_screen.dart';
 import 'package:tashil_web/features/data_ingestion/presentation/widgets/register_chain_dialog.dart';
 import 'package:tashil_web/features/data_ingestion/presentation/widgets/sell_in_upload_target.dart';
@@ -63,9 +64,10 @@ void main() {
   });
 
   testWidgets(
-      'reviewer 6: the 5-minute timeout shows its own message in the M3 dialog',
+      'reviewer 6: a client wait-timeout shows a neutral still-processing dialog (never "nothing saved")',
       (tester) async {
-    expect(sellInUploadTimeout, const Duration(minutes: 5));
+    expect(sellInUploadTimeout, BackendHttp.defaultJobMaxWait);
+    expect(sellInUploadTimeout.inMinutes, greaterThanOrEqualTo(45));
     await tester.pumpWidget(_host((context) {
       showUploadFailureDialog(context, '06_period.xlsx',
           TimeoutException('upload', sellInUploadTimeout));
@@ -74,9 +76,11 @@ void main() {
     await tester.tap(find.text('go'));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
-    expect(
-        find.textContaining('الرفع أخد وقت أطول من المتوقع'), findsOneWidget);
-    expect(find.textContaining('راجع أرشيف الملفات'), findsOneWidget);
+    expect(find.text(sellInUploadStillProcessingTitle), findsOneWidget);
+    expect(find.textContaining('لسه بيتعالج'), findsWidgets);
+    expect(find.textContaining('قائمة الملفات'), findsOneWidget);
+    expect(find.textContaining('مفيش حاجة اتحفظت'), findsNothing);
+    expect(find.textContaining('اترفض'), findsNothing);
   });
 
   testWidgets(

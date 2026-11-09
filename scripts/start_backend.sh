@@ -21,8 +21,8 @@ forward_adb_port() {
     fi
 }
 
-# 1. Check if backend is already healthy
-if curl -s -f http://localhost:8080/healthz > /dev/null 2>&1; then
+# 1. Check if backend is already healthy (/livez: Cloud Run-safe public probe)
+if curl -s -f http://localhost:8080/livez > /dev/null 2>&1; then
     echo "✓ Tashil Go Backend is ALREADY running and healthy on http://localhost:8080"
     forward_adb_port
     exit 0
@@ -31,7 +31,7 @@ fi
 # 2. Check if port 8080 is occupied by a stale or hung process
 OCCUPIED_PID=$(lsof -ti :8080 2>/dev/null || true)
 if [ -n "$OCCUPIED_PID" ]; then
-    echo "⚠️ Port 8080 occupied by PID $OCCUPIED_PID but /healthz failed. Terminating stale process..."
+    echo "⚠️ Port 8080 occupied by PID $OCCUPIED_PID but /livez failed. Terminating stale process..."
     kill -9 $OCCUPIED_PID 2>/dev/null || true
     sleep 1
 fi
@@ -43,10 +43,10 @@ nohup go run cmd/server/main.go > "$LOG_FILE" 2>&1 &
 SERVER_PID=$!
 echo "Backend process launched (PID: $SERVER_PID). Logging to: $LOG_FILE"
 
-# 4. Wait for /healthz to report healthy
+# 4. Wait for /livez to report healthy
 echo "Waiting for backend health check..."
 for i in {1..30}; do
-    if curl -s -f http://localhost:8080/healthz > /dev/null 2>&1; then
+    if curl -s -f http://localhost:8080/livez > /dev/null 2>&1; then
         echo "✓ Tashil Go Backend is UP and HEALTHY on http://localhost:8080"
         forward_adb_port
         exit 0
@@ -62,6 +62,6 @@ for i in {1..30}; do
     sleep 0.5
 done
 
-echo "⚠️ Backend healthz timed out after 15 seconds. Checking logs:"
+echo "⚠️ Backend /livez timed out after 15 seconds. Checking logs:"
 tail -n 20 "$LOG_FILE"
 exit 0

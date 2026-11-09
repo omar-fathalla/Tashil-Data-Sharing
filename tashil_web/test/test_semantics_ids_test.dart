@@ -73,6 +73,7 @@ void main() {
       expect(TestIds.snackbarError, 'snackbar-error');
       expect(TestIds.navIdForIndex(1), TestIds.navSellOut);
       expect(TestIds.navIdForIndex(2), TestIds.navSellIn);
+      expect(TestIds.navIdForIndex(3), TestIds.navReturns);
       expect(TestIds.navIdForIndex(0), isNull);
       // file-delete ids are archiveId + '-' + slugified filename
       expect(

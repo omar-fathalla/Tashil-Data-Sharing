@@ -13,7 +13,8 @@ High-throughput, low-latency multi-tenant backend service designed for Google Cl
 
 | Method | Path | Description | Protected |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/healthz` | Container health probe | No |
+| `GET` | `/livez` | Container health probe (Cloud Run-safe) | No |
+| `GET` | `/api/v1/health` | Same readiness probe via API prefix | No |
 | `POST` | `/api/v1/ingest/upload` | Upload Excel/CSV file for AI ingestion | Yes (JWT) |
 | `GET` | `/api/v1/analytics/executive-summary` | Bento Grid KPIs, chain shares, trend points | Yes (JWT) |
 | `GET` | `/api/v1/analytics/records` | Paginated virtualized table records | Yes (JWT) |

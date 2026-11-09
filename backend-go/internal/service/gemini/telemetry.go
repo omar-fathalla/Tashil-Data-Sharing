@@ -6,6 +6,8 @@ import (
 )
 
 func applyGuardrailEvents(payload *domain.NormalizedRetailIngestionPayload, ev *guardrails.Events) {
+	// Branch-norm summary is cheap and useful on AI-mapped payloads too.
+	attachBranchNormSummary(payload)
 	if payload == nil || ev == nil {
 		return
 	}

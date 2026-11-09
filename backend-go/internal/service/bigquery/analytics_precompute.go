@@ -34,8 +34,11 @@ type precomputeStore struct {
 	writer     AggregatesWriter
 	tenants    []string
 	timer      *time.Timer
-	listenMu   sync.Mutex
-	listeners  []func()
+	// disableBackgroundMirror skips scheduleRecompute and the async mirror in
+	// GetAnalyticsAggregates (CLI backfill uses MaterializeAnalyticsAggregates instead).
+	disableBackgroundMirror bool
+	listenMu                sync.Mutex
+	listeners               []func()
 }
 
 const maxCachedPayloads = 64
@@ -69,19 +72,51 @@ func (c *Client) AnalyticsSourceVersion() int64 { return c.precompute.sourceVers
 // WithAggregatesWriter attaches the BigQuery mirror and the tenants to keep materialized.
 // nil disables background recompute (reads still recompute lazily when stale).
 func (c *Client) WithAggregatesWriter(w AggregatesWriter, tenants ...string) *Client {
+	c.attachAggregatesWriter(w, tenants...)
+	c.scheduleRecompute()
+	return c
+}
+
+// AttachAggregatesWriterForSyncMirror sets the writer without scheduling background
+// recompute. Used by CLI backfill together with MaterializeAnalyticsAggregates and
+// DisableBackgroundAggregatesMirror so the process does not exit with writes in flight.
+func (c *Client) AttachAggregatesWriterForSyncMirror(w AggregatesWriter, tenants ...string) *Client {
+	c.attachAggregatesWriter(w, tenants...)
+	return c
+}
+
+func (c *Client) attachAggregatesWriter(w AggregatesWriter, tenants ...string) {
 	c.precompute.mu.Lock()
 	c.precompute.writer = w
 	c.precompute.tenants = append(c.precompute.tenants, tenants...)
 	c.precompute.mu.Unlock()
-	c.scheduleRecompute()
+}
+
+// DisableBackgroundAggregatesMirror turns off scheduleRecompute and the async mirror
+// inside GetAnalyticsAggregates. Call MaterializeAnalyticsAggregates for a synchronous write.
+func (c *Client) DisableBackgroundAggregatesMirror() *Client {
+	c.precompute.mu.Lock()
+	c.precompute.disableBackgroundMirror = true
+	if c.precompute.timer != nil {
+		c.precompute.timer.Stop()
+		c.precompute.timer = nil
+	}
+	c.precompute.mu.Unlock()
 	return c
+}
+
+// AggregatesWriterAttached reports whether a mirror writer is configured (tests / dry-run guards).
+func (c *Client) AggregatesWriterAttached() bool {
+	c.precompute.mu.Lock()
+	defer c.precompute.mu.Unlock()
+	return c.precompute.writer != nil
 }
 
 func (c *Client) scheduleRecompute() {
 	p := &c.precompute
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.writer == nil {
+	if p.writer == nil || p.disableBackgroundMirror {
 		return
 	}
 	if p.timer != nil {
@@ -203,28 +238,67 @@ func BuildAnalyticsAggregatesFromPayload(chain string, p *domain.CPFRDashboardPa
 }
 
 // GetAnalyticsAggregates returns the tenant's materialized layer, recomputing it only when a
-// source changed since the last computation. A fresh computation is mirrored to BigQuery.
+// source changed since the last computation. A fresh computation is mirrored to BigQuery
+// asynchronously (unless DisableBackgroundAggregatesMirror was called).
 func (c *Client) GetAnalyticsAggregates(ctx context.Context, tenantID string) (*domain.AnalyticsAggregates, error) {
+	agg, fresh, w, v, backgroundOK, err := c.loadOrComputeAnalyticsAggregates(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if fresh && w != nil && backgroundOK {
+		go func() {
+			wctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
+			if err := w.WriteAnalyticsAggregates(wctx, agg); err != nil {
+				log.Printf("ERROR [precompute] BigQuery mirror tenant=%s version=%d failed: %v", agg.TenantID, v, err)
+			}
+		}()
+	}
+	return agg, nil
+}
+
+// MaterializeAnalyticsAggregates recomputes the tenant's agg_* layer and mirrors it to
+// BigQuery synchronously. The caller must not exit until this returns; write failures
+// are returned (unlike GetAnalyticsAggregates' fire-and-forget mirror).
+func (c *Client) MaterializeAnalyticsAggregates(ctx context.Context, tenantID string) (*domain.AnalyticsAggregates, error) {
+	agg, _, w, _, _, err := c.loadOrComputeAnalyticsAggregates(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if w == nil {
+		return agg, fmt.Errorf("no aggregates writer configured")
+	}
+	if err := w.WriteAnalyticsAggregates(ctx, agg); err != nil {
+		return agg, err
+	}
+	return agg, nil
+}
+
+func (c *Client) loadOrComputeAnalyticsAggregates(ctx context.Context, tenantID string) (
+	agg *domain.AnalyticsAggregates, fresh bool, w AggregatesWriter, v int64, backgroundOK bool, err error,
+) {
 	c.syncChainDiscounts(ctx, tenantID)
 	norm := normalizeTenantKey(tenantID)
 	p := &c.precompute
-	v := p.sourceVersion.Load()
+	v = p.sourceVersion.Load()
 	p.mu.Lock()
+	backgroundOK = !p.disableBackgroundMirror
 	if a, ok := p.aggregates[norm]; ok && a.Version == v {
+		w = p.writer
 		p.mu.Unlock()
-		return a, nil
+		return a, false, w, v, backgroundOK, nil
 	}
 	p.mu.Unlock()
 
 	at := time.Now().UTC()
-	agg := &domain.AnalyticsAggregates{TenantID: norm, Version: v, UpdatedAt: at,
+	agg = &domain.AnalyticsAggregates{TenantID: norm, Version: v, UpdatedAt: at,
 		ChainProfitMonthly: []domain.AggChainProfitMonthly{}, SkuCostMargin: []domain.AggSkuCostMargin{}, SellThrough: []domain.AggSellThrough{}}
 	chains := append([]string{"all"}, c.tenantChains(tenantID)...)
 	for _, ch := range chains {
 		f := CPFRFilter{RetailerChain: ch}
-		payload, _, err := c.GetCPFRDashboardCached(ctx, tenantID, f)
-		if err != nil {
-			return nil, fmt.Errorf("compute chain %s: %w", ch, err)
+		payload, _, e := c.GetCPFRDashboardCached(ctx, tenantID, f)
+		if e != nil {
+			return nil, false, nil, v, backgroundOK, fmt.Errorf("compute chain %s: %w", ch, e)
 		}
 		pr, sk, th := BuildAnalyticsAggregatesFromPayload(ch, payload, v, at)
 		agg.ChainProfitMonthly = append(agg.ChainProfitMonthly, pr...)
@@ -233,25 +307,18 @@ func (c *Client) GetAnalyticsAggregates(ctx context.Context, tenantID string) (*
 	}
 
 	p.mu.Lock()
+	backgroundOK = !p.disableBackgroundMirror
 	if p.sourceVersion.Load() != v {
+		w = p.writer
 		p.mu.Unlock()
-		return agg, nil // a source changed mid-compute: serve it, but do not store or mirror it
+		// Source changed mid-compute: serve it, but do not store or treat as fresh mirror.
+		return agg, false, w, v, backgroundOK, nil
 	}
 	if p.aggregates == nil {
 		p.aggregates = map[string]*domain.AnalyticsAggregates{}
 	}
 	p.aggregates[norm] = agg
-	w := p.writer
+	w = p.writer
 	p.mu.Unlock()
-
-	if w != nil {
-		go func() {
-			wctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-			defer cancel()
-			if err := w.WriteAnalyticsAggregates(wctx, agg); err != nil {
-				log.Printf("ERROR [precompute] BigQuery mirror tenant=%s version=%d failed: %v", norm, v, err)
-			}
-		}()
-	}
-	return agg, nil
+	return agg, true, w, v, backgroundOK, nil
 }

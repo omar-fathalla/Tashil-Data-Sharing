@@ -46,6 +46,7 @@ void main() {
       expect(find.text('Dashboard'), findsOneWidget);
       expect(find.text('Sell-Out'), findsOneWidget);
       expect(find.text('Sell-In'), findsOneWidget);
+      expect(find.text('Returns'), findsOneWidget);
       expect(find.text('OOS Monitor'), findsOneWidget);
       expect(find.text('Store Matrix'), findsOneWidget);
       expect(find.text('Pricing & Promos'), findsOneWidget);
@@ -55,39 +56,45 @@ void main() {
       expect(find.byIcon(Icons.store_mall_directory_rounded), findsWidgets);
       // Verify price change icon
       expect(find.byIcon(Icons.price_change_rounded), findsWidgets);
+      // Verify Returns icon (index 3 — المرتجعات)
+      expect(find.byIcon(Icons.assignment_return_rounded), findsWidgets);
 
       // Tap on destination 2 ('Sell-In')
       await tester.tap(find.text('Sell-In'));
       expect(selectedDestination, 2);
 
-      // Tap on destination 4 ('Store Matrix')
-      await tester.tap(find.text('Store Matrix'));
-      expect(selectedDestination, 4);
+      // Tap on destination 3 ('Returns')
+      await tester.tap(find.text('Returns'));
+      expect(selectedDestination, 3);
 
-      // Tap on destination 5 ('Pricing & Promos')
-      await tester.tap(find.text('Pricing & Promos'));
+      // Tap on destination 5 ('Store Matrix') — shifted +1 after Returns
+      await tester.tap(find.text('Store Matrix'));
       expect(selectedDestination, 5);
 
-      // Tap on destination 6 ('Compare', added with Competitor Intelligence)
-      await tester.tap(find.text('Compare'));
+      // Tap on destination 6 ('Pricing & Promos')
+      await tester.tap(find.text('Pricing & Promos'));
       expect(selectedDestination, 6);
 
-      // Tap on destination 7 ('Trade Marketing & ROI')
-      await tester.tap(find.text('Trade Marketing & ROI'));
+      // Tap on destination 7 ('Compare', added with Competitor Intelligence)
+      await tester.tap(find.text('Compare'));
       expect(selectedDestination, 7);
 
-      // Tap on destination 8 ('CPFR Replenishment')
-      await tester.tap(find.text('CPFR Replenishment'));
+      // Tap on destination 8 ('Trade Marketing & ROI')
+      await tester.tap(find.text('Trade Marketing & ROI'));
       expect(selectedDestination, 8);
 
-      // Tap on destination 9 ('Upload')
-      await tester.tap(find.text('Upload'));
+      // Tap on destination 9 ('CPFR Replenishment')
+      await tester.tap(find.text('CPFR Replenishment'));
       expect(selectedDestination, 9);
 
-      // Tap on destination 10 ('Product Master' at the very bottom)
+      // Tap on destination 10 ('Upload')
+      await tester.tap(find.text('Upload'));
+      expect(selectedDestination, 10);
+
+      // Tap on destination 11 ('Product Master' at the very bottom)
       await tester.ensureVisible(find.text('Product Master'));
       await tester.tap(find.text('Product Master'));
-      expect(selectedDestination, 10);
+      expect(selectedDestination, 11);
     });
 
     testWidgets('AppShell switches screens when destinations 4 and 5 are selected', (WidgetTester tester) async {

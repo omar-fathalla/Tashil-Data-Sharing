@@ -1,15 +1,21 @@
-// Command bqbackfill loads every file in the upload archive into the BigQuery sink tables.
+// Command bqbackfill loads archive files into the BigQuery sink tables.
 //
-// It parses the archive exactly like server startup does, then writes each sheet with the same
-// idempotent DELETE+INSERT plans used by live uploads, so re-running it never duplicates rows.
+// Sell-In month-cycle force replay (one archive only — no orphan cleanup) — preferred:
 //
-// Usage (lists only, writes nothing):
+//	TASHIL_ARCHIVE_DIR=... PROJECT_ID=... BIGQUERY_DATASET=... \
+//	  USE_MOCK_SERVICES=true go run ./cmd/bqbackfill \
+//	  -archive-id=arch_sellin_adeco_fathalla_1794178032976473890 \
+//	  -tenant=tenant-adeco -kind=sell_in
 //
-//	TASHIL_ARCHIVE_DIR=/path/to/archive go run ./cmd/bqbackfill
+// Dry-run prints per-month BEFORE/AFTER rows and net TO (no aggregates writer / no BQ writes).
+// Pass -execute to replace only that archive's sell_in_records rows and synchronously
+// refresh agg_sell_through (process waits for the mirror write).
 //
-// To write missing files and drop rows of deleted files (requires tashil-backend-sa roles):
+// Unscoped -execute is refused by default (never all-tenant orphan cleanup). The old
+// full-archive reconcile requires explicit opt-in:
 //
-//	TASHIL_ARCHIVE_DIR=... PROJECT_ID=... BIGQUERY_DATASET=... go run ./cmd/bqbackfill -execute
+//	go run ./cmd/bqbackfill -legacy-reconcile-all
+//	go run ./cmd/bqbackfill -legacy-reconcile-all -execute
 //
 // Note: like server startup, parsing may write stores/OOS alerts to Firestore when USE_MOCK_SERVICES=false.
 // Run with USE_MOCK_SERVICES=true to keep Firestore and Gemini in local mock mode (recommended).
@@ -31,38 +37,108 @@ import (
 )
 
 func main() {
-	execute := flag.Bool("execute", false, "actually write to BigQuery (default: list archive only)")
+	f := parseBackfillFlags()
+	if err := runBackfillEntry(f, mainScopedReplay, mainLegacyReconcile); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func parseBackfillFlags() backfillCLIFlags {
+	execute := flag.Bool("execute", false, "actually write to BigQuery (default: dry-run / list only)")
+	legacyAll := flag.Bool("legacy-reconcile-all", false, "opt-in to full-archive reconcile + orphan cleanup across all tenants (dangerous; off by default)")
+	archiveID := flag.String("archive-id", "", "force re-parse + replace only this archive id (sell-in month-cycle replay; required for scoped mode)")
+	tenant := flag.String("tenant", "tenant-adeco", "tenant id for scoped sell-in replay (setting this selects scoped mode)")
+	kind := flag.String("kind", "sell_in", "sheet kind for scoped sell-in replay (setting this selects scoped mode; sell_in only)")
 	flag.Parse()
 
+	f := backfillCLIFlags{
+		Execute:            *execute,
+		LegacyReconcileAll: *legacyAll,
+		ArchiveID:          *archiveID,
+		Tenant:             *tenant,
+		Kind:               *kind,
+	}
+	flag.Visit(func(fl *flag.Flag) {
+		switch fl.Name {
+		case "archive-id":
+			f.ArchiveIDFlagSet = true
+		case "tenant":
+			f.TenantFlagSet = true
+		case "kind":
+			f.KindFlagSet = true
+		}
+	})
+	return f
+}
+
+// wireBackfillProcessor builds the processor the same way main does.
+// execute=false: sink may read for BEFORE counts; no aggregates writer / no scheduleRecompute.
+// execute=true: attach sync-only aggregates mirror (Materialize waits; no background writes).
+func wireBackfillProcessor(
+	archDir, tenantHint string,
+	execute bool,
+	bqRepo *bigquery.Client,
+	fsRepo *firestore.Client,
+	agent gemini.Agent,
+	sink bqsink.Sink,
+) *ingestion.Processor {
+	p := ingestion.NewProcessor(agent, bqRepo, fsRepo).WithArchiveDir(archDir).WithSink(sink)
+	if !execute {
+		return p
+	}
+	if bqs, ok := sink.(*bqsink.BigQuerySink); ok {
+		bqRepo.AttachAggregatesWriterForSyncMirror(bqs, tenantHint)
+		bqRepo.DisableBackgroundAggregatesMirror()
+		p.WithSellInStore(bqs, fsRepo)
+		p.WithSellOutStore(bqs, fsRepo)
+	} else if w, ok := sink.(bigquery.AggregatesWriter); ok {
+		// Test sinks that also mirror aggregates.
+		bqRepo.AttachAggregatesWriterForSyncMirror(w, tenantHint)
+		bqRepo.DisableBackgroundAggregatesMirror()
+	}
+	return p
+}
+
+func mustProcessor(tenantHint string, execute bool) (*ingestion.Processor, *bigquery.Client, string) {
 	cfg := config.Load()
 	archDir := os.Getenv("TASHIL_ARCHIVE_DIR")
 	if archDir == "" {
 		log.Fatal("TASHIL_ARCHIVE_DIR is required")
 	}
-
 	bqRepo := bigquery.NewClient(cfg.ProjectID, cfg.BigQueryDataset, true)
 	fsRepo := firestore.NewClient(cfg.FirestoreDatabase, cfg.UseMockServices)
 	agent := gemini.NewAgent(cfg.GeminiAPIKey, cfg.GeminiModel, cfg.UseMockServices).WithTier2Model(cfg.GeminiTier2Model)
-	p := ingestion.NewProcessor(agent, bqRepo, fsRepo).WithArchiveDir(archDir)
 
+	sinkCfg := bqsink.ConfigFromEnv(cfg.ProjectID, cfg.BigQueryDataset)
+	sinkCfg.Enabled = true
+	sink := bqsink.New(context.Background(), sinkCfg)
+	p := wireBackfillProcessor(archDir, tenantHint, execute, bqRepo, fsRepo, agent, sink)
+	return p, bqRepo, archDir
+}
+
+func mainScopedReplay(archiveID, tenant, kind string, execute bool) {
+	p, _, _ := mustProcessor(tenant, execute)
+	runScopedSellInReplay(p, tenant, archiveID, kind, execute)
+}
+
+func mainLegacyReconcile(execute bool) {
+	p, _, archDir := mustProcessor("tenant-adeco", execute)
+	runLegacyReconcile(p, archDir, execute)
+}
+
+func runLegacyReconcile(p *ingestion.Processor, archDir string, execute bool) {
 	list := p.ListArchivedFiles(context.Background(), "all", "", "", "", "all")
-	fmt.Printf("archive %s: %d file(s)\n", archDir, len(list.Files))
+	fmt.Printf("archive %s: %d file(s) [legacy-reconcile-all]\n", archDir, len(list.Files))
 	for _, f := range list.Files {
 		fmt.Printf("  %-15s %-14s %-12s %s\n", f.FileType, f.TenantID, f.RetailChain, f.FileName)
 	}
 
-	// Compare every archived file with its rows in BigQuery (read-only), then with -execute write the
-	// missing files (keyed by archive id, idempotent) and drop rows of deleted files. The server runs the
-	// same reconcile on startup (BQ_ARCHIVE_SYNC), so this command is only needed for out-of-band runs.
-	sinkCfg := bqsink.ConfigFromEnv(cfg.ProjectID, cfg.BigQueryDataset)
-	sinkCfg.Enabled = true
-	p.WithSink(bqsink.New(context.Background(), sinkCfg))
 	tenants := map[string]bool{}
 	for _, f := range list.Files {
 		tenants[f.TenantID] = true
 	}
 	for t := range tenants {
-		rep, err := p.ReconcileArchivesToSink(context.Background(), t, *execute)
+		rep, err := p.ReconcileArchivesToSink(context.Background(), t, execute)
 		if err != nil {
 			log.Printf("tenant %s: %v", t, err)
 		}
@@ -76,7 +152,26 @@ func main() {
 			fmt.Printf("  orphan rows %s: %d (deleted=%v)\n", k, n, rep.OrphanDeleted[k])
 		}
 	}
-	if !*execute {
-		fmt.Println("dry run: pass -execute to write missing files and drop orphan rows")
+	if !execute {
+		fmt.Println("dry run: pass -execute with -legacy-reconcile-all to write missing files and drop orphan rows")
+	}
+}
+
+func runScopedSellInReplay(p *ingestion.Processor, tenantID, archiveID, kind string, execute bool) {
+	rep, err := p.ReplaySellInArchive(context.Background(), tenantID, archiveID, kind, execute)
+	if err != nil {
+		if rep != nil {
+			fmt.Print(ingestion.FormatSellInArchiveReplayDryRun(rep))
+			if execute {
+				fmt.Printf("executed_partial: rows_written=%d sink=%s aggregates=%s\n",
+					rep.RowsWritten, rep.SinkStatus, rep.AggRefresh)
+			}
+		}
+		log.Fatal(err)
+	}
+	fmt.Print(ingestion.FormatSellInArchiveReplayDryRun(rep))
+	if execute {
+		fmt.Printf("executed: rows_written=%d sink=%s aggregates=%s\n",
+			rep.RowsWritten, rep.SinkStatus, rep.AggRefresh)
 	}
 }

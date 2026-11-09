@@ -15,7 +15,7 @@ type HealthResponse struct {
 	Detail    string    `json:"detail,omitempty"`
 }
 
-// AuthReadiness is the readiness dependency for /healthz (auth user snapshot).
+// AuthReadiness is the readiness dependency for public health probes (auth user snapshot).
 type AuthReadiness interface {
 	AuthReady() error
 }
@@ -26,6 +26,7 @@ func Healthz(w http.ResponseWriter, r *http.Request) {
 }
 
 // HealthzWithAuth fails readiness (503) when auth users are not safely loaded.
+// Mounted at GET /livez and GET /api/v1/health (Cloud Run-safe; do not rely on /healthz ingress).
 func HealthzWithAuth(auth AuthReadiness) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if auth != nil {

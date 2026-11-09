@@ -61,6 +61,13 @@ class DesktopSidebar extends StatelessWidget {
         semanticsIdentifier: TestIds.navSellIn,
       ),
       _NavDestination(
+        icon: Icons.assignment_return_rounded,
+        selectedIcon: Icons.assignment_return_rounded,
+        label: 'Returns',
+        labelAr: 'المرتجعات',
+        semanticsIdentifier: TestIds.navReturns,
+      ),
+      _NavDestination(
         icon: Icons.warning_amber_rounded,
         selectedIcon: Icons.warning_amber_rounded,
         label: 'OOS Monitor',
