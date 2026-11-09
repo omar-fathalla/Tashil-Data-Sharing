@@ -4,9 +4,9 @@ import "unicode/utf8"
 
 // Confidence thresholds for auto-link vs pending.
 const (
-	HighConfidenceMin      = 0.92
-	AmbiguousGapMax        = 0.05 // top two within this gap → ambiguous
-	LowConfidenceMin       = 0.55
+	HighConfidenceMin = 0.92
+	AmbiguousGapMax   = 0.05 // top two within this gap → ambiguous
+	LowConfidenceMin  = 0.55
 )
 
 // Similarity is 1 - normalized Levenshtein distance over runes of Normalize(a/b).

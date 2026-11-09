@@ -7,8 +7,8 @@ package branchmaster
 var linkAliasNorm = map[string]string{
 	// Keys MUST already be in Normalize() form (no hamza / ة / separators).
 	// Sell-Out "هانوفيل" ↔ Sell-In "الهانوفيل"
-	"هانوفيل": "الهانوفيل",
-	"نهال فيل":  "الهانوفيل",
+	"هانوفيل":  "الهانوفيل",
+	"نهال فيل": "الهانوفيل",
 	// Sell-Out long Amwaj label ↔ Sell-In أمواج
 	"امواج الساحل الشمالي": "امواج",
 	// Sell-Out مدينة الرحاب ↔ Sell-In الرحاب

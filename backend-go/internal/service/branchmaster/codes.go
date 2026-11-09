@@ -7,15 +7,15 @@ import (
 
 // Known chain slug → internal 2–4 letter code used in branch codes (FTH-001).
 var chainCodeBySlug = map[string]string{
-	"fathalla":      "FTH",
-	"carrefour":     "CRF",
-	"gomla":         "GOM",
-	"beet-elgomla":  "BET",
-	"beet_elgomla":  "BET",
-	"spinneys":      "SPI",
-	"metro":         "MET",
-	"seoudi":        "SEO",
-	"kazyon":        "KAZ",
+	"fathalla":     "FTH",
+	"carrefour":    "CRF",
+	"gomla":        "GOM",
+	"beet-elgomla": "BET",
+	"beet_elgomla": "BET",
+	"spinneys":     "SPI",
+	"metro":        "MET",
+	"seoudi":       "SEO",
+	"kazyon":       "KAZ",
 }
 
 var chainNameAR = map[string]string{

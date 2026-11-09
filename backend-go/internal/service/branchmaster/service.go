@@ -237,12 +237,12 @@ func (s *Service) ObserveRaw(ctx context.Context, tenantID, chainSlug, raw, by s
 		})
 		r.AutoLinked = true
 		st.Notices = append(st.Notices, Notice{
-			ID:        uuid.NewString(),
-			Kind:      "auto_link",
-			MessageAR: fmt.Sprintf("تم ربط «%s» تلقائياً بالفرع %s (%s).", raw, r.DisplayName, r.BranchCode),
-			RawName:   raw,
+			ID:         uuid.NewString(),
+			Kind:       "auto_link",
+			MessageAR:  fmt.Sprintf("تم ربط «%s» تلقائياً بالفرع %s (%s).", raw, r.DisplayName, r.BranchCode),
+			RawName:    raw,
 			BranchCode: r.BranchCode,
-			CreatedAt: now,
+			CreatedAt:  now,
 		})
 		if err := s.save(ctx, st); err != nil {
 			return r, err
