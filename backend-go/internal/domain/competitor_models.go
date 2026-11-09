@@ -55,3 +55,51 @@ type CompetitorMappingFilter struct {
 	Chain      string
 	OwnBarcode string
 }
+
+// Competitor suggestion quarantine statuses. Pending never feeds Compare KPIs.
+const (
+	CompetitorSuggestionPending  = "pending"
+	CompetitorSuggestionApproved = "approved"
+	CompetitorSuggestionRejected = "rejected"
+)
+
+// CompetitorSuggestion is an AI-ranked own→competitor candidate awaiting owner review.
+// Stored only in the competitor_suggestions quarantine collection — never auto-applied.
+type CompetitorSuggestion struct {
+	ID                   string    `json:"id" firestore:"id"`
+	TenantID             string    `json:"tenant_id" firestore:"tenant_id"`
+	OwnBarcode           string    `json:"own_barcode" firestore:"own_barcode"`
+	OwnSkuName           string    `json:"own_sku_name" firestore:"own_sku_name"`
+	OwnCategory          string    `json:"own_category" firestore:"own_category"`
+	CompetitorBarcode    string    `json:"competitor_barcode" firestore:"competitor_barcode"`
+	CompetitorSkuName    string    `json:"competitor_sku_name" firestore:"competitor_sku_name"`
+	CompetitorBrand      string    `json:"competitor_brand" firestore:"competitor_brand"`
+	CompetitorSupplier   string    `json:"competitor_supplier" firestore:"competitor_supplier"`
+	Category             string    `json:"category" firestore:"category"`
+	RetailerChain        string    `json:"retailer_chain" firestore:"retailer_chain"`
+	ReasonAR             string    `json:"reason_ar" firestore:"reason_ar"`
+	Confidence           float64   `json:"confidence" firestore:"confidence"`
+	Rank                 int       `json:"rank" firestore:"rank"`
+	Status               string    `json:"status" firestore:"status"` // pending|approved|rejected
+	OwnUnitPrice         float64   `json:"own_unit_price" firestore:"own_unit_price"`
+	CompetitorUnitPrice  float64   `json:"competitor_unit_price" firestore:"competitor_unit_price"`
+	OwnUnits             int       `json:"own_units" firestore:"own_units"`
+	CompetitorUnits      int       `json:"competitor_units" firestore:"competitor_units"`
+	SizeLabelOwn         string    `json:"size_label_own,omitempty" firestore:"size_label_own"`
+	SizeLabelCompetitor  string    `json:"size_label_competitor,omitempty" firestore:"size_label_competitor"`
+	VariantBonus         bool      `json:"variant_bonus" firestore:"variant_bonus"`
+	PromptTokens         int       `json:"prompt_tokens" firestore:"prompt_tokens"`
+	CompletionTokens     int       `json:"completion_tokens" firestore:"completion_tokens"`
+	CreatedBy            string    `json:"created_by" firestore:"created_by"`
+	ReviewedBy           string    `json:"reviewed_by,omitempty" firestore:"reviewed_by"`
+	CreatedAt            time.Time `json:"created_at" firestore:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at" firestore:"updated_at"`
+	ReviewedAt           time.Time `json:"reviewed_at,omitempty" firestore:"reviewed_at"`
+}
+
+// CompetitorSuggestionFilter narrows quarantine list results.
+type CompetitorSuggestionFilter struct {
+	Chain      string
+	Status     string
+	OwnBarcode string
+}

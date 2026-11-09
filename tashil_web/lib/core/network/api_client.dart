@@ -11041,6 +11041,81 @@ class ApiClient {
     } catch (_) {}
   }
 
+  /// Lists AI competitor suggestions from the quarantine collection.
+  /// Pending rows are never merged into Compare groups / KPIs.
+  Future<List<CompetitorSuggestionModel>> listCompetitorSuggestions({
+    String? chain,
+    String status = 'pending',
+  }) async {
+    final params = <String, String>{};
+    if (chain != null && chain.isNotEmpty && chain != 'all' && chain != 'الكل') {
+      params['chain'] = chain;
+    }
+    if (status.isNotEmpty) params['status'] = status;
+    final uri = Uri.parse(ApiEndpoints.competitorSuggestions)
+        .replace(queryParameters: params.isEmpty ? null : params);
+    final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 12));
+    if (resp.statusCode != 200) {
+      throw Exception('فشل تحميل اقتراحات المنافسين (${resp.statusCode})');
+    }
+    final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    final rows = (data['suggestions'] as List?) ?? const [];
+    return [
+      for (final raw in rows)
+        if (raw is Map)
+          CompetitorSuggestionModel.fromJson(Map<String, dynamic>.from(raw)),
+    ];
+  }
+
+  /// Owner-only: run a batch of AI competitor suggestions (default limit 10).
+  Future<Map<String, dynamic>> runCompetitorSuggestions({
+    required String chain,
+    int limit = 10,
+    List<String>? ownSkus,
+    int? year,
+  }) async {
+    final body = <String, dynamic>{
+      'chain': chain,
+      'limit': limit,
+      if (ownSkus != null && ownSkus.isNotEmpty) 'own_skus': ownSkus,
+      if (year != null && year > 0) 'year': year,
+    };
+    final resp = await BackendHttp.post(
+      Uri.parse(ApiEndpoints.competitorSuggestionsRun),
+      headers: _headers,
+      body: jsonEncode(body),
+    ).timeout(const Duration(seconds: 120));
+    final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    if (resp.statusCode != 200) {
+      throw Exception(data['error']?.toString() ?? 'فشل تشغيل الاقتراحات (${resp.statusCode})');
+    }
+    return data;
+  }
+
+  Future<void> approveCompetitorSuggestion(String id) async {
+    final resp = await BackendHttp.post(
+      Uri.parse(ApiEndpoints.competitorSuggestionsApprove),
+      headers: _headers,
+      body: jsonEncode({'id': id}),
+    ).timeout(const Duration(seconds: 15));
+    if (resp.statusCode != 200) {
+      final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      throw Exception(data['error']?.toString() ?? 'فشل الموافقة (${resp.statusCode})');
+    }
+  }
+
+  Future<void> rejectCompetitorSuggestion(String id) async {
+    final resp = await BackendHttp.post(
+      Uri.parse(ApiEndpoints.competitorSuggestionsReject),
+      headers: _headers,
+      body: jsonEncode({'id': id}),
+    ).timeout(const Duration(seconds: 15));
+    if (resp.statusCode != 200) {
+      final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      throw Exception(data['error']?.toString() ?? 'فشل الرفض (${resp.statusCode})');
+    }
+  }
+
   /// Loads persisted custom competitor SKUs from the server and replaces the local cache.
   /// On failure the in-memory list is kept as is.
   Future<void> _syncCustomCompetitorSkus({String? chain}) async {
@@ -12551,6 +12626,75 @@ class _ApprovedCompetitorPin {
     required this.brand,
     required this.supplierName,
   });
+}
+
+/// Quarantine AI competitor suggestion — pending never feeds Compare KPIs.
+class CompetitorSuggestionModel {
+  final String id;
+  final String ownBarcode;
+  final String ownSkuName;
+  final String ownCategory;
+  final String competitorBarcode;
+  final String competitorSkuName;
+  final String competitorBrand;
+  final String competitorSupplier;
+  final String category;
+  final String retailerChain;
+  final String reasonAr;
+  final double confidence;
+  final int rank;
+  final String status;
+  final double ownUnitPrice;
+  final double competitorUnitPrice;
+  final int ownUnits;
+  final int competitorUnits;
+
+  const CompetitorSuggestionModel({
+    required this.id,
+    required this.ownBarcode,
+    required this.ownSkuName,
+    required this.ownCategory,
+    required this.competitorBarcode,
+    required this.competitorSkuName,
+    required this.competitorBrand,
+    required this.competitorSupplier,
+    required this.category,
+    required this.retailerChain,
+    required this.reasonAr,
+    required this.confidence,
+    required this.rank,
+    required this.status,
+    required this.ownUnitPrice,
+    required this.competitorUnitPrice,
+    required this.ownUnits,
+    required this.competitorUnits,
+  });
+
+  factory CompetitorSuggestionModel.fromJson(Map<String, dynamic> r) {
+    double d(String k) => (r[k] as num?)?.toDouble() ?? 0.0;
+    int i(String k) => (r[k] as num?)?.toInt() ?? 0;
+    String s(String k) => '${r[k] ?? ''}'.trim();
+    return CompetitorSuggestionModel(
+      id: s('id'),
+      ownBarcode: s('own_barcode'),
+      ownSkuName: s('own_sku_name'),
+      ownCategory: s('own_category'),
+      competitorBarcode: s('competitor_barcode'),
+      competitorSkuName: s('competitor_sku_name'),
+      competitorBrand: s('competitor_brand'),
+      competitorSupplier: s('competitor_supplier'),
+      category: s('category'),
+      retailerChain: s('retailer_chain'),
+      reasonAr: s('reason_ar'),
+      confidence: d('confidence'),
+      rank: i('rank'),
+      status: s('status').isEmpty ? 'pending' : s('status'),
+      ownUnitPrice: d('own_unit_price'),
+      competitorUnitPrice: d('competitor_unit_price'),
+      ownUnits: i('own_units'),
+      competitorUnits: i('competitor_units'),
+    );
+  }
 }
 
 class _RawCompetitorSeed {
