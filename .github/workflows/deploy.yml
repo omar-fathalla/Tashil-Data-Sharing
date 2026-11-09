@@ -8,8 +8,9 @@
 # jobs also land on Mac with no code change. See docs/ci-self-hosted.md / #41 / #55.
 #
 # Note: tashil-mac … tashil-mac-4 share one physical Mac. Keep light gates on hosted
-# ubuntu so deploy Mac jobs are not starved; workflow concurrency below still queues
-# deploys. Prefer MAC_SHARED_LOCK=1 if heavy CI + deploy overlap thrash the host.
+# ubuntu so deploy Mac jobs are not starved. Workflow concurrency queues deploys;
+# deploy-backend/web also join job group tashil-mac-heavy with Flutter/smoke.
+# Prefer MAC_SHARED_LOCK=1 for cross-repo Mac overlap. See docs/ci-self-hosted.md.
 #
 # Auth: Workload Identity Federation, no JSON keys. The provider only accepts tokens from
 # omar-fathalla/Tashil-Data-Sharing on refs/heads/main, impersonating tashil-gh-deployer.
@@ -128,6 +129,10 @@ jobs:
   deploy-backend:
     needs: [test-backend, test-web]
     # Stay on Mac/self-hosted where gcloud WIF + toolchains work (#41 / #55).
+    # Serialize with Flutter/smoke heavies; never cancel an in-flight deploy job.
+    concurrency:
+      group: tashil-mac-heavy
+      cancel-in-progress: false
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # Observed ~4.5m; Cloud Run source deploy can spike — 30m ceiling.
     timeout-minutes: 30
@@ -241,6 +246,9 @@ jobs:
 
   deploy-web:
     needs: [deploy-backend]
+    concurrency:
+      group: tashil-mac-heavy
+      cancel-in-progress: false
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # Observed ~3m (flutter build + Firebase Hosting); 25m ceiling.
     timeout-minutes: 25

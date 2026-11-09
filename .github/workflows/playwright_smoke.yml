@@ -4,6 +4,8 @@ name: Playwright Semantics Smoke
 # heavy smoke-run on Mac self-hosted (CI_RUNS_ON).
 # NEVER use GitHub-hosted macOS runners.
 # Budget fallback: set CI_HOSTED_RUNNER to the same JSON array as CI_RUNS_ON.
+# Mac contention: smoke-run joins job concurrency group tashil-mac-heavy (no cancel)
+# so flutter build / Setup Node are not starved by 4 parallel Mac jobs.
 # See docs/ci-self-hosted.md.
 #
 # No workflow-level paths-ignore: required check flutter-web-semantics-smoke always reports.
@@ -53,6 +55,10 @@ jobs:
   smoke-run:
     needs: changes
     if: needs.changes.outputs.smoke == 'true'
+    # One Mac-heavy at a time in this repo (with Flutter CI / deploy). No cancel.
+    concurrency:
+      group: tashil-mac-heavy
+      cancel-in-progress: false
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # Build web + Playwright (~15–25m healthy) + lock wait; acquire step < job.
     timeout-minutes: 45
