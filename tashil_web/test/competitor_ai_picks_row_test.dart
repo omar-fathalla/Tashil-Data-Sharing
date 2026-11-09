@@ -71,7 +71,7 @@ void main() {
           body: CompetitorAiPicksRow(
             loading: false,
             picks: picks,
-            selectedBarcode: selected?.barcode,
+            selectedBarcode: null, // initial build — selection asserted after tap
             onSelect: (c) => selected = c,
           ),
         ),
