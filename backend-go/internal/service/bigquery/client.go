@@ -2040,13 +2040,17 @@ func (c *Client) GetSellOutRecords(ctx context.Context, tenantID string, filter 
 	var matched []domain.SellOutFact
 	qLower := strings.ToLower(strings.TrimSpace(filter.SearchQuery))
 	supFilter := strings.TrimSpace(filter.Supplier)
+	targetCat := ""
+	if filter.Category != "" && filter.Category != "all" && filter.Category != "الكل" {
+		targetCat = domain.NormalizeProductCategory(filter.Category)
+	}
 
-	for _, r := range c.records {
+	// Cheap filters first under the read lock; enrich only candidates that still need product-master
+	// fields. Enriching every row on each request held the lock for 100s+ and caused Cloud Run 429s.
+	for i := range c.records {
+		r := c.records[i]
 		if !matchTenant(r.TenantID, tenantID) {
 			continue // Row-Level Security
-		}
-		if r.ItemCode == "" || r.RecommendedPrice == 0 || r.FactoryUnitCost == 0 || r.CartonsSold == 0 {
-			c.enrichSellOutFactLocked(&r)
 		}
 		// Default to tenant's own SKUs unless user explicitly requests "all_market" or a specific competing supplier
 		if supFilter == "" || strings.EqualFold(supFilter, "own") || supFilter == "أصناف الشركة فقط" {
@@ -2073,14 +2077,28 @@ func (c *Client) GetSellOutRecords(ctx context.Context, tenantID string, filter 
 				continue
 			}
 		}
-		r.Category = domain.NormalizeProductCategory(r.Category)
-		if filter.Category != "" && filter.Category != "all" && filter.Category != "الكل" && r.Category != domain.NormalizeProductCategory(filter.Category) {
-			continue
-		}
 		if filter.StartDate != "" && r.TransactionDate < filter.StartDate {
 			continue
 		}
 		if filter.EndDate != "" && r.TransactionDate > filter.EndDate {
+			continue
+		}
+		// Category can reject before enrichment when the raw category already mismatches.
+		if targetCat != "" {
+			rawCat := domain.NormalizeProductCategory(r.Category)
+			if rawCat != "" && rawCat != targetCat {
+				continue
+			}
+		}
+
+		needsEnrich := r.ItemCode == "" || r.RecommendedPrice == 0 || r.FactoryUnitCost == 0 || r.CartonsSold == 0 ||
+			(targetCat != "" && strings.TrimSpace(r.Category) == "")
+		if needsEnrich {
+			c.enrichSellOutFactLocked(&r)
+		}
+
+		r.Category = domain.NormalizeProductCategory(r.Category)
+		if targetCat != "" && r.Category != targetCat {
 			continue
 		}
 		if qLower != "" {

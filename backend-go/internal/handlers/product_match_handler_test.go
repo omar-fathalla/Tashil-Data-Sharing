@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -98,7 +99,7 @@ func TestProductMatchAPI_MatchEnqueueReviewDecide(t *testing.T) {
 		t.Fatalf("enqueue status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	var enqResp struct {
-		Count int `json:"count"`
+		Count int                  `json:"count"`
 		Items []matcher.ReviewItem `json:"enqueued"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &enqResp); err != nil {
@@ -251,6 +252,90 @@ func TestProductMatchDecideSanitizesFirestoreErrors(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "تعذر حفظ قرار المراجعة") {
 		t.Fatalf("want safe Arabic message, got %s", rec.Body.String())
+	}
+}
+
+func TestProductMatchBulkDecideRejectsTooManyIDs(t *testing.T) {
+	h := NewProductMatchHandler(matcher.NewQueue(&matcher.MemoryStore{}), fakePM{})
+	ids := make([]string, MaxBulkDecideIDs+1)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("id-%d", i)
+	}
+	payload, _ := json.Marshal(map[string]interface{}{
+		"ids": ids, "status": "approved", "reason_ar": "x",
+	})
+	req := withClaims(httptest.NewRequest(http.MethodPost, "/api/v1/product-match/review/bulk-decide", bytes.NewReader(payload)), domain.RoleVendorAdmin)
+	rec := httptest.NewRecorder()
+	h.HandleBulkDecide(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "الحد الأقصى") {
+		t.Fatalf("want Arabic cap message, got %s", rec.Body.String())
+	}
+}
+
+func TestProductMatchBulkDecidePrioritized(t *testing.T) {
+	pm := fakePM{items: []domain.ProductMasterItem{{
+		ItemCode: "FGCL-0550-0001", Barcode: "6223000231227",
+		OfficialName: "كلوريل 500 جم مبيض", IsPrimaryForBarcode: true,
+	}}}
+	q := matcher.NewQueue(&matcher.MemoryStore{})
+	h := NewProductMatchHandler(q, pm)
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/product-match/review", h.HandleListReview)
+	mux.HandleFunc("POST /api/v1/product-match/review/bulk-decide", h.HandleBulkDecide)
+
+	elig, err := q.EnqueueMatch(context.Background(), "tenant-adeco",
+		matcher.Query{SKUName: "كلوريل مبيض تقريبي", Rows: 40, Value: 18000},
+		matcher.Result{
+			Decision: matcher.DecisionUncertain, Confidence: 0.62,
+			MatchedItemCode: "FGCL-0550-0001", SuggestedBarcode: "6223000231227",
+			ReasonAR: "تشابه متوسط",
+		})
+	if err != nil || elig == nil {
+		t.Fatal(err)
+	}
+	skip, err := q.EnqueueMatch(context.Background(), "tenant-adeco",
+		matcher.Query{SKUName: "مجهول", Barcode: "9999999999999", Rows: 1, Value: 10},
+		matcher.Result{Decision: matcher.DecisionNone, Confidence: 0})
+	if err != nil || skip == nil {
+		t.Fatal(err)
+	}
+
+	req := withClaims(httptest.NewRequest(http.MethodGet, "/api/v1/product-match/review?status=pending", nil), domain.RoleVendorAdmin)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list %d %s", rec.Code, rec.Body.String())
+	}
+	var listResp struct {
+		Items []matcher.ReviewItem `json:"items"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &listResp)
+	if len(listResp.Items) != 2 || listResp.Items[0].ID != elig.ID {
+		t.Fatalf("expected high-value first: %+v", listResp.Items)
+	}
+
+	body := `{"ids":["` + elig.ID + `","` + skip.ID + `"],"status":"approved","reason_ar":"اعتماد جماعي"}`
+	req = withClaims(httptest.NewRequest(http.MethodPost, "/api/v1/product-match/review/bulk-decide", bytes.NewBufferString(body)), domain.RoleVendorAdmin)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("bulk %d %s", rec.Code, rec.Body.String())
+	}
+	var bulk struct {
+		Approved int             `json:"approved"`
+		Skipped  int             `json:"skipped"`
+		Failed   int             `json:"failed"`
+		Metrics  matcher.Metrics `json:"metrics"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &bulk)
+	if bulk.Approved != 1 || bulk.Skipped != 1 || bulk.Failed != 0 {
+		t.Fatalf("%+v body=%s", bulk, rec.Body.String())
+	}
+	if bulk.Metrics.Approved != 1 || bulk.Metrics.InventedBarcodes != 0 {
+		t.Fatalf("metrics %+v", bulk.Metrics)
 	}
 }
 

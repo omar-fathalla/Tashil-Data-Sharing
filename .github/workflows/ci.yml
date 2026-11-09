@@ -1,31 +1,31 @@
-# Consolidated CI: backend Go + Flutter + Cloud Run pin guard.
-# Runs on Mohamed's self-hosted Mac runners (label tashil-mac). Deploy stays on deploy.yml (ubuntu-latest).
+# Consolidated CI: hybrid runners.
+# Light/fast → GitHub-hosted (vars.CI_HOSTED_RUNNER, default ubuntu-latest).
+# Heavy → Mac self-hosted (vars.CI_RUNS_ON, default ["self-hosted","macOS","tashil-mac"]).
+# NEVER use GitHub-hosted macOS runners (macos-latest) — expensive.
 #
-# Fallback if Mac is offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'
-# (Settings → Secrets and variables → Actions → Variables), or change runs-on below.
+# Budget fallback (no code change): set CI_HOSTED_RUNNER to the same JSON array as
+# CI_RUNS_ON, e.g. ["self-hosted","macOS","tashil-mac"] — ALL light jobs move to Mac.
+# CI_HOSTED_RUNNER accepts a JSON string ("ubuntu-latest") or a JSON label array.
 # See docs/ci-self-hosted.md.
+#
+# tashil-mac … tashil-mac-4 are four runners on one Mac — over-parallel heavy jobs
+# thrash Setup Node / flutter build. Keep light jobs on CI_HOSTED_RUNNER; heavy Mac
+# jobs use job concurrency group tashil-mac-heavy + opt-in MAC_SHARED_LOCK=1.
+# See docs/ci-self-hosted.md (Mac contention).
 name: CI tests
 
+# No workflow-level paths-ignore: docs-only PRs still start the workflow so required
+# check gates always report. Heavy jobs skip via dorny/paths-filter inside.
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "LICENSE"
-      - ".gitignore"
   pull_request:
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "LICENSE"
-      - ".gitignore"
 
-# Cancel superseded runs on the same ref (PR/branch). deploy.yml keeps
-# cancel-in-progress: false so production deploys are never interrupted.
+# Cancel superseded runs on the same PR/branch. Never cancel main.
+# deploy.yml keeps cancel-in-progress: false so production deploys are never interrupted.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -33,15 +33,37 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.41.2"
-  # Opt-in shared Mac lock (unset on dedicated tashil-ci). Set repo variable MAC_SHARED_LOCK=1 to enable.
+  # Opt-in shared Mac directory lock (cross-repo). Set repo variable MAC_SHARED_LOCK=1
+  # while multiple runners share one physical Mac — see docs/ci-self-hosted.md.
   MAC_SHARED_LOCK: ${{ vars.MAC_SHARED_LOCK }}
 
 jobs:
+  # Path filter so Flutter can skip on backend/docs-only PRs while required checks still report.
+  # Light job → hosted by default (CI_HOSTED_RUNNER).
+  changes:
+    name: Detect path changes
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    outputs:
+      flutter: ${{ steps.filter.outputs.flutter }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            flutter:
+              - 'tashil_web/**'
+              - 'scripts/ci_detect_flutter.sh'
+              - 'scripts/ci_runner_env.sh'
+              - 'scripts/ci_pub_cache_isolation_test.sh'
+              - '.github/workflows/ci.yml'
+
   # Stopgap until shared storage (#37): refuse deploy commands that omit or change the 1-instance pin.
-  # Fallback if Mac offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
   guard-cloud-run-one-instance:
     name: Cloud Run one-instance pin
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: Assert deploy pins min/max=1
@@ -49,9 +71,9 @@ jobs:
 
   test-backend:
     name: Backend Go tests
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
-    # Room for acquire wait (≤110m) + tests; acquire step has its own shorter timeout.
-    timeout-minutes: 240
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    # ~20m class with emulator headroom (observed github-hosted go ~6m).
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: backend-go
@@ -62,17 +84,18 @@ jobs:
         working-directory: .
         run: bash scripts/ci_runner_env.sh
 
-      # Shared Mac lock (opt-in via MAC_SHARED_LOCK). timeout < job so if:always release runs.
+      # Shared Mac lock (opt-in via MAC_SHARED_LOCK). No-ops on hosted / when unset.
+      # timeout < job so if:always release runs.
       - name: Acquire Mac resource lock
         id: mac_lock
-        timeout-minutes: 110
+        timeout-minutes: 10
         working-directory: .
         run: |
           set -euo pipefail
           AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
           echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
           chmod +x scripts/mac_lock_ci.sh
-          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "backend-go+firestore-emulator" 45 120
+          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "backend-go+firestore-emulator" 15 10
 
       # On self-hosted Mac, GOMODCACHE/GOCACHE already live on the shared home disk.
       # Remote actions/cache for setup-go was ~880MB and stalled (~10m at 0 B/s).
@@ -190,10 +213,17 @@ jobs:
           bash scripts/mac_lock_ci.sh release "$AGENT"
 
   test-flutter:
-    name: Flutter analyze & test
-    # Opt-in Mac lock (MAC_SHARED_LOCK). Tradeoff when enabled: serializes vs Go/smoke.
+    # Heavy run only when Flutter/web/CI paths change. Required check is the gate job below.
+    needs: changes
+    if: needs.changes.outputs.flutter == 'true'
+    # Serialize with other Mac heavies in this repo (smoke / deploy). Does not cancel.
+    # Cross-repo: also set MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
+    concurrency:
+      group: tashil-mac-heavy
+      cancel-in-progress: false
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
-    timeout-minutes: 180
+    # 35m: up to 8m lock wait + pub/analyze/test (20m was too tight with lock).
+    timeout-minutes: 35
     defaults:
       run:
         working-directory: tashil_web
@@ -204,18 +234,26 @@ jobs:
         working-directory: .
         run: bash scripts/ci_runner_env.sh
 
+      - name: Assert PUB_CACHE isolation
+        working-directory: .
+        run: |
+          chmod +x scripts/ci_pub_cache_isolation_test.sh
+          bash scripts/ci_pub_cache_isolation_test.sh --assert
+          bash scripts/ci_pub_cache_isolation_test.sh
+
       - name: Acquire Mac resource lock
         id: mac_lock
-        timeout-minutes: 110
+        timeout-minutes: 8
         working-directory: .
         run: |
           set -euo pipefail
           AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
           echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
           chmod +x scripts/mac_lock_ci.sh
-          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "flutter-analyze-test" 25 120
+          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "flutter-analyze-test" 12 8
 
-      # Prefer $HOME/toolchains/flutter; avoid flutter-action+cache on self-hosted (runner dropouts).
+      # Prefer $HOME/toolchains/flutter; never download via flutter-action on self-hosted.
+      # PUB_CACHE is forced to $RUNNER_TEMP/pub-cache by scripts/ci_runner_env.sh (ignores presets).
       - name: Detect preinstalled Flutter
         id: flutter_pre
         working-directory: .
@@ -225,23 +263,30 @@ jobs:
           chmod +x scripts/ci_detect_flutter.sh
           bash scripts/ci_detect_flutter.sh
 
+      - name: Require preinstalled Flutter on self-hosted
+        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment == 'self-hosted'
+        run: |
+          echo "::error::Preinstalled Flutter ${{ env.FLUTTER_VERSION }} missing on self-hosted runner. Install at \$HOME/toolchains/flutter — do not download via flutter-action (drops Mac runners)."
+          exit 1
+
       - uses: subosito/flutter-action@v2
-        if: steps.flutter_pre.outputs.use_action == 'true'
-        timeout-minutes: 20
+        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment != 'self-hosted'
+        timeout-minutes: 15
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: false
 
-      # Self-hosted: PUB_CACHE=$HOME/toolchains/pub-cache (ci_runner_env.sh); skip remote cache.
+      # Self-hosted: local PUB_CACHE only (skip remote actions/cache — stalls / races on Mac).
+      # GitHub-hosted: cache the same isolated path ci_runner_env.sh sets (never ~/.pub-cache).
       - name: Cache pub dependencies
         if: runner.environment != 'self-hosted'
         uses: actions/cache@v4
         with:
-          path: ~/.pub-cache
-          key: ${{ runner.os }}-${{ runner.arch }}-pub-${{ hashFiles('tashil_web/pubspec.lock') }}
+          path: ${{ runner.temp }}/pub-cache
+          key: ${{ runner.os }}-${{ runner.arch }}-pub-isolated-v1-${{ hashFiles('tashil_web/pubspec.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-pub-
+            ${{ runner.os }}-${{ runner.arch }}-pub-isolated-v1-
 
       - run: flutter pub get
       - name: flutter analyze
@@ -252,16 +297,16 @@ jobs:
         run: flutter test --concurrency=2
 
       - name: Surface failure summary
-        if: failure() && steps.flutter_test.outcome == 'failure'
+        if: failure()
         run: |
           {
-            echo "## Flutter tests failed"
+            echo "## Flutter job failed"
             echo ""
-            echo "\`flutter test\` failed on branch \`${{ github.ref_name }}\`."
+            echo "Flutter analyze/test (or pub get) failed on branch \`${{ github.ref_name }}\`."
             echo "Reproduce locally:"
             echo ""
             echo '```bash'
-            echo 'cd tashil_web && flutter test'
+            echo 'cd tashil_web && flutter pub get && flutter analyze && flutter test'
             echo '```'
             echo ""
             echo "Proposed next step: fix on this PR branch and push — do not auto-push fixes to main."
@@ -275,11 +320,35 @@ jobs:
           AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
           bash scripts/mac_lock_ci.sh release "$AGENT"
 
+  # Required-check gate: always reports "Flutter analyze & test" (success on path skip).
+  test-flutter-gate:
+    name: Flutter analyze & test
+    needs: [changes, test-flutter]
+    if: always() && !cancelled()
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate Flutter path filter / run result
+        run: |
+          set -euo pipefail
+          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            echo "::error::Detect path changes failed (${{ needs.changes.result }})"
+            exit 1
+          fi
+          if [[ "${{ needs.changes.outputs.flutter }}" != "true" ]]; then
+            echo "Skipped — no Flutter/web/workflow path changes"
+            exit 0
+          fi
+          result="${{ needs.test-flutter.result }}"
+          echo "test-flutter result=${result}"
+          [[ "${result}" == "success" ]]
+
   comment-on-pr-failure:
     name: Comment PR when tests fail
     needs: [test-backend, test-flutter]
     if: always() && github.event_name == 'pull_request' && (needs.test-backend.result == 'failure' || needs.test-flutter.result == 'failure')
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 5
     steps:
       - name: Post failure comment
         uses: actions/github-script@v7

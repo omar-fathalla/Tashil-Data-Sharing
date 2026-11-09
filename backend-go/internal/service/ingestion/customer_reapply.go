@@ -235,6 +235,18 @@ func archiveMonths(f ArchivedFile) []string {
 	return out
 }
 
+// SellOutMonths returns distinct Sell-Out calendar months (1..12) with facts for tenant/year.
+// Used by GET /api/v1/sell-out/months so competitor comparison grows as uploads add months.
+func (p *Processor) SellOutMonths(tenantID string, year int) []int {
+	type sellOutMonthLister interface {
+		SellOutMonths(tenantID string, year int) []int
+	}
+	if lister, ok := p.bqRepo.(sellOutMonthLister); ok && p.bqRepo != nil {
+		return lister.SellOutMonths(tenantID, year)
+	}
+	return nil
+}
+
 // SellInYears returns the years that have counted Sell-In rows or archived files with counted rows.
 // A file whose rows are all quarantined (rows_ingested = 0) adds no year.
 func (p *Processor) SellInYears(tenantID string) []int {

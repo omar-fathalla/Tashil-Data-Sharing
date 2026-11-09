@@ -30,16 +30,17 @@ func filterIsAll(s string) bool {
 }
 
 // recordsFromBigQuery answers the explorer from BigQuery. ok=false means "use the in-memory path":
-// no querier, a filter that needs Go-side normalisation (search text, category), a BigQuery error
-// or timeout, or an empty BigQuery result (memory may still hold rows, e.g. right after an upload).
+// no querier, a search-text filter (still Go-side), a BigQuery error or timeout, or an empty
+// BigQuery result (memory may still hold rows, e.g. right after an upload). Category is pushed
+// into BigQuery via NormalizeProductCategory aliases so the explorer stays sub-second.
 func (h *AnalyticsHandler) recordsFromBigQuery(ctx context.Context, tenantID string, f bigquery.RecordFilter, limit, offset int) (*PaginatedRecordsResponse, bool) {
-	if h.records == nil || strings.TrimSpace(f.SearchQuery) != "" || !filterIsAll(f.Category) {
+	if h.records == nil || strings.TrimSpace(f.SearchQuery) != "" {
 		return nil, false
 	}
 	c, cancel := context.WithTimeout(ctx, recordsBQTimeout)
 	defer cancel()
 	res, err := h.records.QuerySellOutRecords(c, bqsink.RecordsQuery{
-		TenantID: tenantID, Chain: f.RetailerChain, Store: f.StoreID, Supplier: f.Supplier,
+		TenantID: tenantID, Chain: f.RetailerChain, Store: f.StoreID, Category: f.Category, Supplier: f.Supplier,
 		StartDate: f.StartDate, EndDate: f.EndDate, Limit: limit, Offset: offset,
 	})
 	if err != nil {

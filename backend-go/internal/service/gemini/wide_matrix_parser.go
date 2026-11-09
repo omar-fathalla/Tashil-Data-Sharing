@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/branchnorm"
 )
 
 type xlsxWorkbookXML struct {
@@ -41,6 +42,7 @@ type wideMatrixLayout struct {
 	barcodeIdx  int
 	skuIdx      int
 	totalRevIdx int
+	totalQtyIdx int // اجمالى كميات (file qty total; informational — branch qty cols are truth)
 	monthIdx    int
 	yearIdx     int
 	dateIdx     int
@@ -66,6 +68,9 @@ type parsedSheetSummary struct {
 	adcoUnits  int
 	marketRev  float64
 	storeCount int
+	// preferOverFullYear marks summaries from a month-named physical tab; those
+	// win period-coverage dedupe against overlapping full-year / split periods.
+	preferOverFullYear bool
 }
 
 // parseWideMatrixXLSX inspects an .xlsx archive for the Fathalla / Adco Wide Branch-Pivot Matrix structure
@@ -93,29 +98,21 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		return nil, false
 	}
 
-	explicitFileYear := inferYearFromText(filename, 0)
-	hasMatchingFileYearSheet := false
-	if explicitFileYear >= 2020 && len(sheetEntries) > 1 {
-		for _, entry := range sheetEntries {
-			if inferYearFromText(entry.name, 0) == explicitFileYear {
-				hasMatchingFileYearSheet = true
-				break
-			}
-		}
+	sheetNames := make([]string, 0, len(sheetEntries))
+	for _, entry := range sheetEntries {
+		sheetNames = append(sheetNames, entry.name)
 	}
+	selection := buildSheetSelectionPlan(filename, sheetNames)
 
 	var visibleWideSheets []parsedSheetSummary
 	var allWideSheets []parsedSheetSummary
 	var virtualEntries []wbSheetEntry
 
 	for _, entry := range sheetEntries {
-		// If the workbook filename explicitly targets a year (e.g. "2026 out.xlsx") and contains a matching sheet ("sale out2026"),
-		// skip leftover full-year sheets from a different year ("sale out2025") so multi-file archives never double-count 2025.
-		if hasMatchingFileYearSheet {
-			entryYear := inferYearFromText(entry.name, 0)
-			if entryYear >= 2020 && entryYear != explicitFileYear && parseSmartMonthToken(entry.name) == 0 {
-				continue
-			}
+		// Open-sheet gate only: leftover other-year full-year dumps. Same-year
+		// monthly vs yearly overlap is resolved by period coverage after parse.
+		if !selection.shouldIncludeSheet(entry.name) {
+			continue
 		}
 		sampleRows, err := readWorksheetSampleRows(entry.file, sharedStrings, wideMatrixHeaderScanRows+2)
 		if err != nil || len(sampleRows) < 2 {
@@ -143,11 +140,14 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		// even if their headers were unlabeled, non-standard, or placed anywhere in the sheet.
 		inferTemporalColumnsFromData(rows, &layout)
 
+		preferMonthly := isMonthNamedSheetName(entry.name)
+
 		// If a single wide sheet contains multiple months/years across rows (e.g. "2025 out.xlsx" with MONTH=jan,feb,mar,apr and YEAR=2025),
 		// split it into virtual chronological monthly sheets so every month is preserved with 100% accuracy!
 		splitSummaries := splitWideSheetByRowPeriods(filename, entry.name, entry.state, rows, layout)
 		if len(splitSummaries) > 0 {
 			for _, sub := range splitSummaries {
+				sub.preferOverFullYear = preferMonthly
 				allWideSheets = append(allWideSheets, sub)
 				if entry.state != "hidden" {
 					visibleWideSheets = append(visibleWideSheets, sub)
@@ -175,13 +175,14 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		}
 
 		summary := parsedSheetSummary{
-			sheetName:  entry.name,
-			sheetDate:  sheetDate,
-			state:      entry.state,
-			rows:       rows,
-			layout:     layout,
-			isWide:     true,
-			storeCount: len(layout.branches),
+			sheetName:          entry.name,
+			sheetDate:          sheetDate,
+			state:              entry.state,
+			rows:               rows,
+			layout:             layout,
+			isWide:             true,
+			storeCount:         len(layout.branches),
+			preferOverFullYear: preferMonthly,
 		}
 		// Compute quick monthly totals for trend & MoM/YoY
 		computeQuickSheetTotals(&summary)
@@ -192,6 +193,13 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		virtualEntries = append(virtualEntries, entry)
 	}
 
+	if len(allWideSheets) == 0 {
+		return nil, false
+	}
+
+	// Prefer valid month-named periods; keep uncovered months from full-year dumps.
+	allWideSheets = dedupeSheetsByPeriodCoverage(allWideSheets)
+	visibleWideSheets = dedupeSheetsByPeriodCoverage(visibleWideSheets)
 	if len(allWideSheets) == 0 {
 		return nil, false
 	}
@@ -356,6 +364,7 @@ func detectWideMatrixHeader(headerRow []string, retailer string) (wideMatrixLayo
 		barcodeIdx:  -1,
 		skuIdx:      -1,
 		totalRevIdx: -1,
+		totalQtyIdx: -1,
 		monthIdx:    -1,
 		yearIdx:     -1,
 		dateIdx:     -1,
@@ -379,7 +388,9 @@ func detectWideMatrixHeader(headerRow []string, retailer string) (wideMatrixLayo
 			layout.barcodeIdx = idx
 		case layout.skuIdx < 0 && (h == "الصنف" || h == "اسم الصنف" || strings.EqualFold(h, "Item") || strings.EqualFold(h, "SKU")):
 			layout.skuIdx = idx
-		case layout.totalRevIdx < 0 && idx > 3 && (strings.Contains(h, "الاجمال") || strings.Contains(h, "الإجمال") || strings.Contains(h, "اجمالى") || strings.Contains(h, "إجمالي") || strings.EqualFold(h, "Total")):
+		case layout.totalQtyIdx < 0 && idx > 3 && isTotalQuantityHeader(h):
+			layout.totalQtyIdx = idx
+		case layout.totalRevIdx < 0 && idx > 3 && !isTotalQuantityHeader(h) && (strings.Contains(h, "الاجمال") || strings.Contains(h, "الإجمال") || strings.Contains(h, "اجمالى") || strings.Contains(h, "إجمالي") || strings.EqualFold(h, "Total")):
 			layout.totalRevIdx = idx
 		case layout.monthIdx < 0 && (hLower == "month" || hLower == "months" || hLower == "sales month" || h == "الشهر" || h == "شهر" || h == "شهر البيع"):
 			layout.monthIdx = idx
@@ -395,15 +406,18 @@ func detectWideMatrixHeader(headerRow []string, retailer string) (wideMatrixLayo
 		return layout, false
 	}
 
-	// Collect quantity columns after totalRevIdx
+	// Collect quantity columns after totalRevIdx (skip MONTH/YEAR/DATE and اجمالى كميات)
 	qtyColByNormBranch := make(map[string]int)
 	var orderedQtyCols []int
 	for idx := layout.totalRevIdx + 1; idx < len(headerRow); idx++ {
-		if idx == layout.monthIdx || idx == layout.yearIdx || idx == layout.dateIdx {
+		if idx == layout.monthIdx || idx == layout.yearIdx || idx == layout.dateIdx || idx == layout.totalQtyIdx {
 			continue
 		}
 		h := strings.TrimSpace(headerRow[idx])
-		if h == "" {
+		if h == "" || isTotalQuantityHeader(h) {
+			if isTotalQuantityHeader(h) && layout.totalQtyIdx < 0 {
+				layout.totalQtyIdx = idx
+			}
 			continue
 		}
 		if strings.HasPrefix(h, "كمية") || strings.HasPrefix(h, "كميه") || strings.HasPrefix(strings.ToLower(h), "qty") {
@@ -450,6 +464,19 @@ func detectWideMatrixHeader(headerRow []string, retailer string) (wideMatrixLayo
 	return layout, true
 }
 
+// Shared across every Sell-In / Sell-Out row: rebuilding NewReplacer per call was measurable on
+// large GP SOP exports (in26 ≈ 40k rows × 2 BuildBranchStoreMetadata calls).
+var branchKeyReplacer = strings.NewReplacer(
+	" ", "",
+	"-", "",
+	"_", "",
+	"أ", "ا",
+	"إ", "ا",
+	"آ", "ا",
+	"ى", "ي",
+	"ة", "ه",
+)
+
 func normalizeBranchKey(s string) string {
 	cleaned := strings.TrimSpace(s)
 	for _, prefix := range []string{
@@ -461,21 +488,61 @@ func normalizeBranchKey(s string) string {
 	} {
 		cleaned = strings.TrimSpace(strings.TrimPrefix(cleaned, prefix))
 	}
-	replacer := strings.NewReplacer(
-		" ", "",
-		"-", "",
-		"_", "",
-		"أ", "ا",
-		"إ", "ا",
-		"آ", "ا",
-		"ى", "ي",
-		"ة", "ه",
-	)
-	return strings.ToLower(replacer.Replace(cleaned))
+	return strings.ToLower(branchKeyReplacer.Replace(cleaned))
+}
+
+type knownBranchSlug struct {
+	slug, gov, city string
+}
+
+// knownBranchSlugMap is built once: previously BuildBranchStoreMetadata rebuilt this map (and
+// re-normalized every key) on each of ~80k calls for in26.xlsx — the dominant cost before
+// data-quality / product-match / BQ upsert on Adeco prod (~5 min of a 5m37s job).
+var knownBranchSlugMap = map[string]knownBranchSlug{
+	normalizeBranchKey("سموحة"):                  {"smouha", "الإسكندرية", "سموحة"},
+	normalizeBranchKey("سموحة ميني"):             {"smouha_mini", "الإسكندرية", "سموحة"},
+	normalizeBranchKey("جاردينيا"):               {"gardenia", "الإسكندرية", "جاردينيا"},
+	normalizeBranchKey("هانوفيل"):                {"hanoville", "الإسكندرية", "العجمي - هانوفيل"},
+	normalizeBranchKey("نهال فيل"):               {"hanoville", "الإسكندرية", "العجمي - هانوفيل"},
+	normalizeBranchKey("أكتوبر"):                 {"october", "الجيزة", "السادس من أكتوبر"},
+	normalizeBranchKey("طنطا"):                   {"tanta", "الغربية", "طنطا"},
+	normalizeBranchKey("طنطا - اوت ليت مول"):     {"tanta_outlet", "الغربية", "طنطا"},
+	normalizeBranchKey("عجمي ستار"):              {"agamy_star", "الإسكندرية", "العجمي"},
+	normalizeBranchKey("الإبراهيمية"):            {"ibrahimia", "الإسكندرية", "الإبراهيمية"},
+	normalizeBranchKey("الإبراهيمية ميني"):       {"ibrahimia_mini", "الإسكندرية", "الإبراهيمية"},
+	normalizeBranchKey("سيدي جابر ميني"):         {"sidi_gaber_mini", "الإسكندرية", "سيدي جابر"},
+	normalizeBranchKey("سيدي جابر المحطة"):       {"sidi_gaber_station", "الإسكندرية", "سيدي جابر"},
+	normalizeBranchKey("كفر الدوار"):             {"kafr_eldawar", "البحيرة", "كفر الدوار"},
+	normalizeBranchKey("كفر الدوار - مول"):       {"kafr_eldawar_mall", "البحيرة", "كفر الدوار"},
+	normalizeBranchKey("مطروح"):                  {"matrouh", "مرسى مطروح", "مطروح"},
+	normalizeBranchKey("دمنهور الأندلس"):         {"damanhour_andalus", "البحيرة", "دمنهور"},
+	normalizeBranchKey("دمنهور - الاستاد"):       {"damanhour_stadium", "البحيرة", "دمنهور"},
+	normalizeBranchKey("الأنفوشي"):               {"anfoushy", "الإسكندرية", "الأنفوشي"},
+	normalizeBranchKey("المحلة الكبرى"):          {"mahalla", "الغربية", "المحلة الكبرى"},
+	normalizeBranchKey("فلمنج"):                  {"fleming", "الإسكندرية", "فلمنج"},
+	normalizeBranchKey("الدخيلة ميني"):           {"dekheila_mini", "الإسكندرية", "الدخيلة"},
+	normalizeBranchKey("الدخيلة مينى 2"):         {"dekheila_mini_2", "الإسكندرية", "الدخيلة"},
+	normalizeBranchKey("سيدي بشر ميني"):          {"sidi_bishr_mini", "الإسكندرية", "سيدي بشر"},
+	normalizeBranchKey("روزانا"):                 {"rozana", "الإسكندرية", "سموحة - روزانا"},
+	normalizeBranchKey("النصر"):                  {"elnasr", "الإسكندرية", "شارع النصر"},
+	normalizeBranchKey("طوسون"):                  {"toson", "الإسكندرية", "أبو قير - طوسون"},
+	normalizeBranchKey("ابو يوسف"):               {"abu_youssef", "الإسكندرية", "العجمي - أبو يوسف"},
+	normalizeBranchKey("ستانلى"):                 {"stanley", "الإسكندرية", "ستانلي"},
+	normalizeBranchKey("ستانلي"):                 {"stanley", "الإسكندرية", "ستانلي"},
+	normalizeBranchKey("أمواج - الساحل الشمالي"): {"amwaj_north_coast", "الساحل الشمالي", "أمواج"},
+	normalizeBranchKey("ملك حفنى"):               {"malak_hefny", "الإسكندرية", "ملك حفني"},
+	normalizeBranchKey("سيتي سكوير"):             {"city_square", "الإسكندرية", "سيتي سكوير"},
+	normalizeBranchKey("مدينة الرحاب"):           {"rehab_city", "القاهرة", "مدينة الرحاب"},
+	normalizeBranchKey("نيس2"):                   {"nice_2", "الإسكندرية", "نيس"},
+	normalizeBranchKey("دمياط الجديدة"):          {"new_damietta", "دمياط", "دمياط الجديدة"},
+	normalizeBranchKey("المعادي"):                {"maadi", "القاهرة", "المعادي"},
+	normalizeBranchKey("الدقي"):                  {"dokki", "الجيزة", "الدقي"},
+	normalizeBranchKey("مدينة نصر"):             {"nasr_city", "القاهرة", "مدينة نصر"},
 }
 
 // BuildBranchStoreMetadata maps any raw branch name from Excel (or creates a new deterministic branch)
 // with full Egyptian geographic classification (Governorate, City, StoreID, DisplayName).
+// Arabic/English abbreviations are expanded via branchnorm before the frozen slug lookup.
 func BuildBranchStoreMetadata(retailer, rawBranch string) domain.Store {
 	clean := strings.TrimSpace(rawBranch)
 	if clean == "" {
@@ -486,48 +553,51 @@ func BuildBranchStoreMetadata(retailer, rawBranch string) domain.Store {
 		chain = "fathalla"
 	}
 
-	norm := normalizeBranchKey(clean)
-
-	// Known Fathalla & Egyptian retail branches with exact deterministic IDs
-	knownSlugMap := map[string]struct {
-		slug, gov, city string
-	}{
-		normalizeBranchKey("سموحة"):                    {"smouha", "الإسكندرية", "سموحة"},
-		normalizeBranchKey("سموحة ميني"):               {"smouha_mini", "الإسكندرية", "سموحة"},
-		normalizeBranchKey("جاردينيا"):                 {"gardenia", "الإسكندرية", "جاردينيا"},
-		normalizeBranchKey("هانوفيل"):                  {"hanoville", "الإسكندرية", "العجمي - هانوفيل"},
-		normalizeBranchKey("نهال فيل"):                 {"hanoville", "الإسكندرية", "العجمي - هانوفيل"},
-		normalizeBranchKey("أكتوبر"):                   {"october", "الجيزة", "السادس من أكتوبر"},
-		normalizeBranchKey("طنطا"):                     {"tanta", "الغربية", "طنطا"},
-		normalizeBranchKey("طنطا - اوت ليت مول"):       {"tanta_outlet", "الغربية", "طنطا"},
-		normalizeBranchKey("عجمي ستار"):                {"agamy_star", "الإسكندرية", "العجمي"},
-		normalizeBranchKey("الإبراهيمية"):              {"ibrahimia", "الإسكندرية", "الإبراهيمية"},
-		normalizeBranchKey("الإبراهيمية ميني"):         {"ibrahimia_mini", "الإسكندرية", "الإبراهيمية"},
-		normalizeBranchKey("سيدي جابر ميني"):           {"sidi_gaber_mini", "الإسكندرية", "سيدي جابر"},
-		normalizeBranchKey("سيدي جابر المحطة"):         {"sidi_gaber_station", "الإسكندرية", "سيدي جابر"},
-		normalizeBranchKey("كفر الدوار"):               {"kafr_eldawar", "البحيرة", "كفر الدوار"},
-		normalizeBranchKey("كفر الدوار - مول"):         {"kafr_eldawar_mall", "البحيرة", "كفر الدوار"},
-		normalizeBranchKey("مطروح"):                    {"matrouh", "مرسى مطروح", "مطروح"},
-		normalizeBranchKey("دمنهور الأندلس"):           {"damanhour_andalus", "البحيرة", "دمنهور"},
-		normalizeBranchKey("دمنهور - الاستاد"):         {"damanhour_stadium", "البحيرة", "دمنهور"},
-		normalizeBranchKey("الأنفوشي"):                 {"anfoushy", "الإسكندرية", "الأنفوشي"},
-		normalizeBranchKey("المحلة الكبرى"):            {"mahalla", "الغربية", "المحلة الكبرى"},
-		normalizeBranchKey("فلمنج"):                    {"fleming", "الإسكندرية", "فلمنج"},
-		normalizeBranchKey("الدخيلة ميني"):             {"dekheila_mini", "الإسكندرية", "الدخيلة"},
-		normalizeBranchKey("الدخيلة مينى 2"):           {"dekheila_mini_2", "الإسكندرية", "الدخيلة"},
-		normalizeBranchKey("سيدي بشر ميني"):            {"sidi_bishr_mini", "الإسكندرية", "سيدي بشر"},
-		normalizeBranchKey("روزانا"):                   {"rozana", "الإسكندرية", "سموحة - روزانا"},
-		normalizeBranchKey("النصر"):                    {"elnasr", "الإسكندرية", "شارع النصر"},
-		normalizeBranchKey("طوسون"):                    {"toson", "الإسكندرية", "أبو قير - طوسون"},
-		normalizeBranchKey("ابو يوسف"):                 {"abu_youssef", "الإسكندرية", "العجمي - أبو يوسف"},
-		normalizeBranchKey("ستانلى"):                   {"stanley", "الإسكندرية", "ستانلي"},
-		normalizeBranchKey("أمواج - الساحل الشمالي"):   {"amwaj_north_coast", "الساحل الشمالي", "أمواج"},
-		normalizeBranchKey("ملك حفنى"):                 {"malak_hefny", "الإسكندرية", "ملك حفني"},
-		normalizeBranchKey("سيتي سكوير"):               {"city_square", "الإسكندرية", "سيتي سكوير"},
-		normalizeBranchKey("مدينة الرحاب"):             {"rehab_city", "القاهرة", "مدينة الرحاب"},
-		normalizeBranchKey("نيس2"):                     {"nice_2", "الإسكندرية", "نيس"},
-		normalizeBranchKey("دمياط الجديدة"):            {"new_damietta", "دمياط", "دمياط الجديدة"},
+	// Synthetic reconciliation bucket for value not present in any named branch column.
+	if isUnallocatedBranchName(clean) {
+		prefix := "fat"
+		switch chain {
+		case "carrefour":
+			prefix = "crf"
+		case "gomla":
+			prefix = "gom"
+		case "beet-elgomla", "beet_elgomla":
+			prefix = "bet"
+		case "spinneys":
+			prefix = "spi"
+		case "metro":
+			prefix = "met"
+		case "seoudi":
+			prefix = "seo"
+		case "kazyon":
+			prefix = "kaz"
+		default:
+			if chain != "fathalla" {
+				if p := storeIDPrefixForChain(chain); p != "" {
+					prefix = p
+				}
+			}
+		}
+		return domain.Store{
+			ID:          fmt.Sprintf("%s_unallocated", prefix),
+			Chain:       chain,
+			BranchName:  UnallocatedBranchName,
+			Governorate: "غير محدد",
+			City:        UnallocatedBranchName,
+			IsActive:    true,
+		}
 	}
+
+	// Phase A5: expand abbreviations / English → canonical Arabic short name.
+	var bn branchnorm.Result
+	if canon, known, r := canonicalizeBranchForStore(clean); known {
+		clean = canon
+		bn = r
+	} else {
+		bn = r
+	}
+
+	norm := normalizeBranchKey(clean)
 
 	prefix := "fat"
 	chainLabel := "فرع فتح الله"
@@ -569,13 +639,33 @@ func BuildBranchStoreMetadata(retailer, rawBranch string) domain.Store {
 		displayName = fmt.Sprintf("%s - %s", chainLabel, clean)
 	}
 
-	if info, ok := knownSlugMap[norm]; ok {
+	if info, ok := knownBranchSlugMap[norm]; ok {
 		return domain.Store{
 			ID:          fmt.Sprintf("%s_%s", prefix, info.slug),
 			Chain:       chain,
 			BranchName:  displayName,
 			Governorate: info.gov,
 			City:        info.city,
+			IsActive:    true,
+		}
+	}
+
+	// branchnorm knew a slug that isn't in the legacy map yet — still use frozen slug form.
+	if bn.Slug != "" {
+		gov := bn.Governorate
+		city := bn.City
+		if gov == "" {
+			gov = inferGovernorateFromBranch(clean)
+		}
+		if city == "" {
+			city = clean
+		}
+		return domain.Store{
+			ID:          fmt.Sprintf("%s_%s", prefix, bn.Slug),
+			Chain:       chain,
+			BranchName:  displayName,
+			Governorate: gov,
+			City:        city,
 			IsActive:    true,
 		}
 	}
@@ -1159,14 +1249,16 @@ func buildPayloadFromWideMatrix(
 	var anomalies []domain.IngestionAnomaly
 	var computedPricing []domain.PricingComplianceItem
 	var computedOOS []domain.OOSAlert
+	reconByMonth := make(map[string]*monthReconAgg)
+	sawUnallocated := false
 
 	type adcoSKUZeroBranch struct {
-		barcode       string
-		skuName       string
-		category      string
-		totalRev      float64
-		activeStores  int
-		zeroBranches  []branchColumnPair
+		barcode      string
+		skuName      string
+		category     string
+		totalRev     float64
+		activeStores int
+		zeroBranches []branchColumnPair
 	}
 	var oosCandidates []adcoSKUZeroBranch
 
@@ -1210,86 +1302,34 @@ func buildPayloadFromWideMatrix(
 			categorySet[rawCat] = true
 		}
 
-		// Pass 1 across branches for this SKU: collect branch revenues, quantities, and unit prices
-		// so we can infer the standard product price (RRP / سعر المنتج) and branch selling price (سعر البيع)
-		type branchObservation struct {
-			branch    branchColumnPair
-			rev       float64
-			qty       int
-			unitPrice float64
+		activeObs, zeroBranches, recon := collectWideRowBranchObservations(row, layout, retailer, &anomalies, rIdx, rawSKU)
+		monthKey := primary.sheetDate
+		if len(monthKey) >= 7 {
+			monthKey = monthKey[:7]
 		}
-		var activeObs []branchObservation
-		var zeroBranches []branchColumnPair
-		rowTotalRev := 0.0
-		rowTotalQty := 0
-
-		// Price frequency map (rounded to 0.5 EGP) to infer the modal/standard product price (سعر المنتج الأساسي)
-		priceFreq := make(map[float64]int)
-		maxUnitPrice := 0.0
-
-		for _, b := range layout.branches {
-			bRev := parseRevenueFloat(getCell(row, b.revColIdx))
-			bQty := parseQuantityInt(getCell(row, b.qtyColIdx))
-
-			if bRev < 0 || bQty < 0 {
-				anomalies = append(anomalies, domain.IngestionAnomaly{
-					RowNumber:   rIdx,
-					IssueType:   "negative_sales",
-					Description: fmt.Sprintf("قيمة أو كمية سالبة في فرع %s للصنف %s", b.rawBranchName, rawSKU),
-				})
-				continue
-			}
-
-			if bRev == 0 && bQty == 0 {
-				zeroBranches = append(zeroBranches, b)
-				continue
-			}
-
-			if bQty == 0 && bRev > 0 {
-				bQty = 1
-			}
-			uPrice := 0.0
-			if bQty > 0 && bRev > 0 {
-				uPrice = math.Round((bRev/float64(bQty))*100) / 100
-				roundedHalf := math.Round(uPrice*2) / 2
-				priceFreq[roundedHalf]++
-				if uPrice > maxUnitPrice {
-					maxUnitPrice = uPrice
-				}
-			}
-
-			rowTotalRev += bRev
-			rowTotalQty += bQty
-			activeObs = append(activeObs, branchObservation{
-				branch:    b,
-				rev:       bRev,
-				qty:       bQty,
-				unitPrice: uPrice,
-			})
+		accumulateMonthRecon(reconByMonth, monthKey, recon)
+		if math.Abs(recon.valueGap) > valueGapEpsilon {
+			sawUnallocated = true
 		}
 
-		// If branch cells were 0 but total column has value, fall back to total column
-		if rowTotalRev == 0 {
-			totColRev := parseRevenueFloat(getCell(row, layout.totalRevIdx))
-			if totColRev > 0 && len(layout.branches) > 0 {
-				rowTotalRev = totColRev
-				if rowTotalQty <= 0 {
-					rowTotalQty = 1
-				}
-				activeObs = append(activeObs, branchObservation{
-					branch:    layout.branches[0],
-					rev:       totColRev,
-					qty:       rowTotalQty,
-					unitPrice: math.Round((totColRev/float64(rowTotalQty))*100) / 100,
-				})
-			}
-		}
-
-		if rowTotalRev <= 0 && rowTotalQty <= 0 {
+		rowTotalRev, rowTotalQty := rowTotalsFromObservations(activeObs)
+		if rowTotalRev == 0 && rowTotalQty == 0 {
 			continue
 		}
 
-		// Infer Standard Product Price (RRP / سعر المنتج الأساسي) as the modal price across branches
+		// Infer Standard Product Price (RRP) as the modal price across named branches (skip unallocated).
+		priceFreq := make(map[float64]int)
+		maxUnitPrice := 0.0
+		for _, obs := range activeObs {
+			if isUnallocatedBranchName(obs.branch.rawBranchName) || obs.unitPrice <= 0 {
+				continue
+			}
+			roundedHalf := math.Round(obs.unitPrice*2) / 2
+			priceFreq[roundedHalf]++
+			if obs.unitPrice > maxUnitPrice {
+				maxUnitPrice = obs.unitPrice
+			}
+		}
 		inferredRRP := maxUnitPrice
 		bestFreq := 0
 		for pVal, freq := range priceFreq {
@@ -1302,7 +1342,6 @@ func buildPayloadFromWideMatrix(
 			inferredRRP = math.Round((rowTotalRev/float64(rowTotalQty))*100) / 100
 		}
 
-		// Accumulate Supplier & Category Market Share totals
 		totalMarketRev += rowTotalRev
 		categoryMarketTotals[rawCat] += rowTotalRev
 
@@ -1320,15 +1359,20 @@ func buildPayloadFromWideMatrix(
 		sAgg.skus[cleanedBarcode] = true
 
 		if isOwn {
-			// For tenant's own SKUs (e.g., ادكو (1)), emit individual branch-level records for every active branch!
+			namedObsCount := 0
+			for _, obs := range activeObs {
+				if !isUnallocatedBranchName(obs.branch.rawBranchName) {
+					namedObsCount++
+				}
+			}
 			avgBranchUnits := 0.0
-			if len(activeObs) > 0 {
-				avgBranchUnits = float64(rowTotalQty) / float64(len(activeObs))
+			if namedObsCount > 0 {
+				avgBranchUnits = float64(recon.branchQtySum) / float64(namedObsCount)
 			}
 
 			for _, obs := range activeObs {
 				uPrice := obs.unitPrice
-				if uPrice <= 0 {
+				if uPrice <= 0 && obs.qty > 0 {
 					uPrice = inferredRRP
 				}
 				records = append(records, domain.NormalizedRecord{
@@ -1347,7 +1391,9 @@ func buildPayloadFromWideMatrix(
 					DateFromFile:     primary.sheetDate != "",
 				})
 
-				// Generate Pricing & Promotion Compliance item if price variance exists or for top flagship branches
+				if isUnallocatedBranchName(obs.branch.rawBranchName) {
+					continue
+				}
 				if inferredRRP > 0 && uPrice > 0 {
 					deltaPct := domain.CalculatePriceDeltaPct(uPrice, inferredRRP)
 					vType := domain.ClassifyPriceViolation(deltaPct)
@@ -1377,43 +1423,82 @@ func buildPayloadFromWideMatrix(
 				}
 			}
 
-			// Track OOS candidates for top-selling Adco SKUs that have zero sales in specific branches
-			if len(zeroBranches) > 0 && len(activeObs) >= 8 && rowTotalRev >= 15000 {
+			if len(zeroBranches) > 0 && namedObsCount >= 8 && rowTotalRev >= 15000 {
 				oosCandidates = append(oosCandidates, adcoSKUZeroBranch{
 					barcode:      cleanedBarcode,
 					skuName:      rawSKU,
 					category:     rawCat,
 					totalRev:     rowTotalRev,
-					activeStores: len(activeObs),
+					activeStores: namedObsCount,
 					zeroBranches: zeroBranches,
 				})
 			}
 		} else {
-			// For competing suppliers, emit a consolidated market-intelligence record so their barcodes,
-			// categories, prices, and quantities are also searchable in the explorer without polluting Adco branch totals
+			// Competitors: keep one market-intel row for named-branch totals, plus a separate
+			// unallocated row when الاجمالى differs (permanent generic rule).
+			var namedRev float64
+			var namedQty int
 			topBranch := layout.branches[0]
 			bestBRev := -1.0
-			for _, obs := range activeObs {
+			var unallocObs *wideBranchObservation
+			for i := range activeObs {
+				obs := &activeObs[i]
+				if isUnallocatedBranchName(obs.branch.rawBranchName) {
+					unallocObs = obs
+					continue
+				}
+				namedRev += obs.rev
+				namedQty += obs.qty
 				if obs.rev > bestBRev {
 					bestBRev = obs.rev
 					topBranch = obs.branch
 				}
 			}
-			records = append(records, domain.NormalizedRecord{
-				RawStoreName:     topBranch.displayName,
-				ResolvedStoreID:  topBranch.storeID,
-				Barcode:          cleanedBarcode,
-				SKUName:          rawSKU,
-				Category:         rawCat,
-				Supplier:         rawSup,
-				IsOwnBrand:       false,
-				QuantitySold:     rowTotalQty,
-				NetRevenue:       rowTotalRev,
-				UnitPrice:        inferredRRP,
-				RecommendedPrice: inferredRRP,
-				TransactionDate:  primary.sheetDate,
-				DateFromFile:     primary.sheetDate != "",
-			})
+			if namedRev != 0 || namedQty != 0 {
+				// Preserve zero / negative aggregated qty on the stored record.
+				uPrice := inferredRRP
+				if uPrice <= 0 && namedRev != 0 {
+					priceQty := namedQty
+					if priceQty == 0 && namedRev > 0 {
+						priceQty = 1 // unit-price only; not stored
+					}
+					if priceQty != 0 {
+						uPrice = math.Round((namedRev/float64(priceQty))*100) / 100
+					}
+				}
+				records = append(records, domain.NormalizedRecord{
+					RawStoreName:     topBranch.displayName,
+					ResolvedStoreID:  topBranch.storeID,
+					Barcode:          cleanedBarcode,
+					SKUName:          rawSKU,
+					Category:         rawCat,
+					Supplier:         rawSup,
+					IsOwnBrand:       false,
+					QuantitySold:     namedQty,
+					NetRevenue:       math.Round(namedRev*100) / 100,
+					UnitPrice:        uPrice,
+					RecommendedPrice: uPrice,
+					TransactionDate:  primary.sheetDate,
+					DateFromFile:     primary.sheetDate != "",
+				})
+			}
+			if unallocObs != nil {
+				records = append(records, domain.NormalizedRecord{
+					RawStoreName:     unallocObs.branch.displayName,
+					ResolvedStoreID:  unallocObs.branch.storeID,
+					Barcode:          cleanedBarcode,
+					SKUName:          rawSKU,
+					Category:         rawCat,
+					Supplier:         rawSup,
+					IsOwnBrand:       false,
+					QuantitySold:     unallocObs.qty,
+					NetRevenue:       unallocObs.rev,
+					UnitPrice:        0,
+					RecommendedPrice: inferredRRP,
+					TransactionDate:  primary.sheetDate,
+					DateFromFile:     primary.sheetDate != "",
+				})
+			}
 		}
 	}
 
@@ -1459,30 +1544,36 @@ func buildPayloadFromWideMatrix(
 				categorySet[rawCat] = true
 			}
 
+			activeObs, _, recon := collectWideRowBranchObservations(row, shLayout, retailer, nil, rIdx, rawSKU)
+			monthKey := sh.sheetDate
+			if len(monthKey) >= 7 {
+				monthKey = monthKey[:7]
+			}
+			accumulateMonthRecon(reconByMonth, monthKey, recon)
+			if math.Abs(recon.valueGap) > valueGapEpsilon {
+				sawUnallocated = true
+			}
+			rowTotalRev, rowTotalQty := rowTotalsFromObservations(activeObs)
+			if rowTotalRev == 0 && rowTotalQty == 0 {
+				continue
+			}
+
 			if isOwn {
-				for _, b := range shLayout.branches {
-					bRev := parseRevenueFloat(getCell(row, b.revColIdx))
-					bQty := parseQuantityInt(getCell(row, b.qtyColIdx))
-					if bRev <= 0 && bQty <= 0 {
-						continue
-					}
-					if bQty == 0 && bRev > 0 {
-						bQty = 1
-					}
-					uPrice := 0.0
-					if bQty > 0 && bRev > 0 {
-						uPrice = math.Round((bRev/float64(bQty))*100) / 100
+				for _, obs := range activeObs {
+					uPrice := obs.unitPrice
+					if uPrice <= 0 && obs.qty > 0 && obs.rev > 0 {
+						uPrice = math.Round((obs.rev/float64(obs.qty))*100) / 100
 					}
 					records = append(records, domain.NormalizedRecord{
-						RawStoreName:     b.displayName,
-						ResolvedStoreID:  b.storeID,
+						RawStoreName:     obs.branch.displayName,
+						ResolvedStoreID:  obs.branch.storeID,
 						Barcode:          cleanedBarcode,
 						SKUName:          rawSKU,
 						Category:         rawCat,
 						Supplier:         rawSup,
 						IsOwnBrand:       true,
-						QuantitySold:     bQty,
-						NetRevenue:       bRev,
+						QuantitySold:     obs.qty,
+						NetRevenue:       obs.rev,
 						UnitPrice:        uPrice,
 						RecommendedPrice: uPrice,
 						TransactionDate:  sh.sheetDate,
@@ -1491,31 +1582,35 @@ func buildPayloadFromWideMatrix(
 					sheetRecCount++
 				}
 			} else if len(shLayout.branches) > 0 {
-				rowTotalRev := 0.0
-				rowTotalQty := 0
+				var namedRev float64
+				var namedQty int
 				topBranch := shLayout.branches[0]
 				bestBRev := -1.0
-				for _, b := range shLayout.branches {
-					bRev := parseRevenueFloat(getCell(row, b.revColIdx))
-					bQty := parseQuantityInt(getCell(row, b.qtyColIdx))
-					if bRev <= 0 && bQty <= 0 {
+				var unallocObs *wideBranchObservation
+				for i := range activeObs {
+					obs := &activeObs[i]
+					if isUnallocatedBranchName(obs.branch.rawBranchName) {
+						unallocObs = obs
 						continue
 					}
-					rowTotalRev += bRev
-					rowTotalQty += bQty
-					if bRev > bestBRev {
-						bestBRev = bRev
-						topBranch = b
+					namedRev += obs.rev
+					namedQty += obs.qty
+					if obs.rev > bestBRev {
+						bestBRev = obs.rev
+						topBranch = obs.branch
 					}
 				}
-				if rowTotalRev == 0 {
-					rowTotalRev = parseRevenueFloat(getCell(row, shLayout.totalRevIdx))
-				}
-				if rowTotalRev > 0 || rowTotalQty > 0 {
-					if rowTotalQty <= 0 {
-						rowTotalQty = 1
+				if namedRev != 0 || namedQty != 0 {
+					uPrice := 0.0
+					if namedRev != 0 {
+						priceQty := namedQty
+						if priceQty == 0 && namedRev > 0 {
+							priceQty = 1 // unit-price only; not stored
+						}
+						if priceQty != 0 {
+							uPrice = math.Round((namedRev/float64(priceQty))*100) / 100
+						}
 					}
-					uPrice := math.Round((rowTotalRev/float64(rowTotalQty))*100) / 100
 					records = append(records, domain.NormalizedRecord{
 						RawStoreName:     topBranch.displayName,
 						ResolvedStoreID:  topBranch.storeID,
@@ -1524,10 +1619,28 @@ func buildPayloadFromWideMatrix(
 						Category:         rawCat,
 						Supplier:         rawSup,
 						IsOwnBrand:       false,
-						QuantitySold:     rowTotalQty,
-						NetRevenue:       rowTotalRev,
+						QuantitySold:     namedQty,
+						NetRevenue:       math.Round(namedRev*100) / 100,
 						UnitPrice:        uPrice,
 						RecommendedPrice: uPrice,
+						TransactionDate:  sh.sheetDate,
+						DateFromFile:     sh.sheetDate != "",
+					})
+					sheetRecCount++
+				}
+				if unallocObs != nil {
+					records = append(records, domain.NormalizedRecord{
+						RawStoreName:     unallocObs.branch.displayName,
+						ResolvedStoreID:  unallocObs.branch.storeID,
+						Barcode:          cleanedBarcode,
+						SKUName:          rawSKU,
+						Category:         rawCat,
+						Supplier:         rawSup,
+						IsOwnBrand:       false,
+						QuantitySold:     unallocObs.qty,
+						NetRevenue:       unallocObs.rev,
+						UnitPrice:        0,
+						RecommendedPrice: 0,
 						TransactionDate:  sh.sheetDate,
 						DateFromFile:     sh.sheetDate != "",
 					})
@@ -1624,22 +1737,10 @@ func buildPayloadFromWideMatrix(
 						rawCat = "منظفات وعناية منزلية"
 					}
 					isOwn := isAdcoOrTenantSupplier(rawSup)
-					rowTotalRev := 0.0
-					rowTotalQty := 0
-					for _, b := range shLayout.branches {
-						bRev := parseRevenueFloat(getCell(row, b.revColIdx))
-						bQty := parseQuantityInt(getCell(row, b.qtyColIdx))
-						if bRev > 0 {
-							rowTotalRev += bRev
-						}
-						if bQty > 0 {
-							rowTotalQty += bQty
-						}
-					}
-					if rowTotalRev == 0 {
-						rowTotalRev = parseRevenueFloat(getCell(row, shLayout.totalRevIdx))
-					}
-					if rowTotalRev <= 0 && rowTotalQty <= 0 {
+					// Market-share only (records already emitted above); do not re-accumulate recon warnings.
+					activeObs, _, _ := collectWideRowBranchObservations(row, shLayout, retailer, nil, rIdx, cleanedBarcode)
+					rowTotalRev, rowTotalQty := rowTotalsFromObservations(activeObs)
+					if rowTotalRev == 0 && rowTotalQty == 0 {
 						continue
 					}
 					totalMarketRev += rowTotalRev
@@ -1737,7 +1838,13 @@ func buildPayloadFromWideMatrix(
 		maxDate = activeSheets[len(activeSheets)-1].sheetDate
 	}
 
-	return &domain.NormalizedRetailIngestionPayload{
+	if sawUnallocated && !branchMap[UnallocatedBranchName] {
+		discoveredBranches = append(discoveredBranches, UnallocatedBranchName)
+		branchMap[UnallocatedBranchName] = true
+	}
+	anomalies = append(anomalies, buildWideMatrixReconAnomalies(reconByMonth)...)
+
+	payload := &domain.NormalizedRetailIngestionPayload{
 		RetailerDetected:     retailer,
 		ReportingPeriodStart: minDate,
 		ReportingPeriodEnd:   maxDate,
@@ -1768,7 +1875,9 @@ func buildPayloadFromWideMatrix(
 		UnitsMoMPct:          unitsMoM,
 		UnitsYoYPct:          unitsYoY,
 		IsWideMatrixWorkbook: true,
-	}, true
+	}
+	attachBranchNormSummary(payload)
+	return payload, true
 }
 
 // frozenStoreIDPrefixes pins the historical chain[:3] prefix of every chain that already exists

@@ -158,11 +158,17 @@ func (q *Queue) EnqueueUnknowns(ctx context.Context, tenantID, sourceFile string
 	return out, nil
 }
 
-// List returns review items for a tenant filtered by status (empty = all).
+// List returns review items for a tenant filtered by status (empty = all),
+// sorted by priority (high-impact Sell-In rows first).
 func (q *Queue) List(ctx context.Context, tenantID, status string) ([]ReviewItem, error) {
 	ctx, cancel := withStoreTimeout(ctx)
 	defer cancel()
-	return q.store.ListItems(ctx, tenantID, status)
+	items, err := q.store.ListItems(ctx, tenantID, status)
+	if err != nil {
+		return nil, err
+	}
+	SortReviewItemsByPriority(items)
+	return items, nil
 }
 
 // DecideOptions carries optional catalog validation for approve.
@@ -243,4 +249,73 @@ func looksInventedBarcode(raw string) bool {
 		}
 	}
 	return false
+}
+
+// BulkDecideResult is one row outcome from DecideBulk.
+type BulkDecideResult struct {
+	ID      string      `json:"id"`
+	OK      bool        `json:"ok"`
+	Error   string      `json:"error,omitempty"`
+	Item    *ReviewItem `json:"item,omitempty"`
+	Skipped bool        `json:"skipped,omitempty"`
+}
+
+// DecideBulk approves or rejects many review items. For approve, each item must be
+// BulkApproveEligible and uses its matched item code + suggested barcode (never invented).
+// Failures on one id do not abort the rest; callers inspect per-id results.
+func (q *Queue) DecideBulk(ctx context.Context, tenantID string, ids []string, status, decidedBy, reasonAR string, opts DecideOptions) ([]BulkDecideResult, error) {
+	status = strings.TrimSpace(status)
+	if status != StatusApproved && status != StatusRejected {
+		return nil, fmt.Errorf("status must be %s or %s", StatusApproved, StatusRejected)
+	}
+	out := make([]BulkDecideResult, 0, len(ids))
+	seen := map[string]bool{}
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+
+		ctxGet, cancelGet := withStoreTimeout(ctx)
+		existing, err := q.store.GetItem(ctxGet, tenantID, id)
+		cancelGet()
+		if err != nil {
+			out = append(out, BulkDecideResult{ID: id, Error: "تعذر تحميل عنصر المراجعة"})
+			continue
+		}
+		if existing == nil {
+			out = append(out, BulkDecideResult{ID: id, Error: ErrNotFound.Error()})
+			continue
+		}
+
+		chosenCode, chosenBC := "", ""
+		if status == StatusApproved {
+			if !BulkApproveEligible(*existing) {
+				out = append(out, BulkDecideResult{ID: id, Skipped: true, Error: "العنصر غير مؤهل للاعتماد الجماعي"})
+				continue
+			}
+			chosenCode = existing.Result.MatchedItemCode
+			chosenBC = existing.Result.SuggestedBarcode
+		}
+
+		item, err := q.Decide(ctx, tenantID, id, status, decidedBy, reasonAR, chosenCode, chosenBC, opts)
+		if err != nil {
+			msg := "القرار غير صالح"
+			switch {
+			case errors.Is(err, ErrNotFound):
+				msg = ErrNotFound.Error()
+			case errors.Is(err, ErrAlreadyDecided):
+				msg = ErrAlreadyDecided.Error()
+			case errors.Is(err, ErrInventedBarcode):
+				msg = ErrInventedBarcode.Error()
+			case errors.Is(err, ErrTenantMismatch):
+				msg = ErrTenantMismatch.Error()
+			}
+			out = append(out, BulkDecideResult{ID: id, Error: msg})
+			continue
+		}
+		out = append(out, BulkDecideResult{ID: id, OK: true, Item: item})
+	}
+	return out, nil
 }

@@ -16,6 +16,13 @@ if [[ -d "${TOOLCHAINS}/bin" ]]; then
   export PATH="${TOOLCHAINS}/bin:${PATH}"
 fi
 
+# gcloud SDK (deploy.yml Cloud Run / Firebase). Prefer $HOME/toolchains — never hardcode user paths.
+GCLOUD_SDK="${TOOLCHAINS}/google-cloud-sdk"
+if [[ -x "${GCLOUD_SDK}/bin/gcloud" ]]; then
+  echo "${GCLOUD_SDK}/bin" >>"${GITHUB_PATH:-/dev/null}"
+  export PATH="${GCLOUD_SDK}/bin:${PATH}"
+fi
+
 # Flutter SDK lives at $HOME/toolchains/flutter (not always symlinked into toolchains/bin).
 # Missing this path forces flutter-action downloads that have starved self-hosted Mac runners
 # ("lost communication with the server" mid-setup).
@@ -30,10 +37,21 @@ for flutter_bin in \
   fi
 done
 
-# Shared pub cache on the Mac home disk (same idea as local GOMODCACHE).
-# Remote actions/cache for ~/.pub-cache stalls / fights concurrent Flutter jobs;
-# point PUB_CACHE at a stable toolchains path instead.
-PUB_CACHE_DIR="${PUB_CACHE:-${TOOLCHAINS}/pub-cache}"
+# Never share ~/.pub-cache (or a pre-set shared toolchains pub-cache) across concurrent Mac
+# runners — that caused Bad file descriptor / File exists under parallel pub get.
+# When RUNNER_TEMP is set (Actions), always force $RUNNER_TEMP/pub-cache and ignore any
+# pre-set PUB_CACHE (runner/machine env, prior jobs, or #51-style $HOME/toolchains/pub-cache).
+runner="${RUNNER_NAME:-unknown}"
+preset_pub_cache="${PUB_CACHE:-}"
+if [[ -n "${RUNNER_TEMP:-}" ]]; then
+  PUB_CACHE_DIR="${RUNNER_TEMP}/pub-cache"
+  if [[ -n "${preset_pub_cache}" && "${preset_pub_cache}" != "${PUB_CACHE_DIR}" ]]; then
+    echo "ci_runner_env: ignoring pre-set PUB_CACHE=${preset_pub_cache}; forcing ${PUB_CACHE_DIR}"
+  fi
+else
+  runner_slug="$(printf '%s' "${runner}" | tr -c 'A-Za-z0-9._-' '_')"
+  PUB_CACHE_DIR="${TOOLCHAINS}/pub-cache/${runner_slug}"
+fi
 mkdir -p "${PUB_CACHE_DIR}"
 export PUB_CACHE="${PUB_CACHE_DIR}"
 if [[ -n "${GITHUB_ENV:-}" ]]; then
@@ -53,7 +71,6 @@ if [[ -n "${ANDROID_HOME:-}" ]]; then
 fi
 
 # Stable per-runner ADB server port (avoid default 5037 collisions across runners).
-runner="${RUNNER_NAME:-unknown}"
 case "$runner" in
   *mac-3*|*runner-3*) adb_port=5039 ;;
   *mac-2*|*runner-2*) adb_port=5038 ;;
