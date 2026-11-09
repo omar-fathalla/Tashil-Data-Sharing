@@ -63,7 +63,7 @@ class _GatedRepo implements CompetitorComparisonSource {
 }
 
 OwnSkuCompetitiveGroupModel _sampleGroup() {
-  return OwnSkuCompetitiveGroupModel(
+  return const OwnSkuCompetitiveGroupModel(
     ownBarcode: '6223000239438',
     ownSkuName: 'فيبا 3 كجم',
     ownBrand: 'فيبا (Feba)',
@@ -81,10 +81,10 @@ OwnSkuCompetitiveGroupModel _sampleGroup() {
     minCompetitorPrice: 150,
     maxCompetitorPrice: 150,
     priceIndex: 106.7,
-    ownChainPrices: const {'fathalla': 160},
-    competitors: const [],
-    monthlyPrices: const [],
-    allMonthlyPrices: const [],
+    ownChainPrices: {'fathalla': 160},
+    competitors: [],
+    monthlyPrices: [],
+    allMonthlyPrices: [],
     selectedYear: 2026,
     selectedMonth: 0,
   );
