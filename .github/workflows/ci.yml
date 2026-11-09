@@ -84,14 +84,29 @@ jobs:
 
   # Stopgap until shared storage (#37): refuse deploy commands that omit or change the 1-instance pin.
   # Required check name is the gate job below (success when path-skipped).
+  # Hosted pin assert: always join the graph after `changes` succeeds so the gate
+  # never sees needs.*.result=abandoned from a conditional job dropping out.
+  # Path skip is a successful no-op below (cheap on ubuntu).
   guard-cloud-run-one-instance:
     needs: changes
-    if: needs.changes.outputs.pin == 'true'
+    if: always() && !cancelled() && needs.changes.result == 'success'
     runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
+      - name: Path filter
+        id: want
+        run: |
+          set -euo pipefail
+          if [[ "${{ needs.changes.outputs.pin }}" == "true" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipped — no workflow / pin-script path changes"
+          fi
       - uses: actions/checkout@v4
+        if: steps.want.outputs.run == 'true'
       - name: Assert deploy pins min/max=1
+        if: steps.want.outputs.run == 'true'
         run: bash scripts/check_cloud_run_one_instance.sh
 
   guard-cloud-run-one-instance-gate:
@@ -104,8 +119,13 @@ jobs:
       - name: Evaluate pin path filter / run result
         run: |
           set -euo pipefail
-          if [[ "${{ needs.changes.result }}" != "success" ]]; then
-            echo "::error::Detect path changes failed (${{ needs.changes.result }})"
+          changes_result="${{ needs.changes.result }}"
+          if [[ "${changes_result}" == "abandoned" ]]; then
+            echo "::error::needs.changes.result=abandoned (not in this attempt). Use 'Re-run all jobs', not 'Re-run failed jobs'."
+            exit 1
+          fi
+          if [[ "${changes_result}" != "success" ]]; then
+            echo "::error::Detect path changes failed (${changes_result})"
             exit 1
           fi
           if [[ "${{ needs.changes.outputs.pin }}" != "true" ]]; then
@@ -114,11 +134,23 @@ jobs:
           fi
           result="${{ needs.guard-cloud-run-one-instance.result }}"
           echo "guard-cloud-run-one-instance result=${result}"
+          if [[ "${result}" == "abandoned" ]]; then
+            echo "::error::guard-cloud-run-one-instance was abandoned (never ran). abandoned ≠ success."
+            exit 1
+          fi
+          if [[ "${result}" == "cancelled" ]]; then
+            echo "::error::guard-cloud-run-one-instance was cancelled (not success)."
+            exit 1
+          fi
           [[ "${result}" == "success" ]]
 
+  # Hosted Go+emulator: always join the graph after `changes` succeeds so the
+  # required-check gate cannot observe needs.test-backend.result=abandoned when a
+  # job-level path `if:` drops the node (seen on main push db5888d / #71). Path
+  # skip is a successful no-op; runners stay CI_HOSTED_RUNNER (unchanged split).
   test-backend:
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: always() && !cancelled() && needs.changes.result == 'success'
     runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     # ~20m class with emulator headroom (observed github-hosted go ~6m).
     timeout-minutes: 25
@@ -126,15 +158,30 @@ jobs:
       run:
         working-directory: backend-go
     steps:
+      - name: Path filter
+        id: want
+        working-directory: .
+        run: |
+          set -euo pipefail
+          if [[ "${{ needs.changes.outputs.backend }}" == "true" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipped — no backend/workflow path changes"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.want.outputs.run == 'true'
 
       - name: Per-runner toolchain / ADB env
+        if: steps.want.outputs.run == 'true'
         working-directory: .
         run: bash scripts/ci_runner_env.sh
 
       # Shared Mac lock (opt-in via MAC_SHARED_LOCK). No-ops on hosted / when unset.
       # timeout < job so if:always release runs.
       - name: Acquire Mac resource lock
+        if: steps.want.outputs.run == 'true'
         id: mac_lock
         timeout-minutes: 10
         working-directory: .
@@ -148,13 +195,14 @@ jobs:
       # On self-hosted Mac, GOMODCACHE/GOCACHE already live on the shared home disk.
       # Remote actions/cache for setup-go was ~880MB and stalled (~10m at 0 B/s).
       - uses: actions/setup-go@v5
+        if: steps.want.outputs.run == 'true'
         with:
           go-version-file: backend-go/go.mod
           cache: ${{ runner.environment != 'self-hosted' }}
           cache-dependency-path: backend-go/go.sum
 
       - name: Cache Go build
-        if: runner.environment != 'self-hosted'
+        if: steps.want.outputs.run == 'true' && runner.environment != 'self-hosted'
         uses: actions/cache@v4
         with:
           path: |
@@ -165,10 +213,12 @@ jobs:
             go-build-${{ runner.os }}-${{ runner.arch }}-
 
       - name: go vet
+        if: steps.want.outputs.run == 'true'
         run: go vet ./...
 
       # Capped -p/GOMAXPROCS, per-package timeout, slowest-test summary (scripts/run_go_tests_ci.sh).
       - name: go test
+        if: steps.want.outputs.run == 'true'
         id: go_test
         working-directory: .
         env:
@@ -180,12 +230,14 @@ jobs:
           bash scripts/run_go_tests_ci.sh
 
       - name: Setup Node (Firestore emulator)
+        if: steps.want.outputs.run == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       # Prefer the Mac's preinstalled Java 21 — setup-java downloads have 504'd from Adoptium.
       - name: Detect preinstalled Java 21
+        if: steps.want.outputs.run == 'true'
         id: java_pre
         working-directory: .
         run: |
@@ -200,13 +252,14 @@ jobs:
           echo "Preinstalled Java 21 not found; will use setup-java"
 
       - name: Setup Java (Firestore emulator)
-        if: steps.java_pre.outputs.use_action == 'true'
+        if: steps.want.outputs.run == 'true' && steps.java_pre.outputs.use_action == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Cache Firebase emulators
+        if: steps.want.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/firebase/emulators
@@ -216,15 +269,18 @@ jobs:
 
       # Run before emulator so a flaky emulator step cannot skip this check.
       - name: live-version parse fail-safe tests
+        if: steps.want.outputs.run == 'true'
         working-directory: .
         run: python3 scripts/parse_live_backend_commit_test.py
 
       # Prove free-port picker works (two concurrent batches get distinct ports).
       - name: Verify free-port isolation helper
+        if: steps.want.outputs.run == 'true'
         working-directory: .
         run: python3 scripts/pick_free_ports.py --self-test
 
       - name: Firestore emulator product-match tests
+        if: steps.want.outputs.run == 'true'
         id: go_emulator_test
         working-directory: .
         run: |
@@ -235,7 +291,7 @@ jobs:
           GOMAXPROCS=2 bash scripts/run_firestore_emulator_tests.sh
 
       - name: Surface failure summary
-        if: failure() && (steps.go_test.outcome == 'failure' || steps.go_emulator_test.outcome == 'failure')
+        if: steps.want.outputs.run == 'true' && failure() && (steps.go_test.outcome == 'failure' || steps.go_emulator_test.outcome == 'failure')
         run: |
           {
             echo "## Backend tests failed"
@@ -253,7 +309,7 @@ jobs:
 
       # Ownership-based release (if: always). Parent-alive acquire avoids orphans on cancel.
       - name: Release Mac resource lock
-        if: always()
+        if: always() && steps.want.outputs.run == 'true'
         working-directory: .
         run: |
           set +e
@@ -271,8 +327,13 @@ jobs:
       - name: Evaluate backend path filter / run result
         run: |
           set -euo pipefail
-          if [[ "${{ needs.changes.result }}" != "success" ]]; then
-            echo "::error::Detect path changes failed (${{ needs.changes.result }})"
+          changes_result="${{ needs.changes.result }}"
+          if [[ "${changes_result}" == "abandoned" ]]; then
+            echo "::error::needs.changes.result=abandoned (not in this attempt). Use 'Re-run all jobs', not 'Re-run failed jobs'."
+            exit 1
+          fi
+          if [[ "${changes_result}" != "success" ]]; then
+            echo "::error::Detect path changes failed (${changes_result})"
             exit 1
           fi
           if [[ "${{ needs.changes.outputs.backend }}" != "true" ]]; then
@@ -281,6 +342,18 @@ jobs:
           fi
           result="${{ needs.test-backend.result }}"
           echo "test-backend result=${result}"
+          if [[ "${result}" == "abandoned" ]]; then
+            echo "::error::test-backend was abandoned (never ran). abandoned ≠ success. Re-run all jobs."
+            exit 1
+          fi
+          if [[ "${result}" == "cancelled" ]]; then
+            echo "::error::test-backend was cancelled (not success). cancelled ≠ success."
+            exit 1
+          fi
+          if [[ "${result}" == "skipped" ]]; then
+            echo "::error::test-backend was skipped but backend path filter was true."
+            exit 1
+          fi
           [[ "${result}" == "success" ]]
 
   test-flutter:
@@ -400,8 +473,13 @@ jobs:
       - name: Evaluate Flutter path filter / run result
         run: |
           set -euo pipefail
-          if [[ "${{ needs.changes.result }}" != "success" ]]; then
-            echo "::error::Detect path changes failed (${{ needs.changes.result }})"
+          changes_result="${{ needs.changes.result }}"
+          if [[ "${changes_result}" == "abandoned" ]]; then
+            echo "::error::needs.changes.result=abandoned (not in this attempt). Use 'Re-run all jobs', not 'Re-run failed jobs'."
+            exit 1
+          fi
+          if [[ "${changes_result}" != "success" ]]; then
+            echo "::error::Detect path changes failed (${changes_result})"
             exit 1
           fi
           if [[ "${{ needs.changes.outputs.flutter }}" != "true" ]]; then
@@ -410,8 +488,16 @@ jobs:
           fi
           result="${{ needs.test-flutter.result }}"
           echo "test-flutter result=${result}"
+          if [[ "${result}" == "abandoned" ]]; then
+            echo "::error::test-flutter was abandoned (never ran). abandoned ≠ success. Re-run all jobs."
+            exit 1
+          fi
           if [[ "${result}" == "cancelled" ]]; then
             echo "::error::test-flutter was cancelled (not success). cancelled ≠ success."
+            exit 1
+          fi
+          if [[ "${result}" == "skipped" ]]; then
+            echo "::error::test-flutter was skipped but flutter path filter was true."
             exit 1
           fi
           [[ "${result}" == "success" ]]
