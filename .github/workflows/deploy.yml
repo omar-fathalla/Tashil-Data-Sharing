@@ -7,6 +7,10 @@
 # Budget fallback: set CI_HOSTED_RUNNER to the same JSON array as CI_RUNS_ON so light
 # jobs also land on Mac with no code change. See docs/ci-self-hosted.md / #41 / #55.
 #
+# Note: tashil-mac … tashil-mac-4 share one physical Mac. Keep light gates on hosted
+# ubuntu so deploy Mac jobs are not starved; workflow concurrency below still queues
+# deploys. Prefer MAC_SHARED_LOCK=1 if heavy CI + deploy overlap thrash the host.
+#
 # Auth: Workload Identity Federation, no JSON keys. The provider only accepts tokens from
 # omar-fathalla/Tashil-Data-Sharing on refs/heads/main, impersonating tashil-gh-deployer.
 #
