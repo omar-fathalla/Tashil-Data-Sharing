@@ -238,6 +238,19 @@ func TestCompetitorSuggestionsAIRejectsHallucination(t *testing.T) {
 	}
 }
 
+func TestCompetitorSuggestionsBatchCapIsTen(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), &competitorsuggest.GeminiRanker{UseMock: true})
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+	_, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 99,
+	})
+	if int(out["limit"].(float64)) != 10 {
+		t.Fatalf("hard cap must be 10, got %v", out["limit"])
+	}
+}
+
 func TestPendingSuggestionsNeverInMappingsCount(t *testing.T) {
 	fs := firestore.NewClient("test-db", true)
 	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), &competitorsuggest.GeminiRanker{UseMock: true})

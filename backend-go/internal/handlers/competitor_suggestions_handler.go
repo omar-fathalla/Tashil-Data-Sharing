@@ -24,7 +24,7 @@ var competitorSuggestOwnerRoles = map[domain.UserRole]bool{
 
 const (
 	competitorSuggestDefaultBatch = 10
-	competitorSuggestMaxBatch     = 25
+	competitorSuggestMaxBatch     = 10 // hard cap matches owner batch-size spec
 	competitorSuggestMinInterval  = 30 * time.Second
 )
 

@@ -149,7 +149,6 @@ class CompetitorSuggestionsReviewState
                     options: const [
                       M3DropdownOption(5, '5'),
                       M3DropdownOption(10, '10'),
-                      M3DropdownOption(20, '20'),
                     ],
                     onChanged: _running
                         ? null
