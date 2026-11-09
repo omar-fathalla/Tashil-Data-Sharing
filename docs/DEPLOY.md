@@ -4,10 +4,10 @@ Pushing to `main` runs `.github/workflows/deploy.yml`:
 
 1. `go vet` + `go test ./...` (backend-go) and `flutter analyze` + `flutter test` (tashil_web).
 2. Backend: `gcloud run deploy tashil-backend --source backend-go` (europe-west1) from the clean
-   checkout. Deploy pins `--min-instances=1 --max-instances=1` until shared storage lands
-   (#37); other settings (CPU always on, startup boost, gen2, archive volume, env vars and
-   secrets incl. `BIGQUERY_SINK_ENABLED=true`) are kept. The commit SHA is written to
-   `backend-go/data/build_commit.txt`, so `/api/v1/version` reports it.
+   checkout. Deploy pins `--cpu=2 --memory=4Gi` and `--min-instances=1 --max-instances=1`
+   until shared storage lands (#37); other settings (CPU always on, startup boost, gen2,
+   archive volume, env vars and secrets incl. `BIGQUERY_SINK_ENABLED=true`) are kept. The
+   commit SHA is written to `backend-go/data/build_commit.txt`, so `/api/v1/version` reports it.
    **Skip rule:** on `push` to `main`, Cloud Run deploy is skipped only when `backend-go/` and
    `.github/workflows/deploy.yml` are unchanged versus the **live** `/api/v1/version` `git_commit`
    (not `github.event.before`). That way a failed backend deploy followed by a web-only push still
