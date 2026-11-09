@@ -19,7 +19,8 @@ class ApiEndpoints {
     return cloudBackendUrl;
   }
 
-  static String get health => '$baseUrl/healthz';
+  // Prefer /livez or /api/v1/health — Cloud Run reserves /healthz for its own probes.
+  static String get health => '$baseUrl/livez';
   static String get upload => '$baseUrl/api/v1/ingest/upload';
   static String get ingestPrecheck => '$baseUrl/api/v1/ingest/precheck';
   static String get ingestCommit => '$baseUrl/api/v1/ingest/commit';
@@ -36,6 +37,7 @@ class ApiEndpoints {
   static String get records => '$baseUrl/api/v1/analytics/records';
   static String get sellInRecords => '$baseUrl/api/v1/analytics/sell-in-records';
   static String get sellInMonthly => '$baseUrl/api/v1/analytics/sell-in-monthly';
+  static String get sellInReturns => '$baseUrl/api/v1/analytics/sell-in-returns';
   static String get targets => '$baseUrl/api/v1/analytics/targets';
   static String get targetsUpload => '$baseUrl/api/v1/analytics/targets/upload';
   static String get storeMatrix => '$baseUrl/api/v1/analytics/store-matrix';
@@ -49,6 +51,7 @@ class ApiEndpoints {
   static String get dataQualityIssues => '$baseUrl/api/v1/data-quality/issues';
   static String get dataQualitySummary => '$baseUrl/api/v1/data-quality/summary';
   static String get dataYears => '$baseUrl/api/v1/sell-in/years';
+  static String get dataMonths => '$baseUrl/api/v1/sell-out/months';
   static String get customerRegistry => '$baseUrl/api/v1/customers/registry';
   static String get sellInAssistSuggestions => '$baseUrl/api/v1/sell-in/assist/suggestions';
   static String get sellInAssistSuggestLayout => '$baseUrl/api/v1/sell-in/assist/suggest-layout';
@@ -60,6 +63,7 @@ class ApiEndpoints {
   static String get productMatchEnqueue => '$baseUrl/api/v1/product-match/enqueue';
   static String get productMatchReview => '$baseUrl/api/v1/product-match/review';
   static String get productMatchDecide => '$baseUrl/api/v1/product-match/review/decide';
+  static String get productMatchBulkDecide => '$baseUrl/api/v1/product-match/review/bulk-decide';
   static String get productMatchMetrics => '$baseUrl/api/v1/product-match/metrics';
   static String get stores => '$baseUrl/api/v1/stores';
   static String get tenants => '$baseUrl/api/v1/tenants';

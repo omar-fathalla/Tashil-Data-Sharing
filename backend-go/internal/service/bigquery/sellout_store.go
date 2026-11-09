@@ -1,6 +1,13 @@
 package bigquery
 
-import "github.com/tashil/data-sharing/backend/internal/domain"
+import (
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+
+	"github.com/tashil/data-sharing/backend/internal/domain"
+)
 
 // ReplaceSellOutFacts swaps a tenant's whole Sell-Out fact set for facts loaded from the durable store
 // (BigQuery), keeping other tenants untouched. Facts are kept exactly as stored: they were enriched at
@@ -35,5 +42,44 @@ func (c *Client) SellOutFactsSnapshot(tenantID string) []domain.SellOutFact {
 			out = append(out, r)
 		}
 	}
+	return out
+}
+
+// SellOutMonths returns the distinct calendar months (1..12) that have Sell-Out facts for tenant/year,
+// ascending. year<=0 returns months across every year that has data.
+func (c *Client) SellOutMonths(tenantID string, year int) []int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return monthsFromSellOutFacts(c.records, tenantID, year)
+}
+
+// monthsFromSellOutFacts is the pure helper behind SellOutMonths (testable without locking).
+func monthsFromSellOutFacts(facts []domain.SellOutFact, tenantID string, year int) []int {
+	set := map[int]bool{}
+	yPrefix := ""
+	if year > 0 {
+		yPrefix = fmt.Sprintf("%04d-", year)
+	}
+	for _, r := range facts {
+		if !matchTenant(r.TenantID, tenantID) {
+			continue
+		}
+		if len(r.TransactionDate) < 7 {
+			continue
+		}
+		if year > 0 && !strings.HasPrefix(r.TransactionDate, yPrefix) {
+			continue
+		}
+		mo, err := strconv.Atoi(r.TransactionDate[5:7])
+		if err != nil || mo < 1 || mo > 12 {
+			continue
+		}
+		set[mo] = true
+	}
+	out := make([]int, 0, len(set))
+	for m := range set {
+		out = append(out, m)
+	}
+	sort.Ints(out)
 	return out
 }

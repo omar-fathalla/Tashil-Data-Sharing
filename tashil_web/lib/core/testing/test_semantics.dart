@@ -23,6 +23,7 @@ class TestIds {
 
   static const navSellOut = 'nav-sell-out';
   static const navSellIn = 'nav-sell-in';
+  static const navReturns = 'nav-returns';
 
   static const selloutUploadButton = 'sellout-upload-button';
   static const sellinUploadButton = 'sellin-upload-button';
@@ -62,6 +63,7 @@ class TestIds {
     logout,
     navSellOut,
     navSellIn,
+    navReturns,
     selloutUploadButton,
     sellinUploadButton,
     uploadChooseFile,
@@ -84,6 +86,8 @@ class TestIds {
         return navSellOut;
       case 2:
         return navSellIn;
+      case 3:
+        return navReturns;
       default:
         return null;
     }

@@ -37,7 +37,7 @@ var roleMatchOrder = []struct {
 	{roleItemCode, []string{"item number", "item code", "كود الصنف"}},
 	{roleItemName, []string{"item description", "item name", "اسم الصنف", "item 1"}},
 	{roleQty, []string{"qty", "quantity", "الكميه", "الكمية"}},
-	{roleValue, []string{"extended price", "ext price", "قيمه الفاتوره", "قيمة الفاتورة"}},
+	{roleValue, []string{"extended price", "ext price", "to", "t.o", "turnover", "قيمه الفاتوره", "قيمة الفاتورة"}},
 	{roleDate, []string{"document date", "doc date", "invoice date", "تاريخ المستند", "تاريخ الفاتوره", "date"}},
 	{roleMonth, []string{"month", "الشهر", "شهر"}},
 	{roleYear, []string{"year", "السنه", "السنة"}},

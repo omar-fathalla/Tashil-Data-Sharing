@@ -66,11 +66,15 @@ class BackendHttp {
   /// When [response] is a 202 with a `job_id`, polls `GET /api/v1/jobs/{id}` until the
   /// job finishes and returns the job's own HTTP status and body, so callers handle it
   /// like a normal synchronous response. Any other response is returned unchanged.
+  /// Default ceiling for [awaitJob] polling. Large Sell-In workbooks (40k+ rows)
+  /// can take well over five minutes; the UI must not abandon the job earlier.
+  static const Duration defaultJobMaxWait = Duration(minutes: 45);
+
   static Future<http.Response> awaitJob(
     http.Response response, {
     Map<String, String>? headers,
     Duration pollEvery = const Duration(seconds: 2),
-    Duration maxWait = const Duration(minutes: 20),
+    Duration maxWait = defaultJobMaxWait,
   }) async {
     if (response.statusCode != 202) return response;
     final Object? decoded;
@@ -113,6 +117,15 @@ class BackendHttp {
       return http.Response.bytes(utf8.encode(bodyText), httpStatus,
           request: poll.request, headers: const {'content-type': 'application/json; charset=utf-8'});
     }
-    return http.Response(jsonEncode({'message': 'انتهت مهلة انتظار معالجة الملف'}), 504);
+    // Not a server rejection: the job may still finish. Callers must not claim "nothing was saved".
+    // Use utf8 bytes: http.Response(String) is Latin-1 and rejects Arabic.
+    return http.Response.bytes(
+        utf8.encode(jsonEncode({
+          'message':
+              'الملف لسه بيتعالج على السيرفر. شوف قائمة الملفات بعد شوية — متترفعش تاني لو لقيته هناك.',
+          'still_processing': true,
+        })),
+        504,
+        headers: const {'content-type': 'application/json; charset=utf-8'});
   }
 }

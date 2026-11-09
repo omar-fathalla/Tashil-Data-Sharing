@@ -225,6 +225,32 @@ type NormalizedRetailIngestionPayload struct {
 	Validation           *IngestionValidation    `json:"validation,omitempty"`
 	// GuardrailTelemetry is filled only when the corresponding operation actually ran.
 	GuardrailTelemetry   *GuardrailTelemetry     `json:"guardrail_telemetry,omitempty"`
+	// BranchNorm summarizes Arabic/English abbreviation → canonical branch mapping (Phase A5).
+	BranchNorm           *BranchNormSummary      `json:"branch_norm,omitempty"`
+}
+
+// BranchNormSample is one changed raw→canonical example for Arabic UI.
+type BranchNormSample struct {
+	Raw         string  `json:"raw"`
+	CanonicalAR string  `json:"canonical_ar"`
+	MatchKind   string  `json:"match_kind"`
+	ReasonAR    string  `json:"reason_ar"`
+	Confidence  float64 `json:"confidence"`
+}
+
+// BranchNormSummary is success metrics for branch-name normalization on one upload.
+type BranchNormSummary struct {
+	Total       int                `json:"total"`
+	Exact       int                `json:"exact"`
+	Alias       int                `json:"alias"`
+	English     int                `json:"english"`
+	Abbrev      int                `json:"abbrev"`
+	Unknown     int                `json:"unknown"`
+	Changed     int                `json:"changed"`
+	UniqueRaw   int                `json:"unique_raw"`
+	UniqueCanon int                `json:"unique_canon"`
+	SummaryAR   string             `json:"summary_ar"`
+	Samples     []BranchNormSample `json:"samples,omitempty"`
 }
 
 // GuardrailTelemetry records observed guardrail operations for one AnalyzeAndNormalize.

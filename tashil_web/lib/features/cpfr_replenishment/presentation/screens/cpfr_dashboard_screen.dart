@@ -194,6 +194,12 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
     } catch (e) {
       if (!mounted) return;
       setState(() => _isUploadingSellIn = false);
+      if (isUploadWaitTimeout(e)) {
+        try {
+          await _loadDashboard();
+        } catch (_) {}
+        if (!mounted) return;
+      }
       await showUploadFailureDialog(context, picked.name, e);
     } finally {
       if (mounted) {

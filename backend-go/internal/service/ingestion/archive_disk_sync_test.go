@@ -330,6 +330,20 @@ func TestSellInThreeInstancesConvergeOnSharedTombstones(t *testing.T) {
 		}
 	}
 
+	// Concurrent deletes must leave a valid shared index (torn WriteFile was the deploy flake).
+	indexPath := filepath.Join(dir, "tenant-adeco", "index.json")
+	raw, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatalf("shared index missing after concurrent deletes: %v", err)
+	}
+	var indexEntries []*ArchivedFile
+	if err := json.Unmarshal(raw, &indexEntries); err != nil {
+		t.Fatalf("shared index is not valid JSON after concurrent deletes (torn write?): %v\nraw=%s", err, string(raw))
+	}
+	if !listHasID(indexEntries, "arch_si_adeco_seed") {
+		t.Fatalf("shared index lost Adeco seed after concurrent deletes: %+v", indexEntries)
+	}
+
 	var listWG sync.WaitGroup
 	listWG.Add(4)
 	listErr := make(chan error, 4)
@@ -354,6 +368,73 @@ func TestSellInThreeInstancesConvergeOnSharedTombstones(t *testing.T) {
 	close(listErr)
 	for err := range listErr {
 		t.Fatal(err)
+	}
+}
+
+// Regression for deploy run 42544194056: overlapping index.json writers must not leave torn JSON
+// that makes a fresh process load an empty Sell-In list.
+func TestPersistTenantArchiveIndexAtomicUnderConcurrentWriters(t *testing.T) {
+	dir := t.TempDir()
+	const writers = 8
+	const rounds = 40
+
+	procs := make([]*Processor, writers)
+	for i := 0; i < writers; i++ {
+		procs[i] = newArchiveTestProcessor(dir)
+		insertSharedArchive(t, []*Processor{procs[i]}, &ArchivedFile{
+			ID: "arch_si_adeco_seed", BatchID: "batch_si_seed", FileType: "sell_in", TenantID: "tenant-adeco",
+			FileName: "Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx", RetailChain: "fathalla", TargetYear: "2026",
+			RowsIngested: 100, UploadedAt: "2026-11-07T23:40:00Z",
+		}, []byte("seed"))
+		insertSharedArchive(t, []*Processor{procs[i]}, &ArchivedFile{
+			ID: fmt.Sprintf("arch_si_writer_%d", i), BatchID: fmt.Sprintf("batch_w_%d", i),
+			FileType: "sell_in", TenantID: "tenant-adeco",
+			FileName: fmt.Sprintf("writer_%d.xlsx", i), RetailChain: "fathalla", TargetYear: "2026",
+			RowsIngested: 10 + i, UploadedAt: fmt.Sprintf("2026-11-07T23:41:%02dZ", i),
+		}, []byte("w"))
+	}
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, writers*rounds)
+	for r := 0; r < rounds; r++ {
+		for i, p := range procs {
+			wg.Add(1)
+			go func(p *Processor, writerID, round int) {
+				defer wg.Done()
+				p.archiveMu.Lock()
+				defer p.archiveMu.Unlock()
+				// Drop this writer's extra id on odd rounds to force rewrite churn.
+				if round%2 == 1 {
+					delete(p.archivedFiles, fmt.Sprintf("arch_si_writer_%d", writerID))
+				}
+				if err := p.persistTenantArchiveIndexLocked("tenant-adeco"); err != nil {
+					errCh <- err
+				}
+			}(p, i, r)
+		}
+		wg.Wait()
+	}
+	close(errCh)
+	for err := range errCh {
+		t.Fatal(err)
+	}
+
+	indexPath := filepath.Join(dir, "tenant-adeco", "index.json")
+	raw, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatalf("read index: %v", err)
+	}
+	var entries []*ArchivedFile
+	if err := json.Unmarshal(raw, &entries); err != nil {
+		t.Fatalf("index JSON invalid after concurrent persists: %v\nraw=%s", err, string(raw))
+	}
+	if !listHasID(entries, "arch_si_adeco_seed") {
+		t.Fatalf("seed missing from index after concurrent persists: %+v", entries)
+	}
+	fresh := newArchiveTestProcessor(dir)
+	listed := fresh.ListArchivedFiles(context.Background(), "tenant-adeco", "", "", "", "sell_in")
+	if !listHasID(listed.Files, "arch_si_adeco_seed") {
+		t.Fatalf("fresh instance missing seed after concurrent index writes: %+v", listed.Files)
 	}
 }
 
