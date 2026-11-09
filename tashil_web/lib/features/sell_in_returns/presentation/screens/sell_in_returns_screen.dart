@@ -192,7 +192,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
         ),
         SegmentedButton<bool>(
           segments: const [
-            ButtonSegment(value: false, label: Text('قيمة'), icon: Icon(Icons.payments_outlined, size: 18)),
+            ButtonSegment(value: false, label: Text('قيمة'), icon: Icon(Icons.payments_rounded, size: 18)),
             ButtonSegment(value: true, label: Text('نسبة %'), icon: Icon(Icons.percent_rounded, size: 18)),
           ],
           selected: {_showPct},
@@ -315,7 +315,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
             titleEn: 'Returns Qty',
             value: CurrencyFormatter.formatNumber(k.returnsQty.round()),
             subtitle: 'كرتونة / وحدة مرتجعة',
-            icon: Icons.inventory_2_outlined,
+            icon: Icons.inventory_2_rounded,
             growthPct: 0,
             badgeLabel: 'كمية',
             badgeLabelEn: 'Qty',

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_shape.dart';
 import 'package:tashil_web/core/theme/m3_spacing.dart';
+import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
 
 import '../../domain/sell_in_returns_models.dart';
@@ -96,7 +97,7 @@ class ReturnsMonthlyChart extends StatelessWidget {
                               CurrencyFormatter.formatCompactEGP(p.returnsValueEgp),
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: cs.onSurfaceVariant,
-                                fontSize: 10,
+                                fontSize: M3FontSize.tiny,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
