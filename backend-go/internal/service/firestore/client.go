@@ -120,6 +120,9 @@ type Client struct {
 	cmapMu sync.RWMutex
 	cmaps  map[string]domain.CompetitorMapping
 
+	csugMu sync.RWMutex
+	csugs  map[string]domain.CompetitorSuggestion
+
 	// Per-tenant chain discount profiles (see chain_discounts.go)
 	cdMu       sync.RWMutex
 	cdProfiles map[string]domain.ChainDiscountProfiles

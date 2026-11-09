@@ -11,6 +11,7 @@ import '../../../../core/data/result.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/competitor_comparison_repository.dart';
 import '../../domain/competitor_month_options.dart';
+import '../widgets/competitor_suggestions_review.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
@@ -67,6 +68,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
   String _searchQuery = '';
   bool _showWhatIfSimulator = false;
   double? _simulatedOwnPrice;
+  /// 0 = مقارنة الأسعار, 1 = اقتراحات المنافسين (بانتظار الموافقة)
+  int _mainTab = 0;
 
   final TextEditingController _searchController = TextEditingController();
   late String _lastTenantId;
@@ -627,6 +630,34 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
 
             M3Spacing.gapMD,
 
+            SegmentedButton<int>(
+              segments: const [
+                ButtonSegment<int>(
+                  value: 0,
+                  label: Text('مقارنة الأسعار'),
+                  icon: Icon(Icons.compare_arrows_rounded, size: 18),
+                ),
+                ButtonSegment<int>(
+                  value: 1,
+                  label: Text('اقتراحات المنافسين (بانتظار الموافقة)'),
+                  icon: Icon(Icons.rate_review_rounded, size: 18),
+                ),
+              ],
+              selected: {_mainTab},
+              onSelectionChanged: (s) => setState(() => _mainTab = s.first),
+            ),
+
+            M3Spacing.gapMD,
+
+            if (_mainTab == 1) ...[
+              CompetitorSuggestionsReview(
+                apiClient: widget.apiClient,
+                chain: _selectedChain,
+                year: _selectedYear,
+                isOwner: _canRunSuggestions,
+              ),
+            ] else ...[
+
             // 2. Top 4 Competitive & Temporal Summary KPI Cards
             LayoutBuilder(
               builder: (context, constraints) {
@@ -758,10 +789,17 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                   }
                 },
               ),
+            ], // end compare tab
           ],
         ),
       ),
     );
+  }
+
+  bool get _canRunSuggestions {
+    final u = widget.apiClient.currentUser;
+    if (u == null) return false;
+    return u.isSuperAdmin || u.role == 'vendor_admin';
   }
 
   Widget _buildFilterToolbar(BuildContext context) {

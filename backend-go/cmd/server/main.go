@@ -20,6 +20,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/arabicqa"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
+	"github.com/tashil/data-sharing/backend/internal/service/competitorsuggest"
 	"github.com/tashil/data-sharing/backend/internal/service/customers"
 	"github.com/tashil/data-sharing/backend/internal/service/dataquality"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
@@ -253,6 +254,12 @@ func main() {
 	auditHandler := handlers.NewAuditHandler(fsRepo)
 	tradeMarketingHandler := handlers.NewTradeMarketingHandler(fsRepo, fsRepo).WithSalesSource(bqRepo)
 	competitorHandler := handlers.NewCompetitorHandler(fsRepo, fsRepo)
+	competitorSuggestRanker := &competitorsuggest.GeminiRanker{
+		APIKey:  cfg.GeminiAPIKey,
+		Model:   cfg.GeminiModel,
+		UseMock: cfg.UseMockServices || strings.TrimSpace(cfg.GeminiAPIKey) == "",
+	}
+	competitorSuggestionsHandler := handlers.NewCompetitorSuggestionsHandler(fsRepo, fsRepo, bqRepo, competitorSuggestRanker)
 	chainDiscountHandler := handlers.NewChainDiscountHandler(fsRepo, fsRepo, bqRepo)
 	dataQualityHandler := handlers.NewDataQualityHandler(dqService, fsRepo)
 	productMatchHandler := handlers.NewProductMatchHandler(productMatchQueue, bqRepo)
@@ -377,6 +384,11 @@ func main() {
 	mux.HandleFunc("GET /api/v1/competitors/mappings", competitorHandler.HandleListCompetitorMappings)
 	mux.HandleFunc("POST /api/v1/competitors/mappings", competitorHandler.HandleSaveCompetitorMapping)
 	mux.HandleFunc("DELETE /api/v1/competitors/mappings/{id}", competitorHandler.HandleDeleteCompetitorMapping)
+	// AI competitor suggestions quarantine — owner approval required; pending never feeds Compare KPIs.
+	mux.HandleFunc("GET /api/v1/competitors/suggestions", competitorSuggestionsHandler.HandleListSuggestions)
+	mux.HandleFunc("POST /api/v1/competitors/suggestions/run", competitorSuggestionsHandler.HandleRunSuggestions)
+	mux.HandleFunc("POST /api/v1/competitors/suggestions/approve", competitorSuggestionsHandler.HandleApproveSuggestion)
+	mux.HandleFunc("POST /api/v1/competitors/suggestions/reject", competitorSuggestionsHandler.HandleRejectSuggestion)
 
 	// 6. Wrap Middleware Chain: CORS -> Data-ready gate -> Auth -> Snapshot hook -> Router
 	protectedHandler := authMiddleware.Handler(middleware.ETag(newAsyncJobs(archDir).wrap(snapshotOnMutation(mux, ingestProcessor))))

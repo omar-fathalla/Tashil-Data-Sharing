@@ -102,4 +102,13 @@ class ApiEndpoints {
   static String get competitorMappings => '$baseUrl/api/v1/competitors/mappings';
   static String competitorMapping(String id) =>
       '$baseUrl/api/v1/competitors/mappings/${Uri.encodeComponent(id)}';
+
+  // AI competitor suggestions quarantine (pending never feeds Compare KPIs)
+  static String get competitorSuggestions => '$baseUrl/api/v1/competitors/suggestions';
+  static String get competitorSuggestionsRun =>
+      '$baseUrl/api/v1/competitors/suggestions/run';
+  static String get competitorSuggestionsApprove =>
+      '$baseUrl/api/v1/competitors/suggestions/approve';
+  static String get competitorSuggestionsReject =>
+      '$baseUrl/api/v1/competitors/suggestions/reject';
 }

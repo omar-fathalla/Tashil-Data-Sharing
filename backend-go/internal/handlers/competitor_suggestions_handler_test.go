@@ -1,0 +1,262 @@
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"testing"
+	"time"
+
+	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
+	"github.com/tashil/data-sharing/backend/internal/service/competitorsuggest"
+	"github.com/tashil/data-sharing/backend/internal/service/firestore"
+)
+
+type memCatalog struct {
+	res bigquery.CompetitiveMonthlyResult
+}
+
+func (m *memCatalog) CompetitiveMonthly(tenantID string, filter bigquery.RecordFilter) bigquery.CompetitiveMonthlyResult {
+	return m.res
+}
+
+func suggestMux(h *CompetitorSuggestionsHandler) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/competitors/suggestions", h.HandleListSuggestions)
+	mux.HandleFunc("POST /api/v1/competitors/suggestions/run", h.HandleRunSuggestions)
+	mux.HandleFunc("POST /api/v1/competitors/suggestions/approve", h.HandleApproveSuggestion)
+	mux.HandleFunc("POST /api/v1/competitors/suggestions/reject", h.HandleRejectSuggestion)
+	mux.HandleFunc("GET /api/v1/competitors/mappings", NewCompetitorHandler(h.repo, nil).HandleListCompetitorMappings)
+	return mux
+}
+
+func seedCatalog() *memCatalog {
+	return &memCatalog{res: bigquery.CompetitiveMonthlyResult{
+		Year: 2026,
+		Items: []bigquery.CompetitiveMonthlyItem{
+			{
+				Barcode: "OWN-DISH", SKUName: "فيبا 3 كجم", Category: "صابون سائل اطباق", IsOwnBrand: true,
+				Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 180, Units: 10, NetRevenue: 1800}},
+			},
+			{
+				Barcode: "COMP-PRIL", SKUName: "بريل 4 كجم", Category: "صابون سائل اطباق", IsOwnBrand: false,
+				Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 150, Units: 8, NetRevenue: 1200}},
+			},
+			{
+				Barcode: "COMP-FAIRY", SKUName: "فييري بدون حجم", Category: "صابون سائل اطباق", IsOwnBrand: false,
+				Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 160, Units: 5, NetRevenue: 800}},
+			},
+			{
+				Barcode: "OWN-CARE", SKUName: "عناية شخصية 1", Category: "عناية شخصية", IsOwnBrand: true,
+				Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 50, Units: 2, NetRevenue: 100}},
+			},
+			{
+				Barcode: "OWN-GEL", SKUName: "جيل اتوماتيك", Category: "مساحيق جيل اتوماتيك", IsOwnBrand: true,
+				Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 90, Units: 3, NetRevenue: 270}},
+			},
+			{
+				Barcode: "COMP-GEL", SKUName: "منافس مسحوق جيل", Category: "مسحوق جيل اتوماتيك", IsOwnBrand: false,
+				Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 85, Units: 4, NetRevenue: 340}},
+			},
+		},
+	}}
+}
+
+func TestCompetitorSuggestionsRunApproveRejectFlow(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	ranker := &competitorsuggest.GeminiRanker{UseMock: true}
+	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), ranker)
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+	viewer := &domain.UserClaims{UserID: "u2", TenantID: "adeco", Email: "v@adeco.com", Role: domain.RoleExecutive}
+
+	if rec, _ := tmDo(t, mux, viewer, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 10,
+	}); rec.Code != http.StatusForbidden {
+		t.Fatalf("non-owner run: want 403, got %d", rec.Code)
+	}
+
+	rec, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 10, "own_skus": []string{"OWN-DISH", "OWN-CARE", "OWN-GEL"},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("run: want 200, got %d %s", rec.Code, rec.Body.String())
+	}
+	created := int(out["created_count"].(float64))
+	if created < 1 {
+		t.Fatalf("expected suggestions created, got %v", out)
+	}
+	skipped := out["skipped"].([]interface{})
+	careSkip := false
+	for _, s := range skipped {
+		m := s.(map[string]interface{})
+		if m["barcode"] == "OWN-CARE" && m["reason_ar"] == "لا يوجد منافسين في البيانات" {
+			careSkip = true
+		}
+	}
+	if !careSkip {
+		t.Fatalf("عناية شخصية must skip with Arabic empty message, skipped=%v", skipped)
+	}
+
+	_, out = tmDo(t, mux, admin, "GET", "/api/v1/competitors/suggestions?status=pending&chain=fathalla", nil)
+	pending := out["suggestions"].([]interface{})
+	if len(pending) == 0 {
+		t.Fatal("expected pending suggestions")
+	}
+	// Pending must NOT appear as mappings yet.
+	_, mout := tmDo(t, mux, admin, "GET", "/api/v1/competitors/mappings?chain=fathalla", nil)
+	if mout["count"].(float64) != 0 {
+		t.Fatalf("pending must not create mappings, got %v", mout)
+	}
+
+	first := pending[0].(map[string]interface{})
+	id := first["id"].(string)
+	ownBC := first["own_barcode"].(string)
+	compBC := first["competitor_barcode"].(string)
+
+	rec, out = tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/approve", map[string]interface{}{"id": id})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("approve: %d %s", rec.Code, rec.Body.String())
+	}
+	if out["mapping"].(map[string]interface{})["competitor_barcode"] != compBC {
+		t.Fatalf("approve should write mapping: %v", out)
+	}
+	_, mout = tmDo(t, mux, admin, "GET", "/api/v1/competitors/mappings?chain=fathalla", nil)
+	if mout["count"].(float64) != 1 {
+		t.Fatalf("after approve want 1 mapping, got %v", mout)
+	}
+
+	// Reject another pending if available; else create via second own.
+	_, out = tmDo(t, mux, admin, "GET", "/api/v1/competitors/suggestions?status=pending&chain=fathalla", nil)
+	pending = out["suggestions"].([]interface{})
+	var rejectID string
+	for _, raw := range pending {
+		m := raw.(map[string]interface{})
+		if m["own_barcode"] != ownBC {
+			rejectID = m["id"].(string)
+			break
+		}
+	}
+	if rejectID == "" && len(pending) > 0 {
+		rejectID = pending[0].(map[string]interface{})["id"].(string)
+	}
+	if rejectID != "" {
+		rec, _ = tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/reject", map[string]interface{}{"id": rejectID})
+		if rec.Code != http.StatusOK {
+			t.Fatalf("reject: %d", rec.Code)
+		}
+	}
+
+	// Rate-limit: immediate re-run should 429
+	if rec, _ = tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 5,
+	}); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("rate limit: want 429, got %d", rec.Code)
+	}
+	// Bypass rate limit for reject-not-resuggested check
+	h.rateMu.Lock()
+	h.lastRun = map[string]time.Time{}
+	h.rateMu.Unlock()
+
+	// Own with approved mapping is skipped on re-run
+	rec, out = tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 10, "own_skus": []string{ownBC},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("rerun: %d %s", rec.Code, rec.Body.String())
+	}
+	for _, s := range out["skipped"].([]interface{}) {
+		m := s.(map[string]interface{})
+		if m["barcode"] == ownBC && m["reason_ar"] == "يوجد تعيين معتمد مسبقاً" {
+			return
+		}
+	}
+	t.Fatalf("approved own should be skipped on rerun: %v", out["skipped"])
+}
+
+func TestCompetitorSuggestionsRejectNotResuggested(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	ranker := &competitorsuggest.GeminiRanker{UseMock: true}
+	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), ranker)
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+
+	_, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 5, "own_skus": []string{"OWN-DISH"},
+	})
+	pending := out["suggestions"].([]interface{})
+	if len(pending) == 0 {
+		t.Fatal("need pending")
+	}
+	ids := make([]string, 0, len(pending))
+	for _, raw := range pending {
+		ids = append(ids, raw.(map[string]interface{})["id"].(string))
+	}
+	for _, id := range ids {
+		if rec, _ := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/reject", map[string]interface{}{"id": id}); rec.Code != http.StatusOK {
+			t.Fatalf("reject %s: %d", id, rec.Code)
+		}
+	}
+	h.rateMu.Lock()
+	h.lastRun = map[string]time.Time{}
+	h.rateMu.Unlock()
+
+	_, out = tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 5, "own_skus": []string{"OWN-DISH"},
+	})
+	if int(out["created_count"].(float64)) != 0 {
+		t.Fatalf("rejected pairs must not be re-suggested, got %v", out)
+	}
+}
+
+func TestCompetitorSuggestionsAIRejectsHallucination(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	ranker := &competitorsuggest.GeminiRanker{
+		CallJSON: func(ctx context.Context, model, prompt string) (string, competitorsuggest.TokenUsage, error) {
+			return `{"suggestions":[
+				{"competitor_barcode":"COMP-PRIL","reason_ar":"مناسب","confidence":0.9,"rank":1},
+				{"competitor_barcode":"FAKE-SKU","reason_ar":"مخترع","confidence":0.99,"rank":2}
+			]}`, competitorsuggest.TokenUsage{PromptTokens: 10, CompletionTokens: 5}, nil
+		},
+	}
+	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), ranker)
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+	_, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 3, "own_skus": []string{"OWN-DISH"},
+	})
+	sugs := out["suggestions"].([]interface{})
+	for _, raw := range sugs {
+		m := raw.(map[string]interface{})
+		if m["competitor_barcode"] == "FAKE-SKU" {
+			t.Fatal("hallucinated barcode must be rejected server-side")
+		}
+	}
+	if len(sugs) != 1 {
+		t.Fatalf("want only COMP-PRIL, got %v", mustJSON(sugs))
+	}
+}
+
+func TestPendingSuggestionsNeverInMappingsCount(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), &competitorsuggest.GeminiRanker{UseMock: true})
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+	tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 5, "own_skus": []string{"OWN-DISH"},
+	})
+	_, out := tmDo(t, mux, admin, "GET", "/api/v1/competitors/suggestions?status=pending", nil)
+	if out["count"].(float64) < 1 {
+		t.Fatal("expected pending")
+	}
+	_, mout := tmDo(t, mux, admin, "GET", "/api/v1/competitors/mappings", nil)
+	if mout["count"].(float64) != 0 {
+		t.Fatal("pending must not count as mappings / Compare pins")
+	}
+}
+
+func mustJSON(v interface{}) string {
+	b, _ := json.Marshal(v)
+	return string(b)
+}
