@@ -9,6 +9,37 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/domain"
 )
 
+func TestAuthMiddlewarePublicHealthBypass(t *testing.T) {
+	// Production-like: demo tokens off, so missing JWT would 401 on protected routes.
+	authMW := NewAuthMiddleware("test-secret-key-12345678901234567890", false)
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`ok`))
+	})
+	handler := authMW.Handler(next)
+
+	for _, path := range []string{"/livez", "/api/v1/health", "/healthz"} {
+		t.Run("public_"+path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("%s: want 200 without JWT, got %d body=%s", path, rec.Code, rec.Body.String())
+			}
+		})
+	}
+
+	t.Run("protected_/health_requires_jwt", func(t *testing.T) {
+		// /health is not a registered public probe; unauthenticated callers must get 401.
+		req := httptest.NewRequest(http.MethodGet, "/health", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("/health: want 401, got %d", rec.Code)
+		}
+	})
+}
+
 func TestAuthMiddlewareValidToken(t *testing.T) {
 	secret := "test-secret-key-12345678901234567890"
 	authMW := NewAuthMiddleware(secret, true)

@@ -1162,6 +1162,8 @@ func parseFullTabularPayload(filename string, rawContent []byte) (*domain.Normal
 	}
 
 	dataRows := rows[headerIdx+1:]
+	// Section-header layout: a branch name row followed by its detail rows (blank store cells).
+	applySectionHeaderStoreFill(dataRows, cols.storeNameIdx, cols.barcodeIdx, cols.qtyIdx, cols.revIdx)
 	inferTabularTemporalColumnsFromData(dataRows, &cols)
 	isLargeDataset := len(dataRows) > 2500
 	today := time.Now().Format("2006-01-02")
@@ -1255,7 +1257,18 @@ func parseFullTabularPayload(filename string, rawContent []byte) (*domain.Normal
 		}
 		dataRowNum++
 
-		rawStore := getCell(r, cols.storeNameIdx)
+		rawStoreCell := getCell(r, cols.storeNameIdx)
+		chainLabel, branchLabel := ParseChainBranchCell(rawStoreCell)
+		rawStore := branchLabel
+		if rawStore == "" {
+			rawStore = strings.TrimSpace(rawStoreCell)
+		}
+		rowRetailer := effectiveRetailerForStore
+		if chainLabel != "" {
+			if resolved := resolveChainCodeFromCustomerLabel(chainLabel, ""); resolved != "" {
+				rowRetailer = resolved
+			}
+		}
 		rawBarcode := getCell(r, cols.barcodeIdx)
 		rawSKU := getCell(r, cols.skuNameIdx)
 		rawCatCell := getCell(r, cols.categoryIdx)
@@ -1296,18 +1309,20 @@ func parseFullTabularPayload(filename string, rawContent []byte) (*domain.Normal
 			}
 		}
 
-		stEntry, ok := storeCache[rawStore]
+		storeCacheKey := rowRetailer + "|" + rawStore
+		stEntry, ok := storeCache[storeCacheKey]
 		if !ok {
-			id, matched := resolveCanonicalStoreID(effectiveRetailerForStore, rawStore)
+			id, matched := resolveCanonicalStoreID(rowRetailer, rawStore)
 			stEntry = resolvedStoreEntry{id: id, matched: matched}
-			storeCache[rawStore] = stEntry
+			storeCache[storeCacheKey] = stEntry
 		}
 		resolvedStoreID := stEntry.id
 		storeMatched := stEntry.matched
 
 		if rawStore == "" {
-			rawStore = defaultStoreNameForRetailer(effectiveRetailerForStore)
+			rawStore = defaultStoreNameForRetailer(rowRetailer)
 		}
+		// Group by Arabic-normalized branch so عائلة/عائله variants collapse; keep first spelling.
 		branchSet[rawStore] = true
 
 		isOwn, ok := supOwnCache[rawSupplier]
@@ -1628,7 +1643,7 @@ func parseFullTabularPayload(filename string, rawContent []byte) (*domain.Normal
 		}
 	}
 
-	return &domain.NormalizedRetailIngestionPayload{
+	payload := &domain.NormalizedRetailIngestionPayload{
 		RetailerDetected:     retailer,
 		ReportingPeriodStart: minDate,
 		ReportingPeriodEnd:   maxDate,
@@ -1644,7 +1659,9 @@ func parseFullTabularPayload(filename string, rawContent []byte) (*domain.Normal
 		MonthlyTrends:        monthlyTrends,
 		DetectedSheets:       discoveredSheets,
 		ComputedPricingItems: computedPricing,
-	}, true
+	}
+	attachBranchNormSummary(payload)
+	return payload, true
 }
 
 func inferTabularTemporalColumnsFromData(dataRows [][]string, cols *discoveredColumns) {

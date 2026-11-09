@@ -68,28 +68,44 @@ func (e *SellInPeriodError) Error() string {
 		e.Filename, strings.Join(parts, "؛ "), strings.Join(rows, "، "))
 }
 
+// sellInYearSource records where resolve got the calendar year so cycle nudges only apply
+// when the year came from Document Date (not "Jan-25" / filename / explicit year column).
+type sellInYearSource int
+
+const (
+	sellInYearNone sellInYearSource = iota
+	sellInYearExplicit
+	sellInYearMonthToken
+	sellInYearDate
+	sellInYearFilename
+)
+
 type sellInPeriodResolver struct {
-	fileYear int
-	pending  string // failure reason for the current row
-	sample   string
-	perr     SellInPeriodError
-	samples  map[string]bool
+	fileYear   int
+	pending    string // failure reason for the current row
+	sample     string
+	yearSource sellInYearSource
+	perr       SellInPeriodError
+	samples    map[string]bool
 }
 
 func newSellInPeriodResolver(fileYear int) *sellInPeriodResolver {
 	return &sellInPeriodResolver{fileYear: fileYear, samples: map[string]bool{}}
 }
 
-func (p *sellInPeriodResolver) startRow() { p.pending, p.sample = "", "" }
+func (p *sellInPeriodResolver) startRow() {
+	p.pending, p.sample, p.yearSource = "", "", sellInYearNone
+}
 
 // resolve reads (year, month) from a row. Precedence: explicit month number / name / date, explicit
-// year, then a year carried by the date, then a year written in the filename. Never a default.
+// year, then a year carried by the month token, then Document Date, then a year written in the
+// filename. Never a default. yearSource is set for the successful path.
 func (p *sellInPeriodResolver) resolve(row int, yearRaw, monthNumRaw, monthNameRaw, dateRaw string) (int, int, bool) {
-	month, tokYear := 0, 0
+	month, monthTokYear, dateYear := 0, 0, 0
 	var fromNum, fromName int
 	if strings.TrimSpace(monthNumRaw) != "" {
 		if m, y, ok := ParseMonthToken(monthNumRaw); ok {
-			fromNum, tokYear = m, y
+			fromNum, monthTokYear = m, y
 		} else {
 			p.pending, p.sample = "month", monthNumRaw
 			return 0, 0, false
@@ -98,8 +114,8 @@ func (p *sellInPeriodResolver) resolve(row int, yearRaw, monthNumRaw, monthNameR
 	if strings.TrimSpace(monthNameRaw) != "" {
 		if m, y, ok := ParseMonthToken(monthNameRaw); ok {
 			fromName = m
-			if tokYear == 0 {
-				tokYear = y
+			if monthTokYear == 0 {
+				monthTokYear = y
 			}
 		} else if fromNum == 0 {
 			p.pending, p.sample = "month", monthNameRaw
@@ -119,9 +135,7 @@ func (p *sellInPeriodResolver) resolve(row int, yearRaw, monthNumRaw, monthNameR
 			if month == 0 {
 				month = m
 			}
-			if tokYear == 0 {
-				tokYear = y
-			}
+			dateYear = y
 		}
 	}
 	if month == 0 {
@@ -139,12 +153,19 @@ func (p *sellInPeriodResolver) resolve(row int, yearRaw, monthNumRaw, monthNameR
 			return 0, 0, false
 		}
 		year = y
+		p.yearSource = sellInYearExplicit
 	}
-	if year == 0 {
-		year = tokYear
+	if year == 0 && monthTokYear > 0 {
+		year = monthTokYear
+		p.yearSource = sellInYearMonthToken
 	}
-	if year == 0 {
+	if year == 0 && dateYear > 0 {
+		year = dateYear
+		p.yearSource = sellInYearDate
+	}
+	if year == 0 && p.fileYear > 0 {
 		year = p.fileYear
+		p.yearSource = sellInYearFilename
 	}
 	if year == 0 {
 		p.pending = "year"
@@ -187,8 +208,8 @@ func (p *sellInPeriodResolver) err(filename string) error {
 }
 
 func normalizeHeaderLabel(h string) string {
-	h = strings.ToLower(strings.TrimSpace(normalizeArabicDigitsToASCII(h)))
-	h = strings.NewReplacer("أ", "ا", "إ", "ا", "آ", "ا", "ة", "ه", "ى", "ي", "_", " ").Replace(h)
+	h = strings.ToLower(strings.TrimSpace(normalizeArabicDigitsToASCII(normalizeInvisibleSpaces(h))))
+	h = strings.NewReplacer("أ", "ا", "إ", "ا", "آ", "ا", "ة", "ه", "ى", "ي", "_", " ", ".", " ").Replace(h)
 	h = strings.TrimRight(h, ".:")
 	return strings.Join(strings.Fields(h), " ")
 }
@@ -220,6 +241,36 @@ func mapHeaders(header []string, specs []headerSpec) (map[string]int, []string) 
 			}
 			if idx[sp.key] >= 0 {
 				break
+			}
+		}
+		// Soft match for value/qty aliases (Dynamics renames: "ExtendedPrice", "Ext. Price (EGP)",
+		// "XTNDPRCE"). Exact match stays first. Short aliases like "TO"/"to" are exact-or-compact
+		// only — never substring — so a "Total" column cannot steal the value role.
+		if idx[sp.key] < 0 && (sp.key == "value" || sp.key == "qty") {
+			for _, l := range sp.labels {
+				nl := normalizeHeaderLabel(l)
+				if nl == "" {
+					continue
+				}
+				compactNL := strings.ReplaceAll(nl, " ", "")
+				for i, h := range norm {
+					if used[i] || h == "" {
+						continue
+					}
+					compactH := strings.ReplaceAll(h, " ", "")
+					match := h == nl || compactH == compactNL
+					if !match && len(nl) >= 4 && (strings.Contains(h, nl) || strings.Contains(compactH, compactNL)) {
+						match = true
+					}
+					if match {
+						idx[sp.key] = i
+						used[i] = true
+						break
+					}
+				}
+				if idx[sp.key] >= 0 {
+					break
+				}
 			}
 		}
 		if idx[sp.key] < 0 && sp.required {
@@ -265,21 +316,28 @@ func buildRawPlanHeaderMap(header []string) (map[string]int, []string) {
 }
 
 // GP / Dynamics "SOP" invoice export (in25.xlsx / in26.xlsx).
+// in26 has no "Extended Price"; sales amount is the TO (turnover) column. Extended Price
+// aliases are tried first so older exports keep their previous totals; TO is a synonym
+// applied during mapping, and the required-column check runs after that mapping.
 var gpSOPHeaderSpecs = []headerSpec{
 	{"date", true, []string{"Document Date", "doc date", "invoice date", "تاريخ المستند", "تاريخ الفاتوره"}},
 	{"item_code", true, []string{"Item Number", "item code", "كود الصنف"}},
 	{"customer", true, []string{"Customer Name", "اسم العميل"}},
-	// Served Sell-In has always used the invoice line (QTY, Extended Price). Net Q / TO are read
-	// for the report only so existing totals do not move; switching is an open decision.
 	{"qty", true, []string{"QTY", "quantity", "الكميه"}},
-	{"value", true, []string{"Extended Price", "ext price", "قيمه الفاتوره"}},
+	{"value", true, []string{
+		"Extended Price", "ext price", "ext. price", "extendedprice", "xtndprce",
+		"extended price egp", "line extended price", "قيمه الفاتوره", "القيمه الممتده", "قيمة ممتدة",
+		// in26 synonym — after Extended Price so classic exports still prefer Extended Price.
+		"TO", "t.o", "turnover",
+	}},
 	{"net_q", false, []string{"Net Q", "net qty", "صافي الكميه"}},
-	{"net_to", false, []string{"TO", "t.o", "net value", "صافي القيمه"}},
+	{"net_to", false, []string{"net value", "صافي القيمه"}},
 	{"item_name", false, []string{"Item Description", "item name", "اسم الصنف"}},
 	{"uom", false, []string{"U Of M", "uom"}},
 	{"units_per_carton", false, []string{"U of M2", "units per carton"}},
 	{"customer_number", false, []string{"Customer Number", "رقم العميل"}},
 	{"customer_class", false, []string{"Customer Class"}},
+	// Branch in in26 is a region code (ALX/BHR/…), NOT the store branch — store is Customer Name.
 	{"branch", false, []string{"Branch", "الفرع"}},
 	{"statement", false, []string{"Statement Name"}},
 	{"salesman", false, []string{"SalesManNo", "salesman"}},
@@ -298,7 +356,25 @@ func findGPSOPHeaderRow(rows [][]string) int {
 	return -1
 }
 
+// adjustCycleYear fixes year-boundary sales cycles only when the year came from Document Date:
+// a Jan cycle that starts in late December belongs to the next calendar year; a Dec cycle that
+// spills into early January belongs to the previous year. Years from month tokens (e.g. "Jan-25"),
+// an explicit year column, or the filename are left unchanged.
+func adjustCycleYear(resolvedYear, docMonth, cycleMonth int, yearFromDocDate bool) int {
+	if !yearFromDocDate || resolvedYear <= 0 || cycleMonth < 1 || cycleMonth > 12 {
+		return resolvedYear
+	}
+	if cycleMonth == 1 && docMonth == 12 {
+		return resolvedYear + 1
+	}
+	if cycleMonth == 12 && docMonth == 1 {
+		return resolvedYear - 1
+	}
+	return resolvedYear
+}
+
 func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain string, report *SellInParseReport) ([]domain.SellInRecord, error) {
+	// Map synonyms first (Extended Price, then TO, …); required-column check runs after mapping.
 	cols, missing := mapHeaders(rows[hdr], gpSOPHeaderSpecs)
 	if len(missing) > 0 {
 		return nil, &SellInLayoutError{Filename: filename, Missing: missing}
@@ -309,44 +385,80 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 	periods := newSellInPeriodResolver(fileYear)
 	now := time.Now().UTC()
 	out := make([]domain.SellInRecord, 0, len(rows)-hdr-1)
+	monthFromColUsed := 0
 	monthMismatch := 0
-	seen := map[string]int{}
+	monthUnparseable := 0
+	hasMonthCol := cols["month"] >= 0
+	// Store branch lives in Customer Name (full-column scan). The "Branch" column is region codes.
+	storeCol := cols["customer"]
+	dataRows := rows[hdr+1:]
+	applySectionHeaderStoreFill(dataRows, storeCol, cols["item_code"], cols["qty"], cols["value"])
 	for i := hdr + 1; i < len(rows); i++ {
 		r := rows[i]
 		if len(r) == 0 || strings.TrimSpace(getCol(r, cols["item_code"])) == "" && strings.TrimSpace(getCol(r, cols["value"])) == "" {
 			continue
 		}
 		periods.startRow()
-		// The invoice date is authoritative; the "month" column is a lookup that is often #N/A.
-		y, m, _ := periods.resolve(i+1, "", "", "", getCol(r, cols["date"]))
+		dateRaw := getCol(r, cols["date"])
+		// Company sales-month cycle lives in the month column (JAN/Feb/…, Arabic names). Prefer it
+		// over Document Date. Unparseable / #N/A / empty month cells fall back to Document Date.
+		// When the file has no month column at all, Document Date alone drives period_month.
+		monthRaw := ""
+		usedMonthCol := false
+		if hasMonthCol {
+			cell := getCol(r, cols["month"])
+			trimmed := strings.TrimSpace(cell)
+			if _, _, ok := ParseMonthToken(cell); ok {
+				monthRaw = cell
+				usedMonthCol = true
+			} else if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+				// Empty / #N/A fall back silently; other garbage is noted in MonthCheck.
+				monthUnparseable++
+			}
+		}
+		y, m, _ := periods.resolve(i+1, "", "", monthRaw, dateRaw)
 		if !periods.accept(i + 1) {
 			continue
 		}
-		if mc, _, ok := ParseMonthToken(getCol(r, cols["month"])); ok && mc != m {
-			monthMismatch++
+		if usedMonthCol {
+			monthFromColUsed++
+			if _, dm, ok := ParseDateToken(dateRaw); ok {
+				y = adjustCycleYear(y, dm, m, periods.yearSource == sellInYearDate)
+				if dm != m {
+					monthMismatch++
+				}
+			}
 		}
-		qty := math.Round(parseFloatDefault(getCol(r, cols["qty"]), 0)) // served Sell-In has always stored whole units per line
-		val := parseFloatDefault(getCol(r, cols["value"]), 0)
-		cust := strings.TrimSpace(getCol(r, cols["customer"]))
-		st := BuildBranchStoreMetadata(chain, cust)
+		qty := math.Round(parseFloatDefault(getCol(r, cols["qty"]), 0)) // QTY = pieces on the invoice line
+		val := parseFloatDefault(getCol(r, cols["value"]), 0)            // Extended Price or TO; keep sign (returns negative)
+		// Collapse whitespace around the chain/branch dash (… -  فلمنج) but keep the upload chain
+		// authoritative — never re-infer retailer from the customer label (zahran/gomla GP SOP).
+		cust := collapseSpace(getCol(r, cols["customer"]))
+		_, branchLabel := ParseChainBranchCell(cust)
+		if branchLabel == "" {
+			branchLabel = cust
+		}
+		// Geo / known-slug from the branch side (دمنهور - الاستاد ≠ دمنهور); identity from the
+		// full Customer Name so "مواد عناية" accounts stay distinct (56 names in in26).
+		geo := BuildBranchStoreMetadata(chain, branchLabel)
+		ident := BuildBranchStoreMetadata(chain, cust)
+		st := geo
+		st.ID = ident.ID
+		region := strings.ToUpper(strings.TrimSpace(getCol(r, cols["branch"])))
+		if region == "" {
+			region = "ALX"
+		}
 		tx := "مسحوبات بيع (Sale)"
 		if qty < 0 || val < 0 {
 			tx = "مرتجع (Return)"
 		}
 		if strings.EqualFold(strings.TrimSpace(getCol(r, cols["sop_type"])), "return") {
 			report.ReturnRows++
+			tx = "مرتجع (Return)"
 		}
-		key := st.ID + "|" + strings.TrimSpace(getCol(r, cols["item_code"])) + "|" + strings.TrimSpace(getCol(r, cols["date"]))
-		if j, ok := seen[key]; ok {
-			out[j].NetQtyCases += qty
-			out[j].NetValueEGP = math.Round((out[j].NetValueEGP+val)*100) / 100
-			out[j].TurnoverEGP = out[j].NetValueEGP
-			out[j].ExpectedQtyCases = out[j].NetQtyCases
-			out[j].ExpectedValueEGP = out[j].NetValueEGP
-			out[j].WeightTons = math.Round(math.Abs(out[j].NetQtyCases)*0.012*10000) / 10000
-			continue
-		}
-		seen[key] = len(out)
+		// GP SOP week column is not period_week status (W1/W2 would flip مغلق → قيد الإغلاق).
+		// Always Full Month for this layout; week stays unused by status logic.
+		// One Sell-In record per source row — never collapse lines (in26 acceptance: 40927 rows).
 		rec := domain.SellInRecord{
 			RecordID:           fmt.Sprintf("sellin_%s_%d", tenantID, i),
 			TenantID:           tenantID,
@@ -356,7 +468,7 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 			MonthEN:            monthNumToEN(m),
 			MonthAR:            ArabicMonthName(m),
 			PeriodWeek:         "Full Month",
-			RegionCode:         "ALX", // as served since in25/in26 were first loaded; the Branch column is an open decision
+			RegionCode:         region,
 			Governorate:        st.Governorate,
 			Sector:             "MT",
 			CustomerName:       gpSOPCustomerName(cust, st.BranchName),
@@ -379,8 +491,15 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 	if err := periods.err(filename); err != nil {
 		return nil, err
 	}
-	if monthMismatch > 0 {
-		report.MonthCheck = fmt.Sprintf("%d صف عمود الشهر فيه مختلف عن تاريخ الفاتورة؛ اتاخد تاريخ الفاتورة", monthMismatch)
+	var monthNotes []string
+	if monthFromColUsed > 0 && monthMismatch > 0 {
+		monthNotes = append(monthNotes, fmt.Sprintf("%d صف عمود الشهر فيه مختلف عن تاريخ الفاتورة؛ اتاخد عمود الشهر (دورة مبيعات الشركة)", monthMismatch))
+	}
+	if monthUnparseable > 0 {
+		monthNotes = append(monthNotes, fmt.Sprintf("%d صف عمود الشهر فيه مش مفهوم (مش فاضي/#N/A)؛ اتاخد تاريخ الفاتورة", monthUnparseable))
+	}
+	if len(monthNotes) > 0 {
+		report.MonthCheck = strings.Join(monthNotes, "؛ ")
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("no valid sell-in records found in %s", filename)

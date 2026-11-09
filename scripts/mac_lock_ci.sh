@@ -6,7 +6,8 @@
 #
 # Guards:
 # 1) Never exec the live mac-lock.sh for long waits (copy or native wait loop).
-# 2) Opt-in via MAC_SHARED_LOCK=1 (unset/0 → skip; migration to dedicated tashil-ci).
+# 2) Opt-in via MAC_SHARED_LOCK=1 (unset/0 → skip). Recommend =1 while 2+ runners
+#    share one Mac (cross-repo); same-repo heavies also use job group tashil-mac-heavy.
 # 3) Parent-alive: while waiting, and again after acquire, abort/release if the
 #    GHA Runner.Worker / $PPID chain looks dead (avoids orphan LOCK.d after cancel).
 #

@@ -15,6 +15,8 @@ IngestionResultModel _result({
   bool requiresHumanApproval = false,
   List<String> guardrailReasonsAr = const [],
   String guardrailArabicSummary = '',
+  String branchNormSummaryAr = '',
+  int branchNormChanged = 0,
 }) {
   return IngestionResultModel(
     batchId: 'b1',
@@ -41,6 +43,8 @@ IngestionResultModel _result({
     guardrailSchemaValid: mappingSource == 'ai' || mappingSource == 'cache',
     guardrailPiiMinimized: mappingSource == 'ai' || mappingSource == 'cache',
     guardrailPerCallLogged: mappingSource == 'ai',
+    branchNormSummaryAr: branchNormSummaryAr,
+    branchNormChanged: branchNormChanged,
   );
 }
 
@@ -166,6 +170,30 @@ void main() {
     expect(m.validationDiffReasons, contains('returns'));
   });
 
+  test('IngestionResultModel reads payload.branch_norm summary_ar', () {
+    final m = IngestionResultModel.fromJson({
+      'batch_id': 'b',
+      'filename': 'f.xlsx',
+      'payload': {
+        'branch_norm': {
+          'total': 4,
+          'english': 1,
+          'abbrev': 1,
+          'changed': 2,
+          'unknown': 0,
+          'summary_ar':
+              'توحيد الفروع: 4/4 معروف • 1 إنجليزي • 1 اختصار • 2 تغيّر عرضها',
+        },
+      },
+    });
+    expect(m.branchNormSummaryAr, contains('توحيد الفروع'));
+    expect(m.branchNormChanged, 2);
+    expect(m.branchNormEnglish, 1);
+    expect(m.branchNormAbbrev, 1);
+    expect(AiAnalysisProgressCard.branchNormLabel(m), contains('إنجليزي'));
+    expect(AiAnalysisProgressCard.successMetricsLine(m), contains('توحيد أسماء الفروع'));
+  });
+
   testWidgets('card shows Arabic totals explanation when flagged', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -187,6 +215,26 @@ void main() {
     );
     expect(find.textContaining('تنبيه على الإجماليات'), findsOneWidget);
     expect(find.textContaining('مرتجعات'), findsOneWidget);
+  });
+
+  testWidgets('card shows Arabic branch-norm summary', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiAnalysisProgressCard(
+            isAnalyzing: false,
+            result: _result(
+              mappingSource: 'deterministic',
+              branchNormSummaryAr:
+                  'توحيد الفروع: 3/3 معروف • 1 إنجليزي • 1 اختصار • 2 تغيّر عرضها',
+              branchNormChanged: 2,
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.textContaining('توحيد أسماء الفروع'), findsWidgets);
+    expect(find.textContaining('إنجليزي'), findsOneWidget);
   });
 
   test('IngestionResultModel reads guardrail approval + Arabic metrics', () {
