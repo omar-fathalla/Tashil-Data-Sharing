@@ -47,6 +47,22 @@ type AggregatesRefresher interface {
 	GetAnalyticsAggregates(ctx context.Context, tenantID string) (*domain.AnalyticsAggregates, error)
 }
 
+// WithAggregatesRefresher overrides the post-write aggregates refresh target (tests / explicit wiring).
+func (p *Processor) WithAggregatesRefresher(r AggregatesRefresher) *Processor {
+	p.aggRefresher = r
+	return p
+}
+
+func (p *Processor) resolveAggregatesRefresher() AggregatesRefresher {
+	if p.aggRefresher != nil {
+		return p.aggRefresher
+	}
+	if r, ok := p.bqRepo.(AggregatesRefresher); ok {
+		return r
+	}
+	return nil
+}
+
 // AggregateSellInByPeriod sums parsed Sell-In rows by YYYY-MM period_month.
 func AggregateSellInByPeriod(recs []domain.SellInRecord) []bqsink.PeriodMonthCount {
 	type acc struct {
@@ -248,17 +264,25 @@ func (p *Processor) ReplaySellInArchive(ctx context.Context, tenantID, archiveID
 	p.setArchiveStoredRows(entry.ID, res.RowsWritten, entry.BatchID)
 
 	// Reload authoritative Sell-In (and Sell-Out if configured) from BigQuery so memory matches
-	// every archive, then refresh agg_sell_through.
+	// the durable write even if aggregates refresh fails next.
 	p.SyncDurableFromStore(ctx, tenantID, true)
-	if refresher, ok := p.bqRepo.(AggregatesRefresher); ok {
-		if _, err := refresher.GetAnalyticsAggregates(ctx, tenantID); err != nil {
-			rep.AggRefresh = "failed: " + err.Error()
-			log.Printf("WARN [sellin-archive-replay] aggregates refresh tenant=%s: %v", tenantID, err)
-		} else {
-			rep.AggRefresh = "ok"
-		}
-	} else {
-		rep.AggRefresh = "skipped (no aggregates refresher)"
+
+	refresher := p.resolveAggregatesRefresher()
+	if refresher == nil {
+		rep.AggRefresh = "failed: no aggregates refresher"
+		return rep, fmt.Errorf(
+			"sell_in_records updated (%d rows, archive=%s) and memory synced from BigQuery, but aggregates refresh unavailable (no AggregatesRefresher); agg_sell_through not refreshed — retry aggregates for tenant %s",
+			res.RowsWritten, archiveID, tenantID,
+		)
 	}
+	if _, err := refresher.GetAnalyticsAggregates(ctx, tenantID); err != nil {
+		rep.AggRefresh = "failed: " + err.Error()
+		log.Printf("ERROR [sellin-archive-replay] aggregates refresh tenant=%s archive=%s: %v", tenantID, archiveID, err)
+		return rep, fmt.Errorf(
+			"sell_in_records updated (%d rows, archive=%s) and memory synced from BigQuery, but aggregates refresh failed: %w — agg_sell_through may be stale; retry GetAnalyticsAggregates for tenant %s",
+			res.RowsWritten, archiveID, err, tenantID,
+		)
+	}
+	rep.AggRefresh = "ok"
 	return rep, nil
 }

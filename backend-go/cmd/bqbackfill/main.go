@@ -13,7 +13,8 @@
 //	  -tenant=tenant-adeco -kind=sell_in
 //
 // Dry-run prints per-month BEFORE/AFTER rows and net TO. Pass -execute to replace only that
-// archive's sell_in_records rows and refresh agg_sell_through. Archive id is required for this mode.
+// archive's sell_in_records rows and refresh agg_sell_through. Archive id is required for this mode:
+// missing/empty -archive-id with scoped flags exits non-zero before any legacy reconcile.
 //
 // Note: like server startup, parsing may write stores/OOS alerts to Firestore when USE_MOCK_SERVICES=false.
 // Run with USE_MOCK_SERVICES=true to keep Firestore and Gemini in local mock mode (recommended).
@@ -38,9 +39,26 @@ import (
 func main() {
 	execute := flag.Bool("execute", false, "actually write to BigQuery (default: dry-run / list only)")
 	archiveID := flag.String("archive-id", "", "force re-parse + replace only this archive id (sell-in month-cycle replay; required for scoped mode)")
-	tenant := flag.String("tenant", "tenant-adeco", "tenant id for -archive-id scoped replay")
-	kind := flag.String("kind", "sell_in", "sheet kind for -archive-id scoped replay (sell_in only)")
+	tenant := flag.String("tenant", "tenant-adeco", "tenant id for scoped sell-in replay (setting this selects scoped mode)")
+	kind := flag.String("kind", "sell_in", "sheet kind for scoped sell-in replay (setting this selects scoped mode; sell_in only)")
 	flag.Parse()
+
+	archiveIDFlagSet, tenantFlagSet, kindFlagSet := false, false, false
+	flag.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "archive-id":
+			archiveIDFlagSet = true
+		case "tenant":
+			tenantFlagSet = true
+		case "kind":
+			kindFlagSet = true
+		}
+	})
+
+	mode, err := resolveBackfillMode(archiveIDFlagSet, tenantFlagSet, kindFlagSet, *archiveID)
+	if err != nil {
+		log.Fatal(err) // non-zero; never reach legacy ReconcileArchivesToSink
+	}
 
 	cfg := config.Load()
 	archDir := os.Getenv("TASHIL_ARCHIVE_DIR")
@@ -63,12 +81,15 @@ func main() {
 		p.WithSellOutStore(bqs, fsRepo)
 	}
 
-	if id := strings.TrimSpace(*archiveID); id != "" {
-		runScopedSellInReplay(p, *tenant, id, *kind, *execute)
+	if mode == modeScoped {
+		runScopedSellInReplay(p, *tenant, strings.TrimSpace(*archiveID), *kind, *execute)
 		return
 	}
 
-	// Legacy full-archive reconcile (unchanged). Month-cycle redistribute must pass -archive-id.
+	runLegacyReconcile(p, archDir, *execute)
+}
+
+func runLegacyReconcile(p *ingestion.Processor, archDir string, execute bool) {
 	list := p.ListArchivedFiles(context.Background(), "all", "", "", "", "all")
 	fmt.Printf("archive %s: %d file(s)\n", archDir, len(list.Files))
 	for _, f := range list.Files {
@@ -80,7 +101,7 @@ func main() {
 		tenants[f.TenantID] = true
 	}
 	for t := range tenants {
-		rep, err := p.ReconcileArchivesToSink(context.Background(), t, *execute)
+		rep, err := p.ReconcileArchivesToSink(context.Background(), t, execute)
 		if err != nil {
 			log.Printf("tenant %s: %v", t, err)
 		}
@@ -94,18 +115,22 @@ func main() {
 			fmt.Printf("  orphan rows %s: %d (deleted=%v)\n", k, n, rep.OrphanDeleted[k])
 		}
 	}
-	if !*execute {
+	if !execute {
 		fmt.Println("dry run: pass -execute to write missing files and drop orphan rows")
 		fmt.Println("month-cycle redistribute: pass -archive-id=<id> -tenant=tenant-adeco -kind=sell_in")
 	}
 }
 
 func runScopedSellInReplay(p *ingestion.Processor, tenantID, archiveID, kind string, execute bool) {
-	if strings.TrimSpace(archiveID) == "" {
-		log.Fatal("archive id is required for sell-in month-cycle replay (refusing blind rewrite)")
-	}
 	rep, err := p.ReplaySellInArchive(context.Background(), tenantID, archiveID, kind, execute)
 	if err != nil {
+		if rep != nil {
+			fmt.Print(ingestion.FormatSellInArchiveReplayDryRun(rep))
+			if execute {
+				fmt.Printf("executed_partial: rows_written=%d sink=%s aggregates=%s\n",
+					rep.RowsWritten, rep.SinkStatus, rep.AggRefresh)
+			}
+		}
 		log.Fatal(err)
 	}
 	fmt.Print(ingestion.FormatSellInArchiveReplayDryRun(rep))
@@ -113,4 +138,23 @@ func runScopedSellInReplay(p *ingestion.Processor, tenantID, archiveID, kind str
 		fmt.Printf("executed: rows_written=%d sink=%s aggregates=%s\n",
 			rep.RowsWritten, rep.SinkStatus, rep.AggRefresh)
 	}
+}
+
+// runBackfillEntry is the CLI gate used by tests: scoped without archive id must not call legacy.
+func runBackfillEntry(
+	archiveIDFlagSet, tenantFlagSet, kindFlagSet bool,
+	archiveID string,
+	scoped func(archiveID string),
+	legacy func(),
+) error {
+	mode, err := resolveBackfillMode(archiveIDFlagSet, tenantFlagSet, kindFlagSet, archiveID)
+	if err != nil {
+		return err
+	}
+	if mode == modeScoped {
+		scoped(strings.TrimSpace(archiveID))
+		return nil
+	}
+	legacy()
+	return nil
 }

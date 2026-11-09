@@ -2,6 +2,7 @@ package ingestion
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -143,11 +144,24 @@ func TestReplaySellInArchiveDryRunBeforeAfter(t *testing.T) {
 	}
 }
 
+type okAggregatesRefresher struct{}
+
+func (okAggregatesRefresher) GetAnalyticsAggregates(context.Context, string) (*domain.AnalyticsAggregates, error) {
+	return &domain.AnalyticsAggregates{}, nil
+}
+
+type failAggregatesRefresher struct{ err error }
+
+func (f failAggregatesRefresher) GetAnalyticsAggregates(context.Context, string) (*domain.AnalyticsAggregates, error) {
+	return nil, f.err
+}
+
 func TestReplaySellInArchiveExecuteReplacesOnlyArchive(t *testing.T) {
 	dir := t.TempDir()
 	bq := bigquery.NewClient("", "", true)
 	fs := firestore.NewClient("", true)
-	p := NewProcessor(gemini.NewAgent("", "", true), bq, fs).WithArchiveDir(dir)
+	p := NewProcessor(gemini.NewAgent("", "", true), bq, fs).WithArchiveDir(dir).
+		WithAggregatesRefresher(okAggregatesRefresher{})
 
 	raw, err := os.ReadFile(filepath.Join("..", "gemini", "testdata", "in26_synthetic.xlsx"))
 	if err != nil {
@@ -171,7 +185,7 @@ func TestReplaySellInArchiveExecuteReplacesOnlyArchive(t *testing.T) {
 	if sink.lastMeta.ArchiveID != entry.ID || sink.lastMeta.BatchID != entry.BatchID || sink.lastMeta.SourceFile != "in26.xlsx" {
 		t.Fatalf("meta: %+v", sink.lastMeta)
 	}
-	if rep.RowsWritten != 75 || !rep.Executed {
+	if rep.RowsWritten != 75 || !rep.Executed || rep.AggRefresh != "ok" {
 		t.Fatalf("rep: %+v", rep)
 	}
 	// PlanSellIn delete key is archive/batch/file — not chain/month.
@@ -181,5 +195,38 @@ func TestReplaySellInArchiveExecuteReplacesOnlyArchive(t *testing.T) {
 	}
 	if strings.Contains(plan.DeleteWhere, "period_month") || strings.Contains(plan.DeleteWhere, "chain_key") {
 		t.Fatalf("must not replace by chain/month: %s", plan.DeleteWhere)
+	}
+}
+
+func TestReplaySellInArchiveExecuteFailsWhenAggregatesRefreshFails(t *testing.T) {
+	dir := t.TempDir()
+	bq := bigquery.NewClient("", "", true)
+	fs := firestore.NewClient("", true)
+	p := NewProcessor(gemini.NewAgent("", "", true), bq, fs).WithArchiveDir(dir).
+		WithAggregatesRefresher(failAggregatesRefresher{err: errors.New("bq mirror timeout")})
+
+	raw, err := os.ReadFile(filepath.Join("..", "gemini", "testdata", "in26_synthetic.xlsx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := p.SaveArchivedFile("tenant-adeco", "batch_sellin_in26", "in26.xlsx", raw, "fathalla", "2026", "01", 75, 1, 625)
+	sink := &recordingSink{counter: &fakePeriodCounter{}}
+	p.WithSink(sink)
+
+	rep, err := p.ReplaySellInArchive(context.Background(), "tenant-adeco", entry.ID, "sell_in", true)
+	if err == nil {
+		t.Fatal("want aggregates refresh failure")
+	}
+	if !strings.Contains(err.Error(), "aggregates refresh failed") || !strings.Contains(err.Error(), "bq mirror timeout") {
+		t.Fatalf("clear failure message missing: %v", err)
+	}
+	if !strings.Contains(err.Error(), "sell_in_records updated") || !strings.Contains(err.Error(), "memory synced") {
+		t.Fatalf("should state sell-in stayed durable/consistent: %v", err)
+	}
+	if sink.wrote != 1 {
+		t.Fatalf("sell-in write must still happen before agg failure, wrote=%d", sink.wrote)
+	}
+	if rep == nil || rep.RowsWritten != 75 || !strings.Contains(rep.AggRefresh, "failed") {
+		t.Fatalf("partial report: %+v", rep)
 	}
 }
