@@ -42,9 +42,10 @@ type PeriodMonthNet struct {
 	NetDelta    float64 `json:"net_delta"`
 }
 
-// AggregatesRefresher recomputes and mirrors agg_sell_through (and sibling agg_* tables).
+// AggregatesRefresher recomputes and mirrors agg_sell_through (and sibling agg_* tables)
+// synchronously — the caller must wait for MaterializeAnalyticsAggregates to return.
 type AggregatesRefresher interface {
-	GetAnalyticsAggregates(ctx context.Context, tenantID string) (*domain.AnalyticsAggregates, error)
+	MaterializeAnalyticsAggregates(ctx context.Context, tenantID string) (*domain.AnalyticsAggregates, error)
 }
 
 // WithAggregatesRefresher overrides the post-write aggregates refresh target (tests / explicit wiring).
@@ -275,11 +276,11 @@ func (p *Processor) ReplaySellInArchive(ctx context.Context, tenantID, archiveID
 			res.RowsWritten, archiveID, tenantID,
 		)
 	}
-	if _, err := refresher.GetAnalyticsAggregates(ctx, tenantID); err != nil {
+	if _, err := refresher.MaterializeAnalyticsAggregates(ctx, tenantID); err != nil {
 		rep.AggRefresh = "failed: " + err.Error()
 		log.Printf("ERROR [sellin-archive-replay] aggregates refresh tenant=%s archive=%s: %v", tenantID, archiveID, err)
 		return rep, fmt.Errorf(
-			"sell_in_records updated (%d rows, archive=%s) and memory synced from BigQuery, but aggregates refresh failed: %w — agg_sell_through may be stale; retry GetAnalyticsAggregates for tenant %s",
+			"sell_in_records updated (%d rows, archive=%s) and memory synced from BigQuery, but aggregates refresh failed: %w — agg_sell_through may be stale; retry MaterializeAnalyticsAggregates for tenant %s",
 			res.RowsWritten, archiveID, err, tenantID,
 		)
 	}

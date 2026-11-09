@@ -7,7 +7,11 @@
 #   their archive id. Existing sell_in_records already have Document-Date-based
 #   period_month values, so they would be skipped and stay wrong.
 #   Unscoped `bqbackfill -execute` is refused by default; full-archive orphan cleanup
-#   requires explicit `-legacy-reconcile-all` (not used for month-cycle redistributes).
+#   requires explicit `-legacy-reconcile-all` (not used for month-cycle redistributes):
+#        go run ./cmd/bqbackfill -legacy-reconcile-all            # dry-run report
+#        go run ./cmd/bqbackfill -legacy-reconcile-all -execute   # writes + orphans
+#   Dry-run scoped replay does not attach an aggregates writer / scheduleRecompute.
+#   -execute materializes agg_* synchronously (process waits; no in-flight exit).
 #
 # Why archive-scoped force replay is safe:
 #   PlanSellIn / WriteSellIn replace by archive_id + batch_id + legacy source_file

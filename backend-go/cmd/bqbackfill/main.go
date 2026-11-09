@@ -7,8 +7,9 @@
 //	  -archive-id=arch_sellin_adeco_fathalla_1794178032976473890 \
 //	  -tenant=tenant-adeco -kind=sell_in
 //
-// Dry-run prints per-month BEFORE/AFTER rows and net TO. Pass -execute to replace only that
-// archive's sell_in_records rows and refresh agg_sell_through.
+// Dry-run prints per-month BEFORE/AFTER rows and net TO (no aggregates writer / no BQ writes).
+// Pass -execute to replace only that archive's sell_in_records rows and synchronously
+// refresh agg_sell_through (process waits for the mirror write).
 //
 // Unscoped -execute is refused by default (never all-tenant orphan cleanup). The old
 // full-archive reconcile requires explicit opt-in:
@@ -70,7 +71,35 @@ func parseBackfillFlags() backfillCLIFlags {
 	return f
 }
 
-func mustProcessor(tenantHint string) (*ingestion.Processor, string) {
+// wireBackfillProcessor builds the processor the same way main does.
+// execute=false: sink may read for BEFORE counts; no aggregates writer / no scheduleRecompute.
+// execute=true: attach sync-only aggregates mirror (Materialize waits; no background writes).
+func wireBackfillProcessor(
+	archDir, tenantHint string,
+	execute bool,
+	bqRepo *bigquery.Client,
+	fsRepo *firestore.Client,
+	agent gemini.Agent,
+	sink bqsink.Sink,
+) *ingestion.Processor {
+	p := ingestion.NewProcessor(agent, bqRepo, fsRepo).WithArchiveDir(archDir).WithSink(sink)
+	if !execute {
+		return p
+	}
+	if bqs, ok := sink.(*bqsink.BigQuerySink); ok {
+		bqRepo.AttachAggregatesWriterForSyncMirror(bqs, tenantHint)
+		bqRepo.DisableBackgroundAggregatesMirror()
+		p.WithSellInStore(bqs, fsRepo)
+		p.WithSellOutStore(bqs, fsRepo)
+	} else if w, ok := sink.(bigquery.AggregatesWriter); ok {
+		// Test sinks that also mirror aggregates.
+		bqRepo.AttachAggregatesWriterForSyncMirror(w, tenantHint)
+		bqRepo.DisableBackgroundAggregatesMirror()
+	}
+	return p
+}
+
+func mustProcessor(tenantHint string, execute bool) (*ingestion.Processor, *bigquery.Client, string) {
 	cfg := config.Load()
 	archDir := os.Getenv("TASHIL_ARCHIVE_DIR")
 	if archDir == "" {
@@ -79,27 +108,21 @@ func mustProcessor(tenantHint string) (*ingestion.Processor, string) {
 	bqRepo := bigquery.NewClient(cfg.ProjectID, cfg.BigQueryDataset, true)
 	fsRepo := firestore.NewClient(cfg.FirestoreDatabase, cfg.UseMockServices)
 	agent := gemini.NewAgent(cfg.GeminiAPIKey, cfg.GeminiModel, cfg.UseMockServices).WithTier2Model(cfg.GeminiTier2Model)
-	p := ingestion.NewProcessor(agent, bqRepo, fsRepo).WithArchiveDir(archDir)
 
 	sinkCfg := bqsink.ConfigFromEnv(cfg.ProjectID, cfg.BigQueryDataset)
 	sinkCfg.Enabled = true
 	sink := bqsink.New(context.Background(), sinkCfg)
-	p.WithSink(sink)
-	if bqs, ok := sink.(*bqsink.BigQuerySink); ok {
-		bqRepo.WithAggregatesWriter(bqs, tenantHint)
-		p.WithSellInStore(bqs, fsRepo)
-		p.WithSellOutStore(bqs, fsRepo)
-	}
-	return p, archDir
+	p := wireBackfillProcessor(archDir, tenantHint, execute, bqRepo, fsRepo, agent, sink)
+	return p, bqRepo, archDir
 }
 
 func mainScopedReplay(archiveID, tenant, kind string, execute bool) {
-	p, _ := mustProcessor(tenant)
+	p, _, _ := mustProcessor(tenant, execute)
 	runScopedSellInReplay(p, tenant, archiveID, kind, execute)
 }
 
 func mainLegacyReconcile(execute bool) {
-	p, archDir := mustProcessor("tenant-adeco")
+	p, _, archDir := mustProcessor("tenant-adeco", execute)
 	runLegacyReconcile(p, archDir, execute)
 }
 

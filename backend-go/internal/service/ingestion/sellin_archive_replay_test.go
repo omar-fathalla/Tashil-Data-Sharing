@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -146,13 +147,13 @@ func TestReplaySellInArchiveDryRunBeforeAfter(t *testing.T) {
 
 type okAggregatesRefresher struct{}
 
-func (okAggregatesRefresher) GetAnalyticsAggregates(context.Context, string) (*domain.AnalyticsAggregates, error) {
+func (okAggregatesRefresher) MaterializeAnalyticsAggregates(context.Context, string) (*domain.AnalyticsAggregates, error) {
 	return &domain.AnalyticsAggregates{}, nil
 }
 
 type failAggregatesRefresher struct{ err error }
 
-func (f failAggregatesRefresher) GetAnalyticsAggregates(context.Context, string) (*domain.AnalyticsAggregates, error) {
+func (f failAggregatesRefresher) MaterializeAnalyticsAggregates(context.Context, string) (*domain.AnalyticsAggregates, error) {
 	return nil, f.err
 }
 
@@ -228,5 +229,81 @@ func TestReplaySellInArchiveExecuteFailsWhenAggregatesRefreshFails(t *testing.T)
 	}
 	if rep == nil || rep.RowsWritten != 75 || !strings.Contains(rep.AggRefresh, "failed") {
 		t.Fatalf("partial report: %+v", rep)
+	}
+}
+
+// syncCountingWriter is a real AggregatesWriter used with *bigquery.Client.MaterializeAnalyticsAggregates.
+type syncCountingWriter struct {
+	calls atomic.Int32
+	err   error
+	gate  chan struct{} // if non-nil, block until closed (proves sync wait)
+}
+
+func (s *syncCountingWriter) WriteAnalyticsAggregates(context.Context, *domain.AnalyticsAggregates) error {
+	s.calls.Add(1)
+	if s.gate != nil {
+		<-s.gate
+	}
+	return s.err
+}
+
+func TestReplaySellInArchiveExecuteRealClientMaterializeSync(t *testing.T) {
+	dir := t.TempDir()
+	bq := bigquery.NewClient("", "", true)
+	w := &syncCountingWriter{}
+	bq.AttachAggregatesWriterForSyncMirror(w, "tenant-adeco")
+	bq.DisableBackgroundAggregatesMirror()
+
+	fs := firestore.NewClient("", true)
+	// No WithAggregatesRefresher override — uses real *bigquery.Client.MaterializeAnalyticsAggregates.
+	p := NewProcessor(gemini.NewAgent("", "", true), bq, fs).WithArchiveDir(dir)
+
+	raw, err := os.ReadFile(filepath.Join("..", "gemini", "testdata", "in26_synthetic.xlsx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := p.SaveArchivedFile("tenant-adeco", "batch_sellin_in26", "in26.xlsx", raw, "fathalla", "2026", "01", 75, 1, 625)
+	sink := &recordingSink{counter: &fakePeriodCounter{}}
+	p.WithSink(sink)
+
+	rep, err := p.ReplaySellInArchive(context.Background(), "tenant-adeco", entry.ID, "sell_in", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.calls.Load() != 1 {
+		t.Fatalf("Materialize must sync-write once, got %d", w.calls.Load())
+	}
+	if rep.AggRefresh != "ok" || sink.wrote != 1 {
+		t.Fatalf("rep=%+v sink.wrote=%d", rep, sink.wrote)
+	}
+}
+
+func TestReplaySellInArchiveExecuteRealClientMaterializeError(t *testing.T) {
+	dir := t.TempDir()
+	bq := bigquery.NewClient("", "", true)
+	w := &syncCountingWriter{err: errors.New("agg load job failed")}
+	bq.AttachAggregatesWriterForSyncMirror(w, "tenant-adeco")
+	bq.DisableBackgroundAggregatesMirror()
+
+	fs := firestore.NewClient("", true)
+	p := NewProcessor(gemini.NewAgent("", "", true), bq, fs).WithArchiveDir(dir)
+
+	raw, err := os.ReadFile(filepath.Join("..", "gemini", "testdata", "in26_synthetic.xlsx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := p.SaveArchivedFile("tenant-adeco", "batch_sellin_in26", "in26.xlsx", raw, "fathalla", "2026", "01", 75, 1, 625)
+	sink := &recordingSink{counter: &fakePeriodCounter{}}
+	p.WithSink(sink)
+
+	rep, err := p.ReplaySellInArchive(context.Background(), "tenant-adeco", entry.ID, "sell_in", true)
+	if err == nil || !strings.Contains(err.Error(), "agg load job failed") {
+		t.Fatalf("want materialize error, got %v", err)
+	}
+	if w.calls.Load() != 1 || sink.wrote != 1 {
+		t.Fatalf("sell-in wrote=%d agg writes=%d", sink.wrote, w.calls.Load())
+	}
+	if rep == nil || !strings.Contains(rep.AggRefresh, "failed") {
+		t.Fatalf("partial: %+v", rep)
 	}
 }
