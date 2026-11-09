@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/m3_palette.dart';
+import 'package:tashil_web/core/theme/m3_shape.dart';
 import 'package:tashil_web/core/theme/m3_spacing.dart';
+import 'package:tashil_web/core/widgets/m3_dropdown.dart';
 
 /// Arabic RTL review queue for pending AI competitor suggestions.
 /// Pending items never appear in Compare KPIs until owner approve.
@@ -139,18 +141,20 @@ class CompetitorSuggestionsReviewState
                 ),
               ),
               if (widget.isOwner) ...[
-                DropdownButton<int>(
-                  value: _batchSize,
-                  items: const [
-                    DropdownMenuItem(value: 5, child: Text('5')),
-                    DropdownMenuItem(value: 10, child: Text('10')),
-                    DropdownMenuItem(value: 20, child: Text('20')),
-                  ],
-                  onChanged: _running
-                      ? null
-                      : (v) {
-                          if (v != null) setState(() => _batchSize = v);
-                        },
+                SizedBox(
+                  width: 96,
+                  child: M3Dropdown<int>(
+                    value: _batchSize,
+                    label: 'دفعة',
+                    options: const [
+                      M3DropdownOption(5, '5'),
+                      M3DropdownOption(10, '10'),
+                      M3DropdownOption(20, '20'),
+                    ],
+                    onChanged: _running
+                        ? null
+                        : (v) => setState(() => _batchSize = v),
+                  ),
                 ),
                 M3Spacing.gapSM,
                 FilledButton.icon(
@@ -174,7 +178,12 @@ class CompetitorSuggestionsReviewState
           ),
           if (_error != null) ...[
             M3Spacing.gapSM,
-            Text(_error!, style: const TextStyle(color: M3Palette.dangerAccent)),
+            Text(
+              _error!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: M3Palette.dangerAccent,
+              ),
+            ),
           ],
           M3Spacing.gapMD,
           if (_loading)
@@ -305,34 +314,39 @@ class CompetitorSuggestionsReviewState
     required Color surface,
     required Color onSurface,
   }) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: M3Shape.radiusMd,
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: onSurface, fontSize: 12)),
-          const SizedBox(height: 4),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(color: onSurface),
+          ),
+          M3Spacing.gapXXS,
           Text(
             name,
-            style: TextStyle(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: onSurface,
               fontWeight: FontWeight.w700,
-              fontSize: 14,
             ),
           ),
           Text(
             barcode,
-            style: TextStyle(color: onSurface.withValues(alpha: 0.8), fontSize: 11),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: onSurface.withValues(alpha: 0.8),
+            ),
           ),
-          const SizedBox(height: 6),
+          M3Spacing.gapXS,
           Text(
             'سعر ${price.toStringAsFixed(2)} · مبيعات $units',
-            style: TextStyle(color: onSurface, fontSize: 12),
+            style: theme.textTheme.bodySmall?.copyWith(color: onSurface),
           ),
         ],
       ),
