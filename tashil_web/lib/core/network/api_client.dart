@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -3213,7 +3214,16 @@ class ApiClient {
     return [];
   }
 
+  /// Client timeout for executive-summary. Cold Cloud Run + empty kpiCache can
+  /// take 8–12s+; a 12s ceiling raced successful 200s and showed dashboard errors.
+  /// Mutable so widget/unit tests can shorten without waiting 45s.
+  @visibleForTesting
+  static Duration executiveKpisTimeout = const Duration(seconds: 45);
+
   /// Fetches executive summary KPIs.
+  ///
+  /// Retries once on [TimeoutException] so a slow cold-start response is not
+  /// abandoned while the backend is still computing (and may fill kpiCache).
   Future<ExecutiveKPIsModel> getExecutiveKPIs({
     String period = 'MTD',
     String? startDate,
@@ -3239,7 +3249,18 @@ class ApiClient {
         params['chain'] = chain;
       }
       final uri = Uri.parse(ApiEndpoints.executiveSummary).replace(queryParameters: params);
-      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 12));
+
+      Future<http.Response> once() =>
+          BackendHttp.get(uri, headers: _headers).timeout(executiveKpisTimeout);
+
+      http.Response resp;
+      try {
+        resp = await once();
+      } on TimeoutException catch (firstTimeout) {
+        debugPrint('[ApiClient] getExecutiveKPIs timed out; retrying once: $firstTimeout');
+        resp = await once();
+      }
+
       if (resp.statusCode == 200) {
         isServerOnline.value = true;
         lastConnectionError = null;

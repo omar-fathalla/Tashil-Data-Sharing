@@ -37,8 +37,8 @@ func TestHandleSellInReturns_SyntheticAggregation(t *testing.T) {
 	if rep.KPIs.ReturnsValueEGP != 170 {
 		t.Fatalf("returns %v", rep.KPIs.ReturnsValueEGP)
 	}
-	if len(rep.Advisories) == 0 {
-		t.Fatal("expected net-negative advisory for branch B Feb (100-120)")
+	if len(rep.Advisories) != 0 || len(rep.Alerts) != 0 {
+		t.Fatalf("advisories/alerts must be empty (cards removed): advisories=%+v alerts=%+v", rep.Advisories, rep.Alerts)
 	}
 	if len(rep.TopReturnedProducts) == 0 {
 		t.Fatal("expected Phase-2 top returned products")
@@ -46,8 +46,16 @@ func TestHandleSellInReturns_SyntheticAggregation(t *testing.T) {
 	if rep.TopReturnedProducts[0].ReturnsValueEGP <= 0 {
 		t.Fatalf("top product returns: %+v", rep.TopReturnedProducts[0])
 	}
-	if len(rep.Alerts) == 0 {
-		t.Fatal("expected Phase-2 threshold alerts (high return %)")
+
+	// Second hit should be served from cache (same totals).
+	wCached := httptest.NewRecorder()
+	h.HandleSellInReturns(wCached, authenticatedRequest(http.MethodGet, "/api/v1/analytics/sell-in-returns?year=2026", "tenant-adeco"))
+	var cached bigquery.SellInReturnsReport
+	if err := json.NewDecoder(wCached.Body).Decode(&cached); err != nil {
+		t.Fatal(err)
+	}
+	if cached.KPIs.ReturnsValueEGP != 170 {
+		t.Fatalf("cached returns %v", cached.KPIs.ReturnsValueEGP)
 	}
 
 	w2 := httptest.NewRecorder()

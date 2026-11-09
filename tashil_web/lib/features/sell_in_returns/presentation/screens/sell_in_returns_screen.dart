@@ -4,9 +4,7 @@ import 'package:tashil_web/core/data/data_refresh_mixin.dart';
 import 'package:tashil_web/core/layout/m3_content_boundary.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/testing/test_semantics.dart';
-import 'package:tashil_web/core/theme/m3_shape.dart';
 import 'package:tashil_web/core/theme/m3_spacing.dart';
-import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/core/utils/excel_export_service.dart';
 import 'package:tashil_web/core/utils/export_columns.dart';
@@ -14,13 +12,16 @@ import 'package:tashil_web/core/widgets/kpi_card.dart';
 import 'package:tashil_web/core/widgets/m3_dropdown.dart';
 import 'package:tashil_web/core/widgets/m3_feedback.dart';
 import 'package:tashil_web/core/widgets/m3_states.dart';
-import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 
 import '../../data/sell_in_returns_repository.dart';
 import '../../domain/sell_in_returns_models.dart';
+import '../widgets/returns_heatmap_matrix.dart';
 import '../widgets/returns_monthly_chart.dart';
+import '../widgets/returns_top_products_table.dart';
 
-/// المرتجعات page: Phase-1 KPIs/matrix/chart + Phase-2 top products, alerts, Excel.
+/// المرتجعات page: Phase-1 KPIs/matrix/chart + Phase-2 top products + Excel.
+/// Threshold-alert and net-negative advisory cards were removed (cards only;
+/// API may still omit empty `alerts` / `advisories`).
 class SellInReturnsScreen extends StatefulWidget {
   final ApiClient apiClient;
   final SellInReturnsRepository? repository;
@@ -154,14 +155,6 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
                 )
               else ...[
                 _buildKpis(theme, cs),
-                if (_report.alerts.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _buildThresholdAlerts(theme, cs),
-                ],
-                if (_report.advisories.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _buildAdvisories(theme, cs),
-                ],
                 const SizedBox(height: 16),
                 ReturnsMonthlyChart(points: _report.monthly),
                 if (_report.topReturnedProducts.isNotEmpty) ...[
@@ -464,86 +457,6 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
     );
   }
 
-  Widget _buildThresholdAlerts(ThemeData theme, ColorScheme cs) {
-    final status = M3StatusColors.of(context);
-    final hasCritical = _report.alerts.any((a) => a.isCritical);
-    return Card.outlined(
-      color: hasCritical
-          ? cs.errorContainer.withOpacity(0.4)
-          : status.warningContainer.withOpacity(0.55),
-      child: Padding(
-        padding: M3Spacing.pSm,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  hasCritical ? Icons.warning_rounded : Icons.notification_important_rounded,
-                  size: 20,
-                  color: hasCritical ? cs.onErrorContainer : status.onWarningContainer,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'تنبيهات تجاوز الحد المعتاد للمرتجعات',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: hasCritical ? cs.onErrorContainer : status.onWarningContainer,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            for (final a in _report.alerts.take(8))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  '${a.isCritical ? 'حرج' : 'تحذير'}: ${a.messageAr}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: hasCritical ? cs.onErrorContainer : status.onWarningContainer,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAdvisories(ThemeData theme, ColorScheme cs) {
-    return Card.outlined(
-      color: cs.errorContainer.withOpacity(0.35),
-      child: Padding(
-        padding: M3Spacing.pSm,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'تنبيه: صافي سالب (محفوظ وغير مخفي)',
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: cs.onErrorContainer,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            for (final a in _report.advisories.take(8))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  a.messageAr.isNotEmpty
-                      ? a.messageAr
-                      : 'صافي سالب: ${a.productName} / ${a.branchName}',
-                  style: theme.textTheme.bodySmall?.copyWith(color: cs.onErrorContainer),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildTopProducts(ThemeData theme, ColorScheme cs) {
     return Card.outlined(
       child: Padding(
@@ -561,43 +474,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
               style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
-            TableScrollContainer(
-              child: DataTable(
-                headingRowHeight: 44,
-                dataRowMinHeight: 40,
-                dataRowMaxHeight: 52,
-                columns: const [
-                  DataColumn(label: Text('#')),
-                  DataColumn(label: Text('الصنف')),
-                  DataColumn(label: Text('قيمة المرتجع'), numeric: true),
-                  DataColumn(label: Text('الكمية'), numeric: true),
-                  DataColumn(label: Text('نسبة من الإجمالي'), numeric: true),
-                  DataColumn(label: Text('حصة المرتجعات %'), numeric: true),
-                  DataColumn(label: Text('صافي بعد المرتجعات'), numeric: true),
-                ],
-                rows: [
-                  for (final p in _report.topReturnedProducts)
-                    DataRow(
-                      cells: [
-                        DataCell(Text('${p.rank}')),
-                        DataCell(
-                          Text(
-                            p.productCode.isEmpty
-                                ? p.productName
-                                : '${p.productName} (${p.productCode})',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        DataCell(Text(CurrencyFormatter.formatCompactEGP(p.returnsValueEgp))),
-                        DataCell(Text(CurrencyFormatter.formatNumber(p.returnsQty.round()))),
-                        DataCell(Text('${p.returnPctOfGross.toStringAsFixed(1)}%')),
-                        DataCell(Text('${p.shareOfReturns.toStringAsFixed(1)}%')),
-                        DataCell(Text(CurrencyFormatter.formatCompactEGP(p.netValueEgp))),
-                      ],
-                    ),
-                ],
-              ),
-            ),
+            ReturnsTopProductsTable(products: _report.topReturnedProducts),
           ],
         ),
       ),
@@ -606,13 +483,6 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
 
   Widget _buildMatrixCard(ThemeData theme, ColorScheme cs) {
     final months = _report.months;
-    final maxRet = _report.branches.fold<double>(0, (m, b) {
-      for (final c in b.byMonth.values) {
-        final v = _showPct ? c.returnPctOfGross : c.returnsValueEgp;
-        if (v > m) m = v;
-      }
-      return m;
-    });
 
     return Card.outlined(
       child: Padding(
@@ -642,91 +512,16 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
                 ),
               )
             else
-              TableScrollContainer(
-                child: DataTable(
-                  headingRowHeight: 44,
-                  dataRowMinHeight: 40,
-                  dataRowMaxHeight: 52,
-                  columns: [
-                    const DataColumn(label: Text('الفرع')),
-                    for (final m in months)
-                      DataColumn(
-                        label: TestSemantics(
-                          identifier: 'returns-month-col-$m',
-                          label: _monthLabelsAr[m],
-                          child: Text(_monthLabelsAr[m]),
-                        ),
-                        numeric: true,
-                      ),
-                    const DataColumn(label: Text('الإجمالي'), numeric: true),
-                  ],
-                  rows: [
-                    for (final b in _report.branches)
-                      DataRow(
-                        cells: [
-                          DataCell(Text(b.branchName, overflow: TextOverflow.ellipsis)),
-                          for (final m in months)
-                            DataCell(_heatCell(
-                              theme,
-                              cs,
-                              b.byMonth[m] ?? const SellInReturnsCell(),
-                              maxRet,
-                            )),
-                          DataCell(_valueText(theme, b.total, bold: true)),
-                        ],
-                      ),
-                    DataRow(
-                      color: WidgetStatePropertyAll(cs.surfaceContainerHighest.withOpacity(0.5)),
-                      cells: [
-                        DataCell(Text(
-                          'الإجمالي',
-                          style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900),
-                        )),
-                        for (final m in months)
-                          DataCell(_valueText(
-                            theme,
-                            _report.columnTotals[m] ?? const SellInReturnsCell(),
-                            bold: true,
-                          )),
-                        DataCell(_valueText(theme, _report.grandTotal, bold: true)),
-                      ],
-                    ),
-                  ],
-                ),
+              ReturnsHeatmapMatrix(
+                months: months,
+                branches: _report.branches,
+                columnTotals: _report.columnTotals,
+                grandTotal: _report.grandTotal,
+                monthLabelsAr: _monthLabelsAr,
+                showPct: _showPct,
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _heatCell(ThemeData theme, ColorScheme cs, SellInReturnsCell cell, double maxV) {
-    final raw = _showPct ? cell.returnPctOfGross : cell.returnsValueEgp;
-    final t = maxV <= 0 ? 0.0 : (raw / maxV).clamp(0.0, 1.0);
-    final bg = Color.lerp(
-      cs.surface,
-      M3StatusColors.of(context).warningContainer.withOpacity(0.85),
-      t,
-    );
-    return Container(
-      alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      decoration: BoxDecoration(
-        color: raw <= 0 ? null : bg,
-        borderRadius: M3Shape.radiusSm,
-      ),
-      child: _valueText(theme, cell),
-    );
-  }
-
-  Widget _valueText(ThemeData theme, SellInReturnsCell cell, {bool bold = false}) {
-    final text = _showPct
-        ? '${cell.returnPctOfGross.toStringAsFixed(1)}%'
-        : CurrencyFormatter.formatCompactEGP(cell.returnsValueEgp);
-    return Text(
-      text,
-      style: theme.textTheme.bodyMedium?.copyWith(
-        fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
       ),
     );
   }
