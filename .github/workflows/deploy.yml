@@ -13,7 +13,8 @@
 #
 # Note: tashil-mac … tashil-mac-4 share one physical Mac. Keep light gates on hosted
 # ubuntu so deploy Mac jobs are not starved. Workflow concurrency queues deploys;
-# deploy-backend/web also join job group tashil-mac-heavy with Flutter/smoke.
+# deploy-backend/web also join job group tashil-deploy (deploy-only — not shared
+# with Flutter/smoke, which queue natively to avoid pending-slot eviction).
 # Prefer MAC_SHARED_LOCK=1 for cross-repo Mac overlap. See docs/ci-self-hosted.md.
 #
 # Auth: Workload Identity Federation, no JSON keys. The provider only accepts tokens from
@@ -108,29 +109,12 @@ jobs:
           echo "::error::Timed out waiting for CI tests on ${SHA}"
           exit 1
 
-  # Hosted: wait until Mac heavies idle before deploy joins tashil-mac-heavy
-  # (same pending-slot eviction guard as CI Flutter / smoke).
-  wait-mac-free:
-    name: Wait for Mac heavy free
-    needs: [await-ci]
-    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
-    timeout-minutes: 130
-    steps:
-      - uses: actions/checkout@v4
-      - name: Wait until Mac heavies idle before joining tashil-mac-heavy
-        env:
-          GH_TOKEN: ${{ github.token }}
-          WAIT_MAC_HEAVY_DEADLINE_MIN: "120"
-        run: |
-          chmod +x scripts/wait_mac_heavy_free.sh
-          bash scripts/wait_mac_heavy_free.sh
-
   deploy-backend:
-    needs: [await-ci, wait-mac-free]
+    needs: [await-ci]
     # Stay on Mac/self-hosted where gcloud WIF + toolchains work (#41 / #55 / #56).
-    # Serialize with Flutter/smoke heavies; never cancel an in-flight deploy job.
+    # Deploy-only concurrency (not shared with Flutter/smoke). Never cancel.
     concurrency:
-      group: tashil-mac-heavy
+      group: tashil-deploy
       cancel-in-progress: false
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # Observed ~4.5m; Cloud Run source deploy can spike — 30m ceiling.
@@ -258,7 +242,7 @@ jobs:
   deploy-web:
     needs: [deploy-backend]
     concurrency:
-      group: tashil-mac-heavy
+      group: tashil-deploy
       cancel-in-progress: false
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # Observed ~3m (flutter build + Firebase Hosting); 25m ceiling.

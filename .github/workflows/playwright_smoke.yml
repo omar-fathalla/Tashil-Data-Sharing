@@ -4,9 +4,10 @@ name: Playwright Semantics Smoke
 # heavy smoke-run on Mac self-hosted (CI_RUNS_ON).
 # NEVER use GitHub-hosted macOS runners.
 # Budget fallback: set CI_HOSTED_RUNNER to the same JSON array as CI_RUNS_ON.
-# Mac contention: smoke-run joins job concurrency group tashil-mac-heavy (no cancel).
-# Before joining: wait-ci-flutter (same-SHA Flutter) then wait-mac-free (repo-wide
-# idle) on ubuntu — avoids pending-slot eviction (1 running + 1 pending only).
+# Mac contention: smoke-run does NOT join a shared concurrency group (GitHub
+# pending-slot eviction cancels waiters). Queue natively on tashil-mac runners;
+# wait-ci-flutter still yields to same-SHA Flutter before smoke starts.
+# Deploys use tashil-deploy only. Prefer MAC_SHARED_LOCK=1.
 
 #
 # No workflow-level paths-ignore: required check flutter-web-semantics-smoke always reports.
@@ -77,30 +78,11 @@ jobs:
           chmod +x scripts/wait_ci_flutter_before_smoke.sh
           bash scripts/wait_ci_flutter_before_smoke.sh
 
-  # Hosted: wait until no other Mac heavy is active before joining tashil-mac-heavy.
-  wait-mac-free:
-    name: Wait for Mac heavy free
+  smoke-run:
     needs: [changes, wait-ci-flutter]
     if: needs.changes.outputs.smoke == 'true'
-    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
-    timeout-minutes: 130
-    steps:
-      - uses: actions/checkout@v4
-      - name: Wait until Mac heavies idle before joining tashil-mac-heavy
-        env:
-          GH_TOKEN: ${{ github.token }}
-          WAIT_MAC_HEAVY_DEADLINE_MIN: "120"
-        run: |
-          chmod +x scripts/wait_mac_heavy_free.sh
-          bash scripts/wait_mac_heavy_free.sh
-
-  smoke-run:
-    needs: [changes, wait-ci-flutter, wait-mac-free]
-    if: needs.changes.outputs.smoke == 'true'
-    # One Mac-heavy at a time in this repo (with Flutter CI / deploy). No cancel.
-    concurrency:
-      group: tashil-mac-heavy
-      cancel-in-progress: false
+    # No job concurrency group: pending-slot eviction cancels waiters. Native
+    # runner queue never cancels. Cross-repo: MAC_SHARED_LOCK=1.
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # Build web + Playwright (~15–25m healthy) + lock wait; acquire step < job.
     timeout-minutes: 45
@@ -289,7 +271,7 @@ jobs:
 
   # Required-check gate: job id matches existing check name flutter-web-semantics-smoke.
   flutter-web-semantics-smoke:
-    needs: [changes, wait-ci-flutter, wait-mac-free, smoke-run]
+    needs: [changes, wait-ci-flutter, smoke-run]
     if: always() && !cancelled()
     runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
@@ -309,14 +291,10 @@ jobs:
             echo "::error::wait-ci-flutter failed (${{ needs.wait-ci-flutter.result }})"
             exit 1
           fi
-          if [[ "${{ needs.wait-mac-free.result }}" != "success" ]]; then
-            echo "::error::wait-mac-free failed (${{ needs.wait-mac-free.result }})"
-            exit 1
-          fi
           result="${{ needs.smoke-run.result }}"
           echo "smoke-run result=${result}"
           if [[ "${result}" == "cancelled" ]]; then
-            echo "::error::smoke-run was cancelled (not success). tashil-mac-heavy pending eviction."
+            echo "::error::smoke-run was cancelled (not success). cancelled ≠ success."
             exit 1
           fi
           [[ "${result}" == "success" ]]
