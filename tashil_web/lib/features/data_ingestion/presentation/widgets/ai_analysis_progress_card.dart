@@ -63,6 +63,13 @@ class AiAnalysisProgressCard extends StatelessWidget {
     return 'درجة ثقة الذكاء الاصطناعي: ${(conf * 100).toStringAsFixed(1)}%';
   }
 
+  /// Arabic branch-normalization summary from payload.branch_norm.summary_ar.
+  static String? branchNormLabel(IngestionResultModel result) {
+    final text = result.branchNormSummaryAr.trim();
+    if (text.isEmpty) return null;
+    return text;
+  }
+
   /// Arabic totals-difference explanation from payload.validation.explanation_ar.
   static String? totalsExplanationLabel(IngestionResultModel result) {
     final text = result.validationExplanationAr.trim();
@@ -107,6 +114,8 @@ class AiAnalysisProgressCard extends StatelessWidget {
       else
         'بدون استدعاء ذكاء اصطناعي',
       if (result.needsHumanApproval) 'بانتظار الاعتماد',
+      if (result.branchNormSummaryAr.trim().isNotEmpty) 'توحيد أسماء الفروع',
+      if (result.branchNormChanged > 0) '${result.branchNormChanged} فرع وُحِّد',
     ];
     return parts.join(' • ');
   }
@@ -461,6 +470,52 @@ class AiAnalysisProgressCard extends StatelessWidget {
                       const SizedBox(height: 6.0),
                       Text(
                         totalsExplanationLabel(result!)!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          height: 1.45,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (branchNormLabel(result!) != null) ...[
+                M3Spacing.gapMD,
+                Container(
+                  width: double.infinity,
+                  padding: M3Spacing.pSm,
+                  decoration: BoxDecoration(
+                    color: colorScheme.secondaryContainer.withOpacity(0.28),
+                    borderRadius: M3Shape.radiusMd,
+                    border: Border.all(
+                      color: colorScheme.secondary.withOpacity(0.35),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.storefront_rounded,
+                            size: 18.0,
+                            color: colorScheme.secondary,
+                          ),
+                          const SizedBox(width: 6.0),
+                          Expanded(
+                            child: Text(
+                              'توحيد أسماء الفروع',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.secondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6.0),
+                      Text(
+                        branchNormLabel(result!)!,
                         style: theme.textTheme.bodySmall?.copyWith(
                           height: 1.45,
                           color: colorScheme.onSurface,

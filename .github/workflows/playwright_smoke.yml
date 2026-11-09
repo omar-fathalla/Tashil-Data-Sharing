@@ -1,6 +1,11 @@
 name: Playwright Semantics Smoke
 
-# Self-hosted Mac (label tashil-mac). Fallback: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
+# Hybrid runners: path detect + required gate on hosted (CI_HOSTED_RUNNER);
+# heavy smoke-run on Mac self-hosted (CI_RUNS_ON).
+# NEVER use GitHub-hosted macOS runners.
+# Budget fallback: set CI_HOSTED_RUNNER to the same JSON array as CI_RUNS_ON.
+# Mac contention: smoke-run joins job concurrency group tashil-mac-heavy (no cancel)
+# so flutter build / Setup Node are not starved by 4 parallel Mac jobs.
 # See docs/ci-self-hosted.md.
 #
 # No workflow-level paths-ignore: required check flutter-web-semantics-smoke always reports.
@@ -25,10 +30,9 @@ env:
   MAC_SHARED_LOCK: ${{ vars.MAC_SHARED_LOCK }}
 
 jobs:
-  # Must use CI_RUNS_ON (self-hosted): ubuntu-latest failed with no runner (run 42519016115).
   changes:
     name: Detect path changes
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     outputs:
       smoke: ${{ steps.filter.outputs.smoke }}
@@ -45,12 +49,16 @@ jobs:
               - 'scripts/ci_runner_env.sh'
               - 'scripts/ci_pub_cache_isolation_test.sh'
               - 'scripts/pick_free_ports.py'
+              - 'scripts/spa_http_server.py'
               - '.github/workflows/playwright_smoke.yml'
 
   smoke-run:
     needs: changes
     if: needs.changes.outputs.smoke == 'true'
-    # Fallback if Mac offline: set repo variable CI_RUNS_ON to '["ubuntu-latest"]'.
+    # One Mac-heavy at a time in this repo (with Flutter CI / deploy). No cancel.
+    concurrency:
+      group: tashil-mac-heavy
+      cancel-in-progress: false
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # Build web + Playwright (~15–25m healthy) + lock wait; acquire step < job.
     timeout-minutes: 45
@@ -151,6 +159,8 @@ jobs:
           fi
 
       # SPA fallback so /adeco serves index.html (path URL strategy).
+      # Prefer python3 (always on Mac self-hosted) over npx serve@14, which has
+      # failed with `ERROR invalid addKeywords parameters` and never bound :5600+.
       # Per-run free port in 5600+ (never hardcode 4173; avoid other bot 5570–5580).
       - name: Start static server
         id: smoke_server
@@ -160,7 +170,9 @@ jobs:
           PORT="$(python3 scripts/pick_free_ports.py -n 1 --min 5600 --max 5899)"
           echo "SMOKE_PORT=${PORT}" >> "$GITHUB_ENV"
           echo "port=${PORT}" >> "$GITHUB_OUTPUT"
-          npx --yes serve@14 -s tashil_web/build/web -l "${PORT}" \
+          python3 scripts/spa_http_server.py \
+            --root tashil_web/build/web \
+            --port "${PORT}" \
             >"$RUNNER_TEMP/playwright-smoke/serve.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/playwright-smoke/serve.pid"
           for i in $(seq 1 60); do
@@ -214,7 +226,7 @@ jobs:
         run: |
           if [ -f "$RUNNER_TEMP/playwright-smoke/serve.pid" ]; then
             serve_pid="$(cat "$RUNNER_TEMP/playwright-smoke/serve.pid")"
-            # Kill only the serve process this job started (and its children).
+            # Kill only the spa_http_server process this job started (and its children).
             if [ -n "$serve_pid" ] && kill -0 "$serve_pid" 2>/dev/null; then
               pkill -P "$serve_pid" 2>/dev/null || true
               kill "$serve_pid" 2>/dev/null || true
@@ -237,7 +249,7 @@ jobs:
   flutter-web-semantics-smoke:
     needs: [changes, smoke-run]
     if: always() && !cancelled()
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
       - name: Evaluate smoke path filter / run result

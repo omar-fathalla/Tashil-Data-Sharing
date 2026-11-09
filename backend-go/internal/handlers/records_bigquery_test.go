@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
@@ -82,6 +83,49 @@ func TestHandleRecordsSkipsBigQueryForSearchAndEmptyResults(t *testing.T) {
 	resp := decodeRecords(t, rec)
 	if fake.calls != 1 || rec.Header().Get("X-Records-Source") != "memory" || resp.TotalCount != 1 {
 		t.Fatalf("empty BQ result must fall back to memory, calls=%d resp=%+v", fake.calls, resp)
+	}
+}
+
+func TestHandleRecordsCategoryUsesBigQueryPath(t *testing.T) {
+	handler, tenantID := seedRecordsFallbackTenant(t)
+	fake := &fakeRecordsQuerier{res: &bqsink.RecordsResult{
+		Totals: bqsink.RecordsTotals{
+			TotalCount: 28, NetRevenue: 320861, UnitsSold: 6887, CartonsSold: 688.7,
+			FactoryCost: 595500, GrossProfit: -274639, MatchedRevForMargin: 320861,
+			Stores: 12, SKUs: 28, MatchedSKUs: 28,
+		},
+		SKUs: []bqsink.RecordsSKU{{
+			ItemCode: "RH-DISH", SKUName: "Rahab Dish Liquid", Category: "صابون سائل للاطباق",
+			UnitsSold: 100, NetRevenue: 5000, UnitsPerCarton: 12, FactoryUnitCost: 40, Stores: 3,
+		}},
+		Page: []domain.SellOutFact{{RecordID: "bq_cat_1", Category: "صابون سائل للاطباق", NetRevenue: 5000}},
+	}}
+	handler.WithRecordsQuerier(fake)
+
+	cat := "صابون سائل اطباق"
+	q := url.Values{
+		"chain": {"fathalla"}, "category": {cat}, "year": {"2026"}, "month": {"1"}, "supplier": {"own"},
+	}
+	rec := httptest.NewRecorder()
+	handler.HandleRecords(rec, authenticatedRequest(http.MethodGet, "/api/v1/analytics/records?"+q.Encode(), tenantID))
+	resp := decodeRecords(t, rec)
+	if fake.calls != 1 || rec.Header().Get("X-Records-Source") != "bigquery" {
+		t.Fatalf("category must use BigQuery path, calls=%d source=%q", fake.calls, rec.Header().Get("X-Records-Source"))
+	}
+	if fake.last.Category != cat || fake.last.Chain != "fathalla" || fake.last.TenantID != tenantID {
+		t.Errorf("category/chain not forwarded: %+v", fake.last)
+	}
+	if resp.TotalCount != 28 || resp.TotalCartonsSold != 688.7 {
+		t.Errorf("totals mismatch: count=%d cartons=%v", resp.TotalCount, resp.TotalCartonsSold)
+	}
+	if resp.TotalFactoryCost != 595500 || resp.TotalRetailerGrossProfit != -274639 {
+		t.Errorf("factory/margin mismatch: factory=%v margin=%v", resp.TotalFactoryCost, resp.TotalRetailerGrossProfit)
+	}
+	if len(resp.SKUSummaries) != 1 || resp.SKUSummaries[0].Category != cat {
+		t.Errorf("SKU category not normalized: %+v", resp.SKUSummaries)
+	}
+	if !recordsHaveSingleID(resp.Records, "bq_cat_1") {
+		t.Errorf("page not from BQ: %+v", resp.Records)
 	}
 }
 

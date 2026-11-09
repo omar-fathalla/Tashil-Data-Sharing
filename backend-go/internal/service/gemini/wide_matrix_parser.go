@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/branchnorm"
 )
 
 type xlsxWorkbookXML struct {
@@ -67,6 +68,9 @@ type parsedSheetSummary struct {
 	adcoUnits  int
 	marketRev  float64
 	storeCount int
+	// preferOverFullYear marks summaries from a month-named physical tab; those
+	// win period-coverage dedupe against overlapping full-year / split periods.
+	preferOverFullYear bool
 }
 
 // parseWideMatrixXLSX inspects an .xlsx archive for the Fathalla / Adco Wide Branch-Pivot Matrix structure
@@ -94,29 +98,21 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		return nil, false
 	}
 
-	explicitFileYear := inferYearFromText(filename, 0)
-	hasMatchingFileYearSheet := false
-	if explicitFileYear >= 2020 && len(sheetEntries) > 1 {
-		for _, entry := range sheetEntries {
-			if inferYearFromText(entry.name, 0) == explicitFileYear {
-				hasMatchingFileYearSheet = true
-				break
-			}
-		}
+	sheetNames := make([]string, 0, len(sheetEntries))
+	for _, entry := range sheetEntries {
+		sheetNames = append(sheetNames, entry.name)
 	}
+	selection := buildSheetSelectionPlan(filename, sheetNames)
 
 	var visibleWideSheets []parsedSheetSummary
 	var allWideSheets []parsedSheetSummary
 	var virtualEntries []wbSheetEntry
 
 	for _, entry := range sheetEntries {
-		// If the workbook filename explicitly targets a year (e.g. "2026 out.xlsx") and contains a matching sheet ("sale out2026"),
-		// skip leftover full-year sheets from a different year ("sale out2025") so multi-file archives never double-count 2025.
-		if hasMatchingFileYearSheet {
-			entryYear := inferYearFromText(entry.name, 0)
-			if entryYear >= 2020 && entryYear != explicitFileYear && parseSmartMonthToken(entry.name) == 0 {
-				continue
-			}
+		// Open-sheet gate only: leftover other-year full-year dumps. Same-year
+		// monthly vs yearly overlap is resolved by period coverage after parse.
+		if !selection.shouldIncludeSheet(entry.name) {
+			continue
 		}
 		sampleRows, err := readWorksheetSampleRows(entry.file, sharedStrings, wideMatrixHeaderScanRows+2)
 		if err != nil || len(sampleRows) < 2 {
@@ -144,11 +140,14 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		// even if their headers were unlabeled, non-standard, or placed anywhere in the sheet.
 		inferTemporalColumnsFromData(rows, &layout)
 
+		preferMonthly := isMonthNamedSheetName(entry.name)
+
 		// If a single wide sheet contains multiple months/years across rows (e.g. "2025 out.xlsx" with MONTH=jan,feb,mar,apr and YEAR=2025),
 		// split it into virtual chronological monthly sheets so every month is preserved with 100% accuracy!
 		splitSummaries := splitWideSheetByRowPeriods(filename, entry.name, entry.state, rows, layout)
 		if len(splitSummaries) > 0 {
 			for _, sub := range splitSummaries {
+				sub.preferOverFullYear = preferMonthly
 				allWideSheets = append(allWideSheets, sub)
 				if entry.state != "hidden" {
 					visibleWideSheets = append(visibleWideSheets, sub)
@@ -176,13 +175,14 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		}
 
 		summary := parsedSheetSummary{
-			sheetName:  entry.name,
-			sheetDate:  sheetDate,
-			state:      entry.state,
-			rows:       rows,
-			layout:     layout,
-			isWide:     true,
-			storeCount: len(layout.branches),
+			sheetName:          entry.name,
+			sheetDate:          sheetDate,
+			state:              entry.state,
+			rows:               rows,
+			layout:             layout,
+			isWide:             true,
+			storeCount:         len(layout.branches),
+			preferOverFullYear: preferMonthly,
 		}
 		// Compute quick monthly totals for trend & MoM/YoY
 		computeQuickSheetTotals(&summary)
@@ -193,6 +193,13 @@ func parseWideMatrixXLSX(filename string, rawContent []byte) (*domain.Normalized
 		virtualEntries = append(virtualEntries, entry)
 	}
 
+	if len(allWideSheets) == 0 {
+		return nil, false
+	}
+
+	// Prefer valid month-named periods; keep uncovered months from full-year dumps.
+	allWideSheets = dedupeSheetsByPeriodCoverage(allWideSheets)
+	visibleWideSheets = dedupeSheetsByPeriodCoverage(visibleWideSheets)
 	if len(allWideSheets) == 0 {
 		return nil, false
 	}
@@ -457,6 +464,19 @@ func detectWideMatrixHeader(headerRow []string, retailer string) (wideMatrixLayo
 	return layout, true
 }
 
+// Shared across every Sell-In / Sell-Out row: rebuilding NewReplacer per call was measurable on
+// large GP SOP exports (in26 ≈ 40k rows × 2 BuildBranchStoreMetadata calls).
+var branchKeyReplacer = strings.NewReplacer(
+	" ", "",
+	"-", "",
+	"_", "",
+	"أ", "ا",
+	"إ", "ا",
+	"آ", "ا",
+	"ى", "ي",
+	"ة", "ه",
+)
+
 func normalizeBranchKey(s string) string {
 	cleaned := strings.TrimSpace(s)
 	for _, prefix := range []string{
@@ -468,21 +488,61 @@ func normalizeBranchKey(s string) string {
 	} {
 		cleaned = strings.TrimSpace(strings.TrimPrefix(cleaned, prefix))
 	}
-	replacer := strings.NewReplacer(
-		" ", "",
-		"-", "",
-		"_", "",
-		"أ", "ا",
-		"إ", "ا",
-		"آ", "ا",
-		"ى", "ي",
-		"ة", "ه",
-	)
-	return strings.ToLower(replacer.Replace(cleaned))
+	return strings.ToLower(branchKeyReplacer.Replace(cleaned))
+}
+
+type knownBranchSlug struct {
+	slug, gov, city string
+}
+
+// knownBranchSlugMap is built once: previously BuildBranchStoreMetadata rebuilt this map (and
+// re-normalized every key) on each of ~80k calls for in26.xlsx — the dominant cost before
+// data-quality / product-match / BQ upsert on Adeco prod (~5 min of a 5m37s job).
+var knownBranchSlugMap = map[string]knownBranchSlug{
+	normalizeBranchKey("سموحة"):                  {"smouha", "الإسكندرية", "سموحة"},
+	normalizeBranchKey("سموحة ميني"):             {"smouha_mini", "الإسكندرية", "سموحة"},
+	normalizeBranchKey("جاردينيا"):               {"gardenia", "الإسكندرية", "جاردينيا"},
+	normalizeBranchKey("هانوفيل"):                {"hanoville", "الإسكندرية", "العجمي - هانوفيل"},
+	normalizeBranchKey("نهال فيل"):               {"hanoville", "الإسكندرية", "العجمي - هانوفيل"},
+	normalizeBranchKey("أكتوبر"):                 {"october", "الجيزة", "السادس من أكتوبر"},
+	normalizeBranchKey("طنطا"):                   {"tanta", "الغربية", "طنطا"},
+	normalizeBranchKey("طنطا - اوت ليت مول"):     {"tanta_outlet", "الغربية", "طنطا"},
+	normalizeBranchKey("عجمي ستار"):              {"agamy_star", "الإسكندرية", "العجمي"},
+	normalizeBranchKey("الإبراهيمية"):            {"ibrahimia", "الإسكندرية", "الإبراهيمية"},
+	normalizeBranchKey("الإبراهيمية ميني"):       {"ibrahimia_mini", "الإسكندرية", "الإبراهيمية"},
+	normalizeBranchKey("سيدي جابر ميني"):         {"sidi_gaber_mini", "الإسكندرية", "سيدي جابر"},
+	normalizeBranchKey("سيدي جابر المحطة"):       {"sidi_gaber_station", "الإسكندرية", "سيدي جابر"},
+	normalizeBranchKey("كفر الدوار"):             {"kafr_eldawar", "البحيرة", "كفر الدوار"},
+	normalizeBranchKey("كفر الدوار - مول"):       {"kafr_eldawar_mall", "البحيرة", "كفر الدوار"},
+	normalizeBranchKey("مطروح"):                  {"matrouh", "مرسى مطروح", "مطروح"},
+	normalizeBranchKey("دمنهور الأندلس"):         {"damanhour_andalus", "البحيرة", "دمنهور"},
+	normalizeBranchKey("دمنهور - الاستاد"):       {"damanhour_stadium", "البحيرة", "دمنهور"},
+	normalizeBranchKey("الأنفوشي"):               {"anfoushy", "الإسكندرية", "الأنفوشي"},
+	normalizeBranchKey("المحلة الكبرى"):          {"mahalla", "الغربية", "المحلة الكبرى"},
+	normalizeBranchKey("فلمنج"):                  {"fleming", "الإسكندرية", "فلمنج"},
+	normalizeBranchKey("الدخيلة ميني"):           {"dekheila_mini", "الإسكندرية", "الدخيلة"},
+	normalizeBranchKey("الدخيلة مينى 2"):         {"dekheila_mini_2", "الإسكندرية", "الدخيلة"},
+	normalizeBranchKey("سيدي بشر ميني"):          {"sidi_bishr_mini", "الإسكندرية", "سيدي بشر"},
+	normalizeBranchKey("روزانا"):                 {"rozana", "الإسكندرية", "سموحة - روزانا"},
+	normalizeBranchKey("النصر"):                  {"elnasr", "الإسكندرية", "شارع النصر"},
+	normalizeBranchKey("طوسون"):                  {"toson", "الإسكندرية", "أبو قير - طوسون"},
+	normalizeBranchKey("ابو يوسف"):               {"abu_youssef", "الإسكندرية", "العجمي - أبو يوسف"},
+	normalizeBranchKey("ستانلى"):                 {"stanley", "الإسكندرية", "ستانلي"},
+	normalizeBranchKey("ستانلي"):                 {"stanley", "الإسكندرية", "ستانلي"},
+	normalizeBranchKey("أمواج - الساحل الشمالي"): {"amwaj_north_coast", "الساحل الشمالي", "أمواج"},
+	normalizeBranchKey("ملك حفنى"):               {"malak_hefny", "الإسكندرية", "ملك حفني"},
+	normalizeBranchKey("سيتي سكوير"):             {"city_square", "الإسكندرية", "سيتي سكوير"},
+	normalizeBranchKey("مدينة الرحاب"):           {"rehab_city", "القاهرة", "مدينة الرحاب"},
+	normalizeBranchKey("نيس2"):                   {"nice_2", "الإسكندرية", "نيس"},
+	normalizeBranchKey("دمياط الجديدة"):          {"new_damietta", "دمياط", "دمياط الجديدة"},
+	normalizeBranchKey("المعادي"):                {"maadi", "القاهرة", "المعادي"},
+	normalizeBranchKey("الدقي"):                  {"dokki", "الجيزة", "الدقي"},
+	normalizeBranchKey("مدينة نصر"):             {"nasr_city", "القاهرة", "مدينة نصر"},
 }
 
 // BuildBranchStoreMetadata maps any raw branch name from Excel (or creates a new deterministic branch)
 // with full Egyptian geographic classification (Governorate, City, StoreID, DisplayName).
+// Arabic/English abbreviations are expanded via branchnorm before the frozen slug lookup.
 func BuildBranchStoreMetadata(retailer, rawBranch string) domain.Store {
 	clean := strings.TrimSpace(rawBranch)
 	if clean == "" {
@@ -528,48 +588,16 @@ func BuildBranchStoreMetadata(retailer, rawBranch string) domain.Store {
 		}
 	}
 
-	norm := normalizeBranchKey(clean)
-
-	// Known Fathalla & Egyptian retail branches with exact deterministic IDs
-	knownSlugMap := map[string]struct {
-		slug, gov, city string
-	}{
-		normalizeBranchKey("سموحة"):                    {"smouha", "الإسكندرية", "سموحة"},
-		normalizeBranchKey("سموحة ميني"):               {"smouha_mini", "الإسكندرية", "سموحة"},
-		normalizeBranchKey("جاردينيا"):                 {"gardenia", "الإسكندرية", "جاردينيا"},
-		normalizeBranchKey("هانوفيل"):                  {"hanoville", "الإسكندرية", "العجمي - هانوفيل"},
-		normalizeBranchKey("نهال فيل"):                 {"hanoville", "الإسكندرية", "العجمي - هانوفيل"},
-		normalizeBranchKey("أكتوبر"):                   {"october", "الجيزة", "السادس من أكتوبر"},
-		normalizeBranchKey("طنطا"):                     {"tanta", "الغربية", "طنطا"},
-		normalizeBranchKey("طنطا - اوت ليت مول"):       {"tanta_outlet", "الغربية", "طنطا"},
-		normalizeBranchKey("عجمي ستار"):                {"agamy_star", "الإسكندرية", "العجمي"},
-		normalizeBranchKey("الإبراهيمية"):              {"ibrahimia", "الإسكندرية", "الإبراهيمية"},
-		normalizeBranchKey("الإبراهيمية ميني"):         {"ibrahimia_mini", "الإسكندرية", "الإبراهيمية"},
-		normalizeBranchKey("سيدي جابر ميني"):           {"sidi_gaber_mini", "الإسكندرية", "سيدي جابر"},
-		normalizeBranchKey("سيدي جابر المحطة"):         {"sidi_gaber_station", "الإسكندرية", "سيدي جابر"},
-		normalizeBranchKey("كفر الدوار"):               {"kafr_eldawar", "البحيرة", "كفر الدوار"},
-		normalizeBranchKey("كفر الدوار - مول"):         {"kafr_eldawar_mall", "البحيرة", "كفر الدوار"},
-		normalizeBranchKey("مطروح"):                    {"matrouh", "مرسى مطروح", "مطروح"},
-		normalizeBranchKey("دمنهور الأندلس"):           {"damanhour_andalus", "البحيرة", "دمنهور"},
-		normalizeBranchKey("دمنهور - الاستاد"):         {"damanhour_stadium", "البحيرة", "دمنهور"},
-		normalizeBranchKey("الأنفوشي"):                 {"anfoushy", "الإسكندرية", "الأنفوشي"},
-		normalizeBranchKey("المحلة الكبرى"):            {"mahalla", "الغربية", "المحلة الكبرى"},
-		normalizeBranchKey("فلمنج"):                    {"fleming", "الإسكندرية", "فلمنج"},
-		normalizeBranchKey("الدخيلة ميني"):             {"dekheila_mini", "الإسكندرية", "الدخيلة"},
-		normalizeBranchKey("الدخيلة مينى 2"):           {"dekheila_mini_2", "الإسكندرية", "الدخيلة"},
-		normalizeBranchKey("سيدي بشر ميني"):            {"sidi_bishr_mini", "الإسكندرية", "سيدي بشر"},
-		normalizeBranchKey("روزانا"):                   {"rozana", "الإسكندرية", "سموحة - روزانا"},
-		normalizeBranchKey("النصر"):                    {"elnasr", "الإسكندرية", "شارع النصر"},
-		normalizeBranchKey("طوسون"):                    {"toson", "الإسكندرية", "أبو قير - طوسون"},
-		normalizeBranchKey("ابو يوسف"):                 {"abu_youssef", "الإسكندرية", "العجمي - أبو يوسف"},
-		normalizeBranchKey("ستانلى"):                   {"stanley", "الإسكندرية", "ستانلي"},
-		normalizeBranchKey("أمواج - الساحل الشمالي"):   {"amwaj_north_coast", "الساحل الشمالي", "أمواج"},
-		normalizeBranchKey("ملك حفنى"):                 {"malak_hefny", "الإسكندرية", "ملك حفني"},
-		normalizeBranchKey("سيتي سكوير"):               {"city_square", "الإسكندرية", "سيتي سكوير"},
-		normalizeBranchKey("مدينة الرحاب"):             {"rehab_city", "القاهرة", "مدينة الرحاب"},
-		normalizeBranchKey("نيس2"):                     {"nice_2", "الإسكندرية", "نيس"},
-		normalizeBranchKey("دمياط الجديدة"):            {"new_damietta", "دمياط", "دمياط الجديدة"},
+	// Phase A5: expand abbreviations / English → canonical Arabic short name.
+	var bn branchnorm.Result
+	if canon, known, r := canonicalizeBranchForStore(clean); known {
+		clean = canon
+		bn = r
+	} else {
+		bn = r
 	}
+
+	norm := normalizeBranchKey(clean)
 
 	prefix := "fat"
 	chainLabel := "فرع فتح الله"
@@ -611,13 +639,33 @@ func BuildBranchStoreMetadata(retailer, rawBranch string) domain.Store {
 		displayName = fmt.Sprintf("%s - %s", chainLabel, clean)
 	}
 
-	if info, ok := knownSlugMap[norm]; ok {
+	if info, ok := knownBranchSlugMap[norm]; ok {
 		return domain.Store{
 			ID:          fmt.Sprintf("%s_%s", prefix, info.slug),
 			Chain:       chain,
 			BranchName:  displayName,
 			Governorate: info.gov,
 			City:        info.city,
+			IsActive:    true,
+		}
+	}
+
+	// branchnorm knew a slug that isn't in the legacy map yet — still use frozen slug form.
+	if bn.Slug != "" {
+		gov := bn.Governorate
+		city := bn.City
+		if gov == "" {
+			gov = inferGovernorateFromBranch(clean)
+		}
+		if city == "" {
+			city = clean
+		}
+		return domain.Store{
+			ID:          fmt.Sprintf("%s_%s", prefix, bn.Slug),
+			Chain:       chain,
+			BranchName:  displayName,
+			Governorate: gov,
+			City:        city,
 			IsActive:    true,
 		}
 	}
@@ -1796,7 +1844,7 @@ func buildPayloadFromWideMatrix(
 	}
 	anomalies = append(anomalies, buildWideMatrixReconAnomalies(reconByMonth)...)
 
-	return &domain.NormalizedRetailIngestionPayload{
+	payload := &domain.NormalizedRetailIngestionPayload{
 		RetailerDetected:     retailer,
 		ReportingPeriodStart: minDate,
 		ReportingPeriodEnd:   maxDate,
@@ -1827,7 +1875,9 @@ func buildPayloadFromWideMatrix(
 		UnitsMoMPct:          unitsMoM,
 		UnitsYoYPct:          unitsYoY,
 		IsWideMatrixWorkbook: true,
-	}, true
+	}
+	attachBranchNormSummary(payload)
+	return payload, true
 }
 
 // frozenStoreIDPrefixes pins the historical chain[:3] prefix of every chain that already exists

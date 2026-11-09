@@ -45,6 +45,8 @@ check_get() {
 echo "Tashil smoke (read-only) → $BASE_URL  tenant=$TENANT_PATH"
 check_get "/" "200" "web shell (index.html)"
 check_get "${TENANT_PATH}" "200" "tenant portal shell (${TENANT_PATH})"
+# Public readiness via hosting /api/** rewrite (not /livez — that misses the rewrite).
+check_get "/api/v1/health" "200" "backend health via hosting rewrite"
 check_get "/api/v1/version" "200" "backend version via hosting rewrite"
 # Auth-gated route should reject anonymous callers (proves API wiring + JWT gate).
 check_get "/api/v1/tenants" "401" "tenants requires JWT"
