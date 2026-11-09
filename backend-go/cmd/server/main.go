@@ -17,6 +17,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/handlers"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
+	"github.com/tashil/data-sharing/backend/internal/service/arabicqa"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 	"github.com/tashil/data-sharing/backend/internal/service/customers"
@@ -248,6 +249,9 @@ func main() {
 	sellInAssistSvc := sellinassist.New(cfg.GeminiAPIKey, cfg.GeminiModel, cfg.GeminiAPIKey == "").WithTier2Model(cfg.GeminiTier2Model)
 	sellInAssistHandler := handlers.NewSellInAssistHandler(sellInAssistSvc)
 	uploadHandler.WithSellInAssist(sellInAssistSvc)
+	// Phase C Arabic Q&A over BigQuery — read-only, tenant-scoped. Own package; no Excel/ingest hot paths.
+	arabicQASvc := arabicqa.New(bqRepo, cfg.GeminiAPIKey, cfg.GeminiModel, cfg.GeminiAPIKey == "")
+	arabicQAHandler := handlers.NewArabicQAHandler(arabicQASvc)
 
 	// 5. Setup Mux Router (Go 1.22+ method + path patterns)
 	mux := http.NewServeMux()
@@ -339,6 +343,8 @@ func main() {
 	mux.HandleFunc("POST /api/v1/sell-in/assist/approve", sellInAssistHandler.HandleApprove)
 	mux.HandleFunc("POST /api/v1/sell-in/assist/reject", sellInAssistHandler.HandleReject)
 	mux.HandleFunc("GET /api/v1/sell-in/assist/metrics", sellInAssistHandler.HandleMetrics)
+	mux.HandleFunc("POST /api/v1/analytics/ask", arabicQAHandler.HandleAsk)
+	mux.HandleFunc("GET /api/v1/analytics/ask/capabilities", arabicQAHandler.HandleCapabilities)
 	mux.HandleFunc("GET /api/v1/analytics/oos-monitor", oosHandler.HandleOOSMonitor)
 	mux.HandleFunc("GET /api/v1/stores", storeHandler.HandleGetStores)
 	mux.HandleFunc("GET /api/v1/tenants", storeHandler.HandleGetTenants)
