@@ -25,8 +25,32 @@ void main() {
       );
 
   /// Fake backend storing custom SKUs in memory, like the Go endpoints.
+  /// Sell-out records include one live own-SKU row so production path never falls back to seeds.
   MockClient fakeServer(List<Map<String, dynamic>> store, {bool failWrites = false}) {
     return MockClient((req) async {
+      if (req.url.path.contains('/api/v1/analytics/records')) {
+        return _json(
+          jsonEncode({
+            'records': [
+              {
+                'record_id': 'live-own-1',
+                'retailer_chain': 'fathalla',
+                'store_id': 's1',
+                'store_name': 'فرع',
+                'barcode': ownBarcode,
+                'sku_name': 'فيبا 3 كجم',
+                'category': 'صابون سائل اطباق',
+                'quantity_sold': 10,
+                'net_revenue': 1600.0,
+                'unit_price': 160.0,
+                'transaction_date': '2026-05-15',
+              },
+            ],
+            'total_count': 1,
+          }),
+          200,
+        );
+      }
       if (!req.url.path.startsWith('/api/v1/competitors/custom-skus')) {
         return http.Response('{"records":[]}', 200);
       }
@@ -87,6 +111,24 @@ void main() {
       final groups = await api.getCompetitiveComparisonGroups(chain: 'fathalla', syncCustomSkus: false);
       expect(customs(groups), isEmpty);
     }, () => fakeServer(store, failWrites: true));
+  });
+
+  test('custom competitor with no history → empty monthlyPrices; current price kept', () async {
+    final store = <Map<String, dynamic>>[];
+    await http.runWithClient(() async {
+      final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
+      await addPril(api);
+      final groups = await api.getCompetitiveComparisonGroups(chain: 'fathalla');
+      final found = customs(groups).single;
+      expect(found.unitPrice, 150);
+      expect(found.monthlyPrices, isEmpty);
+      expect(found.allMonthlyPrices, isEmpty);
+      // Own live May only — Jan–Apr must not appear on own or custom series.
+      final own = groups.firstWhere((g) => g.ownBarcode == ownBarcode);
+      expect(own.monthlyPrices.map((p) => p.monthNum).toSet(), {5});
+      expect(own.monthlyPrices.any((p) => p.monthNum <= 4), isFalse);
+      expect(found.monthlyPrices.any((p) => p.monthNum <= 4), isFalse);
+    }, () => fakeServer(store));
   });
 }
 

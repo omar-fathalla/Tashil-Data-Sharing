@@ -48,6 +48,7 @@ Compact “More” sheet items for Sell-Out / Sell-In also carry `nav-sell-out` 
 | `logout` | Logout control (rail / drawer / profile) |
 | `nav-sell-out` | Navigate to Sell-Out |
 | `nav-sell-in` | Navigate to Sell-In |
+| `nav-returns` | Navigate to المرتجعات (Returns) |
 | `sellout-upload-button` | Sell-Out “upload / choose file” |
 | `sellin-upload-button` | Sell-In “upload / choose file” |
 | `upload-choose-file` | Smart Upload portal choose-file button |
