@@ -157,6 +157,7 @@ func main() {
 		return b, f, err
 	}).OnRebuilt(func() {
 		ingestProcessor.SyncDurableFromStore(context.Background(), "tenant-adeco", true)
+		bqRepo.WarmCommonTenantAnalytics(context.Background(), []string{"tenant-adeco"})
 		dqService.OnSourceChanged()
 	})
 
@@ -189,6 +190,9 @@ func main() {
 			}
 		}
 		ingestProcessor.SyncDurableFromStore(context.Background(), "tenant-adeco", true)
+		// Fill kpiCache + sell-in-returns cache before serving so cold-start YTD
+		// and year-scoped المرتجعات do not rebuild on the request path.
+		bqRepo.WarmCommonTenantAnalytics(context.Background(), durableTenants)
 		go ingestProcessor.RunDurableSync(context.Background(), durableTenants, ingestion.DefaultDurableSyncInterval)
 	}
 

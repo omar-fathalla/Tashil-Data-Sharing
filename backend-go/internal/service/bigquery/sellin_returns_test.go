@@ -82,18 +82,9 @@ func TestAggregateSellInReturns_MonthlyNettingAndNegativesKept(t *testing.T) {
 		t.Fatalf("monthly returns sum %v != yearly %v", sumRet, rep.KPIs.ReturnsValueEGP)
 	}
 
-	if len(rep.Advisories) == 0 {
-		t.Fatal("expected net-negative advisory for branch A / صنف1 / March")
-	}
-	found := false
-	for _, a := range rep.Advisories {
-		if a.MonthNum == 3 && a.BranchName == "فرع أ" && a.NetValueEGP < 0 {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("advisory missing: %+v", rep.Advisories)
+	// Advisories / alerts intentionally empty (UI cards removed; JSON keys kept).
+	if len(rep.Advisories) != 0 || len(rep.Alerts) != 0 {
+		t.Fatalf("expected empty advisories/alerts, got advisories=%+v alerts=%+v", rep.Advisories, rep.Alerts)
 	}
 
 	if len(rep.FilterOptions.Branches) != 2 || len(rep.FilterOptions.ProductGroups) != 2 {
@@ -140,8 +131,8 @@ func TestAggregateSellInReturns_ProductGroupFilter(t *testing.T) {
 }
 
 func TestAggregateSellInReturns_NetsByStableIdentityNotDisplayName(t *testing.T) {
-	// Same branch + ItemCode; return carries a renamed ItemName — must net +80, not
-	// emit a false net-negative advisory for the −20 alone.
+	// Same branch + ItemCode; return carries a renamed ItemName — KPIs must still
+	// net +80 (top products roll up by ItemCode, not display name).
 	recs := []domain.SellInRecord{
 		{
 			Year: 2026, MonthNum: 1,
@@ -165,8 +156,11 @@ func TestAggregateSellInReturns_NetsByStableIdentityNotDisplayName(t *testing.T)
 	if math.Abs(rep.KPIs.ReturnsValueEGP-20) > 0.01 {
 		t.Fatalf("returns: got %v want 20", rep.KPIs.ReturnsValueEGP)
 	}
-	if len(rep.Advisories) != 0 {
-		t.Fatalf("expected no net-negative advisory when same ItemCode nets +80, got %+v", rep.Advisories)
+	if len(rep.TopReturnedProducts) != 1 || rep.TopReturnedProducts[0].ProductCode != "FG-1" {
+		t.Fatalf("expected one top product FG-1, got %+v", rep.TopReturnedProducts)
+	}
+	if len(rep.Advisories) != 0 || len(rep.Alerts) != 0 {
+		t.Fatalf("advisories/alerts must stay empty: %+v / %+v", rep.Advisories, rep.Alerts)
 	}
 
 	// Barcode-only identity (no ItemCode) should also net across renamed names.
@@ -175,8 +169,11 @@ func TestAggregateSellInReturns_NetsByStableIdentityNotDisplayName(t *testing.T)
 		{Year: 2026, MonthNum: 2, CustomerName: "فرع ب", CustomerBranchCode: "b-b", ItemName: "جديد", Barcode: "6220001", NetValueEGP: -10, NetQtyCases: -1, TransactionType: "مرتجع (Return)"},
 	}
 	rep2 := AggregateSellInReturns(byBarcode, SellInReturnsFilter{Year: 2026, Month: 2})
-	if math.Abs(rep2.KPIs.NetValueEGP-40) > 0.01 || len(rep2.Advisories) != 0 {
-		t.Fatalf("barcode identity: net=%v advisories=%+v", rep2.KPIs.NetValueEGP, rep2.Advisories)
+	if math.Abs(rep2.KPIs.NetValueEGP-40) > 0.01 {
+		t.Fatalf("barcode identity: net=%v", rep2.KPIs.NetValueEGP)
+	}
+	if len(rep2.TopReturnedProducts) != 1 || rep2.TopReturnedProducts[0].ReturnsValueEGP != 10 {
+		t.Fatalf("barcode top product: %+v", rep2.TopReturnedProducts)
 	}
 }
 
@@ -192,15 +189,15 @@ func TestIsSellInReturn(t *testing.T) {
 	}
 }
 
-func TestAggregateSellInReturns_TopProductsAndAlerts(t *testing.T) {
+func TestAggregateSellInReturns_TopProductsNoAlerts(t *testing.T) {
 	recs := []domain.SellInRecord{
-		// P1: heavy returns → top #1, product alert (20/100 = 20%)
+		// P1: heavy returns → top #1
 		{Year: 2026, MonthNum: 4, CustomerName: "فرع أ", CustomerBranchCode: "b-a", ItemName: "صنف ثقيل", ItemCode: "P1", ItemGroup: "مجموعة1", NetValueEGP: 100, NetQtyCases: 10},
 		{Year: 2026, MonthNum: 4, CustomerName: "فرع أ", CustomerBranchCode: "b-a", ItemName: "صنف ثقيل", ItemCode: "P1", ItemGroup: "مجموعة1", NetValueEGP: -20, NetQtyCases: -2, TransactionType: "مرتجع (Return)"},
 		// P2: smaller returns
 		{Year: 2026, MonthNum: 4, CustomerName: "فرع ب", CustomerBranchCode: "b-b", ItemName: "صنف خفيف", ItemCode: "P2", ItemGroup: "مجموعة2", NetValueEGP: 200, NetQtyCases: 20},
 		{Year: 2026, MonthNum: 4, CustomerName: "فرع ب", CustomerBranchCode: "b-b", ItemName: "صنف خفيف", ItemCode: "P2", ItemGroup: "مجموعة2", NetValueEGP: -5, NetQtyCases: -1, TransactionType: "مرتجع (Return)"},
-		// Prior month smaller returns → MoM spike for April focus
+		// Prior month smaller returns → MoM still computed on KPIs
 		{Year: 2026, MonthNum: 3, CustomerName: "فرع أ", CustomerBranchCode: "b-a", ItemName: "صنف ثقيل", ItemCode: "P1", ItemGroup: "مجموعة1", NetValueEGP: 50, NetQtyCases: 5},
 		{Year: 2026, MonthNum: 3, CustomerName: "فرع أ", CustomerBranchCode: "b-a", ItemName: "صنف ثقيل", ItemCode: "P1", ItemGroup: "مجموعة1", NetValueEGP: -2, NetQtyCases: -1, TransactionType: "مرتجع (Return)"},
 	}
@@ -217,52 +214,28 @@ func TestAggregateSellInReturns_TopProductsAndAlerts(t *testing.T) {
 		t.Fatalf("P1 should dominate share of returns: %+v", top)
 	}
 
-	// Overall return % for April: returns 25 / gross 300 ≈ 8.3% → warning (>=5, <10)
+	// Overall return % for April: returns 25 / gross 300 ≈ 8.3%
 	if math.Abs(rep.KPIs.ReturnPctOfGross-round2(25.0/300.0*100)) > 0.05 {
 		t.Fatalf("kpi return pct: %v", rep.KPIs.ReturnPctOfGross)
 	}
-	hasReturnPct := false
-	hasMom := false
-	hasProduct := false
-	for _, a := range rep.Alerts {
-		switch a.Code {
-		case "return_pct":
-			hasReturnPct = true
-			if a.Severity != "warning" {
-				t.Fatalf("overall return_pct severity: %+v", a)
-			}
-		case "mom_spike":
-			hasMom = true
-		case "product_pct":
-			if a.Context == "صنف ثقيل" {
-				hasProduct = true
-			}
-		}
+	if rep.KPIs.MomChangePct == nil || *rep.KPIs.MomChangePct < 100 {
+		t.Fatalf("expected MoM spike on KPI, got %+v", rep.KPIs)
 	}
-	if !hasReturnPct {
-		t.Fatalf("expected return_pct alert, got %+v", rep.Alerts)
-	}
-	if !hasMom {
-		t.Fatalf("expected mom_spike (Apr returns 25 vs Mar 2), got %+v", rep.Alerts)
-	}
-	if !hasProduct {
-		t.Fatalf("expected product_pct for صنف ثقيل, got %+v", rep.Alerts)
+	if len(rep.Alerts) != 0 || len(rep.Advisories) != 0 {
+		t.Fatalf("alerts/advisories must be empty (cards removed), got alerts=%+v advisories=%+v", rep.Alerts, rep.Advisories)
 	}
 }
 
-func TestAggregateSellInReturns_CriticalAlertAt10Pct(t *testing.T) {
+func TestAggregateSellInReturns_HighReturnPctNoAlertPayload(t *testing.T) {
 	recs := []domain.SellInRecord{
 		{Year: 2026, MonthNum: 1, CustomerName: "فرع أ", CustomerBranchCode: "b-a", ItemName: "صنف", ItemCode: "X1", NetValueEGP: 100, NetQtyCases: 10},
 		{Year: 2026, MonthNum: 1, CustomerName: "فرع أ", CustomerBranchCode: "b-a", ItemName: "صنف", ItemCode: "X1", NetValueEGP: -15, NetQtyCases: -2, TransactionType: "مرتجع (Return)"},
 	}
 	rep := AggregateSellInReturns(recs, SellInReturnsFilter{Year: 2026, Month: 1})
-	found := false
-	for _, a := range rep.Alerts {
-		if a.Code == "return_pct" && a.Severity == "critical" {
-			found = true
-		}
+	if math.Abs(rep.KPIs.ReturnPctOfGross-15) > 0.05 {
+		t.Fatalf("expected 15%% return pct on KPI, got %v", rep.KPIs.ReturnPctOfGross)
 	}
-	if !found {
-		t.Fatalf("expected critical return_pct at 15%%, got %+v", rep.Alerts)
+	if len(rep.Alerts) != 0 {
+		t.Fatalf("threshold alerts omitted from payload, got %+v", rep.Alerts)
 	}
 }

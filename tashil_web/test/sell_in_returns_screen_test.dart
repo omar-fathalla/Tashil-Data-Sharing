@@ -8,6 +8,8 @@ import 'package:tashil_web/core/utils/excel_export_service.dart';
 import 'package:tashil_web/features/sell_in_returns/data/sell_in_returns_repository.dart';
 import 'package:tashil_web/features/sell_in_returns/domain/sell_in_returns_models.dart';
 import 'package:tashil_web/features/sell_in_returns/presentation/screens/sell_in_returns_screen.dart';
+import 'package:tashil_web/features/sell_in_returns/presentation/widgets/returns_heatmap_matrix.dart';
+import 'package:tashil_web/features/sell_in_returns/presentation/widgets/returns_top_products_table.dart';
 
 /// Synthetic report: months come from data (Feb/Mar/May) — not a fixed 1..12 grid.
 class _FakeReturnsRepo implements SellInReturnsRepository {
@@ -53,16 +55,7 @@ class _FakeReturnsRepo implements SellInReturnsRepository {
           products: ['صنف QA'],
           productGroups: ['مجموعة QA'],
         ),
-        advisories: [
-          SellInReturnsAdvisory(
-            year: 2026,
-            monthNum: 5,
-            branchName: 'فرع QA تجريبي',
-            productName: 'صنف سالب',
-            netValueEgp: -15,
-            messageAr: 'صافي التوريد سالب للصنف «صنف سالب» في فرع «فرع QA تجريبي» خلال مايو',
-          ),
-        ],
+        // Advisories / alerts intentionally omitted — cards removed from UI.
         topReturnedProducts: [
           SellInReturnsTopProduct(
             rank: 1,
@@ -88,15 +81,6 @@ class _FakeReturnsRepo implements SellInReturnsRepository {
             shareOfReturns: 33.3,
           ),
         ],
-        alerts: [
-          SellInReturnsAlert(
-            severity: 'critical',
-            code: 'return_pct',
-            messageAr: 'نسبة المرتجع من الإجمالي 20.0% تجاوزت الحد الحرج (10%).',
-            value: 20,
-            threshold: 10,
-          ),
-        ],
       ),
     );
   }
@@ -104,7 +88,7 @@ class _FakeReturnsRepo implements SellInReturnsRepository {
 
 void main() {
   testWidgets('المرتجعات matrix months come from data (Feb/Mar/May only)', (tester) async {
-    // Tall viewport so Phase-2 alerts/top-products + matrix are all built (ListView lazy).
+    // Tall viewport so Phase-2 top-products + matrix are all built (ListView lazy).
     tester.view.physicalSize = const Size(1440, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -131,9 +115,9 @@ void main() {
     expect(find.text('نسبة المرتجع من الإجمالي'), findsOneWidget);
     expect(find.textContaining('التغير الشهري'), findsOneWidget);
 
-    // Phase-2: threshold alerts + top returned products + Excel export.
-    expect(find.textContaining('تنبيهات تجاوز الحد المعتاد'), findsOneWidget);
-    expect(find.textContaining('تجاوزت الحد الحرج'), findsOneWidget);
+    // Phase-2: top returned products + Excel export; alert cards removed.
+    expect(find.textContaining('تنبيهات تجاوز الحد المعتاد'), findsNothing);
+    expect(find.textContaining('صافي سالب (محفوظ وغير مخفي)'), findsNothing);
     expect(find.text('أعلى الأصناف المرتجعة'), findsOneWidget);
     expect(find.textContaining('صنف QA مرتجع'), findsOneWidget);
     expect(find.text('تصدير Excel'), findsOneWidget);
@@ -141,21 +125,21 @@ void main() {
     // Dynamic months from fixture — matrix columns only (not a fixed Jan–Dec grid).
     // Month dropdown still lists Jan–Dec; scope assertions to the matrix card.
     expect(find.textContaining('مصفوفة المرتجعات'), findsOneWidget);
-    final matrixCard = find.ancestor(
-      of: find.textContaining('مصفوفة المرتجعات'),
-      matching: find.byWidgetPredicate((w) => w is Card),
-    );
-    final matrixTable = find.descendant(of: matrixCard, matching: find.byType(DataTable));
-    expect(matrixTable, findsOneWidget);
-    expect(find.descendant(of: matrixTable, matching: find.text('فبراير')), findsOneWidget);
-    expect(find.descendant(of: matrixTable, matching: find.text('مارس')), findsOneWidget);
-    expect(find.descendant(of: matrixTable, matching: find.text('مايو')), findsOneWidget);
-    expect(find.descendant(of: matrixTable, matching: find.text('يناير')), findsNothing);
-    expect(find.descendant(of: matrixTable, matching: find.text('أبريل')), findsNothing);
-    expect(find.descendant(of: matrixTable, matching: find.text('يونيو')), findsNothing);
+    // Heatmap uses fixed-width cells (not DataTable) so RTL headers stay aligned.
+    expect(find.byType(ReturnsHeatmapMatrix), findsOneWidget);
+    expect(find.byType(ReturnsTopProductsTable), findsOneWidget);
+    expect(find.text('فبراير'), findsWidgets);
+    expect(find.text('مارس'), findsWidgets);
+    expect(find.text('مايو'), findsWidgets);
 
     expect(find.text('فرع QA تجريبي'), findsWidgets);
-    expect(find.textContaining('صافي التوريد سالب'), findsOneWidget);
+    expect(find.text('الصنف'), findsOneWidget);
+    expect(find.text('قيمة المرتجع'), findsOneWidget);
+
+    // Rank (#) column is narrow and sits beside the product name (not a wide spacer).
+    expect(ReturnsTopProductsTable.columnWidths[0], isA<FixedColumnWidth>());
+    final rankW = (ReturnsTopProductsTable.columnWidths[0]! as FixedColumnWidth).value;
+    expect(rankW, lessThanOrEqualTo(40));
 
     // Value ↔ % toggle is present.
     expect(find.text('قيمة'), findsWidgets);

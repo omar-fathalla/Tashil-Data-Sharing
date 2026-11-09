@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -11,9 +12,15 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 )
 
+// sellInReturnsProvider is implemented by *bigquery.Client (cached + fast path).
+type sellInReturnsProvider interface {
+	GetSellInReturnsCached(ctx context.Context, tenantID string, filter bigquery.SellInReturnsFilter) bigquery.SellInReturnsReport
+}
+
 // HandleSellInReturns serves GET /api/v1/analytics/sell-in-returns (المرتجعات report).
-// Phase-1: KPIs, matrix, chart, net-negative advisories.
-// Phase-2: top returned products, threshold alerts, (Excel is client-side).
+// Phase-1: KPIs, matrix, chart.
+// Phase-2: top returned products (Excel is client-side).
+// Advisories / threshold alerts are omitted (empty) — UI cards removed; keeps JSON keys.
 // Read-only, tenant-scoped. Negatives stay as stored; response returns amounts are positive.
 func (h *AnalyticsHandler) HandleSellInReturns(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := middleware.EnforceTenantRLS(r)
@@ -40,18 +47,23 @@ func (h *AnalyticsHandler) HandleSellInReturns(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	// Load year-scoped rows (all months) so MoM / chart / advisories stay coherent.
-	recs, _, err := h.bqRepo.GetSellInRecords(r.Context(), tenantID, bigquery.SellInRecordFilter{
-		RetailerChain: filter.Chain,
-		Year:          filter.Year,
-		Limit:         0,
-	})
-	if err != nil {
-		http.Error(w, `{"error":"failed to query sell-in records"}`, http.StatusInternalServerError)
-		return
+	var report bigquery.SellInReturnsReport
+	if cached, ok := h.bqRepo.(sellInReturnsProvider); ok {
+		report = cached.GetSellInReturnsCached(r.Context(), tenantID, filter)
+	} else {
+		// Fallback for non-Client repositories: unsorted year rows + aggregate.
+		recs, _, err := h.bqRepo.GetSellInRecords(r.Context(), tenantID, bigquery.SellInRecordFilter{
+			RetailerChain: filter.Chain,
+			Year:          filter.Year,
+			Limit:         0,
+		})
+		if err != nil {
+			http.Error(w, `{"error":"failed to query sell-in records"}`, http.StatusInternalServerError)
+			return
+		}
+		report = bigquery.AggregateSellInReturns(recs, filter)
 	}
 
-	report := bigquery.AggregateSellInReturns(recs, filter)
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(report)
 }

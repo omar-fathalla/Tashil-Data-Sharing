@@ -98,13 +98,8 @@ type SellInReturnsAlert struct {
 	Context   string  `json:"context,omitempty"` // branch / product / month label
 }
 
-// Default returns-rate thresholds (of gross). Match Phase-1 KPI card soft flags.
-const (
-	ReturnsWarnPctOfGross     = 5.0
-	ReturnsCriticalPctOfGross = 10.0
-	ReturnsMomSpikePct        = 25.0
-	TopReturnedProductsLimit  = 10
-)
+// TopReturnedProductsLimit caps Phase-2 top returned products in the response.
+const TopReturnedProductsLimit = 10
 
 // SellInReturnsFilterOptions lists distinct values for the UI filters (from year-scoped data).
 type SellInReturnsFilterOptions struct {
@@ -116,18 +111,18 @@ type SellInReturnsFilterOptions struct {
 
 // SellInReturnsReport is GET /api/v1/analytics/sell-in-returns.
 type SellInReturnsReport struct {
-	Year                 int                          `json:"year"`
-	Month                int                          `json:"month"`
-	Months               []int                        `json:"months"` // dynamic months present after filters
-	KPIs                 SellInReturnsKPI             `json:"kpis"`
-	Monthly              []SellInReturnsMonthPoint    `json:"monthly"`
-	Branches             []SellInReturnsBranchRow     `json:"branches"`
-	ColumnTotals         map[string]SellInReturnsCell `json:"column_totals"`
-	GrandTotal           SellInReturnsCell            `json:"grand_total"`
-	FilterOptions        SellInReturnsFilterOptions   `json:"filter_options"`
-	Advisories           []SellInReturnsAdvisory      `json:"advisories"`
-	TopReturnedProducts  []SellInReturnsTopProduct    `json:"top_returned_products"`
-	Alerts               []SellInReturnsAlert         `json:"alerts"`
+	Year                int                          `json:"year"`
+	Month               int                          `json:"month"`
+	Months              []int                        `json:"months"` // dynamic months present after filters
+	KPIs                SellInReturnsKPI             `json:"kpis"`
+	Monthly             []SellInReturnsMonthPoint    `json:"monthly"`
+	Branches            []SellInReturnsBranchRow     `json:"branches"`
+	ColumnTotals        map[string]SellInReturnsCell `json:"column_totals"`
+	GrandTotal          SellInReturnsCell            `json:"grand_total"`
+	FilterOptions       SellInReturnsFilterOptions   `json:"filter_options"`
+	Advisories          []SellInReturnsAdvisory      `json:"advisories"`
+	TopReturnedProducts []SellInReturnsTopProduct    `json:"top_returned_products"`
+	Alerts              []SellInReturnsAlert         `json:"alerts"`
 }
 
 var arabicMonthNamesReturns = []string{
@@ -289,26 +284,15 @@ func AggregateSellInReturns(records []domain.SellInRecord, f SellInReturnsFilter
 	}
 
 	monthSet := map[int]bool{}
-	type bKey struct{ key, name, chain string }
 	branchRows := map[string]*SellInReturnsBranchRow{}
 	colTotals := map[int]*SellInReturnsCell{}
 	var grand SellInReturnsCell
 	monthlyCells := map[int]*SellInReturnsCell{}
 
-	type netKey struct {
-		month   int
-		branch  string // CustomerBranchCode (stable)
-		product string // ItemCode / Barcode (stable); never display name
-	}
-	type netSum struct {
-		val, qty    float64
-		branchName  string // display only
-		productName string
-		productCode string
-	}
-	netAgg := map[netKey]*netSum{}
-
 	// Phase-2 top returned products: aggregate by stable product identity.
+	// Advisories (net-negative) and threshold alerts are no longer computed —
+	// Flutter removed those cards; skipping the per product×branch×month netAgg
+	// map is a major win on large Sell-In years (~42s request path).
 	type prodAgg struct {
 		returnsVal, returnsQty, grossVal, netVal float64
 		name, code, group                        string
@@ -322,38 +306,7 @@ func AggregateSellInReturns(records []domain.SellInRecord, f SellInReturnsFilter
 		monthSet[r.MonthNum] = true
 		mk := r.MonthNum
 
-		// Net advisories by stable branch+product identity so renamed ItemName
-		// on a return does not split from the invoice (false net-negative).
-		nk := netKey{month: mk, branch: branchKeyOf(r), product: productKeyOf(r)}
-		na := netAgg[nk]
-		if na == nil {
-			na = &netSum{
-				branchName:  strings.TrimSpace(r.CustomerName),
-				productName: strings.TrimSpace(r.ItemName),
-				productCode: strings.TrimSpace(r.ItemCode),
-			}
-			if na.branchName == "" {
-				na.branchName = nk.branch
-			}
-			if na.productName == "" {
-				na.productName = nk.product
-			}
-			if na.productCode == "" {
-				na.productCode = strings.TrimSpace(r.Barcode)
-			}
-			netAgg[nk] = na
-		}
-		na.val += r.NetValueEGP
-		na.qty += r.NetQtyCases
-		// Prefer a non-empty display name if a later row has one.
-		if name := strings.TrimSpace(r.CustomerName); name != "" {
-			na.branchName = name
-		}
-		if name := strings.TrimSpace(r.ItemName); name != "" {
-			na.productName = name
-		}
-
-		// Period-scoped product rollup (respect month filter for top-10 + product alerts).
+		// Period-scoped product rollup (respect month filter for top-10).
 		if f.Month <= 0 || r.MonthNum == f.Month {
 			pk := productKeyOf(r)
 			pa := productAgg[pk]
@@ -549,35 +502,6 @@ func AggregateSellInReturns(records []domain.SellInRecord, f SellInReturnsFilter
 		}
 	}
 
-	advisories := make([]SellInReturnsAdvisory, 0)
-	for k, v := range netAgg {
-		if f.Month > 0 && k.month != f.Month {
-			continue
-		}
-		if v.val >= -0.005 {
-			continue
-		}
-		advisories = append(advisories, SellInReturnsAdvisory{
-			Year:        f.Year,
-			MonthNum:    k.month,
-			BranchName:  v.branchName,
-			ProductCode: v.productCode,
-			ProductName: v.productName,
-			NetValueEGP: round2(v.val),
-			NetQty:      round2(v.qty),
-			MessageAR: fmt.Sprintf(
-				"صافي التوريد سالب للصنف «%s» في فرع «%s» خلال %s (%.2f ج.م) — الصفوف محفوظة ولم تُخفَ.",
-				v.productName, v.branchName, arabicMonthNamesReturns[k.month], v.val,
-			),
-		})
-	}
-	sort.Slice(advisories, func(i, j int) bool {
-		if advisories[i].NetValueEGP != advisories[j].NetValueEGP {
-			return advisories[i].NetValueEGP < advisories[j].NetValueEGP
-		}
-		return advisories[i].ProductName < advisories[j].ProductName
-	})
-
 	// Phase-2: top returned products (by returns value).
 	topProducts := make([]SellInReturnsTopProduct, 0, len(productAgg))
 	for _, pa := range productAgg {
@@ -619,14 +543,13 @@ func AggregateSellInReturns(records []domain.SellInRecord, f SellInReturnsFilter
 		topProducts[i].Rank = i + 1
 	}
 
-	// Phase-2: threshold alerts when returns exceed normal levels.
-	alerts := buildReturnsAlerts(kpis, outBranches, topProducts)
-
 	monthsOut := visibleMonths
 	if len(monthsOut) == 0 && f.Month <= 0 {
 		monthsOut = chartMonths
 	}
 
+	// Advisories / Alerts intentionally empty (backward-compatible JSON keys).
+	// UI cards removed; computing them dominated large-year latency.
 	return SellInReturnsReport{
 		Year:         f.Year,
 		Month:        f.Month,
@@ -642,102 +565,10 @@ func AggregateSellInReturns(records []domain.SellInRecord, f SellInReturnsFilter
 			Products:      productsOpt,
 			ProductGroups: groupsOpt,
 		},
-		Advisories:          advisories,
+		Advisories:          []SellInReturnsAdvisory{},
 		TopReturnedProducts: topProducts,
-		Alerts:              alerts,
+		Alerts:              []SellInReturnsAlert{},
 	}
-}
-
-// buildReturnsAlerts emits warning/critical alerts when overall, MoM, branch, or
-// product return rates exceed the default "normal" thresholds.
-func buildReturnsAlerts(
-	kpis SellInReturnsKPI,
-	branches []SellInReturnsBranchRow,
-	top []SellInReturnsTopProduct,
-) []SellInReturnsAlert {
-	alerts := make([]SellInReturnsAlert, 0)
-
-	if kpis.GrossValueEGP > 0 || kpis.ReturnsValueEGP > 0 {
-		pct := kpis.ReturnPctOfGross
-		switch {
-		case pct >= ReturnsCriticalPctOfGross:
-			alerts = append(alerts, SellInReturnsAlert{
-				Severity:  "critical",
-				Code:      "return_pct",
-				MessageAR: fmt.Sprintf("نسبة المرتجع من الإجمالي %.1f%% تجاوزت الحد الحرج (%.0f%%).", pct, ReturnsCriticalPctOfGross),
-				Value:     pct,
-				Threshold: ReturnsCriticalPctOfGross,
-			})
-		case pct >= ReturnsWarnPctOfGross:
-			alerts = append(alerts, SellInReturnsAlert{
-				Severity:  "warning",
-				Code:      "return_pct",
-				MessageAR: fmt.Sprintf("نسبة المرتجع من الإجمالي %.1f%% أعلى من المعتاد (حد التحذير %.0f%%).", pct, ReturnsWarnPctOfGross),
-				Value:     pct,
-				Threshold: ReturnsWarnPctOfGross,
-			})
-		}
-	}
-
-	if kpis.MomChangePct != nil && kpis.MomDirection == "up" && *kpis.MomChangePct >= ReturnsMomSpikePct {
-		alerts = append(alerts, SellInReturnsAlert{
-			Severity:  "warning",
-			Code:      "mom_spike",
-			MessageAR: fmt.Sprintf("ارتفاع المرتجعات شهرياً بنسبة %.1f%% (حد التنبيه %.0f%%).", *kpis.MomChangePct, ReturnsMomSpikePct),
-			Value:     *kpis.MomChangePct,
-			Threshold: ReturnsMomSpikePct,
-			Context:   arabicMonthNamesReturns[kpis.FocusMonth],
-		})
-	}
-
-	for _, b := range branches {
-		pct := b.Total.ReturnPctOfGross
-		if pct < ReturnsCriticalPctOfGross || b.Total.ReturnsValueEGP <= 0 {
-			continue
-		}
-		alerts = append(alerts, SellInReturnsAlert{
-			Severity:  "critical",
-			Code:      "branch_pct",
-			MessageAR: fmt.Sprintf("فرع «%s»: نسبة المرتجع %.1f%% تجاوزت الحد الحرج.", b.BranchName, pct),
-			Value:     pct,
-			Threshold: ReturnsCriticalPctOfGross,
-			Context:   b.BranchName,
-		})
-	}
-
-	for _, p := range top {
-		if p.ReturnPctOfGross < ReturnsCriticalPctOfGross || p.ReturnsValueEGP <= 0 {
-			continue
-		}
-		// Skip products with no gross (return-only) for rate alerts — already covered by advisories.
-		if p.GrossValueEGP <= 0 {
-			continue
-		}
-		alerts = append(alerts, SellInReturnsAlert{
-			Severity:  "warning",
-			Code:      "product_pct",
-			MessageAR: fmt.Sprintf("الصنف «%s»: نسبة مرتجع %.1f%% أعلى من المعتاد.", p.ProductName, p.ReturnPctOfGross),
-			Value:     p.ReturnPctOfGross,
-			Threshold: ReturnsCriticalPctOfGross,
-			Context:   p.ProductName,
-		})
-	}
-
-	sort.Slice(alerts, func(i, j int) bool {
-		sev := map[string]int{"critical": 0, "warning": 1}
-		if sev[alerts[i].Severity] != sev[alerts[j].Severity] {
-			return sev[alerts[i].Severity] < sev[alerts[j].Severity]
-		}
-		if alerts[i].Value != alerts[j].Value {
-			return alerts[i].Value > alerts[j].Value
-		}
-		return alerts[i].Code < alerts[j].Code
-	})
-	// Cap noise: keep the strongest handful for the page banner.
-	if len(alerts) > 12 {
-		alerts = alerts[:12]
-	}
-	return alerts
 }
 
 func sortedInts(m map[int]bool) []int {

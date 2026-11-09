@@ -131,13 +131,13 @@ type Client struct {
 	dataset   string
 	useMock   bool
 
-	mu                     sync.RWMutex
-	records                []domain.SellOutFact
-	pricingItems           []domain.PricingComplianceItem
-	workbookMeta           map[string]TenantWorkbookAnalytics
-	sellInRecords          map[string][]domain.SellInRecord
-	sellInFilename         map[string]string
-	targets                map[string][]domain.TargetRecord
+	mu                               sync.RWMutex
+	records                          []domain.SellOutFact
+	pricingItems                     []domain.PricingComplianceItem
+	workbookMeta                     map[string]TenantWorkbookAnalytics
+	sellInRecords                    map[string][]domain.SellInRecord
+	sellInFilename                   map[string]string
+	targets                          map[string][]domain.TargetRecord
 	productMaster                    map[string]*domain.ProductMasterSummaryResponse
 	baselineProductMaster            map[string]*domain.ProductMasterSummaryResponse
 	productMasterByCode              map[string]map[string]domain.ProductMasterItem
@@ -149,6 +149,9 @@ type Client struct {
 	kpiCacheMu sync.RWMutex
 	kpiCache   map[string]*domain.ExecutiveKPIs
 
+	returnsCacheMu sync.RWMutex
+	returnsCache   map[string]sellInReturnsCacheEntry
+
 	// Per-chain discount profiles (chain_discounts.go) and precomputed analytics (analytics_precompute.go).
 	chainDisc  chainDiscountStore
 	precompute precomputeStore
@@ -159,6 +162,9 @@ func (c *Client) invalidateKPICache() {
 	c.kpiCacheMu.Lock()
 	c.kpiCache = make(map[string]*domain.ExecutiveKPIs)
 	c.kpiCacheMu.Unlock()
+	c.returnsCacheMu.Lock()
+	c.returnsCache = make(map[string]sellInReturnsCacheEntry)
+	c.returnsCacheMu.Unlock()
 }
 
 // NewClient initializes the BigQuery repository.
@@ -181,6 +187,7 @@ func NewClient(projectID, dataset string, useMock bool) *Client {
 		productMasterByName:              make(map[string]map[string]domain.ProductMasterItem),
 		cleanedTenants:                   make(map[string]bool),
 		kpiCache:                         make(map[string]*domain.ExecutiveKPIs),
+		returnsCache:                     make(map[string]sellInReturnsCacheEntry),
 	}
 	c.loadPersistedProductMaster()
 	c.seedInitialData()
@@ -1813,9 +1820,10 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 		supplierShares = topSuppliers
 	}
 
-	// If no data exists and tenant was cleared (or unseeded), return clean 0 metrics without fake numbers
+	// If no data exists and tenant was cleared (or unseeded), return clean 0 metrics without fake numbers.
+	// Still cache the empty result so startup warm / cold-start YTD hits do not recompute.
 	if totalRevenue == 0 && (isCleared || len(storeMap) == 0) {
-		return &domain.ExecutiveKPIs{
+		empty := &domain.ExecutiveKPIs{
 			TotalRevenue:          0,
 			TotalMarketRevenue:    0,
 			TenantMarketSharePct:  0,
@@ -1842,7 +1850,14 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 			DailyTrends:           []domain.DailyTrendPoint{},
 			CategoryContributions: []domain.CategoryContribution{},
 			ParetoSKUs:            []domain.ParetoSKUItem{},
-		}, nil
+		}
+		c.kpiCacheMu.Lock()
+		if c.kpiCache == nil {
+			c.kpiCache = make(map[string]*domain.ExecutiveKPIs)
+		}
+		c.kpiCache[cacheKey] = empty
+		c.kpiCacheMu.Unlock()
+		return empty, nil
 	}
 
 	revMoM := 14.8
@@ -2024,6 +2039,9 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 	}
 
 	c.kpiCacheMu.Lock()
+	if c.kpiCache == nil {
+		c.kpiCache = make(map[string]*domain.ExecutiveKPIs)
+	}
 	c.kpiCache[cacheKey] = result
 	c.kpiCacheMu.Unlock()
 
@@ -2142,12 +2160,12 @@ func (c *Client) GetChainShares(ctx context.Context, tenantID, period string, da
 }
 
 var retailChainDisplayNames = map[string]string{
-	"carrefour":    "كارفور (Carrefour)",
-	"fathalla":     "أسواق فتح الله (Fathalla Market)",
-	"gomla":        "جملة ماركت (Gomla Market)",
-	"spinneys":     "سبينيس (Spinneys)",
-	"metro":        "مترو ماركت (Metro)",
-	"seoudi":       "سعودي ماركت (Seoudi)",
+	"carrefour":     "كارفور (Carrefour)",
+	"fathalla":      "أسواق فتح الله (Fathalla Market)",
+	"gomla":         "جملة ماركت (Gomla Market)",
+	"spinneys":      "سبينيس (Spinneys)",
+	"metro":         "مترو ماركت (Metro)",
+	"seoudi":        "سعودي ماركت (Seoudi)",
 	"beet-elgomla":  "بيت الجملة (Beet El Gomla)",
 	"kazyon":        "كازيون (Kazyon)",
 	"chain-1080314": "الوكالة (El Wakala)",
@@ -2870,8 +2888,6 @@ func (c *Client) GetMonthlyPriceElasticity(ctx context.Context, tenantID string,
 
 	return points, summary, nil
 }
-
-
 
 // categoryCompetition ranks suppliers in one category by revenue and returns
 // the tenant's 1-based rank, the number of suppliers, and the top-N named
