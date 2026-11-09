@@ -72,6 +72,10 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
   /// 0 = مقارنة الأسعار, 1 = اقتراحات المنافسين (بانتظار الموافقة)
   int _mainTab = 0;
 
+  /// Own-SKU master list pagination (0-based). Filters always reset to page 0.
+  static const int _ownSkuPageSize = 10;
+  int _ownSkuPageIndex = 0;
+
   final TextEditingController _searchController = TextEditingController();
   late String _lastTenantId;
 
@@ -151,6 +155,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       _selectedCategory = 'الكل';
       _searchQuery = '';
       _searchController.clear();
+      _ownSkuPageIndex = 0;
       _simulatedOwnPrice = null;
       _selectedCompetitorBarcode = null;
       _monthsLoadFinished = false;
@@ -286,6 +291,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       return true;
     }).toList();
 
+    // Search / category (and data refresh via this path) always restart at page 1.
+    _ownSkuPageIndex = 0;
     _filteredGroups = filtered;
     if (_filteredGroups.isNotEmpty) {
       final stillExists = _filteredGroups
@@ -316,6 +323,28 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       if (g.ownBarcode == _selectedOwnBarcode) return g;
     }
     return _filteredGroups.first;
+  }
+
+  int get _ownSkuTotalPages {
+    final total = _filteredGroups.length;
+    if (total <= 0) return 1;
+    return ((total + _ownSkuPageSize - 1) ~/ _ownSkuPageSize);
+  }
+
+  int get _ownSkuSafePageIndex {
+    final last = _ownSkuTotalPages - 1;
+    if (_ownSkuPageIndex < 0) return 0;
+    if (_ownSkuPageIndex > last) return last;
+    return _ownSkuPageIndex;
+  }
+
+  List<OwnSkuCompetitiveGroupModel> get _ownSkuPageGroups {
+    final total = _filteredGroups.length;
+    if (total == 0) return const [];
+    final page = _ownSkuSafePageIndex;
+    final start = page * _ownSkuPageSize;
+    final end = (start + _ownSkuPageSize > total) ? total : start + _ownSkuPageSize;
+    return _filteredGroups.sublist(start, end);
   }
 
   List<String> get _availableCategories {
@@ -1067,7 +1096,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     );
   }
 
-  /// Master List Panel showing the company's own SKUs.
+  /// Master List Panel showing the company's own SKUs (paginated, 10 / page).
   Widget _buildOwnSkusMasterPanel(
     BuildContext context,
     OwnSkuCompetitiveGroupModel selectedGroup, {
@@ -1075,6 +1104,14 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final pageGroups = _ownSkuPageGroups;
+    final totalCount = _filteredGroups.length;
+    final totalPages = _ownSkuTotalPages;
+    final safePage = _ownSkuSafePageIndex;
+    final startIndex = totalCount == 0 ? 0 : safePage * _ownSkuPageSize + 1;
+    final endIndex = totalCount == 0
+        ? 0
+        : (safePage * _ownSkuPageSize + pageGroups.length);
 
     return Container(
       decoration: BoxDecoration(
@@ -1145,7 +1182,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     borderRadius: M3Shape.radiusFull,
                   ),
                   child: Text(
-                    '${_filteredGroups.length} صنف',
+                    '$totalCount صنف',
                     style: theme.textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: colorScheme.primary,
@@ -1159,7 +1196,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             padding: const EdgeInsets.all(12.0),
             child: Column(
               children: [
-                for (final group in _filteredGroups)
+                for (final group in pageGroups)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10.0),
                     child: _buildOwnSkuSelectorCard(
@@ -1168,8 +1205,95 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                       isSelected: group.ownBarcode == selectedGroup.ownBarcode,
                     ),
                   ),
+                if (totalCount > 0) ...[
+                  const SizedBox(height: 4.0),
+                  _buildOwnSkuPaginationBar(
+                    context,
+                    safePage: safePage,
+                    totalPages: totalPages,
+                    startIndex: startIndex,
+                    endIndex: endIndex,
+                    totalCount: totalCount,
+                  ),
+                ],
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// RTL-aware prev/next: [AppIcons.chevronStart]/[AppIcons.chevronEnd] mirror;
+  /// Row places previous at the reading start (right in RTL).
+  Widget _buildOwnSkuPaginationBar(
+    BuildContext context, {
+    required int safePage,
+    required int totalPages,
+    required int startIndex,
+    required int endIndex,
+    required int totalCount,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final canGoPrev = safePage > 0;
+    final canGoNext = safePage < totalPages - 1;
+
+    return Container(
+      key: const ValueKey('own_sku_pagination_bar'),
+      padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 6.0),
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.85),
+        borderRadius: M3Shape.radiusMd,
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            key: const ValueKey('own_sku_page_indicator'),
+            'صفحة ${safePage + 1} من $totalPages',
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 2.0),
+          Text(
+            key: const ValueKey('own_sku_range_indicator'),
+            '$startIndex–$endIndex من $totalCount',
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4.0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                key: const ValueKey('own_sku_pagination_prev_btn'),
+                icon: const Icon(AppIcons.chevronStart, size: 20.0),
+                tooltip: 'الصفحة السابقة',
+                visualDensity: VisualDensity.compact,
+                onPressed: canGoPrev
+                    ? () => setState(() => _ownSkuPageIndex = safePage - 1)
+                    : null,
+              ),
+              const SizedBox(width: 8.0),
+              IconButton(
+                key: const ValueKey('own_sku_pagination_next_btn'),
+                icon: const Icon(AppIcons.chevronEnd, size: 20.0),
+                tooltip: 'الصفحة التالية',
+                visualDensity: VisualDensity.compact,
+                onPressed: canGoNext
+                    ? () => setState(() => _ownSkuPageIndex = safePage + 1)
+                    : null,
+              ),
+            ],
           ),
         ],
       ),
