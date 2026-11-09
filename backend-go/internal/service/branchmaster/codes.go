@@ -67,14 +67,14 @@ func ChainNameAR(slug string) string {
 }
 
 // InferChainSlug guesses the retailer slug from a raw store/customer name.
-// KH Gomla Market banners stay under fathalla until the owner decides otherwise
-// (they are uploaded under the Fathalla Sell-In file today).
+// Prefer the live BQ chain_key when available (dry-run passes ChainSlug explicitly).
+// Adeco live data today is one chain (أسواق فتح الله / fathalla); legacy KH / بيت الجملة
+// banners are still recognized for older fixtures but map to their historical slugs only
+// when those tokens appear in the raw string.
 func InferChainSlug(raw string) string {
 	rawL := strings.ToLower(raw)
 	n := strings.ToLower(Normalize(raw))
 	switch {
-	case strings.Contains(raw, "كيه اتش") || strings.Contains(rawL, "كيه اتش"):
-		return "fathalla"
 	case strings.Contains(rawL, "كارفور") || strings.Contains(n, "carrefour"):
 		return "carrefour"
 	case strings.Contains(rawL, "سبينيس") || strings.Contains(n, "spinney"):
@@ -90,6 +90,7 @@ func InferChainSlug(raw string) string {
 	case strings.Contains(rawL, "سعودي") || strings.Contains(n, "seoudi"):
 		return "seoudi"
 	default:
+		// «كيه اتش جمله ماركت» and plain Fathalla banners → fathalla (owner: one chain أسواق فتح الله).
 		return "fathalla"
 	}
 }

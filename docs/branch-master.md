@@ -27,15 +27,15 @@ Per-tenant durable tables (Firestore `branch_master/{tenant}`):
 
 ## Bootstrap
 
-First confirmation applies a dry-run proposal sheet once (`POST /api/v1/branches/bootstrap/confirm`). Adeco dry-run artifact is generated with:
+First confirmation applies a dry-run proposal sheet once (`POST /api/v1/branches/bootstrap/confirm`). Adeco dry-run artifact is generated from **live BigQuery occurrences only** (every raw spelling cites `source_table` + `source_file`):
 
 ```bash
-# From backend-go/: reads Sell-In seed + Returns (same customer column) + out26 Sell-Out headers
+# From backend-go/: -live-json is required (seed_customers / old archive xlsx are refused)
 go run ./cmd/branchmasterdryrun -out /tmp -tenant adeco \
-  -sellout-xlsx "data/archive/tenant-adeco/arch_adeco_fathalla_1792258238476465882_2026 out.xlsx"
+  -live-json /path/to/adeco-live-occurrences.json
 ```
 
-Dry-run groups by **chain + normalized short name**, maps Sell-Out headers onto Sell-In codes when they match (plus a small Adeco link-alias table), lists unmatched Sell-Out separately, and surfaces owner questions for «مواد عناية» vs grocery and «كيه اتش جمله ماركت» chain ownership — without guessing.
+Dry-run groups by **chain + normalized short name**, maps Sell-Out onto Sell-In when short names match (plus Adeco link aliases), lists unmatched Sell-Out, and flags likely misspelling pairs — without guessing. Owner decision: «مواد عناية - X» merges with grocery «X» under one FTH code (reports sum both; display short name only). Live Adeco data is one chain (`fathalla` / FTH).
 
 ## APIs
 

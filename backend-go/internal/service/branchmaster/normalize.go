@@ -106,8 +106,20 @@ func unifyDigits(s string) string {
 // across Sell-Out and Sell-In collapse (e.g. "عائلة فتح الله ماركت - سموحة" → "سموحة").
 func stripChainPrefix(s string) string {
 	cleaned := strings.TrimSpace(s)
+	original := cleaned
 	prefixes := []string{
-		// Care-line (مواد عناية) before grocery so both collapse to the same short name.
+		// Longest legal-entity banners FIRST so "عائله فتح الله ماركت لتصنيع…" is not
+		// truncated by the shorter "عائله فتح الله ماركت" grocery prefix.
+		"عائله فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م -",
+		"عائلة فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م -",
+		"عائله فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م",
+		"عائلة فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م",
+		"فتح الله بيت الجمله للتجاره والتوريدات ش م م -",
+		"فتح الله بيت الجملة للتجاره والتوريدات ش م م -",
+		"فتح الله بيت الجمله للتجاره والتوريدات ش م م",
+		"فتح الله بيت الجملة للتجاره والتوريدات ش م م",
+		// Care-line (مواد عناية) before grocery so both collapse to the same short name
+		// (owner still decides whether that merge is correct — dry-run flags PENDING).
 		"عائله فتح الله ماركت مواد عناية -",
 		"عائلة فتح الله ماركت مواد عناية -",
 		"عائله فتح الله ماركت مواد عناية",
@@ -116,7 +128,7 @@ func stripChainPrefix(s string) string {
 		"عائلة فتح الله ماركت -",
 		"عائله فتح الله ماركت",
 		"عائلة فتح الله ماركت",
-		// KH Gomla Market (often uploaded under Fathalla file) — strip banner; chain ownership is an owner question.
+		// Legacy KH Gomla Market spellings (not present in current live Adeco BQ).
 		"فرع فتح الله - كيه اتش جمله ماركت مواد عناية -",
 		"فرع فتح الله - كيه اتش جملة ماركت مواد عناية -",
 		"فرع فتح الله - كيه اتش جمله ماركت -",
@@ -131,16 +143,6 @@ func stripChainPrefix(s string) string {
 		"كيه اتش جملة ماركت -",
 		"كيه اتش جمله ماركت",
 		"كيه اتش جملة ماركت",
-		// Beet El Gomla legal entity
-		"فتح الله بيت الجمله للتجاره والتوريدات ش م م -",
-		"فتح الله بيت الجملة للتجاره والتوريدات ش م م -",
-		"فتح الله بيت الجمله للتجاره والتوريدات ش م م",
-		"فتح الله بيت الجملة للتجاره والتوريدات ش م م",
-		// Other Fathalla legal-entity leftovers
-		"عائله فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م -",
-		"عائلة فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م -",
-		"عائله فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م",
-		"عائلة فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م",
 		"فتح الله اسواق -",
 		"فتح الله أسواق -",
 		"فتح الله اسواق",
@@ -216,7 +218,13 @@ func stripChainPrefix(s string) string {
 			cleaned = strings.TrimRight(cleaned, "-–—/| ")
 		}
 	}
-	return strings.TrimSpace(cleaned)
+	cleaned = strings.TrimSpace(cleaned)
+	// Never invent / drop a name: if every banner stripped away, keep the original
+	// (e.g. legal-entity-only Sell-In rows with no branch suffix).
+	if cleaned == "" {
+		return original
+	}
+	return cleaned
 }
 
 // HasCareLine reports whether the raw label is a «مواد عناية» care-line spelling.

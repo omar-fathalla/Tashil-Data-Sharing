@@ -20,6 +20,9 @@ var linkAliasNorm = map[string]string{
 	// Sell-Out طنطا - اوت ليت مول ↔ Sell-In طنطا Out Let
 	"طنطا اوت ليت مول": "طنطا out let",
 	"طنطا out let":     "طنطا out let",
+	// Care-line spelling without space before trailing 2 ↔ grocery «كفر الدوار 2»
+	// (owner: مواد عناية + بقالة = same branch).
+	"كفر الدوار2": "كفر الدوار 2",
 }
 
 // LinkNormalize returns the dry-run grouping key fragment after applying known

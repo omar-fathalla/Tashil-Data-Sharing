@@ -58,6 +58,17 @@ func TestNormalize_KHAndCarePrefixes(t *testing.T) {
 	}
 }
 
+func TestNormalize_LegalEntityBeforeShortBanner(t *testing.T) {
+	full := "عائله فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م"
+	if got := Normalize(full); got == "" {
+		t.Fatalf("legal-entity-only must not normalize to empty")
+	}
+	mini := "عائله فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م - ميني"
+	if got := Normalize(mini); got != "ميني" {
+		t.Fatalf("Normalize(legal-mini)=%q want ميني", got)
+	}
+}
+
 func TestLinkNormalize_HanovilleBridge(t *testing.T) {
 	a := LinkNormalize("هانوفيل")
 	b := LinkNormalize("عائله فتح الله ماركت - الهانوفيل")

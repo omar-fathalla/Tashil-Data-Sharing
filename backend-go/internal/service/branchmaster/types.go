@@ -126,19 +126,20 @@ type Resolution struct {
 
 // ProposalRow is one row in a bootstrap / dry-run proposal (not written until owner approves).
 type ProposalRow struct {
-	RawNames      []string `json:"raw_names"`
-	NormalizedKey string   `json:"normalized_key"`
-	ChainSlug     string   `json:"chain_slug"`
-	ChainCode     string   `json:"chain_code"`
-	BranchCode    string   `json:"branch_code"`
-	DisplayName   string   `json:"display_name"`
-	Unallocated   bool     `json:"unallocated,omitempty"`
-	SourceHint    string   `json:"source_hint,omitempty"` // sell_in+sell_out+returns style
-	HasCareLine   bool     `json:"has_care_line,omitempty"` // مواد عناية spellings present
-	HasGroceryLine bool    `json:"has_grocery_line,omitempty"`
-	HasKHBanner   bool     `json:"has_kh_banner,omitempty"` // كيه اتش جمله ماركت
-	MultiSpelling bool     `json:"multi_spelling,omitempty"`
-	AmbiguousNote string   `json:"ambiguous_note,omitempty"`
+	RawNames       []string        `json:"raw_names"`
+	RawSourceCites []RawSourceCite `json:"raw_source_cites,omitempty"`
+	NormalizedKey  string          `json:"normalized_key"`
+	ChainSlug      string          `json:"chain_slug"`
+	ChainCode      string          `json:"chain_code"`
+	BranchCode     string          `json:"branch_code"`
+	DisplayName    string          `json:"display_name"`
+	Unallocated    bool            `json:"unallocated,omitempty"`
+	SourceHint     string          `json:"source_hint,omitempty"` // sell_in+sell_out+returns style
+	HasCareLine    bool            `json:"has_care_line,omitempty"` // مواد عناية spellings present
+	HasGroceryLine bool            `json:"has_grocery_line,omitempty"`
+	HasKHBanner    bool            `json:"has_kh_banner,omitempty"` // كيه اتش جمله ماركت
+	MultiSpelling  bool            `json:"multi_spelling,omitempty"`
+	AmbiguousNote  string          `json:"ambiguous_note,omitempty"`
 }
 
 // DryRunChainSummary is per-chain counts for the dry-run top summary.
@@ -166,9 +167,11 @@ type DryRunReport struct {
 	MultiSpelling   int                 `json:"multi_spelling_merges"`
 	ReturnsCovered  int                 `json:"branches_with_returns"`
 	ChainSummaries  []DryRunChainSummary `json:"chain_summaries,omitempty"`
-	OwnerQuestions  []string            `json:"owner_questions,omitempty"`
-	UnmatchedSellOut []string           `json:"unmatched_sell_out,omitempty"` // sell-out names with no Sell-In counterpart
-	AmbiguousPending []string           `json:"ambiguous_pending,omitempty"`
-	Rows            []ProposalRow       `json:"rows"`
-	NotesAR         []string            `json:"notes_ar,omitempty"`
+	OwnerQuestions     []string            `json:"owner_questions,omitempty"`
+	UnmatchedSellOut   []string            `json:"unmatched_sell_out,omitempty"` // sell-out names with no Sell-In counterpart
+	AmbiguousPending   []string            `json:"ambiguous_pending,omitempty"`
+	LikelyMisspellings []string            `json:"likely_misspellings,omitempty"`
+	DataProvenance     []string            `json:"data_provenance,omitempty"` // how raw names were sourced
+	Rows               []ProposalRow       `json:"rows"`
+	NotesAR            []string            `json:"notes_ar,omitempty"`
 }
