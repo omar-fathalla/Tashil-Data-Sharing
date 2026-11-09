@@ -10729,6 +10729,10 @@ class ApiClient {
   /// Set when [getRecordsAllPages] hits [sellOutRecordsMaxRows] with pages still remaining.
   String? lastSellOutPaginationWarning;
 
+  /// Distinct months (1..12) from the last successful [getCompetitiveMonthly] response.
+  /// Compare prefers these together with [AvailableMonths] / `/sell-out/months`.
+  List<int> lastCompetitiveMonths = const [];
+
   /// Test-only override for the competitive-comparison fetch safety cap.
   @visibleForTesting
   int? debugSellOutMaxRows;
@@ -11162,8 +11166,69 @@ class ApiClient {
     return (volume: 1.0, unitLabel: 'عبوة', badgeLabel: '1 عبوة قياسية');
   }
 
+  /// One-shot server aggregate for Compare: barcode → YYYY-MM → (avg unit price, units).
+  /// Replaces [getRecordsAllPages] so the browser never pages ~80k raw sell-out rows.
+  Future<({
+    Map<String, Map<String, ({double price, int units})>> byBarcode,
+    List<int> months,
+  })> getCompetitiveMonthly({
+    String? chain,
+    int year = 2026,
+  }) async {
+    lastCompetitiveMonths = const [];
+    final params = <String, String>{
+      'year': '$year',
+      'supplier': 'all_market',
+    };
+    if (chain != null && chain.isNotEmpty && chain != 'all' && chain != 'الكل') {
+      params['chain'] = chain;
+    }
+    final uri = Uri.parse(ApiEndpoints.competitiveMonthly).replace(queryParameters: params);
+    final res = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 45));
+    if (res.statusCode != 200) {
+      throw Exception('competitive-monthly HTTP ${res.statusCode}');
+    }
+    final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final months = <int>{};
+    for (final v in (body['months'] as List?) ?? const []) {
+      final m = v is int ? v : int.tryParse('$v');
+      if (m != null && m >= 1 && m <= 12) months.add(m);
+    }
+    final sortedMonths = months.toList()..sort();
+    lastCompetitiveMonths = sortedMonths;
+
+    final byBarcode = <String, Map<String, ({double price, int units})>>{};
+    for (final raw in (body['items'] as List?) ?? const []) {
+      if (raw is! Map) continue;
+      final item = Map<String, dynamic>.from(raw);
+      final barcode = '${item['barcode'] ?? ''}'.trim();
+      if (barcode.isEmpty) continue;
+      final monthMap = <String, ({double price, int units})>{};
+      for (final ptRaw in (item['months'] as List?) ?? const []) {
+        if (ptRaw is! Map) continue;
+        final pt = Map<String, dynamic>.from(ptRaw);
+        final mk = '${pt['month_key'] ?? ''}'.trim();
+        if (mk.length < 7) continue;
+        final price = (pt['unit_price'] is num)
+            ? (pt['unit_price'] as num).toDouble()
+            : double.tryParse('${pt['unit_price']}') ?? 0.0;
+        final units = (pt['units'] is num)
+            ? (pt['units'] as num).toInt()
+            : int.tryParse('${pt['units']}') ?? 0;
+        if (price <= 0 && units <= 0) continue;
+        monthMap[mk] = (price: double.parse(price.toStringAsFixed(2)), units: units);
+        final mo = int.tryParse(mk.substring(5, 7));
+        if (mo != null && mo >= 1 && mo <= 12) months.add(mo);
+      }
+      if (monthMap.isNotEmpty) byBarcode[barcode] = monthMap;
+    }
+    final mergedMonths = months.toList()..sort();
+    lastCompetitiveMonths = mergedMonths;
+    return (byBarcode: byBarcode, months: mergedMonths);
+  }
+
   /// Retrieves competitive SKU comparison groups (Own SKUs + mapped Competitor SKUs)
-  /// strictly from real uploaded Fathalla Market data (`2026 out.xlsx` & `2025 out.xlsx`) + live server records,
+  /// from the server-side competitive-monthly aggregate (not raw `/analytics/records` paging),
   /// scoped by `year` (default 2026) and `month` (0 = all months of the year, or 1..12).
   Future<List<OwnSkuCompetitiveGroupModel>> getCompetitiveComparisonGroups({
     String? chain,
@@ -11179,39 +11244,25 @@ class ApiClient {
         ? currentUser!.assignedChain
         : chain;
 
-    // Always pull the full selected year (paginated — server caps each page at 500)
-    // so monthly trajectories come from real uploads, not seed Jan–Apr leftovers.
-    List<SellOutRecordModel> liveRecords = const [];
+    // Single aggregated request — never page raw sell-out records for Compare.
+    var liveByBarcode = <String, Map<String, ({double price, int units})>>{};
     try {
-      String? startDate;
-      String? endDate;
-      if (year > 0) {
-        startDate = '$year-01-01';
-        endDate = '$year-12-31';
-      }
-      liveRecords = await getRecordsAllPages(
+      final agg = await getCompetitiveMonthly(
         chain: (effectiveChain != null && effectiveChain != 'all' && effectiveChain != 'الكل')
             ? effectiveChain
             : null,
-        supplier: 'all_market',
-        category: (category != null && category != 'all' && category != 'الكل') ? category : null,
-        startDate: startDate,
-        endDate: endDate,
-        maxRows: debugSellOutMaxRows ?? sellOutRecordsMaxRows,
-        // Never let dashboard mock sell-out rows invent comparison months.
-        allowMockRecords: allowDemoSeedData,
+        year: year,
       );
-    } on SellOutRecordsTruncatedException catch (e) {
-      // Visible warning on [lastSellOutPaginationWarning]; keep partial live so we
-      // never fall through to seed Jan–Apr while claiming a live year.
-      liveRecords = e.partial;
-      debugPrint('[ApiClient] competitive comparison: ${e.message}');
-    } catch (_) {}
+      liveByBarcode = agg.byBarcode;
+    } catch (e) {
+      debugPrint('[ApiClient] competitive-monthly failed: $e');
+      lastCompetitiveMonths = const [];
+    }
 
     if (syncCustomSkus) await _syncCustomCompetitorSkus(chain: effectiveChain);
 
     final groups = _buildRichCompetitiveGroups(
-      liveRecords: liveRecords,
+      liveByBarcode: liveByBarcode,
       chainFilter: effectiveChain,
       year: year,
       month: month,
@@ -11246,7 +11297,7 @@ class ApiClient {
   }
 
   List<OwnSkuCompetitiveGroupModel> _buildRichCompetitiveGroups({
-    required List<SellOutRecordModel> liveRecords,
+    required Map<String, Map<String, ({double price, int units})>> liveByBarcode,
     String? chainFilter,
     int year = 2026,
     int month = 0,
@@ -11259,18 +11310,16 @@ class ApiClient {
         : null;
 
     // Only Fathalla Market has real uploaded competitive sheets (`2026 out.xlsx` & `2025 out.xlsx`).
-    // If the user filters by a chain that has no uploaded competitive records and isn't fathalla, check liveRecords first.
+    // Non-fathalla chains with no live barcode series → empty (same as prior liveRecords check).
     if (activeChainKey != null && activeChainKey != 'fathalla') {
-      final hasChainLive = liveRecords.any((r) => r.retailerChain.toLowerCase() == activeChainKey);
-      if (!hasChainLive) {
+      if (liveByBarcode.isEmpty) {
         return const [];
       }
     }
 
-    final liveByBarcode = aggregateLiveMonthlyByBarcode(liveRecords);
     // Production / live year: never inject seed monthly prices. Seeds only when there is
     // no live data at all and the explicit demo flag is on (not [allowMockFallback]).
-    final allowSeedMonths = liveRecords.isEmpty && allowDemoSeedData;
+    final allowSeedMonths = liveByBarcode.isEmpty && allowDemoSeedData;
 
     // Group structure (barcodes / brands). Monthly prices come from live or gated seeds.
     final rawDefs = <_RawCompetitiveGroupSeed>[

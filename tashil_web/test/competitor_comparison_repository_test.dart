@@ -32,25 +32,25 @@ void main() {
   MockClient fakeServer(List<Map<String, dynamic>> store, {bool failWrites = false, List<String>? log}) {
     return MockClient((req) async {
       log?.add('${req.method} ${req.url.path}');
-      if (req.url.path.contains('/api/v1/analytics/records')) {
+      if (req.url.path.contains('/api/v1/analytics/competitive-monthly')) {
         return _json(
           jsonEncode({
-            'records': [
+            'year': 2026,
+            'months': [5],
+            'items': [
               {
-                'record_id': 'live-own-1',
-                'retailer_chain': 'fathalla',
-                'store_id': 's1',
-                'store_name': 'فرع',
                 'barcode': ownBarcode,
-                'sku_name': 'فيبا 3 كجم',
-                'category': 'صابون سائل اطباق',
-                'quantity_sold': 10,
-                'net_revenue': 1600.0,
-                'unit_price': 160.0,
-                'transaction_date': '2026-05-15',
+                'months': [
+                  {
+                    'month_key': '2026-05',
+                    'month': 5,
+                    'unit_price': 160.0,
+                    'units': 10,
+                    'net_revenue': 1600.0,
+                  },
+                ],
               },
             ],
-            'total_count': 1,
           }),
           200,
         );

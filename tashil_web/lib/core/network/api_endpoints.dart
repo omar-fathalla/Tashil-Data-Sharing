@@ -37,6 +37,8 @@ class ApiEndpoints {
   static String get records => '$baseUrl/api/v1/analytics/records';
   static String get sellInRecords => '$baseUrl/api/v1/analytics/sell-in-records';
   static String get sellInMonthly => '$baseUrl/api/v1/analytics/sell-in-monthly';
+  /// Server-side barcode × month price aggregate for Compare (no raw record paging).
+  static String get competitiveMonthly => '$baseUrl/api/v1/analytics/competitive-monthly';
   static String get sellInReturns => '$baseUrl/api/v1/analytics/sell-in-returns';
   static String get targets => '$baseUrl/api/v1/analytics/targets';
   static String get targetsUpload => '$baseUrl/api/v1/analytics/targets/upload';
