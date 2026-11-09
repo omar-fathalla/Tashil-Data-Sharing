@@ -212,10 +212,13 @@ func main() {
 		Model:     cfg.GeminiModel,
 		UseMock:   cfg.UseMockServices || strings.TrimSpace(cfg.GeminiAPIKey) == "",
 	})
-	// Sell-Out explorer totals/SKU summaries/paging run in BigQuery when the sink is live
-	// (RECORDS_SOURCE=memory forces the in-memory path).
+	customerRegistryHandler := handlers.NewCustomerRegistryHandler(ingestProcessor, fsRepo)
+	// Sell-Out explorer totals/SKU summaries/paging + Compare aggregates run in BigQuery when the
+	// sink is live (RECORDS_SOURCE=memory forces the in-memory path).
 	if bqs, ok := sink.(*bqsink.BigQuerySink); ok && os.Getenv("RECORDS_SOURCE") != "memory" {
 		analyticsHandler.WithRecordsQuerier(bqs)
+		analyticsHandler.WithCompetitiveMonthlyQuerier(bqs)
+		customerRegistryHandler.WithSellOutMonthsQuerier(bqs)
 		// Sell-In totals and monthly groups too (SELLIN_SOURCE=memory forces the in-memory path).
 		if os.Getenv("SELLIN_SOURCE") != "memory" {
 			analyticsHandler.WithSellInTotalsQuerier(bqs)
@@ -252,7 +255,6 @@ func main() {
 	competitorHandler := handlers.NewCompetitorHandler(fsRepo, fsRepo)
 	chainDiscountHandler := handlers.NewChainDiscountHandler(fsRepo, fsRepo, bqRepo)
 	dataQualityHandler := handlers.NewDataQualityHandler(dqService, fsRepo)
-	customerRegistryHandler := handlers.NewCustomerRegistryHandler(ingestProcessor, fsRepo)
 	productMatchHandler := handlers.NewProductMatchHandler(productMatchQueue, bqRepo)
 	// Sell-In Gemini assist (layout + SELLIN_CUSTOMER_CHAIN_MAP suggestions). Human approval only;
 	// never mutates production data or env. Own package — no edits to hot Gemini ingest paths.
@@ -324,6 +326,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/analytics/records", analyticsHandler.HandleRecords)
 	mux.HandleFunc("GET /api/v1/analytics/sell-in-records", analyticsHandler.HandleSellInRecords)
 	mux.HandleFunc("GET /api/v1/analytics/sell-in-monthly", analyticsHandler.HandleSellInMonthly)
+	mux.HandleFunc("GET /api/v1/analytics/competitive-monthly", analyticsHandler.HandleCompetitiveMonthly)
 	mux.HandleFunc("GET /api/v1/analytics/sell-in-returns", analyticsHandler.HandleSellInReturns)
 	mux.HandleFunc("GET /api/v1/analytics/targets", analyticsHandler.HandleTargets)
 	mux.HandleFunc("POST /api/v1/analytics/targets", analyticsHandler.HandleTargets)

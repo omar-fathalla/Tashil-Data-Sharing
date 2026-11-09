@@ -78,12 +78,17 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
         for (final y in AvailableYears.current.including(_selectedYear)) (year: y, labelAr: 'سنة $y'),
       ];
 
-  /// Months that have data for the selected year — sell-out API only (never seed series).
+  /// Months that have data for the selected year — `/sell-out/months` ∪ competitive-monthly
+  /// (never seed series).
   List<int> get _dataMonths {
     final api = _apiMonths.isNotEmpty
         ? _apiMonths
         : AvailableMonths.currentFor(_selectedYear).months;
-    return CompetitorMonthOptions.resolveDataMonths(apiMonths: api);
+    final merged = <int>{
+      ...api,
+      ...widget.apiClient.lastCompetitiveMonths,
+    };
+    return CompetitorMonthOptions.resolveDataMonths(apiMonths: merged.toList());
   }
 
   List<({int month, String labelAr})> get _monthOptions =>
@@ -170,7 +175,17 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     if (!mounted) return;
     result.when(
       success: (groups) {
+        // Prefer union of /sell-out/months and competitive-monthly months so a
+        // short memory window cannot leave the picker stuck at Jan–Apr.
+        final fromAgg = widget.apiClient.lastCompetitiveMonths;
+        if (fromAgg.isNotEmpty) {
+          AvailableMonths.mergeMonths(_selectedYear, fromAgg);
+        }
         setState(() {
+          _apiMonths = AvailableMonths.currentFor(_selectedYear).months;
+          if (_apiMonths.isEmpty && fromAgg.isNotEmpty) {
+            _apiMonths = List<int>.from(fromAgg);
+          }
           _allGroups = groups;
           _applyLocalFilters();
           // Drop a stale month pick if the year no longer has that month.
@@ -180,12 +195,6 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
           }
           _isLoading = false;
         });
-        final warn = widget.apiClient.lastSellOutPaginationWarning;
-        if (warn != null && warn.isNotEmpty && mounted) {
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-            SnackBar(content: Text('تحذير: $warn')),
-          );
-        }
       },
       failure: (error) {
         setState(() => _isLoading = false);

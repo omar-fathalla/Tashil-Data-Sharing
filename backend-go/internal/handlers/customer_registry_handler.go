@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"sort"
 	"strconv"
@@ -26,17 +27,29 @@ type customerAuditSink interface {
 	SaveAuditLog(ctx context.Context, e *domain.AuditLogEntry) error
 }
 
+// SellOutMonthsQuerier loads distinct Sell-Out months from durable storage (BigQuery).
+type SellOutMonthsQuerier interface {
+	QuerySellOutMonths(ctx context.Context, tenantID string, year int) ([]int, error)
+}
+
 // CustomerRegistryHandler serves the Sell-In customer registry (pending names, approve, reject, unmerge)
 // and the data-driven year list. Rule: a name is attributed only by exact match or an explicit
 // admin decision; suggestions are never applied automatically.
 type CustomerRegistryHandler struct {
-	p     CustomerRegistryProcessor
-	audit customerAuditSink
-	now   func() time.Time
+	p      CustomerRegistryProcessor
+	audit  customerAuditSink
+	months SellOutMonthsQuerier
+	now    func() time.Time
 }
 
 func NewCustomerRegistryHandler(p CustomerRegistryProcessor, audit customerAuditSink) *CustomerRegistryHandler {
 	return &CustomerRegistryHandler{p: p, audit: audit, now: time.Now}
+}
+
+// WithSellOutMonthsQuerier prefers durable BigQuery months when memory is short/stale.
+func (h *CustomerRegistryHandler) WithSellOutMonthsQuerier(q SellOutMonthsQuerier) *CustomerRegistryHandler {
+	h.months = q
+	return h
 }
 
 // HandleList serves GET /api/v1/customers/registry?status=pending|approved|rejected&include_seed=true.
@@ -191,6 +204,8 @@ func (h *CustomerRegistryHandler) HandleYears(w http.ResponseWriter, r *http.Req
 // HandleMonths serves GET /api/v1/sell-out/months?year=YYYY: distinct months (1..12) that have
 // Sell-Out facts for the year. month=0 on analytics filters means the whole year — this list is
 // what the competitor comparison picker uses so it grows as uploads add months.
+// Prefers durable BigQuery months when available so a short in-memory window (e.g. Jan–Apr seed)
+// cannot truncate the picker while uploaded Sell-Out already has later months.
 func (h *CustomerRegistryHandler) HandleMonths(w http.ResponseWriter, r *http.Request) {
 	c, ok := tmClaims(w, r)
 	if !ok {
@@ -201,7 +216,37 @@ func (h *CustomerRegistryHandler) HandleMonths(w http.ResponseWriter, r *http.Re
 		year = h.now().Year()
 	}
 	months := MonthList(h.p.SellOutMonths(c.TenantID, year))
+	if h.months != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+		defer cancel()
+		if bqMonths, err := h.months.QuerySellOutMonths(ctx, c.TenantID, year); err == nil {
+			months = MonthList(mergeMonthLists(months, bqMonths))
+		} else {
+			log.Printf("WARN [sell-out/months] BigQuery path failed, using memory: %v", err)
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"year": year, "months": months})
+}
+
+// mergeMonthLists unions two month lists (1..12).
+func mergeMonthLists(a, b []int) []int {
+	set := map[int]bool{}
+	for _, m := range a {
+		if m >= 1 && m <= 12 {
+			set[m] = true
+		}
+	}
+	for _, m := range b {
+		if m >= 1 && m <= 12 {
+			set[m] = true
+		}
+	}
+	out := make([]int, 0, len(set))
+	for m := range set {
+		out = append(out, m)
+	}
+	sort.Ints(out)
+	return out
 }
 
 // YearList merges data years with the current year (newest first) and picks the latest data year as default.

@@ -74,6 +74,20 @@ class AvailableMonths {
     return _byYear[year] ?? MonthOptions.empty(year);
   }
 
+  /// Merges [months] into the cache for [year] (union, sorted). Used when Compare's
+  /// competitive-monthly aggregate returns a fuller month list than a stale memory window.
+  static void mergeMonths(int year, Iterable<int> months) {
+    if (year <= 0) return;
+    final set = <int>{
+      ...(_byYear[year]?.months ?? const []),
+      ...months.where((m) => m >= 1 && m <= 12),
+    };
+    if (set.isEmpty) return;
+    final opts = MonthOptions(year: year, months: set.toList()..sort());
+    _byYear[year] = opts;
+    notifier.value = opts;
+  }
+
   @visibleForTesting
   static void setForTest(MonthOptions o) {
     _byYear[o.year] = o;

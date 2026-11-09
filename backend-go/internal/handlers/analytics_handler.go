@@ -21,6 +21,7 @@ type AnalyticsHandler struct {
 	bqRepo             bigquery.Repository
 	records            bqsink.RecordsQuerier
 	sellIn             SellInTotalsQuerier
+	competitiveMonthly bqsink.CompetitiveMonthlyQuerier
 	monthlySummaryOpts monthlysummary.Options
 }
 
@@ -739,9 +740,6 @@ func (h *AnalyticsHandler) HandleCPFRDashboard(w http.ResponseWriter, r *http.Re
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(payload)
 }
-
-
-
 
 // yearMonthRange turns ?year=&month= into an inclusive YYYY-MM-DD range (string-compared dates).
 func yearMonthRange(yr, mo int) (string, string, bool) {
