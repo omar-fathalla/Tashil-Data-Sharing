@@ -23,6 +23,16 @@ var linkAliasNorm = map[string]string{
 	// Care-line spelling without space before trailing 2 ↔ grocery «كفر الدوار 2»
 	// (owner: مواد عناية + بقالة = same branch).
 	"كفر الدوار2": "كفر الدوار 2",
+	// Owner (#70): Sell-Out «الإبراهيمية» alone = Sell-In «الابراهيمية ريفيرا»
+	// (grocery + مواد عناية). Values summed under one code.
+	// Must NOT absorb «الإبراهيمية ميني» (exact key only — ميني stays separate).
+	"الابراهيميه": "الابراهيميه ريفيرا",
+	// Owner (#70 confirmed): Sell-In plain «دمنهور» (grocery+care) = Sell-Out «دمنهور الأندلس».
+	// «دمنهور الاستاد» stays its own code (exact longer key wins — no strip-merge).
+	"دمنهور": "دمنهور الاندلس",
+	// Owner (#70 confirmed): Sell-In plain «سيدي جابر» (grocery+care) = Sell-Out «سيدي جابر المحطة».
+	// «سيدي جابر ميني» stays separate.
+	"سيدي جابر": "سيدي جابر المحطه",
 }
 
 // LinkNormalize returns the dry-run grouping key fragment after applying known
@@ -41,9 +51,8 @@ func LinkNormalize(raw string) string {
 		if alt, ok := linkAliasNorm[stripped]; ok {
 			return Normalize(alt)
 		}
-		// If the other side already stores without ال, prefer the shorter form
-		// only when an explicit reverse alias exists — otherwise keep as-is so
-		// الإبراهيمية ≠ الابراهيمية ريفيرا.
+		// Explicit aliases only (above). Never strip suffixes to guess merges —
+		// «دمنهور الاستاد» / «سيدي جابر ميني» / «الإبراهيمية ميني» stay exact.
 	}
 	return n
 }

@@ -8,12 +8,12 @@ cursor:
 **Status: HOLD — owner approval required before any production write.**
 
 - Tenant: `adeco`
-- Generated (UTC): `2026-11-09T17:34:14Z`
+- Generated (UTC): `2026-11-09T17:36:37Z`
 - Live input: `adeco-live-occurrences.json`
 - **Unification sources only:** `in26.xlsx` (Sell-In + Returns) + `out26.xlsx` (Sell-Out)
 - **Excluded (BQ untouched):** `Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx` / `arch_sellin_adeco_fathalla_1794179188685072646` — no parent/mini/Regional/16 codes in this proposal
 - Raw name observations: **91**
-- Unique normalized keys / proposed branches: **43**
+- Unique normalized keys / proposed branches: **40**
 - Chains: **1**
 
 ## Source of prior false names (corrected)
@@ -51,9 +51,9 @@ This dry-run uses **live BQ in26+out26 only** (Plan archive excluded from unific
 
 | Metric | Count |
 | --- | ---: |
-| Sell-In **and** Sell-Out | 22 |
-| Sell-In only (normal) | 8 |
-| Sell-Out only (normal) | 13 |
+| Sell-In **and** Sell-Out | 25 |
+| Sell-In only (normal) | 5 |
+| Sell-Out only (normal) | 10 |
 | Multi-spelling merges | 28 |
 | Branches with Returns coverage | 30 |
 | Likely misspelling pairs (informational) | 0 |
@@ -63,7 +63,7 @@ This dry-run uses **live BQ in26+out26 only** (Plan archive excluded from unific
 
 | Chain | Code | Branches | SI+SO | SI only | SO only | +Returns |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| fathalla | `FTH` | 43 | 22 | 8 | 13 | 30 |
+| fathalla | `FTH` | 40 | 25 | 5 | 10 | 30 |
 
 ### Chain policies in effect
 
@@ -83,7 +83,7 @@ This dry-run uses **live BQ in26+out26 only** (Plan archive excluded from unific
 - Sell-Out = نقاط البيع. وجود فرع في ملف واحد فقط (Sell-In فقط أو Sell-Out فقط) طبيعي — لا تحذير ولا سؤال مالك.
 - لا ربط تلقائي بين مصادر مختلفة؛ كل صف يبقى باسمه الخام وقيمه حتى يقرر المالك الدمج.
 - عدد الفروع التي دُمجت فيها مواد عناية + بقالة في هذا dry-run: 27.
-- أسماء Sell-Out تُربط عند تطابق الاسم القصير فقط؛ لا تخمين (الإبراهيمية ≠ الإبراهيمية ريفيرا).
+- جسور المالك: الإبراهيمية = الابراهيمية ريفيرا؛ دمنهور = دمنهور الأندلس؛ سيدي جابر = سيدي جابر المحطة. تبقى منفصلة: الإبراهيمية ميني، دمنهور الاستاد، سيدي جابر ميني.
 - مصدر Returns = صفوف sell_in_records ذات قيمة سالبة أو نوع مرتجع (من in26).
 
 ## Sell-In vs Sell-Out rules
@@ -101,45 +101,42 @@ This dry-run uses **live BQ in26+out26 only** (Plan archive excluded from unific
 | `FTH-002` | fathalla (`FTH`) | store | أمواج | عائله فتح الله ماركت - أمواج _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - أمواج _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - أمواج - الساحل الشمالي _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
 | `FTH-003` | fathalla (`FTH`) | store | أكتوبر | عائله فتح الله ماركت - اكتوبر _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - اكتوبر _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - أكتوبر _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
 | `FTH-004` | fathalla (`FTH`) | store | فرع فتح الله - الأنفوشي | فرع فتح الله - الأنفوشي _(sell_out:out26.xlsx)_ | sell_out |
-| `FTH-005` | fathalla (`FTH`) | store | فرع فتح الله - الإبراهيمية | فرع فتح الله - الإبراهيمية _(sell_out:out26.xlsx)_ | sell_out |
+| `FTH-005` | fathalla (`FTH`) | store | الإبراهيمية | عائله فتح الله ماركت - الابراهيمية ريفيرا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - الابراهيمية ريفيرا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - الإبراهيمية _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
 | `FTH-006` | fathalla (`FTH`) | store | فرع فتح الله - الإبراهيمية ميني | فرع فتح الله - الإبراهيمية ميني _(sell_out:out26.xlsx)_ | sell_out |
-| `FTH-007` | fathalla (`FTH`) | store | الابراهيمية ريفيرا | عائله فتح الله ماركت - الابراهيمية ريفيرا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - الابراهيمية ريفيرا _(returns:in26.xlsx, sell_in:in26.xlsx)_ | sell_in+returns |
-| `FTH-008` | fathalla (`FTH`) | store | فرع فتح الله - الدخيلة مينى 2 | فرع فتح الله - الدخيلة مينى 2 _(sell_out:out26.xlsx)_ | sell_out |
-| `FTH-009` | fathalla (`FTH`) | store | فرع فتح الله - الدخيلة ميني | فرع فتح الله - الدخيلة ميني _(sell_out:out26.xlsx)_ | sell_out |
-| `FTH-010` | fathalla (`FTH`) | store | الرحاب | عائله فتح الله ماركت - الرحاب _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - الرحاب _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - مدينة الرحاب _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-011` | fathalla (`FTH`) | store | المحلة الكبرى | عائله فتح الله ماركت - المحلة الكبري _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - المحلة الكبري _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - المحلة الكبرى _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-012` | fathalla (`FTH`) | store | النصر | عائله فتح الله ماركت - ش النصر بلازا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - ش النصر بلازا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - النصر _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-013` | fathalla (`FTH`) | store | بحري | عائله فتح الله ماركت - بحري _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - بحري _(sell_in:in26.xlsx)_ | sell_in+returns |
-| `FTH-014` | fathalla (`FTH`) | store | جاردينيا | عائله فتح الله ماركت - جاردينيا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - جاردينيا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - جاردينيا _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-015` | fathalla (`FTH`) | store | دمنهور | عائله فتح الله ماركت - دمنهور _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - دمنهور _(returns:in26.xlsx, sell_in:in26.xlsx)_ | sell_in+returns |
-| `FTH-016` | fathalla (`FTH`) | store | دمنهور - الاستاد | عائله فتح الله ماركت - دمنهور - الاستاد _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - دمنهور - الاستاد _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - دمنهور - الاستاد _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-017` | fathalla (`FTH`) | store | فرع فتح الله - دمنهور الأندلس | فرع فتح الله - دمنهور الأندلس _(sell_out:out26.xlsx)_ | sell_out |
-| `FTH-018` | fathalla (`FTH`) | store | دمياط الجديدة | عائله فتح الله ماركت - دمياط الجديدة _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - دمياط الجديدة _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - دمياط الجديدة _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-019` | fathalla (`FTH`) | store | روزانا | عائله فتح الله ماركت - قرية روزانا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - قرية روزانا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - روزانا _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-020` | fathalla (`FTH`) | store | ستانلي | عائله فتح الله ماركت - ستانلي _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - ستانلي _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - ستانلي _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-021` | fathalla (`FTH`) | store | سموحة | عائله فتح الله ماركت - سموحة _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - سموحة _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - سموحة _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-022` | fathalla (`FTH`) | store | فرع فتح الله - سموحة ميني | فرع فتح الله - سموحة ميني _(sell_out:out26.xlsx)_ | sell_out |
-| `FTH-023` | fathalla (`FTH`) | store | سيتي سكوير | عائله فتح الله ماركت - سيتي سكوير _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - سيتي سكوير _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - سيتي سكوير _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-024` | fathalla (`FTH`) | store | فرع فتح الله - سيدي بشر ميني | فرع فتح الله - سيدي بشر ميني _(sell_out:out26.xlsx)_ | sell_out |
-| `FTH-025` | fathalla (`FTH`) | store | سيدي جابر | عائله فتح الله ماركت - سيدي جابر _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - سيدي جابر _(returns:in26.xlsx, sell_in:in26.xlsx)_ | sell_in+returns |
-| `FTH-026` | fathalla (`FTH`) | store | فرع فتح الله - سيدي جابر المحطة | فرع فتح الله - سيدي جابر المحطة _(sell_out:out26.xlsx)_ | sell_out |
-| `FTH-027` | fathalla (`FTH`) | store | فرع فتح الله - سيدي جابر ميني | فرع فتح الله - سيدي جابر ميني _(sell_out:out26.xlsx)_ | sell_out |
-| `FTH-028` | fathalla (`FTH`) | store | طنطا | عائله فتح الله ماركت - طنطا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - طنطا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - طنطا _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-029` | fathalla (`FTH`) | store | طنطا - اوت ليت مول | عائله فتح الله ماركت مواد عناية - طنطا Out Let _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - طنطا - اوت ليت مول _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-030` | fathalla (`FTH`) | store | طوسون | عائله فتح الله ماركت - طوسون _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - طوسون _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - طوسون _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-031` | fathalla (`FTH`) | store | عجمي ستار | عائله فتح الله ماركت - عجمى ستار _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - عجمى ستار _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - عجمي ستار _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-032` | fathalla (`FTH`) | store | فلمنج | عائله فتح الله ماركت - فلمنج _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - فلمنج _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - فلمنج _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-033` | fathalla (`FTH`) | store | كفر الدوار | عائله فتح الله ماركت - كفر الدوار _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - كفر الدوار _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - كفر الدوار _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-034` | fathalla (`FTH`) | store | فرع فتح الله - كفر الدوار - مول | فرع فتح الله - كفر الدوار - مول _(sell_out:out26.xlsx)_ | sell_out |
-| `FTH-035` | fathalla (`FTH`) | store | كفر الدوار 2 | عائله فتح الله ماركت - كفر الدوار 2 _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - كفر الدوار2 _(returns:in26.xlsx, sell_in:in26.xlsx)_ | sell_in+returns |
-| `FTH-036` | fathalla (`FTH`) | warehouse | مخزن أبيس 4 المركزى | عائله فتح الله ماركت - مخزن أبيس 4 المركزى _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - مخزن أبيس 4 المركزى _(returns:in26.xlsx, sell_in:in26.xlsx)_ | sell_in+returns |
-| `FTH-037` | fathalla (`FTH`) | warehouse | مخزن الافوجادو | عائله فتح الله ماركت - مخزن الافوجادو _(returns:in26.xlsx, sell_in:in26.xlsx)_ | sell_in+returns |
-| `FTH-038` | fathalla (`FTH`) | store | مدينه بدر | عائله فتح الله ماركت - مدينه بدر _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - مدينه بدر _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - مدينه بدر _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-039` | fathalla (`FTH`) | store | مطروح | عائله فتح الله ماركت - مطروح _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - مطروح _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - مطروح _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
-| `FTH-040` | fathalla (`FTH`) | store | فرع فتح الله - ملك حفنى | فرع فتح الله - ملك حفنى _(sell_out:out26.xlsx)_ | sell_out |
-| `FTH-041` | fathalla (`FTH`) | store | نيس | عائله فتح الله ماركت - نيس _(returns:in26.xlsx, sell_in:in26.xlsx)_ | sell_in+returns |
-| `FTH-042` | fathalla (`FTH`) | store | فرع فتح الله - نيس2 | فرع فتح الله - نيس2 _(sell_out:out26.xlsx)_ | sell_out |
-| `FTH-043` | fathalla (`FTH`) | store | هانوفيل | عائله فتح الله ماركت - الهانوفيل _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - هانوفيل _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-007` | fathalla (`FTH`) | store | فرع فتح الله - الدخيلة مينى 2 | فرع فتح الله - الدخيلة مينى 2 _(sell_out:out26.xlsx)_ | sell_out |
+| `FTH-008` | fathalla (`FTH`) | store | فرع فتح الله - الدخيلة ميني | فرع فتح الله - الدخيلة ميني _(sell_out:out26.xlsx)_ | sell_out |
+| `FTH-009` | fathalla (`FTH`) | store | الرحاب | عائله فتح الله ماركت - الرحاب _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - الرحاب _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - مدينة الرحاب _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-010` | fathalla (`FTH`) | store | المحلة الكبرى | عائله فتح الله ماركت - المحلة الكبري _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - المحلة الكبري _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - المحلة الكبرى _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-011` | fathalla (`FTH`) | store | النصر | عائله فتح الله ماركت - ش النصر بلازا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - ش النصر بلازا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - النصر _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-012` | fathalla (`FTH`) | store | بحري | عائله فتح الله ماركت - بحري _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - بحري _(sell_in:in26.xlsx)_ | sell_in+returns |
+| `FTH-013` | fathalla (`FTH`) | store | جاردينيا | عائله فتح الله ماركت - جاردينيا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - جاردينيا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - جاردينيا _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-014` | fathalla (`FTH`) | store | دمنهور | عائله فتح الله ماركت - دمنهور _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - دمنهور _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - دمنهور الأندلس _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-015` | fathalla (`FTH`) | store | دمنهور - الاستاد | عائله فتح الله ماركت - دمنهور - الاستاد _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - دمنهور - الاستاد _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - دمنهور - الاستاد _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-016` | fathalla (`FTH`) | store | دمياط الجديدة | عائله فتح الله ماركت - دمياط الجديدة _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - دمياط الجديدة _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - دمياط الجديدة _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-017` | fathalla (`FTH`) | store | روزانا | عائله فتح الله ماركت - قرية روزانا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - قرية روزانا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - روزانا _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-018` | fathalla (`FTH`) | store | ستانلي | عائله فتح الله ماركت - ستانلي _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - ستانلي _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - ستانلي _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-019` | fathalla (`FTH`) | store | سموحة | عائله فتح الله ماركت - سموحة _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - سموحة _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - سموحة _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-020` | fathalla (`FTH`) | store | فرع فتح الله - سموحة ميني | فرع فتح الله - سموحة ميني _(sell_out:out26.xlsx)_ | sell_out |
+| `FTH-021` | fathalla (`FTH`) | store | سيتي سكوير | عائله فتح الله ماركت - سيتي سكوير _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - سيتي سكوير _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - سيتي سكوير _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-022` | fathalla (`FTH`) | store | فرع فتح الله - سيدي بشر ميني | فرع فتح الله - سيدي بشر ميني _(sell_out:out26.xlsx)_ | sell_out |
+| `FTH-023` | fathalla (`FTH`) | store | سيدي جابر | عائله فتح الله ماركت - سيدي جابر _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - سيدي جابر _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - سيدي جابر المحطة _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-024` | fathalla (`FTH`) | store | فرع فتح الله - سيدي جابر ميني | فرع فتح الله - سيدي جابر ميني _(sell_out:out26.xlsx)_ | sell_out |
+| `FTH-025` | fathalla (`FTH`) | store | طنطا | عائله فتح الله ماركت - طنطا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - طنطا _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - طنطا _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-026` | fathalla (`FTH`) | store | طنطا - اوت ليت مول | عائله فتح الله ماركت مواد عناية - طنطا Out Let _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - طنطا - اوت ليت مول _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-027` | fathalla (`FTH`) | store | طوسون | عائله فتح الله ماركت - طوسون _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - طوسون _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - طوسون _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-028` | fathalla (`FTH`) | store | عجمي ستار | عائله فتح الله ماركت - عجمى ستار _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - عجمى ستار _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - عجمي ستار _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-029` | fathalla (`FTH`) | store | فلمنج | عائله فتح الله ماركت - فلمنج _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - فلمنج _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - فلمنج _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-030` | fathalla (`FTH`) | store | كفر الدوار | عائله فتح الله ماركت - كفر الدوار _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - كفر الدوار _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - كفر الدوار _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-031` | fathalla (`FTH`) | store | فرع فتح الله - كفر الدوار - مول | فرع فتح الله - كفر الدوار - مول _(sell_out:out26.xlsx)_ | sell_out |
+| `FTH-032` | fathalla (`FTH`) | store | كفر الدوار 2 | عائله فتح الله ماركت - كفر الدوار 2 _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - كفر الدوار2 _(returns:in26.xlsx, sell_in:in26.xlsx)_ | sell_in+returns |
+| `FTH-033` | fathalla (`FTH`) | warehouse | مخزن أبيس 4 المركزى | عائله فتح الله ماركت - مخزن أبيس 4 المركزى _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - مخزن أبيس 4 المركزى _(returns:in26.xlsx, sell_in:in26.xlsx)_ | sell_in+returns |
+| `FTH-034` | fathalla (`FTH`) | warehouse | مخزن الافوجادو | عائله فتح الله ماركت - مخزن الافوجادو _(returns:in26.xlsx, sell_in:in26.xlsx)_ | sell_in+returns |
+| `FTH-035` | fathalla (`FTH`) | store | مدينه بدر | عائله فتح الله ماركت - مدينه بدر _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - مدينه بدر _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - مدينه بدر _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-036` | fathalla (`FTH`) | store | مطروح | عائله فتح الله ماركت - مطروح _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>عائله فتح الله ماركت مواد عناية - مطروح _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - مطروح _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
+| `FTH-037` | fathalla (`FTH`) | store | فرع فتح الله - ملك حفنى | فرع فتح الله - ملك حفنى _(sell_out:out26.xlsx)_ | sell_out |
+| `FTH-038` | fathalla (`FTH`) | store | نيس | عائله فتح الله ماركت - نيس _(returns:in26.xlsx, sell_in:in26.xlsx)_ | sell_in+returns |
+| `FTH-039` | fathalla (`FTH`) | store | فرع فتح الله - نيس2 | فرع فتح الله - نيس2 _(sell_out:out26.xlsx)_ | sell_out |
+| `FTH-040` | fathalla (`FTH`) | store | هانوفيل | عائله فتح الله ماركت - الهانوفيل _(returns:in26.xlsx, sell_in:in26.xlsx)_<br>فرع فتح الله - هانوفيل _(sell_out:out26.xlsx)_ | sell_in+sell_out+returns |
 
 ## Next step
 
