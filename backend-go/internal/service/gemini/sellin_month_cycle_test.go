@@ -199,9 +199,31 @@ func TestGPSOPNoMonthColumnFallsBackToDocumentDate(t *testing.T) {
 	}
 }
 
-// Optional: when MONTH_CYCLE_EXPECTED_CSV points at the expected table, assert label→boundary
-// dates match the checked-in copy used for fixture design (does not parse customer xlsx).
-// TOTAL rows/TO are owner-owned — do not "fix" them here without an explicit decision.
+// Locked Adeco in26 company-month totals (owner-approved). Used by fixture design and
+// optional full-file acceptance (IN26_XLSX).
+var monthCycleExpectedTotals = []struct {
+	label string
+	rows  int
+	net   float64
+}{
+	{"JAN", 3539, 10212067.77},
+	{"Feb", 4664, 11404520.48},
+	{"Mar", 3493, 12592702.99},
+	{"Apr", 3025, 9641468.61},
+	{"May", 4179, 8483253.75},
+	{"Jun", 3581, 12939113.05},
+	{"Jul", 4427, 14550887.86},
+	{"Aug", 4113, 16735656.86},
+	{"Sep", 5003, 17531787.55},
+	{"Oct", 4903, 19099943.93},
+}
+
+const (
+	monthCycleExpectedTotalRows = 40927
+	monthCycleExpectedTotalNet  = 133191402.85
+)
+
+// Assert label→boundary dates and per-month rows/net TO match the checked-in expected CSV.
 func TestMonthCycleExpectedCSVMatchesFixtureDesign(t *testing.T) {
 	path := os.Getenv("MONTH_CYCLE_EXPECTED_CSV")
 	if path == "" {
@@ -221,23 +243,49 @@ func TestMonthCycleExpectedCSVMatchesFixtureDesign(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	byLabel := map[string][2]string{}
+	type rowExp struct {
+		first, last string
+		rows        int
+		net         float64
+	}
+	byLabel := map[string]rowExp{}
+	var totalRows int
+	var totalNet float64
 	for i, row := range records {
 		if i == 0 || len(row) < 5 {
 			continue
 		}
 		if strings.EqualFold(row[0], "TOTAL") {
+			totalRows, _ = strconv.Atoi(strings.TrimSpace(row[3]))
+			totalNet, _ = strconv.ParseFloat(strings.TrimSpace(row[4]), 64)
 			continue
 		}
-		byLabel[row[0]] = [2]string{row[1], row[2]}
+		rows, _ := strconv.Atoi(strings.TrimSpace(row[3]))
+		net, _ := strconv.ParseFloat(strings.TrimSpace(row[4]), 64)
+		byLabel[row[0]] = rowExp{first: row[1], last: row[2], rows: rows, net: net}
 	}
 	for _, b := range monthCycleBoundaries {
 		got, ok := byLabel[b.label]
 		if !ok {
 			t.Fatalf("missing label %q in expected CSV", b.label)
 		}
-		if got[0] != b.firstDocDate || got[1] != b.lastDocDate {
-			t.Fatalf("%s: CSV %v want %s..%s", b.label, got, b.firstDocDate, b.lastDocDate)
+		if got.first != b.firstDocDate || got.last != b.lastDocDate {
+			t.Fatalf("%s: CSV dates %s..%s want %s..%s", b.label, got.first, got.last, b.firstDocDate, b.lastDocDate)
 		}
+	}
+	for _, want := range monthCycleExpectedTotals {
+		got, ok := byLabel[want.label]
+		if !ok {
+			t.Fatalf("missing totals for %q", want.label)
+		}
+		if got.rows != want.rows {
+			t.Fatalf("%s rows: CSV %d want %d", want.label, got.rows, want.rows)
+		}
+		if got.net != want.net {
+			t.Fatalf("%s net: CSV %v want %v", want.label, got.net, want.net)
+		}
+	}
+	if totalRows != monthCycleExpectedTotalRows || totalNet != monthCycleExpectedTotalNet {
+		t.Fatalf("TOTAL: CSV %d / %.2f want %d / %.2f", totalRows, totalNet, monthCycleExpectedTotalRows, monthCycleExpectedTotalNet)
 	}
 }

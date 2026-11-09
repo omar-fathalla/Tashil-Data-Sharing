@@ -21,15 +21,23 @@ emulators, Flutter/Go builds). CI must never assume exclusive use of the machine
 runs-on: [self-hosted, macOS, tashil-mac]
 ```
 
-Three runners share that label (parallel jobs OK). **`tashil-mac-2` / `tashil-mac-3`
-run as user `tashil-ci`** (`HOME=/Users/tashil-ci`). Toolchains live at
-`$HOME/toolchains` — never hardcode `/Users/fathalla`.
+**`tashil-mac` … `tashil-mac-4` are four GitHub runner processes on one physical Mac.**
+They share CPU, disk, and toolchains — when all four pick up jobs at once the machine
+thrashes (slow Flutter/Go/Playwright, lost communication). Prefer hosted ubuntu for
+light gates (`CI_HOSTED_RUNNER`); keep only heavy/deploy work on Mac. For overlapping
+heavy jobs, enable `MAC_SHARED_LOCK=1` (below) or reduce how many Mac runners are
+online so GitHub queues instead of over-paralleling one host.
+
+**`tashil-mac-2` / `tashil-mac-3` / `tashil-mac-4` run as user `tashil-ci`**
+(`HOME=/Users/tashil-ci`). Toolchains live at `$HOME/toolchains` — never hardcode
+`/Users/fathalla`.
 
 | Runner name    | User (target) | Install dir            | ADB server port |
 |----------------|---------------|------------------------|-----------------|
 | `tashil-mac`   | (legacy / migrating) | `~/actions-runner`   | 5037 |
 | `tashil-mac-2` | `tashil-ci`   | `~/actions-runner-2`   | 5038 |
 | `tashil-mac-3` | `tashil-ci`   | `~/actions-runner-3`   | 5039 |
+| `tashil-mac-4` | `tashil-ci`   | `~/actions-runner-4`   | 5040 |
 
 `scripts/ci_runner_env.sh` sets `PATH` (`$HOME/toolchains/bin` + Flutter), `ANDROID_HOME`,
 `ANDROID_ADB_SERVER_PORT`, `ADB_SERVER_SOCKET=tcp:localhost:<port>`, and forces
@@ -155,7 +163,13 @@ concurrency:
 Superseded PR syncs cancel in-flight CI; **never cancel `main`**. **`deploy.yml` must
 keep `cancel-in-progress: false`** — never cancel a production deploy.
 
-## CPU budget (14-core Mac, 3 runners + other bots)
+GitHub workflow concurrency only serializes within one workflow/ref — it does **not**
+stop `tashil-mac`…`tashil-mac-4` from all running different workflows at once on the
+same Mac. Queueing levers: keep light jobs on `CI_HOSTED_RUNNER`, enable
+`MAC_SHARED_LOCK=1` for heavies, or take runners offline so the label has fewer
+slots.
+
+## CPU budget (14-core Mac, up to 4 runners + other bots)
 
 | Job | Cap |
 |-----|-----|
@@ -213,16 +227,21 @@ Emulator isolation scripts still probe free ports (safe on ubuntu-latest too).
 ~/actions-runner/svc.sh status
 ~/actions-runner-2/svc.sh status
 ~/actions-runner-3/svc.sh status
+~/actions-runner-4/svc.sh status
 
 ~/actions-runner/svc.sh stop && ~/actions-runner/svc.sh start
-# … same for -2 / -3
+# … same for -2 / -3 / -4
 ```
+
+If the Mac is saturated, stop one or two runner services so GitHub queues jobs
+instead of scheduling four heavy workloads onto one host.
 
 ## Work directories
 
 - `~/actions-runner/_work/Tashil-Data-Sharing/Tashil-Data-Sharing`
 - `~/actions-runner-2/_work/...`
 - `~/actions-runner-3/_work/...`
+- `~/actions-runner-4/_work/...`
 - Emulator sandboxes: `$RUNNER_TEMP/tashil-emu-<run>-<job>-<pid>/`
 
 ## Clean disk

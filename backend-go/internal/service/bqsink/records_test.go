@@ -29,6 +29,30 @@ func TestRecordsFilterSQL(t *testing.T) {
 	if !strings.Contains(supWhere, "@supplier") {
 		t.Errorf("supplier filter missing: %s", supWhere)
 	}
+
+	catWhere, catParams := RecordsFilterSQL(RecordsQuery{TenantID: "t", Category: "صابون سائل اطباق", Supplier: "all_market"})
+	if !strings.Contains(catWhere, "IN UNNEST(@categories)") {
+		t.Errorf("category filter missing: %s", catWhere)
+	}
+	var cats []string
+	for _, p := range catParams {
+		if p.Name == "categories" {
+			cats, _ = p.Value.([]string)
+		}
+	}
+	if len(cats) < 2 {
+		t.Fatalf("expected alias list for dish liquid, got %#v", cats)
+	}
+	foundAlias := false
+	for _, c := range cats {
+		if c == "صابون سائل للاطباق" || c == "سائل اطباق" {
+			foundAlias = true
+			break
+		}
+	}
+	if !foundAlias {
+		t.Errorf("expected known dish-liquid aliases in %#v", cats)
+	}
 }
 
 func TestRecordsSQLTenantScopedAndPaged(t *testing.T) {
