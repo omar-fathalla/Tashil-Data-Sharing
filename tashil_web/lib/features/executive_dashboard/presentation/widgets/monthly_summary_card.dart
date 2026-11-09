@@ -5,6 +5,7 @@ import 'package:tashil_web/core/theme/m3_spacing.dart';
 import 'package:tashil_web/core/widgets/app_icons.dart';
 
 /// Phase C: shows the grounded Arabic monthly narrative from executive KPIs.
+/// CI re-run after Mac test-flutter cancellation (gate treats cancelled as fail).
 class MonthlySummaryCard extends StatelessWidget {
   final MonthlySummaryModel summary;
 
