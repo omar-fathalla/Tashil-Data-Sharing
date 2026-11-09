@@ -19,7 +19,8 @@ class ApiEndpoints {
     return cloudBackendUrl;
   }
 
-  static String get health => '$baseUrl/healthz';
+  // Prefer /livez or /api/v1/health — Cloud Run reserves /healthz for its own probes.
+  static String get health => '$baseUrl/livez';
   static String get upload => '$baseUrl/api/v1/ingest/upload';
   static String get ingestPrecheck => '$baseUrl/api/v1/ingest/precheck';
   static String get ingestCommit => '$baseUrl/api/v1/ingest/commit';
