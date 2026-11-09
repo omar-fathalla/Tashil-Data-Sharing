@@ -1,5 +1,9 @@
 # Production deploy on every push to main (backend → Cloud Run, web → Firebase Hosting).
 #
+# Intentionally NO merge_group trigger: one deploy per merged PR via push to main after CI
+# (await-ci → deploy-backend → deploy-web → livez/health smoke). Merge-queue required
+# checks live in ci.yml / playwright_smoke.yml only.
+#
 # Hybrid runners (same pattern as ci.yml / #56):
 #   Light gate (await-ci) → CI_HOSTED_RUNNER (default ubuntu-latest) — no duplicate Mac test load
 #   deploy-backend / deploy-web → CI_RUNS_ON Mac self-hosted (gcloud WIF / toolchains)
@@ -53,10 +57,10 @@ env:
 
 jobs:
   # Light gate on hosted ubuntu — replaces duplicate test-backend/test-web Mac load (#41).
-  # Guard: never schedule on non-main pushes.
+  # Guard: never schedule on non-main pushes; merge_group is not in workflow `on:` either.
   await-ci:
     name: Await CI tests
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name != 'merge_group' && github.ref == 'refs/heads/main'
     runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 240
     steps:
@@ -104,8 +108,25 @@ jobs:
           echo "::error::Timed out waiting for CI tests on ${SHA}"
           exit 1
 
-  deploy-backend:
+  # Hosted: wait until Mac heavies idle before deploy joins tashil-mac-heavy
+  # (same pending-slot eviction guard as CI Flutter / smoke).
+  wait-mac-free:
+    name: Wait for Mac heavy free
     needs: [await-ci]
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 130
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait until Mac heavies idle before joining tashil-mac-heavy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WAIT_MAC_HEAVY_DEADLINE_MIN: "120"
+        run: |
+          chmod +x scripts/wait_mac_heavy_free.sh
+          bash scripts/wait_mac_heavy_free.sh
+
+  deploy-backend:
+    needs: [await-ci, wait-mac-free]
     # Stay on Mac/self-hosted where gcloud WIF + toolchains work (#41 / #55 / #56).
     # Serialize with Flutter/smoke heavies; never cancel an in-flight deploy job.
     concurrency:

@@ -4,16 +4,19 @@ name: Playwright Semantics Smoke
 # heavy smoke-run on Mac self-hosted (CI_RUNS_ON).
 # NEVER use GitHub-hosted macOS runners.
 # Budget fallback: set CI_HOSTED_RUNNER to the same JSON array as CI_RUNS_ON.
-# Mac contention: smoke-run joins job concurrency group tashil-mac-heavy (no cancel)
-# so flutter build / Setup Node are not starved by 4 parallel Mac jobs.
-# See docs/ci-self-hosted.md.
+# Mac contention: smoke-run joins job concurrency group tashil-mac-heavy (no cancel).
+# Before joining: wait-ci-flutter (same-SHA Flutter) then wait-mac-free (repo-wide
+# idle) on ubuntu — avoids pending-slot eviction (1 running + 1 pending only).
+
 #
 # No workflow-level paths-ignore: required check flutter-web-semantics-smoke always reports.
 # Heavy smoke job is path-filtered; gate reports success on backend/docs-only skips.
+# merge_group: required smoke gate must run in the GitHub merge queue (deploy does not).
 on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
 
 # Cancel superseded runs on the same PR/branch. Never cancel main.
 # deploy.yml stays cancel-in-progress: false.
@@ -24,6 +27,7 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read
+  actions: read
 
 env:
   FLUTTER_VERSION: "3.41.2"
@@ -50,10 +54,48 @@ jobs:
               - 'scripts/ci_pub_cache_isolation_test.sh'
               - 'scripts/pick_free_ports.py'
               - 'scripts/spa_http_server.py'
-              - '.github/workflows/playwright_smoke.yml'
+              - 'scripts/wait_ci_flutter_before_smoke.sh'
+              - 'scripts/wait_mac_heavy_free.sh'
+              - '.github/workflows/**'
+
+  # Hosted: wait until CI test-flutter is in_progress/done/skipped (not cancelled).
+  wait-ci-flutter:
+    name: Wait for CI Flutter before Mac smoke
+    needs: changes
+    if: needs.changes.outputs.smoke == 'true'
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+      - name: Yield to CI test-flutter on this SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WAIT_CI_FLUTTER_DEADLINE_MIN: "90"
+          # PR workflows use a virtual merge GITHUB_SHA; CI runs are on the head tip.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          chmod +x scripts/wait_ci_flutter_before_smoke.sh
+          bash scripts/wait_ci_flutter_before_smoke.sh
+
+  # Hosted: wait until no other Mac heavy is active before joining tashil-mac-heavy.
+  wait-mac-free:
+    name: Wait for Mac heavy free
+    needs: [changes, wait-ci-flutter]
+    if: needs.changes.outputs.smoke == 'true'
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 130
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait until Mac heavies idle before joining tashil-mac-heavy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WAIT_MAC_HEAVY_DEADLINE_MIN: "120"
+        run: |
+          chmod +x scripts/wait_mac_heavy_free.sh
+          bash scripts/wait_mac_heavy_free.sh
 
   smoke-run:
-    needs: changes
+    needs: [changes, wait-ci-flutter, wait-mac-free]
     if: needs.changes.outputs.smoke == 'true'
     # One Mac-heavy at a time in this repo (with Flutter CI / deploy). No cancel.
     concurrency:
@@ -247,7 +289,7 @@ jobs:
 
   # Required-check gate: job id matches existing check name flutter-web-semantics-smoke.
   flutter-web-semantics-smoke:
-    needs: [changes, smoke-run]
+    needs: [changes, wait-ci-flutter, wait-mac-free, smoke-run]
     if: always() && !cancelled()
     runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
@@ -263,6 +305,18 @@ jobs:
             echo "Skipped — no Flutter/web/e2e/workflow path changes"
             exit 0
           fi
+          if [[ "${{ needs.wait-ci-flutter.result }}" != "success" ]]; then
+            echo "::error::wait-ci-flutter failed (${{ needs.wait-ci-flutter.result }})"
+            exit 1
+          fi
+          if [[ "${{ needs.wait-mac-free.result }}" != "success" ]]; then
+            echo "::error::wait-mac-free failed (${{ needs.wait-mac-free.result }})"
+            exit 1
+          fi
           result="${{ needs.smoke-run.result }}"
           echo "smoke-run result=${result}"
+          if [[ "${result}" == "cancelled" ]]; then
+            echo "::error::smoke-run was cancelled (not success). tashil-mac-heavy pending eviction."
+            exit 1
+          fi
           [[ "${result}" == "success" ]]

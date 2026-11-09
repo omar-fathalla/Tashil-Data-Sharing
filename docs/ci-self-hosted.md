@@ -103,6 +103,24 @@ concurrency:
 deploy or flutter build. Superseded **PR** workflow runs still cancel via the
 workflow-level group (non-`main` only).
 
+**Pending-slot eviction (root cause):** GitHub keeps only **one pending** job per
+concurrency group even with `cancel-in-progress: false` (that flag protects only
+the *running* job). A second pending job **cancels** the first — evidence: main CI
+`test-flutter` pending then evicted when another PR queued; smoke can be
+instant-cancelled the same way.
+
+**Mitigation — wait then join:** every Mac heavy is preceded by a hosted ubuntu
+job that runs `scripts/wait_mac_heavy_free.sh` and only then joins
+`tashil-mac-heavy`:
+
+| Mac job | Pre-join wait(s) |
+|---------|------------------|
+| `test-flutter` | `wait-mac-free` |
+| `smoke-run` | `wait-ci-flutter` then `wait-mac-free` |
+| `deploy-backend` | `wait-mac-free` (after `await-ci`); `deploy-web` follows backend |
+
+Do **not** join the concurrency group while another heavy is in_progress/queued.
+
 This is complementary to `MAC_SHARED_LOCK`: the job group covers **this repo**; the
 directory lock covers **other repos/bots** on the same Mac.
 
@@ -154,10 +172,16 @@ bash scripts/mac_lock_ci.sh release "$AGENT"
 | Cloud Run pin / PR comment / path detect & gates | no | **no** | — | 5m (hosted via `CI_HOSTED_RUNNER`) |
 
 Path filters (`dorny/paths-filter`): no workflow-level `paths-ignore` — workflows always
-start so gates report. Flutter + Playwright heavy jobs run only when `tashil_web/` /
-`e2e/` / related scripts / workflow files change. Required checks report via lightweight
-gate jobs on `CI_HOSTED_RUNNER` (`Flutter analyze & test`,
-`flutter-web-semantics-smoke`).
+start so gates report. Backend Go, Cloud Run pin, Flutter, and Playwright heavy jobs
+run only when their path filters match (any `.github/workflows/**` change sets all
+filters true). Required checks report via lightweight gate jobs on `CI_HOSTED_RUNNER`
+(`Backend Go tests`, `Cloud Run one-instance pin`, `Flutter analyze & test`,
+`flutter-web-semantics-smoke`) so skips still show **success** (never hang required
+checks / merge queue).
+
+**Merge queue:** `ci.yml` and `playwright_smoke.yml` listen for `merge_group` so
+required checks run in the queue. `deploy.yml` does **not** — production stays
+one-deploy-per-merged-PR via `push` to `main` (`await-ci` → deploy → livez/health).
 
 Self-hosted Flutter: prefer `$HOME/toolchains/flutter` (`scripts/ci_detect_flutter.sh`);
 **fail fast** if missing — never download via `flutter-action` on Mac. `PUB_CACHE` is
