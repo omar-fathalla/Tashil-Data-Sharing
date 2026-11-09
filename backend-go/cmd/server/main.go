@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"os/signal"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"syscall"
@@ -18,9 +18,9 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/handlers"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
-	"github.com/tashil/data-sharing/backend/internal/service/dataquality"
 	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 	"github.com/tashil/data-sharing/backend/internal/service/customers"
+	"github.com/tashil/data-sharing/backend/internal/service/dataquality"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
@@ -287,6 +287,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/ingest/upload", uploadHandler.HandleUpload)
 	mux.HandleFunc("POST /api/v1/ingest/precheck", uploadHandler.HandlePrecheck)
 	mux.HandleFunc("POST /api/v1/ingest/commit", uploadHandler.HandleCommit)
+	mux.HandleFunc("POST /api/v1/ingest/mapping-correction", uploadHandler.HandleSaveMappingCorrection)
 	mux.HandleFunc("POST /api/v1/ingest/discard", uploadHandler.HandleDiscard)
 	mux.HandleFunc("POST /api/v1/ingest/clear", uploadHandler.HandleClearData)
 	mux.HandleFunc("DELETE /api/v1/ingest/clear", uploadHandler.HandleClearData)
