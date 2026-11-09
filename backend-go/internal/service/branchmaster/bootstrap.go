@@ -346,27 +346,13 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 	sort.Strings(unmatchedSO)
 	sort.Strings(ambiguous)
 
-	unmappedPlan := 0
-	for _, p := range planCodeProps {
-		if p.Status == "unmapped_owner_to_name" {
-			unmappedPlan++
-		}
-	}
-
 	var ownerQ []string
-	if unmappedPlan > 0 {
-		ownerQ = append(ownerQ, fmt.Sprintf(
-			"Plan_2026_Clean: %d Customer_Branch_Code بلا اسم فرع في الملف (لا عمود branch-name) — سمِّ/اربط كل كود بفرع FTH (انظر unmapped_plan_branch_codes). لا تخمين.",
-			unmappedPlan))
-	}
-	if len(misspellings) > 0 {
-		ownerQ = append(ownerQ, fmt.Sprintf(
-			"أزواج أسماء متقاربة قد تكون إملاءً مختلفًا لنفس الفرع — أكّد الدمج أو أبقِها منفصلة (انظر likely_misspellings): %s",
-			strings.Join(misspellings[:min(3, len(misspellings))], "؛ ")))
-	}
+	// Owner (#70): remaining owner question for in26+out26 unification is only
+	// Sell-Out names missing a Sell-In counterpart. Plan codes / misspellings are
+	// not owner questions (Plan excluded; numbered-distinct already keeps pairs apart).
 	if len(unmatchedSO) > 0 {
 		ownerQ = append(ownerQ, fmt.Sprintf(
-			"missing Sell-In counterpart: %d Sell-Out POS names have no Sell-In match (never auto-link to warehouses/Regional). انظر unmatched_sell_out",
+			"missing Sell-In counterpart: %d Sell-Out POS names have no Sell-In match (never auto-link to warehouses). انظر unmatched_sell_out",
 			len(unmatchedSO)))
 	}
 
@@ -397,18 +383,18 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 
 	notes := []string{
 		"هذا تقرير تجريبي (dry-run) فقط — لم يُكتب أي شيء في الإنتاج.",
-		"المصادر = بيانات Adeco الحية فقط (BigQuery). لا seed_customers / seed_aliases / ملفات أرشيف قديمة (مسار dry-run يرفضها).",
+		"توحيد الفروع = in26.xlsx (Sell-In/Returns) + out26.xlsx (Sell-Out) فقط.",
+		"مستبعد من هذا الـ dry-run: Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx / arch_sellin_adeco_fathalla_1794179188685072646 — بلا صفوف أب/ميني/Regional ولا 16 كودًا. بيانات BQ لم تُحذف ولم تُعدَّل.",
+		"المصادر = بيانات Adeco الحية فقط (BigQuery). لا seed_customers / seed_aliases.",
 		"قواعد السلسلة قابلة للضبط لكل chain (care+grocery merge، أرقام الفروع، quarantine للأسماء المجهولة).",
 		"قرار المالك: مواد عناية + بقالة لنفس الموقع = فرع واحد (FTH)؛ أرقام مختلفة = فروع مختلفة؛ المسافة فقط مع نفس الرقم تُدمَج.",
-		"أسماء الشركة الأم / مجمع الإقليم / أب-ميني ليست فروعًا مقترحة — انظر parent_level_rows (القيم والصفوف محفوظة).",
 		"Sell-In = شحنات الشركة وقد يشمل مواقع إضافية (مخازن مثل مخزن الافوجادو) — Sell-In-only صحيح؛ يُعلَّم type=warehouse.",
 		"Sell-Out = نقاط البيع فقط؛ كل فرع Sell-Out يجب أن يكون له مقابل Sell-In. Sell-Out-only = missing Sell-In counterpart (لا ربط تلقائي بمخزن أو Regional).",
-		"أي اسم/كود غير مربوط بعد (Sell-Out-only، أكواد Plan، …) يبقى ظاهرًا ومعدودًا كصف مستقل بالاسم الخام الأصلي حتى يربطه المالك — لا إخفاء ولا تخمين دمج.",
-		"Plan_2026_Clean: لا عمود اسم فرع — ليس خطأ ingestion. 16 كودًا بلا اسم بانتظار المالك (تُعرض بالكود الخام).",
+		"أي اسم غير مربوط بعد (Sell-Out-only) يبقى ظاهرًا ومعدودًا كصف مستقل بالاسم الخام الأصلي حتى يربطه المالك — لا إخفاء ولا تخمين دمج.",
 		fmt.Sprintf("عدد الفروع التي دُمجت فيها مواد عناية + بقالة في هذا dry-run: %d.", careMerged),
-		"بعد موافقة المالك على بقية الأسئلة تُحفظ الجداول مرة واحدة.",
+		"سؤال المالك المتبقي = أسماء Sell-Out بلا مقابل Sell-In فقط.",
 		"أسماء Sell-Out تُربط عند تطابق الاسم القصير فقط؛ لا تخمين (الإبراهيمية ≠ الإبراهيمية ريفيرا).",
-		"مصدر Returns = صفوف sell_in_records ذات قيمة سالبة أو نوع مرتجع.",
+		"مصدر Returns = صفوف sell_in_records ذات قيمة سالبة أو نوع مرتجع (من in26).",
 	}
 
 	return DryRunReport{
@@ -645,8 +631,8 @@ func buildSourceReconcile(occ []RawOccurrence) ([]SourceReconcileRow, []string) 
 	notes := []string{
 		"«35» (Sell-Out) = distinct store_name in live sell_out_facts for out26 archive arch_adeco_fathalla_1794146334922507694.",
 		"in26: ~29 grocery + care-only طنطا Out Let ≈ 30 locations after owner care=grocery merge.",
-		"Plan_2026_Clean: no branch-name column (ingestion correct). Parent Customer_Name (2) + Regional + 16 coded branches. Parents/Regional are parent_level_rows (not proposed branches); 16 codes unmapped until owner names them.",
-		"Proposed branch codes = in26/out26 store locations only under chain policy; numbered branches stay separate.",
+		"Owner (#70): Plan_2026_Clean archive excluded from unification (BQ data untouched). Proposal = in26 + out26 only.",
+		"Proposed branch codes = in26/out26 store locations under chain policy; numbered branches stay separate.",
 	}
 	return rows, notes
 }

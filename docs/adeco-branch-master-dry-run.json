@@ -1,0 +1,1900 @@
+{
+  "tenant_id": "adeco",
+  "generated_at": "2026-11-09T17:31:28.369699398Z",
+  "raw_name_count": 91,
+  "unique_norm_count": 43,
+  "chain_count": 1,
+  "branch_count": 43,
+  "sell_in_and_sell_out": 22,
+  "sell_in_only": 8,
+  "sell_out_only": 13,
+  "multi_spelling_merges": 28,
+  "branches_with_returns": 30,
+  "chain_summaries": [
+    {
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branches": 43,
+      "sell_in_and_sell_out": 22,
+      "sell_in_only": 8,
+      "sell_out_only": 13,
+      "with_returns": 30
+    }
+  ],
+  "owner_questions": [
+    "missing Sell-In counterpart: 13 Sell-Out POS names have no Sell-In match (never auto-link to warehouses). انظر unmatched_sell_out"
+  ],
+  "unmatched_sell_out": [
+    "فرع فتح الله - الأنفوشي → proposed FTH-004 (فرع فتح الله - الأنفوشي) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
+    "فرع فتح الله - الإبراهيمية ميني → proposed FTH-006 (فرع فتح الله - الإبراهيمية ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
+    "فرع فتح الله - الإبراهيمية → proposed FTH-005 (فرع فتح الله - الإبراهيمية) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
+    "فرع فتح الله - الدخيلة مينى 2 → proposed FTH-008 (فرع فتح الله - الدخيلة مينى 2) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
+    "فرع فتح الله - الدخيلة ميني → proposed FTH-009 (فرع فتح الله - الدخيلة ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
+    "فرع فتح الله - دمنهور الأندلس → proposed FTH-017 (فرع فتح الله - دمنهور الأندلس) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
+    "فرع فتح الله - سموحة ميني → proposed FTH-022 (فرع فتح الله - سموحة ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
+    "فرع فتح الله - سيدي بشر ميني → proposed FTH-024 (فرع فتح الله - سيدي بشر ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
+    "فرع فتح الله - سيدي جابر المحطة → proposed FTH-026 (فرع فتح الله - سيدي جابر المحطة) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
+    "فرع فتح الله - سيدي جابر ميني → proposed FTH-027 (فرع فتح الله - سيدي جابر ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
+    "فرع فتح الله - كفر الدوار - مول → proposed FTH-034 (فرع فتح الله - كفر الدوار - مول) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
+    "فرع فتح الله - ملك حفنى → proposed FTH-040 (فرع فتح الله - ملك حفنى) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
+    "فرع فتح الله - نيس2 → proposed FTH-042 (فرع فتح الله - نيس2) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)"
+  ],
+  "data_provenance": [
+    "returns ← tashil_analytics.sell_in_records / in26.xlsx (arch_sellin_adeco_fathalla_1794178032976473890)",
+    "sell_in ← tashil_analytics.sell_in_records / in26.xlsx (arch_sellin_adeco_fathalla_1794178032976473890)",
+    "sell_out ← tashil_analytics.sell_out_facts / out26.xlsx (arch_adeco_fathalla_1794146334922507694)"
+  ],
+  "source_reconcile": [
+    {
+      "source_file": "in26.xlsx",
+      "source_table": "tashil_analytics.sell_in_records",
+      "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890",
+      "raw_spellings": 56,
+      "care_spellings": 27,
+      "grocery_spellings": 29,
+      "unique_locations_after_normalize": 30,
+      "note_ar": "in26: 29 grocery + 27 care spellings → 30 locations after مواد عناية merge with grocery (طنطا Out Let care-only stays separate)."
+    },
+    {
+      "source_file": "out26.xlsx",
+      "source_table": "tashil_analytics.sell_out_facts",
+      "archive_id": "arch_adeco_fathalla_1794146334922507694",
+      "raw_spellings": 35,
+      "grocery_spellings": 35,
+      "unique_locations_after_normalize": 35,
+      "note_ar": "Sell-Out wide-matrix stores = 35 (this is the «35» live branch count from out26)."
+    }
+  ],
+  "reconcile_notes_ar": [
+    "«35» (Sell-Out) = distinct store_name in live sell_out_facts for out26 archive arch_adeco_fathalla_1794146334922507694.",
+    "in26: ~29 grocery + care-only طنطا Out Let ≈ 30 locations after owner care=grocery merge.",
+    "Owner (#70): Plan_2026_Clean archive excluded from unification (BQ data untouched). Proposal = in26 + out26 only.",
+    "Proposed branch codes = in26/out26 store locations under chain policy; numbered branches stay separate."
+  ],
+  "chain_policies": [
+    {
+      "slug": "fathalla",
+      "merge_care_with_grocery": true,
+      "keep_numbered_distinct": true,
+      "quarantine_unknown": true,
+      "care_markers": [
+        "مواد عناية",
+        "مواد عنايه"
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - أبو يوسف",
+        "عائله فتح الله ماركت مواد عناية - أبو يوسف",
+        "فرع فتح الله - ابو يوسف"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - أبو يوسف",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - أبو يوسف",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - أبو يوسف",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - أبو يوسف",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - ابو يوسف",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|ابو يوسف",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-001",
+      "display_name": "ابو يوسف",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - أمواج",
+        "عائله فتح الله ماركت مواد عناية - أمواج",
+        "فرع فتح الله - أمواج - الساحل الشمالي"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - أمواج",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - أمواج",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - أمواج",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - أمواج",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - أمواج - الساحل الشمالي",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|امواج",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-002",
+      "display_name": "أمواج",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - اكتوبر",
+        "عائله فتح الله ماركت مواد عناية - اكتوبر",
+        "فرع فتح الله - أكتوبر"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - اكتوبر",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - اكتوبر",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - اكتوبر",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - اكتوبر",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - أكتوبر",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|اكتوبر",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-003",
+      "display_name": "أكتوبر",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "فرع فتح الله - الأنفوشي"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "فرع فتح الله - الأنفوشي",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|الانفوشي",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-004",
+      "display_name": "فرع فتح الله - الأنفوشي",
+      "source_hint": "sell_out",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "فرع فتح الله - الإبراهيمية"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "فرع فتح الله - الإبراهيمية",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|الابراهيميه",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-005",
+      "display_name": "فرع فتح الله - الإبراهيمية",
+      "source_hint": "sell_out",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "فرع فتح الله - الإبراهيمية ميني"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "فرع فتح الله - الإبراهيمية ميني",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|الابراهيميه ميني",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-006",
+      "display_name": "فرع فتح الله - الإبراهيمية ميني",
+      "source_hint": "sell_out",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - الابراهيمية ريفيرا",
+        "عائله فتح الله ماركت مواد عناية - الابراهيمية ريفيرا"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - الابراهيمية ريفيرا",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - الابراهيمية ريفيرا",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - الابراهيمية ريفيرا",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - الابراهيمية ريفيرا",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        }
+      ],
+      "normalized_key": "FTH|الابراهيميه ريفيرا",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-007",
+      "display_name": "الابراهيمية ريفيرا",
+      "source_hint": "sell_in+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "فرع فتح الله - الدخيلة مينى 2"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "فرع فتح الله - الدخيلة مينى 2",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|الدخيله ميني 2",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-008",
+      "display_name": "فرع فتح الله - الدخيلة مينى 2",
+      "source_hint": "sell_out",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "فرع فتح الله - الدخيلة ميني"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "فرع فتح الله - الدخيلة ميني",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|الدخيله ميني",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-009",
+      "display_name": "فرع فتح الله - الدخيلة ميني",
+      "source_hint": "sell_out",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - الرحاب",
+        "عائله فتح الله ماركت مواد عناية - الرحاب",
+        "فرع فتح الله - مدينة الرحاب"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - الرحاب",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - الرحاب",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - الرحاب",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - الرحاب",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - مدينة الرحاب",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|الرحاب",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-010",
+      "display_name": "الرحاب",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - المحلة الكبري",
+        "عائله فتح الله ماركت مواد عناية - المحلة الكبري",
+        "فرع فتح الله - المحلة الكبرى"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - المحلة الكبري",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - المحلة الكبري",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - المحلة الكبري",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - المحلة الكبري",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - المحلة الكبرى",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|المحله الكبري",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-011",
+      "display_name": "المحلة الكبرى",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - ش النصر بلازا",
+        "عائله فتح الله ماركت مواد عناية - ش النصر بلازا",
+        "فرع فتح الله - النصر"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - ش النصر بلازا",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - ش النصر بلازا",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - ش النصر بلازا",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - ش النصر بلازا",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - النصر",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|ش النصر بلازا",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-012",
+      "display_name": "النصر",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - بحري",
+        "عائله فتح الله ماركت مواد عناية - بحري"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - بحري",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - بحري",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - بحري",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        }
+      ],
+      "normalized_key": "FTH|بحري",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-013",
+      "display_name": "بحري",
+      "source_hint": "sell_in+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - جاردينيا",
+        "عائله فتح الله ماركت مواد عناية - جاردينيا",
+        "فرع فتح الله - جاردينيا"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - جاردينيا",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - جاردينيا",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - جاردينيا",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - جاردينيا",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - جاردينيا",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|جاردينيا",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-014",
+      "display_name": "جاردينيا",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - دمنهور",
+        "عائله فتح الله ماركت مواد عناية - دمنهور"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - دمنهور",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - دمنهور",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - دمنهور",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - دمنهور",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        }
+      ],
+      "normalized_key": "FTH|دمنهور",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-015",
+      "display_name": "دمنهور",
+      "source_hint": "sell_in+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - دمنهور - الاستاد",
+        "عائله فتح الله ماركت مواد عناية - دمنهور - الاستاد",
+        "فرع فتح الله - دمنهور - الاستاد"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - دمنهور - الاستاد",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - دمنهور - الاستاد",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - دمنهور - الاستاد",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - دمنهور - الاستاد",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - دمنهور - الاستاد",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|دمنهور الاستاد",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-016",
+      "display_name": "دمنهور - الاستاد",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "فرع فتح الله - دمنهور الأندلس"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "فرع فتح الله - دمنهور الأندلس",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|دمنهور الاندلس",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-017",
+      "display_name": "فرع فتح الله - دمنهور الأندلس",
+      "source_hint": "sell_out",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - دمياط الجديدة",
+        "عائله فتح الله ماركت مواد عناية - دمياط الجديدة",
+        "فرع فتح الله - دمياط الجديدة"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - دمياط الجديدة",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - دمياط الجديدة",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - دمياط الجديدة",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - دمياط الجديدة",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - دمياط الجديدة",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|دمياط الجديده",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-018",
+      "display_name": "دمياط الجديدة",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - قرية روزانا",
+        "عائله فتح الله ماركت مواد عناية - قرية روزانا",
+        "فرع فتح الله - روزانا"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - قرية روزانا",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - قرية روزانا",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - قرية روزانا",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - قرية روزانا",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - روزانا",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|قريه روزانا",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-019",
+      "display_name": "روزانا",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - ستانلي",
+        "عائله فتح الله ماركت مواد عناية - ستانلي",
+        "فرع فتح الله - ستانلي"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - ستانلي",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - ستانلي",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - ستانلي",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - ستانلي",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - ستانلي",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|ستانلي",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-020",
+      "display_name": "ستانلي",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - سموحة",
+        "عائله فتح الله ماركت مواد عناية - سموحة",
+        "فرع فتح الله - سموحة"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - سموحة",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - سموحة",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - سموحة",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - سموحة",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - سموحة",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|سموحه",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-021",
+      "display_name": "سموحة",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "فرع فتح الله - سموحة ميني"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "فرع فتح الله - سموحة ميني",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|سموحه ميني",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-022",
+      "display_name": "فرع فتح الله - سموحة ميني",
+      "source_hint": "sell_out",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - سيتي سكوير",
+        "عائله فتح الله ماركت مواد عناية - سيتي سكوير",
+        "فرع فتح الله - سيتي سكوير"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - سيتي سكوير",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - سيتي سكوير",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - سيتي سكوير",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - سيتي سكوير",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - سيتي سكوير",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|سيتي سكوير",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-023",
+      "display_name": "سيتي سكوير",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "فرع فتح الله - سيدي بشر ميني"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "فرع فتح الله - سيدي بشر ميني",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|سيدي بشر ميني",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-024",
+      "display_name": "فرع فتح الله - سيدي بشر ميني",
+      "source_hint": "sell_out",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - سيدي جابر",
+        "عائله فتح الله ماركت مواد عناية - سيدي جابر"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - سيدي جابر",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - سيدي جابر",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - سيدي جابر",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - سيدي جابر",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        }
+      ],
+      "normalized_key": "FTH|سيدي جابر",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-025",
+      "display_name": "سيدي جابر",
+      "source_hint": "sell_in+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "فرع فتح الله - سيدي جابر المحطة"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "فرع فتح الله - سيدي جابر المحطة",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|سيدي جابر المحطه",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-026",
+      "display_name": "فرع فتح الله - سيدي جابر المحطة",
+      "source_hint": "sell_out",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "فرع فتح الله - سيدي جابر ميني"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "فرع فتح الله - سيدي جابر ميني",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|سيدي جابر ميني",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-027",
+      "display_name": "فرع فتح الله - سيدي جابر ميني",
+      "source_hint": "sell_out",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - طنطا",
+        "عائله فتح الله ماركت مواد عناية - طنطا",
+        "فرع فتح الله - طنطا"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - طنطا",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - طنطا",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - طنطا",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - طنطا",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - طنطا",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|طنطا",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-028",
+      "display_name": "طنطا",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت مواد عناية - طنطا Out Let",
+        "فرع فتح الله - طنطا - اوت ليت مول"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - طنطا Out Let",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - طنطا Out Let",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - طنطا - اوت ليت مول",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|طنطا out let",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-029",
+      "display_name": "طنطا - اوت ليت مول",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - طوسون",
+        "عائله فتح الله ماركت مواد عناية - طوسون",
+        "فرع فتح الله - طوسون"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - طوسون",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - طوسون",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - طوسون",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - طوسون",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - طوسون",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|طوسون",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-030",
+      "display_name": "طوسون",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - عجمى ستار",
+        "عائله فتح الله ماركت مواد عناية - عجمى ستار",
+        "فرع فتح الله - عجمي ستار"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - عجمى ستار",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - عجمى ستار",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - عجمى ستار",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - عجمى ستار",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - عجمي ستار",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|عجمي ستار",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-031",
+      "display_name": "عجمي ستار",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - فلمنج",
+        "عائله فتح الله ماركت مواد عناية - فلمنج",
+        "فرع فتح الله - فلمنج"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - فلمنج",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - فلمنج",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - فلمنج",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - فلمنج",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - فلمنج",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|فلمنج",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-032",
+      "display_name": "فلمنج",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - كفر الدوار",
+        "عائله فتح الله ماركت مواد عناية - كفر الدوار",
+        "فرع فتح الله - كفر الدوار"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - كفر الدوار",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - كفر الدوار",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - كفر الدوار",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - كفر الدوار",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - كفر الدوار",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|كفر الدوار",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-033",
+      "display_name": "كفر الدوار",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "فرع فتح الله - كفر الدوار - مول"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "فرع فتح الله - كفر الدوار - مول",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|كفر الدوار مول",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-034",
+      "display_name": "فرع فتح الله - كفر الدوار - مول",
+      "source_hint": "sell_out",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - كفر الدوار 2",
+        "عائله فتح الله ماركت مواد عناية - كفر الدوار2"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - كفر الدوار 2",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - كفر الدوار 2",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - كفر الدوار2",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - كفر الدوار2",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        }
+      ],
+      "normalized_key": "FTH|كفر الدوار 2",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-035",
+      "display_name": "كفر الدوار 2",
+      "source_hint": "sell_in+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - مخزن أبيس 4 المركزى",
+        "عائله فتح الله ماركت مواد عناية - مخزن أبيس 4 المركزى"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - مخزن أبيس 4 المركزى",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - مخزن أبيس 4 المركزى",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - مخزن أبيس 4 المركزى",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - مخزن أبيس 4 المركزى",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        }
+      ],
+      "normalized_key": "FTH|مخزن ابيس 4 المركزي",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-036",
+      "display_name": "مخزن أبيس 4 المركزى",
+      "source_hint": "sell_in+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "warehouse"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - مخزن الافوجادو"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - مخزن الافوجادو",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - مخزن الافوجادو",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        }
+      ],
+      "normalized_key": "FTH|مخزن الافوجادو",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-037",
+      "display_name": "مخزن الافوجادو",
+      "source_hint": "sell_in+returns",
+      "has_grocery_line": true,
+      "location_type": "warehouse"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - مدينه بدر",
+        "عائله فتح الله ماركت مواد عناية - مدينه بدر",
+        "فرع فتح الله - مدينه بدر"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - مدينه بدر",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - مدينه بدر",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - مدينه بدر",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - مدينه بدر",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - مدينه بدر",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|مدينه بدر",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-038",
+      "display_name": "مدينه بدر",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - مطروح",
+        "عائله فتح الله ماركت مواد عناية - مطروح",
+        "فرع فتح الله - مطروح"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - مطروح",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - مطروح",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - مطروح",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت مواد عناية - مطروح",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - مطروح",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|مطروح",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-039",
+      "display_name": "مطروح",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_care_line": true,
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "ambiguous_note": "policy: care+grocery same location → one branch (sum in reports; short display)",
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "فرع فتح الله - ملك حفنى"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "فرع فتح الله - ملك حفنى",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|ملك حفني",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-040",
+      "display_name": "فرع فتح الله - ملك حفنى",
+      "source_hint": "sell_out",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - نيس"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - نيس",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - نيس",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        }
+      ],
+      "normalized_key": "FTH|نيس",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-041",
+      "display_name": "نيس",
+      "source_hint": "sell_in+returns",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "فرع فتح الله - نيس2"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "فرع فتح الله - نيس2",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|نيس 2",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-042",
+      "display_name": "فرع فتح الله - نيس2",
+      "source_hint": "sell_out",
+      "has_grocery_line": true,
+      "location_type": "store"
+    },
+    {
+      "raw_names": [
+        "عائله فتح الله ماركت - الهانوفيل",
+        "فرع فتح الله - هانوفيل"
+      ],
+      "raw_source_cites": [
+        {
+          "raw_name": "عائله فتح الله ماركت - الهانوفيل",
+          "source": "returns",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "عائله فتح الله ماركت - الهانوفيل",
+          "source": "sell_in",
+          "source_table": "tashil_analytics.sell_in_records",
+          "source_file": "in26.xlsx",
+          "archive_id": "arch_sellin_adeco_fathalla_1794178032976473890"
+        },
+        {
+          "raw_name": "فرع فتح الله - هانوفيل",
+          "source": "sell_out",
+          "source_table": "tashil_analytics.sell_out_facts",
+          "source_file": "out26.xlsx",
+          "archive_id": "arch_adeco_fathalla_1794146334922507694"
+        }
+      ],
+      "normalized_key": "FTH|الهانوفيل",
+      "chain_slug": "fathalla",
+      "chain_code": "FTH",
+      "branch_code": "FTH-043",
+      "display_name": "هانوفيل",
+      "source_hint": "sell_in+sell_out+returns",
+      "has_grocery_line": true,
+      "multi_spelling": true,
+      "location_type": "store"
+    }
+  ],
+  "notes_ar": [
+    "هذا تقرير تجريبي (dry-run) فقط — لم يُكتب أي شيء في الإنتاج.",
+    "توحيد الفروع = in26.xlsx (Sell-In/Returns) + out26.xlsx (Sell-Out) فقط.",
+    "مستبعد من هذا الـ dry-run: Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx / arch_sellin_adeco_fathalla_1794179188685072646 — بلا صفوف أب/ميني/Regional ولا 16 كودًا. بيانات BQ لم تُحذف ولم تُعدَّل.",
+    "المصادر = بيانات Adeco الحية فقط (BigQuery). لا seed_customers / seed_aliases.",
+    "قواعد السلسلة قابلة للضبط لكل chain (care+grocery merge، أرقام الفروع، quarantine للأسماء المجهولة).",
+    "قرار المالك: مواد عناية + بقالة لنفس الموقع = فرع واحد (FTH)؛ أرقام مختلفة = فروع مختلفة؛ المسافة فقط مع نفس الرقم تُدمَج.",
+    "Sell-In = شحنات الشركة وقد يشمل مواقع إضافية (مخازن مثل مخزن الافوجادو) — Sell-In-only صحيح؛ يُعلَّم type=warehouse.",
+    "Sell-Out = نقاط البيع فقط؛ كل فرع Sell-Out يجب أن يكون له مقابل Sell-In. Sell-Out-only = missing Sell-In counterpart (لا ربط تلقائي بمخزن أو Regional).",
+    "أي اسم غير مربوط بعد (Sell-Out-only) يبقى ظاهرًا ومعدودًا كصف مستقل بالاسم الخام الأصلي حتى يربطه المالك — لا إخفاء ولا تخمين دمج.",
+    "عدد الفروع التي دُمجت فيها مواد عناية + بقالة في هذا dry-run: 27.",
+    "سؤال المالك المتبقي = أسماء Sell-Out بلا مقابل Sell-In فقط.",
+    "أسماء Sell-Out تُربط عند تطابق الاسم القصير فقط؛ لا تخمين (الإبراهيمية ≠ الإبراهيمية ريفيرا).",
+    "مصدر Returns = صفوف sell_in_records ذات قيمة سالبة أو نوع مرتجع (من in26)."
+  ]
+}

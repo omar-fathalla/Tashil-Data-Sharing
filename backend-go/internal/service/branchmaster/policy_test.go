@@ -152,6 +152,35 @@ func TestDryRun_UnmappedKeepsOriginalRawDisplay(t *testing.T) {
 	}
 }
 
+func TestFilterUnificationSources_ExcludesPlan(t *testing.T) {
+	in := []RawOccurrence{
+		{RawName: "عائله فتح الله ماركت - سموحة", Source: "sell_in", SourceFile: "in26.xlsx", ArchiveID: "arch_in26"},
+		{RawName: "فرع فتح الله - سموحة", Source: "sell_out", SourceFile: "out26.xlsx", ArchiveID: "arch_out26"},
+		{RawName: "عائله فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م", Source: "sell_in",
+			SourceFile: ExcludedPlanFileName, ArchiveID: ExcludedPlanArchiveID},
+		{RawName: "311350557", PlanCode: "311350557", Source: "plan_branch_code",
+			SourceFile: ExcludedPlanFileName, ArchiveID: ExcludedPlanArchiveID},
+		{RawName: "مجمع الإقليم (Regional)", PlanCode: "مجمع الإقليم (Regional)", Source: "plan_branch_code",
+			SourceFile: ExcludedPlanFileName, ArchiveID: ExcludedPlanArchiveID},
+	}
+	kept, skipped := FilterUnificationSources(in)
+	if len(kept) != 2 || skipped != 3 {
+		t.Fatalf("kept=%d skipped=%d want kept=2 skipped=3", len(kept), skipped)
+	}
+	report := BuildDryRunProposal("adeco", kept)
+	if len(report.ParentLevelRows) != 0 {
+		t.Fatalf("Plan parents must not appear: %+v", report.ParentLevelRows)
+	}
+	if len(report.UnmappedPlanCodes) != 0 {
+		t.Fatalf("Plan codes must not appear: %+v", report.UnmappedPlanCodes)
+	}
+	for _, q := range report.OwnerQuestions {
+		if stringIndex(q, "Plan") >= 0 || stringIndex(q, "plan") >= 0 {
+			t.Fatalf("no Plan owner questions: %q", q)
+		}
+	}
+}
+
 func TestDryRun_UnmappedPlanCodeKeepsRawCode(t *testing.T) {
 	report := BuildDryRunProposal("adeco", []RawOccurrence{
 		{RawName: "FTH-031", PlanCode: "FTH-031", ChainSlug: "fathalla", Source: "plan_branch_code",

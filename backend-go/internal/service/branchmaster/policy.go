@@ -178,3 +178,43 @@ func InferLocationType(raws []string) string {
 	}
 	return "store"
 }
+
+// Adeco Plan_2026 archive — excluded from branch unification (owner #70).
+// Do NOT delete or modify this archive's rows in BQ/prod.
+const (
+	ExcludedPlanArchiveID = "arch_sellin_adeco_fathalla_1794179188685072646"
+	ExcludedPlanFileName  = "Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx"
+)
+
+// ExcludedFromUnification reports Plan_2026 / non in26|out26 rows that must not
+// enter the Adeco dry-run proposal (parent/mini/Regional/16 codes).
+func ExcludedFromUnification(o RawOccurrence) bool {
+	file := strings.TrimSpace(o.SourceFile)
+	arch := strings.TrimSpace(o.ArchiveID)
+	src := strings.ToLower(strings.TrimSpace(o.Source))
+	if arch == ExcludedPlanArchiveID ||
+		file == ExcludedPlanFileName ||
+		strings.Contains(file, "Plan_2026") ||
+		strings.Contains(file, "Sell_In_Plan") ||
+		src == "plan_branch_code" {
+		return true
+	}
+	lower := strings.ToLower(file)
+	if strings.Contains(lower, "in26") || strings.Contains(lower, "out26") {
+		return false
+	}
+	// Unknown files are excluded from unification.
+	return file != ""
+}
+
+// FilterUnificationSources keeps only in26/out26 rows for Adeco branch unification.
+func FilterUnificationSources(in []RawOccurrence) (kept []RawOccurrence, skipped int) {
+	for _, o := range in {
+		if ExcludedFromUnification(o) {
+			skipped++
+			continue
+		}
+		kept = append(kept, o)
+	}
+	return kept, skipped
+}

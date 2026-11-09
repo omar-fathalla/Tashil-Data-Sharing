@@ -54,7 +54,16 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	fmt.Fprintf(os.Stderr, "live occurrences: %d from %s\n", len(occ), *liveJSON)
+	kept, skipped := branchmaster.FilterUnificationSources(occ)
+	if skipped > 0 {
+		fmt.Fprintf(os.Stderr, "excluded %d Plan_2026 / non-unification rows (BQ data untouched)\n", skipped)
+	}
+	occ = kept
+	if len(occ) == 0 {
+		fmt.Fprintf(os.Stderr, "no in26/out26 occurrences left after Plan exclusion\n")
+		os.Exit(1)
+	}
+	fmt.Fprintf(os.Stderr, "live occurrences: %d from %s (unification = in26.xlsx + out26.xlsx only)\n", len(occ), *liveJSON)
 
 	report := branchmaster.BuildDryRunProposal(*tenant, occ)
 	if err := os.MkdirAll(*outDir, 0o755); err != nil {
@@ -88,6 +97,8 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 	b.WriteString(fmt.Sprintf("- Tenant: `%s`\n", r.TenantID))
 	b.WriteString(fmt.Sprintf("- Generated (UTC): `%s`\n", r.GeneratedAt.Format(time.RFC3339)))
 	b.WriteString(fmt.Sprintf("- Live input: `%s`\n", filepath.Base(liveJSONPath)))
+	b.WriteString("- **Unification sources only:** `in26.xlsx` (Sell-In + Returns) + `out26.xlsx` (Sell-Out)\n")
+	b.WriteString("- **Excluded (BQ untouched):** `Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx` / `arch_sellin_adeco_fathalla_1794179188685072646` — no parent/mini/Regional/16 codes in this proposal\n")
 	b.WriteString(fmt.Sprintf("- Raw name observations: **%d**\n", r.RawNameCount))
 	b.WriteString(fmt.Sprintf("- Unique normalized keys / proposed branches: **%d**\n", r.UniqueNormCount))
 	b.WriteString(fmt.Sprintf("- Chains: **%d**\n\n", r.ChainCount))
@@ -100,7 +111,7 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 	b.WriteString("- wired by `cmd/branchmasterdryrun` via `customers.SeedCustomerNames()` / `SeedAliasPairs()`\n")
 	b.WriteString("- plus an **old local archive xlsx** header pass (`arch_adeco_fathalla_1792258238476465882_2026 out.xlsx`), not current `out26`\n\n")
 	b.WriteString("Checked and **not** the source: live `sell_in_records`, live `sell_out_facts`, and `sell_in_records_backup_20261109_in26` contain **no** `كيه اتش` / `بيت الجمله` tokens.\n")
-	b.WriteString("This dry-run uses **live BQ only** (see provenance).\n\n")
+	b.WriteString("This dry-run uses **live BQ in26+out26 only** (Plan archive excluded from unification; not deleted).\n\n")
 
 	if len(r.DataProvenance) > 0 {
 		b.WriteString("## Data provenance (live)\n\n")
