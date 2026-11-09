@@ -174,7 +174,7 @@ class CompetitorSuggestionsReviewState
           ),
           if (_error != null) ...[
             M3Spacing.gapSM,
-            Text(_error!, style: TextStyle(color: M3Palette.dangerAccent)),
+            Text(_error!, style: const TextStyle(color: M3Palette.dangerAccent)),
           ],
           M3Spacing.gapMD,
           if (_loading)
