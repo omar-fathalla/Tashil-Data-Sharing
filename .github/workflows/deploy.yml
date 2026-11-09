@@ -228,7 +228,9 @@ jobs:
         if: steps.backend_paths.outputs.deploy == 'true'
         run: |
           url="$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT_ID" --format='value(status.url)')"
-          curl -fsS --retry 5 --retry-delay 10 "$url/api/v1/version"
+          # /livez is public and Cloud Run-safe (/healthz is reserved by Google ingress).
+          curl -fsS --retry 5 --retry-delay 10 "$url/livez"
+          curl -fsS --retry 5 --retry-delay 10 "$url/api/v1/health"
       - name: Skip summary
         if: steps.backend_paths.outputs.deploy != 'true'
         run: echo "Skipped Cloud Run deploy (web-only / non-backend change)." >> "$GITHUB_STEP_SUMMARY"

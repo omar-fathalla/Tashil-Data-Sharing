@@ -2131,6 +2131,20 @@ class UploadRejectedException implements Exception {
   String toString() => message;
 }
 
+/// Client stopped waiting for a background ingest job; the server may still be saving.
+/// Never treat this as "nothing was saved" — guide the user to the files list instead.
+class UploadStillProcessingException implements Exception {
+  final String message;
+
+  UploadStillProcessingException([
+    this.message =
+        'الملف لسه بيتعالج على السيرفر. شوف قائمة الملفات بعد شوية — متترفعش تاني لو لقيته هناك.',
+  ]);
+
+  @override
+  String toString() => message;
+}
+
 /// Turns a refused upload/commit response into a typed exception: 409 = a question for the user
 /// (nothing saved), any other 4xx/5xx = rejection with the server's Arabic message.
 /// Returns normally for 2xx.
@@ -3230,8 +3244,17 @@ class ApiClient {
         'limit': limit.toString(),
         'offset': offset.toString(),
       });
-      final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 180));
-      if (resp.statusCode == 200) {
+      http.Response? resp;
+      for (var attempt = 0; attempt < 4; attempt++) {
+        resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 180));
+        if (resp.statusCode != 429) break;
+        final parsed = int.tryParse(resp.headers['retry-after'] ?? '');
+        final retryAfter = (parsed ?? (1 << attempt)).clamp(0, 30);
+        if (retryAfter > 0) {
+          await Future<void>.delayed(Duration(seconds: retryAfter));
+        }
+      }
+      if (resp != null && resp.statusCode == 200) {
         isServerOnline.value = true;
         lastConnectionError = null;
         final body = jsonDecode(resp.body) as Map<String, dynamic>;
@@ -3272,9 +3295,11 @@ class ApiClient {
         );
         return list;
       } else {
-        failureError = 'HTTP ${resp.statusCode}: ${resp.body}';
+        lastSellOutSummary = const SellOutRecordsSummaryModel();
+        failureError = 'HTTP ${resp?.statusCode}: ${resp?.body}';
       }
     } catch (e) {
+      lastSellOutSummary = const SellOutRecordsSummaryModel();
       failureError = e;
       debugPrint('[ApiClient] Fallback to mock records: $e');
     }
@@ -3283,6 +3308,7 @@ class ApiClient {
     if (!useMocks) {
       isServerOnline.value = false;
       lastConnectionError = failureError.toString();
+      lastSellOutSummary = const SellOutRecordsSummaryModel();
       throw ServerConnectionException(
         'تعذّر تحميل البيانات من الخادم. حاول مرة أخرى بعد قليل.',
         failureError,
@@ -8693,7 +8719,8 @@ class ApiClient {
       final streamed = await BackendHttp.send(req).timeout(const Duration(seconds: 120));
       final resp = await BackendHttp.awaitJob(
           await http.Response.fromStream(streamed),
-          headers: _headers);
+          headers: _headers,
+          maxWait: BackendHttp.defaultJobMaxWait);
       if (resp.statusCode == 200) {
         final jsonMap = jsonDecode(resp.body) as Map<String, dynamic>;
         final model = IngestionResultModel.fromJson(jsonMap);
@@ -8704,12 +8731,18 @@ class ApiClient {
         }
         return model;
       }
+      // Client wait ceiling — job may still finish on the server; never claim "nothing saved".
+      if (resp.statusCode == 504) {
+        throw UploadStillProcessingException();
+      }
       // Rejected or needs an answer: nothing was saved, so never show a fake success.
       if (resp.statusCode == 403 || resp.statusCode == 409 || resp.statusCode == 422 || !allowMockFallback) {
         throwIfUploadRefused(resp.statusCode, resp.body, 'فشل رفع ملف التوريد');
       }
       throw Exception('فشل رفع ملف التوريد (${resp.statusCode})');
     } on UploadRejectedException {
+      rethrow;
+    } on UploadStillProcessingException {
       rethrow;
     } on UploadConfirmationRequiredException {
       rethrow;
