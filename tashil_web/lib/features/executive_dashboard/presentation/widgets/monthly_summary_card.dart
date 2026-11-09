@@ -57,14 +57,14 @@ class MonthlySummaryCard extends StatelessWidget {
                 ),
               ],
             ),
-            M3Spacing.gapSm,
+            M3Spacing.gapSM,
             Text(
               summary.narrativeAr,
               textDirection: TextDirection.rtl,
               style: theme.textTheme.bodyMedium?.copyWith(height: 1.55),
             ),
             if (!summary.grounded) ...[
-              M3Spacing.gapSm,
+              M3Spacing.gapSM,
               Text(
                 'تنبيه: النص غير موثّق بالكامل مقابل أرقام اللوحة.',
                 style: theme.textTheme.labelSmall?.copyWith(color: cs.error),
