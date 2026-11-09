@@ -64,12 +64,18 @@ while (( SECONDS < deadline )); do
 
   if [ "$flutter_status" = "completed" ]; then
     if [ "$flutter_conclusion" = "cancelled" ]; then
-      # Eviction already happened; do not block smoke forever. CI Flutter gate stays red.
-      echo "CI test-flutter already cancelled; proceeding with smoke (re-run CI for Flutter green)"
+      # Stay off Mac until Flutter re-runs — proceeding lets smoke steal pending slot.
+      echo "CI test-flutter cancelled — waiting for Flutter re-run / in_progress (do not join Mac)"
+      sleep "$POLL_SEC"
+      continue
+    fi
+    if [ "$flutter_conclusion" = "failure" ] || [ "$flutter_conclusion" = "success" ] || [ "$flutter_conclusion" = "skipped" ]; then
+      echo "CI test-flutter completed (conclusion=${flutter_conclusion}) — proceeding"
       exit 0
     fi
-    echo "CI test-flutter completed (conclusion=${flutter_conclusion:-none}) — proceeding"
-    exit 0
+    echo "CI test-flutter completed conclusion=${flutter_conclusion:-none}; sleeping ${POLL_SEC}s"
+    sleep "$POLL_SEC"
+    continue
   fi
 
   if [ "$flutter_status" = "missing" ] && [ "$ci_status" = "completed" ]; then

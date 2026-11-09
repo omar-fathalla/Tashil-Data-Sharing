@@ -108,8 +108,25 @@ jobs:
           echo "::error::Timed out waiting for CI tests on ${SHA}"
           exit 1
 
-  deploy-backend:
+  # Hosted: wait until Mac heavies idle before deploy joins tashil-mac-heavy
+  # (same pending-slot eviction guard as CI Flutter / smoke).
+  wait-mac-free:
+    name: Wait for Mac heavy free
     needs: [await-ci]
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 130
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait until Mac heavies idle before joining tashil-mac-heavy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WAIT_MAC_HEAVY_DEADLINE_MIN: "120"
+        run: |
+          chmod +x scripts/wait_mac_heavy_free.sh
+          bash scripts/wait_mac_heavy_free.sh
+
+  deploy-backend:
+    needs: [await-ci, wait-mac-free]
     # Stay on Mac/self-hosted where gcloud WIF + toolchains work (#41 / #55 / #56).
     # Serialize with Flutter/smoke heavies; never cancel an in-flight deploy job.
     concurrency:

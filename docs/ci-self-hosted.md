@@ -103,12 +103,23 @@ concurrency:
 deploy or flutter build. Superseded **PR** workflow runs still cancel via the
 workflow-level group (non-`main` only).
 
-**Pending eviction caveat:** GitHub keeps only **one pending** job per concurrency
-group. A newer pending job **cancels** the previously pending one (in-progress jobs
-are still protected). If deploy holds the group and both `test-flutter` and
-`smoke-run` try to queue, smoke can cancel Flutter. Mitigation: Playwright runs
-hosted job `wait-ci-flutter` (`scripts/wait_ci_flutter_before_smoke.sh`) before
-joining `tashil-mac-heavy`, so CI Flutter claims the pending slot first.
+**Pending-slot eviction (root cause):** GitHub keeps only **one pending** job per
+concurrency group even with `cancel-in-progress: false` (that flag protects only
+the *running* job). A second pending job **cancels** the first — evidence: main CI
+`test-flutter` pending then evicted when another PR queued; smoke can be
+instant-cancelled the same way.
+
+**Mitigation — wait then join:** every Mac heavy is preceded by a hosted ubuntu
+job that runs `scripts/wait_mac_heavy_free.sh` and only then joins
+`tashil-mac-heavy`:
+
+| Mac job | Pre-join wait(s) |
+|---------|------------------|
+| `test-flutter` | `wait-mac-free` |
+| `smoke-run` | `wait-ci-flutter` then `wait-mac-free` |
+| `deploy-backend` | `wait-mac-free` (after `await-ci`); `deploy-web` follows backend |
+
+Do **not** join the concurrency group while another heavy is in_progress/queued.
 
 This is complementary to `MAC_SHARED_LOCK`: the job group covers **this repo**; the
 directory lock covers **other repos/bots** on the same Mac.

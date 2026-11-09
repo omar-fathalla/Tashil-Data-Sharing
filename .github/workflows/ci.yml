@@ -34,6 +34,7 @@ concurrency:
 permissions:
   contents: read
   pull-requests: write
+  actions: read
 
 env:
   FLUTTER_VERSION: "3.41.2"
@@ -74,6 +75,7 @@ jobs:
               - 'scripts/ci_detect_flutter.sh'
               - 'scripts/ci_runner_env.sh'
               - 'scripts/ci_pub_cache_isolation_test.sh'
+              - 'scripts/wait_mac_heavy_free.sh'
               - '.github/workflows/**'
             pin:
               - '.github/workflows/**'
@@ -280,9 +282,27 @@ jobs:
           echo "test-backend result=${result}"
           [[ "${result}" == "success" ]]
 
+  # Hosted gate: do not join tashil-mac-heavy until no other Mac heavy is active
+  # (avoids GitHub pending-slot eviction: 1 running + 1 pending only).
+  wait-mac-free:
+    name: Wait for Mac heavy free
+    needs: changes
+    if: needs.changes.outputs.flutter == 'true'
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 130
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait until Mac heavies idle before joining tashil-mac-heavy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WAIT_MAC_HEAVY_DEADLINE_MIN: "120"
+        run: |
+          chmod +x scripts/wait_mac_heavy_free.sh
+          bash scripts/wait_mac_heavy_free.sh
+
   test-flutter:
     # Heavy run only when Flutter/web/CI paths change. Required check is the gate job below.
-    needs: changes
+    needs: [changes, wait-mac-free]
     if: needs.changes.outputs.flutter == 'true'
     # Serialize with other Mac heavies in this repo (smoke / deploy). Does not cancel.
     # Cross-repo: also set MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
@@ -391,7 +411,7 @@ jobs:
   # Required-check gate: always reports "Flutter analyze & test" (success on path skip).
   test-flutter-gate:
     name: Flutter analyze & test
-    needs: [changes, test-flutter]
+    needs: [changes, wait-mac-free, test-flutter]
     if: always() && !cancelled()
     runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
@@ -407,10 +427,14 @@ jobs:
             echo "Skipped — no Flutter/web/workflow path changes"
             exit 0
           fi
+          if [[ "${{ needs.wait-mac-free.result }}" != "success" ]]; then
+            echo "::error::wait-mac-free failed (${{ needs.wait-mac-free.result }})"
+            exit 1
+          fi
           result="${{ needs.test-flutter.result }}"
           echo "test-flutter result=${result}"
           if [[ "${result}" == "cancelled" ]]; then
-            echo "::error::test-flutter was cancelled (not success). Likely tashil-mac-heavy pending eviction while deploy/smoke held the group — re-run CI; smoke now yields to Flutter first."
+            echo "::error::test-flutter was cancelled (not success). tashil-mac-heavy pending-slot eviction — cancelled ≠ success."
             exit 1
           fi
           [[ "${result}" == "success" ]]
