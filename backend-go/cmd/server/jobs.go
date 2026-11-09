@@ -62,14 +62,19 @@ func (j *asyncJobs) save(rec *jobRecord) {
 	cp := *rec
 	// Persist first, atomically (temp file + rename), so another instance never reads
 	// a truncated file or sees a status this instance has not written to disk yet.
+	// Memory is updated only after the rename attempt so a peer sharing the mount can
+	// load whatever this instance already considers durable (or the prior file).
 	if j.dir != "" {
-		if data, err := json.Marshal(&cp); err == nil {
+		if data, err := json.Marshal(&cp); err != nil {
+			log.Printf("[jobs] cannot marshal job %s: %v", rec.ID, err)
+		} else {
 			final := filepath.Join(j.dir, rec.ID+".json")
 			tmp := final + ".tmp"
 			if err := os.WriteFile(tmp, data, 0o644); err != nil {
 				log.Printf("[jobs] cannot persist job %s: %v", rec.ID, err)
 			} else if err := os.Rename(tmp, final); err != nil {
 				log.Printf("[jobs] cannot persist job %s: %v", rec.ID, err)
+				_ = os.Remove(tmp)
 			}
 		}
 	}
