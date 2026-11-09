@@ -10,10 +10,12 @@ name: Playwright Semantics Smoke
 #
 # No workflow-level paths-ignore: required check flutter-web-semantics-smoke always reports.
 # Heavy smoke job is path-filtered; gate reports success on backend/docs-only skips.
+# merge_group: required smoke gate must run in the GitHub merge queue (deploy does not).
 on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
 
 # Cancel superseded runs on the same PR/branch. Never cancel main.
 # deploy.yml stays cancel-in-progress: false.
@@ -50,7 +52,7 @@ jobs:
               - 'scripts/ci_pub_cache_isolation_test.sh'
               - 'scripts/pick_free_ports.py'
               - 'scripts/spa_http_server.py'
-              - '.github/workflows/playwright_smoke.yml'
+              - '.github/workflows/**'
 
   smoke-run:
     needs: changes

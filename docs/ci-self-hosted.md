@@ -154,10 +154,16 @@ bash scripts/mac_lock_ci.sh release "$AGENT"
 | Cloud Run pin / PR comment / path detect & gates | no | **no** | — | 5m (hosted via `CI_HOSTED_RUNNER`) |
 
 Path filters (`dorny/paths-filter`): no workflow-level `paths-ignore` — workflows always
-start so gates report. Flutter + Playwright heavy jobs run only when `tashil_web/` /
-`e2e/` / related scripts / workflow files change. Required checks report via lightweight
-gate jobs on `CI_HOSTED_RUNNER` (`Flutter analyze & test`,
-`flutter-web-semantics-smoke`).
+start so gates report. Backend Go, Cloud Run pin, Flutter, and Playwright heavy jobs
+run only when their path filters match (any `.github/workflows/**` change sets all
+filters true). Required checks report via lightweight gate jobs on `CI_HOSTED_RUNNER`
+(`Backend Go tests`, `Cloud Run one-instance pin`, `Flutter analyze & test`,
+`flutter-web-semantics-smoke`) so skips still show **success** (never hang required
+checks / merge queue).
+
+**Merge queue:** `ci.yml` and `playwright_smoke.yml` listen for `merge_group` so
+required checks run in the queue. `deploy.yml` does **not** — production stays
+one-deploy-per-merged-PR via `push` to `main` (`await-ci` → deploy → livez/health).
 
 Self-hosted Flutter: prefer `$HOME/toolchains/flutter` (`scripts/ci_detect_flutter.sh`);
 **fail fast** if missing — never download via `flutter-action` on Mac. `PUB_CACHE` is

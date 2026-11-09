@@ -12,6 +12,9 @@
 # thrash Setup Node / flutter build. Keep light jobs on CI_HOSTED_RUNNER; heavy Mac
 # jobs use job concurrency group tashil-mac-heavy + opt-in MAC_SHARED_LOCK=1.
 # See docs/ci-self-hosted.md (Mac contention).
+#
+# merge_group: required checks must run in the GitHub merge queue. Deploy stays on
+# push-to-main only (see deploy.yml) — never on merge_group.
 name: CI tests
 
 # No workflow-level paths-ignore: docs-only PRs still start the workflow so required
@@ -20,6 +23,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
 
 # Cancel superseded runs on the same PR/branch. Never cancel main.
 # deploy.yml keeps cancel-in-progress: false so production deploys are never interrupted.
@@ -38,30 +42,48 @@ env:
   MAC_SHARED_LOCK: ${{ vars.MAC_SHARED_LOCK }}
 
 jobs:
-  # Path filter so Flutter can skip on backend/docs-only PRs while required checks still report.
+  # Path filter so backend / Flutter / pin can skip while required-check gates still report.
   # Light job → hosted by default (CI_HOSTED_RUNNER).
+  # Any .github/workflows/** change sets every filter true ("workflow changes run everything").
   changes:
     name: Detect path changes
     runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     outputs:
+      backend: ${{ steps.filter.outputs.backend }}
       flutter: ${{ steps.filter.outputs.flutter }}
+      pin: ${{ steps.filter.outputs.pin }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
+            backend:
+              - 'backend-go/**'
+              - 'scripts/run_go_tests_ci.sh'
+              - 'scripts/run_firestore_emulator_tests.sh'
+              - 'scripts/parse_live_backend_commit.py'
+              - 'scripts/parse_live_backend_commit_test.py'
+              - 'scripts/pick_free_ports.py'
+              - 'scripts/ci_runner_env.sh'
+              - 'scripts/mac_lock_ci.sh'
+              - '.github/workflows/**'
             flutter:
               - 'tashil_web/**'
               - 'scripts/ci_detect_flutter.sh'
               - 'scripts/ci_runner_env.sh'
               - 'scripts/ci_pub_cache_isolation_test.sh'
-              - '.github/workflows/ci.yml'
+              - '.github/workflows/**'
+            pin:
+              - '.github/workflows/**'
+              - 'scripts/check_cloud_run_one_instance.sh'
 
   # Stopgap until shared storage (#37): refuse deploy commands that omit or change the 1-instance pin.
+  # Required check name is the gate job below (success when path-skipped).
   guard-cloud-run-one-instance:
-    name: Cloud Run one-instance pin
+    needs: changes
+    if: needs.changes.outputs.pin == 'true'
     runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
@@ -69,8 +91,31 @@ jobs:
       - name: Assert deploy pins min/max=1
         run: bash scripts/check_cloud_run_one_instance.sh
 
+  guard-cloud-run-one-instance-gate:
+    name: Cloud Run one-instance pin
+    needs: [changes, guard-cloud-run-one-instance]
+    if: always() && !cancelled()
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate pin path filter / run result
+        run: |
+          set -euo pipefail
+          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            echo "::error::Detect path changes failed (${{ needs.changes.result }})"
+            exit 1
+          fi
+          if [[ "${{ needs.changes.outputs.pin }}" != "true" ]]; then
+            echo "Skipped — no workflow / pin-script path changes"
+            exit 0
+          fi
+          result="${{ needs.guard-cloud-run-one-instance.result }}"
+          echo "guard-cloud-run-one-instance result=${result}"
+          [[ "${result}" == "success" ]]
+
   test-backend:
-    name: Backend Go tests
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     # ~20m class with emulator headroom (observed github-hosted go ~6m).
     timeout-minutes: 25
@@ -211,6 +256,29 @@ jobs:
           set +e
           AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
           bash scripts/mac_lock_ci.sh release "$AGENT"
+
+  # Required-check gate: always reports "Backend Go tests" (success on path skip).
+  test-backend-gate:
+    name: Backend Go tests
+    needs: [changes, test-backend]
+    if: always() && !cancelled()
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate backend path filter / run result
+        run: |
+          set -euo pipefail
+          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            echo "::error::Detect path changes failed (${{ needs.changes.result }})"
+            exit 1
+          fi
+          if [[ "${{ needs.changes.outputs.backend }}" != "true" ]]; then
+            echo "Skipped — no backend/workflow path changes"
+            exit 0
+          fi
+          result="${{ needs.test-backend.result }}"
+          echo "test-backend result=${result}"
+          [[ "${result}" == "success" ]]
 
   test-flutter:
     # Heavy run only when Flutter/web/CI paths change. Required check is the gate job below.
