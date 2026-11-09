@@ -300,10 +300,98 @@ func TestReplaySellInArchiveExecuteRealClientMaterializeError(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "agg load job failed") {
 		t.Fatalf("want materialize error, got %v", err)
 	}
+	if !strings.Contains(err.Error(), "executed_partial") {
+		t.Fatalf("partial failure must say executed_partial: %v", err)
+	}
 	if w.calls.Load() != 1 || sink.wrote != 1 {
 		t.Fatalf("sell-in wrote=%d agg writes=%d", sink.wrote, w.calls.Load())
 	}
 	if rep == nil || !strings.Contains(rep.AggRefresh, "failed") {
 		t.Fatalf("partial: %+v", rep)
 	}
+}
+
+type failSellInReader struct{ err error }
+
+func (f failSellInReader) ReadSellIn(context.Context, string) ([]domain.SellInRecord, error) {
+	return nil, f.err
+}
+
+type failSellOutReader struct{ err error }
+
+func (f failSellOutReader) ReadSellOut(context.Context, string) ([]domain.SellOutFact, error) {
+	return nil, f.err
+}
+
+func TestReplaySellInArchiveSkipsMaterializeWhenSellInSyncFails(t *testing.T) {
+	dir := t.TempDir()
+	bq := bigquery.NewClient("", "", true)
+	w := &syncCountingWriter{}
+	bq.AttachAggregatesWriterForSyncMirror(w, "tenant-adeco")
+	bq.DisableBackgroundAggregatesMirror()
+
+	fs := firestore.NewClient("", true)
+	p := NewProcessor(gemini.NewAgent("", "", true), bq, fs).WithArchiveDir(dir)
+	p.WithSellInStore(failSellInReader{err: errors.New("bq sell_in read timeout")}, nil)
+
+	raw, err := os.ReadFile(filepath.Join("..", "gemini", "testdata", "in26_synthetic.xlsx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := p.SaveArchivedFile("tenant-adeco", "batch_sellin_in26", "in26.xlsx", raw, "fathalla", "2026", "01", 75, 1, 625)
+	sink := &recordingSink{counter: &fakePeriodCounter{}}
+	p.WithSink(sink)
+
+	rep, err := p.ReplaySellInArchive(context.Background(), "tenant-adeco", entry.ID, "sell_in", true)
+	if err == nil || !strings.Contains(err.Error(), "sell_in") || !strings.Contains(err.Error(), "bq sell_in read timeout") {
+		t.Fatalf("want sell_in sync failure, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "executed_partial") || !strings.Contains(err.Error(), "before aggregates materialization") {
+		t.Fatalf("must abort before materialize with executed_partial: %v", err)
+	}
+	if w.calls.Load() != 0 {
+		t.Fatalf("aggregates writer must not be called when source load fails, calls=%d", w.calls.Load())
+	}
+	if sink.wrote != 1 || rep == nil || rep.RowsWritten != 75 || rep.AggRefresh != "skipped: source sync failed" {
+		t.Fatalf("rows written but partial: sink=%d rep=%+v", sink.wrote, rep)
+	}
+}
+
+func TestReplaySellInArchiveSkipsMaterializeWhenSellOutSyncFails(t *testing.T) {
+	dir := t.TempDir()
+	bq := bigquery.NewClient("", "", true)
+	w := &syncCountingWriter{}
+	bq.AttachAggregatesWriterForSyncMirror(w, "tenant-adeco")
+	bq.DisableBackgroundAggregatesMirror()
+
+	fs := firestore.NewClient("", true)
+	p := NewProcessor(gemini.NewAgent("", "", true), bq, fs).WithArchiveDir(dir)
+	// Sell-In reload succeeds; Sell-Out reload fails — still must not materialize.
+	p.WithSellInStore(&okSellInReader{}, nil)
+	p.WithSellOutStore(failSellOutReader{err: errors.New("bq sell_out read timeout")}, nil)
+
+	raw, err := os.ReadFile(filepath.Join("..", "gemini", "testdata", "in26_synthetic.xlsx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := p.SaveArchivedFile("tenant-adeco", "batch_sellin_in26", "in26.xlsx", raw, "fathalla", "2026", "01", 75, 1, 625)
+	sink := &recordingSink{counter: &fakePeriodCounter{}}
+	p.WithSink(sink)
+
+	rep, err := p.ReplaySellInArchive(context.Background(), "tenant-adeco", entry.ID, "sell_in", true)
+	if err == nil || !strings.Contains(err.Error(), "sell_out") || !strings.Contains(err.Error(), "bq sell_out read timeout") {
+		t.Fatalf("want sell_out sync failure, got %v", err)
+	}
+	if w.calls.Load() != 0 {
+		t.Fatalf("aggregates writer must not be called when sell_out load fails, calls=%d", w.calls.Load())
+	}
+	if sink.wrote != 1 || rep == nil || !strings.Contains(err.Error(), "executed_partial") {
+		t.Fatalf("partial: sink=%d err=%v rep=%+v", sink.wrote, err, rep)
+	}
+}
+
+type okSellInReader struct{}
+
+func (okSellInReader) ReadSellIn(context.Context, string) ([]domain.SellInRecord, error) {
+	return []domain.SellInRecord{{Year: 2026, MonthNum: 1, NetValueEGP: 1}}, nil
 }

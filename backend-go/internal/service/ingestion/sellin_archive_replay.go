@@ -264,15 +264,22 @@ func (p *Processor) ReplaySellInArchive(ctx context.Context, tenantID, archiveID
 	p.noteSellInWritten(ctx, tenantID, res)
 	p.setArchiveStoredRows(entry.ID, res.RowsWritten, entry.BatchID)
 
-	// Reload authoritative Sell-In (and Sell-Out if configured) from BigQuery so memory matches
-	// the durable write even if aggregates refresh fails next.
-	p.SyncDurableFromStore(ctx, tenantID, true)
+	// Reload authoritative Sell-In / Sell-Out from BigQuery before materializing aggregates.
+	// Sync failure must abort before Materialize (agg_* must not be built on stale memory).
+	if err := p.syncDurableSourcesBeforeMaterialize(ctx, tenantID); err != nil {
+		rep.AggRefresh = "skipped: source sync failed"
+		log.Printf("ERROR [sellin-archive-replay] source sync tenant=%s archive=%s: %v", tenantID, archiveID, err)
+		return rep, fmt.Errorf(
+			"executed_partial: sell_in_records updated (%d rows, archive=%s) but source reload failed before aggregates materialization: %w — agg_sell_through not refreshed; retry sync+MaterializeAnalyticsAggregates for tenant %s",
+			res.RowsWritten, archiveID, err, tenantID,
+		)
+	}
 
 	refresher := p.resolveAggregatesRefresher()
 	if refresher == nil {
 		rep.AggRefresh = "failed: no aggregates refresher"
 		return rep, fmt.Errorf(
-			"sell_in_records updated (%d rows, archive=%s) and memory synced from BigQuery, but aggregates refresh unavailable (no AggregatesRefresher); agg_sell_through not refreshed — retry aggregates for tenant %s",
+			"executed_partial: sell_in_records updated (%d rows, archive=%s) and memory synced from BigQuery, but aggregates refresh unavailable (no AggregatesRefresher); agg_sell_through not refreshed — retry aggregates for tenant %s",
 			res.RowsWritten, archiveID, tenantID,
 		)
 	}
@@ -280,10 +287,23 @@ func (p *Processor) ReplaySellInArchive(ctx context.Context, tenantID, archiveID
 		rep.AggRefresh = "failed: " + err.Error()
 		log.Printf("ERROR [sellin-archive-replay] aggregates refresh tenant=%s archive=%s: %v", tenantID, archiveID, err)
 		return rep, fmt.Errorf(
-			"sell_in_records updated (%d rows, archive=%s) and memory synced from BigQuery, but aggregates refresh failed: %w — agg_sell_through may be stale; retry MaterializeAnalyticsAggregates for tenant %s",
+			"executed_partial: sell_in_records updated (%d rows, archive=%s) and memory synced from BigQuery, but aggregates refresh failed: %w — agg_sell_through may be stale; retry MaterializeAnalyticsAggregates for tenant %s",
 			res.RowsWritten, archiveID, err, tenantID,
 		)
 	}
 	rep.AggRefresh = "ok"
 	return rep, nil
+}
+
+// syncDurableSourcesBeforeMaterialize reloads Sell-In and Sell-Out from the durable store.
+// Unlike SyncDurableFromStore (log-and-continue for background poll), every configured
+// source error is returned so archive replay never materializes on a failed load.
+func (p *Processor) syncDurableSourcesBeforeMaterialize(ctx context.Context, tenantID string) error {
+	if _, err := p.SyncSellInFromStore(ctx, tenantID, true); err != nil {
+		return fmt.Errorf("sell_in: %w", err)
+	}
+	if _, err := p.SyncSellOutFromStore(ctx, tenantID, true); err != nil {
+		return fmt.Errorf("sell_out: %w", err)
+	}
+	return nil
 }
