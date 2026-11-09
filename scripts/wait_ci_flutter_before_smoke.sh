@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # Avoid GitHub concurrency pending-eviction on group tashil-mac-heavy.
 #
-# GitHub allows only one pending job per concurrency group; a newer pending job
-# cancels the previous pending one (even with cancel-in-progress: false). When
-# deploy holds the group, CI test-flutter and Playwright smoke-run both try to
-# queue — smoke would cancel Flutter. This helper runs on ubuntu *before*
-# smoke-run joins tashil-mac-heavy, waiting until CI Flutter for the same SHA is
-# in_progress, terminal, or skipped/absent after CI finished.
+# Waits until CI test-flutter for the PR *head* SHA is in_progress, terminal
+# success/failure/skipped, or absent after CI finished (path-filter skip).
+#
+# IMPORTANT: On pull_request, GITHUB_SHA is the virtual merge commit — CI runs
+# are keyed to github.event.pull_request.head.sha. Pass HEAD_SHA from the
+# workflow: ${{ github.event.pull_request.head.sha || github.sha }}
 set -euo pipefail
 
 REPO="${GITHUB_REPOSITORY:?}"
-SHA="${GITHUB_SHA:?}"
+# Prefer explicit HEAD_SHA (PR head); fall back to GITHUB_SHA (push/merge_group).
+SHA="${HEAD_SHA:-${GITHUB_SHA:?}}"
 # Default 90m: Mac Flutter can wait behind deploy (30m) + run (35m).
 DEADLINE_MIN="${WAIT_CI_FLUTTER_DEADLINE_MIN:-90}"
 POLL_SEC="${WAIT_CI_FLUTTER_POLL_SEC:-30}"
@@ -22,6 +23,9 @@ fi
 export GH_TOKEN="${GH_TOKEN:-$GITHUB_TOKEN}"
 
 echo "Waiting for CI tests / test-flutter on ${SHA} (deadline ${DEADLINE_MIN}m) before joining tashil-mac-heavy"
+if [ -n "${GITHUB_SHA:-}" ] && [ "$SHA" != "$GITHUB_SHA" ]; then
+  echo "Note: HEAD_SHA=${SHA:0:7} ≠ GITHUB_SHA=${GITHUB_SHA:0:7} (PR virtual merge) — polling head"
+fi
 deadline=$((SECONDS + DEADLINE_MIN * 60))
 
 while (( SECONDS < deadline )); do
@@ -58,28 +62,42 @@ while (( SECONDS < deadline )); do
   echo "CI run=${run_id} status=${ci_status} conclusion=${ci_conclusion:-none}; test-flutter status=${flutter_status} conclusion=${flutter_conclusion:-none}"
 
   if [ "$flutter_status" = "in_progress" ]; then
-    echo "CI test-flutter in progress — safe to queue smoke as the single tashil-mac-heavy pending"
+    echo "CI test-flutter in progress — safe to queue smoke after wait-mac-free"
     exit 0
   fi
 
   if [ "$flutter_status" = "completed" ]; then
-    if [ "$flutter_conclusion" = "cancelled" ]; then
-      # Stay off Mac until Flutter re-runs — proceeding lets smoke steal pending slot.
-      echo "CI test-flutter cancelled — waiting for Flutter re-run / in_progress (do not join Mac)"
-      sleep "$POLL_SEC"
-      continue
-    fi
-    if [ "$flutter_conclusion" = "failure" ] || [ "$flutter_conclusion" = "success" ] || [ "$flutter_conclusion" = "skipped" ]; then
-      echo "CI test-flutter completed (conclusion=${flutter_conclusion}) — proceeding"
-      exit 0
-    fi
-    echo "CI test-flutter completed conclusion=${flutter_conclusion:-none}; sleeping ${POLL_SEC}s"
-    sleep "$POLL_SEC"
-    continue
+    case "${flutter_conclusion}" in
+      success|failure|skipped)
+        echo "CI test-flutter completed (conclusion=${flutter_conclusion}) — proceeding"
+        exit 0
+        ;;
+      cancelled)
+        # Stay off Mac until a non-cancelled attempt exists for this head SHA.
+        echo "CI test-flutter cancelled — waiting for Flutter re-run / in_progress"
+        sleep "$POLL_SEC"
+        continue
+        ;;
+      *)
+        echo "CI test-flutter completed conclusion=${flutter_conclusion:-none}; sleeping ${POLL_SEC}s"
+        sleep "$POLL_SEC"
+        continue
+        ;;
+    esac
   fi
 
+  # Path-filter skip: job never scheduled (missing) or explicitly skipped.
   if [ "$flutter_status" = "missing" ] && [ "$ci_status" = "completed" ]; then
     echo "CI finished without test-flutter job (path-skipped) — proceeding"
+    exit 0
+  fi
+  if [ "$flutter_status" = "completed" ] && [ "$flutter_conclusion" = "skipped" ]; then
+    echo "CI test-flutter skipped by path filter — proceeding"
+    exit 0
+  fi
+  # Job still listed as skipped while run completes
+  if [ "$flutter_conclusion" = "skipped" ]; then
+    echo "CI test-flutter skipped — proceeding"
     exit 0
   fi
 

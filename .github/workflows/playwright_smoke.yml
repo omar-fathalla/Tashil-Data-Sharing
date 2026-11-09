@@ -71,6 +71,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           WAIT_CI_FLUTTER_DEADLINE_MIN: "90"
+          # PR workflows use a virtual merge GITHUB_SHA; CI runs are on the head tip.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           chmod +x scripts/wait_ci_flutter_before_smoke.sh
           bash scripts/wait_ci_flutter_before_smoke.sh
