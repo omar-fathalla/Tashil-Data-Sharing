@@ -6,6 +6,8 @@
 #   ReconcileArchivesToSink only re-parses archives that have zero BigQuery rows under
 #   their archive id. Existing sell_in_records already have Document-Date-based
 #   period_month values, so they would be skipped and stay wrong.
+#   Unscoped `bqbackfill -execute` is refused by default; full-archive orphan cleanup
+#   requires explicit `-legacy-reconcile-all` (not used for month-cycle redistributes).
 #
 # Why archive-scoped force replay is safe:
 #   PlanSellIn / WriteSellIn replace by archive_id + batch_id + legacy source_file

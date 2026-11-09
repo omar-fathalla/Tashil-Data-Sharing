@@ -1,11 +1,6 @@
 // Command bqbackfill loads archive files into the BigQuery sink tables.
 //
-// Default mode (lists / reconciles every archived file of every tenant):
-//
-//	TASHIL_ARCHIVE_DIR=/path/to/archive go run ./cmd/bqbackfill
-//	TASHIL_ARCHIVE_DIR=... PROJECT_ID=... BIGQUERY_DATASET=... go run ./cmd/bqbackfill -execute
-//
-// Sell-In month-cycle force replay (one archive only — no orphan cleanup):
+// Sell-In month-cycle force replay (one archive only — no orphan cleanup) — preferred:
 //
 //	TASHIL_ARCHIVE_DIR=... PROJECT_ID=... BIGQUERY_DATASET=... \
 //	  USE_MOCK_SERVICES=true go run ./cmd/bqbackfill \
@@ -13,8 +8,13 @@
 //	  -tenant=tenant-adeco -kind=sell_in
 //
 // Dry-run prints per-month BEFORE/AFTER rows and net TO. Pass -execute to replace only that
-// archive's sell_in_records rows and refresh agg_sell_through. Archive id is required for this mode:
-// missing/empty -archive-id with scoped flags exits non-zero before any legacy reconcile.
+// archive's sell_in_records rows and refresh agg_sell_through.
+//
+// Unscoped -execute is refused by default (never all-tenant orphan cleanup). The old
+// full-archive reconcile requires explicit opt-in:
+//
+//	go run ./cmd/bqbackfill -legacy-reconcile-all
+//	go run ./cmd/bqbackfill -legacy-reconcile-all -execute
 //
 // Note: like server startup, parsing may write stores/OOS alerts to Firestore when USE_MOCK_SERVICES=false.
 // Run with USE_MOCK_SERVICES=true to keep Firestore and Gemini in local mock mode (recommended).
@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/tashil/data-sharing/backend/internal/config"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
@@ -37,35 +36,46 @@ import (
 )
 
 func main() {
+	f := parseBackfillFlags()
+	if err := runBackfillEntry(f, mainScopedReplay, mainLegacyReconcile); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func parseBackfillFlags() backfillCLIFlags {
 	execute := flag.Bool("execute", false, "actually write to BigQuery (default: dry-run / list only)")
+	legacyAll := flag.Bool("legacy-reconcile-all", false, "opt-in to full-archive reconcile + orphan cleanup across all tenants (dangerous; off by default)")
 	archiveID := flag.String("archive-id", "", "force re-parse + replace only this archive id (sell-in month-cycle replay; required for scoped mode)")
 	tenant := flag.String("tenant", "tenant-adeco", "tenant id for scoped sell-in replay (setting this selects scoped mode)")
 	kind := flag.String("kind", "sell_in", "sheet kind for scoped sell-in replay (setting this selects scoped mode; sell_in only)")
 	flag.Parse()
 
-	archiveIDFlagSet, tenantFlagSet, kindFlagSet := false, false, false
-	flag.Visit(func(f *flag.Flag) {
-		switch f.Name {
+	f := backfillCLIFlags{
+		Execute:            *execute,
+		LegacyReconcileAll: *legacyAll,
+		ArchiveID:          *archiveID,
+		Tenant:             *tenant,
+		Kind:               *kind,
+	}
+	flag.Visit(func(fl *flag.Flag) {
+		switch fl.Name {
 		case "archive-id":
-			archiveIDFlagSet = true
+			f.ArchiveIDFlagSet = true
 		case "tenant":
-			tenantFlagSet = true
+			f.TenantFlagSet = true
 		case "kind":
-			kindFlagSet = true
+			f.KindFlagSet = true
 		}
 	})
+	return f
+}
 
-	mode, err := resolveBackfillMode(archiveIDFlagSet, tenantFlagSet, kindFlagSet, *archiveID)
-	if err != nil {
-		log.Fatal(err) // non-zero; never reach legacy ReconcileArchivesToSink
-	}
-
+func mustProcessor(tenantHint string) (*ingestion.Processor, string) {
 	cfg := config.Load()
 	archDir := os.Getenv("TASHIL_ARCHIVE_DIR")
 	if archDir == "" {
 		log.Fatal("TASHIL_ARCHIVE_DIR is required")
 	}
-
 	bqRepo := bigquery.NewClient(cfg.ProjectID, cfg.BigQueryDataset, true)
 	fsRepo := firestore.NewClient(cfg.FirestoreDatabase, cfg.UseMockServices)
 	agent := gemini.NewAgent(cfg.GeminiAPIKey, cfg.GeminiModel, cfg.UseMockServices).WithTier2Model(cfg.GeminiTier2Model)
@@ -76,22 +86,26 @@ func main() {
 	sink := bqsink.New(context.Background(), sinkCfg)
 	p.WithSink(sink)
 	if bqs, ok := sink.(*bqsink.BigQuerySink); ok {
-		bqRepo.WithAggregatesWriter(bqs, *tenant)
+		bqRepo.WithAggregatesWriter(bqs, tenantHint)
 		p.WithSellInStore(bqs, fsRepo)
 		p.WithSellOutStore(bqs, fsRepo)
 	}
+	return p, archDir
+}
 
-	if mode == modeScoped {
-		runScopedSellInReplay(p, *tenant, strings.TrimSpace(*archiveID), *kind, *execute)
-		return
-	}
+func mainScopedReplay(archiveID, tenant, kind string, execute bool) {
+	p, _ := mustProcessor(tenant)
+	runScopedSellInReplay(p, tenant, archiveID, kind, execute)
+}
 
-	runLegacyReconcile(p, archDir, *execute)
+func mainLegacyReconcile(execute bool) {
+	p, archDir := mustProcessor("tenant-adeco")
+	runLegacyReconcile(p, archDir, execute)
 }
 
 func runLegacyReconcile(p *ingestion.Processor, archDir string, execute bool) {
 	list := p.ListArchivedFiles(context.Background(), "all", "", "", "", "all")
-	fmt.Printf("archive %s: %d file(s)\n", archDir, len(list.Files))
+	fmt.Printf("archive %s: %d file(s) [legacy-reconcile-all]\n", archDir, len(list.Files))
 	for _, f := range list.Files {
 		fmt.Printf("  %-15s %-14s %-12s %s\n", f.FileType, f.TenantID, f.RetailChain, f.FileName)
 	}
@@ -116,8 +130,7 @@ func runLegacyReconcile(p *ingestion.Processor, archDir string, execute bool) {
 		}
 	}
 	if !execute {
-		fmt.Println("dry run: pass -execute to write missing files and drop orphan rows")
-		fmt.Println("month-cycle redistribute: pass -archive-id=<id> -tenant=tenant-adeco -kind=sell_in")
+		fmt.Println("dry run: pass -execute with -legacy-reconcile-all to write missing files and drop orphan rows")
 	}
 }
 
@@ -138,23 +151,4 @@ func runScopedSellInReplay(p *ingestion.Processor, tenantID, archiveID, kind str
 		fmt.Printf("executed: rows_written=%d sink=%s aggregates=%s\n",
 			rep.RowsWritten, rep.SinkStatus, rep.AggRefresh)
 	}
-}
-
-// runBackfillEntry is the CLI gate used by tests: scoped without archive id must not call legacy.
-func runBackfillEntry(
-	archiveIDFlagSet, tenantFlagSet, kindFlagSet bool,
-	archiveID string,
-	scoped func(archiveID string),
-	legacy func(),
-) error {
-	mode, err := resolveBackfillMode(archiveIDFlagSet, tenantFlagSet, kindFlagSet, archiveID)
-	if err != nil {
-		return err
-	}
-	if mode == modeScoped {
-		scoped(strings.TrimSpace(archiveID))
-		return nil
-	}
-	legacy()
-	return nil
 }
