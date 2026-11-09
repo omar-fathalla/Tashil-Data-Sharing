@@ -735,6 +735,46 @@ class ProvisionTenantResultModel {
 }
 
 /// Models matching the Go backend domain.
+/// Phase C automatic monthly summary narrative attached to executive KPIs.
+class MonthlySummaryModel {
+  final String narrativeAr;
+  final String mappingSource;
+  final double confidence;
+  final bool grounded;
+  final String modelUsed;
+  final Map<String, dynamic> aggregates;
+
+  const MonthlySummaryModel({
+    required this.narrativeAr,
+    this.mappingSource = 'deterministic',
+    this.confidence = 0,
+    this.grounded = false,
+    this.modelUsed = '',
+    this.aggregates = const {},
+  });
+
+  factory MonthlySummaryModel.fromJson(Map<String, dynamic> json) {
+    final aggs = json['aggregates'];
+    return MonthlySummaryModel(
+      narrativeAr: json['narrative_ar'] as String? ?? '',
+      mappingSource: json['mapping_source'] as String? ?? 'deterministic',
+      confidence: (json['confidence'] as num?)?.toDouble() ?? 0,
+      grounded: json['grounded'] as bool? ?? false,
+      modelUsed: json['model_used'] as String? ?? '',
+      aggregates: aggs is Map<String, dynamic> ? aggs : const {},
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'narrative_ar': narrativeAr,
+        'mapping_source': mappingSource,
+        'confidence': confidence,
+        'grounded': grounded,
+        'model_used': modelUsed,
+        'aggregates': aggregates,
+      };
+}
+
 class ExecutiveKPIsModel {
   final double totalRevenue;
   final double totalMarketRevenue;
@@ -762,6 +802,7 @@ class ExecutiveKPIsModel {
   final List<DailyTrendItem> dailyTrends;
   final List<CategoryContributionModel> categoryContributions;
   final List<ParetoSkuItemModel> paretoSkus;
+  final MonthlySummaryModel? monthlySummary;
 
   ExecutiveKPIsModel({
     required this.totalRevenue,
@@ -790,6 +831,7 @@ class ExecutiveKPIsModel {
     required this.dailyTrends,
     this.categoryContributions = const [],
     this.paretoSkus = const [],
+    this.monthlySummary,
   })  : revenueMomPct = revenueMomPct ?? revenueGrowthPct,
         revenueYoyPct = revenueYoyPct ??
             double.parse((revenueGrowthPct * 1.65).toStringAsFixed(1)),
@@ -860,6 +902,10 @@ class ExecutiveKPIsModel {
               ?.map((e) => ParetoSkuItemModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      monthlySummary: json['monthly_summary'] is Map<String, dynamic>
+          ? MonthlySummaryModel.fromJson(
+              json['monthly_summary'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -888,6 +934,7 @@ class ExecutiveKPIsModel {
         'category_contributions':
             categoryContributions.map((c) => c.toJson()).toList(),
         'pareto_skus': paretoSkus.map((p) => p.toJson()).toList(),
+        if (monthlySummary != null) 'monthly_summary': monthlySummary!.toJson(),
       };
 }
 
@@ -2990,6 +3037,7 @@ class ApiClient {
         dailyTrends: kpis.dailyTrends,
         categoryContributions: kpis.categoryContributions,
         paretoSkus: kpis.paretoSkus,
+        monthlySummary: kpis.monthlySummary,
       );
     }
     return kpis;

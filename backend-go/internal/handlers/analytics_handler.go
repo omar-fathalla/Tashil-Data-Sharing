@@ -13,18 +13,26 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
+	"github.com/tashil/data-sharing/backend/internal/service/monthlysummary"
 )
 
 // AnalyticsHandler serves high-speed OLAP aggregates to Flutter Web.
 type AnalyticsHandler struct {
-	bqRepo  bigquery.Repository
-	records bqsink.RecordsQuerier
-	sellIn  SellInTotalsQuerier
+	bqRepo             bigquery.Repository
+	records            bqsink.RecordsQuerier
+	sellIn             SellInTotalsQuerier
+	monthlySummaryOpts monthlysummary.Options
 }
 
 // NewAnalyticsHandler creates a new AnalyticsHandler.
 func NewAnalyticsHandler(bqRepo bigquery.Repository) *AnalyticsHandler {
 	return &AnalyticsHandler{bqRepo: bqRepo}
+}
+
+// WithMonthlySummary configures Phase C automatic monthly narrative generation.
+func (h *AnalyticsHandler) WithMonthlySummary(opts monthlysummary.Options) *AnalyticsHandler {
+	h.monthlySummaryOpts = opts
+	return h
 }
 
 // HandleExecutiveSummary serves GET /api/v1/analytics/executive-summary (and /api/v1/analytics/executive).
@@ -69,6 +77,10 @@ func (h *AnalyticsHandler) HandleExecutiveSummary(w http.ResponseWriter, r *http
 			}
 		}
 	}
+
+	// Phase C: attach Arabic monthly narrative grounded only in the KPI numbers above.
+	// Runs after NDA masking so competitor chain names are not narrated for Chain KAM.
+	monthlysummary.Attach(r.Context(), kpis, h.monthlySummaryOpts)
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(kpis)

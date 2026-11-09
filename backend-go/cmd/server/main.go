@@ -26,6 +26,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 	"github.com/tashil/data-sharing/backend/internal/service/ingestion"
 	"github.com/tashil/data-sharing/backend/internal/service/matcher"
+	"github.com/tashil/data-sharing/backend/internal/service/monthlysummary"
 	"github.com/tashil/data-sharing/backend/internal/service/sellinassist"
 )
 
@@ -200,7 +201,13 @@ func main() {
 	log.Printf("[Tashil Cloud Run] Demo tokens allowed: %v", allowDemoTokens)
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWTSecret, allowDemoTokens)
 	uploadHandler := handlers.NewUploadHandler(ingestProcessor)
-	analyticsHandler := handlers.NewAnalyticsHandler(bqRepo)
+	// Phase C monthly narrative: deterministic facts from executive KPIs; optional Gemini
+	// rewrite only when a live key is present and UseMockServices is false. Ungrounded AI falls back.
+	analyticsHandler := handlers.NewAnalyticsHandler(bqRepo).WithMonthlySummary(monthlysummary.Options{
+		Generator: monthlysummary.NewGeminiGenerator(cfg.GeminiAPIKey, "", nil),
+		Model:     cfg.GeminiModel,
+		UseMock:   cfg.UseMockServices || strings.TrimSpace(cfg.GeminiAPIKey) == "",
+	})
 	// Sell-Out explorer totals/SKU summaries/paging run in BigQuery when the sink is live
 	// (RECORDS_SOURCE=memory forces the in-memory path).
 	if bqs, ok := sink.(*bqsink.BigQuerySink); ok && os.Getenv("RECORDS_SOURCE") != "memory" {

@@ -547,6 +547,54 @@ type ParetoSKUItem struct {
 	IsTop80Contributor bool    `json:"is_top_80_contributor"`
 }
 
+// MonthlySummaryNamedValue is one ranked entity used in the monthly narrative facts.
+type MonthlySummaryNamedValue struct {
+	Name     string  `json:"name"`
+	Revenue  float64 `json:"revenue"`
+	Units    int     `json:"units,omitempty"`
+	SharePct float64 `json:"share_pct,omitempty"`
+}
+
+// MonthlySummaryDelta is a notable change computed from executive KPIs (never invented).
+type MonthlySummaryDelta struct {
+	Code        string  `json:"code"`
+	LabelAR     string  `json:"label_ar"`
+	Value       float64 `json:"value"`
+	Unit        string  `json:"unit,omitempty"` // pct | egp | count
+	Direction   string  `json:"direction,omitempty"` // up | down | flat
+}
+
+// MonthlySummaryAggregates holds deterministic monthly facts for narrative grounding.
+type MonthlySummaryAggregates struct {
+	Period             string                     `json:"period"`
+	Currency           string                     `json:"currency"`
+	TotalRevenue       float64                    `json:"total_revenue"`
+	TotalUnits         int                        `json:"total_units"`
+	RevenueMoMPct      float64                    `json:"revenue_mom_pct"`
+	UnitsMoMPct        float64                    `json:"units_mom_pct"`
+	RevenueYoYPct      float64                    `json:"revenue_yoy_pct"`
+	ActiveStores       int                        `json:"active_stores"`
+	MarketSharePct     float64                    `json:"market_share_pct"`
+	CurrentMonthKey    string                     `json:"current_month_key,omitempty"`
+	PriorMonthKey      string                     `json:"prior_month_key,omitempty"`
+	PriorMonthRevenue  float64                    `json:"prior_month_revenue,omitempty"`
+	TopChains          []MonthlySummaryNamedValue `json:"top_chains,omitempty"`
+	TopProducts        []MonthlySummaryNamedValue `json:"top_products,omitempty"`
+	TopCategories      []MonthlySummaryNamedValue `json:"top_categories,omitempty"`
+	NotableDeltas      []MonthlySummaryDelta      `json:"notable_deltas,omitempty"`
+}
+
+// MonthlySummaryNarrative is the Phase C automatic monthly summary attached to executive KPIs.
+// Figures always come from Aggregates; NarrativeAR must be grounded in those numbers.
+type MonthlySummaryNarrative struct {
+	NarrativeAR   string                   `json:"narrative_ar"`
+	Aggregates    MonthlySummaryAggregates `json:"aggregates"`
+	MappingSource string                   `json:"mapping_source"` // deterministic | ai | mock
+	Confidence    float64                  `json:"confidence"`
+	ModelUsed     string                   `json:"model_used,omitempty"`
+	Grounded      bool                     `json:"grounded"`
+}
+
 // ExecutiveKPIs provides aggregated summary metrics for the executive Bento Grid.
 type ExecutiveKPIs struct {
 	TotalRevenue          float64                `json:"total_revenue"`
@@ -575,4 +623,6 @@ type ExecutiveKPIs struct {
 	DailyTrends           []DailyTrendPoint      `json:"daily_trends"`
 	CategoryContributions []CategoryContribution `json:"category_contributions"`
 	ParetoSKUs            []ParetoSKUItem        `json:"pareto_skus"`
+	// MonthlySummary is Phase C Arabic narrative grounded in the KPI numbers above.
+	MonthlySummary *MonthlySummaryNarrative `json:"monthly_summary,omitempty"`
 }
