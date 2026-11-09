@@ -12,6 +12,10 @@ class ReturnsTopProductsTable extends StatelessWidget {
     required this.products,
   });
 
+  /// Stable keys for widget tests (filter dropdown also labels «الصنف»).
+  static const Key productHeaderKey = Key('returns-top-products-col-product');
+  static const Key returnsValueHeaderKey = Key('returns-top-products-col-returns-value');
+
   final List<SellInReturnsTopProduct> products;
 
   static const double _rowH = 44;
@@ -40,7 +44,7 @@ class ReturnsTopProductsTable extends StatelessWidget {
     );
     final bodyStyle = theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
 
-    Widget head(String text, {TextAlign align = TextAlign.start}) => SizedBox(
+    Widget head(String text, {TextAlign align = TextAlign.start, Key? key}) => SizedBox(
           height: _rowH,
           child: Align(
             alignment: align == TextAlign.end
@@ -48,7 +52,7 @@ class ReturnsTopProductsTable extends StatelessWidget {
                 : align == TextAlign.center
                     ? Alignment.center
                     : AlignmentDirectional.centerStart,
-            child: Text(text, style: headerStyle, textAlign: align, maxLines: 2),
+            child: Text(key: key, text, style: headerStyle, textAlign: align, maxLines: 2),
           ),
         );
 
@@ -83,8 +87,8 @@ class ReturnsTopProductsTable extends StatelessWidget {
             decoration: BoxDecoration(color: cs.surfaceContainerHighest.withOpacity(0.45)),
             children: [
               head('#', align: TextAlign.center),
-              head('الصنف'),
-              head('قيمة المرتجع', align: TextAlign.end),
+              head('الصنف', key: productHeaderKey),
+              head('قيمة المرتجع', align: TextAlign.end, key: returnsValueHeaderKey),
               head('الكمية', align: TextAlign.end),
               head('نسبة من الإجمالي', align: TextAlign.end),
               head('حصة المرتجعات', align: TextAlign.end),

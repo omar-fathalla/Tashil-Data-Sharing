@@ -133,8 +133,13 @@ void main() {
     expect(find.text('مايو'), findsWidgets);
 
     expect(find.text('فرع QA تجريبي'), findsWidgets);
-    expect(find.text('الصنف'), findsOneWidget);
-    expect(find.text('قيمة المرتجع'), findsOneWidget);
+    // Filter dropdown also uses label «الصنف» — assert the top-products header by key.
+    expect(find.byKey(ReturnsTopProductsTable.productHeaderKey), findsOneWidget);
+    expect(find.byKey(ReturnsTopProductsTable.returnsValueHeaderKey), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(ReturnsTopProductsTable), matching: find.text('الصنف')),
+      findsOneWidget,
+    );
 
     // Rank (#) column is narrow and sits beside the product name (not a wide spacer).
     expect(ReturnsTopProductsTable.columnWidths[0], isA<FixedColumnWidth>());
