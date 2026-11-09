@@ -12,6 +12,10 @@ func TestCompetitiveMonthlySQLGroupsByBarcodeMonth(t *testing.T) {
 		"SUBSTR(transaction_date, 1, 7)",
 		"unit_price * quantity_sold",
 		"TRIM(IFNULL(barcode, ''))",
+		"sku_name",
+		"category",
+		"is_own_brand",
+		"LOGICAL_OR",
 	} {
 		if !strings.Contains(sql, want) {
 			t.Fatalf("SQL missing %q:\n%s", want, sql)

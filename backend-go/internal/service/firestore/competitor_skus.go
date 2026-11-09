@@ -20,11 +20,13 @@ const customCompetitorSkusCollection = "custom_competitor_skus"
 // ErrCustomSkuNotFound is returned when a custom competitor SKU does not exist for the tenant.
 var ErrCustomSkuNotFound = errors.New("custom competitor sku not found")
 
-// CompetitorSkuRepository persists custom competitor SKUs, always scoped by tenant.
+// CompetitorSkuRepository persists custom competitor SKUs and owner-approved
+// barcode mappings, always scoped by tenant.
 type CompetitorSkuRepository interface {
 	SaveCustomCompetitorSku(ctx context.Context, s *domain.CustomCompetitorSku) error
 	ListCustomCompetitorSkus(ctx context.Context, tenantID string, f domain.CustomCompetitorSkuFilter) ([]domain.CustomCompetitorSku, error)
 	DeleteCustomCompetitorSku(ctx context.Context, tenantID, id string) error
+	CompetitorMappingRepository
 }
 
 var _ CompetitorSkuRepository = (*Client)(nil)

@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
@@ -77,5 +78,69 @@ func TestAggregateCompetitiveMonthlyJanThroughOct(t *testing.T) {
 	}
 	if len(own.Months) != 6 {
 		t.Fatalf("own months=%d want 6 (May–Oct)", len(own.Months))
+	}
+}
+
+func TestAggregateCompetitiveMonthlyOwnSkusFromLiveMetadata(t *testing.T) {
+	facts := []domain.SellOutFact{
+		{
+			TenantID: "tenant-adeco", RetailerChain: "fathalla",
+			Barcode: "6223000232514", SKUName: "فيبا صابون سائل اطباق 1 كجم",
+			Category: "صابون سائل اطباق", IsOwnBrand: true,
+			QuantitySold: 5, UnitPrice: 40, NetRevenue: 200, TransactionDate: "2026-03-10",
+		},
+		{
+			TenantID: "tenant-adeco", RetailerChain: "fathalla",
+			Barcode: "6223000239438", SKUName: "عرض شرنك فيبا بلس + 3 كجم & فيبا 3 كجم - 3 مجموعه",
+			Category: "منظف ارضيات", IsOwnBrand: true,
+			QuantitySold: 8, UnitPrice: 150, NetRevenue: 1200, TransactionDate: "2026-03-12",
+		},
+		{
+			TenantID: "tenant-adeco", RetailerChain: "fathalla",
+			Barcode: "6221143099674", SKUName: "بريل", Category: "صابون سائل اطباق",
+			IsOwnBrand: false, Supplier: "هنكل",
+			QuantitySold: 3, UnitPrice: 140, NetRevenue: 420, TransactionDate: "2026-03-11",
+		},
+		// Extra own barcodes in dish soap — must all appear in own_skus.
+		{
+			TenantID: "tenant-adeco", RetailerChain: "fathalla",
+			Barcode: "6223000999001", SKUName: "فيبا اطباق A", Category: "صابون سائل اطباق",
+			IsOwnBrand: true, QuantitySold: 2, UnitPrice: 30, NetRevenue: 60, TransactionDate: "2026-03-01",
+		},
+		{
+			TenantID: "tenant-adeco", RetailerChain: "fathalla",
+			Barcode: "6223000999002", SKUName: "فيبا اطباق B", Category: "صابون سائل اطباق",
+			IsOwnBrand: true, QuantitySold: 2, UnitPrice: 31, NetRevenue: 62, TransactionDate: "2026-03-02",
+		},
+	}
+	start, end := CompetitiveMonthlyYearWindow(2026)
+	got := AggregateCompetitiveMonthly(facts, "tenant-adeco", RecordFilter{
+		RetailerChain: "fathalla", Supplier: "all_market", StartDate: start, EndDate: end,
+	})
+	if len(got.OwnSkus) != 4 {
+		t.Fatalf("own_skus=%d want 4 (all own with sales); got %+v", len(got.OwnSkus), got.OwnSkus)
+	}
+	byBC := map[string]CompetitiveOwnSku{}
+	for _, o := range got.OwnSkus {
+		byBC[o.Barcode] = o
+	}
+	floor := byBC["6223000239438"]
+	if floor.Category != "منظف ارضيات" {
+		t.Fatalf("live category for 6223000239438 = %q want منظف ارضيات (seed must not apply server-side)", floor.Category)
+	}
+	if floor.SKUName == "" || !strings.Contains(floor.SKUName, "شرنك") {
+		t.Fatalf("live name missing: %q", floor.SKUName)
+	}
+	dish := byBC["6223000232514"]
+	if dish.Category != "صابون سائل اطباق" {
+		t.Fatalf("dish category=%q", dish.Category)
+	}
+	for _, item := range got.Items {
+		if item.Barcode == "6223000239438" && !item.IsOwnBrand {
+			t.Fatal("own barcode missing is_own_brand on item")
+		}
+		if item.Barcode == "6221143099674" && item.IsOwnBrand {
+			t.Fatal("competitor marked as own")
+		}
 	}
 }

@@ -21,16 +21,27 @@ type CompetitiveMonthPoint struct {
 
 // CompetitiveMonthlyItem is the per-barcode series used by the Compare page.
 type CompetitiveMonthlyItem struct {
-	Barcode string                  `json:"barcode"`
-	Months  []CompetitiveMonthPoint `json:"months"`
+	Barcode    string                  `json:"barcode"`
+	SKUName    string                  `json:"sku_name,omitempty"`
+	Category   string                  `json:"category,omitempty"`
+	IsOwnBrand bool                    `json:"is_own_brand"`
+	Months     []CompetitiveMonthPoint `json:"months"`
+}
+
+// CompetitiveOwnSku is one company (is_own_brand) barcode with live name/category for Compare.
+type CompetitiveOwnSku struct {
+	Barcode  string `json:"barcode"`
+	SKUName  string `json:"sku_name"`
+	Category string `json:"category"`
 }
 
 // CompetitiveMonthlyResult is the server-side aggregate for Compare (no raw row paging).
 type CompetitiveMonthlyResult struct {
-	Year   int                      `json:"year"`
-	Months []int                    `json:"months"` // distinct months 1..12 with data, ascending
-	Items  []CompetitiveMonthlyItem `json:"items"`
-	Source string                   `json:"source,omitempty"` // memory | bigquery
+	Year    int                      `json:"year"`
+	Months  []int                    `json:"months"` // distinct months 1..12 with data, ascending
+	Items   []CompetitiveMonthlyItem `json:"items"`
+	OwnSkus []CompetitiveOwnSku      `json:"own_skus"` // every own SKU with sales in the filter
+	Source  string                   `json:"source,omitempty"` // memory | bigquery
 }
 
 // AggregateCompetitiveMonthly builds barcode × month average unit prices from Sell-Out facts.
@@ -41,7 +52,14 @@ func AggregateCompetitiveMonthly(facts []domain.SellOutFact, tenantID string, fi
 		rev   float64
 		units int
 	}
+	type meta struct {
+		skuName    string
+		category   string
+		isOwnBrand bool
+		txDate     string // latest transaction_date seen for name/category preference
+	}
 	byBarcode := map[string]map[string]*agg{} // barcode -> YYYY-MM -> agg
+	metaBy := map[string]*meta{}
 	monthSet := map[int]bool{}
 
 	supFilter := strings.TrimSpace(filter.Supplier)
@@ -105,6 +123,29 @@ func AggregateCompetitiveMonthly(facts []domain.SellOutFact, tenantID string, fi
 		}
 		a.rev += revAdd
 		a.units += qty
+
+		m := metaBy[barcode]
+		if m == nil {
+			m = &meta{}
+			metaBy[barcode] = m
+		}
+		if isOwnRecord(r) {
+			m.isOwnBrand = true
+		}
+		// Prefer the newest non-empty live name/category (never invent).
+		if r.TransactionDate >= m.txDate {
+			m.txDate = r.TransactionDate
+			if name := strings.TrimSpace(r.SKUName); name != "" {
+				m.skuName = name
+			} else if raw := strings.TrimSpace(r.RetailerRawSKUName); raw != "" && m.skuName == "" {
+				m.skuName = raw
+			}
+			if cat := strings.TrimSpace(domain.NormalizeProductCategory(r.Category)); cat != "" {
+				m.category = cat
+			} else if cat := strings.TrimSpace(r.Category); cat != "" && m.category == "" {
+				m.category = cat
+			}
+		}
 	}
 
 	months := make([]int, 0, len(monthSet))
@@ -120,6 +161,7 @@ func AggregateCompetitiveMonthly(facts []domain.SellOutFact, tenantID string, fi
 	sort.Strings(barcodes)
 
 	items := make([]CompetitiveMonthlyItem, 0, len(barcodes))
+	ownSkus := make([]CompetitiveOwnSku, 0)
 	for _, barcode := range barcodes {
 		keys := make([]string, 0, len(byBarcode[barcode]))
 		for k := range byBarcode[barcode] {
@@ -150,14 +192,28 @@ func AggregateCompetitiveMonthly(facts []domain.SellOutFact, tenantID string, fi
 		if len(pts) == 0 {
 			continue
 		}
-		items = append(items, CompetitiveMonthlyItem{Barcode: barcode, Months: pts})
+		meta := metaBy[barcode]
+		item := CompetitiveMonthlyItem{Barcode: barcode, Months: pts}
+		if meta != nil {
+			item.SKUName = meta.skuName
+			item.Category = meta.category
+			item.IsOwnBrand = meta.isOwnBrand
+		}
+		items = append(items, item)
+		if item.IsOwnBrand {
+			ownSkus = append(ownSkus, CompetitiveOwnSku{
+				Barcode:  barcode,
+				SKUName:  item.SKUName,
+				Category: item.Category,
+			})
+		}
 	}
 
 	year := 0
 	if len(start) >= 4 {
 		year, _ = strconv.Atoi(start[:4])
 	}
-	return CompetitiveMonthlyResult{Year: year, Months: months, Items: items, Source: "memory"}
+	return CompetitiveMonthlyResult{Year: year, Months: months, Items: items, OwnSkus: ownSkus, Source: "memory"}
 }
 
 // CompetitiveMonthlyYearWindow returns the inclusive date window for a calendar year

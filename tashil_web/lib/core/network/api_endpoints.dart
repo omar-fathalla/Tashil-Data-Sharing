@@ -97,4 +97,9 @@ class ApiEndpoints {
   static String get customCompetitorSkus => '$baseUrl/api/v1/competitors/custom-skus';
   static String customCompetitorSku(String id) =>
       '$baseUrl/api/v1/competitors/custom-skus/${Uri.encodeComponent(id)}';
+
+  // Owner-approved own→competitor barcode mappings (no auto-match; empty until owner saves)
+  static String get competitorMappings => '$baseUrl/api/v1/competitors/mappings';
+  static String competitorMapping(String id) =>
+      '$baseUrl/api/v1/competitors/mappings/${Uri.encodeComponent(id)}';
 }

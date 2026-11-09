@@ -48,6 +48,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
   }
 
   bool _isLoading = true;
+  bool _monthsLoadFinished = false;
   late CompetitorComparisonSource _repo;
   List<OwnSkuCompetitiveGroupModel> _allGroups = [];
   List<OwnSkuCompetitiveGroupModel> _filteredGroups = [];
@@ -69,6 +70,11 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
 
   final TextEditingController _searchController = TextEditingController();
   late String _lastTenantId;
+
+  /// Adeco / own-SKU accent — theme brand green (not ColorScheme.primary blue).
+  /// Pair with [M3Palette.successSurface] / [M3Palette.onSuccessSurface] for fills.
+  static const Color _ownBrandGreen = M3Palette.success;
+
 
   static const List<({String code, String labelAr})> _chainOptions = [
     (code: 'fathalla', labelAr: 'أسواق فتح الله (بيانات فعلية مرفوعة)'),
@@ -143,6 +149,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       _searchController.clear();
       _simulatedOwnPrice = null;
       _selectedCompetitorBarcode = null;
+      _monthsLoadFinished = false;
       _loadAvailableMonths();
       _loadCompetitiveData();
     }
@@ -153,6 +160,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     if (!mounted) return;
     setState(() {
       _apiMonths = opts.months;
+      _monthsLoadFinished = true;
       if (_selectedMonth > 0 &&
           _apiMonths.isNotEmpty &&
           !_apiMonths.contains(_selectedMonth) &&
@@ -543,6 +551,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     final isCompactScreen = MediaQuery.sizeOf(context).width < 600.0;
 
     final totalOwnSkus = _allGroups.length;
+    final mappedOwnSkus =
+        _allGroups.where((g) => g.competitors.isNotEmpty).length;
     int totalCompetitorSkus = 0;
     int advantageSkusCount = 0;
     int undercutRiskSkusCount = 0;
@@ -580,8 +590,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             // 1. Unified Page Header
             M3PageHeader(
               titleEn: 'Compare',
-              subtitleAr:
-                  'مقارنة أسعار أصنافنا أمام المنافسين بالتاريخ والشهور ($_activePeriodLabelAr) — بيانات أسواق فتح الله الفعلية',
+              subtitleAr: 'مقارنة أسعار أصناف شركة أديكو بالمنافسين',
               actions: M3ActionButtonGroup(
                 actions: [
                   if (selectedGroup != null)
@@ -626,9 +635,9 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                   _buildKpiCard(
                     context: context,
                     title: 'الفترة الزمنية النشطة ($_selectedYear)',
-                    value: '$totalOwnSkus صنف أساسي',
+                    value: '$totalOwnSkus صنف',
                     subtitle:
-                        'أمام $totalCompetitorSkus منافس مباشر في $_activePeriodLabelAr',
+                        'منها $mappedOwnSkus بمنافسين محددين · $totalCompetitorSkus منافس · $_activePeriodLabelAr',
                     icon: Icons.calendar_month_rounded,
                     containerColor: colorScheme.primaryContainer,
                     onContainerColor: colorScheme.onPrimaryContainer,
@@ -826,6 +835,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                             _yearTouched = true;
                             _selectedMonth = 0;
                             _simulatedOwnPrice = null;
+                            _monthsLoadFinished = false;
                           });
                           _loadAvailableMonths();
                           _loadCompetitiveData();
@@ -850,13 +860,17 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                       ),
                     ),
                     if (_monthOptions.isEmpty)
-                      Text(
-                        'لا توجد شهور بيانات لهذه السنة',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      )
+                      // Avoid brief empty-state flash while months / compare data still load.
+                      if (_monthsLoadFinished && !_isLoading)
+                        Text(
+                          'لا توجد شهور بيانات لهذه السنة',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )
+                      else
+                        const SizedBox.shrink()
                     else
                       for (final m in _monthOptions)
                         ChoiceChip(
@@ -1156,7 +1170,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     final bool priceDropped = momPct < -0.5;
 
     return Material(
-      color: isSelected ? colorScheme.primaryContainer : colorScheme.surface,
+      color: isSelected ? M3Palette.successSurface : colorScheme.surface,
       borderRadius: M3Shape.radiusLg,
       elevation: isSelected ? 2.0 : 0.0,
       child: InkWell(
@@ -1177,7 +1191,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: isSelected
-                  ? colorScheme.primary
+                  ? _ownBrandGreen
                   : colorScheme.outlineVariant.withValues(alpha: 0.6),
               width: isSelected ? 2.0 : 1.0,
             ),
@@ -1203,7 +1217,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                               ),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? colorScheme.primary
+                                    ? _ownBrandGreen
                                     : colorScheme.surfaceContainerHighest,
                                 borderRadius: M3Shape.radiusSm,
                               ),
@@ -1212,7 +1226,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   fontWeight: FontWeight.w700,
                                   color: isSelected
-                                      ? colorScheme.onPrimary
+                                      ? Colors.white
                                       : colorScheme.onSurfaceVariant,
                                 ),
                               ),
@@ -1267,7 +1281,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w800,
                             color: isSelected
-                                ? colorScheme.onPrimaryContainer
+                                ? M3Palette.onSuccessSurface
                                 : colorScheme.onSurface,
                           ),
                         ),
@@ -1282,7 +1296,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                         '${group.ownUnitPrice.toStringAsFixed(1)} ج.م',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w900,
-                          color: colorScheme.primary,
+                          color: _ownBrandGreen,
                         ),
                       ),
                       Text(
@@ -1322,11 +1336,13 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        '${group.competitors.length} منافسين',
+                        group.competitors.isEmpty
+                            ? 'لم يتم تحديد المنافسين بعد'
+                            : '${group.competitors.length} منافسين',
                         style: theme.textTheme.labelSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: isSelected
-                              ? colorScheme.primary
+                              ? _ownBrandGreen
                               : colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -1335,7 +1351,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                         AppIcons.chevronEnd,
                         size: 16.0,
                         color: isSelected
-                            ? colorScheme.primary
+                            ? _ownBrandGreen
                             : colorScheme.onSurfaceVariant,
                       ),
                     ],
@@ -1435,14 +1451,66 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
 
         M3Spacing.gapMD,
 
-        // C. Clean M3 Competitor Brand Selector Row (1 Card per Brand with Pack Volume — e.g. Pril 4Kg, Fairy 2L, Wafeer 4Kg)
-        _buildCompetitorBrandSelectorSection(
-          context,
-          group: group,
-          competitors: adjustedCompetitors,
-          selectedCompetitor: selectedCompetitor,
-          effectiveOwnPrice: effectiveOwnPrice,
-        ),
+        if (adjustedCompetitors.isEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: M3Shape.radiusXl,
+              border: Border.all(
+                color: Theme.of(context)
+                    .colorScheme
+                    .outlineVariant
+                    .withValues(alpha: 0.65),
+              ),
+            ),
+            child: Text(
+              'لم يتم تحديد المنافسين بعد — معروض مبيعات وسعر صنفنا فقط',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+          if (group.monthlyPrices.isNotEmpty) ...[
+            M3Spacing.gapMD,
+            Container(
+              height: 240.0,
+              padding: const EdgeInsetsDirectional.fromSTEB(18.0, 24.0, 22.0, 14.0),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: M3Shape.radiusLg,
+                border: Border.all(
+                  color: _ownBrandGreen.withValues(alpha: 0.35),
+                ),
+              ),
+              child: CustomPaint(
+                painter: _MonthlyPriceTrajectoryPainter(
+                  ownSeries: _showFullTwoYearTimeline
+                      ? group.allMonthlyPrices
+                      : group.monthlyPrices,
+                  competitorSeries: const [],
+                  ownColor: _ownBrandGreen,
+                  compColor: M3Palette.dangerAccent,
+                  gridColor: Theme.of(context)
+                      .colorScheme
+                      .outlineVariant
+                      .withValues(alpha: 0.4),
+                  textColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                  selectedMonth: _selectedMonth,
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ],
+        ] else
+          // C. Clean M3 Competitor Brand Selector Row (1 Card per Brand with Pack Volume — e.g. Pril 4Kg, Fairy 2L, Wafeer 4Kg)
+          _buildCompetitorBrandSelectorSection(
+            context,
+            group: group,
+            competitors: adjustedCompetitors,
+            selectedCompetitor: selectedCompetitor,
+            effectiveOwnPrice: effectiveOwnPrice,
+          ),
 
         if (selectedCompetitor != null) ...[
           M3Spacing.gapMD,
@@ -1818,7 +1886,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
   /// Focused 1-vs-1 Monthly Trajectory Card:
   /// - Does NOT show the deleted title "منحنى حركة الأسعار الشهرية المقارن لسنة 2026".
   /// - Gives generous line-height and top spacing to the description text.
-  /// - Plots ONLY 2 lines: Default Own SKU (Blue) vs. Selected Competitor across every month with data.
+  /// - Plots ONLY 2 lines: Default Own SKU (brand green) vs. Selected Competitor across every month with data.
   /// - Displays one M3 month card per returned series point.
   Widget _buildFocusedOneVsOneTrajectoryCard(
     BuildContext context, {
@@ -1850,7 +1918,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
         color: colorScheme.surfaceContainerLow,
         borderRadius: M3Shape.radiusXl,
         border: Border.all(
-          color: colorScheme.primary.withValues(alpha: 0.3),
+          color: _ownBrandGreen.withValues(alpha: 0.3),
           width: 1.2,
         ),
       ),
@@ -1875,11 +1943,11 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                       horizontal: 14.0,
                       vertical: 8.0,
                     ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withValues(alpha: 0.12),
+                    decoration: const BoxDecoration(
+                      color: M3Palette.successSurface,
                       borderRadius: M3Shape.radiusFull,
                       border:
-                          Border.all(color: colorScheme.primary, width: 1.5),
+                          Border.fromBorderSide(BorderSide(color: _ownBrandGreen, width: 1.5)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1887,8 +1955,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                         Container(
                           width: 12.0,
                           height: 12.0,
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary,
+                          decoration: const BoxDecoration(
+                            color: _ownBrandGreen,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -1897,7 +1965,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                           'صنفنا الأساسي: ${group.ownBrand} • ${group.packSizeLabel} (${effectiveOwnPrice.toStringAsFixed(1)} ج.م)',
                           style: theme.textTheme.labelMedium?.copyWith(
                             fontWeight: FontWeight.w900,
-                            color: colorScheme.primary,
+                            color: M3Palette.onSuccessSurface,
                           ),
                         ),
                       ],
@@ -1970,7 +2038,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4.0),
             child: Text(
-              'يرسم اتجاه سعر بيع صنفك (خط أزرق عريض) أمام سعر المنافس المختار (${selectedCompetitor.brand} — ${selectedCompetitor.packSizeLabel}) شهراً بشهر خلال ($_monthEnumeratedLabel) مع نسب الارتفاع (▲) والانخفاض (▼).',
+              'يرسم اتجاه سعر بيع صنفك (خط أخضر عريض) أمام سعر المنافس المختار (${selectedCompetitor.brand} — ${selectedCompetitor.packSizeLabel}) شهراً بشهر خلال ($_monthEnumeratedLabel) مع نسب الارتفاع (▲) والانخفاض (▼).',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 height: 1.8,
@@ -1995,7 +2063,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
               painter: _MonthlyPriceTrajectoryPainter(
                 ownSeries: ownSeries,
                 competitorSeries: compSeries,
-                ownColor: colorScheme.primary,
+                ownColor: _ownBrandGreen,
                 compColor: compColor,
                 gridColor: colorScheme.outlineVariant.withValues(alpha: 0.4),
                 textColor: colorScheme.onSurfaceVariant,
@@ -2216,7 +2284,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
 
     return Material(
       color: isSelectedMonth
-          ? colorScheme.primaryContainer.withValues(alpha: 0.55)
+          ? M3Palette.successSurface.withValues(alpha: 0.85)
           : colorScheme.surface,
       borderRadius: M3Shape.radiusLg,
       child: InkWell(
@@ -2228,7 +2296,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: isSelectedMonth
-                  ? colorScheme.primary
+                  ? _ownBrandGreen
                   : colorScheme.outlineVariant.withValues(alpha: 0.7),
               width: isSelectedMonth ? 2.0 : 1.0,
             ),
@@ -2298,8 +2366,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
               // Row 1: Our Default SKU in this month
               Container(
                 padding: const EdgeInsets.all(10.0),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.07),
+                decoration: const BoxDecoration(
+                  color: M3Palette.successSurface,
                   borderRadius: M3Shape.radiusMd,
                 ),
                 child: Column(
@@ -2313,7 +2381,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                             'صنفنا ($ownBrand)',
                             style: theme.textTheme.labelSmall?.copyWith(
                               fontWeight: FontWeight.w800,
-                              color: colorScheme.primary,
+                              color: M3Palette.onSuccessSurface,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -2338,7 +2406,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                             '${ownPoint.unitPrice.toStringAsFixed(2)} ج.م',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w900,
-                              color: colorScheme.primary,
+                              color: _ownBrandGreen,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -2482,7 +2550,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            colorScheme.primaryContainer.withValues(alpha: 0.85),
+            M3Palette.successSurface.withValues(alpha: 0.95),
             colorScheme.surfaceContainerLow,
           ],
           begin: AlignmentDirectional.topStart,
@@ -2490,7 +2558,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
         ),
         borderRadius: M3Shape.radiusXl,
         border: Border.all(
-          color: colorScheme.primary.withValues(alpha: 0.35),
+          color: _ownBrandGreen.withValues(alpha: 0.35),
           width: 1.5,
         ),
       ),
@@ -2518,14 +2586,14 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                             horizontal: 10.0,
                             vertical: 4.0,
                           ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary,
+                          decoration: const BoxDecoration(
+                            color: _ownBrandGreen,
                             borderRadius: M3Shape.radiusFull,
                           ),
                           child: Text(
                             'صنفنا الافتراضي ($_activePeriodLabelAr)',
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onPrimary,
+                              color: Colors.white,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -2673,11 +2741,11 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
       decoration: BoxDecoration(
-        color: isHighlighted ? colorScheme.primary : colorScheme.surface,
+        color: isHighlighted ? _ownBrandGreen : colorScheme.surface,
         borderRadius: M3Shape.radiusLg,
         border: Border.all(
           color: isHighlighted
-              ? colorScheme.primary
+              ? _ownBrandGreen
               : colorScheme.outlineVariant.withValues(alpha: 0.6),
         ),
       ),
@@ -2688,7 +2756,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             label,
             style: theme.textTheme.labelSmall?.copyWith(
               color: isHighlighted
-                  ? colorScheme.onPrimary.withValues(alpha: 0.9)
+                  ? Colors.white.withValues(alpha: 0.9)
                   : colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w700,
             ),
@@ -2699,7 +2767,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w900,
               color: isHighlighted
-                  ? colorScheme.onPrimary
+                  ? Colors.white
                   : colorScheme.onSurface,
             ),
           ),
@@ -2707,8 +2775,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             subValue,
             style: theme.textTheme.labelSmall?.copyWith(
               color: isHighlighted
-                  ? colorScheme.onPrimary.withValues(alpha: 0.85)
-                  : colorScheme.primary,
+                  ? Colors.white.withValues(alpha: 0.85)
+                  : _ownBrandGreen,
               fontWeight: FontWeight.w700,
               fontSize: M3FontSize.tinyPlus,
             ),
