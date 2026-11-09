@@ -7,6 +7,9 @@
 # CI_RUNS_ON, e.g. ["self-hosted","macOS","tashil-mac"] — ALL light jobs move to Mac.
 # CI_HOSTED_RUNNER accepts a JSON string ("ubuntu-latest") or a JSON label array.
 # See docs/ci-self-hosted.md.
+#
+# tashil-mac … tashil-mac-4 are four runners on one Mac — over-parallel heavy jobs
+# slow everything. Keep light jobs hosted; use MAC_SHARED_LOCK=1 to queue heavies.
 name: CI tests
 
 # No workflow-level paths-ignore: docs-only PRs still start the workflow so required
