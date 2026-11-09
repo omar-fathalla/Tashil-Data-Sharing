@@ -3,9 +3,46 @@ import '../../../core/data/cache_store.dart';
 import '../../../core/data/result.dart';
 import '../../../core/network/api_client.dart';
 
+/// Screen-facing contract so tests can inject fixed monthly series.
+abstract class CompetitorComparisonSource {
+  Future<Result<List<OwnSkuCompetitiveGroupModel>>> loadGroups({
+    String? chain,
+    required int year,
+    required int month,
+    bool forceRefresh = false,
+  });
+
+  Future<Result<List<OwnSkuCompetitiveGroupModel>>> rebuildLocal({
+    String? chain,
+    required int year,
+    required int month,
+  });
+
+  bool isCustomSku(String barcode);
+
+  Future<Result<void>> addCustomSku({
+    required String ownBarcode,
+    required String ownSkuName,
+    required double ownUnitPrice,
+    required double ownVolumeUnits,
+    required String ownVolumeUnitLabel,
+    required String competitorSkuName,
+    required String competitorBrand,
+    required String competitorSupplier,
+    required String category,
+    required String packSizeLabel,
+    required double packVolumeUnits,
+    required double competitorPrice,
+    required String retailerChain,
+    bool isPromoActive = false,
+  });
+
+  Future<Result<void>> deleteCustomSku(String barcode);
+}
+
 /// Repository for the Competitor Comparison screen. Wraps [ApiClient] (which stays the
 /// source of truth for HTTP + custom-SKU state) and adds [Result] errors + a tenant-aware cache.
-class CompetitorComparisonRepository {
+class CompetitorComparisonRepository implements CompetitorComparisonSource {
   static const feature = 'competitor_groups';
 
   final ApiClient api;
@@ -21,6 +58,7 @@ class CompetitorComparisonRepository {
 
   /// Loads competitive groups (ingested sell-out + saved custom SKUs).
   /// [forceRefresh] bypasses the cache (used by the screen's refresh button).
+  @override
   Future<Result<List<OwnSkuCompetitiveGroupModel>>> loadGroups({
     String? chain,
     required int year,
@@ -36,6 +74,7 @@ class CompetitorComparisonRepository {
   }
 
   /// Re-renders from ApiClient's in-memory custom SKUs without a server round-trip.
+  @override
   Future<Result<List<OwnSkuCompetitiveGroupModel>>> rebuildLocal({
     String? chain,
     required int year,
@@ -49,10 +88,12 @@ class CompetitorComparisonRepository {
     });
   }
 
+  @override
   bool isCustomSku(String barcode) => api.isCustomCompetitorSku(barcode);
 
   /// Optimistic add: ApiClient updates its local list synchronously, then POSTs.
   /// Returns a Result that completes when the server confirms.
+  @override
   Future<Result<void>> addCustomSku({
     required String ownBarcode,
     required String ownSkuName,
@@ -96,6 +137,7 @@ class CompetitorComparisonRepository {
   }
 
   /// Optimistic delete (local removal happens synchronously inside ApiClient).
+  @override
   Future<Result<void>> deleteCustomSku(String barcode) {
     final deleting = api.deleteCustomCompetitorSku(barcode);
     invalidateAll();

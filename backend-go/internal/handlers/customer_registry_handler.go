@@ -19,6 +19,7 @@ type CustomerRegistryProcessor interface {
 	CustomerRegistry() *customers.Registry
 	ReapplySellInFiles(ctx context.Context, tenantID string, files []string, chains []string) ([]ingestion.ReapplyResult, []string)
 	SellInYears(tenantID string) []int
+	SellOutMonths(tenantID string, year int) []int
 }
 
 type customerAuditSink interface {
@@ -187,6 +188,22 @@ func (h *CustomerRegistryHandler) HandleYears(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusOK, map[string]interface{}{"years": years, "default_year": def})
 }
 
+// HandleMonths serves GET /api/v1/sell-out/months?year=YYYY: distinct months (1..12) that have
+// Sell-Out facts for the year. month=0 on analytics filters means the whole year — this list is
+// what the competitor comparison picker uses so it grows as uploads add months.
+func (h *CustomerRegistryHandler) HandleMonths(w http.ResponseWriter, r *http.Request) {
+	c, ok := tmClaims(w, r)
+	if !ok {
+		return
+	}
+	year, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("year")))
+	if year <= 0 {
+		year = h.now().Year()
+	}
+	months := MonthList(h.p.SellOutMonths(c.TenantID, year))
+	writeJSON(w, http.StatusOK, map[string]interface{}{"year": year, "months": months})
+}
+
 // YearList merges data years with the current year (newest first) and picks the latest data year as default.
 func YearList(dataYears []int, current int) ([]int, int) {
 	set := map[int]bool{current: true}
@@ -209,4 +226,21 @@ func YearList(dataYears []int, current int) ([]int, int) {
 	}
 	sort.Sort(sort.Reverse(sort.IntSlice(out)))
 	return out, def
+}
+
+// MonthList keeps valid calendar months (1..12), sorted ascending. Empty input stays empty
+// (callers fall back to series-derived months on the client).
+func MonthList(months []int) []int {
+	set := map[int]bool{}
+	for _, m := range months {
+		if m >= 1 && m <= 12 {
+			set[m] = true
+		}
+	}
+	out := make([]int, 0, len(set))
+	for m := range set {
+		out = append(out, m)
+	}
+	sort.Ints(out)
+	return out
 }

@@ -16,6 +16,7 @@ import '../../executive_dashboard/presentation/screens/executive_screen.dart';
 import '../../oos_monitor/presentation/screens/oos_dashboard_screen.dart';
 import '../../sell_out_analytics/presentation/screens/sell_in_explorer_screen.dart';
 import '../../sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
+import '../../sell_in_returns/presentation/screens/sell_in_returns_screen.dart';
 import '../../auth/presentation/widgets/user_profile_dialog.dart';
 import '../../competitor_comparison/presentation/screens/competitor_comparison_screen.dart';
 import '../../pricing_compliance/presentation/screens/pricing_compliance_screen.dart';
@@ -125,6 +126,14 @@ class _AppShellState extends State<AppShell> {
     ),
     _NavDestinationSpec(
       index: 3,
+      labelEn: 'Returns',
+      labelAr: 'المرتجعات',
+      shortLabel: 'Returns',
+      icon: Icons.assignment_return_rounded,
+      selectedIcon: Icons.assignment_return_rounded,
+    ),
+    _NavDestinationSpec(
+      index: 4,
       labelEn: 'OOS Monitor',
       labelAr: 'مراقب النواقص',
       shortLabel: 'OOS',
@@ -132,7 +141,7 @@ class _AppShellState extends State<AppShell> {
       selectedIcon: Icons.warning_amber_rounded,
     ),
     _NavDestinationSpec(
-      index: 4,
+      index: 5,
       labelEn: 'Store Matrix',
       labelAr: 'مصفوفة الفروع',
       shortLabel: 'Matrix',
@@ -140,7 +149,7 @@ class _AppShellState extends State<AppShell> {
       selectedIcon: Icons.store_mall_directory_rounded,
     ),
     _NavDestinationSpec(
-      index: 5,
+      index: 6,
       labelEn: 'Pricing & Promos',
       labelAr: 'التسعير والعروض',
       shortLabel: 'Pricing',
@@ -148,7 +157,7 @@ class _AppShellState extends State<AppShell> {
       selectedIcon: Icons.price_change_rounded,
     ),
     _NavDestinationSpec(
-      index: 6,
+      index: 7,
       labelEn: 'Compare',
       labelAr: 'مقارنة المنافسين',
       shortLabel: 'Compare',
@@ -156,7 +165,7 @@ class _AppShellState extends State<AppShell> {
       selectedIcon: Icons.compare_arrows_rounded,
     ),
     _NavDestinationSpec(
-      index: 7,
+      index: 8,
       labelEn: 'Trade Marketing & ROI',
       labelAr: 'المصروفات الترويجية وعائد التسويق',
       shortLabel: 'Promo ROI',
@@ -164,7 +173,7 @@ class _AppShellState extends State<AppShell> {
       selectedIcon: Icons.campaign_rounded,
     ),
     _NavDestinationSpec(
-      index: 8,
+      index: 9,
       labelEn: 'CPFR & PO',
       labelAr: 'التجديد وأوامر الشراء',
       shortLabel: 'CPFR',
@@ -172,7 +181,7 @@ class _AppShellState extends State<AppShell> {
       selectedIcon: Icons.inventory_2_rounded,
     ),
     _NavDestinationSpec(
-      index: 9,
+      index: 10,
       labelEn: 'Smart Upload',
       labelAr: 'رفع البيانات الذكي',
       shortLabel: 'Upload',
@@ -180,7 +189,7 @@ class _AppShellState extends State<AppShell> {
       selectedIcon: Icons.auto_awesome_rounded,
     ),
     _NavDestinationSpec(
-      index: 10,
+      index: 11,
       labelEn: 'Product Master & Price List',
       labelAr: 'كارتة الأصناف والأسعار',
       shortLabel: 'Master',
@@ -188,7 +197,7 @@ class _AppShellState extends State<AppShell> {
       selectedIcon: Icons.qr_code_2_rounded,
     ),
     _NavDestinationSpec(
-      index: 11,
+      index: 12,
       labelEn: 'Data Errors',
       labelAr: 'الأخطاء',
       shortLabel: 'Errors',
@@ -268,8 +277,8 @@ class _AppShellState extends State<AppShell> {
                     final navId = TestIds.navIdForIndex(dest.index);
                     // Compact bottom bar already owns Dashboard / Sell-Out /
                     // Pricing / OOS ids — only tag destinations missing there
-                    // (notably Sell-In) so each nav-* id stays unique in the tree.
-                    const primaryCompactIndexes = {0, 1, 3, 5};
+                    // (notably Sell-In / Returns) so each nav-* id stays unique in the tree.
+                    const primaryCompactIndexes = {0, 1, 4, 6};
                     final attachNavId = navId != null &&
                         !primaryCompactIndexes.contains(dest.index);
                     Widget title = Text(
@@ -353,6 +362,10 @@ class _AppShellState extends State<AppShell> {
       ),
       SellInExplorerScreen(
         key: ValueKey('sellin_$stateKey'),
+        apiClient: widget.apiClient,
+      ),
+      SellInReturnsScreen(
+        key: ValueKey('returns_$stateKey'),
         apiClient: widget.apiClient,
       ),
       OOSDashboardScreen(
@@ -562,20 +575,20 @@ class _AppShellState extends State<AppShell> {
 
     // 3. Compact Mobile Experience (< 600dp)
     // Strictly follows M3 Bottom Navigation Bar limit (5 destinations max):
-    // 4 primary destinations: Dashboard (0), Sell-Out (1), Pricing (5), OOS (3)
-    // + 5th dynamic 'More' destination containing Smart Upload (2), Store Matrix (4), CPFR (6).
+    // 4 primary destinations: Dashboard (0), Sell-Out (1), Pricing (6), OOS (4)
+    // + 5th dynamic 'More' destination (Sell-In, Returns, Matrix, CPFR, …).
     final bool isSecondarySelected = _selectedIndex != 0 &&
         _selectedIndex != 1 &&
-        _selectedIndex != 5 &&
-        _selectedIndex != 3;
+        _selectedIndex != 6 &&
+        _selectedIndex != 4;
     final int bottomNavIndex;
     if (_selectedIndex == 0) {
       bottomNavIndex = 0;
     } else if (_selectedIndex == 1) {
       bottomNavIndex = 1;
-    } else if (_selectedIndex == 5) {
+    } else if (_selectedIndex == 6) {
       bottomNavIndex = 2; // Pricing
-    } else if (_selectedIndex == 3) {
+    } else if (_selectedIndex == 4) {
       bottomNavIndex = 3; // OOS
     } else {
       bottomNavIndex = 4; // More / Secondary
@@ -828,9 +841,9 @@ class _AppShellState extends State<AppShell> {
             } else if (idx == 1) {
               _selectPage(1);
             } else if (idx == 2) {
-              _selectPage(5); // Pricing & Promos
+              _selectPage(6); // Pricing & Promos
             } else if (idx == 3) {
-              _selectPage(3); // OOS Monitor
+              _selectPage(4); // OOS Monitor
             } else {
               _openMobileModulesSheet();
             }
