@@ -4,6 +4,7 @@ import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_shape.dart';
 import 'package:tashil_web/core/theme/m3_spacing.dart';
 import 'package:tashil_web/core/widgets/m3_dropdown.dart';
+import 'package:tashil_web/core/widgets/m3_feedback.dart';
 
 /// Arabic RTL review queue for pending AI competitor suggestions.
 /// Pending items never appear in Compare KPIs until owner approve.
@@ -49,6 +50,16 @@ class CompetitorSuggestionsReviewState
     }
   }
 
+  void _surfaceError(Object e) {
+    final msg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+    setState(() => _error = msg);
+    if (!mounted) return;
+    M3Feedback.showError(
+      context,
+      msg.isEmpty ? 'حدث خطأ أثناء اقتراحات المنافسين' : msg,
+    );
+  }
+
   Future<void> _reload() async {
     setState(() {
       _loading = true;
@@ -66,10 +77,8 @@ class CompetitorSuggestionsReviewState
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      setState(() => _loading = false);
+      _surfaceError(e);
     }
   }
 
@@ -92,28 +101,27 @@ class CompetitorSuggestionsReviewState
       final hasSummary = summary != null && summary.isNotEmpty;
       if (created == 0 && (hasSummary || rankFailures > 0)) {
         final detail =
-            hasSummary ? summary : 'لم يتم إنشاء اقتراحات';
+            hasSummary ? summary! : 'لم يتم إنشاء اقتراحات';
         _showRunFailure(detail);
-        setState(() => _error = detail);
       }
       await _reload();
     } catch (e) {
       if (!mounted) return;
       final detail = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
       _showRunFailure(detail);
-      setState(() => _error = detail);
     } finally {
       if (mounted) setState(() => _running = false);
     }
   }
 
+  /// Surfaces empty/failed batch runs with an Arabic snackbar (not silent empty).
   void _showRunFailure(String detail) {
     final message = detail.startsWith('تعذر تشغيل الاقتراحات')
         ? detail
         : 'تعذر تشغيل الاقتراحات: $detail';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    setState(() => _error = message);
+    if (!mounted) return;
+    M3Feedback.showError(context, message);
   }
 
   Future<void> _approve(CompetitorSuggestionModel s) async {
@@ -123,7 +131,7 @@ class CompetitorSuggestionsReviewState
       await _reload();
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      _surfaceError(e);
     } finally {
       if (mounted) setState(() => _busyId = null);
     }
@@ -136,7 +144,7 @@ class CompetitorSuggestionsReviewState
       await _reload();
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      _surfaceError(e);
     } finally {
       if (mounted) setState(() => _busyId = null);
     }

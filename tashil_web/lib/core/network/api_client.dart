@@ -10737,6 +10737,15 @@ class ApiClient {
   /// Compare prefers these together with [AvailableMonths] / `/sell-out/months`.
   List<int> lastCompetitiveMonths = const [];
 
+  /// Barcode → YYYY-MM → (price, units) from the last successful competitive-monthly load.
+  /// Used to build AI-pick trajectories without a second network hop.
+  Map<String, Map<String, ({double price, int units})>> lastCompetitiveByBarcode =
+      const {};
+
+  /// HOLD: AI suggestion prices must NOT feed Compare KPI averages until owner confirms.
+  /// Default OFF — KPIs use owner-pinned competitors only.
+  static const bool includeAiSuggestionsInKpiAverages = false;
+
   /// Test-only override for the competitive-comparison fetch safety cap.
   @visibleForTesting
   int? debugSellOutMaxRows;
@@ -11092,6 +11101,131 @@ class ApiClient {
     return data;
   }
 
+  /// Owner-only: on-demand top-3 AI competitors for one own barcode (cached per SKU).
+  /// Does not write competitor_mappings — viewing/compare needs no approve step.
+  Future<CompetitorSkuSuggestionsResult> suggestCompetitorsForSku({
+    required String barcode,
+    required String chain,
+    int? year,
+  }) async {
+    final body = <String, dynamic>{
+      'barcode': barcode,
+      'chain': chain,
+      if (year != null && year > 0) 'year': year,
+    };
+    final resp = await BackendHttp.post(
+      Uri.parse(ApiEndpoints.competitorSuggestionsSku),
+      headers: _headers,
+      body: jsonEncode(body),
+    ).timeout(const Duration(seconds: 90));
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    } catch (_) {
+      data = const {};
+    }
+    if (resp.statusCode != 200) {
+      final err = data['error']?.toString().trim();
+      throw Exception(
+        (err != null && err.isNotEmpty)
+            ? err
+            : 'فشل جلب اقتراحات المنافسين (${resp.statusCode})',
+      );
+    }
+    final rows = (data['suggestions'] as List?) ?? const [];
+    return CompetitorSkuSuggestionsResult(
+      suggestions: [
+        for (final raw in rows)
+          if (raw is Map)
+            CompetitorSuggestionModel.fromJson(Map<String, dynamic>.from(raw)),
+      ],
+      cached: data['cached'] == true,
+      skippedReasonAr: '${data['skipped_reason_ar'] ?? ''}'.trim(),
+      includeInKpiAverages: data['include_in_kpi_averages'] == true,
+    );
+  }
+
+  /// Builds a [CompetitorSkuComparisonModel] from an AI suggestion + cached monthly series.
+  /// Never marks the row as an owner pin (`isPinnedDirect: false`).
+  CompetitorSkuComparisonModel competitorFromAiSuggestion(
+    CompetitorSuggestionModel s, {
+    required double ownUnitPrice,
+    int year = 2026,
+  }) {
+    final pack = extractPackVolume(
+      s.sizeLabelCompetitor.isNotEmpty ? s.sizeLabelCompetitor : s.competitorSkuName,
+    );
+    // Prefer size token from name when size_label is empty/partial.
+    final namePack = extractPackVolume(s.competitorSkuName);
+    final packSizeLabel = s.sizeLabelCompetitor.isNotEmpty
+        ? s.sizeLabelCompetitor
+        : namePack.badgeLabel;
+    final volume = namePack.volume > 0 ? namePack.volume : pack.volume;
+    final unitLabel =
+        namePack.unitLabel.isNotEmpty ? namePack.unitLabel : pack.unitLabel;
+    final price = s.competitorUnitPrice;
+    final pricePerVol =
+        volume > 0 ? double.parse((price / volume).toStringAsFixed(2)) : price;
+    final diffEgp = price - ownUnitPrice;
+    final diffPct = ownUnitPrice > 0 ? (diffEgp / ownUnitPrice) * 100.0 : 0.0;
+    final pos = diffPct > 1.5
+        ? 'higher'
+        : diffPct < -1.5
+            ? 'lower'
+            : 'equal';
+    final monthlyRaw = lastCompetitiveByBarcode[s.competitorBarcode] ??
+        lastCompetitiveByBarcode[s.competitorBarcode.toLowerCase()] ??
+        const <String, ({double price, int units})>{};
+    var yearTrajectory =
+        buildMonthlyPriceTrajectory(monthlyRaw, filterYear: year);
+    final allTrajectory = buildMonthlyPriceTrajectory(monthlyRaw);
+    if (yearTrajectory.isEmpty && price > 0) {
+      // Flat fallback so H2H chart still renders a dashed-comparable series.
+      yearTrajectory = [
+        SkuMonthlyPricePointModel(
+          monthKey: '$year-01',
+          year: year,
+          monthNum: 1,
+          monthNameAr: 'يناير',
+          monthLabelAr: 'يناير $year',
+          unitPrice: price,
+          unitsSold: s.competitorUnits,
+          netRevenue: double.parse((price * s.competitorUnits).toStringAsFixed(2)),
+          priceChangeEgp: 0,
+          priceChangePct: 0,
+          trendDirection: 'baseline',
+        ),
+      ];
+    }
+    final brand = s.competitorBrand.isNotEmpty
+        ? s.competitorBrand
+        : (s.competitorSupplier.isNotEmpty ? s.competitorSupplier : 'منافس');
+    return CompetitorSkuComparisonModel(
+      skuName: s.competitorSkuName.isNotEmpty
+          ? s.competitorSkuName
+          : s.competitorBarcode,
+      barcode: s.competitorBarcode,
+      supplierName: s.competitorSupplier,
+      brand: brand,
+      category: s.category.isNotEmpty ? s.category : s.ownCategory,
+      packSizeLabel: packSizeLabel,
+      packVolumeUnits: volume,
+      volumeUnitLabel: unitLabel,
+      unitPrice: price,
+      pricePerUnitVolume: pricePerVol,
+      priceDiffEgp: double.parse(diffEgp.toStringAsFixed(2)),
+      priceDiffPct: double.parse(diffPct.toStringAsFixed(1)),
+      pricePosition: pos,
+      unitsSold: s.competitorUnits,
+      netRevenue: double.parse((price * s.competitorUnits).toStringAsFixed(2)),
+      categorySharePct: 0,
+      isPinnedDirect: false,
+      chainPrices: {s.retailerChain: price},
+      monthlyPrices: yearTrajectory,
+      allMonthlyPrices: allTrajectory.isNotEmpty ? allTrajectory : yearTrajectory,
+    );
+  }
+
   Future<void> approveCompetitorSuggestion(String id) async {
     final resp = await BackendHttp.post(
       Uri.parse(ApiEndpoints.competitorSuggestionsApprove),
@@ -11291,6 +11425,7 @@ class ApiClient {
     int year = 2026,
   }) async {
     lastCompetitiveMonths = const [];
+    lastCompetitiveByBarcode = const {};
     final params = <String, String>{
       'year': '$year',
       'supplier': 'all_market',
@@ -11377,6 +11512,9 @@ class ApiClient {
 
     final mergedMonths = months.toList()..sort();
     lastCompetitiveMonths = mergedMonths;
+    lastCompetitiveByBarcode = Map.unmodifiable(
+      byBarcode.map((k, v) => MapEntry(k, Map.unmodifiable(v))),
+    );
     return (
       byBarcode: byBarcode,
       metaByBarcode: metaByBarcode,
@@ -11419,6 +11557,7 @@ class ApiClient {
     } catch (e) {
       debugPrint('[ApiClient] competitive-monthly failed: $e');
       lastCompetitiveMonths = const [];
+      lastCompetitiveByBarcode = const {};
     }
 
     if (syncCustomSkus) {
@@ -12628,6 +12767,21 @@ class _ApprovedCompetitorPin {
   });
 }
 
+/// Result of POST /competitors/suggestions/sku (cached or freshly generated).
+class CompetitorSkuSuggestionsResult {
+  final List<CompetitorSuggestionModel> suggestions;
+  final bool cached;
+  final String skippedReasonAr;
+  final bool includeInKpiAverages;
+
+  const CompetitorSkuSuggestionsResult({
+    required this.suggestions,
+    required this.cached,
+    this.skippedReasonAr = '',
+    this.includeInKpiAverages = false,
+  });
+}
+
 /// Quarantine AI competitor suggestion — pending never feeds Compare KPIs.
 class CompetitorSuggestionModel {
   final String id;
@@ -12648,6 +12802,7 @@ class CompetitorSuggestionModel {
   final double competitorUnitPrice;
   final int ownUnits;
   final int competitorUnits;
+  final String sizeLabelCompetitor;
 
   const CompetitorSuggestionModel({
     required this.id,
@@ -12668,6 +12823,7 @@ class CompetitorSuggestionModel {
     required this.competitorUnitPrice,
     required this.ownUnits,
     required this.competitorUnits,
+    this.sizeLabelCompetitor = '',
   });
 
   factory CompetitorSuggestionModel.fromJson(Map<String, dynamic> r) {
@@ -12693,6 +12849,7 @@ class CompetitorSuggestionModel {
       competitorUnitPrice: d('competitor_unit_price'),
       ownUnits: i('own_units'),
       competitorUnits: i('competitor_units'),
+      sizeLabelCompetitor: s('size_label_competitor'),
     );
   }
 }
