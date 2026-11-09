@@ -107,16 +107,40 @@ func unifyDigits(s string) string {
 func stripChainPrefix(s string) string {
 	cleaned := strings.TrimSpace(s)
 	prefixes := []string{
+		// Care-line (مواد عناية) before grocery so both collapse to the same short name.
 		"عائله فتح الله ماركت مواد عناية -",
 		"عائلة فتح الله ماركت مواد عناية -",
+		"عائله فتح الله ماركت مواد عناية",
+		"عائلة فتح الله ماركت مواد عناية",
 		"عائله فتح الله ماركت -",
 		"عائلة فتح الله ماركت -",
 		"عائله فتح الله ماركت",
 		"عائلة فتح الله ماركت",
+		// KH Gomla Market (often uploaded under Fathalla file) — strip banner; chain ownership is an owner question.
+		"فرع فتح الله - كيه اتش جمله ماركت مواد عناية -",
+		"فرع فتح الله - كيه اتش جملة ماركت مواد عناية -",
+		"فرع فتح الله - كيه اتش جمله ماركت -",
+		"فرع فتح الله - كيه اتش جملة ماركت -",
+		"فرع فتح الله - كيه اتش جمله ماركت",
+		"فرع فتح الله - كيه اتش جملة ماركت",
+		"كيه اتش جمله ماركت مواد عناية -",
+		"كيه اتش جملة ماركت مواد عناية -",
+		"كيه اتش جمله ماركت مواد عناية",
+		"كيه اتش جملة ماركت مواد عناية",
+		"كيه اتش جمله ماركت -",
+		"كيه اتش جملة ماركت -",
+		"كيه اتش جمله ماركت",
+		"كيه اتش جملة ماركت",
+		// Beet El Gomla legal entity
 		"فتح الله بيت الجمله للتجاره والتوريدات ش م م -",
 		"فتح الله بيت الجملة للتجاره والتوريدات ش م م -",
 		"فتح الله بيت الجمله للتجاره والتوريدات ش م م",
 		"فتح الله بيت الجملة للتجاره والتوريدات ش م م",
+		// Other Fathalla legal-entity leftovers
+		"عائله فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م -",
+		"عائلة فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م -",
+		"عائله فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م",
+		"عائلة فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م",
 		"فتح الله اسواق -",
 		"فتح الله أسواق -",
 		"فتح الله اسواق",
@@ -177,5 +201,31 @@ func stripChainPrefix(s string) string {
 			}
 		}
 	}
+	cleaned = strings.TrimSpace(cleaned)
+	// Trailing legal-entity crumbs after a successful prefix strip.
+	for _, suf := range []string{
+		"للتجاره والتوريدات ش م م",
+		"للتجارة والتوريدات ش م م",
+		"لتصنيع وتجاره السلع الغذائيه ش م م",
+		"لتصنيع وتجارة السلع الغذائية ش م م",
+		"ش م م",
+		"مواد عناية",
+	} {
+		if strings.HasSuffix(cleaned, suf) {
+			cleaned = strings.TrimSpace(strings.TrimSuffix(cleaned, suf))
+			cleaned = strings.TrimRight(cleaned, "-–—/| ")
+		}
+	}
 	return strings.TrimSpace(cleaned)
+}
+
+// HasCareLine reports whether the raw label is a «مواد عناية» care-line spelling.
+func HasCareLine(raw string) bool {
+	return strings.Contains(raw, "مواد عناية") || strings.Contains(raw, "مواد عنايه")
+}
+
+// HasKHBanner reports «كيه اتش جمله ماركت» (KH Gomla Market) banner.
+func HasKHBanner(raw string) bool {
+	n := strings.ToLower(raw)
+	return strings.Contains(raw, "كيه اتش") || strings.Contains(n, "kh ") || strings.Contains(n, "k.h")
 }

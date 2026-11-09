@@ -247,6 +247,16 @@ func SeedCustomerNames() []string {
 	return names
 }
 
+// SeedAliasPairs returns embedded permanent alias from→to spellings (read-only).
+func SeedAliasPairs() map[string]string {
+	var aliases map[string]string
+	_ = json.Unmarshal(seedAliasesJSON, &aliases)
+	if aliases == nil {
+		return map[string]string{}
+	}
+	return aliases
+}
+
 // AliasCount is the number of embedded permanent aliases.
 func (r *Registry) AliasCount() int { return len(r.alias) }
 

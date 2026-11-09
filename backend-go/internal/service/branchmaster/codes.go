@@ -67,17 +67,21 @@ func ChainNameAR(slug string) string {
 }
 
 // InferChainSlug guesses the retailer slug from a raw store/customer name.
+// KH Gomla Market banners stay under fathalla until the owner decides otherwise
+// (they are uploaded under the Fathalla Sell-In file today).
 func InferChainSlug(raw string) string {
-	n := strings.ToLower(Normalize(raw))
 	rawL := strings.ToLower(raw)
+	n := strings.ToLower(Normalize(raw))
 	switch {
+	case strings.Contains(raw, "كيه اتش") || strings.Contains(rawL, "كيه اتش"):
+		return "fathalla"
 	case strings.Contains(rawL, "كارفور") || strings.Contains(n, "carrefour"):
 		return "carrefour"
 	case strings.Contains(rawL, "سبينيس") || strings.Contains(n, "spinney"):
 		return "spinneys"
-	case strings.Contains(rawL, "بيت الجمل") || strings.Contains(n, "beet"):
+	case strings.Contains(raw, "بيت الجمل") || strings.Contains(raw, "بيت الجملة"):
 		return "beet-elgomla"
-	case strings.Contains(rawL, "جملة ماركت") || (strings.Contains(rawL, "جمله") && !strings.Contains(rawL, "فتح")):
+	case strings.Contains(rawL, "جملة ماركت") || (strings.Contains(raw, "جمله ماركت") && !strings.Contains(raw, "فتح الله") && !strings.Contains(raw, "كيه اتش")):
 		return "gomla"
 	case strings.Contains(rawL, "مترو") || strings.Contains(n, "metro"):
 		return "metro"

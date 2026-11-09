@@ -30,8 +30,12 @@ Per-tenant durable tables (Firestore `branch_master/{tenant}`):
 First confirmation applies a dry-run proposal sheet once (`POST /api/v1/branches/bootstrap/confirm`). Adeco dry-run artifact is generated with:
 
 ```bash
-go run ./cmd/branchmasterdryrun -out /tmp -tenant adeco
+# From backend-go/: reads Sell-In seed + Returns (same customer column) + out26 Sell-Out headers
+go run ./cmd/branchmasterdryrun -out /tmp -tenant adeco \
+  -sellout-xlsx "data/archive/tenant-adeco/arch_adeco_fathalla_1792258238476465882_2026 out.xlsx"
 ```
+
+Dry-run groups by **chain + normalized short name**, maps Sell-Out headers onto Sell-In codes when they match (plus a small Adeco link-alias table), lists unmatched Sell-Out separately, and surfaces owner questions for «مواد عناية» vs grocery and «كيه اتش جمله ماركت» chain ownership — without guessing.
 
 ## APIs
 

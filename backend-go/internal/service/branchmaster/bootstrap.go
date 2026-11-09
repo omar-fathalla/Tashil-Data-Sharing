@@ -1,6 +1,7 @@
 package branchmaster
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -25,21 +26,29 @@ type proposalGroup struct {
 func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 	now := time.Now().UTC()
 	byNorm := map[string]*proposalGroup{}
+	sellOutRaw := map[string]string{} // normalize(raw) → original sell-out raw (for unmatched list)
+
 	for _, o := range occ {
 		raw := strings.TrimSpace(o.RawName)
 		if raw == "" {
 			continue
 		}
-		key := Normalize(raw)
-		if key == "" {
+		norm := LinkNormalize(raw)
+		if norm == "" {
 			continue
+		}
+		slug := strings.ToLower(strings.TrimSpace(o.ChainSlug))
+		if slug == "" {
+			slug = InferChainSlug(raw)
+		}
+		// Chain-scoped key so "6 اكتوبر" under beet ≠ KH/fathalla "6 اكتوبر".
+		key := ChainCodeForSlug(slug) + "|" + norm
+		src := strings.ToLower(strings.TrimSpace(o.Source))
+		if src == "sell_out" {
+			sellOutRaw[key] = raw
 		}
 		g := byNorm[key]
 		if g == nil {
-			slug := strings.ToLower(strings.TrimSpace(o.ChainSlug))
-			if slug == "" {
-				slug = InferChainSlug(raw)
-			}
 			g = &proposalGroup{
 				raws:    map[string]struct{}{},
 				sources: map[string]struct{}{},
@@ -48,15 +57,11 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 			byNorm[key] = g
 		}
 		g.raws[raw] = struct{}{}
-		if o.Source != "" {
-			g.sources[o.Source] = struct{}{}
-		}
-		if g.slug == "" && o.ChainSlug != "" {
-			g.slug = strings.ToLower(strings.TrimSpace(o.ChainSlug))
+		if src != "" {
+			g.sources[src] = struct{}{}
 		}
 	}
 
-	// Assign codes per chain in stable display-name order.
 	type keyed struct {
 		key string
 		g   *proposalGroup
@@ -71,19 +76,33 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 			return keys[i].g.slug < keys[j].g.slug
 		}
 		if IsUnallocated(si) != IsUnallocated(sj) {
-			return IsUnallocated(sj) // unallocated last within chain
+			return IsUnallocated(sj)
 		}
 		return si < sj
 	})
 
-	seq := map[string]int{} // chainCode → next seq
+	seq := map[string]int{}
 	var rows []ProposalRow
 	chainSet := map[string]bool{}
+	chainAgg := map[string]*DryRunChainSummary{}
+	var unmatchedSO []string
+	var ambiguous []string
+	careMergeExamples := []string{}
+	khExamples := []string{}
+	sawCareMerge, sawKH := false, false
+
+	sellInOut, sellInOnly, sellOutOnly, multiSpell, returnsHit := 0, 0, 0, 0, 0
 
 	for _, k := range keys {
 		g := k.g
 		cc := ChainCodeForSlug(g.slug)
 		chainSet[cc] = true
+		if chainAgg[cc] == nil {
+			chainAgg[cc] = &DryRunChainSummary{ChainSlug: g.slug, ChainCode: cc}
+		}
+		ca := chainAgg[cc]
+		ca.Branches++
+
 		display := ShortDisplay(firstRaw(g))
 		unalloc := IsUnallocated(display) || IsUnallocated(firstRaw(g))
 		var code string
@@ -96,16 +115,105 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 		}
 		raws := sortedKeys(g.raws)
 		srcHint := joinSources(g.sources)
+		_, hasSI := g.sources["sell_in"]
+		_, hasSO := g.sources["sell_out"]
+		_, hasRet := g.sources["returns"]
+		multi := len(raws) > 1
+		care, grocery, kh := false, false, false
+		for _, r := range raws {
+			if HasCareLine(r) {
+				care = true
+			} else if !IsUnallocated(r) {
+				grocery = true
+			}
+			if HasKHBanner(r) {
+				kh = true
+			}
+		}
+		note := ""
+		if care && grocery {
+			note = "مواد عناية + بقالة لنفس المفتاح الموحّد"
+			sawCareMerge = true
+			if len(careMergeExamples) < 8 {
+				careMergeExamples = append(careMergeExamples, fmt.Sprintf("%s (%s)", code, display))
+			}
+			ambiguous = append(ambiguous, fmt.Sprintf("%s (%s): %s", code, display, note))
+		}
+		if kh {
+			sawKH = true
+			if len(khExamples) < 8 {
+				khExamples = append(khExamples, fmt.Sprintf("%s (%s)", code, display))
+			}
+		}
+		// Sell-out with no Sell-In counterpart
+		if hasSO && !hasSI && !unalloc {
+			unmatchedSO = append(unmatchedSO, fmt.Sprintf("%s → proposed %s (%s)", sellOutRaw[k.key], code, display))
+		}
+
+		switch {
+		case hasSI && hasSO:
+			sellInOut++
+			ca.SellInOut++
+		case hasSI && !hasSO:
+			sellInOnly++
+			ca.SellInOnly++
+		case hasSO && !hasSI:
+			sellOutOnly++
+			ca.SellOutOnly++
+		}
+		if multi {
+			multiSpell++
+		}
+		if hasRet {
+			returnsHit++
+			ca.ReturnsHit++
+		}
+
 		rows = append(rows, ProposalRow{
-			RawNames:      raws,
-			NormalizedKey: k.key,
-			ChainSlug:     g.slug,
-			ChainCode:     cc,
-			BranchCode:    code,
-			DisplayName:   display,
-			Unallocated:   unalloc,
-			SourceHint:    srcHint,
+			RawNames:       raws,
+			NormalizedKey:  k.key,
+			ChainSlug:      g.slug,
+			ChainCode:      cc,
+			BranchCode:     code,
+			DisplayName:    display,
+			Unallocated:    unalloc,
+			SourceHint:     srcHint,
+			HasCareLine:    care,
+			HasGroceryLine: grocery,
+			HasKHBanner:    kh,
+			MultiSpelling:  multi,
+			AmbiguousNote:  note,
 		})
+	}
+
+	var summaries []DryRunChainSummary
+	for _, cc := range sortedKeys(func() map[string]struct{} {
+		m := map[string]struct{}{}
+		for k := range chainAgg {
+			m[k] = struct{}{}
+		}
+		return m
+	}()) {
+		summaries = append(summaries, *chainAgg[cc])
+	}
+	sort.Strings(unmatchedSO)
+	sort.Strings(ambiguous)
+
+	var ownerQ []string
+	if sawCareMerge {
+		ownerQ = append(ownerQ, fmt.Sprintf(
+			"هل صفوف «مواد عناية» لنفس الموقع الجغرافي تُحسب مع البقالة تحت كود فرع واحد؟ (اقتراح dry-run الحالي: نعم، دمج بعد إزالة البادئة — أمثلة: %s)",
+			strings.Join(careMergeExamples, "، ")))
+	}
+	if sawKH {
+		ownerQ = append(ownerQ, fmt.Sprintf(
+			"هل «كيه اتش جمله ماركت» سلسلة مستقلة (كود جديد مثل KHG) أم تبقى تحت فتح الله / FTH كما في رفع Sell-In الحالي؟ (أمثلة: %s)",
+			strings.Join(khExamples, "، ")))
+	}
+	if len(unmatchedSO) > 0 {
+		ownerQ = append(ownerQ, fmt.Sprintf(
+			"هناك %d اسم Sell-Out من out26 بلا مقابل Sell-In بعد التوحيد — اعتماد كفروع جديدة أم ربط يدوي؟ (انظر unmatched_sell_out)",
+			len(unmatchedSO)))
 	}
 
 	notes := []string{
@@ -113,17 +221,28 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 		"بعد موافقة المالك تُحفظ الجداول (سلاسل / فروع / أسماء مستعارة) مرة واحدة.",
 		"«غير موزع على فرع» يبقى دلواً منفصلاً ولا يُربط تلقائياً بأي فرع حقيقي.",
 		"التجميع في التقارير يتم بكود الفرع مع الاسم القصير؛ الأسماء الخام في الحقائق لا تُمس.",
+		"أسماء Sell-Out (out26) رُبطت بأكواد Sell-In عند تطابق الاسم القصير بعد التوحيد؛ غير المطابق مذكور في unmatched_sell_out.",
+		"مصدر Returns = أسماء عملاء Sell-In (المرتجعات تُجمَّع على نفس عمود العميل).",
 	}
 
 	return DryRunReport{
-		TenantID:        tenantID,
-		GeneratedAt:     now,
-		RawNameCount:    countRaws(byNorm),
-		UniqueNormCount: len(byNorm),
-		ChainCount:      len(chainSet),
-		BranchCount:     len(rows),
-		Rows:            rows,
-		NotesAR:         notes,
+		TenantID:         tenantID,
+		GeneratedAt:      now,
+		RawNameCount:     countRaws(byNorm),
+		UniqueNormCount:  len(byNorm),
+		ChainCount:       len(chainSet),
+		BranchCount:      len(rows),
+		SellInAndOut:     sellInOut,
+		SellInOnly:       sellInOnly,
+		SellOutOnly:      sellOutOnly,
+		MultiSpelling:    multiSpell,
+		ReturnsCovered:   returnsHit,
+		ChainSummaries:   summaries,
+		OwnerQuestions:   ownerQ,
+		UnmatchedSellOut: unmatchedSO,
+		AmbiguousPending: ambiguous,
+		Rows:             rows,
+		NotesAR:          notes,
 	}
 }
 
@@ -152,9 +271,6 @@ func ApplyProposal(st *State, report DryRunReport, confirmedBy string, now time.
 			key := Normalize(raw)
 			if key == "" {
 				continue
-			}
-			if row.Unallocated {
-				// Record alias for visibility but Resolve never auto-links unallocated.
 			}
 			if hasAliasKey(st, key) {
 				continue
@@ -196,7 +312,6 @@ func firstRaw(g *proposalGroup) string {
 		return ""
 	}
 	keys := sortedKeys(g.raws)
-	// Prefer the shortest raw as canonical display seed (usually already short).
 	best := keys[0]
 	for _, k := range keys {
 		if len([]rune(ShortDisplay(k))) < len([]rune(ShortDisplay(best))) {
@@ -216,16 +331,26 @@ func sortedKeys(m map[string]struct{}) []string {
 }
 
 func joinSources(m map[string]struct{}) string {
-	if len(m) == 0 {
-		return ""
-	}
-	if len(m) > 1 {
-		return "mixed"
+	order := []string{"sell_in", "sell_out", "returns"}
+	var parts []string
+	for _, o := range order {
+		if _, ok := m[o]; ok {
+			parts = append(parts, o)
+		}
 	}
 	for k := range m {
-		return k
+		found := false
+		for _, o := range order {
+			if k == o {
+				found = true
+				break
+			}
+		}
+		if !found {
+			parts = append(parts, k)
+		}
 	}
-	return ""
+	return strings.Join(parts, "+")
 }
 
 func countRaws(byNorm map[string]*proposalGroup) int {

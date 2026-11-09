@@ -133,17 +133,42 @@ type ProposalRow struct {
 	BranchCode    string   `json:"branch_code"`
 	DisplayName   string   `json:"display_name"`
 	Unallocated   bool     `json:"unallocated,omitempty"`
-	SourceHint    string   `json:"source_hint,omitempty"` // sell_out | sell_in | returns | mixed
+	SourceHint    string   `json:"source_hint,omitempty"` // sell_in+sell_out+returns style
+	HasCareLine   bool     `json:"has_care_line,omitempty"` // مواد عناية spellings present
+	HasGroceryLine bool    `json:"has_grocery_line,omitempty"`
+	HasKHBanner   bool     `json:"has_kh_banner,omitempty"` // كيه اتش جمله ماركت
+	MultiSpelling bool     `json:"multi_spelling,omitempty"`
+	AmbiguousNote string   `json:"ambiguous_note,omitempty"`
+}
+
+// DryRunChainSummary is per-chain counts for the dry-run top summary.
+type DryRunChainSummary struct {
+	ChainSlug   string `json:"chain_slug"`
+	ChainCode   string `json:"chain_code"`
+	Branches    int    `json:"branches"`
+	SellInOut   int    `json:"sell_in_and_sell_out"`
+	SellInOnly  int    `json:"sell_in_only"`
+	SellOutOnly int    `json:"sell_out_only"`
+	ReturnsHit  int    `json:"with_returns"`
 }
 
 // DryRunReport is the one-time Adeco (or any tenant) proposal artifact.
 type DryRunReport struct {
-	TenantID       string        `json:"tenant_id"`
-	GeneratedAt    time.Time     `json:"generated_at"`
-	RawNameCount   int           `json:"raw_name_count"`
-	UniqueNormCount int          `json:"unique_norm_count"`
-	ChainCount     int           `json:"chain_count"`
-	BranchCount    int           `json:"branch_count"`
-	Rows           []ProposalRow `json:"rows"`
-	NotesAR        []string      `json:"notes_ar,omitempty"`
+	TenantID        string              `json:"tenant_id"`
+	GeneratedAt     time.Time           `json:"generated_at"`
+	RawNameCount    int                 `json:"raw_name_count"`
+	UniqueNormCount int                 `json:"unique_norm_count"`
+	ChainCount      int                 `json:"chain_count"`
+	BranchCount     int                 `json:"branch_count"`
+	SellInAndOut    int                 `json:"sell_in_and_sell_out"`
+	SellInOnly      int                 `json:"sell_in_only"`
+	SellOutOnly     int                 `json:"sell_out_only"`
+	MultiSpelling   int                 `json:"multi_spelling_merges"`
+	ReturnsCovered  int                 `json:"branches_with_returns"`
+	ChainSummaries  []DryRunChainSummary `json:"chain_summaries,omitempty"`
+	OwnerQuestions  []string            `json:"owner_questions,omitempty"`
+	UnmatchedSellOut []string           `json:"unmatched_sell_out,omitempty"` // sell-out names with no Sell-In counterpart
+	AmbiguousPending []string           `json:"ambiguous_pending,omitempty"`
+	Rows            []ProposalRow       `json:"rows"`
+	NotesAR         []string            `json:"notes_ar,omitempty"`
 }
