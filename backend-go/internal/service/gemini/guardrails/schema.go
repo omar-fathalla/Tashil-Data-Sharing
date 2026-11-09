@@ -26,6 +26,8 @@ var allowedRetailers = map[string]bool{
 
 var allowedAnomalyTypes = map[string]bool{
 	"invalid_barcode": true, "negative_sales": true, "unmapped_store": true, "missing_price": true,
+	// Phase B (post-parse detectors)
+	"duplicate_row": true, "unit_price_outlier": true, "mom_spike": true,
 }
 
 var allowedMappingSources = map[string]bool{
