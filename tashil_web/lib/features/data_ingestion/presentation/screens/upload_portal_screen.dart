@@ -2350,6 +2350,13 @@ onChanged: m3Legacy<String>((val) {
                           'تاريخ الرفع: ${_formatArchiveDate(file.uploadedAt)}',
                           theme,
                         ),
+                        if (file.lastIngestedAt.isNotEmpty &&
+                            file.lastIngestedAt != file.uploadedAt)
+                          _buildArchiveMetaChip(
+                            Icons.update_rounded,
+                            'آخر استيراد: ${_formatArchiveDate(file.lastIngestedAt)}',
+                            theme,
+                          ),
                       ],
                     ),
                   ],

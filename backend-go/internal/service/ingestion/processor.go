@@ -428,9 +428,14 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			cleanedBarcode = rec.Barcode
 		}
 
-		// Anomaly post-validation: flag and exclude anomalous rows from BigQuery persistence
+		// Anomaly post-validation: flag and exclude anomalous rows from BigQuery persistence.
+		// Wide-matrix reconciliation rows under غير موزع على فرع intentionally carry qty=0 with
+		// non-zero (signed) NetRevenue so imported totals match الاجمالى — persist those only.
+		// Do not loosen this gate for named/normal branches.
 		isAnomaly := false
-		if rec.NetRevenue < 0 || rec.QuantitySold <= 0 {
+		unallocatedRecon := gemini.IsUnallocatedBranchName(rec.RawStoreName) &&
+			rec.QuantitySold == 0 && rec.NetRevenue != 0
+		if (rec.NetRevenue < 0 || rec.QuantitySold <= 0) && !unallocatedRecon {
 			if len(payload.AnomaliesDetected) < 250 {
 				appendUniqueAnomaly(&payload.AnomaliesDetected, domain.IngestionAnomaly{
 					RowNumber:   rowNum,

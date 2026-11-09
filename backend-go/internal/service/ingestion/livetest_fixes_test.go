@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 	"github.com/tashil/data-sharing/backend/internal/service/customers"
@@ -216,9 +217,17 @@ func TestArchiveKeepsUploadedAtOnReplay(t *testing.T) {
 	raw := livetestBytes(t, "05a_full_month.xlsx")
 	a := e.p.SaveArchivedFile(e.ten, "b1", "05a_full_month.xlsx", raw, "qa_test", "2026", "07", 30, 1, 3000)
 	first := a.UploadedAt
+	firstIngested := a.LastIngestedAt
+	if firstIngested == "" {
+		t.Fatal("expected last_ingested_at on first save")
+	}
+	time.Sleep(2 * time.Millisecond)
 	b := e.p.SaveArchivedFile(e.ten, "b2", "05a_full_month.xlsx", raw, "qa_test", "2026", "07", 30, 1, 3000)
 	if b.UploadedAt != first || b.ID != a.ID {
 		t.Fatalf("uploaded_at changed on identical replay: %v -> %v", first, b.UploadedAt)
+	}
+	if b.LastIngestedAt == "" || b.LastIngestedAt <= firstIngested {
+		t.Fatalf("last_ingested_at should refresh on re-ingest: first=%v second=%v", firstIngested, b.LastIngestedAt)
 	}
 }
 

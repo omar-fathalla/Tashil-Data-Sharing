@@ -64,8 +64,15 @@ func isTotalQuantityHeader(h string) bool {
 	return hasTotal && hasQty
 }
 
-func isUnallocatedBranchName(name string) bool {
+// IsUnallocatedBranchName reports whether name is the synthetic wide-matrix
+// reconciliation branch (غير موزع على فرع). Exported so ingestion can exempt
+// qty=0 / non-zero-revenue recon rows from the normal anomaly drop gate.
+func IsUnallocatedBranchName(name string) bool {
 	return normalizeBranchKey(name) == normalizeBranchKey(UnallocatedBranchName)
+}
+
+func isUnallocatedBranchName(name string) bool {
+	return IsUnallocatedBranchName(name)
 }
 
 func unallocatedBranchPair(retailer string) branchColumnPair {
