@@ -137,6 +137,9 @@ type Processor struct {
 	replaying     atomic.Bool
 	snap          snapshotConfig
 	onRebuilt     func()
+	// aggRefresher optionally overrides bqRepo for post-write analytics materialization
+	// (tests inject a failing refresher; production leaves this nil and type-asserts bqRepo).
+	aggRefresher AggregatesRefresher
 
 	onProductMaster func(tenantID, filename string, raw []byte)
 
