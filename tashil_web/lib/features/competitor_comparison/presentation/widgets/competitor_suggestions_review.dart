@@ -91,7 +91,8 @@ class CompetitorSuggestionsReviewState
       if (!mounted) return;
       final hasSummary = summary != null && summary.isNotEmpty;
       if (created == 0 && (hasSummary || rankFailures > 0)) {
-        final detail = hasSummary ? summary! : 'لم يتم إنشاء اقتراحات';
+        final detail =
+            hasSummary ? summary : 'لم يتم إنشاء اقتراحات';
         _showRunFailure(detail);
         setState(() => _error = detail);
       }
