@@ -6,7 +6,9 @@ name: Playwright Semantics Smoke
 # Budget fallback: set CI_HOSTED_RUNNER to the same JSON array as CI_RUNS_ON.
 # Mac contention: smoke-run joins job concurrency group tashil-mac-heavy (no cancel)
 # so flutter build / Setup Node are not starved by 4 parallel Mac jobs.
-# See docs/ci-self-hosted.md.
+# Before joining that group, wait-ci-flutter (ubuntu) yields to CI test-flutter so a
+# second pending job cannot cancel Flutter (GitHub pending-eviction). See docs.
+
 #
 # No workflow-level paths-ignore: required check flutter-web-semantics-smoke always reports.
 # Heavy smoke job is path-filtered; gate reports success on backend/docs-only skips.
@@ -26,6 +28,7 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read
+  actions: read
 
 env:
   FLUTTER_VERSION: "3.41.2"
@@ -52,10 +55,29 @@ jobs:
               - 'scripts/ci_pub_cache_isolation_test.sh'
               - 'scripts/pick_free_ports.py'
               - 'scripts/spa_http_server.py'
+              - 'scripts/wait_ci_flutter_before_smoke.sh'
               - '.github/workflows/**'
 
-  smoke-run:
+  # Hosted: wait until CI test-flutter is in_progress/done/skipped so smoke does not
+  # enter tashil-mac-heavy as a second pending job (which cancels the first pending).
+  wait-ci-flutter:
+    name: Wait for CI Flutter before Mac smoke
     needs: changes
+    if: needs.changes.outputs.smoke == 'true'
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+      - name: Yield tashil-mac-heavy pending slot to CI test-flutter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WAIT_CI_FLUTTER_DEADLINE_MIN: "90"
+        run: |
+          chmod +x scripts/wait_ci_flutter_before_smoke.sh
+          bash scripts/wait_ci_flutter_before_smoke.sh
+
+  smoke-run:
+    needs: [changes, wait-ci-flutter]
     if: needs.changes.outputs.smoke == 'true'
     # One Mac-heavy at a time in this repo (with Flutter CI / deploy). No cancel.
     concurrency:
@@ -249,7 +271,7 @@ jobs:
 
   # Required-check gate: job id matches existing check name flutter-web-semantics-smoke.
   flutter-web-semantics-smoke:
-    needs: [changes, smoke-run]
+    needs: [changes, wait-ci-flutter, smoke-run]
     if: always() && !cancelled()
     runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
@@ -265,6 +287,14 @@ jobs:
             echo "Skipped — no Flutter/web/e2e/workflow path changes"
             exit 0
           fi
+          if [[ "${{ needs.wait-ci-flutter.result }}" != "success" ]]; then
+            echo "::error::wait-ci-flutter failed (${{ needs.wait-ci-flutter.result }})"
+            exit 1
+          fi
           result="${{ needs.smoke-run.result }}"
           echo "smoke-run result=${result}"
+          if [[ "${result}" == "cancelled" ]]; then
+            echo "::error::smoke-run was cancelled (not success). Re-run; check tashil-mac-heavy contention."
+            exit 1
+          fi
           [[ "${result}" == "success" ]]

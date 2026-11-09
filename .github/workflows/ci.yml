@@ -409,6 +409,10 @@ jobs:
           fi
           result="${{ needs.test-flutter.result }}"
           echo "test-flutter result=${result}"
+          if [[ "${result}" == "cancelled" ]]; then
+            echo "::error::test-flutter was cancelled (not success). Likely tashil-mac-heavy pending eviction while deploy/smoke held the group — re-run CI; smoke now yields to Flutter first."
+            exit 1
+          fi
           [[ "${result}" == "success" ]]
 
   comment-on-pr-failure:
