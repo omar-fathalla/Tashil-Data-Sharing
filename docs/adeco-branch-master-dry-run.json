@@ -1,6 +1,6 @@
 {
   "tenant_id": "adeco",
-  "generated_at": "2026-11-09T17:31:28.369699398Z",
+  "generated_at": "2026-11-09T17:34:14.16519555Z",
   "raw_name_count": 91,
   "unique_norm_count": 43,
   "chain_count": 1,
@@ -20,24 +20,6 @@
       "sell_out_only": 13,
       "with_returns": 30
     }
-  ],
-  "owner_questions": [
-    "missing Sell-In counterpart: 13 Sell-Out POS names have no Sell-In match (never auto-link to warehouses). انظر unmatched_sell_out"
-  ],
-  "unmatched_sell_out": [
-    "فرع فتح الله - الأنفوشي → proposed FTH-004 (فرع فتح الله - الأنفوشي) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
-    "فرع فتح الله - الإبراهيمية ميني → proposed FTH-006 (فرع فتح الله - الإبراهيمية ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
-    "فرع فتح الله - الإبراهيمية → proposed FTH-005 (فرع فتح الله - الإبراهيمية) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
-    "فرع فتح الله - الدخيلة مينى 2 → proposed FTH-008 (فرع فتح الله - الدخيلة مينى 2) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
-    "فرع فتح الله - الدخيلة ميني → proposed FTH-009 (فرع فتح الله - الدخيلة ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
-    "فرع فتح الله - دمنهور الأندلس → proposed FTH-017 (فرع فتح الله - دمنهور الأندلس) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
-    "فرع فتح الله - سموحة ميني → proposed FTH-022 (فرع فتح الله - سموحة ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
-    "فرع فتح الله - سيدي بشر ميني → proposed FTH-024 (فرع فتح الله - سيدي بشر ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
-    "فرع فتح الله - سيدي جابر المحطة → proposed FTH-026 (فرع فتح الله - سيدي جابر المحطة) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
-    "فرع فتح الله - سيدي جابر ميني → proposed FTH-027 (فرع فتح الله - سيدي جابر ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
-    "فرع فتح الله - كفر الدوار - مول → proposed FTH-034 (فرع فتح الله - كفر الدوار - مول) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
-    "فرع فتح الله - ملك حفنى → proposed FTH-040 (فرع فتح الله - ملك حفنى) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
-    "فرع فتح الله - نيس2 → proposed FTH-042 (فرع فتح الله - نيس2) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)"
   ],
   "data_provenance": [
     "returns ← tashil_analytics.sell_in_records / in26.xlsx (arch_sellin_adeco_fathalla_1794178032976473890)",
@@ -1889,11 +1871,10 @@
     "المصادر = بيانات Adeco الحية فقط (BigQuery). لا seed_customers / seed_aliases.",
     "قواعد السلسلة قابلة للضبط لكل chain (care+grocery merge، أرقام الفروع، quarantine للأسماء المجهولة).",
     "قرار المالك: مواد عناية + بقالة لنفس الموقع = فرع واحد (FTH)؛ أرقام مختلفة = فروع مختلفة؛ المسافة فقط مع نفس الرقم تُدمَج.",
-    "Sell-In = شحنات الشركة وقد يشمل مواقع إضافية (مخازن مثل مخزن الافوجادو) — Sell-In-only صحيح؛ يُعلَّم type=warehouse.",
-    "Sell-Out = نقاط البيع فقط؛ كل فرع Sell-Out يجب أن يكون له مقابل Sell-In. Sell-Out-only = missing Sell-In counterpart (لا ربط تلقائي بمخزن أو Regional).",
-    "أي اسم غير مربوط بعد (Sell-Out-only) يبقى ظاهرًا ومعدودًا كصف مستقل بالاسم الخام الأصلي حتى يربطه المالك — لا إخفاء ولا تخمين دمج.",
+    "Sell-In = شحنات الشركة وقد يشمل مواقع إضافية (مخازن مثل مخزن الافوجادو) — Sell-In-only طبيعي؛ يُعلَّم type=warehouse عند المخزن.",
+    "Sell-Out = نقاط البيع. وجود فرع في ملف واحد فقط (Sell-In فقط أو Sell-Out فقط) طبيعي — لا تحذير ولا سؤال مالك.",
+    "لا ربط تلقائي بين مصادر مختلفة؛ كل صف يبقى باسمه الخام وقيمه حتى يقرر المالك الدمج.",
     "عدد الفروع التي دُمجت فيها مواد عناية + بقالة في هذا dry-run: 27.",
-    "سؤال المالك المتبقي = أسماء Sell-Out بلا مقابل Sell-In فقط.",
     "أسماء Sell-Out تُربط عند تطابق الاسم القصير فقط؛ لا تخمين (الإبراهيمية ≠ الإبراهيمية ريفيرا).",
     "مصدر Returns = صفوف sell_in_records ذات قيمة سالبة أو نوع مرتجع (من in26)."
   ]

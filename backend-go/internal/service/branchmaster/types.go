@@ -170,7 +170,7 @@ type DryRunReport struct {
 	ReturnsCovered     int                  `json:"branches_with_returns"`
 	ChainSummaries     []DryRunChainSummary `json:"chain_summaries,omitempty"`
 	OwnerQuestions     []string             `json:"owner_questions,omitempty"`
-	UnmatchedSellOut   []string             `json:"unmatched_sell_out,omitempty"` // sell-out names with no Sell-In counterpart
+	UnmatchedSellOut   []string             `json:"unmatched_sell_out,omitempty"` // deprecated: SI-only/SO-only are normal; always empty
 	AmbiguousPending   []string             `json:"ambiguous_pending,omitempty"`
 	LikelyMisspellings []string             `json:"likely_misspellings,omitempty"`
 	DataProvenance     []string             `json:"data_provenance,omitempty"` // how raw names were sourced

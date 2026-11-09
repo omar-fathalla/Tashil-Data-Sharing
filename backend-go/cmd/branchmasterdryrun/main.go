@@ -81,9 +81,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "write md: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Printf("wrote %s\nwrote %s\nrows=%d chains=%d si+so=%d si_only=%d so_only=%d unmatched_so=%d questions=%d\n",
+	fmt.Printf("wrote %s\nwrote %s\nrows=%d chains=%d si+so=%d si_only=%d so_only=%d questions=%d\n",
 		mdPath, jsonPath, report.BranchCount, report.ChainCount, report.SellInAndOut, report.SellInOnly, report.SellOutOnly,
-		len(report.UnmatchedSellOut), len(report.OwnerQuestions))
+		len(report.OwnerQuestions))
 }
 
 func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
@@ -146,13 +146,14 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 	b.WriteString("## Top summary\n\n")
 	b.WriteString("| Metric | Count |\n| --- | ---: |\n")
 	b.WriteString(fmt.Sprintf("| Sell-In **and** Sell-Out | %d |\n", r.SellInAndOut))
-	b.WriteString(fmt.Sprintf("| Sell-In only | %d |\n", r.SellInOnly))
-	b.WriteString(fmt.Sprintf("| Sell-Out only | %d |\n", r.SellOutOnly))
+	b.WriteString(fmt.Sprintf("| Sell-In only (normal) | %d |\n", r.SellInOnly))
+	b.WriteString(fmt.Sprintf("| Sell-Out only (normal) | %d |\n", r.SellOutOnly))
 	b.WriteString(fmt.Sprintf("| Multi-spelling merges | %d |\n", r.MultiSpelling))
 	b.WriteString(fmt.Sprintf("| Branches with Returns coverage | %d |\n", r.ReturnsCovered))
-	b.WriteString(fmt.Sprintf("| Unmatched Sell-Out (no Sell-In counterpart) | %d |\n", len(r.UnmatchedSellOut)))
-	b.WriteString(fmt.Sprintf("| Unmapped Plan branch codes (owner to name) | %d |\n", unmappedPlan))
-	b.WriteString(fmt.Sprintf("| Likely misspelling pairs | %d |\n", len(r.LikelyMisspellings)))
+	if unmappedPlan > 0 {
+		b.WriteString(fmt.Sprintf("| Unmapped Plan branch codes | %d |\n", unmappedPlan))
+	}
+	b.WriteString(fmt.Sprintf("| Likely misspelling pairs (informational) | %d |\n", len(r.LikelyMisspellings)))
 	b.WriteString(fmt.Sprintf("| Owner questions / ambiguous | %d / %d |\n\n", len(r.OwnerQuestions), len(r.AmbiguousPending)))
 
 	if len(r.ChainSummaries) > 0 {
@@ -232,16 +233,6 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 		b.WriteString("\n")
 	}
 
-	if len(r.UnmatchedSellOut) > 0 {
-		b.WriteString("### Unmatched Sell-Out names\n\n")
-		b.WriteString("Present in live `sell_out_facts` (out26) but **missing Sell-In counterpart**. ")
-		b.WriteString("Each stays visible as its **own row** with the **original raw** display name until the owner maps it — never hidden, never guess-merged to a warehouse/Regional:\n\n")
-		for _, u := range r.UnmatchedSellOut {
-			b.WriteString("- " + u + "\n")
-		}
-		b.WriteString("\n")
-	}
-
 	if len(r.AmbiguousPending) > 0 {
 		b.WriteString("### Ambiguous / pending owner decision\n\n")
 		for _, a := range r.AmbiguousPending {
@@ -256,10 +247,10 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 	}
 
 	b.WriteString("\n## Sell-In vs Sell-Out rules\n\n")
-	b.WriteString("- **Sell-In** = company shipments; may include extra locations (warehouses / مخزن*). SI-only is valid; those rows are typed `warehouse`.\n")
-	b.WriteString("- **Sell-Out** = points of sale only; every SO branch must have a Sell-In counterpart.\n")
-	b.WriteString("- **Sell-Out-only** = `missing Sell-In counterpart` (owner question). Never auto-link to warehouses or Regional.\n")
-	b.WriteString("- **Unmapped** names/codes keep their **original raw** as display, stay visible and counted as their own row until the owner maps them — never hidden, never guess-merged.\n\n")
+	b.WriteString("- **Sell-In** = company shipments; may include warehouses (`location_type=warehouse`).\n")
+	b.WriteString("- **Sell-Out** = points of sale.\n")
+	b.WriteString("- **SI-only / SO-only are normal** — counted and shown as their own rows under their own names/values. **No warning / no owner question.**\n")
+	b.WriteString("- Never auto-link across sources; unmapped names keep **original raw** as display until the owner maps them — never hidden, never guess-merged.\n\n")
 
 	b.WriteString("## Proposed branches\n\n")
 	b.WriteString("| Code | Chain | Type | Display | Raw spellings (with source) | Sources |\n")

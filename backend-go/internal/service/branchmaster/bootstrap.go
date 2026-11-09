@@ -43,7 +43,6 @@ type proposalGroup struct {
 func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 	now := time.Now().UTC()
 	byNorm := map[string]*proposalGroup{}
-	sellOutRaw := map[string]string{} // normalize(raw) → original sell-out raw (for unmatched list)
 
 	provenance := map[string]struct{}{}
 	var planCodeProps []PlanBranchCodeRow
@@ -170,9 +169,6 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 		if key == "" {
 			continue
 		}
-		if src == "sell_out" {
-			sellOutRaw[key] = raw
-		}
 		g := byNorm[key]
 		if g == nil {
 			g = &proposalGroup{
@@ -212,7 +208,6 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 	var rows []ProposalRow
 	chainSet := map[string]bool{}
 	chainAgg := map[string]*DryRunChainSummary{}
-	var unmatchedSO []string
 	var ambiguous []string
 	careMerged := 0
 
@@ -284,13 +279,8 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 			careMerged++
 		}
 		locType := InferLocationType(raws)
-		// Sell-Out = POS only; every SO branch must have a Sell-In counterpart.
-		// Never auto-link SO-only to warehouses or Regional.
-		if hasSO && !hasSI && !unalloc {
-			unmatchedSO = append(unmatchedSO, fmt.Sprintf(
-				"%s → proposed %s (%s) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)",
-				sellOutRaw[k.key], code, display))
-		}
+		// SI-only / SO-only are normal (owner #70) — never flag as missing counterpart.
+		// Still never auto-link across sources; each row keeps its own name/values.
 
 		switch {
 		case hasSI && hasSO:
@@ -343,18 +333,10 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 	}()) {
 		summaries = append(summaries, *chainAgg[cc])
 	}
-	sort.Strings(unmatchedSO)
 	sort.Strings(ambiguous)
 
+	// Owner (#70): no owner questions from SI-only / SO-only (normal). Plan excluded.
 	var ownerQ []string
-	// Owner (#70): remaining owner question for in26+out26 unification is only
-	// Sell-Out names missing a Sell-In counterpart. Plan codes / misspellings are
-	// not owner questions (Plan excluded; numbered-distinct already keeps pairs apart).
-	if len(unmatchedSO) > 0 {
-		ownerQ = append(ownerQ, fmt.Sprintf(
-			"missing Sell-In counterpart: %d Sell-Out POS names have no Sell-In match (never auto-link to warehouses). انظر unmatched_sell_out",
-			len(unmatchedSO)))
-	}
 
 	var parentRows []ParentLevelRow
 	for _, k := range sortedKeys(func() map[string]struct{} {
@@ -388,11 +370,10 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 		"المصادر = بيانات Adeco الحية فقط (BigQuery). لا seed_customers / seed_aliases.",
 		"قواعد السلسلة قابلة للضبط لكل chain (care+grocery merge، أرقام الفروع، quarantine للأسماء المجهولة).",
 		"قرار المالك: مواد عناية + بقالة لنفس الموقع = فرع واحد (FTH)؛ أرقام مختلفة = فروع مختلفة؛ المسافة فقط مع نفس الرقم تُدمَج.",
-		"Sell-In = شحنات الشركة وقد يشمل مواقع إضافية (مخازن مثل مخزن الافوجادو) — Sell-In-only صحيح؛ يُعلَّم type=warehouse.",
-		"Sell-Out = نقاط البيع فقط؛ كل فرع Sell-Out يجب أن يكون له مقابل Sell-In. Sell-Out-only = missing Sell-In counterpart (لا ربط تلقائي بمخزن أو Regional).",
-		"أي اسم غير مربوط بعد (Sell-Out-only) يبقى ظاهرًا ومعدودًا كصف مستقل بالاسم الخام الأصلي حتى يربطه المالك — لا إخفاء ولا تخمين دمج.",
+		"Sell-In = شحنات الشركة وقد يشمل مواقع إضافية (مخازن مثل مخزن الافوجادو) — Sell-In-only طبيعي؛ يُعلَّم type=warehouse عند المخزن.",
+		"Sell-Out = نقاط البيع. وجود فرع في ملف واحد فقط (Sell-In فقط أو Sell-Out فقط) طبيعي — لا تحذير ولا سؤال مالك.",
+		"لا ربط تلقائي بين مصادر مختلفة؛ كل صف يبقى باسمه الخام وقيمه حتى يقرر المالك الدمج.",
 		fmt.Sprintf("عدد الفروع التي دُمجت فيها مواد عناية + بقالة في هذا dry-run: %d.", careMerged),
-		"سؤال المالك المتبقي = أسماء Sell-Out بلا مقابل Sell-In فقط.",
 		"أسماء Sell-Out تُربط عند تطابق الاسم القصير فقط؛ لا تخمين (الإبراهيمية ≠ الإبراهيمية ريفيرا).",
 		"مصدر Returns = صفوف sell_in_records ذات قيمة سالبة أو نوع مرتجع (من in26).",
 	}
@@ -411,7 +392,7 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 		ReturnsCovered:     returnsHit,
 		ChainSummaries:     summaries,
 		OwnerQuestions:     ownerQ,
-		UnmatchedSellOut:   unmatchedSO,
+		UnmatchedSellOut:   nil, // owner: SI-only/SO-only are normal — never flag
 		AmbiguousPending:   ambiguous,
 		LikelyMisspellings: misspellings,
 		DataProvenance:     sortedKeys(provenance),

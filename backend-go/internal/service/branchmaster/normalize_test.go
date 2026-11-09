@@ -112,10 +112,26 @@ func TestDryRunSellOutSources(t *testing.T) {
 		{RawName: "الأنفوشي", ChainSlug: "fathalla", Source: "sell_out"},
 	})
 	if report.SellInAndOut < 2 {
-		t.Fatalf("expected smouha+hanoville matched, got si+so=%d unmatched=%v", report.SellInAndOut, report.UnmatchedSellOut)
+		t.Fatalf("expected smouha+hanoville matched, got si+so=%d so_only=%d", report.SellInAndOut, report.SellOutOnly)
 	}
-	if len(report.UnmatchedSellOut) != 1 || !containsSub(report.UnmatchedSellOut[0], "الأنفوشي") {
-		t.Fatalf("expected anfoushy unmatched, got %v", report.UnmatchedSellOut)
+	// SO-only (الأنفوشي) is normal — counted, shown, never flagged.
+	if report.SellOutOnly < 1 {
+		t.Fatalf("expected ≥1 sell-out-only row, got so_only=%d", report.SellOutOnly)
+	}
+	if len(report.UnmatchedSellOut) != 0 {
+		t.Fatalf("SO-only must not be flagged unmatched: %v", report.UnmatchedSellOut)
+	}
+	if len(report.OwnerQuestions) != 0 {
+		t.Fatalf("SO-only must not create owner questions: %v", report.OwnerQuestions)
+	}
+	foundAnf := false
+	for _, r := range report.Rows {
+		if containsSub(r.DisplayName, "الأنفوشي") || containsSub(stringsJoin(r.RawNames), "الأنفوشي") {
+			foundAnf = true
+		}
+	}
+	if !foundAnf {
+		t.Fatal("الأنفوشي SO-only row must stay visible in proposed branches")
 	}
 	var smouhaSrc string
 	for _, r := range report.Rows {

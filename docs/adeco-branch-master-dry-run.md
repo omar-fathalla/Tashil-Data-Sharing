@@ -8,7 +8,7 @@ cursor:
 **Status: HOLD — owner approval required before any production write.**
 
 - Tenant: `adeco`
-- Generated (UTC): `2026-11-09T17:31:28Z`
+- Generated (UTC): `2026-11-09T17:34:14Z`
 - Live input: `adeco-live-occurrences.json`
 - **Unification sources only:** `in26.xlsx` (Sell-In + Returns) + `out26.xlsx` (Sell-Out)
 - **Excluded (BQ untouched):** `Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx` / `arch_sellin_adeco_fathalla_1794179188685072646` — no parent/mini/Regional/16 codes in this proposal
@@ -52,14 +52,12 @@ This dry-run uses **live BQ in26+out26 only** (Plan archive excluded from unific
 | Metric | Count |
 | --- | ---: |
 | Sell-In **and** Sell-Out | 22 |
-| Sell-In only | 8 |
-| Sell-Out only | 13 |
+| Sell-In only (normal) | 8 |
+| Sell-Out only (normal) | 13 |
 | Multi-spelling merges | 28 |
 | Branches with Returns coverage | 30 |
-| Unmatched Sell-Out (no Sell-In counterpart) | 13 |
-| Unmapped Plan branch codes (owner to name) | 0 |
-| Likely misspelling pairs | 0 |
-| Owner questions / ambiguous | 1 / 0 |
+| Likely misspelling pairs (informational) | 0 |
+| Owner questions / ambiguous | 0 / 0 |
 
 ### Per chain
 
@@ -73,28 +71,6 @@ This dry-run uses **live BQ in26+out26 only** (Plan archive excluded from unific
 | --- | --- | --- | --- |
 | `fathalla` | true | true | true |
 
-### Owner questions (do not guess)
-
-1. missing Sell-In counterpart: 13 Sell-Out POS names have no Sell-In match (never auto-link to warehouses). انظر unmatched_sell_out
-
-### Unmatched Sell-Out names
-
-Present in live `sell_out_facts` (out26) but **missing Sell-In counterpart**. Each stays visible as its **own row** with the **original raw** display name until the owner maps it — never hidden, never guess-merged to a warehouse/Regional:
-
-- فرع فتح الله - الأنفوشي → proposed FTH-004 (فرع فتح الله - الأنفوشي) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)
-- فرع فتح الله - الإبراهيمية ميني → proposed FTH-006 (فرع فتح الله - الإبراهيمية ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)
-- فرع فتح الله - الإبراهيمية → proposed FTH-005 (فرع فتح الله - الإبراهيمية) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)
-- فرع فتح الله - الدخيلة مينى 2 → proposed FTH-008 (فرع فتح الله - الدخيلة مينى 2) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)
-- فرع فتح الله - الدخيلة ميني → proposed FTH-009 (فرع فتح الله - الدخيلة ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)
-- فرع فتح الله - دمنهور الأندلس → proposed FTH-017 (فرع فتح الله - دمنهور الأندلس) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)
-- فرع فتح الله - سموحة ميني → proposed FTH-022 (فرع فتح الله - سموحة ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)
-- فرع فتح الله - سيدي بشر ميني → proposed FTH-024 (فرع فتح الله - سيدي بشر ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)
-- فرع فتح الله - سيدي جابر المحطة → proposed FTH-026 (فرع فتح الله - سيدي جابر المحطة) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)
-- فرع فتح الله - سيدي جابر ميني → proposed FTH-027 (فرع فتح الله - سيدي جابر ميني) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)
-- فرع فتح الله - كفر الدوار - مول → proposed FTH-034 (فرع فتح الله - كفر الدوار - مول) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)
-- فرع فتح الله - ملك حفنى → proposed FTH-040 (فرع فتح الله - ملك حفنى) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)
-- فرع فتح الله - نيس2 → proposed FTH-042 (فرع فتح الله - نيس2) — missing Sell-In counterpart (do not auto-link to warehouse/Regional)
-
 ## Notes
 
 - هذا تقرير تجريبي (dry-run) فقط — لم يُكتب أي شيء في الإنتاج.
@@ -103,20 +79,19 @@ Present in live `sell_out_facts` (out26) but **missing Sell-In counterpart**. Ea
 - المصادر = بيانات Adeco الحية فقط (BigQuery). لا seed_customers / seed_aliases.
 - قواعد السلسلة قابلة للضبط لكل chain (care+grocery merge، أرقام الفروع، quarantine للأسماء المجهولة).
 - قرار المالك: مواد عناية + بقالة لنفس الموقع = فرع واحد (FTH)؛ أرقام مختلفة = فروع مختلفة؛ المسافة فقط مع نفس الرقم تُدمَج.
-- Sell-In = شحنات الشركة وقد يشمل مواقع إضافية (مخازن مثل مخزن الافوجادو) — Sell-In-only صحيح؛ يُعلَّم type=warehouse.
-- Sell-Out = نقاط البيع فقط؛ كل فرع Sell-Out يجب أن يكون له مقابل Sell-In. Sell-Out-only = missing Sell-In counterpart (لا ربط تلقائي بمخزن أو Regional).
-- أي اسم غير مربوط بعد (Sell-Out-only) يبقى ظاهرًا ومعدودًا كصف مستقل بالاسم الخام الأصلي حتى يربطه المالك — لا إخفاء ولا تخمين دمج.
+- Sell-In = شحنات الشركة وقد يشمل مواقع إضافية (مخازن مثل مخزن الافوجادو) — Sell-In-only طبيعي؛ يُعلَّم type=warehouse عند المخزن.
+- Sell-Out = نقاط البيع. وجود فرع في ملف واحد فقط (Sell-In فقط أو Sell-Out فقط) طبيعي — لا تحذير ولا سؤال مالك.
+- لا ربط تلقائي بين مصادر مختلفة؛ كل صف يبقى باسمه الخام وقيمه حتى يقرر المالك الدمج.
 - عدد الفروع التي دُمجت فيها مواد عناية + بقالة في هذا dry-run: 27.
-- سؤال المالك المتبقي = أسماء Sell-Out بلا مقابل Sell-In فقط.
 - أسماء Sell-Out تُربط عند تطابق الاسم القصير فقط؛ لا تخمين (الإبراهيمية ≠ الإبراهيمية ريفيرا).
 - مصدر Returns = صفوف sell_in_records ذات قيمة سالبة أو نوع مرتجع (من in26).
 
 ## Sell-In vs Sell-Out rules
 
-- **Sell-In** = company shipments; may include extra locations (warehouses / مخزن*). SI-only is valid; those rows are typed `warehouse`.
-- **Sell-Out** = points of sale only; every SO branch must have a Sell-In counterpart.
-- **Sell-Out-only** = `missing Sell-In counterpart` (owner question). Never auto-link to warehouses or Regional.
-- **Unmapped** names/codes keep their **original raw** as display, stay visible and counted as their own row until the owner maps them — never hidden, never guess-merged.
+- **Sell-In** = company shipments; may include warehouses (`location_type=warehouse`).
+- **Sell-Out** = points of sale.
+- **SI-only / SO-only are normal** — counted and shown as their own rows under their own names/values. **No warning / no owner question.**
+- Never auto-link across sources; unmapped names keep **original raw** as display until the owner maps them — never hidden, never guess-merged.
 
 ## Proposed branches
 

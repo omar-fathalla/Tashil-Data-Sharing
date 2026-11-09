@@ -138,17 +138,14 @@ func TestDryRun_UnmappedKeepsOriginalRawDisplay(t *testing.T) {
 	if ShortDisplay(wantRaw) == wantRaw {
 		t.Fatal("test invariant: ShortDisplay would have changed the raw — fixture needs a prefixed name")
 	}
-	if len(report.UnmatchedSellOut) == 0 || stringIndex(report.UnmatchedSellOut[0], "missing Sell-In counterpart") < 0 {
-		t.Fatalf("expected missing Sell-In counterpart flag, got %v", report.UnmatchedSellOut)
+	if len(report.UnmatchedSellOut) != 0 {
+		t.Fatalf("SO-only must not be flagged: %v", report.UnmatchedSellOut)
+	}
+	if len(report.OwnerQuestions) != 0 {
+		t.Fatalf("SO-only must not create owner questions: %v", report.OwnerQuestions)
 	}
 	if warehouse == nil || warehouse.LocationType != "warehouse" {
 		t.Fatalf("expected warehouse type for مخزن الافوجادو, got %+v", warehouse)
-	}
-	// Warehouse is SI-only and valid — not in unmatched SO list.
-	for _, u := range report.UnmatchedSellOut {
-		if stringIndex(u, "افوجادو") >= 0 {
-			t.Fatalf("warehouse must not be flagged as missing SI: %s", u)
-		}
 	}
 }
 
