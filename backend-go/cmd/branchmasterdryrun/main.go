@@ -250,7 +250,8 @@ func renderMarkdown(r branchmaster.DryRunReport, liveJSONPath string) string {
 	b.WriteString("- **Sell-In** = company shipments; may include warehouses (`location_type=warehouse`).\n")
 	b.WriteString("- **Sell-Out** = points of sale.\n")
 	b.WriteString("- **SI-only / SO-only are normal** — counted and shown as their own rows under their own names/values. **No warning / no owner question.**\n")
-	b.WriteString("- Never auto-link across sources; unmapped names keep **original raw** as display until the owner maps them — never hidden, never guess-merged.\n\n")
+	b.WriteString("- Never auto-link across sources; single-file rows stay their own codes until the owner maps them — never hidden, never guess-merged.\n")
+	b.WriteString("- **Display** in reports = short branch name only (chain prefix stripped, e.g. `الأنفوشي` not `فرع فتح الله - الأنفوشي`). Raw spellings remain in the raw column.\n\n")
 
 	b.WriteString("## Proposed branches\n\n")
 	b.WriteString("| Code | Chain | Type | Display | Raw spellings (with source) | Sources |\n")

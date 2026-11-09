@@ -229,28 +229,19 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 		_, hasSI := g.sources["sell_in"]
 		_, hasSO := g.sources["sell_out"]
 		_, hasRet := g.sources["returns"]
-		unmappedPending := hasSO && !hasSI // Sell-Out-only until owner maps
 		displayRaw := firstRaw(g)
 		// Prefer a non-care spelling for the short display when grocery+care share a code
-		// (owner: show short location name only) — except unmapped pending rows keep ORIGINAL raw.
-		if !unmappedPending {
-			for _, r := range sortedKeys(g.raws) {
-				if !HasCareLine(r) && !IsUnallocated(r) {
-					if displayRaw == "" || HasCareLine(displayRaw) || len([]rune(ShortDisplay(r))) <= len([]rune(ShortDisplay(displayRaw))) {
-						displayRaw = r
-					}
+		// (owner: reports show short location name only — always strip chain prefix).
+		for _, r := range sortedKeys(g.raws) {
+			if !HasCareLine(r) && !IsUnallocated(r) {
+				if displayRaw == "" || HasCareLine(displayRaw) || len([]rune(ShortDisplay(r))) <= len([]rune(ShortDisplay(displayRaw))) {
+					displayRaw = r
 				}
 			}
 		}
-		var display string
-		if unmappedPending {
-			// Owner: unmapped keeps ORIGINAL raw as display — never hide / never guess-merge.
-			display = strings.TrimSpace(displayRaw)
-			if display == "" && len(raws) > 0 {
-				display = raws[0]
-			}
-		} else {
-			display = ShortDisplay(displayRaw)
+		display := ShortDisplay(displayRaw)
+		if display == "" && len(raws) > 0 {
+			display = ShortDisplay(raws[0])
 		}
 		unalloc := IsUnallocated(display) || IsUnallocated(firstRaw(g))
 		var code string
@@ -372,7 +363,7 @@ func BuildDryRunProposal(tenantID string, occ []RawOccurrence) DryRunReport {
 		"قرار المالك: مواد عناية + بقالة لنفس الموقع = فرع واحد (FTH)؛ أرقام مختلفة = فروع مختلفة؛ المسافة فقط مع نفس الرقم تُدمَج.",
 		"Sell-In = شحنات الشركة وقد يشمل مواقع إضافية (مخازن مثل مخزن الافوجادو) — Sell-In-only طبيعي؛ يُعلَّم type=warehouse عند المخزن.",
 		"Sell-Out = نقاط البيع. وجود فرع في ملف واحد فقط (Sell-In فقط أو Sell-Out فقط) طبيعي — لا تحذير ولا سؤال مالك.",
-		"لا ربط تلقائي بين مصادر مختلفة؛ كل صف يبقى باسمه الخام وقيمه حتى يقرر المالك الدمج.",
+		"لا ربط تلقائي بين مصادر مختلفة؛ كل صف يبقى مستقلاً بقيمه حتى يقرر المالك الدمج. العرض في التقارير = الاسم القصير فقط (بدون «فرع فتح الله -»).",
 		fmt.Sprintf("عدد الفروع التي دُمجت فيها مواد عناية + بقالة في هذا dry-run: %d.", careMerged),
 		"جسور المالك: الإبراهيمية = الابراهيمية ريفيرا؛ دمنهور = دمنهور الأندلس؛ سيدي جابر = سيدي جابر المحطة. تبقى منفصلة: الإبراهيمية ميني، دمنهور الاستاد، سيدي جابر ميني.",
 		"مصدر Returns = صفوف sell_in_records ذات قيمة سالبة أو نوع مرتجع (من in26).",

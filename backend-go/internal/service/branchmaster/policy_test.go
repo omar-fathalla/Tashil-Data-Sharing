@@ -111,38 +111,38 @@ func stringsContainsAny(s string, subs ...string) bool {
 	return false
 }
 
-func TestDryRun_UnmappedKeepsOriginalRawDisplay(t *testing.T) {
+func TestDryRun_SOOnlyUsesShortDisplay(t *testing.T) {
 	report := BuildDryRunProposal("adeco", []RawOccurrence{
 		{RawName: "فرع فتح الله - الأنفوشي", ChainSlug: "fathalla", Source: "sell_out",
+			SourceTable: "t.sell_out", SourceFile: "out26.xlsx"},
+		{RawName: "فرع فتح الله - الإبراهيمية ميني", ChainSlug: "fathalla", Source: "sell_out",
+			SourceTable: "t.sell_out", SourceFile: "out26.xlsx"},
+		{RawName: "فرع فتح الله - نيس2", ChainSlug: "fathalla", Source: "sell_out",
 			SourceTable: "t.sell_out", SourceFile: "out26.xlsx"},
 		{RawName: "عائله فتح الله ماركت - مخزن الافوجادو", ChainSlug: "fathalla", Source: "sell_in",
 			SourceTable: "t.sell_in", SourceFile: "in26.xlsx"},
 	})
-	var anfoushy, warehouse *ProposalRow
+	wantShort := map[string]bool{"الأنفوشي": false, "الإبراهيمية ميني": false, "نيس2": false}
+	var warehouse *ProposalRow
 	for i := range report.Rows {
 		r := &report.Rows[i]
-		if stringIndex(r.DisplayName, "الأنفوشي") >= 0 || stringIndex(stringsJoin(r.RawNames), "الأنفوشي") >= 0 {
-			anfoushy = r
+		if _, ok := wantShort[r.DisplayName]; ok {
+			wantShort[r.DisplayName] = true
+		}
+		if stringIndex(r.DisplayName, "فرع") >= 0 || stringIndex(r.DisplayName, "فتح الله") >= 0 {
+			t.Fatalf("display must strip chain prefix, got %q", r.DisplayName)
 		}
 		if r.LocationType == "warehouse" || stringIndex(r.DisplayName, "افوجادو") >= 0 {
 			warehouse = r
 		}
 	}
-	if anfoushy == nil {
-		t.Fatalf("Sell-Out-only anfoushy missing from rows (must stay visible): %+v", report.Rows)
+	for name, found := range wantShort {
+		if !found {
+			t.Fatalf("expected short display %q in rows %+v", name, report.Rows)
+		}
 	}
-	const wantRaw = "فرع فتح الله - الأنفوشي"
-	if anfoushy.DisplayName != wantRaw {
-		t.Fatalf("unmapped must keep ORIGINAL raw as display (not ShortDisplay), got %q want %q", anfoushy.DisplayName, wantRaw)
-	}
-	if ShortDisplay(wantRaw) == wantRaw {
-		t.Fatal("test invariant: ShortDisplay would have changed the raw — fixture needs a prefixed name")
-	}
-	if len(report.UnmatchedSellOut) != 0 {
-		t.Fatalf("SO-only must not be flagged: %v", report.UnmatchedSellOut)
-	}
-	if len(report.OwnerQuestions) != 0 {
-		t.Fatalf("SO-only must not create owner questions: %v", report.OwnerQuestions)
+	if len(report.UnmatchedSellOut) != 0 || len(report.OwnerQuestions) != 0 {
+		t.Fatalf("SO-only must not be flagged: unmatched=%v q=%v", report.UnmatchedSellOut, report.OwnerQuestions)
 	}
 	if warehouse == nil || warehouse.LocationType != "warehouse" {
 		t.Fatalf("expected warehouse type for مخزن الافوجادو, got %+v", warehouse)

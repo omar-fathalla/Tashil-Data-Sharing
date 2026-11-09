@@ -1,6 +1,6 @@
 {
   "tenant_id": "adeco",
-  "generated_at": "2026-11-09T17:36:37.840565888Z",
+  "generated_at": "2026-11-09T17:40:32.661312645Z",
   "raw_name_count": 91,
   "unique_norm_count": 40,
   "chain_count": 1,
@@ -248,7 +248,7 @@
       "chain_slug": "fathalla",
       "chain_code": "FTH",
       "branch_code": "FTH-004",
-      "display_name": "فرع فتح الله - الأنفوشي",
+      "display_name": "الأنفوشي",
       "source_hint": "sell_out",
       "has_grocery_line": true,
       "location_type": "store"
@@ -325,7 +325,7 @@
       "chain_slug": "fathalla",
       "chain_code": "FTH",
       "branch_code": "FTH-006",
-      "display_name": "فرع فتح الله - الإبراهيمية ميني",
+      "display_name": "الإبراهيمية ميني",
       "source_hint": "sell_out",
       "has_grocery_line": true,
       "location_type": "store"
@@ -347,7 +347,7 @@
       "chain_slug": "fathalla",
       "chain_code": "FTH",
       "branch_code": "FTH-007",
-      "display_name": "فرع فتح الله - الدخيلة مينى 2",
+      "display_name": "الدخيلة مينى 2",
       "source_hint": "sell_out",
       "has_grocery_line": true,
       "location_type": "store"
@@ -369,7 +369,7 @@
       "chain_slug": "fathalla",
       "chain_code": "FTH",
       "branch_code": "FTH-008",
-      "display_name": "فرع فتح الله - الدخيلة ميني",
+      "display_name": "الدخيلة ميني",
       "source_hint": "sell_out",
       "has_grocery_line": true,
       "location_type": "store"
@@ -981,7 +981,7 @@
       "chain_slug": "fathalla",
       "chain_code": "FTH",
       "branch_code": "FTH-020",
-      "display_name": "فرع فتح الله - سموحة ميني",
+      "display_name": "سموحة ميني",
       "source_hint": "sell_out",
       "has_grocery_line": true,
       "location_type": "store"
@@ -1058,7 +1058,7 @@
       "chain_slug": "fathalla",
       "chain_code": "FTH",
       "branch_code": "FTH-022",
-      "display_name": "فرع فتح الله - سيدي بشر ميني",
+      "display_name": "سيدي بشر ميني",
       "source_hint": "sell_out",
       "has_grocery_line": true,
       "location_type": "store"
@@ -1135,7 +1135,7 @@
       "chain_slug": "fathalla",
       "chain_code": "FTH",
       "branch_code": "FTH-024",
-      "display_name": "فرع فتح الله - سيدي جابر ميني",
+      "display_name": "سيدي جابر ميني",
       "source_hint": "sell_out",
       "has_grocery_line": true,
       "location_type": "store"
@@ -1472,7 +1472,7 @@
       "chain_slug": "fathalla",
       "chain_code": "FTH",
       "branch_code": "FTH-031",
-      "display_name": "فرع فتح الله - كفر الدوار - مول",
+      "display_name": "كفر الدوار - مول",
       "source_hint": "sell_out",
       "has_grocery_line": true,
       "location_type": "store"
@@ -1727,7 +1727,7 @@
       "chain_slug": "fathalla",
       "chain_code": "FTH",
       "branch_code": "FTH-037",
-      "display_name": "فرع فتح الله - ملك حفنى",
+      "display_name": "ملك حفنى",
       "source_hint": "sell_out",
       "has_grocery_line": true,
       "location_type": "store"
@@ -1778,7 +1778,7 @@
       "chain_slug": "fathalla",
       "chain_code": "FTH",
       "branch_code": "FTH-039",
-      "display_name": "فرع فتح الله - نيس2",
+      "display_name": "نيس2",
       "source_hint": "sell_out",
       "has_grocery_line": true,
       "location_type": "store"
@@ -1831,7 +1831,7 @@
     "قرار المالك: مواد عناية + بقالة لنفس الموقع = فرع واحد (FTH)؛ أرقام مختلفة = فروع مختلفة؛ المسافة فقط مع نفس الرقم تُدمَج.",
     "Sell-In = شحنات الشركة وقد يشمل مواقع إضافية (مخازن مثل مخزن الافوجادو) — Sell-In-only طبيعي؛ يُعلَّم type=warehouse عند المخزن.",
     "Sell-Out = نقاط البيع. وجود فرع في ملف واحد فقط (Sell-In فقط أو Sell-Out فقط) طبيعي — لا تحذير ولا سؤال مالك.",
-    "لا ربط تلقائي بين مصادر مختلفة؛ كل صف يبقى باسمه الخام وقيمه حتى يقرر المالك الدمج.",
+    "لا ربط تلقائي بين مصادر مختلفة؛ كل صف يبقى مستقلاً بقيمه حتى يقرر المالك الدمج. العرض في التقارير = الاسم القصير فقط (بدون «فرع فتح الله -»).",
     "عدد الفروع التي دُمجت فيها مواد عناية + بقالة في هذا dry-run: 27.",
     "جسور المالك: الإبراهيمية = الابراهيمية ريفيرا؛ دمنهور = دمنهور الأندلس؛ سيدي جابر = سيدي جابر المحطة. تبقى منفصلة: الإبراهيمية ميني، دمنهور الاستاد، سيدي جابر ميني.",
     "مصدر Returns = صفوف sell_in_records ذات قيمة سالبة أو نوع مرتجع (من in26)."
