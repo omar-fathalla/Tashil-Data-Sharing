@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/branchnorm"
 )
 
 type xlsxWorkbookXML struct {
@@ -521,16 +522,21 @@ var knownBranchSlugMap = map[string]knownBranchSlug{
 	normalizeBranchKey("طوسون"):                  {"toson", "الإسكندرية", "أبو قير - طوسون"},
 	normalizeBranchKey("ابو يوسف"):               {"abu_youssef", "الإسكندرية", "العجمي - أبو يوسف"},
 	normalizeBranchKey("ستانلى"):                 {"stanley", "الإسكندرية", "ستانلي"},
+	normalizeBranchKey("ستانلي"):                 {"stanley", "الإسكندرية", "ستانلي"},
 	normalizeBranchKey("أمواج - الساحل الشمالي"): {"amwaj_north_coast", "الساحل الشمالي", "أمواج"},
 	normalizeBranchKey("ملك حفنى"):               {"malak_hefny", "الإسكندرية", "ملك حفني"},
 	normalizeBranchKey("سيتي سكوير"):             {"city_square", "الإسكندرية", "سيتي سكوير"},
 	normalizeBranchKey("مدينة الرحاب"):           {"rehab_city", "القاهرة", "مدينة الرحاب"},
 	normalizeBranchKey("نيس2"):                   {"nice_2", "الإسكندرية", "نيس"},
 	normalizeBranchKey("دمياط الجديدة"):          {"new_damietta", "دمياط", "دمياط الجديدة"},
+	normalizeBranchKey("المعادي"):                {"maadi", "القاهرة", "المعادي"},
+	normalizeBranchKey("الدقي"):                  {"dokki", "الجيزة", "الدقي"},
+	normalizeBranchKey("مدينة نصر"):             {"nasr_city", "القاهرة", "مدينة نصر"},
 }
 
 // BuildBranchStoreMetadata maps any raw branch name from Excel (or creates a new deterministic branch)
 // with full Egyptian geographic classification (Governorate, City, StoreID, DisplayName).
+// Arabic/English abbreviations are expanded via branchnorm before the frozen slug lookup.
 func BuildBranchStoreMetadata(retailer, rawBranch string) domain.Store {
 	clean := strings.TrimSpace(rawBranch)
 	if clean == "" {
@@ -574,6 +580,15 @@ func BuildBranchStoreMetadata(retailer, rawBranch string) domain.Store {
 			City:        UnallocatedBranchName,
 			IsActive:    true,
 		}
+	}
+
+	// Phase A5: expand abbreviations / English → canonical Arabic short name.
+	var bn branchnorm.Result
+	if canon, known, r := canonicalizeBranchForStore(clean); known {
+		clean = canon
+		bn = r
+	} else {
+		bn = r
 	}
 
 	norm := normalizeBranchKey(clean)
@@ -625,6 +640,26 @@ func BuildBranchStoreMetadata(retailer, rawBranch string) domain.Store {
 			BranchName:  displayName,
 			Governorate: info.gov,
 			City:        info.city,
+			IsActive:    true,
+		}
+	}
+
+	// branchnorm knew a slug that isn't in the legacy map yet — still use frozen slug form.
+	if bn.Slug != "" {
+		gov := bn.Governorate
+		city := bn.City
+		if gov == "" {
+			gov = inferGovernorateFromBranch(clean)
+		}
+		if city == "" {
+			city = clean
+		}
+		return domain.Store{
+			ID:          fmt.Sprintf("%s_%s", prefix, bn.Slug),
+			Chain:       chain,
+			BranchName:  displayName,
+			Governorate: gov,
+			City:        city,
 			IsActive:    true,
 		}
 	}
@@ -1803,7 +1838,7 @@ func buildPayloadFromWideMatrix(
 	}
 	anomalies = append(anomalies, buildWideMatrixReconAnomalies(reconByMonth)...)
 
-	return &domain.NormalizedRetailIngestionPayload{
+	payload := &domain.NormalizedRetailIngestionPayload{
 		RetailerDetected:     retailer,
 		ReportingPeriodStart: minDate,
 		ReportingPeriodEnd:   maxDate,
@@ -1834,7 +1869,9 @@ func buildPayloadFromWideMatrix(
 		UnitsMoMPct:          unitsMoM,
 		UnitsYoYPct:          unitsYoY,
 		IsWideMatrixWorkbook: true,
-	}, true
+	}
+	attachBranchNormSummary(payload)
+	return payload, true
 }
 
 // frozenStoreIDPrefixes pins the historical chain[:3] prefix of every chain that already exists
