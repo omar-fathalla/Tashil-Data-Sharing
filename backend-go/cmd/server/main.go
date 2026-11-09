@@ -308,6 +308,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/analytics/records", analyticsHandler.HandleRecords)
 	mux.HandleFunc("GET /api/v1/analytics/sell-in-records", analyticsHandler.HandleSellInRecords)
 	mux.HandleFunc("GET /api/v1/analytics/sell-in-monthly", analyticsHandler.HandleSellInMonthly)
+	mux.HandleFunc("GET /api/v1/analytics/sell-in-returns", analyticsHandler.HandleSellInReturns)
 	mux.HandleFunc("GET /api/v1/analytics/targets", analyticsHandler.HandleTargets)
 	mux.HandleFunc("POST /api/v1/analytics/targets", analyticsHandler.HandleTargets)
 	mux.HandleFunc("DELETE /api/v1/analytics/targets", analyticsHandler.HandleTargets)
