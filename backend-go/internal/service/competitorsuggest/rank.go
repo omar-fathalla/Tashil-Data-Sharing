@@ -37,6 +37,8 @@ type Ranker interface {
 type GeminiRanker struct {
 	APIKey     string
 	Model      string
+	// Tier2Model is used when the primary model returns 404 / model-not-found.
+	Tier2Model string
 	APIBase    string
 	HTTPClient *http.Client
 	UseMock    bool
@@ -121,7 +123,7 @@ barcode=%s name=%q category=%q price=%.2f
 	var err error
 	if r.CallJSON != nil {
 		raw, usage, err = r.CallJSON(ctx, r.Model, prompt)
-	} else if r.UseMock || strings.TrimSpace(r.APIKey) == "" {
+	} else if r.UseMock || r.apiKey() == "" {
 		raw, usage, err = r.mockRank(own, candidates), TokenUsage{}, nil
 	} else {
 		raw, usage, err = r.callGeminiJSON(ctx, r.model(), prompt)
@@ -134,10 +136,21 @@ barcode=%s name=%q category=%q price=%.2f
 }
 
 func (r *GeminiRanker) model() string {
-	if strings.TrimSpace(r.Model) == "" {
-		return "gemini-pro-latest"
+	if m := strings.TrimSpace(r.Model); m != "" {
+		return m
 	}
-	return r.Model
+	return "gemini-pro-latest"
+}
+
+func (r *GeminiRanker) tier2() string {
+	if m := strings.TrimSpace(r.Tier2Model); m != "" {
+		return m
+	}
+	return "gemini-pro-latest"
+}
+
+func (r *GeminiRanker) apiKey() string {
+	return strings.TrimSpace(r.APIKey)
 }
 
 func (r *GeminiRanker) mockRank(own SkuCandidate, candidates []PrefScore) string {
@@ -160,6 +173,19 @@ func (r *GeminiRanker) mockRank(own SkuCandidate, candidates []PrefScore) string
 }
 
 func (r *GeminiRanker) callGeminiJSON(ctx context.Context, model, prompt string) (string, TokenUsage, error) {
+	raw, usage, err := r.doGeminiJSON(ctx, model, prompt)
+	if err == nil {
+		return raw, usage, nil
+	}
+	fallback := r.tier2()
+	if fallback == "" || fallback == model || !isGeminiModelNotFound(err) {
+		return "", usage, err
+	}
+	log.Printf("[competitor-suggest] model %q not found; falling back to GEMINI_TIER2_MODEL=%q", model, fallback)
+	return r.doGeminiJSON(ctx, fallback, prompt)
+}
+
+func (r *GeminiRanker) doGeminiJSON(ctx context.Context, model, prompt string) (string, TokenUsage, error) {
 	started := time.Now()
 	body, err := json.Marshal(geminiRequest{
 		Contents: []geminiContent{{Role: "user", Parts: []geminiPart{{Text: prompt}}}},
@@ -184,19 +210,25 @@ func (r *GeminiRanker) callGeminiJSON(ctx context.Context, model, prompt string)
 	if err != nil {
 		return "", TokenUsage{}, err
 	}
+	apiKey := r.apiKey()
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-goog-api-key", r.APIKey)
+	// Trim again at the wire boundary: Secret Manager newlines make Go reject the header.
+	req.Header.Set("x-goog-api-key", apiKey)
 	resp, err := client.Do(req)
 	if err != nil {
-		safe := fmt.Errorf("gemini competitor suggest failed: %s", redactKey(err.Error(), r.APIKey))
+		safe := fmt.Errorf("gemini competitor suggest failed: %s", redactKey(err.Error(), apiKey))
 		log.Printf("[competitor-suggest] gemini err after %s: %v", time.Since(started), safe)
 		return "", TokenUsage{}, safe
 	}
 	defer resp.Body.Close()
 	rawBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("[competitor-suggest] gemini status=%d latency=%s", resp.StatusCode, time.Since(started))
-		return "", TokenUsage{}, fmt.Errorf("gemini competitor suggest status %d", resp.StatusCode)
+		log.Printf("[competitor-suggest] gemini status=%d model=%s latency=%s", resp.StatusCode, model, time.Since(started))
+		err := fmt.Errorf("gemini competitor suggest status %d", resp.StatusCode)
+		if isModelNotFoundStatus(resp.StatusCode, rawBody) {
+			err = fmt.Errorf("%w: model not found", err)
+		}
+		return "", TokenUsage{}, err
 	}
 	var gr geminiResponse
 	if err := json.Unmarshal(rawBody, &gr); err != nil {
@@ -215,6 +247,21 @@ func (r *GeminiRanker) callGeminiJSON(ctx context.Context, model, prompt string)
 		return "", usage, fmt.Errorf("gemini competitor suggest returned no candidates")
 	}
 	return gr.Candidates[0].Content.Parts[0].Text, usage, nil
+}
+
+func isModelNotFoundStatus(status int, body []byte) bool {
+	if status == http.StatusNotFound {
+		return true
+	}
+	lower := strings.ToLower(string(body))
+	return strings.Contains(lower, "not found") && strings.Contains(lower, "model")
+}
+
+func isGeminiModelNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "model not found")
 }
 
 func redactKey(msg, apiKey string) string {

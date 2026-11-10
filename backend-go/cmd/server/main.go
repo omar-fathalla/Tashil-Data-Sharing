@@ -255,10 +255,13 @@ func main() {
 	tradeMarketingHandler := handlers.NewTradeMarketingHandler(fsRepo, fsRepo).WithSalesSource(bqRepo)
 	competitorHandler := handlers.NewCompetitorHandler(fsRepo, fsRepo)
 	competitorSuggestRanker := &competitorsuggest.GeminiRanker{
-		APIKey:  cfg.GeminiAPIKey,
-		Model:   cfg.GeminiModel,
-		UseMock: cfg.UseMockServices || strings.TrimSpace(cfg.GeminiAPIKey) == "",
+		APIKey:     cfg.GeminiAPIKey,
+		Model:      cfg.GeminiModel,
+		Tier2Model: cfg.GeminiTier2Model,
+		UseMock:    cfg.UseMockServices || strings.TrimSpace(cfg.GeminiAPIKey) == "",
 	}
+	log.Printf("[competitor-suggest] gemini model=%s tier2_fallback=%s (404 model-not-found → tier2)",
+		cfg.GeminiModel, cfg.GeminiTier2Model)
 	competitorSuggestionsHandler := handlers.NewCompetitorSuggestionsHandler(fsRepo, fsRepo, bqRepo, competitorSuggestRanker)
 	chainDiscountHandler := handlers.NewChainDiscountHandler(fsRepo, fsRepo, bqRepo)
 	dataQualityHandler := handlers.NewDataQualityHandler(dqService, fsRepo)
