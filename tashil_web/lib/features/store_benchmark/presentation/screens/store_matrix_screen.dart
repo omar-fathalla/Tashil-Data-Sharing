@@ -690,7 +690,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> with DataRefreshM
                                                                   Icon(
                                                                     Icons.location_on_rounded,
                                                                     size: 13.0,
-                                                                    color: colorScheme.outline,
+                                                                    color: colorScheme.onSurfaceVariant,
                                                                   ),
                                                                   const SizedBox(width: 2.0),
                                                                   Flexible(
@@ -911,7 +911,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> with DataRefreshM
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.location_on_rounded, size: 16.0, color: colorScheme.outline),
+                                      Icon(Icons.location_on_rounded, size: 16.0, color: colorScheme.onSurfaceVariant),
                                       const SizedBox(width: 4.0),
                                       Text(store.region, style: theme.textTheme.bodyMedium),
                                     ],

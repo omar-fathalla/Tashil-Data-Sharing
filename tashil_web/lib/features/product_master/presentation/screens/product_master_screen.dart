@@ -1006,24 +1006,68 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     }
 
     if (_errorMessage != null && _summary == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
+      // Keep page chrome (title + upload) visible; body uses shared M3 error state.
+      // Backend hang root-cause is tracked in PR #86 / TDS-76 — this is UI only.
+      return Scaffold(
+        backgroundColor: cs.surface,
+        body: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(24.0, 20.0, 24.0, 12.0),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(Icons.error_outline_rounded, size: 48, color: cs.error),
-              const SizedBox(height: 12),
-              Text(
-                _errorMessage!,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleMedium,
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Product Master & Price List',
+                          style: theme.textTheme.headlineSmall,
+                        ),
+                        Text(
+                          'كارتة الأصناف والأسعار',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  FilledButton.tonalIcon(
+                    key: const ValueKey('product_master_upload_btn'),
+                    onPressed: _isUploading ? null : _handleUploadMasterWorkbook,
+                    icon: _isUploading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.upload_file_rounded),
+                    label: Text(
+                      _isUploading
+                          ? 'جاري تحديث الكارتة...'
+                          : 'رفع تحديث شيت الأسعار',
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _loadData,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('إعادة المحاولة'),
+              const SizedBox(height: 16.0),
+              M3ErrorBanner(
+                title: 'تعذّر تحميل كارتة الأصناف والأسعار',
+                message: 'حاول مرة أخرى بعد قليل، أو ارفع شيت أسعار محدّث.',
+                technicalDetails: _errorMessage,
+                onRetry: _loadData,
+                retryLabel: 'إعادة المحاولة',
+              ),
+              Expanded(
+                child: M3ErrorState(
+                  key: const ValueKey('product_master_error_state'),
+                  title: 'تعذّر تحميل كارتة الأصناف والأسعار',
+                  message: 'تعذّر الاتصال بالخادم أو انتهت مهلة الطلب.',
+                  onRetry: _loadData,
+                  retryLabel: 'إعادة المحاولة',
+                ),
               ),
             ],
           ),

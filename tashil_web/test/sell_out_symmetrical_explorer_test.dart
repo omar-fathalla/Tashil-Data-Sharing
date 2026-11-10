@@ -94,8 +94,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(slots, findsNothing);
       expect(find.byIcon(AppIcons.expandMore), findsOneWidget);
-      expect(find.byKey(const ValueKey('branch_chart_year_2026')), findsOneWidget);
-      expect(find.byKey(const ValueKey('branch_chart_year_2025')), findsOneWidget);
+      expect(find.byKey(const ValueKey('branch_chart_year_segmented')), findsOneWidget);
+      expect(find.text('سنة 2026'), findsWidgets);
+      expect(find.text('سنة 2025'), findsWidgets);
 
       // 4. Verify Action Buttons: Upload Sell-Out, Export Excel, Print PDF
       expect(find.byKey(const ValueKey('upload_sellout_button')), findsOneWidget);
@@ -135,8 +136,11 @@ void main() {
       expect(find.textContaining('سنة 2026'), findsWidgets);
       expect(find.textContaining('34 فرع'), findsWidgets);
 
-      // Switch to Year 2025 using the chart year button
-      final year2025Btn = find.byKey(const ValueKey('branch_chart_year_2025'));
+      // Switch to Year 2025 via SegmentedButton segment label
+      final year2025Btn = find.descendant(
+        of: find.byKey(const ValueKey('branch_chart_year_segmented')),
+        matching: find.text('سنة 2025'),
+      );
       await tester.ensureVisible(year2025Btn);
       await tester.tap(year2025Btn);
       await tester.pumpAndSettle();
