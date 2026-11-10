@@ -124,10 +124,10 @@ void main() {
                     border: Border.all(color: Colors.black12),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: SizedBox(
+                  child: const SizedBox(
                     width: tableWidth,
                     height: 240,
-                    child: const Row(
+                    child: Row(
                       children: [
                         SizedBox(width: 200, child: Text('الفترة')),
                         SizedBox(width: 280, child: Text('السلسلة')),
