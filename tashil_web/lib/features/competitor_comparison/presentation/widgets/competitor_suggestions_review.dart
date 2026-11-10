@@ -371,7 +371,7 @@ class CompetitorSuggestionsReviewState
           onPressed: _pageIndex > 0
               ? () => setState(() => _pageIndex--)
               : null,
-          icon: Icon(AppIcons.chevronStart),
+          icon: const Icon(AppIcons.chevronStart),
         ),
         Expanded(
           child: Text(
@@ -385,7 +385,7 @@ class CompetitorSuggestionsReviewState
           onPressed: _pageIndex < pageCount - 1
               ? () => setState(() => _pageIndex++)
               : null,
-          icon: Icon(AppIcons.chevronEnd),
+          icon: const Icon(AppIcons.chevronEnd),
         ),
       ],
     );
