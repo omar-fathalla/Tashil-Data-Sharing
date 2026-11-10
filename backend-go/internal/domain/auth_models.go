@@ -26,7 +26,7 @@ type TenantProfile struct {
 	DisplayName    string    `json:"display_name"`     // 'شركة أديكو للصناعات الغذائية'
 	Slug           string    `json:"slug"`             // 'adeco'
 	PortalURL      string    `json:"portal_url"`       // 'http://localhost:3000/portal/adeco'
-	BrandSeedColor string    `json:"brand_seed_color"` // Hex color code e.g. '#1E3A8A'
+	BrandSeedColor string    `json:"brand_seed_color"` // Hex color code e.g. '#35A211'
 	LogoURL        string    `json:"logo_url"`
 	AdminEmail     string    `json:"admin_email"`
 	ActiveChains   []string  `json:"active_chains"`

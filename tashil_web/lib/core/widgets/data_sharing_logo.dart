@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/theme/m3_color_roles.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 
 /// DataSharingLogo renders the official Tashil Data Sharing brand mark:
-/// A Material Design 3 Medium Contrast Blue (#1B6EF3) squircle with a bold,
+/// A squircle filled with the Adeco brand green (#35A211) and a bold,
 /// optically centered, pure white capital letter 'D'.
 class DataSharingLogo extends StatelessWidget {
   final double size;
@@ -24,14 +25,17 @@ class DataSharingLogo extends StatelessWidget {
     this.subtitle,
   });
 
-  /// Official Google Material Design 3 Standard Contrast Blue (#1565C0)
+  /// Adeco brand green (#35A211) — sampled from the official ADCO logo.
+  static const Color brandMarkGreen = TenantBrandSeeds.brandGreen;
+
+  @Deprecated('Use brandMarkGreen')
   static const Color m3StandardBlue = Color(0xFF1565C0);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final bgColor = primaryColor ?? m3StandardBlue;
+    final bgColor = primaryColor ?? brandMarkGreen;
     final effectiveGlow = showShadow ?? showGlow;
 
     final logoMark = Container(
@@ -83,7 +87,7 @@ class DataSharingLogo extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                   letterSpacing: -0.3,
                   height: 1.15,
                 ),

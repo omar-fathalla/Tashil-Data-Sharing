@@ -3,29 +3,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
 
 void main() {
-  test('M3AccentRoles.light matches the original Material swatches', () {
+  test('M3AccentRoles.light uses contrast-safe text tones (G20)', () {
     const a = M3AccentRoles.light;
-    expect(a.positive, Colors.green.shade700);
-    expect(a.positiveStrong, Colors.green.shade800);
-    expect(a.teal, Colors.teal.shade700);
-    expect(a.tealStrong, Colors.teal.shade800);
-    expect(a.tealDeep, Colors.teal.shade900);
-    expect(a.tealSurface, Colors.teal.shade50);
-    expect(a.indigo, Colors.indigo.shade700);
-    expect(a.caution, Colors.orange.shade800);
-    expect(a.cautionStrong, Colors.orange.shade900);
-    expect(a.cautionSurface, Colors.orange.shade100);
-    expect(a.alert, Colors.deepOrange.shade700);
-    expect(a.alertStrong, Colors.deepOrange.shade800);
-    expect(a.highlight, Colors.amber.shade900);
-    expect(a.highlightBorder, Colors.amber.shade700);
-    expect(a.highlightSurface, Colors.amber.shade100);
-    expect(a.purple, Colors.purple.shade700);
-    expect(a.purpleStrong, Colors.purple.shade800);
-    expect(a.negative, Colors.red.shade700);
-    expect(a.neutral, Colors.blueGrey.shade700);
-    expect(a.tealBase, Color(Colors.teal.toARGB32()));
-    expect(a.redBase, Color(Colors.red.toARGB32()));
-    expect(a.orangeBase, Color(Colors.orange.toARGB32()));
+    // Darker than legacy Material 500/700 swatches so small text clears 4.5:1.
+    expect(a.positive, const Color(0xFF2E7D32));
+    expect(a.positiveStrong, const Color(0xFF1B5E20));
+    expect(a.teal, const Color(0xFF00695C));
+    expect(a.tealStrong, const Color(0xFF004D40));
+    expect(a.tealDeep, const Color(0xFF00352C));
+    expect(a.tealSurface, const Color(0xFFE0F2F1));
+    expect(a.tealBase, const Color(0xFF00695C));
+    expect(a.caution, const Color(0xFFE65100));
+    expect(a.competitor, const Color(0xFF546E7A));
+    expect(a.competitorStrong, const Color(0xFF37474F));
+    expect(M3StatusColors.chainFathalla, const Color(0xFF047857));
   });
 }

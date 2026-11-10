@@ -13,26 +13,23 @@ class AppTheme {
   AppTheme._();
 
   /// Builds light ThemeData derived programmatically from a single seed color.
-  static ThemeData light({Color seedColor = TenantBrandSeeds.adecoSeed}) {
-    final isBlue = TenantBrandSeeds.isDefaultBlueSeed(seedColor);
-    final baseScheme = ColorScheme.fromSeed(
-      seedColor: isBlue ? const Color(0xFF0B57D0) : seedColor,
+  /// Uses [DynamicSchemeVariant.fidelity] so primary stays close to brand green.
+  static ThemeData light({Color seedColor = TenantBrandSeeds.brandGreen}) {
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: seedColor,
       brightness: Brightness.light,
+      dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
     );
-    final colorScheme = isBlue
-        ? baseScheme.copyWith(primary: const Color(0xFF1565C0))
-        : baseScheme;
-
     return _buildTheme(colorScheme);
   }
 
   /// Builds dark ThemeData derived programmatically from a single seed color.
-  static ThemeData dark({Color seedColor = TenantBrandSeeds.adecoSeed}) {
+  static ThemeData dark({Color seedColor = TenantBrandSeeds.brandGreen}) {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: Brightness.dark,
+      dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
     );
-
     return _buildTheme(colorScheme);
   }
 
@@ -46,7 +43,7 @@ class AppTheme {
       baseTextTheme = const TextTheme();
     }
 
-    // Full M3 type scale (sizes per M3 spec, tuned for Cairo/Arabic legibility).
+    // Official M3 type scale (size/weight). Cairo font + line-height only tuned.
     TextStyle? t(TextStyle? base, double size, FontWeight w, Color c,
             {double? ls, double? h}) =>
         base?.copyWith(
@@ -59,37 +56,40 @@ class AppTheme {
     final onS = colorScheme.onSurface;
     final onSV = colorScheme.onSurfaceVariant;
     final textTheme = baseTextTheme.copyWith(
-      displayLarge: t(baseTextTheme.displayLarge, 40.0, FontWeight.w700, onS, ls: -0.5),
-      displayMedium: t(baseTextTheme.displayMedium, 32.0, FontWeight.w700, onS),
-      displaySmall: t(baseTextTheme.displaySmall, 28.0, FontWeight.w700, onS),
-      headlineLarge: t(baseTextTheme.headlineLarge, 26.0, FontWeight.w600, onS),
-      headlineMedium: t(baseTextTheme.headlineMedium, 24.0, FontWeight.w600, onS),
-      headlineSmall: t(baseTextTheme.headlineSmall, 20.0, FontWeight.w600, onS),
-      titleLarge: t(baseTextTheme.titleLarge, 18.0, FontWeight.w600, onS),
-      titleMedium: t(baseTextTheme.titleMedium, 15.0, FontWeight.w500, onS),
-      titleSmall: t(baseTextTheme.titleSmall, 13.0, FontWeight.w500, onSV),
-      bodyLarge: t(baseTextTheme.bodyLarge, 15.0, FontWeight.w400, onS),
-      bodyMedium: t(baseTextTheme.bodyMedium, 13.0, FontWeight.w400, onSV),
-      bodySmall: t(baseTextTheme.bodySmall, 12.0, FontWeight.w400, onSV),
+      displayLarge: t(baseTextTheme.displayLarge, 57.0, FontWeight.w400, onS, h: 64 / 57),
+      displayMedium: t(baseTextTheme.displayMedium, 45.0, FontWeight.w400, onS, h: 52 / 45),
+      displaySmall: t(baseTextTheme.displaySmall, 36.0, FontWeight.w400, onS, h: 44 / 36),
+      headlineLarge: t(baseTextTheme.headlineLarge, 32.0, FontWeight.w400, onS, h: 40 / 32),
+      headlineMedium: t(baseTextTheme.headlineMedium, 28.0, FontWeight.w400, onS, h: 36 / 28),
+      headlineSmall: t(baseTextTheme.headlineSmall, 24.0, FontWeight.w400, onS, h: 32 / 24),
+      titleLarge: t(baseTextTheme.titleLarge, 22.0, FontWeight.w400, onS, h: 28 / 22),
+      titleMedium: t(baseTextTheme.titleMedium, 16.0, FontWeight.w500, onS, h: 24 / 16),
+      titleSmall: t(baseTextTheme.titleSmall, 14.0, FontWeight.w500, onSV, h: 20 / 14),
+      bodyLarge: t(baseTextTheme.bodyLarge, 16.0, FontWeight.w400, onS, h: 24 / 16),
+      bodyMedium: t(baseTextTheme.bodyMedium, 14.0, FontWeight.w400, onSV, h: 20 / 14),
+      bodySmall: t(baseTextTheme.bodySmall, 12.0, FontWeight.w400, onSV, h: 16 / 12),
       labelLarge: baseTextTheme.labelLarge?.copyWith(
         fontSize: 14.0,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w500,
         letterSpacing: 0.1,
+        height: 20 / 14,
       ),
       labelMedium: baseTextTheme.labelMedium?.copyWith(
         fontSize: 12.0,
         fontWeight: FontWeight.w500,
+        height: 16 / 12,
       ),
       labelSmall: baseTextTheme.labelSmall?.copyWith(
         fontSize: 11.0,
         fontWeight: FontWeight.w500,
+        height: 16 / 11,
       ),
     );
 
     final menuShape = RoundedRectangleBorder(
       borderRadius: M3Shape.radiusMd,
       side: BorderSide(
-        color: colorScheme.outlineVariant.withOpacity(0.5),
+        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
         width: 1.0,
       ),
     );
@@ -98,7 +98,7 @@ class AppTheme {
       backgroundColor: WidgetStateProperty.all(colorScheme.surfaceContainerHigh),
       surfaceTintColor: WidgetStateProperty.all(colorScheme.surfaceTint),
       elevation: WidgetStateProperty.all(3.0),
-      shadowColor: WidgetStateProperty.all(colorScheme.shadow.withOpacity(0.18)),
+      shadowColor: WidgetStateProperty.all(colorScheme.shadow.withValues(alpha: 0.18)),
       shape: WidgetStateProperty.all(menuShape),
       padding: WidgetStateProperty.all(
         const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
@@ -112,15 +112,15 @@ class AppTheme {
       textTheme: textTheme,
       fontFamily: 'Cairo',
       pageTransitionsTheme: M3Motion.pageTransitionsTheme,
-      focusColor: Colors.transparent,
-      hoverColor: colorScheme.surfaceContainerHighest.withOpacity(0.2),
-      highlightColor: Colors.transparent,
-      splashColor: Colors.transparent,
+      // Desktop browsers otherwise pick VisualDensity.compact and shrink 40→32dp buttons.
+      visualDensity: VisualDensity.standard,
+      materialTapTargetSize: MaterialTapTargetSize.padded,
+      // Restore M3 default state layers (hover/focus/pressed). Do not zero them out.
 
-      // M3 Card Theme (Container Low surface, 16dp rounded corners)
+      // M3 outlined card: surface + 1dp outlineVariant
       cardTheme: CardThemeData(
         elevation: 0,
-        color: colorScheme.surfaceContainerLow,
+        color: colorScheme.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: M3Shape.radiusMd,
@@ -129,13 +129,11 @@ class AppTheme {
         margin: EdgeInsets.zero,
       ),
 
-      // M3 Input Field Theme
+      // M3 Input Field Theme — outlined, ~56dp with vertical 16 padding
       inputDecorationTheme: InputDecorationTheme(
         filled: false,
-        focusColor: Colors.transparent,
-        hoverColor: Colors.transparent,
         contentPadding: const EdgeInsets.symmetric(
-            horizontal: M3Spacing.sm, vertical: 12.0),
+            horizontal: M3Spacing.sm, vertical: 16.0),
         border: OutlineInputBorder(
           borderRadius: M3Shape.radiusSm,
           borderSide: BorderSide(color: colorScheme.outlineVariant, width: 1.0),
@@ -163,7 +161,7 @@ class AppTheme {
         color: colorScheme.surfaceContainerHigh,
         surfaceTintColor: colorScheme.surfaceTint,
         elevation: 3.0,
-        shadowColor: colorScheme.shadow.withOpacity(0.18),
+        shadowColor: colorScheme.shadow.withValues(alpha: 0.18),
         shape: menuShape,
         textStyle: textTheme.labelLarge?.copyWith(
           color: colorScheme.onSurface,
@@ -180,9 +178,9 @@ class AppTheme {
           shape: WidgetStateProperty.all(const StadiumBorder()),
           minimumSize: WidgetStateProperty.all(const Size(64.0, 40.0)),
           padding: WidgetStateProperty.all(
-            const EdgeInsets.symmetric(horizontal: M3Spacing.md, vertical: 10.0),
+            const EdgeInsets.symmetric(horizontal: M3Spacing.sm, vertical: 10.0),
           ),
-          iconSize: WidgetStateProperty.all(18.0),
+          iconSize: WidgetStateProperty.all(20.0),
           textStyle: WidgetStateProperty.all(textTheme.labelLarge),
         ),
       ),
@@ -192,14 +190,14 @@ class AppTheme {
           shape: WidgetStateProperty.all(const StadiumBorder()),
           minimumSize: WidgetStateProperty.all(const Size(64.0, 40.0)),
           padding: WidgetStateProperty.all(
-            const EdgeInsets.symmetric(horizontal: M3Spacing.md, vertical: 10.0),
+            const EdgeInsets.symmetric(horizontal: M3Spacing.sm, vertical: 10.0),
           ),
           side: WidgetStateProperty.resolveWith((states) => BorderSide(
             color: states.contains(WidgetState.disabled)
-                ? colorScheme.onSurface.withOpacity(0.12)
-                : colorScheme.outline,
+                ? colorScheme.onSurface.withValues(alpha: 0.12)
+                : colorScheme.outlineVariant,
           )),
-          iconSize: WidgetStateProperty.all(18.0),
+          iconSize: WidgetStateProperty.all(20.0),
           textStyle: WidgetStateProperty.all(textTheme.labelLarge),
         ),
       ),
@@ -209,9 +207,9 @@ class AppTheme {
           shape: WidgetStateProperty.all(const StadiumBorder()),
           minimumSize: WidgetStateProperty.all(const Size(64.0, 40.0)),
           padding: WidgetStateProperty.all(
-            const EdgeInsets.symmetric(horizontal: M3Spacing.md, vertical: 10.0),
+            const EdgeInsets.symmetric(horizontal: M3Spacing.sm, vertical: 10.0),
           ),
-          iconSize: WidgetStateProperty.all(18.0),
+          iconSize: WidgetStateProperty.all(20.0),
           textStyle: WidgetStateProperty.all(textTheme.labelLarge),
         ),
       ),
@@ -251,14 +249,12 @@ class AppTheme {
       dropdownMenuTheme: DropdownMenuThemeData(
         textStyle: textTheme.bodyMedium?.copyWith(
           color: colorScheme.onSurface,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
         ),
         menuStyle: menuStyle,
         inputDecorationTheme: InputDecorationTheme(
           filled: false,
-          focusColor: Colors.transparent,
-          hoverColor: Colors.transparent,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 16.0),
           border: OutlineInputBorder(
             borderRadius: M3Shape.radiusSm,
             borderSide: BorderSide(color: colorScheme.outlineVariant),
@@ -274,7 +270,7 @@ class AppTheme {
         ),
       ),
 
-      // M3 Segmented Button Theme
+      // M3 Segmented Button Theme — selected = secondaryContainer (no elevation)
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
           shape: WidgetStateProperty.all(
@@ -284,17 +280,18 @@ class AppTheme {
             textTheme.labelLarge,
           ),
           side: WidgetStateProperty.all(
-            BorderSide(color: colorScheme.outlineVariant),
+            BorderSide(color: colorScheme.outline),
           ),
+          elevation: WidgetStateProperty.all(0),
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
-              return colorScheme.primaryContainer;
+              return colorScheme.secondaryContainer;
             }
             return Colors.transparent;
           }),
           foregroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
-              return colorScheme.onPrimaryContainer;
+              return colorScheme.onSecondaryContainer;
             }
             return colorScheme.onSurfaceVariant;
           }),
@@ -307,13 +304,13 @@ class AppTheme {
         selectedColor: colorScheme.secondaryContainer,
         labelStyle: textTheme.labelMedium?.copyWith(
           color: colorScheme.onSurface,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
         ),
         secondaryLabelStyle: textTheme.labelMedium?.copyWith(
           color: colorScheme.onSecondaryContainer,
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w500,
         ),
-        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.7)),
+        side: BorderSide(color: colorScheme.outlineVariant),
         shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusSm),
       ),
 
@@ -358,15 +355,15 @@ class AppTheme {
         selectedIconTheme: IconThemeData(color: colorScheme.onSecondaryContainer),
         unselectedIconTheme: IconThemeData(color: colorScheme.onSurfaceVariant),
         selectedLabelTextStyle: textTheme.labelMedium?.copyWith(
-          color: colorScheme.onSurface,
-          fontWeight: FontWeight.bold,
+          color: colorScheme.secondary,
+          fontWeight: FontWeight.w500,
         ),
         unselectedLabelTextStyle: textTheme.labelMedium?.copyWith(
           color: colorScheme.onSurfaceVariant,
         ),
       ),
 
-      // M3 Navigation Bar Theme
+      // M3 Navigation Bar Theme — selected label = secondary (no bold)
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: colorScheme.surfaceContainer,
         indicatorColor: colorScheme.secondaryContainer,
@@ -374,15 +371,26 @@ class AppTheme {
         elevation: 0,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return textTheme.labelSmall?.copyWith(
-              color: colorScheme.onSurface,
-              fontWeight: FontWeight.bold,
+            return textTheme.labelMedium?.copyWith(
+              color: colorScheme.secondary,
+              fontWeight: FontWeight.w500,
             );
           }
-          return textTheme.labelSmall?.copyWith(
+          return textTheme.labelMedium?.copyWith(
             color: colorScheme.onSurfaceVariant,
           );
         }),
+      ),
+
+      // M3 TabBar Theme (secondary indicator style for page sections)
+      tabBarTheme: TabBarThemeData(
+        labelColor: colorScheme.primary,
+        unselectedLabelColor: colorScheme.onSurfaceVariant,
+        labelStyle: textTheme.titleSmall,
+        unselectedLabelStyle: textTheme.titleSmall,
+        dividerColor: colorScheme.outlineVariant,
+        indicatorSize: TabBarIndicatorSize.label,
+        indicatorColor: colorScheme.primary,
       ),
 
       extensions: <ThemeExtension<dynamic>>[
@@ -431,20 +439,20 @@ class AppTheme {
       // M3 Data Table Theme
       dataTableTheme: DataTableThemeData(
         headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainer),
-        headingTextStyle: textTheme.labelLarge?.copyWith(color: onS),
+        headingTextStyle: textTheme.titleSmall?.copyWith(color: onS),
         dataTextStyle: textTheme.bodyMedium?.copyWith(color: onS),
         dividerThickness: 1.0,
         headingRowHeight: 48.0,
-        dataRowMinHeight: 44.0,
-        dataRowMaxHeight: 52.0,
+        dataRowMinHeight: 48.0,
+        dataRowMaxHeight: 56.0,
         horizontalMargin: M3Spacing.sm,
         columnSpacing: M3Spacing.md,
         dataRowColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return colorScheme.secondaryContainer.withOpacity(0.6);
+            return colorScheme.secondaryContainer.withValues(alpha: 0.6);
           }
           if (states.contains(WidgetState.hovered)) {
-            return colorScheme.surfaceContainerHighest.withOpacity(0.4);
+            return colorScheme.surfaceContainerHighest.withValues(alpha: 0.4);
           }
           return null;
         }),
@@ -503,13 +511,13 @@ class AppTheme {
         ),
       ),
 
-      // M3 App Bar Theme
+      // M3 App Bar Theme — prefer surfaceContainer tint over shadow when scrolled
       appBarTheme: AppBarTheme(
         backgroundColor: colorScheme.surface,
         elevation: 0,
         centerTitle: false,
-        scrolledUnderElevation: 1,
-        surfaceTintColor: colorScheme.surfaceTint,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         titleTextStyle: textTheme.titleLarge?.copyWith(
           color: colorScheme.onSurface,
         ),

@@ -881,7 +881,7 @@ class _EditTenantDialogState extends State<_EditTenantDialog> {
   bool _isSubmitting = false;
 
   static const List<Map<String, String>> _presetColors = [
-    {'name': 'Adeco Navy', 'hex': '#1E3A8A'},
+    {'name': 'Adeco Green', 'hex': '#35A211'},
     {'name': 'Unilever Teal', 'hex': '#0D9488'},
     {'name': 'Pepsi Crimson', 'hex': '#B91C1C'},
     {'name': 'Juhayna Emerald', 'hex': '#059669'},
@@ -896,7 +896,7 @@ class _EditTenantDialogState extends State<_EditTenantDialog> {
     _emailController = TextEditingController(text: widget.tenant.adminEmail);
     _selectedHex = widget.tenant.brandSeedColor.isNotEmpty
         ? widget.tenant.brandSeedColor
-        : '#1E3A8A';
+        : '#35A211';
   }
 
   @override
@@ -1135,12 +1135,12 @@ class _TenantProvisionWizardDialogState
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  String _selectedHex = '#1E3A8A';
+  String _selectedHex = '#35A211';
   bool _isSubmitting = false;
   ProvisionTenantResultModel? _createdResult;
 
   final List<Map<String, String>> _presetColors = [
-    {'name': 'Adeco Navy', 'hex': '#1E3A8A'},
+    {'name': 'Adeco Green', 'hex': '#35A211'},
     {'name': 'Unilever Teal', 'hex': '#0D9488'},
     {'name': 'Pepsi Crimson', 'hex': '#B91C1C'},
     {'name': 'Juhayna Emerald', 'hex': '#059669'},
