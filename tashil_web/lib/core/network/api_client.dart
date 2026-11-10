@@ -11101,6 +11101,11 @@ class ApiClient {
     return data;
   }
 
+  /// Client ceiling for on-demand AI picks. Must stay above the server rank
+  /// timeout (~28s) so the Arabic gateway timeout can surface; never leave
+  /// skeletons spinning for 90s+. Mutable for unit tests only.
+  static Duration suggestCompetitorsForSkuTimeout = const Duration(seconds: 35);
+
   /// Owner-only: on-demand top-3 AI competitors for one own barcode (cached per SKU).
   /// Does not write competitor_mappings — viewing/compare needs no approve step.
   Future<CompetitorSkuSuggestionsResult> suggestCompetitorsForSku({
@@ -11113,11 +11118,18 @@ class ApiClient {
       'chain': chain,
       if (year != null && year > 0) 'year': year,
     };
-    final resp = await BackendHttp.post(
-      Uri.parse(ApiEndpoints.competitorSuggestionsSku),
-      headers: _headers,
-      body: jsonEncode(body),
-    ).timeout(const Duration(seconds: 90));
+    late http.Response resp;
+    try {
+      resp = await BackendHttp.post(
+        Uri.parse(ApiEndpoints.competitorSuggestionsSku),
+        headers: _headers,
+        body: jsonEncode(body),
+      ).timeout(suggestCompetitorsForSkuTimeout);
+    } on TimeoutException {
+      throw Exception(
+        'انتهت مهلة جلب اقتراحات المنافسين — حاول مرة أخرى',
+      );
+    }
     Map<String, dynamic> data;
     try {
       data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;

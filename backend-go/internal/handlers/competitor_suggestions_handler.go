@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 	"github.com/tashil/data-sharing/backend/internal/service/competitorsuggest"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
+	"golang.org/x/sync/singleflight"
 )
 
 // Owner-only for run / sku / approve / reject (company manager + super admin).
@@ -27,10 +29,23 @@ const (
 	competitorSuggestDefaultBatch = 10
 	competitorSuggestMaxBatch     = 10 // hard cap matches owner batch-size spec
 	competitorSuggestMinInterval  = 30 * time.Second
-	competitorSuggestSkuInterval  = 10 * time.Second // per-SKU generate (cache hits skip)
+	// Cooldown only after a *completed* generate for the same SKU (not on hang/fail).
+	competitorSuggestSkuInterval = 10 * time.Second
+	// Remember empty generates so re-selecting the same SKU does not re-call Gemini.
+	competitorSuggestEmptyCacheTTL = 10 * time.Minute
 	// HOLD: AI picks must NOT feed Compare KPI averages until owner confirms.
 	competitorSuggestIncludeInKPIAverages = false
 )
+
+// competitorSuggestRankTimeout is the hard ceiling for one on-demand SKU generate.
+// Mutable for tests; production stays at 28s so Flutter skeletons never hang forever.
+var competitorSuggestRankTimeout = 28 * time.Second
+
+// skuEmptyCache remembers a completed empty generate (skip reason) per SKU.
+type skuEmptyCache struct {
+	ReasonAR string
+	At       time.Time
+}
 
 // CompetitiveCatalogSource supplies Sell-Out barcode catalogue for suggestions.
 type CompetitiveCatalogSource interface {
@@ -48,7 +63,9 @@ type CompetitorSuggestionsHandler struct {
 	eq      competitorsuggest.CategoryEquivalence
 	rateMu  sync.Mutex
 	lastRun map[string]time.Time // tenant|chain → last batch run
-	lastSku map[string]time.Time // tenant|chain|barcode → last generate
+	lastSku map[string]time.Time // tenant|chain|barcode → last *completed* generate
+	emptySku map[string]skuEmptyCache // tenant|chain|barcode → empty result cache
+	skuSF   singleflight.Group        // coalesce concurrent generates for the same SKU
 }
 
 // NewCompetitorSuggestionsHandler wires quarantine + ranking. ranker may be a mock.
@@ -62,13 +79,14 @@ func NewCompetitorSuggestionsHandler(
 		ranker = &competitorsuggest.GeminiRanker{UseMock: true}
 	}
 	return &CompetitorSuggestionsHandler{
-		repo:    repo,
-		audit:   audit,
-		catalog: catalog,
-		ranker:  ranker,
-		eq:      competitorsuggest.DefaultCategoryEquivalence(),
-		lastRun: make(map[string]time.Time),
-		lastSku: make(map[string]time.Time),
+		repo:     repo,
+		audit:    audit,
+		catalog:  catalog,
+		ranker:   ranker,
+		eq:       competitorsuggest.DefaultCategoryEquivalence(),
+		lastRun:  make(map[string]time.Time),
+		lastSku:  make(map[string]time.Time),
+		emptySku: make(map[string]skuEmptyCache),
 	}
 }
 
@@ -175,7 +193,9 @@ func (h *CompetitorSuggestionsHandler) HandleSuggestForSku(w http.ResponseWriter
 		year = time.Now().Year()
 	}
 
-	// Cache hit: return pending rows without regenerating or rate-limiting.
+	rateKey := strings.ToLower(normalizeAuditTenantID(c.TenantID) + "|" + p.Chain + "|" + p.Barcode)
+
+	// Positive cache: pending Firestore rows — skip regenerate + rate limit.
 	cached, err := h.repo.ListCompetitorSuggestions(r.Context(), c.TenantID, domain.CompetitorSuggestionFilter{
 		Chain: p.Chain, Status: domain.CompetitorSuggestionPending, OwnBarcode: p.Barcode,
 	})
@@ -184,6 +204,7 @@ func (h *CompetitorSuggestionsHandler) HandleSuggestForSku(w http.ResponseWriter
 		return
 	}
 	if len(cached) > 0 {
+		h.clearEmptySkuCache(rateKey)
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"suggestions":             cached,
 			"count":                   len(cached),
@@ -195,14 +216,27 @@ func (h *CompetitorSuggestionsHandler) HandleSuggestForSku(w http.ResponseWriter
 		return
 	}
 
-	rateKey := strings.ToLower(normalizeAuditTenantID(c.TenantID) + "|" + p.Chain + "|" + p.Barcode)
+	// Negative cache: prior empty generate for this SKU (re-select must not re-call Gemini).
+	if reason, ok := h.getEmptySkuCache(rateKey); ok {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"suggestions":             []domain.CompetitorSuggestion{},
+			"count":                   0,
+			"cached":                  true,
+			"barcode":                 p.Barcode,
+			"chain":                   p.Chain,
+			"skipped_reason_ar":       reason,
+			"include_in_kpi_averages": competitorSuggestIncludeInKPIAverages,
+		})
+		return
+	}
+
+	// Cooldown only after a completed generate for *this* SKU. Other barcodes never share the key.
 	h.rateMu.Lock()
 	if last, ok := h.lastSku[rateKey]; ok && time.Since(last) < competitorSuggestSkuInterval {
 		h.rateMu.Unlock()
 		writeErr(w, http.StatusTooManyRequests, "تم تجاوز حد الطلبات — انتظر قليلاً قبل إعادة توليد اقتراحات هذا الصنف")
 		return
 	}
-	h.lastSku[rateKey] = time.Now()
 	h.rateMu.Unlock()
 
 	if h.catalog == nil {
@@ -210,55 +244,136 @@ func (h *CompetitorSuggestionsHandler) HandleSuggestForSku(w http.ResponseWriter
 		return
 	}
 
-	ctx := suggestContext{
-		tenantID: c.TenantID,
-		chain:    p.Chain,
-		year:     year,
-		email:    c.Email,
-		// On-demand view: still suggest alongside owner pins; exclude already-mapped pairs.
-		skipOwnWithAnyMapping: false,
-	}
-	pool, err := h.loadSuggestPools(r, c.TenantID, p.Chain, year)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "تعذر تحميل بيانات المنافسة")
-		return
+	type skuGenResult struct {
+		created []domain.CompetitorSuggestion
+		skip    string
+		usage   competitorsuggest.TokenUsage
+		err     error
 	}
 
-	var own *competitorsuggest.SkuCandidate
-	for i := range pool.own {
-		if normBarcode(pool.own[i].Barcode) == normBarcode(p.Barcode) {
-			o := pool.own[i]
-			own = &o
-			break
+	// Single-flight: concurrent selects of the same SKU share one generate (avoids false 429).
+	v, sfErr, _ := h.skuSF.Do(rateKey, func() (interface{}, error) {
+		rankCtx, cancel := context.WithTimeout(r.Context(), competitorSuggestRankTimeout)
+		defer cancel()
+		req := r.WithContext(rankCtx)
+
+		sctx := suggestContext{
+			tenantID: c.TenantID,
+			chain:    p.Chain,
+			year:     year,
+			email:    c.Email,
+			// On-demand view: still suggest alongside owner pins; exclude already-mapped pairs.
+			skipOwnWithAnyMapping: false,
 		}
-	}
-	if own == nil {
-		writeErr(w, http.StatusNotFound, "الصنف غير موجود في بيانات البيع لهذا التسلسل")
+		pool, poolErr := h.loadSuggestPools(req, c.TenantID, p.Chain, year)
+		if poolErr != nil {
+			return &skuGenResult{err: fmt.Errorf("catalog: %w", poolErr)}, nil
+		}
+		var own *competitorsuggest.SkuCandidate
+		for i := range pool.own {
+			if normBarcode(pool.own[i].Barcode) == normBarcode(p.Barcode) {
+				o := pool.own[i]
+				own = &o
+				break
+			}
+		}
+		if own == nil {
+			return &skuGenResult{err: errSkuNotFound}, nil
+		}
+		created, skip, usage, genErr := h.generateForOwn(req, sctx, pool, *own)
+		res := &skuGenResult{created: created, skip: skip, usage: usage, err: genErr}
+		if genErr != nil {
+			// Do NOT stamp cooldown on hang/timeout/failure — allow one clear retry.
+			return res, nil
+		}
+		h.markSkuGenerateCompleted(rateKey, skip, len(created))
+		return res, nil
+	})
+	if sfErr != nil {
+		log.Printf("[competitor-suggest] sku singleflight own=%s: %v", p.Barcode, sfErr)
+		writeErr(w, http.StatusBadGateway, "تعذر ترتيب المرشحين عبر الذكاء الاصطناعي")
 		return
 	}
-
-	created, skip, usage, genErr := h.generateForOwn(r, ctx, pool, *own)
-	if genErr != nil {
-		log.Printf("[competitor-suggest] sku generate failed own=%s: %v", p.Barcode, genErr)
+	res, _ := v.(*skuGenResult)
+	if res == nil {
 		writeErr(w, http.StatusBadGateway, "تعذر ترتيب المرشحين عبر الذكاء الاصطناعي")
+		return
+	}
+	if res.err != nil {
+		if errors.Is(res.err, errSkuNotFound) {
+			writeErr(w, http.StatusNotFound, "الصنف غير موجود في بيانات البيع لهذا التسلسل")
+			return
+		}
+		log.Printf("[competitor-suggest] sku generate failed own=%s: %v", p.Barcode, res.err)
+		msg := "تعذر ترتيب المرشحين عبر الذكاء الاصطناعي"
+		status := http.StatusBadGateway
+		errText := strings.ToLower(res.err.Error())
+		if errors.Is(res.err, context.DeadlineExceeded) ||
+			strings.Contains(errText, "deadline exceeded") ||
+			strings.Contains(errText, "context canceled") {
+			msg = "انتهت مهلة توليد اقتراحات المنافسين — حاول مرة أخرى"
+			status = http.StatusGatewayTimeout
+		} else if strings.HasPrefix(errText, "catalog:") {
+			msg = "تعذر تحميل بيانات المنافسة"
+			status = http.StatusInternalServerError
+		}
+		writeErr(w, status, msg)
 		return
 	}
 
 	h.recordAudit(r, c, "SUGGEST_COMPETITOR_SKU",
 		fmt.Sprintf("chain=%s barcode=%s created=%d cached=false tokens=%d/%d skip=%s",
-			p.Chain, p.Barcode, len(created), usage.PromptTokens, usage.CompletionTokens, skip))
+			p.Chain, p.Barcode, len(res.created), res.usage.PromptTokens, res.usage.CompletionTokens, res.skip))
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"suggestions":             created,
-		"count":                   len(created),
+		"suggestions":             res.created,
+		"count":                   len(res.created),
 		"cached":                  false,
 		"barcode":                 p.Barcode,
 		"chain":                   p.Chain,
-		"skipped_reason_ar":       skip,
-		"prompt_tokens":           usage.PromptTokens,
-		"completion_tokens":       usage.CompletionTokens,
+		"skipped_reason_ar":       res.skip,
+		"prompt_tokens":           res.usage.PromptTokens,
+		"completion_tokens":       res.usage.CompletionTokens,
 		"include_in_kpi_averages": competitorSuggestIncludeInKPIAverages,
 	})
+}
+
+var errSkuNotFound = errors.New("sku not found in competitive catalog")
+
+func (h *CompetitorSuggestionsHandler) getEmptySkuCache(rateKey string) (string, bool) {
+	h.rateMu.Lock()
+	defer h.rateMu.Unlock()
+	ent, ok := h.emptySku[rateKey]
+	if !ok {
+		return "", false
+	}
+	if time.Since(ent.At) > competitorSuggestEmptyCacheTTL {
+		delete(h.emptySku, rateKey)
+		return "", false
+	}
+	return ent.ReasonAR, true
+}
+
+func (h *CompetitorSuggestionsHandler) clearEmptySkuCache(rateKey string) {
+	h.rateMu.Lock()
+	defer h.rateMu.Unlock()
+	delete(h.emptySku, rateKey)
+}
+
+// markSkuGenerateCompleted stamps per-SKU cooldown only after success, and caches empty results.
+func (h *CompetitorSuggestionsHandler) markSkuGenerateCompleted(rateKey, skip string, created int) {
+	h.rateMu.Lock()
+	defer h.rateMu.Unlock()
+	h.lastSku[rateKey] = time.Now()
+	if created == 0 {
+		reason := skip
+		if reason == "" {
+			reason = "لا يوجد منافسين في البيانات"
+		}
+		h.emptySku[rateKey] = skuEmptyCache{ReasonAR: reason, At: time.Now()}
+	} else {
+		delete(h.emptySku, rateKey)
+	}
 }
 
 // HandleRunSuggestions serves POST /api/v1/competitors/suggestions/run (owner-only).

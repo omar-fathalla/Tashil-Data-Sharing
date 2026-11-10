@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestGeminiRankerTrimsAPIKeyNewlineBeforeHeader(t *testing.T) {
@@ -75,6 +76,80 @@ func TestGeminiRankerFallsBackOnModelNotFound(t *testing.T) {
 	}
 	if len(got) != 1 {
 		t.Fatalf("want 1 suggestion after fallback, got %#v", got)
+	}
+}
+
+func TestGeminiRankerFallsBackOnPrimaryTimeout(t *testing.T) {
+	var models []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		models = append(models, path)
+		if strings.Contains(path, "slow-primary") {
+			// Simulate a slow/hung primary without blocking httptest.Close.
+			select {
+			case <-r.Context().Done():
+			case <-time.After(2 * time.Second):
+			}
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"candidates":[{"content":{"parts":[{"text":"{\"suggestions\":[{\"competitor_barcode\":\"A\",\"reason_ar\":\"مناسب\",\"confidence\":0.8,\"rank\":1}]}"}]}}]}`)
+	}))
+	defer srv.Close()
+
+	r := &GeminiRanker{
+		APIKey:     "k",
+		Model:      "slow-primary",
+		Tier2Model: "gemini-pro-latest",
+		APIBase:    srv.URL,
+		HTTPClient: srv.Client(),
+	}
+	own := SkuCandidate{Barcode: "O", SKUName: "فيبا", Category: "صابون سائل اطباق"}
+	cands := []PrefScore{{Candidate: SkuCandidate{Barcode: "A", SKUName: "بريل"}}}
+	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	defer cancel()
+	got, _, err := r.Rank(ctx, own, cands)
+	if err != nil {
+		t.Fatalf("tier2 should succeed after primary timeout: %v (models=%v)", err, models)
+	}
+	if len(models) < 2 {
+		t.Fatalf("want primary then tier2, got %v", models)
+	}
+	if !strings.Contains(models[0], "slow-primary") || !strings.Contains(models[len(models)-1], "gemini-pro-latest") {
+		t.Fatalf("fallback order: %v", models)
+	}
+	if len(got) != 1 || got[0].CompetitorBarcode != "A" {
+		t.Fatalf("unexpected result: %#v", got)
+	}
+}
+
+func TestGeminiRankerOmitsTemperatureAndSetsThinkingLow(t *testing.T) {
+	var rawBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rawBody, _ = io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"candidates":[{"content":{"parts":[{"text":"{\"suggestions\":[]}"}]}}]}`)
+	}))
+	defer srv.Close()
+
+	r := &GeminiRanker{
+		APIKey:     "k",
+		Model:      "gemini-3.8-flash",
+		APIBase:    srv.URL,
+		HTTPClient: srv.Client(),
+	}
+	own := SkuCandidate{Barcode: "O", SKUName: "فيبا", Category: "صابون سائل اطباق"}
+	cands := []PrefScore{{Candidate: SkuCandidate{Barcode: "A", SKUName: "بريل"}}}
+	_, _, err := r.Rank(context.Background(), own, cands)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(rawBody)
+	if strings.Contains(body, `"temperature"`) {
+		t.Fatalf("Gemini 3.x request must omit temperature, got %s", body)
+	}
+	if !strings.Contains(body, `"thinkingLevel":"low"`) {
+		t.Fatalf("want thinkingLevel=low for latency-critical rank, got %s", body)
 	}
 }
 

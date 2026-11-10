@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
@@ -897,12 +898,15 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       });
     } catch (e) {
       if (!mounted || seq != _aiPicksRequestSeq) return;
+      final msg = e is TimeoutException
+          ? 'انتهت مهلة جلب اقتراحات المنافسين — حاول مرة أخرى'
+          : e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
       setState(() {
         _aiPicks = const [];
         _aiPicksLoading = false;
-        _aiPicksEmptyHint = null;
+        // Surface a stable Arabic empty hint so the row never looks "stuck loading".
+        _aiPicksEmptyHint = msg.isEmpty ? 'فشل جلب اقتراحات المنافسين' : msg;
       });
-      final msg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
       M3Feedback.showError(
         context,
         msg.isEmpty ? 'فشل جلب اقتراحات المنافسين' : msg,
