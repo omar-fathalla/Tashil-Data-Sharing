@@ -27,8 +27,14 @@ type UnknownItem struct {
 func (s *Service) RecordSellInUnknownItems(ctx context.Context, tenantID, filename string, items []UnknownItem) error {
 	source := DQSourceSellInUploadPrefix + strings.TrimSpace(filename)
 	found := make([]domain.DataQualityIssue, 0, len(items))
+	totalRows := 0
 	for _, it := range items {
 		v := it.Value
+		rows := it.Rows
+		if rows <= 0 {
+			rows = 1
+		}
+		totalRows += rows
 		found = append(found, domain.DataQualityIssue{
 			ID:            issueID(source, DQTypeUnknownItem, it.ItemCode, it.Barcode, it.ItemName),
 			Source:        source,
@@ -54,10 +60,25 @@ func (s *Service) RecordSellInUnknownItems(ctx context.Context, tenantID, filena
 		return err
 	}
 	Reconcile(st, source, found, s.now())
+	run := domain.DataQualityRun{
+		Source: source, SourceFile: filename, Sheet: filename,
+		TotalRows: totalRows, RanAt: s.now(),
+	}
+	replaced := false
+	for i := range st.Runs {
+		if st.Runs[i].Source == source {
+			st.Runs[i] = run
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		st.Runs = append(st.Runs, run)
+	}
 	st.TenantID = tenantID
 	if err := s.store.SaveDataQualityState(ctx, st); err != nil {
 		return err
 	}
-	log.Printf("[data-quality] tenant=%s sell-in %s: %d items not in the Product Master", tenantID, filename, len(items))
+	log.Printf("[data-quality] tenant=%s sell-in %s: %d items not in the Product Master (%d rows)", tenantID, filename, len(items), totalRows)
 	return nil
 }

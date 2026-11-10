@@ -1383,6 +1383,35 @@ type skuChainPullAgg struct {
 	chains map[string]bool
 }
 
+// resolvePullStatsCodeLocked maps a sell-out/sell-in row to a Product Master item code using
+// only O(1) indexes (item code + barcode). It never runs the fuzzy Arabic name scan: that path
+// is O(SKU×tokens) per row and made GET /product-master hang past the web client's timeout when
+// tens of thousands of POS rows lacked an item code.
+func (c *Client) resolvePullStatsCodeLocked(normTenant, itemCode, barcode string) string {
+	if code := domain.NormalizeItemCode(itemCode); code != "" {
+		return code
+	}
+	bc := domain.CleanBarcode(barcode)
+	if bc == "" {
+		return ""
+	}
+	if cands := c.productMasterByBarcodeCandidates[normTenant][bc]; len(cands) > 0 {
+		best := cands[0]
+		for _, cand := range cands[1:] {
+			if cand.IsPrimaryForBarcode && !best.IsPrimaryForBarcode {
+				best = cand
+			}
+		}
+		return domain.NormalizeItemCode(best.ItemCode)
+	}
+	if by := c.productMasterByBarcode[normTenant]; by != nil {
+		if it, ok := by[bc]; ok {
+			return domain.NormalizeItemCode(it.ItemCode)
+		}
+	}
+	return ""
+}
+
 func (c *Client) computeSKUChainPullStatsLocked(normTenant string) map[string]*skuChainPullAgg {
 	statsByCode := make(map[string]*skuChainPullAgg)
 	ensureAgg := func(code string) *skuChainPullAgg {
@@ -1398,12 +1427,7 @@ func (c *Client) computeSKUChainPullStatsLocked(normTenant string) map[string]*s
 		if !matchTenant(r.TenantID, normTenant) || !isOwnRecord(r) {
 			continue
 		}
-		code := domain.NormalizeItemCode(r.ItemCode)
-		if code == "" {
-			if pm, ok := c.lookupProductMasterLocked(normTenant, r.ItemCode, r.Barcode, r.SKUName); ok {
-				code = domain.NormalizeItemCode(pm.ItemCode)
-			}
-		}
+		code := c.resolvePullStatsCodeLocked(normTenant, r.ItemCode, r.Barcode)
 		if code == "" {
 			continue
 		}
@@ -1419,12 +1443,7 @@ func (c *Client) computeSKUChainPullStatsLocked(normTenant string) map[string]*s
 		if sr.NetQtyCases <= 0 && sr.NetValueEGP <= 0 {
 			continue
 		}
-		code := domain.NormalizeItemCode(sr.ItemCode)
-		if code == "" {
-			if pm, ok := c.lookupProductMasterLocked(normTenant, sr.ItemCode, sr.Barcode, sr.ItemName); ok {
-				code = domain.NormalizeItemCode(pm.ItemCode)
-			}
-		}
+		code := c.resolvePullStatsCodeLocked(normTenant, sr.ItemCode, sr.Barcode)
 		if code == "" {
 			continue
 		}

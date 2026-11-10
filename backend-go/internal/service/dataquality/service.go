@@ -332,6 +332,9 @@ type Summary struct {
 }
 
 // Summary: counts per source/type and cleanliness % = rows without an open critical issue / rows.
+// Row totals come from persisted Runs when present. Sources that only have Issues (e.g. sell-in
+// unknown-item findings, or product_master after a restart before the PM file is re-registered)
+// are still counted so the gauge never shows «0 من 0» / 100% while Open > 0.
 func (s *Service) Summary(ctx context.Context, tenantID string) (*Summary, error) {
 	st, err := s.store.GetDataQualityState(ctx, tenantID)
 	if err != nil {
@@ -341,6 +344,7 @@ func (s *Service) Summary(ctx context.Context, tenantID string) (*Summary, error
 	types := map[string]*TypeSummary{}
 	impactSeen := map[string]bool{}
 	critRows := map[string]map[int]bool{}
+	openRows := map[string]map[int]bool{}
 	openBySource := map[string]int{}
 	for _, iss := range st.Issues {
 		k := iss.Source + "|" + iss.Type
@@ -358,6 +362,10 @@ func (s *Service) Summary(ctx context.Context, tenantID string) (*Summary, error
 			t.Open++
 			sum.Open++
 			openBySource[iss.Source]++
+			if openRows[iss.Source] == nil {
+				openRows[iss.Source] = map[int]bool{}
+			}
+			openRows[iss.Source][iss.Row] = true
 			if iss.ImpactEGP != nil && !impactSeen[k+"|"+iss.ItemCode+"|"+iss.Barcode] {
 				impactSeen[k+"|"+iss.ItemCode+"|"+iss.Barcode] = true
 				t.ImpactEGP += *iss.ImpactEGP
@@ -386,16 +394,68 @@ func (s *Service) Summary(ctx context.Context, tenantID string) (*Summary, error
 		}
 		return sum.Types[i].Type < sum.Types[j].Type
 	})
+	covered := map[string]bool{}
 	for _, r := range st.Runs {
-		ss := SourceSummary{Source: r.Source, SourceFile: r.SourceFile, Sheet: r.Sheet, TotalRows: r.TotalRows,
-			CriticalRows: len(critRows[r.Source]), Open: openBySource[r.Source], RanAt: r.RanAt}
+		total := r.TotalRows
+		crit := len(critRows[r.Source])
+		if total <= 0 {
+			total = fallbackSourceRows(r.Source, crit, openBySource[r.Source], openRows[r.Source], s, tenantID)
+		}
+		ss := SourceSummary{Source: r.Source, SourceFile: r.SourceFile, Sheet: r.Sheet, TotalRows: total,
+			CriticalRows: crit, Open: openBySource[r.Source], RanAt: r.RanAt}
+		ss.CleanlinessPc = cleanliness(ss.TotalRows, ss.CriticalRows)
+		sum.Sources = append(sum.Sources, ss)
+		sum.TotalRows += ss.TotalRows
+		sum.CriticalRows += ss.CriticalRows
+		covered[r.Source] = true
+	}
+	for source, open := range openBySource {
+		if covered[source] {
+			continue
+		}
+		crit := len(critRows[source])
+		total := fallbackSourceRows(source, crit, open, openRows[source], s, tenantID)
+		ss := SourceSummary{Source: source, TotalRows: total, CriticalRows: crit, Open: open, RanAt: st.UpdatedAt}
 		ss.CleanlinessPc = cleanliness(ss.TotalRows, ss.CriticalRows)
 		sum.Sources = append(sum.Sources, ss)
 		sum.TotalRows += ss.TotalRows
 		sum.CriticalRows += ss.CriticalRows
 	}
+	if sum.TotalRows <= 0 && sum.Open > 0 {
+		sum.TotalRows = sum.Open
+		if sum.CriticalRows <= 0 {
+			for _, rows := range critRows {
+				sum.CriticalRows += len(rows)
+			}
+		}
+	}
 	sum.CleanlinessPc = cleanliness(sum.TotalRows, sum.CriticalRows)
 	return sum, nil
+}
+
+// fallbackSourceRows picks a denominator when a Run is missing or has TotalRows=0.
+func fallbackSourceRows(source string, crit, open int, openRowSet map[int]bool, s *Service, tenantID string) int {
+	if source == domain.DQSourceProductMaster && s != nil && s.master != nil {
+		if n := len(s.master.GetProductMasterItems(tenantID)); n > 0 {
+			return n
+		}
+	}
+	if n := len(openRowSet); n > 0 {
+		if open > n {
+			return open
+		}
+		if crit > n {
+			return crit
+		}
+		return n
+	}
+	if open > 0 {
+		return open
+	}
+	if crit > 0 {
+		return crit
+	}
+	return 0
 }
 
 func cleanliness(total, critical int) float64 {
