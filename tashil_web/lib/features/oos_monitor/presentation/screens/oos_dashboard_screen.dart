@@ -7,6 +7,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 
@@ -719,7 +720,12 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('✓ ', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                                Icon(
+                                  Icons.check_circle,
+                                  size: 16,
+                                  color: M3StatusColors.of(context).success,
+                                ),
+                                const SizedBox(width: 6.0),
                                 Expanded(
                                   child: Text(
                                     action,

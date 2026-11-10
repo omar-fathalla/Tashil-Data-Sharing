@@ -13,6 +13,7 @@ import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/widgets/m3_button_group.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
@@ -751,30 +752,34 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
       titleEn: 'CPFR & Inventory Replenishment',
       subtitleAr:
           'منظومة التخطيط المشترك ومطابقة التوريد (Sell-In) مع مبيعات الكاشير (Sell-Out) وحساب دوران المخزون وأوامر التوريد لجميع السلاسل',
-      actions: M3ActionButtonGroup(
-        actions: [
-          M3ActionItem(
+      actions: M3ButtonGroup(
+        maxVisibleCompact: 2,
+        items: [
+          M3GroupItem(
             label: 'نموذج التوريد الإرشادي',
             icon: Icons.download_for_offline_rounded,
+            kind: M3GroupItemKind.tonal,
             onPressed: _downloadSellInGuidedDemoTemplate,
           ),
-          M3ActionItem(
+          M3GroupItem(
             label: 'رفع ملف Sell-In',
             icon: Icons.upload_file_rounded,
+            kind: M3GroupItemKind.tonal,
             isLoading: _isUploadingSellIn,
             onPressed: _isUploadingSellIn ? null : _pickAndUploadSellInFile,
           ),
-          M3ActionItem(
+          M3GroupItem(
             label: 'تحديث التوريد',
             icon: Icons.sync_rounded,
+            kind: M3GroupItemKind.tonal,
             isLoading: _isReloadingWorkbook,
             onPressed: _isReloadingWorkbook ? null : _reloadSellInWorkbook,
           ),
           if (_data != null)
-            M3ActionItem(
+            M3GroupItem(
               label: 'تصدير PO',
               icon: Icons.shopping_cart_checkout_rounded,
-              isPrimary: true,
+              kind: M3GroupItemKind.tonal,
               onPressed: () => _exportReplenishmentPOExcel(_data!),
             ),
         ],
@@ -1308,6 +1313,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
     required String title,
     required bool isSelected,
   }) {
+    // Selected uses secondaryContainer (not primary solid) — G6 / CPFR solids.
     return InkWell(
       borderRadius: M3Shape.radiusMd,
       onTap: () => setState(() => _activeTab = tabIndex),
@@ -1315,15 +1321,16 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
         alignment: Alignment.center,
+        constraints: const BoxConstraints(minHeight: 48.0),
         decoration: BoxDecoration(
           color: isSelected
-              ? colorScheme.primary
-              : colorScheme.surfaceContainerHighest.withOpacity(0.55),
+              ? colorScheme.secondaryContainer
+              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
           borderRadius: M3Shape.radiusMd,
           border: Border.all(
             color: isSelected
-                ? colorScheme.primary
-                : colorScheme.outlineVariant.withOpacity(0.5),
+                ? colorScheme.secondaryContainer
+                : colorScheme.outlineVariant.withValues(alpha: 0.5),
           ),
         ),
         child: Row(
@@ -1332,9 +1339,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
           children: [
             Icon(
               icon,
-              size: 18.0,
+              size: 20.0,
               color: isSelected
-                  ? colorScheme.onPrimary
+                  ? colorScheme.onSecondaryContainer
                   : colorScheme.onSurfaceVariant,
             ),
             const SizedBox(width: 8.0),
@@ -1346,9 +1353,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: isSelected
-                      ? colorScheme.onPrimary
+                      ? colorScheme.onSecondaryContainer
                       : colorScheme.onSurface,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),

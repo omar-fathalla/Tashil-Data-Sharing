@@ -11,6 +11,7 @@ import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/widgets/m3_button_group.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../widgets/ai_analysis_progress_card.dart';
@@ -1635,18 +1636,19 @@ onChanged: m3Legacy<String>((val) {
               ),
             ],
           ),
-          M3ActionButtonGroup(
-            actions: [
-              M3ActionItem(
+          // Cancel = text (not destructive); only final commit stays filled.
+          M3ButtonGroup(
+            items: [
+              M3GroupItem(
                 label: 'إلغاء',
-                icon: Icons.delete_outline_rounded,
-                isDestructive: true,
+                icon: Icons.close_rounded,
+                kind: M3GroupItemKind.text,
                 onPressed: isCommitting ? null : _handleDiscardData,
               ),
-              M3ActionItem(
+              M3GroupItem(
                 label: 'اعتماد البيانات',
                 icon: Icons.check_circle_rounded,
-                isPrimary: true,
+                kind: M3GroupItemKind.filled,
                 isLoading: isCommitting,
                 onPressed: isCommitting ? null : _handleCommitData,
               ),
