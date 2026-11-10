@@ -228,6 +228,9 @@ func TestForgotPasswordRateLimit(t *testing.T) {
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected HTTP 429 after rate limit, got %d: %s", rec.Code, rec.Body.String())
 	}
+	if !strings.Contains(rec.Body.String(), authForgotRateLimitMsg) {
+		t.Fatalf("expected Arabic 429 body, got %s", rec.Body.String())
+	}
 }
 
 func TestLoginRateLimit(t *testing.T) {
@@ -254,6 +257,100 @@ func TestLoginRateLimit(t *testing.T) {
 	handler.HandleLogin(rec, req)
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected HTTP 429 after login rate limit, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), authLoginRateLimitMsg) {
+		t.Fatalf("expected Arabic 429 body, got %s", rec.Body.String())
+	}
+}
+
+func TestLoginSuccessDoesNotConsumeRateLimit(t *testing.T) {
+	_, _, handler := setupAuthTest()
+	okBody, _ := json.Marshal(domain.LoginRequest{
+		TenantID: "adeco",
+		Email:    "admin@adeco-retail.com",
+		Password: testAdecoAdminPassword,
+	})
+	badBody, _ := json.Marshal(domain.LoginRequest{
+		TenantID: "adeco",
+		Email:    "admin@adeco-retail.com",
+		Password: "WrongPassword!",
+	})
+
+	for i := 0; i < authLoginMaxAttempts+2; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(okBody))
+		req.Header.Set("X-Forwarded-For", "198.51.100.10, 169.254.1.1")
+		rec := httptest.NewRecorder()
+		handler.HandleLogin(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("success %d: expected 200, got %d: %s", i+1, rec.Code, rec.Body.String())
+		}
+	}
+
+	for i := 0; i < authLoginMaxAttempts; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(badBody))
+		req.Header.Set("X-Forwarded-For", "198.51.100.10, 169.254.1.1")
+		rec := httptest.NewRecorder()
+		handler.HandleLogin(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("fail %d: expected 401 (successes must not consume limit), got %d", i+1, rec.Code)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(badBody))
+	req.Header.Set("X-Forwarded-For", "198.51.100.10, 169.254.1.1")
+	rec := httptest.NewRecorder()
+	handler.HandleLogin(rec, req)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 after failed-only budget exhausted, got %d", rec.Code)
+	}
+}
+
+func TestLoginRateLimitIndependentPerEmail(t *testing.T) {
+	_, _, handler := setupAuthTest()
+	adminBody, _ := json.Marshal(domain.LoginRequest{
+		TenantID: "adeco",
+		Email:    "admin@adeco-retail.com",
+		Password: "WrongPassword!",
+	})
+	kamBody, _ := json.Marshal(domain.LoginRequest{
+		TenantID: "adeco",
+		Email:    "kam.carrefour@adeco-retail.com",
+		Password: "WrongPassword!",
+	})
+
+	for i := 0; i < authLoginMaxAttempts; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(adminBody))
+		req.RemoteAddr = "203.0.113.70:9999"
+		rec := httptest.NewRecorder()
+		handler.HandleLogin(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("admin fail %d: expected 401, got %d", i+1, rec.Code)
+		}
+	}
+
+	reqAdmin := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(adminBody))
+	reqAdmin.RemoteAddr = "203.0.113.70:9999"
+	recAdmin := httptest.NewRecorder()
+	handler.HandleLogin(recAdmin, reqAdmin)
+	if recAdmin.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected admin email rate-limited (429), got %d", recAdmin.Code)
+	}
+
+	reqKam := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(kamBody))
+	reqKam.RemoteAddr = "203.0.113.70:9999"
+	recKam := httptest.NewRecorder()
+	handler.HandleLogin(recKam, reqKam)
+	if recKam.Code != http.StatusUnauthorized {
+		t.Fatalf("expected other email on same IP still independent (401), got %d: %s", recKam.Code, recKam.Body.String())
+	}
+}
+
+func TestExtractRequestIPUsesXForwardedForClient(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "10.0.0.1:1234"
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 169.254.169.126")
+	if got := extractRequestIP(req); got != "203.0.113.9" {
+		t.Fatalf("Cloud Run/GFE leftmost XFF client IP: got %q want 203.0.113.9", got)
 	}
 }
 

@@ -7820,7 +7820,8 @@ class ApiClient {
     ));
   }
 
-  /// Request forgot password reset token
+  /// Request forgot password (server never returns reset_token).
+  /// UI directs users to an admin until outbound email exists — do not invent tokens.
   Future<String> forgotPassword({required String tenantId, required String email}) async {
     http.Response? resp;
     try {
@@ -7831,21 +7832,20 @@ class ApiClient {
         body: jsonEncode({'tenant_id': tenantId, 'email': email}),
       ).timeout(const Duration(seconds: 4));
     } catch (e) {
-      debugPrint('[ApiClient] Fallback forgot password: $e');
+      debugPrint('[ApiClient] Forgot password request failed: $e');
     }
 
     if (resp != null && resp.statusCode == 200) {
       final body = jsonDecode(resp.body) as Map<String, dynamic>;
-      if (body['reset_token'] != null) {
-        lastResetToken = body['reset_token'] as String;
-      }
-      return body['message'] as String? ?? 'تم إرسال التعليمات بنجاح';
+      // Intentionally ignore any reset_token field — tokens are server-side / OOB only.
+      lastResetToken = null;
+      return body['message'] as String? ?? 'إذا كان البريد مسجلاً، فسيتم إرسال رابط استعادة كلمة المرور';
     } else if (resp != null && resp.statusCode >= 400 && resp.body.trim().isNotEmpty) {
       throw Exception(_extractBackendError(resp, 'فشل طلب استعادة كلمة المرور'));
     }
 
-    lastResetToken = 'demo-reset-token-2026';
-    return 'تم إرسال رمز استعادة كلمة المرور إلى $email';
+    lastResetToken = null;
+    return 'تواصل مع المسؤول لإعادة تعيين كلمة المرور';
   }
 
   /// Reset password using token

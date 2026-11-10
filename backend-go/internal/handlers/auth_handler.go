@@ -19,6 +19,9 @@ import (
 const forgotPasswordAckMessage = "إذا كان البريد مسجلاً، فسيتم إرسال رابط استعادة كلمة المرور"
 
 const (
+	authLoginRateLimitMsg  = "تم تجاوز عدد محاولات تسجيل الدخول. حاول مرة أخرى لاحقاً"
+	authForgotRateLimitMsg = "تم تجاوز عدد طلبات استعادة كلمة المرور. حاول مرة أخرى لاحقاً"
+
 	authLoginMaxAttempts  = 10
 	authLoginWindow       = time.Minute
 	authForgotMaxAttempts = 5
@@ -26,12 +29,13 @@ const (
 )
 
 // AuthHandler coordinates authentication and password recovery endpoints.
+// Rate-limit maps are in-memory only (acceptable while Cloud Run maxScale=1).
 type AuthHandler struct {
 	fsRepo firestore.Repository
 	authMW *middleware.AuthMiddleware
 
 	rateMu     sync.Mutex
-	loginHits  map[string][]time.Time
+	loginHits  map[string][]time.Time // failed logins only: IP|email → timestamps
 	forgotHits map[string][]time.Time
 }
 
@@ -45,43 +49,60 @@ func NewAuthHandler(fsRepo firestore.Repository, authMW *middleware.AuthMiddlewa
 	}
 }
 
-func (h *AuthHandler) allowRate(bucket map[string][]time.Time, key string, max int, window time.Duration) bool {
+// pruneRateLocked drops expired hits and returns the remaining count for key.
+// Caller must hold h.rateMu.
+func (h *AuthHandler) pruneRateLocked(bucket map[string][]time.Time, key string, window time.Duration) int {
 	now := time.Now()
 	cutoff := now.Add(-window)
-	h.rateMu.Lock()
-	defer h.rateMu.Unlock()
 	kept := bucket[key][:0]
 	for _, t := range bucket[key] {
 		if t.After(cutoff) {
 			kept = append(kept, t)
 		}
 	}
-	if len(kept) >= max {
-		bucket[key] = kept
+	bucket[key] = kept
+	return len(kept)
+}
+
+func (h *AuthHandler) isRateLimited(bucket map[string][]time.Time, key string, max int, window time.Duration) bool {
+	h.rateMu.Lock()
+	defer h.rateMu.Unlock()
+	return h.pruneRateLocked(bucket, key, window) >= max
+}
+
+func (h *AuthHandler) recordRateHit(bucket map[string][]time.Time, key string, window time.Duration) {
+	h.rateMu.Lock()
+	defer h.rateMu.Unlock()
+	_ = h.pruneRateLocked(bucket, key, window)
+	bucket[key] = append(bucket[key], time.Now())
+}
+
+// allowRate records a hit unless the key is already at the limit (used for forgot-password).
+func (h *AuthHandler) allowRate(bucket map[string][]time.Time, key string, max int, window time.Duration) bool {
+	h.rateMu.Lock()
+	defer h.rateMu.Unlock()
+	if h.pruneRateLocked(bucket, key, window) >= max {
 		return false
 	}
-	bucket[key] = append(kept, now)
+	bucket[key] = append(bucket[key], time.Now())
 	return true
 }
 
-func authRateKey(r *http.Request, extra string) string {
+// authRateKey uses extractRequestIP (X-Forwarded-For leftmost hop — Cloud Run/GFE
+// and Firebase Hosting populate this with the client IP) plus a normalized email.
+func authRateKey(r *http.Request, email string) string {
 	ip := extractRequestIP(r)
-	extra = strings.ToLower(strings.TrimSpace(extra))
-	if extra == "" {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
 		return ip
 	}
-	return ip + "|" + extra
+	return ip + "|" + email
 }
 
 // HandleLogin serves POST /api/v1/auth/login.
 func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
-		return
-	}
-
-	if !h.allowRate(h.loginHits, authRateKey(r, ""), authLoginMaxAttempts, authLoginWindow) {
-		http.Error(w, `{"error":"too many login attempts, try again later"}`, http.StatusTooManyRequests)
 		return
 	}
 
@@ -103,18 +124,31 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rateKey := authRateKey(r, req.Email)
+	if h.isRateLimited(h.loginHits, rateKey, authLoginMaxAttempts, authLoginWindow) {
+		writeErr(w, http.StatusTooManyRequests, authLoginRateLimitMsg)
+		return
+	}
+
+	recordLoginFailure := func() {
+		h.recordRateHit(h.loginHits, rateKey, authLoginWindow)
+	}
+
 	user, err := h.fsRepo.GetUserByEmail(r.Context(), req.TenantID, req.Email)
 	if err != nil {
+		recordLoginFailure()
 		http.Error(w, `{"error":"invalid credentials or unassigned company"}`, http.StatusUnauthorized)
 		return
 	}
 
 	if !user.Active {
+		recordLoginFailure()
 		http.Error(w, `{"error":"account is deactivated"}`, http.StatusForbidden)
 		return
 	}
 
 	if !security.CheckPassword(req.Password, user.PasswordHash) {
+		recordLoginFailure()
 		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
 		return
 	}
@@ -215,7 +249,7 @@ func (h *AuthHandler) HandleForgotPassword(w http.ResponseWriter, r *http.Reques
 	}
 
 	if !h.allowRate(h.forgotHits, authRateKey(r, req.Email), authForgotMaxAttempts, authForgotWindow) {
-		http.Error(w, `{"error":"too many reset requests, try again later"}`, http.StatusTooManyRequests)
+		writeErr(w, http.StatusTooManyRequests, authForgotRateLimitMsg)
 		return
 	}
 

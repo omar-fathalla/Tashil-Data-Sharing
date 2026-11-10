@@ -157,15 +157,18 @@ void main() {
       expect(find.text('01211857725'), findsOneWidget);
     });
 
-    testWidgets('ForgotPasswordDialog executes token request and reset steps', (WidgetTester tester) async {
+    testWidgets('ForgotPasswordDialog shows contact-admin note (no self-serve token)', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light(),
-          home: Scaffold(
-            body: ForgotPasswordDialog(
-              apiClient: apiClient,
-              tenantSlug: 'adeco',
-              initialEmail: 'admin@adeco-retail.com',
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              body: ForgotPasswordDialog(
+                apiClient: apiClient,
+                tenantSlug: 'adeco',
+                initialEmail: 'admin@adeco-retail.com',
+              ),
             ),
           ),
         ),
@@ -173,14 +176,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('استعادة كلمة المرور'), findsOneWidget);
-      expect(find.text('إرسال الرمز'), findsOneWidget);
-
-      await tester.tap(find.text('إرسال الرمز'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('تعيين كلمة المرور الجديدة'), findsOneWidget);
-      expect(find.text('رمز التحقق (Reset Token)'), findsOneWidget);
-      expect(find.text('كلمة المرور الجديدة'), findsOneWidget);
+      expect(find.text(ForgotPasswordDialog.contactAdminMessageAr), findsOneWidget);
+      expect(find.text('إرسال الرمز'), findsNothing);
+      expect(find.text('رمز التحقق (Reset Token)'), findsNothing);
     });
 
     testWidgets('UserProfileDialog renders account details and password change form', (WidgetTester tester) async {
