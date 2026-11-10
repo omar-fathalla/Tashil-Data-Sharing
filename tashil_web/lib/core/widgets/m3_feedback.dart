@@ -27,31 +27,16 @@ class M3Feedback {
       barrierDismissible: false,
       builder: (ctx) {
         return AlertDialog(
-          backgroundColor: colorScheme.surfaceContainerHigh,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: M3Shape.radiusLg,
-            side: BorderSide(color: colorScheme.outlineVariant, width: 1.0),
-          ),
-          icon: Container(
-            padding: const EdgeInsets.all(12.0),
-            decoration: BoxDecoration(
-              color: colorScheme.errorContainer.withOpacity(0.4),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.warning_amber_rounded,
-              size: 36.0,
-              color: colorScheme.error,
-            ),
+          // Uses dialogTheme (28dp, surfaceContainerHigh, no border).
+          icon: Icon(
+            Icons.warning_amber_rounded,
+            size: 36.0,
+            color: colorScheme.error,
           ),
           title: Text(
             title,
             textAlign: TextAlign.center,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
+            style: theme.textTheme.headlineSmall,
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -69,9 +54,8 @@ class M3Feedback {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     borderRadius: M3Shape.radiusSm,
-                    border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
                   ),
                   child: Text(
                     duplicateIdentifier,
@@ -87,12 +71,8 @@ class M3Feedback {
           ),
           actionsAlignment: MainAxisAlignment.center,
           actions: [
-            FilledButton.tonal(
+            TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              style: FilledButton.styleFrom(
-                shape: const StadiumBorder(),
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
-              ),
               child: const Text('إغلاق وتخطي التكرار'),
             ),
           ],
@@ -127,80 +107,67 @@ class M3Feedback {
     );
   }
 
-  /// Displays an M3 compliant floating success snackbar.
+  /// Floating success snackbar — inverseSurface from theme; status via icon only.
   static void showSuccess(BuildContext context, String message) {
     final colorScheme = Theme.of(context).colorScheme;
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: _snackbarBody(
           identifier: TestIds.snackbarSuccess,
           message: message,
           icon: Icons.check_circle_rounded,
-          iconColor: colorScheme.onPrimaryContainer,
-          textColor: colorScheme.onPrimaryContainer,
+          iconColor: colorScheme.inversePrimary,
+          textColor: colorScheme.onInverseSurface,
         ),
-        backgroundColor: colorScheme.primaryContainer,
-        behavior: SnackBarBehavior.floating,
-        shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusMd),
+        // background / shape from snackBarTheme
       ),
     );
   }
 
-  /// Displays an M3 compliant floating error snackbar.
+  /// Floating error snackbar — inverseSurface; error conveyed by icon.
   static void showError(BuildContext context, String message) {
     final colorScheme = Theme.of(context).colorScheme;
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: _snackbarBody(
           identifier: TestIds.snackbarError,
           message: message,
           icon: Icons.error_outline_rounded,
-          iconColor: colorScheme.onErrorContainer,
-          textColor: colorScheme.onErrorContainer,
+          iconColor: colorScheme.error,
+          textColor: colorScheme.onInverseSurface,
         ),
-        backgroundColor: colorScheme.errorContainer,
-        behavior: SnackBarBehavior.floating,
-        shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusMd),
       ),
     );
   }
 
-  /// Displays an M3 compliant floating warning snackbar.
+  /// Floating warning snackbar — inverseSurface (no amber fill).
   static void showWarning(BuildContext context, String message) {
+    final colorScheme = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: _snackbarBody(
           identifier: TestIds.snackbarMessage,
           message: message,
           icon: Icons.warning_amber_rounded,
-          iconColor: Colors.black87,
-          textColor: Colors.black87,
+          iconColor: colorScheme.inversePrimary,
+          textColor: colorScheme.onInverseSurface,
         ),
-        backgroundColor: Colors.amber.shade300,
-        behavior: SnackBarBehavior.floating,
-        shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusMd),
       ),
     );
   }
 
-  /// Displays an M3 compliant floating info snackbar.
+  /// Floating info snackbar — inverseSurface; status via icon.
   static void showInfo(BuildContext context, String message) {
     final colorScheme = Theme.of(context).colorScheme;
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: _snackbarBody(
           identifier: TestIds.snackbarMessage,
           message: message,
           icon: Icons.info_outline_rounded,
-          iconColor: colorScheme.onSecondaryContainer,
-          textColor: colorScheme.onSecondaryContainer,
+          iconColor: colorScheme.inversePrimary,
+          textColor: colorScheme.onInverseSurface,
         ),
-        backgroundColor: colorScheme.secondaryContainer,
-        behavior: SnackBarBehavior.floating,
-        shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusMd),
       ),
     );
   }

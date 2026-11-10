@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/m3_shape.dart';
-import '../theme/m3_motion.dart';
 
 /// Item descriptor for an M3 Segmented Button.
 class M3SegmentItem<T> {
@@ -15,8 +13,8 @@ class M3SegmentItem<T> {
   });
 }
 
-/// M3SegmentedButtonGroup implements Google's official M3 Connected Button Groups.
-/// Renders seamless connected buttons with shared borders and stadium pill outer geometry.
+/// Thin wrapper over [SegmentedButton] — styling comes from [ThemeData.segmentedButtonTheme]
+/// (selected = secondaryContainer, no elevation, no compact density).
 class M3SegmentedButtonGroup<T> extends StatelessWidget {
   final List<M3SegmentItem<T>> segments;
   final T selectedValue;
@@ -33,75 +31,21 @@ class M3SegmentedButtonGroup<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      alignment: AlignmentDirectional.centerStart,
-      child: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
-          borderRadius: M3Shape.radiusXl,
-          border: Border.all(
-            color: colorScheme.outlineVariant.withOpacity(0.6),
-            width: 1.0,
-          ),
-        ),
-        padding: const EdgeInsets.all(3.0),
-        child: SegmentedButton<T>(
-          segments: segments.map((s) {
-            return ButtonSegment<T>(
+    return SegmentedButton<T>(
+      segments: segments
+          .map(
+            (s) => ButtonSegment<T>(
               value: s.value,
-              label: Text(
-                s.label,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.2,
-                ),
-              ),
-              icon: s.icon != null ? Icon(s.icon, size: 16.0) : null,
-            );
-          }).toList(),
-          selected: {selectedValue},
-          onSelectionChanged: (Set<T> newSelection) {
-            if (newSelection.isNotEmpty) {
-              onSelectionChanged(newSelection.first);
-            }
-          },
-          showSelectedIcon: showSelectedCheckmark,
-          style: ButtonStyle(
-            animationDuration: M3Motion.short4,
-            shape: WidgetStateProperty.all(const StadiumBorder()),
-            visualDensity: VisualDensity.compact,
-            side: WidgetStateProperty.all(BorderSide.none),
-            backgroundColor: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.selected)) {
-                return colorScheme.primary;
-              }
-              if (states.contains(WidgetState.hovered)) {
-                return colorScheme.surfaceContainerHigh;
-              }
-              return Colors.transparent;
-            }),
-            foregroundColor: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.selected)) {
-                return colorScheme.onPrimary;
-              }
-              return colorScheme.onSurfaceVariant;
-            }),
-            elevation: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.selected)) {
-                return 2.0;
-              }
-              return 0.0;
-            }),
-            padding: WidgetStateProperty.all(
-              const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              label: Text(s.label),
+              icon: s.icon != null ? Icon(s.icon, size: 20.0) : null,
             ),
-          ),
-        ),
-      ),
+          )
+          .toList(),
+      selected: {selectedValue},
+      onSelectionChanged: (Set<T> next) {
+        if (next.isNotEmpty) onSelectionChanged(next.first);
+      },
+      showSelectedIcon: showSelectedCheckmark,
     );
   }
 }

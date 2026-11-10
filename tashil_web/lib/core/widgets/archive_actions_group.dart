@@ -38,7 +38,7 @@ class ArchiveActionsGroup extends StatelessWidget {
     final divider = VerticalDivider(
       width: 1.0,
       thickness: 1.0,
-      color: colorScheme.outline,
+      color: colorScheme.outlineVariant,
     );
 
     final deleteId = (archiveId != null &&
@@ -50,7 +50,7 @@ class ArchiveActionsGroup extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: colorScheme.outline),
+        border: Border.all(color: colorScheme.outlineVariant),
         borderRadius: M3Shape.radiusFull,
       ),
       child: ClipRRect(
@@ -107,19 +107,18 @@ class ArchiveActionsGroup extends StatelessWidget {
     Widget button = TextButton.icon(
       style: TextButton.styleFrom(
         foregroundColor: color,
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
         shape: const RoundedRectangleBorder(),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        tapTargetSize: MaterialTapTargetSize.padded,
       ),
       onPressed: onPressed,
       icon: busy
           ? const SizedBox(
-              width: 14.0,
-              height: 14.0,
+              width: 18.0,
+              height: 18.0,
               child: CircularProgressIndicator(strokeWidth: 2.0),
             )
-          : Icon(icon, size: 16.0),
+          : Icon(icon, size: 20.0),
       label: Text(label),
     );
 

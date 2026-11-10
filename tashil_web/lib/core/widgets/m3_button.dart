@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../testing/test_semantics.dart';
 import '../theme/m3_shape.dart';
+import 'm3_button_group.dart';
 
 /// M3Button adheres strictly to Google Material Design 3 button specifications.
 /// Enforces the STRICT SINGLE-ICON RULE:
@@ -154,9 +155,8 @@ class M3ActionItem {
   });
 }
 
-/// M3ActionButtonGroup renders 2 or more adjacent action buttons as a unified
-/// Material Design 3 Connected Button Group (stadium outer corners, shared inner divider,
-/// generous 42dp height and 20dp horizontal padding).
+/// Deprecated connected group — prefer [M3ButtonGroup] (standard 12dp tonal).
+@Deprecated('Use M3ButtonGroup with M3GroupItem instead')
 class M3ActionButtonGroup extends StatelessWidget {
   final List<M3ActionItem> actions;
   final bool compact;
@@ -169,122 +169,28 @@ class M3ActionButtonGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final height = compact ? 38.0 : 42.0;
-    final hPad = compact ? 16.0 : 20.0;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: M3Shape.radiusXl,
-        border: Border.all(
-          color: colorScheme.outlineVariant.withOpacity(0.75),
-          width: 1.0,
-        ),
-      ),
-      padding: const EdgeInsets.all(3.0),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (int i = 0; i < actions.length; i++) ...[
-              if (i > 0)
-                Container(
-                  width: 1.0,
-                  height: height - 14.0,
-                  margin: const EdgeInsets.symmetric(horizontal: 2.0),
-                  color: colorScheme.outlineVariant.withOpacity(0.6),
-                ),
-              _buildSegment(context, actions[i], height, hPad),
-            ],
-          ],
-        ),
-      ),
+    // `compact` retained for call-site compatibility; density comes from theme.
+    assert(() {
+      // ignore: unnecessary_statements
+      compact;
+      return true;
+    }());
+    // Thin compatibility shim → standard tonal M3ButtonGroup.
+    return M3ButtonGroup(
+      items: [
+        for (final a in actions)
+          M3GroupItem(
+            label: a.label,
+            icon: a.icon,
+            onPressed: a.onPressed,
+            isLoading: a.isLoading,
+            semanticsIdentifier: a.semanticsIdentifier,
+            kind: a.isDestructive
+                ? M3GroupItemKind.danger
+                : (a.isPrimary ? M3GroupItemKind.filled : M3GroupItemKind.tonal),
+          ),
+      ],
     );
-  }
-
-  Widget _buildSegment(
-    BuildContext context,
-    M3ActionItem item,
-    double height,
-    double hPad,
-  ) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    final Color bgColor;
-    final Color fgColor;
-
-    if (item.isPrimary) {
-      bgColor = colorScheme.primary;
-      fgColor = colorScheme.onPrimary;
-    } else if (item.isDestructive) {
-      bgColor = colorScheme.errorContainer.withOpacity(0.65);
-      fgColor = colorScheme.onErrorContainer;
-    } else {
-      bgColor = Colors.transparent;
-      fgColor = colorScheme.onSurface;
-    }
-
-    Widget segment = Material(
-      color: bgColor,
-      borderRadius: M3Shape.radiusXl,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: item.isLoading ? null : item.onPressed,
-        borderRadius: M3Shape.radiusXl,
-        hoverColor: item.isPrimary
-            ? colorScheme.onPrimary.withOpacity(0.1)
-            : colorScheme.surfaceContainerHigh,
-        child: Container(
-          height: height - 6.0,
-          padding: EdgeInsets.symmetric(horizontal: hPad),
-          alignment: Alignment.center,
-          child: item.isLoading
-              ? SizedBox(
-                  width: 16.0,
-                  height: 16.0,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.0,
-                    color: fgColor,
-                  ),
-                )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (item.icon != null) ...[
-                      Icon(item.icon, size: 17.0, color: fgColor),
-                      const SizedBox(width: 8.0),
-                    ],
-                    Text(
-                      item.label,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: fgColor,
-                        fontWeight: FontWeight.w700,
-                        fontSize: compact
-                            ? M3FontSize.bodySmallPlus
-                            : M3FontSize.labelMediumPlus,
-                        letterSpacing: 0.15,
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-      ),
-    );
-
-    final id = item.semanticsIdentifier;
-    if (id != null && id.isNotEmpty) {
-      return TestSemantics.button(
-        identifier: id,
-        label: item.label,
-        onPressed: item.isLoading ? null : item.onPressed,
-        child: segment,
-      );
-    }
-    return segment;
   }
 }
 
@@ -342,9 +248,7 @@ class M3PageHeader extends StatelessWidget {
                           subtitleAr,
                           textDirection: TextDirection.rtl,
                           textAlign: TextAlign.right,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            fontSize: M3FontSize.titleMediumPlus,
+                          style: theme.textTheme.headlineSmall?.copyWith(
                             color: colorScheme.onSurface,
                           ),
                         ),
@@ -406,8 +310,7 @@ class M3PageHeader extends StatelessWidget {
                                 child: Text(
                                   subtitleAr,
                                   textDirection: TextDirection.rtl,
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w800,
+                                  style: theme.textTheme.headlineSmall?.copyWith(
                                     color: colorScheme.onSurface,
                                   ),
                                 ),

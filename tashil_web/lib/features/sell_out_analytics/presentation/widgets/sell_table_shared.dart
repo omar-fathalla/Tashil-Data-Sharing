@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:tashil_web/core/theme/m3_typography.dart';
-import '../../../../core/theme/m3_shape.dart';
+import 'package:tashil_web/core/widgets/m3_button_group.dart';
 import '../../../../core/widgets/app_icons.dart';
 
-/// Shared action buttons (Upload / Print PDF / Export Excel) used by both the
-/// Sell-Out and Sell-In filter cards so the two pages stay visually identical.
+/// Shared Sell-Out / Sell-In toolbar actions as real M3 buttons (tonal group).
+/// Replaces the old InkWell+Container fakes (G21). Prefer [M3ButtonGroup] directly
+/// for new call sites; these helpers keep ValueKeys for existing tests.
 class SellActionButtons {
   SellActionButtons._();
 
@@ -16,48 +16,17 @@ class SellActionButtons {
     Key key = const ValueKey('upload_sellout_button'),
     bool expand = false,
   }) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return InkWell(
+    return FilledButton.tonalIcon(
       key: key,
-      borderRadius: M3Shape.radiusLg,
-      onTap: isUploading ? null : onTap,
-      child: Container(
-        height: 38.0,
-        padding: const EdgeInsets.symmetric(horizontal: 14.0),
-        decoration: BoxDecoration(
-          color: cs.secondary,
-          borderRadius: M3Shape.radiusLg,
-        ),
-        child: Row(
-          mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (isUploading)
-              const SizedBox(
-                width: 14.0,
-                height: 14.0,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2.0, color: Colors.white),
-              )
-            else
-              Icon(AppIcons.uploadFile, size: 16.0, color: cs.onSecondary),
-            const SizedBox(width: 6.0),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: M3FontSize.labelSmallPlus,
-                  color: cs.onSecondary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      onPressed: isUploading ? null : onTap,
+      icon: isUploading
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(AppIcons.uploadFile),
+      label: Text(label),
     );
   }
 
@@ -66,38 +35,11 @@ class SellActionButtons {
     required VoidCallback? onTap,
     bool expand = false,
   }) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return InkWell(
+    return FilledButton.tonalIcon(
       key: const ValueKey('export_pdf_button'),
-      borderRadius: M3Shape.radiusLg,
-      onTap: onTap,
-      child: Container(
-        height: 38.0,
-        padding: const EdgeInsets.symmetric(horizontal: 10.0),
-        decoration:
-            BoxDecoration(color: cs.primary, borderRadius: M3Shape.radiusLg),
-        child: Row(
-          mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(AppIcons.print, size: 15.0, color: cs.onPrimary),
-            const SizedBox(width: 5.0),
-            Flexible(
-              child: Text(
-                'طباعة',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: M3FontSize.labelSmall,
-                  color: cs.onPrimary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      onPressed: onTap,
+      icon: const Icon(AppIcons.print),
+      label: const Text('طباعة'),
     );
   }
 
@@ -106,46 +48,15 @@ class SellActionButtons {
     required VoidCallback? onTap,
     bool expand = false,
   }) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return InkWell(
+    return OutlinedButton.icon(
       key: const ValueKey('export_excel_button'),
-      borderRadius: M3Shape.radiusLg,
-      onTap: onTap,
-      child: Container(
-        height: 38.0,
-        padding: const EdgeInsets.symmetric(horizontal: 10.0),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHigh,
-          borderRadius: M3Shape.radiusLg,
-          border: Border.all(color: cs.outlineVariant.withOpacity(0.6)),
-        ),
-        child: Row(
-          mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(AppIcons.fileDownload, size: 15.0, color: cs.onSurface),
-            const SizedBox(width: 5.0),
-            Flexible(
-              child: Text(
-                'تصدير',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: M3FontSize.labelSmall,
-                  color: cs.onSurface,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      onPressed: onTap,
+      icon: const Icon(AppIcons.fileDownload),
+      label: const Text('تصدير'),
     );
   }
 
-  /// Upload, Print PDF, Export Excel in one row (Excel ends up at the far
-  /// left in RTL, matching the Sell-Out filter card).
+  /// Upload (tonal) + Print (tonal) + Export (outlined) as [M3ButtonGroup].
   static Widget row(
     BuildContext context, {
     required String uploadLabel,
@@ -154,20 +65,33 @@ class SellActionButtons {
     VoidCallback? onExportPdf,
     required VoidCallback onExportExcel,
   }) {
-    return Row(
+    return M3ButtonGroup(
       key: const ValueKey('sell_action_buttons_row'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (onUpload != null) ...[
-          upload(context,
-              label: uploadLabel, onTap: onUpload, isUploading: isUploading),
-          const SizedBox(width: 8.0),
-        ],
-        if (onExportPdf != null) ...[
-          printPdf(context, onTap: onExportPdf),
-          const SizedBox(width: 8.0),
-        ],
-        exportExcel(context, onTap: onExportExcel),
+      items: [
+        if (onUpload != null)
+          M3GroupItem(
+            key: const ValueKey('upload_sellout_button'),
+            label: uploadLabel,
+            icon: AppIcons.uploadFile,
+            onPressed: onUpload,
+            isLoading: isUploading,
+            kind: M3GroupItemKind.tonal,
+          ),
+        if (onExportPdf != null)
+          M3GroupItem(
+            key: const ValueKey('export_pdf_button'),
+            label: 'طباعة',
+            icon: AppIcons.print,
+            onPressed: onExportPdf,
+            kind: M3GroupItemKind.tonal,
+          ),
+        M3GroupItem(
+          key: const ValueKey('export_excel_button'),
+          label: 'تصدير',
+          icon: AppIcons.fileDownload,
+          onPressed: onExportExcel,
+          kind: M3GroupItemKind.outlined,
+        ),
       ],
     );
   }
