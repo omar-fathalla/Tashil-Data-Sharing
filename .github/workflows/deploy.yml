@@ -1,23 +1,22 @@
 # Production deploy after CI tests succeed on main (backend → Cloud Run, web → Firebase Hosting).
 #
 # Trigger: workflow_run of "CI tests" completed successfully on main (no runner busy-wait).
-# Also workflow_dispatch for manual redeploys. Intentionally NO merge_group / push trigger —
-# one deploy per green main CI run. Merge-queue required checks live in ci.yml /
-# playwright_smoke.yml only.
+# Also workflow_dispatch for manual redeploys. Intentionally NO merge_group / push /
+# pull_request / pull_request_target — one deploy per green main CI run. Merge-queue
+# required checks live in ci.yml / playwright_smoke.yml only.
 #
 # Why not push + await-ci: after #95 routed all jobs to tashil-mac, await-ci busy-waited
-# ~2.5h on a Mac runner while CI gate jobs queued behind it (deadlock). workflow_run
-# waits in GitHub's event bus — zero runner minutes held.
+# ~2.5h on a Mac runner while CI gate jobs queued behind it (deadlock). #97 workflow_run
+# waits in GitHub's event bus — zero runner minutes held. Keep that pattern.
 #
-# TODO(billing): TEMPORARY — ALL jobs use Mac self-hosted until GitHub billing is fixed.
-# Single expression CI_RUNS_ON || ["self-hosted","tashil-mac"].
-# Revert: restore light/gate jobs to CI_HOSTED_RUNNER / ubuntu-latest (hybrid #56).
-# NEVER use GitHub-hosted macOS runners.
-# See docs/ci-self-hosted.md / #41 / #55 / #56.
+# Mac self-hosted only (CI_RUNS_ON): deploy-gate + deploy-backend/web stay on Mac until
+# WIF/gcloud/ubuntu compatibility is tested separately. Portable CI is hosted ubuntu.
+# NEVER macos-latest / larger / paid runners. Public repo: no PR triggers; jobs require
+# same-repo main workflow_run (or workflow_dispatch) so fork PRs never touch this Mac.
+# See docs/ci-self-hosted.md / #41 / #55 / #56 / #97.
 #
 # Note: tashil-mac … tashil-mac-4 share one physical Mac. Workflow concurrency queues
-# deploys; deploy-backend/web also join job group tashil-deploy (deploy-only — not
-# shared with Flutter/smoke, which queue natively to avoid pending-slot eviction).
+# deploys; deploy-backend/web also join job group tashil-deploy (deploy-only).
 # Prefer MAC_SHARED_LOCK=1 for cross-repo Mac overlap. See docs/ci-self-hosted.md.
 #
 # Auth: Workload Identity Federation, no JSON keys. The provider only accepts tokens from
@@ -61,20 +60,36 @@ env:
 
 jobs:
   # Tiny gate: confirm CI success context + skip ignored paths. No busy-wait.
-  # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
+  # Stays on Mac with deploy jobs until WIF/ubuntu gate is tested. Trusted events only.
   deploy-gate:
     name: Deploy gate
     if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main')
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+      github.repository == 'omar-fathalla/Tashil-Data-Sharing' &&
+      github.event_name != 'pull_request' &&
+      github.event_name != 'pull_request_target' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.head_repository.full_name == github.repository
+        )
+      )
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 5
     outputs:
       should_deploy: ${{ steps.decide.outputs.should_deploy }}
       sha: ${{ steps.decide.outputs.sha }}
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety)."
+          exit 1
       - uses: actions/checkout@v4
         with:
           # workflow_run: deploy the CI-green commit, not whatever tip holds this YAML.
@@ -136,14 +151,22 @@ jobs:
     if: needs.deploy-gate.outputs.should_deploy == 'true'
     # Stay on Mac/self-hosted where gcloud WIF + toolchains work (#41 / #55 / #56).
     # Deploy-only concurrency (not shared with Flutter/smoke). Never cancel.
+    # Trusted via deploy-gate if (same-repo main workflow_run / dispatch only).
     concurrency:
       group: tashil-deploy
       cancel-in-progress: false
-    # TODO(billing): TEMP — same Mac expression as other jobs (was already Mac).
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # Observed ~4.5m; Cloud Run source deploy can spike — 30m ceiling.
     timeout-minutes: 30
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety)."
+          exit 1
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.deploy-gate.outputs.sha }}
@@ -282,11 +305,19 @@ jobs:
     concurrency:
       group: tashil-deploy
       cancel-in-progress: false
-    # TODO(billing): TEMP — same Mac expression as other jobs (was already Mac).
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    # Mac self-hosted until WIF/ubuntu deploy is tested. Trusted via deploy-gate.
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # Observed ~3m (flutter build + Firebase Hosting); 30m ceiling (Mac timeout policy).
     timeout-minutes: 30
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety)."
+          exit 1
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.deploy-gate.outputs.sha }}

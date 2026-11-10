@@ -1,16 +1,23 @@
 # Self-hosted CI runbook (tashil-mac)
 
-CI uses a **hybrid runner split**:
+CI uses **hosted ubuntu for portable jobs**; Mac self-hosted is **deploy-only**
+until WIF/ubuntu deploy is tested:
 
 | Class | Jobs | Runner var | Default |
 |-------|------|------------|---------|
-| Light / fast | Go tests, path detect, Cloud Run pin, Flutter/smoke gates, deploy gate | `CI_HOSTED_RUNNER` | `ubuntu-latest` (GitHub-hosted) |
-| Heavy | Flutter analyze/test (≤45m), Playwright smoke (≤45m) | `CI_RUNS_ON` | `["self-hosted","macOS","tashil-mac"]` |
-| Deploy | `deploy-backend` / `deploy-web` (≤30m) | `CI_RUNS_ON` | Mac (gcloud WIF / toolchains) |
+| Portable CI | Path detect, Cloud Run pin, Go tests, Flutter analyze/test, Playwright smoke + gates, PR comment | `CI_HOSTED_RUNNER` | `ubuntu-latest` (GitHub-hosted) |
+| Deploy | `deploy-gate` / `deploy-backend` / `deploy-web` (≤30m) | `CI_RUNS_ON` | `["self-hosted","macOS","tashil-mac"]` |
 
-**Never** use GitHub-hosted macOS runners (`macos-latest`) — they are expensive.
+**Never** use GitHub-hosted macOS runners (`macos-latest`) / larger / paid runners.
 `deploy.yml` keeps `cancel-in-progress: false` so production deploys are never
 cancelled mid-flight.
+
+**Public repo Mac safety:** `deploy.yml` has no `pull_request` /
+`pull_request_target` triggers. Deploy jobs require same-repo `workflow_run` on
+`main` (or `workflow_dispatch`). Every job also has a refuse step that fails
+closed if a fork PR somehow lands on `self-hosted`. Keep `CI_HOSTED_RUNNER`
+unset (ubuntu) while public — do not point it at Mac for budget fallback unless
+you accept that only non-fork events should use that fallback.
 
 **This Mac is shared** with other bots/accounts (their own runners, Firestore
 emulators, Flutter/Go builds). CI must never assume exclusive use of the machine.
@@ -34,19 +41,17 @@ dedicated / single-runner:
 
 | Lever | What it does | Who sets it |
 |-------|--------------|-------------|
-| **Hosted light gates** | Path detect, Cloud Run pin, Backend Go, Flutter/smoke gates, deploy `deploy-gate` stay on `CI_HOSTED_RUNNER` (default `ubuntu-latest`) so they never compete for Mac CPU/disk | Already in workflows — leave `CI_HOSTED_RUNNER` unset (or `"ubuntu-latest"`). **Do not** point it at Mac unless GitHub minutes are exhausted |
-| **Native Mac runner queue** | `test-flutter` / `smoke-run` have **no** shared job concurrency group — the 4 `tashil-mac` runners queue them (runner queue never cancels). Avoids GitHub pending-slot eviction | Wired in workflows (this repo) |
+| **Hosted portable CI** | Path detect, Cloud Run pin, Backend Go, Flutter analyze/test, Playwright smoke + gates stay on `CI_HOSTED_RUNNER` (default `ubuntu-latest`) so PR CI never competes for Mac CPU/disk | Already in workflows — leave `CI_HOSTED_RUNNER` unset (or `"ubuntu-latest"`). **Do not** point it at Mac while the repo is public |
 | **Job group `tashil-deploy`** | Deploy-only: `deploy-backend` / `deploy-web` serialize one-at-a-time (`cancel-in-progress: false`). Not shared with PR/test jobs | Wired in `deploy.yml` |
-| **`MAC_SHARED_LOCK=1`** | Cross-repo directory lock (`~/mac-resources/LOCK.d`) so other bots/repos on the same Mac serialize with our heavies | Repo variable (Actions → Variables) |
+| **`MAC_SHARED_LOCK=1`** | Cross-repo directory lock (`~/mac-resources/LOCK.d`) so other bots/repos on the same Mac serialize with deploy / rare Mac fallback | Repo variable (Actions → Variables) |
 | **Fewer online runners** | Stop `tashil-mac-3` / `tashil-mac-4` (leave 1–2 online) so the label cannot schedule four heavies | On the Mac host (`svc.sh stop`) |
 
 **Ops checklist (shared Mac):**
 
-1. Confirm light jobs are hosted (variable unset or `"ubuntu-latest"`).
+1. Confirm portable CI is hosted (variable unset or `"ubuntu-latest"`).
 2. Set **`MAC_SHARED_LOCK=1`** on this repo while multiple runners share the box.
 3. Prefer **1–2** online Mac runners; use 4 only when load is proven quiet.
-4. Expect heavies to queue (wall-clock longer, step times healthy) instead of
-   10m Setup Node / 12m flutter builds from thrash.
+4. Deploy stays Mac via `workflow_run` (#97) — no await-ci busy-wait.
 
 **`tashil-mac-2` / `tashil-mac-3` / `tashil-mac-4` run as user `tashil-ci`**
 (`HOME=/Users/tashil-ci`). Toolchains live at `$HOME/toolchains` — never hardcode
@@ -98,8 +103,7 @@ pending.
 
 | Job | Concurrency |
 |-----|-------------|
-| `test-flutter` | **none** — native `tashil-mac` runner queue |
-| `smoke-run` | **none** — native queue; still waits for same-SHA Flutter via `wait-ci-flutter` |
+| `test-flutter` / `smoke-run` | **none** (hosted ubuntu by default; lock no-ops) |
 | `deploy-backend` / `deploy-web` | job group `tashil-deploy` (`cancel-in-progress: false`) |
 
 ```yaml
@@ -153,12 +157,12 @@ bash scripts/mac_lock_ci.sh release "$AGENT"
 
 | Job | Job concurrency? | Lock when `MAC_SHARED_LOCK=1`? | acquire step timeout | job timeout |
 |-----|-------------------|-------------------------------|----------------------|-------------|
-| Backend Go (+ emulator) | no (hosted by default) | yes (no-op on ubuntu) | 10m | 45m |
-| Flutter analyze & test (run) | no (native Mac queue) | yes | 8m | 45m |
-| Playwright Semantics smoke (run) | no (native Mac queue) | yes | 15m | 45m |
-| Wait CI Flutter (smoke) | no | **no** (poll only) | — | 45m (deadline 40m) |
-| Deploy gate | no | **no** | — | 5m |
-| Deploy backend / web | **`tashil-deploy`** | no (deploy group + workflow queue) | — | 30m / 30m |
+| Backend Go (+ emulator) | no (hosted ubuntu) | yes (no-op on ubuntu) | 10m | 45m |
+| Flutter analyze & test (run) | no (hosted ubuntu) | yes (no-op on ubuntu) | 8m | 45m |
+| Playwright Semantics smoke (run) | no (hosted ubuntu) | yes (no-op on ubuntu) | 15m | 45m |
+| Wait CI Flutter (smoke) | no (hosted) | **no** (poll only) | — | 45m (deadline 40m) |
+| Deploy gate | no (Mac) | **no** | — | 5m |
+| Deploy backend / web | **`tashil-deploy`** (Mac) | no (deploy group + workflow queue) | — | 30m / 30m |
 | Cloud Run pin / PR comment / path detect & gates | no | **no** | — | 5m (hosted via `CI_HOSTED_RUNNER`) |
 
 Path filters (`dorny/paths-filter`): no workflow-level `paths-ignore` — workflows always
@@ -173,8 +177,8 @@ checks / merge queue).
 and smoke `wait-ci-flutter` use `if: always() && !cancelled() && needs.changes.result == 'success'`
 and path-skip inside the job. That avoids `needs.*.result=abandoned` when a job-level
 path `if:` drops the node (seen on main `db5888d` / #71 and smoke on #72/#73).
-`smoke-run` (Mac) schedules only when `wait-ci-flutter.outputs.run_smoke == 'true'`
-so docs-only PRs do not spin a Mac runner. `test-flutter` keeps its job-level path
+`smoke-run` (hosted) schedules only when `wait-ci-flutter.outputs.run_smoke == 'true'`
+so docs-only PRs do not spin a heavy runner. `test-flutter` keeps its job-level path
 `if:`. Gates fail clearly on `abandoned` / `cancelled` and tell you to use
 **Re-run all jobs** (not Re-run failed jobs — successful deps like `changes` become
 `abandoned` on failed-only re-runs).
@@ -279,10 +283,10 @@ Both expressions use `fromJSON` so a **single variable** can be either a JSON st
 runner name or a JSON label array:
 
 ```yaml
-# Light jobs (default GitHub-hosted ubuntu):
+# Portable CI (default GitHub-hosted ubuntu):
 runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
 
-# Heavy + deploy jobs (default Mac self-hosted):
+# Deploy jobs (default Mac self-hosted; keep until WIF/ubuntu tested):
 runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
 ```
 
@@ -290,11 +294,11 @@ Settings → Secrets and variables → Actions → Variables:
 
 | Goal | Variable | Value (exact) |
 |------|----------|---------------|
-| Default (recommended) | leave `CI_*` unset | light → ubuntu; heavy/deploy → Mac |
+| Default (recommended) | leave `CI_*` unset | portable CI → ubuntu; deploy → Mac |
 | Serialize vs other bots on shared Mac | `MAC_SHARED_LOCK` | `1` (recommended while 2+ runners share one host) |
-| Force light jobs to Mac (GitHub minutes / spending exhausted) | `CI_HOSTED_RUNNER` | `["self-hosted","macOS","tashil-mac"]` — also set `MAC_SHARED_LOCK=1` and/or reduce online runners |
-| Explicit ubuntu for light jobs | `CI_HOSTED_RUNNER` | `"ubuntu-latest"` (JSON string — include the quotes) |
-| Move heavy jobs to ubuntu (Mac offline) | `CI_RUNS_ON` | `["ubuntu-latest"]` |
+| Force portable CI to Mac (GitHub minutes exhausted) | `CI_HOSTED_RUNNER` | `["self-hosted","macOS","tashil-mac"]` — **avoid while public** (fork PRs blocked by refuse step, but prefer hosted) |
+| Explicit ubuntu for portable CI | `CI_HOSTED_RUNNER` | `"ubuntu-latest"` (JSON string — include the quotes) |
+| Move deploy to ubuntu (after WIF tested) | `CI_RUNS_ON` | `["ubuntu-latest"]` |
 
 **Important:** values must be valid JSON for `fromJSON`. A bare `ubuntu-latest` (no
 quotes) is **not** valid — use `"ubuntu-latest"` or leave the var unset.
@@ -332,7 +336,7 @@ CI-green commit only touched `**.md`, `docs/**`, `LICENSE`, `.gitignore`, or
 
 | Job | Runner | Notes |
 |-----|--------|-------|
-| `deploy-gate` | `CI_RUNS_ON` (Mac while TODO billing) | 5m; success-only `workflow_run` / always on dispatch; path skip; outputs `sha` + `should_deploy` — **no** polling |
+| `deploy-gate` | `CI_RUNS_ON` (Mac until WIF/ubuntu tested) | 5m; same-repo success-only `workflow_run` on `main` / dispatch; path skip; outputs `sha` + `should_deploy` — **no** polling; no PR triggers |
 | `deploy-backend` | `CI_RUNS_ON` (Mac) | job concurrency `tashil-deploy` (`cancel-in-progress: false`); checks out gate SHA; smoke unit test; gcloud WIF; `CLOUDSDK_CONFIG` under `$RUNNER_TEMP`; hard-fail smoke `/api/v1/version` + `/livez` + `/api/v1/health`; timeout 30m; `--max-instances=1` unchanged |
 | `deploy-web` | `CI_RUNS_ON` (Mac) | same `tashil-deploy` group; Flutter detect/require-preinstalled; gcloud isolation; timeout 30m |
 
