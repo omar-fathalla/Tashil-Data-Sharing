@@ -210,6 +210,19 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
     );
   }
 
+  /// Resolves a finite viewport width so wide tables scroll inside the card
+  /// instead of expanding the page and clipping off-screen (common in RTL).
+  double _resolveViewportWidth(BoxConstraints constraints, BuildContext context) {
+    if (constraints.maxWidth.isFinite && constraints.maxWidth > 0) {
+      return constraints.maxWidth;
+    }
+    if (constraints.minWidth.isFinite && constraints.minWidth > 0) {
+      return constraints.minWidth;
+    }
+    final mediaWidth = MediaQuery.sizeOf(context).width;
+    return mediaWidth.isFinite && mediaWidth > 0 ? mediaWidth : 0.0;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -221,6 +234,9 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
         widget.showControls;
 
     return Container(
+      // Keep overflowing table ink inside the rounded card / bordered shell.
+      // Container asserts if clipBehavior != Clip.none without a decoration.
+      clipBehavior: widget.decoration != null ? Clip.antiAlias : Clip.none,
       decoration: widget.decoration,
       padding: widget.padding,
       child: Column(
@@ -327,8 +343,10 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
           // Scrollable Table Area with Always-Visible Scrollbar & Full-Width Column Expansion
           LayoutBuilder(
             builder: (context, constraints) {
-              final availableWidth =
-                  constraints.maxWidth.isFinite ? constraints.maxWidth : 0.0;
+              final availableWidth = _resolveViewportWidth(constraints, context);
+              // SizedBox pins the scroll *viewport* to the card width. Without it,
+              // an unbounded/loose parent lets the view grow with the table and the
+              // trailing RTL columns (e.g. Net) get clipped by the window edge.
               return Scrollbar(
                 controller: _effectiveController,
                 thumbVisibility: true,
@@ -336,13 +354,17 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
                 interactive: true,
                 thickness: 9.0,
                 radius: const Radius.circular(8.0),
-                child: SingleChildScrollView(
-                  controller: _effectiveController,
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  width: availableWidth > 0 ? availableWidth : null,
+                  child: SingleChildScrollView(
+                    controller: _effectiveController,
+                    scrollDirection: Axis.horizontal,
+                    clipBehavior: Clip.hardEdge,
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    child: _buildExpandedChild(widget.child, availableWidth),
                   ),
-                  child: _buildExpandedChild(widget.child, availableWidth),
                 ),
               );
             },
@@ -352,15 +374,37 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
     );
   }
 
+  /// Peel common width wrappers so column expansion still sees the [DataTable].
+  DataTable? _unwrapDataTable(Widget child) {
+    var current = child;
+    // Bound unwrap depth so adversarial / unusual trees cannot loop forever.
+    for (var i = 0; i < 6; i++) {
+      if (current is DataTable) return current;
+      if (current is ConstrainedBox && current.child != null) {
+        current = current.child!;
+        continue;
+      }
+      if (current is SizedBox && current.child != null) {
+        current = current.child!;
+        continue;
+      }
+      if (current is Padding && current.child != null) {
+        current = current.child!;
+        continue;
+      }
+      if (current is DecoratedBox && current.child != null) {
+        current = current.child!;
+        continue;
+      }
+      break;
+    }
+    return null;
+  }
+
   Widget _buildExpandedChild(Widget child, double availableWidth) {
     if (availableWidth <= 0) return child;
 
-    DataTable? dt;
-    if (child is DataTable) {
-      dt = child;
-    } else if (child is ConstrainedBox && child.child is DataTable) {
-      dt = child.child as DataTable;
-    }
+    final dt = _unwrapDataTable(child);
 
     if (dt != null && dt.columns.isNotEmpty) {
       final colCount = dt.columns.length;

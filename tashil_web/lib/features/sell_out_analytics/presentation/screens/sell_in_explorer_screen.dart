@@ -927,19 +927,25 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
 
   Widget _sellInCell(int i, Widget child) => SizedBox(
         width: _sellInColWidths[i],
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-          child: Align(
-            alignment: _sellInColNumeric[i]
-                ? AlignmentDirectional.centerEnd
-                : AlignmentDirectional.centerStart,
-            child: child,
+        child: ClipRect(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+            child: Align(
+              alignment: _sellInColNumeric[i]
+                  ? AlignmentDirectional.centerEnd
+                  : AlignmentDirectional.centerStart,
+              child: child,
+            ),
           ),
         ),
       );
 
   /// Header row + ListView.builder: only rows on screen are built. Rows are
   /// appended 25 at a time as the user nears the end of the list.
+  ///
+  /// Intrinsic column width is fixed ([_sellInColWidths]); the outer
+  /// [TableScrollContainer] pins the viewport and scrolls horizontally so the
+  /// Net column stays reachable instead of being clipped off-screen.
   Widget _buildVirtualSellInTable(BuildContext context, ColorScheme colorScheme) {
     final theme = Theme.of(context);
     final totalWidth = _sellInColWidths.fold<double>(0, (a, b) => a + b);
@@ -958,6 +964,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     ];
     final records = _records;
     return SizedBox(
+      key: const ValueKey('sell_in_virtual_table'),
       width: totalWidth,
       height: 600.0,
       child: Column(
@@ -1684,6 +1691,7 @@ onChanged: m3Legacy<int>((v) {
 
         // 3. Sell-In Records Table
         Container(
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLowest,
             borderRadius: M3Shape.radiusLg,
@@ -1709,6 +1717,7 @@ onChanged: m3Legacy<int>((v) {
                       ),
                     )
                   : TableScrollContainer(
+                      key: const ValueKey('sell_in_records_table_scroll'),
                       controller: _recordsTableScrollController,
                       showSwipeHint: true,
                       padding: const EdgeInsets.all(16.0),
@@ -3334,6 +3343,7 @@ onChanged: m3Legacy<int>((v) {
           label: 'Uploaded Files (${_archivedSellInFiles.length})',
           container: true,
           child: Container(
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerLowest,
               borderRadius: M3Shape.radiusLg,
@@ -3377,6 +3387,7 @@ onChanged: m3Legacy<int>((v) {
                         ),
                       )
                     : TableScrollContainer(
+                        key: const ValueKey('sell_in_archive_table_scroll'),
                         controller: _archiveSheetsScrollController,
                         showSwipeHint: true,
                         child: DataTable(

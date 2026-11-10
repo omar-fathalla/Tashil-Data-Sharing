@@ -550,7 +550,9 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
 
             // Tabular View Card
             Card(
+              key: const ValueKey('pricing_compliance_table_card'),
               elevation: 0,
+              clipBehavior: Clip.antiAlias,
               color: colorScheme.surfaceContainerLow,
               shape: RoundedRectangleBorder(
                 borderRadius: M3Shape.radiusLg,
@@ -815,6 +817,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                                     return SizedBox(
                                       width: availableWidth,
                                       child: TableScrollContainer(
+                                        key: const ValueKey('pricing_compliance_table_scroll'),
                                         showSwipeHint: true,
                                         child: ConstrainedBox(
                                           constraints: BoxConstraints(minWidth: availableWidth),
