@@ -11063,7 +11063,8 @@ class ApiClient {
     if (status.isNotEmpty) params['status'] = status;
     final uri = Uri.parse(ApiEndpoints.competitorSuggestions)
         .replace(queryParameters: params.isEmpty ? null : params);
-    final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 12));
+    // Pending queue can be hundreds of rows (~320 own SKUs × up to 3); allow headroom.
+    final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 45));
     if (resp.statusCode != 200) {
       throw Exception('فشل تحميل اقتراحات المنافسين (${resp.statusCode})');
     }
@@ -11120,10 +11121,14 @@ class ApiClient {
     };
     late http.Response resp;
     try {
+      // Read-like POST: must NOT invalidate SWR / bump dataRevision.
+      // Otherwise Compare's DataRefreshMixin reloads → re-POSTs → infinite KPI hang
+      // and AI-pick request seq races swallow the 35s Arabic timeout.
       resp = await BackendHttp.post(
         Uri.parse(ApiEndpoints.competitorSuggestionsSku),
         headers: _headers,
         body: jsonEncode(body),
+        invalidateCache: false,
       ).timeout(suggestCompetitorsForSkuTimeout);
     } on TimeoutException {
       throw Exception(
@@ -11425,6 +11430,9 @@ class ApiClient {
     return (volume: 1.0, unitLabel: 'عبوة', badgeLabel: '1 عبوة قياسية');
   }
 
+  /// Client ceiling for Compare competitive-monthly. Mutable for unit tests only.
+  static Duration competitiveMonthlyTimeout = const Duration(seconds: 45);
+
   /// One-shot server aggregate for Compare: barcode → YYYY-MM → (avg unit price, units),
   /// plus live own-SKU name/category metadata (is_own_brand). No raw row paging.
   Future<({
@@ -11446,7 +11454,15 @@ class ApiClient {
       params['chain'] = chain;
     }
     final uri = Uri.parse(ApiEndpoints.competitiveMonthly).replace(queryParameters: params);
-    final res = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 45));
+    late http.Response res;
+    try {
+      res = await BackendHttp.get(uri, headers: _headers)
+          .timeout(competitiveMonthlyTimeout);
+    } on TimeoutException {
+      throw Exception(
+        'انتهت مهلة تحميل بيانات مقارنة الأسعار — حاول مرة أخرى',
+      );
+    }
     if (res.statusCode != 200) {
       throw Exception('competitive-monthly HTTP ${res.statusCode}');
     }
@@ -11570,6 +11586,11 @@ class ApiClient {
       metaByBarcode = agg.metaByBarcode;
       ownSkus = agg.ownSkus;
     } catch (e) {
+      // Surface Arabic timeout to Compare (clear error, never infinite KPI skeletons).
+      final msg = e.toString();
+      if (msg.contains('انتهت مهلة تحميل بيانات مقارنة الأسعار')) {
+        rethrow;
+      }
       debugPrint('[ApiClient] competitive-monthly failed: $e');
       lastCompetitiveMonths = const [];
       lastCompetitiveByBarcode = const {};

@@ -103,9 +103,11 @@ void main() {
       expect(find.text('نفس الفئة وحجم قريب'), findsOneWidget);
       expect(find.text('موافقة'), findsOneWidget);
       expect(find.text('رفض'), findsOneWidget);
+      expect(find.text('موافقة على الكل'), findsOneWidget);
       expect(find.textContaining('تشغيل دفعة'), findsOneWidget);
       expect(find.text('صنف الشركة'), findsOneWidget);
       expect(find.text('المنافس المقترح'), findsOneWidget);
+      expect(find.byKey(const ValueKey('suggestion-group-OWN1')), findsOneWidget);
 
       await tester.tap(find.text('موافقة'));
       await tester.pumpAndSettle();

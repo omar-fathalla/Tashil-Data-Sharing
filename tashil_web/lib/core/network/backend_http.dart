@@ -39,26 +39,56 @@ class BackendHttp {
     return r;
   }
 
-  static Future<http.Response> post(Uri url,
-          {Map<String, String>? headers, Object? body}) async =>
-      _mutated(_note(await http.post(url, headers: headers, body: body), url, headers));
+  /// POST. Set [invalidateCache] false for read-like POSTs that must not bump
+  /// [dataRevision] (e.g. on-demand AI picks) — otherwise Compare reloads forever.
+  static Future<http.Response> post(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    bool invalidateCache = true,
+  }) async {
+    final r = _note(await http.post(url, headers: headers, body: body), url, headers);
+    return invalidateCache ? _mutated(r) : r;
+  }
 
-  static Future<http.Response> put(Uri url,
-          {Map<String, String>? headers, Object? body}) async =>
-      _mutated(_note(await http.put(url, headers: headers, body: body), url, headers));
+  static Future<http.Response> put(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    bool invalidateCache = true,
+  }) async {
+    final r = _note(await http.put(url, headers: headers, body: body), url, headers);
+    return invalidateCache ? _mutated(r) : r;
+  }
 
-  static Future<http.Response> patch(Uri url,
-          {Map<String, String>? headers, Object? body}) async =>
-      _mutated(_note(await http.patch(url, headers: headers, body: body), url, headers));
+  static Future<http.Response> patch(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    bool invalidateCache = true,
+  }) async {
+    final r = _note(await http.patch(url, headers: headers, body: body), url, headers);
+    return invalidateCache ? _mutated(r) : r;
+  }
 
-  static Future<http.Response> delete(Uri url,
-          {Map<String, String>? headers, Object? body}) async =>
-      _mutated(_note(await http.delete(url, headers: headers, body: body), url, headers));
+  static Future<http.Response> delete(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    bool invalidateCache = true,
+  }) async {
+    final r = _note(await http.delete(url, headers: headers, body: body), url, headers);
+    return invalidateCache ? _mutated(r) : r;
+  }
 
-  static Future<http.StreamedResponse> send(http.BaseRequest request) async =>
-      request.method == 'GET'
-          ? _note(await request.send(), request.url, request.headers)
-          : _mutated(_note(await request.send(), request.url, request.headers));
+  static Future<http.StreamedResponse> send(
+    http.BaseRequest request, {
+    bool invalidateCache = true,
+  }) async {
+    final r = _note(await request.send(), request.url, request.headers);
+    if (request.method == 'GET' || !invalidateCache) return r;
+    return _mutated(r);
+  }
 
   /// Header that asks the backend to run a large ingest as a background job.
   static const asyncJobHeader = 'X-Tashil-Async';

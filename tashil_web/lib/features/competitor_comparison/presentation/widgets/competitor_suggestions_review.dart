@@ -3,16 +3,73 @@ import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_shape.dart';
 import 'package:tashil_web/core/theme/m3_spacing.dart';
+import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:tashil_web/core/widgets/m3_dropdown.dart';
 import 'package:tashil_web/core/widgets/m3_feedback.dart';
 
+/// One own-SKU card with its pending competitor suggestions (2–3 typically).
+class PendingSuggestionGroup {
+  final String ownBarcode;
+  final String ownSkuName;
+  final double ownUnitPrice;
+  final int ownUnits;
+  final List<CompetitorSuggestionModel> suggestions;
+
+  const PendingSuggestionGroup({
+    required this.ownBarcode,
+    required this.ownSkuName,
+    required this.ownUnitPrice,
+    required this.ownUnits,
+    required this.suggestions,
+  });
+}
+
+/// Groups flat pending rows by own barcode (rank ascending within each group).
+List<PendingSuggestionGroup> groupPendingSuggestionsByOwnSku(
+  List<CompetitorSuggestionModel> items,
+) {
+  final order = <String>[];
+  final byOwn = <String, List<CompetitorSuggestionModel>>{};
+  for (final s in items) {
+    final key = s.ownBarcode.trim();
+    if (key.isEmpty) continue;
+    final list = byOwn.putIfAbsent(key, () {
+      order.add(key);
+      return <CompetitorSuggestionModel>[];
+    });
+    if (!list.any((e) => e.id == s.id)) {
+      list.add(s);
+    }
+  }
+  final out = <PendingSuggestionGroup>[];
+  for (final key in order) {
+    final list = List<CompetitorSuggestionModel>.from(byOwn[key]!)
+      ..sort((a, b) => a.rank.compareTo(b.rank));
+    final first = list.first;
+    out.add(
+      PendingSuggestionGroup(
+        ownBarcode: key,
+        ownSkuName: first.ownSkuName,
+        ownUnitPrice: first.ownUnitPrice,
+        ownUnits: first.ownUnits,
+        suggestions: list,
+      ),
+    );
+  }
+  return out;
+}
+
 /// Arabic RTL review queue for pending AI competitor suggestions.
 /// Pending items never appear in Compare KPIs until owner approve.
+/// Batch size only controls «تشغيل دفعة» — it never caps the pending list.
 class CompetitorSuggestionsReview extends StatefulWidget {
   final ApiClient apiClient;
   final String chain;
   final int year;
   final bool isOwner;
+
+  /// Called after any approve so Compare can treat new mappings as ready.
+  final VoidCallback? onMappingsChanged;
 
   const CompetitorSuggestionsReview({
     super.key,
@@ -20,6 +77,7 @@ class CompetitorSuggestionsReview extends StatefulWidget {
     required this.chain,
     required this.year,
     this.isOwner = true,
+    this.onMappingsChanged,
   });
 
   @override
@@ -35,6 +93,11 @@ class CompetitorSuggestionsReviewState
   String? _error;
   int _batchSize = 10;
   String? _busyId;
+  String? _busyGroupKey;
+
+  /// Paginate grouped own-SKU cards (batch dropdown must NOT limit this list).
+  static const int _pageSize = 20;
+  int _pageIndex = 0;
 
   @override
   void initState() {
@@ -49,6 +112,9 @@ class CompetitorSuggestionsReviewState
       _reload();
     }
   }
+
+  List<PendingSuggestionGroup> get _groups =>
+      groupPendingSuggestionsByOwnSku(_items);
 
   void _surfaceError(Object e) {
     final msg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
@@ -74,6 +140,11 @@ class CompetitorSuggestionsReviewState
       setState(() {
         _items = items;
         _loading = false;
+        final pages = (_groups.isEmpty)
+            ? 1
+            : ((_groups.length + _pageSize - 1) ~/ _pageSize);
+        if (_pageIndex >= pages) _pageIndex = pages - 1;
+        if (_pageIndex < 0) _pageIndex = 0;
       });
     } catch (e) {
       if (!mounted) return;
@@ -129,6 +200,7 @@ class CompetitorSuggestionsReviewState
     try {
       await widget.apiClient.approveCompetitorSuggestion(s.id);
       await _reload();
+      widget.onMappingsChanged?.call();
     } catch (e) {
       if (!mounted) return;
       _surfaceError(e);
@@ -150,10 +222,36 @@ class CompetitorSuggestionsReviewState
     }
   }
 
+  Future<void> _approveAll(PendingSuggestionGroup group) async {
+    if (!widget.isOwner || group.suggestions.isEmpty) return;
+    setState(() => _busyGroupKey = group.ownBarcode);
+    try {
+      for (final s in List<CompetitorSuggestionModel>.from(group.suggestions)) {
+        await widget.apiClient.approveCompetitorSuggestion(s.id);
+      }
+      await _reload();
+      widget.onMappingsChanged?.call();
+    } catch (e) {
+      if (!mounted) return;
+      _surfaceError(e);
+      await _reload();
+    } finally {
+      if (mounted) setState(() => _busyGroupKey = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final groups = _groups;
+    final pageCount =
+        groups.isEmpty ? 1 : ((groups.length + _pageSize - 1) ~/ _pageSize);
+    final pageStart = (_pageIndex * _pageSize).clamp(0, groups.length);
+    final pageEnd = (pageStart + _pageSize).clamp(0, groups.length);
+    final pageGroups = groups.isEmpty
+        ? const <PendingSuggestionGroup>[]
+        : groups.sublist(pageStart, pageEnd);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -186,7 +284,7 @@ class CompetitorSuggestionsReviewState
                   ),
                 ),
                 M3Spacing.gapSM,
-                FilledButton.icon(
+                FilledButton.tonalIcon(
                   onPressed: _running ? null : _runBatch,
                   icon: _running
                       ? const SizedBox(
@@ -202,9 +300,21 @@ class CompetitorSuggestionsReviewState
           ),
           M3Spacing.gapSM,
           Text(
-            'الاقتراحات المعلّقة لا تظهر في المقارنة أو مؤشرات الأداء حتى الموافقة.',
+            'الاقتراحات المعلّقة لا تظهر في المقارنة أو مؤشرات الأداء حتى الموافقة. '
+            'حجم الدفعة يخص «تشغيل دفعة» فقط ولا يقيّد قائمة الانتظار.',
             style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
+          if (!_loading && groups.isNotEmpty) ...[
+            M3Spacing.gapXS,
+            Text(
+              '${groups.length} صنف · ${_items.length} اقتراح بانتظار الموافقة',
+              key: const ValueKey('pending-suggestions-count'),
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           if (_error != null) ...[
             M3Spacing.gapSM,
             Text(
@@ -220,7 +330,7 @@ class CompetitorSuggestionsReviewState
               padding: EdgeInsets.all(24),
               child: Center(child: CircularProgressIndicator()),
             )
-          else if (_items.isEmpty)
+          else if (groups.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Text(
@@ -231,19 +341,72 @@ class CompetitorSuggestionsReviewState
                 ),
               ),
             )
-          else
-            ..._items.map(_buildCard),
+          else ...[
+            for (final g in pageGroups) _buildGroupCard(g),
+            if (pageCount > 1) ...[
+              M3Spacing.gapSM,
+              _buildPager(theme, cs, groups.length, pageCount, pageStart, pageEnd),
+            ],
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildCard(CompetitorSuggestionModel s) {
+  Widget _buildPager(
+    ThemeData theme,
+    ColorScheme cs,
+    int totalGroups,
+    int pageCount,
+    int pageStart,
+    int pageEnd,
+  ) {
+    final rangeLabel = totalGroups == 0
+        ? '0 من 0'
+        : '${pageStart + 1}–$pageEnd من $totalGroups';
+    return Row(
+      children: [
+        IconButton(
+          tooltip: 'الصفحة السابقة',
+          onPressed: _pageIndex > 0
+              ? () => setState(() => _pageIndex--)
+              : null,
+          icon: Icon(AppIcons.chevronStart),
+        ),
+        Expanded(
+          child: Text(
+            'صفحة ${_pageIndex + 1} من $pageCount · $rangeLabel',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+        IconButton(
+          tooltip: 'الصفحة التالية',
+          onPressed: _pageIndex < pageCount - 1
+              ? () => setState(() => _pageIndex++)
+              : null,
+          icon: Icon(AppIcons.chevronEnd),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGroupCard(PendingSuggestionGroup group) {
     final theme = Theme.of(context);
-    final busy = _busyId == s.id;
+    final cs = theme.colorScheme;
+    final groupBusy = _busyGroupKey == group.ownBarcode;
+    final ownName =
+        group.ownSkuName.isEmpty ? group.ownBarcode : group.ownSkuName;
+
     return Card(
-      key: ValueKey('suggestion-${s.id}'),
+      key: ValueKey('suggestion-group-${group.ownBarcode}'),
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      color: cs.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: M3Shape.radiusLg,
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.7)),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -253,79 +416,60 @@ class CompetitorSuggestionsReviewState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: _skuBlock(
-                    label: 'صنف الشركة',
-                    name: s.ownSkuName.isEmpty ? s.ownBarcode : s.ownSkuName,
-                    barcode: s.ownBarcode,
-                    price: s.ownUnitPrice,
-                    units: s.ownUnits,
-                    color: M3Palette.success,
-                    surface: M3Palette.successSurface,
-                    onSurface: M3Palette.onSuccessSurface,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'صنف الشركة',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: M3Palette.success,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      M3Spacing.gapXXS,
+                      Text(
+                        ownName,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        group.ownBarcode,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      Text(
+                        'سعر ${group.ownUnitPrice.toStringAsFixed(2)} · مبيعات ${group.ownUnits}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 24),
-                  child: Icon(Icons.compare_arrows_rounded, color: theme.colorScheme.outline),
-                ),
-                Expanded(
-                  child: _skuBlock(
-                    label: 'المنافس المقترح',
-                    name: s.competitorSkuName.isEmpty
-                        ? s.competitorBarcode
-                        : s.competitorSkuName,
-                    barcode: s.competitorBarcode,
-                    price: s.competitorUnitPrice,
-                    units: s.competitorUnits,
-                    color: M3Palette.dangerAccent,
-                    surface: M3Palette.dangerSurface,
-                    onSurface: M3Palette.onDangerSurface,
+                if (widget.isOwner)
+                  FilledButton.tonalIcon(
+                    onPressed: groupBusy ? null : () => _approveAll(group),
+                    style: FilledButton.styleFrom(
+                      foregroundColor: M3Palette.success,
+                      backgroundColor: M3Palette.successSurface,
+                    ),
+                    icon: groupBusy
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.done_all_rounded, size: 18),
+                    label: const Text('موافقة على الكل'),
                   ),
-                ),
               ],
             ),
-            M3Spacing.gapSM,
-            Text(
-              s.reasonAr,
-              style: theme.textTheme.bodyMedium,
-            ),
-            M3Spacing.gapXS,
-            Text(
-              'الثقة: ${(s.confidence * 100).toStringAsFixed(0)}% · الترتيب: ${s.rank}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            if (widget.isOwner) ...[
+            M3Spacing.gapMD,
+            for (final s in group.suggestions) ...[
+              _buildCompetitorRow(s, groupBusy: groupBusy),
               M3Spacing.gapSM,
-              Row(
-                children: [
-                  FilledButton(
-                    onPressed: busy ? null : () => _approve(s),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: M3Palette.success,
-                      foregroundColor: M3Palette.onSuccessSurface,
-                    ),
-                    child: const Text('موافقة'),
-                  ),
-                  M3Spacing.gapSM,
-                  OutlinedButton(
-                    onPressed: busy ? null : () => _reject(s),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: M3Palette.dangerAccent,
-                    ),
-                    child: const Text('رفض'),
-                  ),
-                  if (busy) ...[
-                    M3Spacing.gapSM,
-                    const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ],
-                ],
-              ),
             ],
           ],
         ),
@@ -333,50 +477,129 @@ class CompetitorSuggestionsReviewState
     );
   }
 
-  Widget _skuBlock({
-    required String label,
-    required String name,
-    required String barcode,
-    required double price,
-    required int units,
-    required Color color,
-    required Color surface,
-    required Color onSurface,
+  Widget _buildCompetitorRow(
+    CompetitorSuggestionModel s, {
+    required bool groupBusy,
   }) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final busy = groupBusy || _busyId == s.id;
+    final name = s.competitorSkuName.isEmpty
+        ? s.competitorBarcode
+        : s.competitorSkuName;
+
     return Container(
+      key: ValueKey('suggestion-${s.id}'),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: surface,
+        color: cs.surfaceContainerLowest,
         borderRadius: M3Shape.radiusMd,
-        border: Border.all(color: color.withValues(alpha: 0.35)),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.55)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(color: onSurface),
-          ),
-          M3Spacing.gapXXS,
-          Text(
-            name,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: onSurface,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          Text(
-            barcode,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: onSurface.withValues(alpha: 0.8),
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'المنافس المقترح',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    Text(
+                      name,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (s.competitorBrand.isNotEmpty)
+                      Text(
+                        s.competitorBrand,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    Text(
+                      s.competitorBarcode,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    Text(
+                      'سعر ${s.competitorUnitPrice.toStringAsFixed(2)} · مبيعات ${s.competitorUnits}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              if (busy)
+                const Padding(
+                  padding: EdgeInsetsDirectional.only(start: 8),
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+            ],
           ),
           M3Spacing.gapXS,
+          Text(s.reasonAr, style: theme.textTheme.bodyMedium),
+          M3Spacing.gapXXS,
           Text(
-            'سعر ${price.toStringAsFixed(2)} · مبيعات $units',
-            style: theme.textTheme.bodySmall?.copyWith(color: onSurface),
+            'الثقة: ${(s.confidence * 100).toStringAsFixed(0)}% · الترتيب: ${s.rank}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
           ),
+          if (widget.isOwner) ...[
+            M3Spacing.gapSM,
+            // M3 connected action group: tonal approve + outlined reject on light surface.
+            // Adeco green is accent only (selected/tonal), never a solid dark fill.
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: M3Shape.radiusXl,
+                  border: Border.all(
+                    color: cs.outlineVariant.withValues(alpha: 0.7),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FilledButton.tonal(
+                        onPressed: busy ? null : () => _approve(s),
+                        style: FilledButton.styleFrom(
+                          foregroundColor: M3Palette.success,
+                          backgroundColor: M3Palette.successSurface,
+                        ),
+                        child: const Text('موافقة'),
+                      ),
+                      M3Spacing.gapXS,
+                      OutlinedButton(
+                        onPressed: busy ? null : () => _reject(s),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: cs.onSurfaceVariant,
+                          side: BorderSide(color: cs.outlineVariant),
+                        ),
+                        child: const Text('رفض'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
