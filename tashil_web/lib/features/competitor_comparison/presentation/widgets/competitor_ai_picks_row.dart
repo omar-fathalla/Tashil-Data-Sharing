@@ -57,13 +57,19 @@ class CompetitorAiPicksRow extends StatelessWidget {
           const _AiPicksSkeleton()
         else if (picks.isEmpty)
           Padding(
+            key: const ValueKey('ai-picks-empty-reason'),
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               emptyHintAr?.isNotEmpty == true
                   ? emptyHintAr!
                   : 'لا توجد اقتراحات متاحة لهذا الصنف',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
+                color: emptyHintAr?.isNotEmpty == true
+                    ? M3Palette.dangerAccent
+                    : cs.onSurfaceVariant,
+                fontWeight: emptyHintAr?.isNotEmpty == true
+                    ? FontWeight.w600
+                    : FontWeight.w400,
               ),
             ),
           )

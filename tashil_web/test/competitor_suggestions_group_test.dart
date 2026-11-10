@@ -104,6 +104,14 @@ void main() {
     ];
 
     MockClient fake() => MockClient((req) async {
+          if (req.url.path.contains('/competitors/suggestions/no-candidates') &&
+              req.method == 'GET') {
+            return http.Response.bytes(
+              utf8.encode(jsonEncode({'skus': [], 'count': 0})),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
           if (req.url.path.contains('/competitors/suggestions') &&
               req.method == 'GET') {
             return http.Response.bytes(
@@ -220,6 +228,14 @@ void main() {
                 'suggestion': {'id': id, 'status': 'approved'},
                 'mapping': {'id': 'cmap_$id'},
               })),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          if (req.url.path.contains('/competitors/suggestions/no-candidates') &&
+              req.method == 'GET') {
+            return http.Response.bytes(
+              utf8.encode(jsonEncode({'skus': [], 'count': 0})),
               200,
               headers: {'content-type': 'application/json'},
             );

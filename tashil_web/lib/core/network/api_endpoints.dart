@@ -105,6 +105,8 @@ class ApiEndpoints {
 
   // AI competitor suggestions quarantine (pending never feeds Compare KPIs)
   static String get competitorSuggestions => '$baseUrl/api/v1/competitors/suggestions';
+  static String get competitorSuggestionsNoCandidates =>
+      '$baseUrl/api/v1/competitors/suggestions/no-candidates';
   static String get competitorSuggestionsRun =>
       '$baseUrl/api/v1/competitors/suggestions/run';
   static String get competitorSuggestionsSku =>

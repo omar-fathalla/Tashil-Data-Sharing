@@ -11101,6 +11101,32 @@ class ApiClient {
     ];
   }
 
+  /// Owner-only: own Sell-Out SKUs that cannot get AI suggestions (reason per SKU).
+  /// Never invents competitors — empty same-category pool / all pairs excluded.
+  Future<List<CompetitorNoSuggestionSkuModel>> listCompetitorNoSuggestionSkus({
+    required String chain,
+    int? year,
+  }) async {
+    final params = <String, String>{
+      'chain': chain,
+      if (year != null && year > 0) 'year': '$year',
+    };
+    final uri = Uri.parse(ApiEndpoints.competitorSuggestionsNoCandidates)
+        .replace(queryParameters: params);
+    final resp =
+        await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 45));
+    if (resp.statusCode != 200) {
+      throw Exception('فشل تحميل أصناف بلا اقتراحات (${resp.statusCode})');
+    }
+    final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    final rows = (data['skus'] as List?) ?? const [];
+    return [
+      for (final raw in rows)
+        if (raw is Map)
+          CompetitorNoSuggestionSkuModel.fromJson(Map<String, dynamic>.from(raw)),
+    ];
+  }
+
   /// Owner-only: run a batch of AI competitor suggestions (default limit 10).
   /// Throws [CompetitorSuggestRateLimitException] on HTTP 429 (per-chain ~30s).
   Future<Map<String, dynamic>> runCompetitorSuggestions({
@@ -12853,6 +12879,33 @@ class CompetitorSkuSuggestionsResult {
     this.skippedReasonAr = '',
     this.includeInKpiAverages = false,
   });
+}
+
+/// Own Sell-Out SKU that cannot receive AI competitor suggestions (with reason).
+class CompetitorNoSuggestionSkuModel {
+  final String barcode;
+  final String skuName;
+  final String category;
+  final String reasonAr;
+  final String reasonCode;
+
+  const CompetitorNoSuggestionSkuModel({
+    required this.barcode,
+    required this.skuName,
+    required this.category,
+    required this.reasonAr,
+    this.reasonCode = '',
+  });
+
+  factory CompetitorNoSuggestionSkuModel.fromJson(Map<String, dynamic> j) {
+    return CompetitorNoSuggestionSkuModel(
+      barcode: '${j['barcode'] ?? ''}'.trim(),
+      skuName: '${j['sku_name'] ?? ''}'.trim(),
+      category: '${j['category'] ?? ''}'.trim(),
+      reasonAr: '${j['reason_ar'] ?? ''}'.trim(),
+      reasonCode: '${j['reason_code'] ?? ''}'.trim(),
+    );
+  }
 }
 
 /// Raised when POST …/suggestions/run hits the per-chain rate limit (~30s).

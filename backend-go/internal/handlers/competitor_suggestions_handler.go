@@ -59,14 +59,14 @@ type CompetitiveCatalogSource interface {
 // Pending suggestions NEVER feed Compare KPIs or mappings until owner approve
 // (and KPI averages stay owner-pinned while competitorSuggestIncludeInKPIAverages is false).
 type CompetitorSuggestionsHandler struct {
-	repo    firestore.CompetitorSkuRepository
-	audit   firestore.Repository
-	catalog CompetitiveCatalogSource
-	ranker  competitorsuggest.Ranker
-	eq      competitorsuggest.CategoryEquivalence
-	rateMu  sync.Mutex
-	lastRun map[string]time.Time // tenant|chain → last batch run
-	lastSku map[string]time.Time // tenant|chain|barcode → last *completed* generate
+	repo     firestore.CompetitorSkuRepository
+	audit    firestore.Repository
+	catalog  CompetitiveCatalogSource
+	ranker   competitorsuggest.Ranker
+	eq       competitorsuggest.CategoryEquivalence
+	rateMu   sync.Mutex
+	lastRun  map[string]time.Time     // tenant|chain → last batch run
+	lastSku  map[string]time.Time     // tenant|chain|barcode → last *completed* generate
 	emptySku map[string]skuEmptyCache // tenant|chain|barcode → empty result cache
 	// batchAttempted: tenant|chain|barcode → last empty/fail batch attempt (in-memory TTL).
 	batchAttempted map[string]time.Time
@@ -114,8 +114,11 @@ type suggestDecidePayload struct {
 }
 
 type skipInfo struct {
-	Barcode string `json:"barcode"`
-	Reason  string `json:"reason_ar"`
+	Barcode  string `json:"barcode"`
+	SkuName  string `json:"sku_name,omitempty"`
+	Category string `json:"category,omitempty"`
+	Reason   string `json:"reason_ar"`
+	Code     string `json:"reason_code,omitempty"`
 }
 
 func (h *CompetitorSuggestionsHandler) ownerClaims(w http.ResponseWriter, r *http.Request) (*domain.UserClaims, bool) {
@@ -164,6 +167,51 @@ func (h *CompetitorSuggestionsHandler) HandleListSuggestions(w http.ResponseWrit
 		"count":                        len(items),
 		"include_in_kpi_averages":      competitorSuggestIncludeInKPIAverages,
 		"pending_category_equivalence": competitorsuggest.PendingCategoryEquivalencePairs,
+	})
+}
+
+// HandleNoSuggestionSkus serves GET /api/v1/competitors/suggestions/no-candidates?chain=&year=
+// Owner-only. Returns own Sell-Out SKUs with no AI suggestions possible (reason per SKU).
+// Never invents or auto-creates competitors.
+func (h *CompetitorSuggestionsHandler) HandleNoSuggestionSkus(w http.ResponseWriter, r *http.Request) {
+	c, ok := h.ownerClaims(w, r)
+	if !ok {
+		return
+	}
+	q := r.URL.Query()
+	chain := strings.TrimSpace(q.Get("chain"))
+	if chain == "" {
+		writeErr(w, http.StatusBadRequest, "chain is required")
+		return
+	}
+	if k := kamChain(c); k != "" && !strings.EqualFold(k, chain) {
+		writeErr(w, http.StatusForbidden, "chain KAM can only inspect the assigned chain")
+		return
+	}
+	year := 0
+	if y := strings.TrimSpace(q.Get("year")); y != "" {
+		fmt.Sscanf(y, "%d", &year)
+	}
+	if year <= 0 {
+		year = time.Now().Year()
+	}
+	if h.catalog == nil {
+		writeErr(w, http.StatusServiceUnavailable, "competitive catalog unavailable")
+		return
+	}
+	pool, err := h.loadSuggestPools(r, c.TenantID, chain, year)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "تعذر تحميل بيانات المنافسة")
+		return
+	}
+	gaps := h.collectNoSuggestionSkus(pool, chain)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"skus":                    gaps,
+		"count":                   len(gaps),
+		"chain":                   chain,
+		"year":                    year,
+		"include_in_kpi_averages": competitorSuggestIncludeInKPIAverages,
+		"auto_create_competitors": false,
 	})
 }
 
@@ -480,27 +528,28 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 		// Advance past own SKUs that already have pending or rejected suggestions.
 		// Does not consume a batch slot (same as approved mapping / missing category).
 		if pool.ownHasPendingOrRejected[bc] {
-			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skipReasonOwnAlreadyCovered})
+			skipped = append(skipped, skipInfoForOwn(own, skipReasonOwnAlreadyCovered, reasonCodeOwnAlreadyCovered))
 			continue
 		}
 		// Approved mapping (batch mode) — before pre-filter so a sole mapped
 		// competitor is not misreported as «لا يوجد منافسين».
 		if ctx.skipOwnWithAnyMapping && pool.ownHasMapping[bc] {
-			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skipReasonApprovedMapping})
+			skipped = append(skipped, skipInfoForOwn(own, skipReasonApprovedMapping, reasonCodeApprovedMapping))
 			continue
 		}
 		if strings.TrimSpace(own.Category) == "" {
-			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skipReasonMissingCategory})
+			skipped = append(skipped, skipInfoForOwn(own, skipReasonMissingCategory, reasonCodeMissingCategory))
 			continue
 		}
 		if h.hasBatchAttempt(tenantSlug, p.Chain, bc) {
-			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skipReasonAttemptedEmpty})
+			skipped = append(skipped, skipInfoForOwn(own, skipReasonAttemptedEmpty, reasonCodeAttemptedEmpty))
 			attemptedNow[bc] = true
 			continue
 		}
 		// No same-category competitors after pre-filter: skip without consuming a slot.
+		// Never invent competitors — surface the exact Arabic reason per SKU.
 		if !h.hasEligibleCompetitors(own, pool, p.Chain) {
-			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skipReasonNoCompetitors})
+			skipped = append(skipped, h.explainNoEligibleCompetitors(own, pool, p.Chain))
 			continue
 		}
 
@@ -514,7 +563,7 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 			log.Printf("[competitor-suggest] rank failed own=%s: %v", own.Barcode, genErr)
 			h.markBatchAttempt(tenantSlug, p.Chain, bc)
 			attemptedNow[bc] = true
-			info := skipInfo{Barcode: own.Barcode, Reason: skipReasonRankFailed}
+			info := skipInfoForOwn(own, skipReasonRankFailed, reasonCodeRankFailed)
 			skipped = append(skipped, info)
 			attemptedEmpty = append(attemptedEmpty, info)
 			processed++
@@ -522,19 +571,28 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 		}
 		// Approved mapping / missing category do not consume a batch slot.
 		if skip == skipReasonApprovedMapping || skip == skipReasonMissingCategory {
-			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skip})
+			code := reasonCodeApprovedMapping
+			if skip == skipReasonMissingCategory {
+				code = reasonCodeMissingCategory
+			}
+			skipped = append(skipped, skipInfoForOwn(own, skip, code))
 			continue
 		}
 		if len(rows) == 0 {
 			// Gemini returned empty / unsaveable after eligible candidates existed.
 			rankAttempts++
 			reason := skip
-			if reason == "" || reason == skipReasonNoCompetitors {
+			code := reasonCodeAttemptedEmpty
+			if reason == "" || isNoSameCategoryReason(reason) {
 				reason = skipReasonAttemptedEmpty
+			} else if reason == skipReasonAllExcluded {
+				code = reasonCodeAllCandidatesExcluded
+			} else if reason == skipReasonRankFailed {
+				code = reasonCodeRankFailed
 			}
 			h.markBatchAttempt(tenantSlug, p.Chain, bc)
 			attemptedNow[bc] = true
-			info := skipInfo{Barcode: own.Barcode, Reason: reason}
+			info := skipInfoForOwn(own, reason, code)
 			skipped = append(skipped, info)
 			attemptedEmpty = append(attemptedEmpty, info)
 			processed++
@@ -557,21 +615,25 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 	for _, s := range skipped {
 		reasonCounts[s.Reason]++
 	}
+	noSuggestion := h.collectNoSuggestionSkus(pool, p.Chain)
 	payload := map[string]interface{}{
-		"suggestions":                     created,
-		"created_count":                   len(created),
-		"processed_own":                   processed,
-		"remaining_uncovered":             remaining,
-		"attempted_without_suggestions":   attemptedEmpty,
-		"skipped":                         skipped,
-		"skipped_reason_counts":           reasonCounts,
-		"rank_attempts":                   rankAttempts,
-		"rank_failures":                   rankFailures,
-		"prompt_tokens":                   promptTok,
-		"completion_tokens":               completionTok,
-		"limit":                           limit,
-		"include_in_kpi_averages":         competitorSuggestIncludeInKPIAverages,
-		"pending_category_equivalence":    competitorsuggest.PendingCategoryEquivalencePairs,
+		"suggestions":                   created,
+		"created_count":                 len(created),
+		"processed_own":                 processed,
+		"remaining_uncovered":           remaining,
+		"attempted_without_suggestions": attemptedEmpty,
+		"skipped":                       skipped,
+		"skipped_reason_counts":         reasonCounts,
+		"no_suggestion_skus":            noSuggestion,
+		"no_suggestion_count":           len(noSuggestion),
+		"rank_attempts":                 rankAttempts,
+		"rank_failures":                 rankFailures,
+		"prompt_tokens":                 promptTok,
+		"completion_tokens":             completionTok,
+		"limit":                         limit,
+		"include_in_kpi_averages":       competitorSuggestIncludeInKPIAverages,
+		"pending_category_equivalence":  competitorsuggest.PendingCategoryEquivalencePairs,
+		"auto_create_competitors":       false,
 	}
 	// Prod silence: Gemini key/header failures yielded HTTP 200 + created_count=0.
 	// Surface a clear Arabic error when every ranking attempt failed.
@@ -777,7 +839,99 @@ const (
 	skipReasonRankFailed        = "تعذر ترتيب المرشحين"
 	skipReasonApprovedMapping   = "يوجد تعيين معتمد مسبقاً"
 	skipReasonMissingCategory   = "فئة مفقودة في البيانات"
+	skipReasonAllExcluded       = "تم استبعاد كل المنافسين (مرفوض أو معتمد مسبقاً)"
 )
+
+// Machine-readable reason codes (UI + analytics). Arabic reason_ar stays human-facing.
+const (
+	reasonCodeOwnAlreadyCovered     = "OWN_ALREADY_COVERED"
+	reasonCodeNoSameCategoryComps   = "NO_SAME_CATEGORY_COMPETITORS"
+	reasonCodeAllCandidatesExcluded = "ALL_CANDIDATES_EXCLUDED"
+	reasonCodeAttemptedEmpty        = "ATTEMPTED_WITHOUT_SUGGESTIONS"
+	reasonCodeRankFailed            = "RANK_FAILED"
+	reasonCodeApprovedMapping       = "APPROVED_MAPPING"
+	reasonCodeMissingCategory       = "MISSING_CATEGORY"
+)
+
+// formatNoSameCategoryReason explains a hard same-category empty pool (never invents competitors).
+func formatNoSameCategoryReason(category string) string {
+	cat := strings.TrimSpace(category)
+	if cat == "" {
+		return skipReasonNoCompetitors
+	}
+	return fmt.Sprintf("لا يوجد منافسين في نفس الفئة «%s»", cat)
+}
+
+func isNoSameCategoryReason(reason string) bool {
+	return reason == skipReasonNoCompetitors ||
+		strings.HasPrefix(strings.TrimSpace(reason), "لا يوجد منافسين في نفس الفئة")
+}
+
+func skipInfoForOwn(own competitorsuggest.SkuCandidate, reason, code string) skipInfo {
+	return skipInfo{
+		Barcode:  own.Barcode,
+		SkuName:  own.SKUName,
+		Category: own.Category,
+		Reason:   reason,
+		Code:     code,
+	}
+}
+
+// explainNoEligibleCompetitors distinguishes empty same-category pool vs all pairs excluded.
+// Does NOT invent or auto-create competitors.
+func (h *CompetitorSuggestionsHandler) explainNoEligibleCompetitors(
+	own competitorsuggest.SkuCandidate,
+	pool suggestPools,
+	chain string,
+) skipInfo {
+	if strings.TrimSpace(own.Category) == "" {
+		return skipInfoForOwn(own, skipReasonMissingCategory, reasonCodeMissingCategory)
+	}
+	cands := competitorsuggest.PreFilterCandidates(own, pool.comp, h.eq)
+	if len(cands) == 0 {
+		return skipInfoForOwn(own, formatNoSameCategoryReason(own.Category), reasonCodeNoSameCategoryComps)
+	}
+	for _, cand := range cands {
+		key := firestore.RejectedPairKey(own.Barcode, cand.Candidate.Barcode, chain)
+		if pool.rejectedPairs[key] || pool.mappedPairs[key] {
+			continue
+		}
+		// Eligible competitor exists — caller should not use this path.
+		return skipInfoForOwn(own, skipReasonNoCompetitors, reasonCodeNoSameCategoryComps)
+	}
+	return skipInfoForOwn(own, skipReasonAllExcluded, reasonCodeAllCandidatesExcluded)
+}
+
+// collectNoSuggestionSkus lists own Sell-Out SKUs that cannot receive AI suggestions
+// because the same-category competitor pool is empty (or every candidate was excluded).
+// Skips own SKUs that already have an approved mapping. Never invents competitors.
+func (h *CompetitorSuggestionsHandler) collectNoSuggestionSkus(pool suggestPools, chain string) []skipInfo {
+	out := make([]skipInfo, 0)
+	for _, own := range pool.own {
+		bc := normBarcode(own.Barcode)
+		if pool.ownHasMapping[bc] {
+			continue
+		}
+		if strings.TrimSpace(own.Category) == "" {
+			out = append(out, skipInfoForOwn(own, skipReasonMissingCategory, reasonCodeMissingCategory))
+			continue
+		}
+		if h.hasEligibleCompetitors(own, pool, chain) {
+			continue
+		}
+		out = append(out, h.explainNoEligibleCompetitors(own, pool, chain))
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Category != out[j].Category {
+			return out[i].Category < out[j].Category
+		}
+		if out[i].SkuName != out[j].SkuName {
+			return out[i].SkuName < out[j].SkuName
+		}
+		return out[i].Barcode < out[j].Barcode
+	})
+	return out
+}
 
 func (h *CompetitorSuggestionsHandler) loadSuggestPools(r *http.Request, tenantID, chain string, year int) (suggestPools, error) {
 	start, end := bigquery.CompetitiveMonthlyYearWindow(year)
@@ -819,6 +973,7 @@ func (h *CompetitorSuggestionsHandler) loadSuggestPools(r *http.Request, tenantI
 
 // generateForOwn ranks and persists up to MaxRank pending suggestions for one own SKU.
 // Returns Arabic skip reason when nothing is created (empty string on success).
+// Never invents competitors when the same-category pool is empty.
 func (h *CompetitorSuggestionsHandler) generateForOwn(
 	r *http.Request,
 	ctx suggestContext,
@@ -827,12 +982,15 @@ func (h *CompetitorSuggestionsHandler) generateForOwn(
 ) ([]domain.CompetitorSuggestion, string, competitorsuggest.TokenUsage, error) {
 	var usage competitorsuggest.TokenUsage
 	if ctx.skipOwnWithAnyMapping && pool.ownHasMapping[normBarcode(own.Barcode)] {
-		return nil, "يوجد تعيين معتمد مسبقاً", usage, nil
+		return nil, skipReasonApprovedMapping, usage, nil
 	}
 	if strings.TrimSpace(own.Category) == "" {
-		return nil, "فئة مفقودة في البيانات", usage, nil
+		return nil, skipReasonMissingCategory, usage, nil
 	}
 	cands := competitorsuggest.PreFilterCandidates(own, pool.comp, h.eq)
+	if len(cands) == 0 {
+		return nil, formatNoSameCategoryReason(own.Category), usage, nil
+	}
 	filtered := make([]competitorsuggest.PrefScore, 0, len(cands))
 	for _, cand := range cands {
 		key := firestore.RejectedPairKey(own.Barcode, cand.Candidate.Barcode, ctx.chain)
@@ -845,11 +1003,11 @@ func (h *CompetitorSuggestionsHandler) generateForOwn(
 		filtered = append(filtered, cand)
 	}
 	if len(filtered) == 0 {
-		return nil, "لا يوجد منافسين في البيانات", usage, nil
+		return nil, skipReasonAllExcluded, usage, nil
 	}
 	ranked, usage, err := h.ranker.Rank(r.Context(), own, filtered)
 	if err != nil {
-		return nil, "تعذر ترتيب المرشحين", usage, err
+		return nil, skipReasonRankFailed, usage, err
 	}
 	byBC := map[string]competitorsuggest.PrefScore{}
 	for _, f := range filtered {
@@ -897,7 +1055,8 @@ func (h *CompetitorSuggestionsHandler) generateForOwn(
 		}
 	}
 	if len(created) == 0 {
-		return created, "لا يوجد منافسين في البيانات", usage, nil
+		// Candidates existed but rank/save yielded nothing — not a missing-competitor case.
+		return created, skipReasonAttemptedEmpty, usage, nil
 	}
 	return created, "", usage, nil
 }

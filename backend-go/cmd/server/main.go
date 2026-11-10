@@ -389,6 +389,7 @@ func main() {
 	mux.HandleFunc("DELETE /api/v1/competitors/mappings/{id}", competitorHandler.HandleDeleteCompetitorMapping)
 	// AI competitor suggestions quarantine — owner approval required; pending never feeds Compare KPIs.
 	mux.HandleFunc("GET /api/v1/competitors/suggestions", competitorSuggestionsHandler.HandleListSuggestions)
+	mux.HandleFunc("GET /api/v1/competitors/suggestions/no-candidates", competitorSuggestionsHandler.HandleNoSuggestionSkus)
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/run", competitorSuggestionsHandler.HandleRunSuggestions)
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/sku", competitorSuggestionsHandler.HandleSuggestForSku)
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/approve", competitorSuggestionsHandler.HandleApproveSuggestion)

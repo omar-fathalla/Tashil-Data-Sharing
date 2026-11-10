@@ -70,6 +70,10 @@ void main() {
               200,
             );
           }
+          if (req.url.path.contains('/competitors/suggestions/no-candidates') &&
+              req.method == 'GET') {
+            return _json(jsonEncode({'skus': [], 'count': 0}), 200);
+          }
           if (req.url.path.contains('/competitors/suggestions') &&
               req.method == 'GET') {
             return _json(
@@ -195,6 +199,10 @@ void main() {
               200,
             );
           }
+          if (req.url.path.contains('/competitors/suggestions/no-candidates') &&
+              req.method == 'GET') {
+            return _json(jsonEncode({'skus': [], 'count': 0}), 200);
+          }
           if (req.url.path.contains('/competitors/suggestions') &&
               req.method == 'GET') {
             return _json(
@@ -258,6 +266,10 @@ void main() {
               }),
               200,
             );
+          }
+          if (req.url.path.contains('/competitors/suggestions/no-candidates') &&
+              req.method == 'GET') {
+            return _json(jsonEncode({'skus': [], 'count': 0}), 200);
           }
           if (req.url.path.contains('/competitors/suggestions') &&
               req.method == 'GET') {
@@ -333,6 +345,10 @@ void main() {
               502,
             );
           }
+          if (req.url.path.contains('/competitors/suggestions/no-candidates') &&
+              req.method == 'GET') {
+            return _json(jsonEncode({'skus': [], 'count': 0}), 200);
+          }
           if (req.url.path.contains('/competitors/suggestions') &&
               req.method == 'GET') {
             return _json(
@@ -368,6 +384,88 @@ void main() {
       expect(
         find.textContaining('تعذر تشغيل الاقتراحات'),
         findsWidgets,
+      );
+    }, fake);
+  });
+
+  testWidgets('no-suggestion SKUs panel shows per-SKU Arabic reason',
+      (tester) async {
+    MockClient fake() => MockClient((req) async {
+          if (req.url.path.contains('/competitors/suggestions/no-candidates') &&
+              req.method == 'GET') {
+            return _json(
+              jsonEncode({
+                'count': 2,
+                'auto_create_competitors': false,
+                'skus': [
+                  {
+                    'barcode': 'OWN-CARE-1',
+                    'sku_name': 'ديفا منظف ايدى الترا فريش',
+                    'category': 'عناية شخصية',
+                    'reason_ar':
+                        'لا يوجد منافسين في نفس الفئة «عناية شخصية»',
+                    'reason_code': 'NO_SAME_CATEGORY_COMPETITORS',
+                  },
+                  {
+                    'barcode': 'OWN-FELVITA-OFFER',
+                    'sku_name':
+                        'عرض سعر فلفيتا 500 جم مزيل بقع مطور مسحوق',
+                    'category': 'مزيلات بقع ملابس',
+                    'reason_ar':
+                        'تم استبعاد كل المنافسين (مرفوض أو معتمد مسبقاً)',
+                    'reason_code': 'ALL_CANDIDATES_EXCLUDED',
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+          if (req.url.path.contains('/competitors/suggestions') &&
+              req.method == 'GET') {
+            return _json(
+              jsonEncode({'suggestions': [], 'count': 0}),
+              200,
+            );
+          }
+          return _json('{"error":"unhandled"}', 500);
+        });
+
+    await http.runWithClient(() async {
+      final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: CompetitorSuggestionsReview(
+                apiClient: api,
+                chain: 'fathalla',
+                year: 2026,
+                isOwner: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('no-suggestion-skus-panel')), findsOneWidget);
+      expect(find.textContaining('أصناف بلا اقتراحات (2)'), findsOneWidget);
+      expect(find.text('ديفا منظف ايدى الترا فريش'), findsOneWidget);
+      expect(
+        find.text('لا يوجد منافسين في نفس الفئة «عناية شخصية»'),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('no-suggestion-sku-OWN-CARE-1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('no-suggestion-sku-OWN-FELVITA-OFFER')),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('لا يُنشأ منافسون تلقائياً'),
+        findsOneWidget,
       );
     }, fake);
   });

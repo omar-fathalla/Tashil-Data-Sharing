@@ -115,6 +115,14 @@ void main() {
               headers: {'content-type': 'application/json'},
             );
           }
+          if (req.url.path.contains('/competitors/suggestions/no-candidates') &&
+              req.method == 'GET') {
+            return http.Response.bytes(
+              utf8.encode(jsonEncode({'skus': [], 'count': 0})),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
           if (req.url.path.contains('/competitors/suggestions') &&
               req.method == 'GET') {
             return http.Response.bytes(
@@ -212,6 +220,27 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('لا توجد اقتراحات متاحة لهذا الصنف'), findsNothing);
+  });
+
+  testWidgets('AI picks row surfaces same-category empty reason per SKU',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: CompetitorAiPicksRow(
+            loading: false,
+            picks: [],
+            emptyHintAr: 'لا يوجد منافسين في نفس الفئة «عناية شخصية»',
+            onSelect: _noop,
+          ),
+        ),
+      ),
+    );
+    expect(find.byKey(const ValueKey('ai-picks-empty-reason')), findsOneWidget);
+    expect(
+      find.text('لا يوجد منافسين في نفس الفئة «عناية شخصية»'),
+      findsOneWidget,
+    );
   });
 }
 

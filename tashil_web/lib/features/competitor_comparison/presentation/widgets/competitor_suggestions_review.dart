@@ -96,6 +96,7 @@ class CompetitorSuggestionsReview extends StatefulWidget {
 class CompetitorSuggestionsReviewState
     extends State<CompetitorSuggestionsReview> {
   List<CompetitorSuggestionModel> _items = const [];
+  List<CompetitorNoSuggestionSkuModel> _noSuggestionSkus = const [];
   bool _loading = true;
   bool _running = false;
   bool _generatingAll = false;
@@ -152,9 +153,22 @@ class CompetitorSuggestionsReviewState
         chain: widget.chain,
         status: 'pending',
       );
+      var gaps = const <CompetitorNoSuggestionSkuModel>[];
+      if (widget.isOwner) {
+        try {
+          gaps = await widget.apiClient.listCompetitorNoSuggestionSkus(
+            chain: widget.chain,
+            year: widget.year,
+          );
+        } catch (_) {
+          // Best-effort: pending queue still loads if gaps endpoint fails.
+          gaps = _noSuggestionSkus;
+        }
+      }
       if (!mounted) return;
       setState(() {
         _items = items;
+        _noSuggestionSkus = gaps;
         _loading = false;
         final pages = (_groups.isEmpty)
             ? 1
@@ -167,6 +181,19 @@ class CompetitorSuggestionsReviewState
       setState(() => _loading = false);
       _surfaceError(e);
     }
+  }
+
+  void _applyNoSuggestionSkusFromRun(Map<String, dynamic> result) {
+    final raw = result['no_suggestion_skus'];
+    if (raw is! List) return;
+    final gaps = <CompetitorNoSuggestionSkuModel>[
+      for (final row in raw)
+        if (row is Map)
+          CompetitorNoSuggestionSkuModel.fromJson(
+            Map<String, dynamic>.from(row),
+          ),
+    ];
+    setState(() => _noSuggestionSkus = gaps);
   }
 
   Future<void> _runBatch() async {
@@ -186,6 +213,7 @@ class CompetitorSuggestionsReviewState
           (result['summary_ar'] ?? result['error'])?.toString().trim() ?? '';
       final rankFailures = (result['rank_failures'] as num?)?.toInt() ?? 0;
       if (!mounted) return;
+      _applyNoSuggestionSkusFromRun(result);
       if (created == 0 && (summary.isNotEmpty || rankFailures > 0)) {
         _showRunFailure(
           summary.isNotEmpty ? summary : 'لم يتم إنشاء اقتراحات',
@@ -262,6 +290,9 @@ class CompetitorSuggestionsReviewState
           _generateAllDone =
               (_generateAllDone + processed).clamp(0, _generateAllTotal);
         });
+
+        if (!mounted) return;
+        _applyNoSuggestionSkusFromRun(result);
 
         if (created == 0 && (summary.isNotEmpty || rankFailures > 0)) {
           _showRunFailure(
@@ -489,9 +520,14 @@ class CompetitorSuggestionsReviewState
             '(لا تُنشأ تلقائياً لكل أصناف الشركة). '
             'تشغيل دفعة (حتى 10 أصناف) أو «توليد للكل» أو اختيار صنف في تبويب الأسعار يولّد اقتراحات جديدة (تبقى معلّقة). '
             'حجم الدفعة يخص التشغيل اليدوي فقط ولا يقيّد قائمة الانتظار. '
-            'الاقتراحات المعلّقة لا تظهر في المقارنة أو مؤشرات الأداء حتى الموافقة.',
+            'الاقتراحات المعلّقة لا تظهر في المقارنة أو مؤشرات الأداء حتى الموافقة. '
+            'لا يتم تخمين أو إنشاء منافسين تلقائياً عند غيابهم من البيانات.',
             style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
+          if (!_loading && _noSuggestionSkus.isNotEmpty) ...[
+            M3Spacing.gapMD,
+            _buildNoSuggestionPanel(theme, cs),
+          ],
           if (!_loading && groups.isNotEmpty) ...[
             M3Spacing.gapXS,
             Text(
@@ -536,6 +572,69 @@ class CompetitorSuggestionsReviewState
               _buildPager(theme, cs, groups.length, pageCount, pageStart, pageEnd),
             ],
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoSuggestionPanel(ThemeData theme, ColorScheme cs) {
+    return Container(
+      key: const ValueKey('no-suggestion-skus-panel'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: M3Shape.radiusLg,
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'أصناف بلا اقتراحات (${_noSuggestionSkus.length})',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          M3Spacing.gapXS,
+          Text(
+            'سبب كل صنف ظاهر أدناه. لا يُنشأ منافسون تلقائياً ولا يُخمَّنون خارج بيانات البيع.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          M3Spacing.gapSM,
+          for (final sku in _noSuggestionSkus)
+            Padding(
+              key: ValueKey('no-suggestion-sku-${sku.barcode}'),
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    sku.skuName.isEmpty ? sku.barcode : sku.skuName,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (sku.category.isNotEmpty)
+                    Text(
+                      'الفئة: ${sku.category}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  Text(
+                    sku.reasonAr.isEmpty
+                        ? 'لا توجد اقتراحات متاحة لهذا الصنف'
+                        : sku.reasonAr,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: M3Palette.dangerAccent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

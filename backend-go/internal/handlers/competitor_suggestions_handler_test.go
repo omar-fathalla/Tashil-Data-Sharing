@@ -26,6 +26,7 @@ func (m *memCatalog) CompetitiveMonthly(tenantID string, filter bigquery.RecordF
 func suggestMux(h *CompetitorSuggestionsHandler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/competitors/suggestions", h.HandleListSuggestions)
+	mux.HandleFunc("GET /api/v1/competitors/suggestions/no-candidates", h.HandleNoSuggestionSkus)
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/run", h.HandleRunSuggestions)
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/sku", h.HandleSuggestForSku)
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/approve", h.HandleApproveSuggestion)
@@ -94,12 +95,27 @@ func TestCompetitorSuggestionsRunApproveRejectFlow(t *testing.T) {
 	careSkip := false
 	for _, s := range skipped {
 		m := s.(map[string]interface{})
-		if m["barcode"] == "OWN-CARE" && m["reason_ar"] == "لا يوجد منافسين في البيانات" {
+		if m["barcode"] != "OWN-CARE" {
+			continue
+		}
+		reason, _ := m["reason_ar"].(string)
+		code, _ := m["reason_code"].(string)
+		if isNoSameCategoryReason(reason) && code == reasonCodeNoSameCategoryComps {
+			if !strings.Contains(reason, "عناية شخصية") {
+				t.Fatalf("care skip reason must name category: %q", reason)
+			}
+			if m["category"] != "عناية شخصية" {
+				t.Fatalf("care skip must include category field: %v", m)
+			}
 			careSkip = true
 		}
 	}
 	if !careSkip {
-		t.Fatalf("عناية شخصية must skip with Arabic empty message, skipped=%v", skipped)
+		t.Fatalf("عناية شخصية must skip with same-category empty reason, skipped=%v", skipped)
+	}
+	gaps, _ := out["no_suggestion_skus"].([]interface{})
+	if len(gaps) < 1 {
+		t.Fatalf("run must include no_suggestion_skus, got %v", out["no_suggestion_skus"])
 	}
 
 	_, out = tmDo(t, mux, admin, "GET", "/api/v1/competitors/suggestions?status=pending&chain=fathalla", nil)
@@ -444,7 +460,8 @@ func TestCompetitorSuggestionsForSkuEmptyCacheAndPerSkuScope(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("first empty: %d %s", rec.Code, rec.Body.String())
 	}
-	if out["skipped_reason_ar"] != "لا يوجد منافسين في البيانات" {
+	reason, _ := out["skipped_reason_ar"].(string)
+	if !isNoSameCategoryReason(reason) || !strings.Contains(reason, "عناية شخصية") {
 		t.Fatalf("skip: %v", out["skipped_reason_ar"])
 	}
 
@@ -707,7 +724,8 @@ func TestCompetitorSuggestionsRunAdvancesPastNoCandidateHead(t *testing.T) {
 	noCandSkips := 0
 	for _, s := range out["skipped"].([]interface{}) {
 		m := s.(map[string]interface{})
-		if m["reason_ar"] == skipReasonNoCompetitors {
+		reason, _ := m["reason_ar"].(string)
+		if isNoSameCategoryReason(reason) || m["reason_code"] == reasonCodeNoSameCategoryComps {
 			noCandSkips++
 		}
 	}
@@ -783,6 +801,133 @@ func TestCompetitorSuggestionsRunRankFailureMarksAttemptAndAdvances(t *testing.T
 	}
 	if int(out["remaining_uncovered"].(float64)) != 0 {
 		t.Fatalf("batch2 remaining want 0, got %v", out["remaining_uncovered"])
+	}
+}
+
+func TestCompetitorSuggestionsNoCandidatesEndpointListsReasons(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), &competitorsuggest.GeminiRanker{UseMock: true})
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+	viewer := &domain.UserClaims{UserID: "u2", TenantID: "adeco", Email: "v@adeco.com", Role: domain.RoleExecutive}
+
+	if rec, _ := tmDo(t, mux, viewer, "GET", "/api/v1/competitors/suggestions/no-candidates?chain=fathalla&year=2026", nil); rec.Code != http.StatusForbidden {
+		t.Fatalf("non-owner no-candidates: want 403, got %d", rec.Code)
+	}
+
+	rec, out := tmDo(t, mux, admin, "GET", "/api/v1/competitors/suggestions/no-candidates?chain=fathalla&year=2026", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("no-candidates: %d %s", rec.Code, rec.Body.String())
+	}
+	if out["auto_create_competitors"] != false {
+		t.Fatalf("must never auto-create competitors: %v", out["auto_create_competitors"])
+	}
+	skus, _ := out["skus"].([]interface{})
+	foundCare := false
+	for _, raw := range skus {
+		m := raw.(map[string]interface{})
+		if m["barcode"] != "OWN-CARE" {
+			continue
+		}
+		foundCare = true
+		reason, _ := m["reason_ar"].(string)
+		if !isNoSameCategoryReason(reason) || !strings.Contains(reason, "عناية شخصية") {
+			t.Fatalf("OWN-CARE reason want category-aware empty pool, got %q", reason)
+		}
+		if m["reason_code"] != reasonCodeNoSameCategoryComps {
+			t.Fatalf("OWN-CARE reason_code: %v", m["reason_code"])
+		}
+		if m["sku_name"] == "" || m["category"] != "عناية شخصية" {
+			t.Fatalf("OWN-CARE must include name+category: %v", m)
+		}
+	}
+	if !foundCare {
+		t.Fatalf("OWN-CARE must appear in no-candidates list: %v", skus)
+	}
+	// OWN-DISH / OWN-GEL have same-category comps — must not be listed.
+	for _, raw := range skus {
+		m := raw.(map[string]interface{})
+		bc := fmt.Sprint(m["barcode"])
+		if bc == "OWN-DISH" || bc == "OWN-GEL" {
+			t.Fatalf("%s has competitors and must not appear in no-candidates", bc)
+		}
+	}
+}
+
+func TestCompetitorSuggestionsAllCandidatesExcludedReason(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	cat := &memCatalog{res: bigquery.CompetitiveMonthlyResult{
+		Year: 2026,
+		Items: []bigquery.CompetitiveMonthlyItem{
+			{
+				Barcode: "OWN-ONLY", SKUName: "عرض سعر فلفيتا 500 جم", Category: "مزيلات بقع ملابس", IsOwnBrand: true,
+				Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 40, Units: 2, NetRevenue: 80}},
+			},
+			{
+				Barcode: "COMP-ONLY", SKUName: "منافس مزيل بقع", Category: "مزيلات بقع ملابس", IsOwnBrand: false,
+				Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 35, Units: 3, NetRevenue: 105}},
+			},
+		},
+	}}
+	h := NewCompetitorSuggestionsHandler(fs, fs, cat, &competitorsuggest.GeminiRanker{UseMock: true})
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+
+	// Reject the only competitor pair so eligible pool becomes empty via exclusion.
+	rec, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 1, "own_skus": []string{"OWN-ONLY"},
+	})
+	if rec.Code != http.StatusOK || int(out["created_count"].(float64)) < 1 {
+		t.Fatalf("seed suggestion: %d %v", rec.Code, out)
+	}
+	_, list := tmDo(t, mux, admin, "GET", "/api/v1/competitors/suggestions?status=pending&chain=fathalla", nil)
+	id := list["suggestions"].([]interface{})[0].(map[string]interface{})["id"].(string)
+	if rec, _ = tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/reject", map[string]interface{}{"id": id}); rec.Code != http.StatusOK {
+		t.Fatalf("reject: %d", rec.Code)
+	}
+
+	rec, out = tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
+		"barcode": "OWN-ONLY", "chain": "fathalla", "year": 2026,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("sku after reject: %d %s", rec.Code, rec.Body.String())
+	}
+	// Pending was rejected → own is "covered" for batch, but on-demand sku still generates.
+	// With only rejected pair left, generateForOwn should return ALL_EXCLUDED reason.
+	if int(out["count"].(float64)) != 0 {
+		t.Fatalf("want 0 suggestions after sole pair rejected, got %v", out)
+	}
+	reason, _ := out["skipped_reason_ar"].(string)
+	if reason != skipReasonAllExcluded {
+		t.Fatalf("want all-excluded reason, got %q (out=%v)", reason, out)
+	}
+
+	rec, gaps := tmDo(t, mux, admin, "GET", "/api/v1/competitors/suggestions/no-candidates?chain=fathalla&year=2026", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("gaps: %d", rec.Code)
+	}
+	found := false
+	for _, raw := range gaps["skus"].([]interface{}) {
+		m := raw.(map[string]interface{})
+		if m["barcode"] == "OWN-ONLY" && m["reason_code"] == reasonCodeAllCandidatesExcluded {
+			found = true
+			if m["reason_ar"] != skipReasonAllExcluded {
+				t.Fatalf("gap reason: %v", m)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("OWN-ONLY must be listed as ALL_CANDIDATES_EXCLUDED: %v", gaps["skus"])
+	}
+}
+
+func TestFormatNoSameCategoryReason(t *testing.T) {
+	got := formatNoSameCategoryReason("عناية شخصية")
+	if !strings.Contains(got, "عناية شخصية") || !isNoSameCategoryReason(got) {
+		t.Fatalf("format: %q", got)
+	}
+	if formatNoSameCategoryReason("  ") != skipReasonNoCompetitors {
+		t.Fatalf("empty category fallback")
 	}
 }
 
