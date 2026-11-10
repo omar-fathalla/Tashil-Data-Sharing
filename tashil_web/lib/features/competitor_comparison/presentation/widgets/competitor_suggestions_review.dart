@@ -95,14 +95,14 @@ class CompetitorSuggestionsReviewState
         year: widget.year,
       );
       final created = (result['created_count'] as num?)?.toInt() ?? 0;
-      final summary = (result['summary_ar'] ?? result['error'])?.toString();
+      final summary =
+          (result['summary_ar'] ?? result['error'])?.toString().trim() ?? '';
       final rankFailures = (result['rank_failures'] as num?)?.toInt() ?? 0;
       if (!mounted) return;
-      final hasSummary = summary != null && summary.isNotEmpty;
-      if (created == 0 && (hasSummary || rankFailures > 0)) {
-        final detail =
-            hasSummary ? summary! : 'لم يتم إنشاء اقتراحات';
-        _showRunFailure(detail);
+      if (created == 0 && (summary.isNotEmpty || rankFailures > 0)) {
+        _showRunFailure(
+          summary.isNotEmpty ? summary : 'لم يتم إنشاء اقتراحات',
+        );
       }
       await _reload();
     } catch (e) {
