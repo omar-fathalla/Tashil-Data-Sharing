@@ -206,11 +206,12 @@ class CompetitorSuggestionsReviewState
     setState(() => _stopGenerateAll = true);
   }
 
-  static const int _maxRateLimitRetries = 5;
+  static const int _maxTransientRetries = 5;
 
   /// Loops POST …/run batches until remaining_uncovered=0, user stops, or error.
-  /// Respects the ~30s per-chain rate limit; 429 uses a slightly longer backoff
-  /// (capped at [_maxRateLimitRetries]). Never auto-approves — rows stay pending.
+  /// Respects the ~30s per-chain rate limit; 429 and connection drops
+  /// (`ERR_CONNECTION_CLOSED`) use a slightly longer backoff (capped at
+  /// [_maxTransientRetries]). Never auto-approves — rows stay pending.
   Future<void> _generateAll() async {
     if (!widget.isOwner || _busyBatch) return;
     setState(() {
@@ -221,7 +222,7 @@ class CompetitorSuggestionsReviewState
       _generateAllTotal = 0;
     });
     var previousRemaining = -1;
-    var rateLimitRetries = 0;
+    var transientRetries = 0;
     try {
       while (mounted && !_stopGenerateAll) {
         Map<String, dynamic> result;
@@ -231,13 +232,26 @@ class CompetitorSuggestionsReviewState
             limit: _batchSize,
             year: widget.year,
           );
-          rateLimitRetries = 0;
+          transientRetries = 0;
         } on CompetitorSuggestRateLimitException catch (e) {
           if (!mounted || _stopGenerateAll) break;
-          rateLimitRetries++;
-          if (rateLimitRetries > _maxRateLimitRetries) {
+          transientRetries++;
+          if (transientRetries > _maxTransientRetries) {
             _showRunFailure(
               'تم إيقاف التوليد بعد عدة تجاوزات لحد الطلبات (${e.message})',
+            );
+            break;
+          }
+          await Future<void>.delayed(widget.rateLimitBackoff);
+          continue;
+        } on CompetitorSuggestConnectionException catch (e) {
+          // Mid-flight socket drop often leaves the per-chain cooldown stamped;
+          // wait like 429, then resume the generate-all loop.
+          if (!mounted || _stopGenerateAll) break;
+          transientRetries++;
+          if (transientRetries > _maxTransientRetries) {
+            _showRunFailure(
+              'تم إيقاف التوليد بعد عدة انقطاعات للاتصال (${e.message})',
             );
             break;
           }

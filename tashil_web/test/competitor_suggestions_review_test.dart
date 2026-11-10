@@ -307,6 +307,101 @@ void main() {
     }, fake);
   });
 
+  testWidgets(
+      'توليد للكل retries after ERR_CONNECTION_CLOSED then continues',
+      (tester) async {
+    var runCalls = 0;
+    final store = <Map<String, dynamic>>[];
+
+    MockClient fake() => MockClient((req) async {
+          if (req.url.path.contains('/competitors/suggestions/run') &&
+              req.method == 'POST') {
+            runCalls++;
+            // First logical batch: ApiClient exhausts 3 connection attempts,
+            // then generate-all backs off and calls again successfully.
+            if (runCalls <= 3) {
+              throw http.ClientException('net::ERR_CONNECTION_CLOSED');
+            }
+            store.add({
+              'id': 'csug_conn',
+              'own_barcode': 'OWN1',
+              'own_sku_name': 'صنف 1',
+              'own_category': 'صابون',
+              'competitor_barcode': 'C1',
+              'competitor_sku_name': 'منافس 1',
+              'competitor_brand': 'Brand',
+              'competitor_supplier': 'S',
+              'category': 'صابون',
+              'retailer_chain': 'fathalla',
+              'reason_ar': 'نفس الفئة',
+              'confidence': 0.8,
+              'rank': 1,
+              'status': 'pending',
+              'own_unit_price': 10.0,
+              'competitor_unit_price': 9.0,
+              'own_units': 1,
+              'competitor_units': 1,
+            });
+            return _json(
+              jsonEncode({
+                'created_count': 1,
+                'processed_own': 1,
+                'remaining_uncovered': 0,
+                'suggestions': [store.last],
+                'skipped': [],
+              }),
+              200,
+            );
+          }
+          if (req.url.path.contains('/competitors/suggestions') &&
+              req.method == 'GET') {
+            return _json(
+              jsonEncode({'suggestions': store, 'count': store.length}),
+              200,
+            );
+          }
+          return _json('{"error":"unhandled"}', 500);
+        });
+
+    final prevAttempts = ApiClient.suggestionsRunMaxAttempts;
+    final prevDelay = ApiClient.connectionRetryDelay;
+    ApiClient.suggestionsRunMaxAttempts = 3;
+    ApiClient.connectionRetryDelay = Duration.zero;
+    addTearDown(() {
+      ApiClient.suggestionsRunMaxAttempts = prevAttempts;
+      ApiClient.connectionRetryDelay = prevDelay;
+    });
+
+    await http.runWithClient(() async {
+      final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: CompetitorSuggestionsReview(
+                apiClient: api,
+                chain: 'fathalla',
+                year: 2026,
+                isOwner: true,
+                chainRunCooldown: Duration.zero,
+                rateLimitBackoff: Duration.zero,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('generate-all-suggestions')));
+      await tester.pumpAndSettle();
+
+      // 3 failed attempts + 1 successful resume after generate-all backoff.
+      expect(runCalls, 4);
+      expect(store, hasLength(1));
+      expect(find.text('توليد للكل'), findsOneWidget);
+    }, fake);
+  });
+
   testWidgets('run failure shows Arabic snackbar instead of empty silence',
       (tester) async {
     MockClient fake() => MockClient((req) async {

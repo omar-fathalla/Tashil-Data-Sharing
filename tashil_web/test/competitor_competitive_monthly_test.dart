@@ -177,6 +177,15 @@ void main() {
   });
 
   test('timeout surfaces Arabic error (never silent empty / hang)', () async {
+    final prevDelay = ApiClient.connectionRetryDelay;
+    final prevAttempts = ApiClient.competitiveMonthlyMaxAttempts;
+    ApiClient.connectionRetryDelay = Duration.zero;
+    ApiClient.competitiveMonthlyMaxAttempts = 3;
+    addTearDown(() {
+      ApiClient.connectionRetryDelay = prevDelay;
+      ApiClient.competitiveMonthlyMaxAttempts = prevAttempts;
+    });
+
     await http.runWithClient(() async {
       final api = ApiClient(
         tenantId: 'tenant-adeco',

@@ -11101,8 +11101,32 @@ class ApiClient {
     ];
   }
 
+  /// Attempts for POST …/suggestions/run when the browser drops the socket
+  /// (`net::ERR_CONNECTION_CLOSED` / Failed to fetch) under Cloud Run maxScale=1.
+  /// Mutable for unit tests only.
+  static int suggestionsRunMaxAttempts = 3;
+
+  /// Delay between [suggestionsRunMaxAttempts] connection retries. Mutable for tests.
+  static Duration connectionRetryDelay = const Duration(seconds: 1);
+
+  /// True for browser/transport drops that are safe to retry (not HTTP 4xx/5xx bodies).
+  static bool isTransientConnectionFailure(Object e) {
+    if (e is TimeoutException || e is http.ClientException) return true;
+    if (e is CompetitorSuggestConnectionException) return true;
+    final s = e.toString().toLowerCase();
+    return s.contains('err_connection_closed') ||
+        s.contains('connection closed') ||
+        s.contains('failed to fetch') ||
+        s.contains('clientexception') ||
+        s.contains('xmlhttprequest') ||
+        s.contains('networkerror') ||
+        s.contains('connection reset') ||
+        s.contains('socketexception');
+  }
+
   /// Owner-only: run a batch of AI competitor suggestions (default limit 10).
   /// Throws [CompetitorSuggestRateLimitException] on HTTP 429 (per-chain ~30s).
+  /// Retries transient connection drops (ERR_CONNECTION_CLOSED) a few times.
   Future<Map<String, dynamic>> runCompetitorSuggestions({
     required String chain,
     int limit = 10,
@@ -11115,21 +11139,55 @@ class ApiClient {
       if (ownSkus != null && ownSkus.isNotEmpty) 'own_skus': ownSkus,
       if (year != null && year > 0) 'year': year,
     };
-    final resp = await BackendHttp.post(
-      Uri.parse(ApiEndpoints.competitorSuggestionsRun),
-      headers: _headers,
-      body: jsonEncode(body),
-    ).timeout(const Duration(seconds: 120));
-    final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
-    if (resp.statusCode == 429) {
-      throw CompetitorSuggestRateLimitException(
-        data['error']?.toString() ?? 'تم تجاوز حد الطلبات — انتظر قبل إعادة التشغيل',
-      );
+    final maxAttempts = suggestionsRunMaxAttempts < 1 ? 1 : suggestionsRunMaxAttempts;
+    Object? lastError;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        final resp = await BackendHttp.post(
+          Uri.parse(ApiEndpoints.competitorSuggestionsRun),
+          headers: _headers,
+          body: jsonEncode(body),
+        ).timeout(const Duration(seconds: 120));
+        Map<String, dynamic> data;
+        try {
+          data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+        } catch (_) {
+          data = const {};
+        }
+        if (resp.statusCode == 429) {
+          throw CompetitorSuggestRateLimitException(
+            data['error']?.toString() ??
+                'تم تجاوز حد الطلبات — انتظر قبل إعادة التشغيل',
+          );
+        }
+        if (resp.statusCode != 200) {
+          throw Exception(
+            data['error']?.toString() ??
+                'فشل تشغيل الاقتراحات (${resp.statusCode})',
+          );
+        }
+        return data;
+      } on CompetitorSuggestRateLimitException {
+        rethrow;
+      } catch (e) {
+        lastError = e;
+        // Non-transient HTTP/app errors must surface immediately.
+        if (!isTransientConnectionFailure(e)) rethrow;
+        debugPrint(
+          '[ApiClient] suggestions/run connection drop '
+          '(attempt $attempt/$maxAttempts): $e',
+        );
+        if (attempt >= maxAttempts) break;
+        final delay = connectionRetryDelay;
+        if (delay > Duration.zero) {
+          await Future<void>.delayed(delay);
+        }
+      }
     }
-    if (resp.statusCode != 200) {
-      throw Exception(data['error']?.toString() ?? 'فشل تشغيل الاقتراحات (${resp.statusCode})');
-    }
-    return data;
+    throw CompetitorSuggestConnectionException(
+      'انقطع الاتصال أثناء تشغيل الاقتراحات — سيتم إعادة المحاولة',
+      lastError,
+    );
   }
 
   /// Client ceiling for on-demand AI picks. Must stay above the server rank
@@ -11470,8 +11528,12 @@ class ApiClient {
   /// Client ceiling for Compare competitive-monthly. Mutable for unit tests only.
   static Duration competitiveMonthlyTimeout = const Duration(seconds: 45);
 
+  /// Attempts for competitive-monthly on timeout / connection closed. Mutable for tests.
+  static int competitiveMonthlyMaxAttempts = 3;
+
   /// One-shot server aggregate for Compare: barcode → YYYY-MM → (avg unit price, units),
   /// plus live own-SKU name/category metadata (is_own_brand). No raw row paging.
+  /// Retries transient connection drops and timeouts (Cloud Run maxScale=1).
   Future<({
     Map<String, Map<String, ({double price, int units})>> byBarcode,
     Map<String, ({String skuName, String category, bool isOwnBrand})> metaByBarcode,
@@ -11491,13 +11553,55 @@ class ApiClient {
       params['chain'] = chain;
     }
     final uri = Uri.parse(ApiEndpoints.competitiveMonthly).replace(queryParameters: params);
+    final maxAttempts =
+        competitiveMonthlyMaxAttempts < 1 ? 1 : competitiveMonthlyMaxAttempts;
     late http.Response res;
-    try {
-      res = await BackendHttp.get(uri, headers: _headers)
-          .timeout(competitiveMonthlyTimeout);
-    } on TimeoutException {
+    Object? lastError;
+    var timedOut = false;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        res = await BackendHttp.get(uri, headers: _headers)
+            .timeout(competitiveMonthlyTimeout);
+        lastError = null;
+        timedOut = false;
+        break;
+      } on TimeoutException catch (e) {
+        lastError = e;
+        timedOut = true;
+        debugPrint(
+          '[ApiClient] competitive-monthly timeout '
+          '(attempt $attempt/$maxAttempts): $e',
+        );
+        if (attempt >= maxAttempts) {
+          throw Exception(
+            'انتهت مهلة تحميل بيانات مقارنة الأسعار — حاول مرة أخرى',
+          );
+        }
+      } catch (e) {
+        lastError = e;
+        timedOut = false;
+        if (!isTransientConnectionFailure(e)) rethrow;
+        debugPrint(
+          '[ApiClient] competitive-monthly connection drop '
+          '(attempt $attempt/$maxAttempts): $e',
+        );
+        if (attempt >= maxAttempts) {
+          throw Exception(
+            'انقطع الاتصال أثناء تحميل بيانات مقارنة الأسعار — حاول مرة أخرى',
+          );
+        }
+      }
+      final delay = connectionRetryDelay;
+      if (delay > Duration.zero) {
+        await Future<void>.delayed(delay);
+      }
+    }
+    if (lastError != null) {
+      // Unreachable when the loop breaks on success; keeps analyzer happy.
       throw Exception(
-        'انتهت مهلة تحميل بيانات مقارنة الأسعار — حاول مرة أخرى',
+        timedOut
+            ? 'انتهت مهلة تحميل بيانات مقارنة الأسعار — حاول مرة أخرى'
+            : 'انقطع الاتصال أثناء تحميل بيانات مقارنة الأسعار — حاول مرة أخرى',
       );
     }
     if (res.statusCode != 200) {
@@ -11623,9 +11727,10 @@ class ApiClient {
       metaByBarcode = agg.metaByBarcode;
       ownSkus = agg.ownSkus;
     } catch (e) {
-      // Surface Arabic timeout to Compare (clear error, never infinite KPI skeletons).
+      // Surface Arabic timeout / connection-closed to Compare (never silent empty).
       final msg = e.toString();
-      if (msg.contains('انتهت مهلة تحميل بيانات مقارنة الأسعار')) {
+      if (msg.contains('انتهت مهلة تحميل بيانات مقارنة الأسعار') ||
+          msg.contains('انقطع الاتصال أثناء تحميل بيانات مقارنة الأسعار')) {
         rethrow;
       }
       debugPrint('[ApiClient] competitive-monthly failed: $e');
@@ -12859,6 +12964,17 @@ class CompetitorSkuSuggestionsResult {
 class CompetitorSuggestRateLimitException implements Exception {
   final String message;
   const CompetitorSuggestRateLimitException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+/// Raised when POST …/suggestions/run exhausts retries after a transport drop
+/// (`net::ERR_CONNECTION_CLOSED` / Failed to fetch). Generate-all backs off like 429.
+class CompetitorSuggestConnectionException implements Exception {
+  final String message;
+  final Object? cause;
+  const CompetitorSuggestConnectionException(this.message, [this.cause]);
 
   @override
   String toString() => message;

@@ -80,9 +80,15 @@ void main() {
         });
 
     final prev = ApiClient.competitiveMonthlyTimeout;
+    final prevDelay = ApiClient.connectionRetryDelay;
+    final prevAttempts = ApiClient.competitiveMonthlyMaxAttempts;
     ApiClient.competitiveMonthlyTimeout = const Duration(milliseconds: 40);
+    ApiClient.connectionRetryDelay = Duration.zero;
+    ApiClient.competitiveMonthlyMaxAttempts = 2;
     addTearDown(() {
       ApiClient.competitiveMonthlyTimeout = prev;
+      ApiClient.connectionRetryDelay = prevDelay;
+      ApiClient.competitiveMonthlyMaxAttempts = prevAttempts;
     });
 
     await http.runWithClient(() async {

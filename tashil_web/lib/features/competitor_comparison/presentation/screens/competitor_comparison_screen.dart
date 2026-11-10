@@ -240,7 +240,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       failure: (error) {
         setState(() => _isLoading = false);
         final raw = error.message;
-        final msg = raw.contains('انتهت مهلة')
+        final msg = (raw.contains('انتهت مهلة') || raw.contains('انقطع الاتصال'))
             ? raw.replaceFirst(RegExp(r'^Exception:\s*'), '')
             : 'تعذر تحميل بيانات المقارنة: $raw';
         M3Feedback.showError(
