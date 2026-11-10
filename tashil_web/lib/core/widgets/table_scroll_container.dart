@@ -122,16 +122,24 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
             ),
             const SizedBox(width: 8.0),
           ],
-          IconButton.outlined(
-            tooltip: 'تحريك الجدول لليمين (الأعمدة الأولى)',
+          OutlinedButton.icon(
             onPressed: _scrollRight,
-            icon: const Icon(Icons.arrow_forward_rounded),
+            icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+            label: const Text('يمين'),
+            style: OutlinedButton.styleFrom(
+              visualDensity: VisualDensity.standard,
+              tapTargetSize: MaterialTapTargetSize.padded,
+            ),
           ),
           const SizedBox(width: 6.0),
-          IconButton.outlined(
-            tooltip: 'تحريك الجدول لليسار (باقي الأعمدة)',
+          OutlinedButton.icon(
             onPressed: _scrollLeft,
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: const Icon(Icons.arrow_back_rounded, size: 18),
+            label: const Text('شمال'),
+            style: OutlinedButton.styleFrom(
+              visualDensity: VisualDensity.standard,
+              tapTargetSize: MaterialTapTargetSize.padded,
+            ),
           ),
         ],
       ),
