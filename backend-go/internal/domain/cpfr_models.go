@@ -567,6 +567,10 @@ func InferBrandFromItemName(itemName, subCategory string) string {
 		return "أريال (Ariel)"
 	case strings.Contains(s, "برسيل") || strings.Contains(s, "persil"):
 		return "برسيل (Persil)"
+	case strings.Contains(s, "أوكسى") || strings.Contains(s, "اوكسى") ||
+		strings.Contains(s, "أوكسي") || strings.Contains(s, "اوكسي") ||
+		strings.Contains(s, "oxi"):
+		return "أوكسي (Oxi)"
 	case strings.Contains(s, "كلوركس") || strings.Contains(s, "clorox"):
 		return "كلوركس (Clorox)"
 	case strings.Contains(s, "ديتول") || strings.Contains(s, "dettol"):
@@ -601,6 +605,10 @@ func InferBrandFromItemName(itemName, subCategory string) string {
 		}
 		parts := strings.Fields(clean)
 		if len(parts) > 0 && parts[0] == "عرض" && len(parts) > 1 {
+			parts = parts[1:]
+		}
+		// Skip generic placeholders that are not real brand tokens.
+		for len(parts) > 0 && (parts[0] == "منافس" || parts[0] == "المنافس") {
 			parts = parts[1:]
 		}
 		if len(parts) > 0 {

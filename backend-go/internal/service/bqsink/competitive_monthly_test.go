@@ -14,6 +14,7 @@ func TestCompetitiveMonthlySQLGroupsByBarcodeMonth(t *testing.T) {
 		"TRIM(IFNULL(barcode, ''))",
 		"sku_name",
 		"category",
+		"supplier",
 		"is_own_brand",
 		"LOGICAL_OR",
 	} {

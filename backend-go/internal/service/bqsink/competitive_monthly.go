@@ -12,6 +12,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/iterator"
 
+	"github.com/tashil/data-sharing/backend/internal/domain"
 	bqsvc "github.com/tashil/data-sharing/backend/internal/service/bigquery"
 )
 
@@ -23,6 +24,7 @@ type CompetitiveMonthlyRow struct {
 	Units      int64   `bigquery:"units"`
 	SKUName    string  `bigquery:"sku_name"`
 	Category   string  `bigquery:"category"`
+	Supplier   string  `bigquery:"supplier"`
 	IsOwnBrand bool    `bigquery:"is_own_brand"`
 }
 
@@ -42,6 +44,7 @@ func CompetitiveMonthlySQL(tableRef, where string) string {
 		" IFNULL(SUM(quantity_sold), 0) units," +
 		" IFNULL(ARRAY_AGG(IFNULL(sku_name, '') ORDER BY transaction_date DESC LIMIT 1)[SAFE_OFFSET(0)], '') sku_name," +
 		" IFNULL(ARRAY_AGG(IFNULL(category, '') ORDER BY transaction_date DESC LIMIT 1)[SAFE_OFFSET(0)], '') category," +
+		" IFNULL(ARRAY_AGG(IFNULL(supplier, '') ORDER BY transaction_date DESC LIMIT 1)[SAFE_OFFSET(0)], '') supplier," +
 		" LOGICAL_OR(IFNULL(is_own_brand, FALSE) OR TRIM(IFNULL(supplier, '')) = '') is_own_brand" +
 		" FROM m WHERE TRIM(IFNULL(barcode, '')) != '' AND LENGTH(IFNULL(transaction_date, '')) >= 7" +
 		" GROUP BY 1, 2 ORDER BY 1, 2"
@@ -71,6 +74,7 @@ func (s *BigQuerySink) QueryCompetitiveMonthly(ctx context.Context, rq RecordsQu
 	type meta struct {
 		skuName    string
 		category   string
+		supplier   string
 		isOwnBrand bool
 		monthKey   string
 	}
@@ -129,6 +133,9 @@ func (s *BigQuerySink) QueryCompetitiveMonthly(ctx context.Context, rq RecordsQu
 			if cat := strings.TrimSpace(row.Category); cat != "" {
 				m.category = cat
 			}
+			if sup := strings.TrimSpace(row.Supplier); sup != "" {
+				m.supplier = sup
+			}
 		}
 	}
 	months := make([]int, 0, len(monthSet))
@@ -148,7 +155,11 @@ func (s *BigQuerySink) QueryCompetitiveMonthly(ctx context.Context, rq RecordsQu
 		if m := metaBy[b]; m != nil {
 			item.SKUName = m.skuName
 			item.Category = m.category
+			item.Supplier = m.supplier
 			item.IsOwnBrand = m.isOwnBrand
+			if item.SKUName != "" {
+				item.Brand = domain.InferBrandFromItemName(item.SKUName, item.Category)
+			}
 		}
 		items = append(items, item)
 		if item.IsOwnBrand {

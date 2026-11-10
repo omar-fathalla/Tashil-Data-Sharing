@@ -24,6 +24,8 @@ type CompetitiveMonthlyItem struct {
 	Barcode    string                  `json:"barcode"`
 	SKUName    string                  `json:"sku_name,omitempty"`
 	Category   string                  `json:"category,omitempty"`
+	Supplier   string                  `json:"supplier,omitempty"`
+	Brand      string                  `json:"brand,omitempty"`
 	IsOwnBrand bool                    `json:"is_own_brand"`
 	Months     []CompetitiveMonthPoint `json:"months"`
 }
@@ -55,6 +57,7 @@ func AggregateCompetitiveMonthly(facts []domain.SellOutFact, tenantID string, fi
 	type meta struct {
 		skuName    string
 		category   string
+		supplier   string
 		isOwnBrand bool
 		txDate     string // latest transaction_date seen for name/category preference
 	}
@@ -132,7 +135,7 @@ func AggregateCompetitiveMonthly(facts []domain.SellOutFact, tenantID string, fi
 		if isOwnRecord(r) {
 			m.isOwnBrand = true
 		}
-		// Prefer the newest non-empty live name/category (never invent).
+		// Prefer the newest non-empty live name/category/supplier (never invent).
 		if r.TransactionDate >= m.txDate {
 			m.txDate = r.TransactionDate
 			if name := strings.TrimSpace(r.SKUName); name != "" {
@@ -144,6 +147,9 @@ func AggregateCompetitiveMonthly(facts []domain.SellOutFact, tenantID string, fi
 				m.category = cat
 			} else if cat := strings.TrimSpace(r.Category); cat != "" && m.category == "" {
 				m.category = cat
+			}
+			if sup := strings.TrimSpace(r.Supplier); sup != "" {
+				m.supplier = sup
 			}
 		}
 	}
@@ -197,7 +203,11 @@ func AggregateCompetitiveMonthly(facts []domain.SellOutFact, tenantID string, fi
 		if meta != nil {
 			item.SKUName = meta.skuName
 			item.Category = meta.category
+			item.Supplier = meta.supplier
 			item.IsOwnBrand = meta.isOwnBrand
+			if item.SKUName != "" {
+				item.Brand = domain.InferBrandFromItemName(item.SKUName, item.Category)
+			}
 		}
 		items = append(items, item)
 		if item.IsOwnBrand {
