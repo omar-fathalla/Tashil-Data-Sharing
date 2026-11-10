@@ -24,6 +24,29 @@ class PendingSuggestionGroup {
   });
 }
 
+/// Backend skip reason for own SKUs with no same-category competitors.
+const String kSkipReasonNoCompetitors = 'لا يوجد منافسين في البيانات';
+
+/// Arabic final summary for «توليد للكل» (created / covered / remaining / no-competitor).
+String formatGenerateAllSummaryAr({
+  required int created,
+  required int covered,
+  required int remaining,
+  required int noCompetitor,
+}) {
+  return 'انتهى التوليد — أُنشئ: $created · مغطى: $covered · '
+      'متبقي: $remaining · بدون منافس: $noCompetitor';
+}
+
+/// Reads «لا يوجد منافسين» count from a /run payload's skipped_reason_counts.
+int noCompetitorCountFromRunResult(Map<String, dynamic> result) {
+  final counts = result['skipped_reason_counts'];
+  if (counts is! Map) return 0;
+  final raw = counts[kSkipReasonNoCompetitors];
+  if (raw is num) return raw.toInt();
+  return int.tryParse(raw?.toString() ?? '') ?? 0;
+}
+
 /// Groups flat pending rows by own barcode (rank ascending within each group).
 List<PendingSuggestionGroup> groupPendingSuggestionsByOwnSku(
   List<CompetitorSuggestionModel> items,
@@ -211,6 +234,7 @@ class CompetitorSuggestionsReviewState
   /// Loops POST …/run batches until remaining_uncovered=0, user stops, or error.
   /// Respects the ~30s per-chain rate limit; 429 uses a slightly longer backoff
   /// (capped at [_maxRateLimitRetries]). Never auto-approves — rows stay pending.
+  /// On clean finish (or user stop), shows a final summary snackbar.
   Future<void> _generateAll() async {
     if (!widget.isOwner || _busyBatch) return;
     setState(() {
@@ -222,6 +246,13 @@ class CompetitorSuggestionsReviewState
     });
     var previousRemaining = -1;
     var rateLimitRetries = 0;
+    var totalCreated = 0;
+    var totalCovered = 0;
+    var totalNoCompetitor = 0;
+    var lastRemaining = 0;
+    var endedWithFailure = false;
+    var endedWithStall = false;
+    var ranAtLeastOneBatch = false;
     try {
       while (mounted && !_stopGenerateAll) {
         Map<String, dynamic> result;
@@ -236,6 +267,7 @@ class CompetitorSuggestionsReviewState
           if (!mounted || _stopGenerateAll) break;
           rateLimitRetries++;
           if (rateLimitRetries > _maxRateLimitRetries) {
+            endedWithFailure = true;
             _showRunFailure(
               'تم إيقاف التوليد بعد عدة تجاوزات لحد الطلبات (${e.message})',
             );
@@ -245,6 +277,7 @@ class CompetitorSuggestionsReviewState
           continue;
         }
 
+        ranAtLeastOneBatch = true;
         final processed = (result['processed_own'] as num?)?.toInt() ?? 0;
         final created = (result['created_count'] as num?)?.toInt() ?? 0;
         final remaining =
@@ -252,6 +285,10 @@ class CompetitorSuggestionsReviewState
         final summary =
             (result['summary_ar'] ?? result['error'])?.toString().trim() ?? '';
         final rankFailures = (result['rank_failures'] as num?)?.toInt() ?? 0;
+        totalCreated += created;
+        totalCovered += processed;
+        totalNoCompetitor += noCompetitorCountFromRunResult(result);
+        lastRemaining = remaining;
 
         if (!mounted) return;
         setState(() {
@@ -264,6 +301,7 @@ class CompetitorSuggestionsReviewState
         });
 
         if (created == 0 && (summary.isNotEmpty || rankFailures > 0)) {
+          endedWithFailure = true;
           _showRunFailure(
             summary.isNotEmpty ? summary : 'لم يتم إنشاء اقتراحات',
           );
@@ -279,6 +317,7 @@ class CompetitorSuggestionsReviewState
             (created == 0 &&
                 previousRemaining >= 0 &&
                 remaining >= previousRemaining)) {
+          endedWithStall = true;
           _showInfoMessage(
             'توقف التوليد: لا تقدّم إضافي (المتبقي $remaining صنف)',
           );
@@ -304,18 +343,47 @@ class CompetitorSuggestionsReviewState
         }
       }
     } catch (e) {
+      endedWithFailure = true;
       if (!mounted) return;
       final detail = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
       _showRunFailure(detail);
     } finally {
       if (mounted) {
+        final showSummary = ranAtLeastOneBatch &&
+            !endedWithFailure &&
+            !endedWithStall;
         setState(() {
           _generatingAll = false;
           _stopGenerateAll = false;
         });
         await _reload();
+        if (mounted && showSummary) {
+          _showGenerateAllSummary(
+            created: totalCreated,
+            covered: totalCovered,
+            remaining: lastRemaining,
+            noCompetitor: totalNoCompetitor,
+          );
+        }
       }
     }
+  }
+
+  void _showGenerateAllSummary({
+    required int created,
+    required int covered,
+    required int remaining,
+    required int noCompetitor,
+  }) {
+    final message = formatGenerateAllSummaryAr(
+      created: created,
+      covered: covered,
+      remaining: remaining,
+      noCompetitor: noCompetitor,
+    );
+    setState(() => _error = null);
+    if (!mounted) return;
+    M3Feedback.showSuccess(context, message);
   }
 
   void _showInfoMessage(String message) {

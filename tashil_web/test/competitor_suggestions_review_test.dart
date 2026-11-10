@@ -119,6 +119,26 @@ void main() {
     }, fake);
   });
 
+  test('formatGenerateAllSummaryAr lists created/covered/remaining/no-competitor',
+      () {
+    expect(
+      formatGenerateAllSummaryAr(
+        created: 12,
+        covered: 5,
+        remaining: 0,
+        noCompetitor: 3,
+      ),
+      'انتهى التوليد — أُنشئ: 12 · مغطى: 5 · متبقي: 0 · بدون منافس: 3',
+    );
+    expect(
+      noCompetitorCountFromRunResult({
+        'skipped_reason_counts': {kSkipReasonNoCompetitors: 7},
+      }),
+      7,
+    );
+    expect(noCompetitorCountFromRunResult(const {}), 0);
+  });
+
   testWidgets('توليد للكل loops /run until remaining_uncovered=0 with progress',
       (tester) async {
     var runCalls = 0;
@@ -159,6 +179,9 @@ void main() {
                   'remaining_uncovered': 1,
                   'suggestions': [store.last],
                   'skipped': [],
+                  'skipped_reason_counts': {
+                    kSkipReasonNoCompetitors: 2,
+                  },
                 }),
                 200,
               );
@@ -191,6 +214,9 @@ void main() {
                 'remaining_uncovered': 0,
                 'suggestions': [store.last],
                 'skipped': [],
+                'skipped_reason_counts': {
+                  kSkipReasonNoCompetitors: 1,
+                },
               }),
               200,
             );
@@ -239,6 +265,95 @@ void main() {
       expect(runCalls, 2);
       expect(find.text('توليد للكل'), findsOneWidget);
       expect(store, hasLength(2));
+      // Final summary snackbar: created / covered / remaining / no-competitor.
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(
+        find.textContaining(
+          formatGenerateAllSummaryAr(
+            created: 2,
+            covered: 2,
+            remaining: 0,
+            noCompetitor: 3,
+          ),
+        ),
+        findsOneWidget,
+      );
+    }, fake);
+  });
+
+  testWidgets('توليد للكل stop shows partial summary snackbar', (tester) async {
+    var runCalls = 0;
+    MockClient fake() => MockClient((req) async {
+          if (req.url.path.contains('/competitors/suggestions/run') &&
+              req.method == 'POST') {
+            runCalls++;
+            return _json(
+              jsonEncode({
+                'created_count': 4,
+                'processed_own': 2,
+                'remaining_uncovered': 40,
+                'suggestions': [],
+                'skipped': [],
+                'skipped_reason_counts': {
+                  kSkipReasonNoCompetitors: 5,
+                },
+              }),
+              200,
+            );
+          }
+          if (req.url.path.contains('/competitors/suggestions') &&
+              req.method == 'GET') {
+            return _json(
+              jsonEncode({'suggestions': [], 'count': 0}),
+              200,
+            );
+          }
+          return _json('{"error":"unhandled"}', 500);
+        });
+
+    await http.runWithClient(() async {
+      final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: CompetitorSuggestionsReview(
+                apiClient: api,
+                chain: 'fathalla',
+                year: 2026,
+                isOwner: true,
+                chainRunCooldown: const Duration(seconds: 30),
+                rateLimitBackoff: Duration.zero,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('generate-all-suggestions')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byKey(const ValueKey('stop-generate-all-suggestions')),
+          findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('stop-generate-all-suggestions')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
+
+      expect(runCalls, 1);
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(
+        find.textContaining(
+          formatGenerateAllSummaryAr(
+            created: 4,
+            covered: 2,
+            remaining: 40,
+            noCompetitor: 5,
+          ),
+        ),
+        findsOneWidget,
+      );
     }, fake);
   });
 
