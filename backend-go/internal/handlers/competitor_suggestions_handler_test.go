@@ -169,7 +169,7 @@ func TestCompetitorSuggestionsRunApproveRejectFlow(t *testing.T) {
 	h.lastRun = map[string]time.Time{}
 	h.rateMu.Unlock()
 
-	// Own with approved mapping is skipped on re-run
+	// Own with approved mapping and/or remaining pending rows is skipped on re-run
 	rec, out = tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
 		"chain": "fathalla", "limit": 10, "own_skus": []string{ownBC},
 	})
@@ -178,11 +178,16 @@ func TestCompetitorSuggestionsRunApproveRejectFlow(t *testing.T) {
 	}
 	for _, s := range out["skipped"].([]interface{}) {
 		m := s.(map[string]interface{})
-		if m["barcode"] == ownBC && m["reason_ar"] == "يوجد تعيين معتمد مسبقاً" {
+		if m["barcode"] != ownBC {
+			continue
+		}
+		reason := fmt.Sprint(m["reason_ar"])
+		// Remaining pending rows → covered skip; otherwise approved-mapping skip.
+		if reason == skipReasonOwnAlreadyCovered || reason == "يوجد تعيين معتمد مسبقاً" {
 			return
 		}
 	}
-	t.Fatalf("approved own should be skipped on rerun: %v", out["skipped"])
+	t.Fatalf("approved/covered own should be skipped on rerun: %v", out["skipped"])
 }
 
 func TestCompetitorSuggestionsRejectNotResuggested(t *testing.T) {
@@ -526,6 +531,135 @@ func TestCompetitorSuggestionsForSkuCooldownAfterClearedEmptyCache(t *testing.T)
 	})
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("want 429 when empty cache cleared inside cooldown, got %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCompetitorSuggestionsRunSkipsPendingAndAdvances(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	// Expand catalogue so two own SKUs with competitors exist beyond the first.
+	cat := seedCatalog()
+	cat.res.Items = append(cat.res.Items,
+		bigquery.CompetitiveMonthlyItem{
+			Barcode: "OWN-DISH-2", SKUName: "فيبا 2 كجم", Category: "صابون سائل اطباق", IsOwnBrand: true,
+			Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 170, Units: 6, NetRevenue: 1020}},
+		},
+		bigquery.CompetitiveMonthlyItem{
+			Barcode: "OWN-DISH-3", SKUName: "فيبا 1 كجم", Category: "صابون سائل اطباق", IsOwnBrand: true,
+			Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 100, Units: 4, NetRevenue: 400}},
+		},
+	)
+	h := NewCompetitorSuggestionsHandler(fs, fs, cat, &competitorsuggest.GeminiRanker{UseMock: true})
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+
+	// Batch 1: only first own — creates pending coverage.
+	rec, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 1, "own_skus": []string{"OWN-DISH", "OWN-DISH-2", "OWN-DISH-3"},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("batch1: %d %s", rec.Code, rec.Body.String())
+	}
+	if int(out["processed_own"].(float64)) != 1 {
+		t.Fatalf("batch1 processed_own: %v", out["processed_own"])
+	}
+	if int(out["created_count"].(float64)) < 1 {
+		t.Fatalf("batch1 created: %v", out)
+	}
+	remaining1 := int(out["remaining_uncovered"].(float64))
+	if remaining1 != 2 {
+		t.Fatalf("batch1 remaining_uncovered want 2, got %d (out=%v)", remaining1, out)
+	}
+
+	h.rateMu.Lock()
+	h.lastRun = map[string]time.Time{}
+	h.rateMu.Unlock()
+
+	// Batch 2: must skip OWN-DISH (pending) and advance to OWN-DISH-2.
+	rec, out = tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 1, "own_skus": []string{"OWN-DISH", "OWN-DISH-2", "OWN-DISH-3"},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("batch2: %d %s", rec.Code, rec.Body.String())
+	}
+	coveredSkip := false
+	for _, s := range out["skipped"].([]interface{}) {
+		m := s.(map[string]interface{})
+		if m["barcode"] == "OWN-DISH" && m["reason_ar"] == skipReasonOwnAlreadyCovered {
+			coveredSkip = true
+		}
+	}
+	if !coveredSkip {
+		t.Fatalf("batch2 must skip pending OWN-DISH: %v", out["skipped"])
+	}
+	if int(out["processed_own"].(float64)) != 1 {
+		t.Fatalf("batch2 should process next uncovered, got processed=%v created=%v", out["processed_own"], out["created_count"])
+	}
+	sugs := out["suggestions"].([]interface{})
+	if len(sugs) == 0 {
+		t.Fatal("batch2 should create suggestions for the next own SKU")
+	}
+	own2 := sugs[0].(map[string]interface{})["own_barcode"]
+	if own2 != "OWN-DISH-2" {
+		t.Fatalf("batch2 should advance to OWN-DISH-2, got %v", own2)
+	}
+	remaining2 := int(out["remaining_uncovered"].(float64))
+	if remaining2 != 1 {
+		t.Fatalf("batch2 remaining_uncovered want 1, got %d", remaining2)
+	}
+}
+
+func TestCompetitorSuggestionsRunSkipsRejectedOwnAndReportsRemaining(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), &competitorsuggest.GeminiRanker{UseMock: true})
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+
+	_, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 5, "own_skus": []string{"OWN-DISH"},
+	})
+	pending := out["suggestions"].([]interface{})
+	if len(pending) == 0 {
+		t.Fatal("need pending to reject")
+	}
+	for _, raw := range pending {
+		id := raw.(map[string]interface{})["id"].(string)
+		if rec, _ := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/reject", map[string]interface{}{"id": id}); rec.Code != http.StatusOK {
+			t.Fatalf("reject: %d", rec.Code)
+		}
+	}
+
+	h.rateMu.Lock()
+	h.lastRun = map[string]time.Time{}
+	h.rateMu.Unlock()
+
+	rec, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 5, "own_skus": []string{"OWN-DISH", "OWN-GEL"},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("rerun: %d %s", rec.Code, rec.Body.String())
+	}
+	rejectedSkip := false
+	for _, s := range out["skipped"].([]interface{}) {
+		m := s.(map[string]interface{})
+		if m["barcode"] == "OWN-DISH" && m["reason_ar"] == skipReasonOwnAlreadyCovered {
+			rejectedSkip = true
+		}
+	}
+	if !rejectedSkip {
+		t.Fatalf("rejected own must be skipped as covered: %v", out["skipped"])
+	}
+	// OWN-GEL should still be processed; OWN-DISH must not be re-ranked.
+	for _, raw := range out["suggestions"].([]interface{}) {
+		if raw.(map[string]interface{})["own_barcode"] == "OWN-DISH" {
+			t.Fatal("OWN-DISH must not be re-suggested after reject coverage")
+		}
+	}
+	if _, ok := out["remaining_uncovered"]; !ok {
+		t.Fatal("response must include remaining_uncovered")
+	}
+	if int(out["remaining_uncovered"].(float64)) != 0 {
+		// OWN-DISH covered (rejected), OWN-GEL processed this run → 0 left in filter.
+		t.Fatalf("remaining_uncovered want 0, got %v", out["remaining_uncovered"])
 	}
 }
 

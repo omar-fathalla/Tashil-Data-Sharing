@@ -11089,6 +11089,7 @@ class ApiClient {
   }
 
   /// Owner-only: run a batch of AI competitor suggestions (default limit 10).
+  /// Throws [CompetitorSuggestRateLimitException] on HTTP 429 (per-chain ~30s).
   Future<Map<String, dynamic>> runCompetitorSuggestions({
     required String chain,
     int limit = 10,
@@ -11107,6 +11108,11 @@ class ApiClient {
       body: jsonEncode(body),
     ).timeout(const Duration(seconds: 120));
     final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    if (resp.statusCode == 429) {
+      throw CompetitorSuggestRateLimitException(
+        data['error']?.toString() ?? 'تم تجاوز حد الطلبات — انتظر قبل إعادة التشغيل',
+      );
+    }
     if (resp.statusCode != 200) {
       throw Exception(data['error']?.toString() ?? 'فشل تشغيل الاقتراحات (${resp.statusCode})');
     }
@@ -12834,6 +12840,15 @@ class CompetitorSkuSuggestionsResult {
     this.skippedReasonAr = '',
     this.includeInKpiAverages = false,
   });
+}
+
+/// Raised when POST …/suggestions/run hits the per-chain rate limit (~30s).
+class CompetitorSuggestRateLimitException implements Exception {
+  final String message;
+  const CompetitorSuggestRateLimitException(this.message);
+
+  @override
+  String toString() => message;
 }
 
 /// Quarantine AI competitor suggestion — pending never feeds Compare KPIs.

@@ -452,12 +452,26 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 	processed := 0
 	rankAttempts := 0
 	rankFailures := 0
+	// Track coverage mutations within this run for remaining_uncovered.
+	coveredNow := map[string]bool{}
+	for bc, ok := range pool.ownHasPendingOrRejected {
+		if ok {
+			coveredNow[bc] = true
+		}
+	}
 
 	for _, own := range pool.own {
 		if processed >= limit {
 			break
 		}
-		if len(ownFilter) > 0 && !ownFilter[normBarcode(own.Barcode)] {
+		bc := normBarcode(own.Barcode)
+		if len(ownFilter) > 0 && !ownFilter[bc] {
+			continue
+		}
+		// Advance past own SKUs that already have pending or rejected suggestions.
+		// Does not consume a batch slot (same as approved mapping / missing category).
+		if pool.ownHasPendingOrRejected[bc] {
+			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skipReasonOwnAlreadyCovered})
 			continue
 		}
 		rows, skip, usage, genErr := h.generateForOwn(r, ctx, pool, own)
@@ -485,13 +499,18 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 		}
 		rankAttempts++
 		created = append(created, rows...)
+		if len(rows) > 0 {
+			coveredNow[bc] = true
+		}
 		processed++
 	}
 
-	log.Printf("[competitor-suggest] run tenant=%s chain=%s processed=%d created=%d prompt_tokens=%d completion_tokens=%d rank_fail=%d/%d",
-		normalizeAuditTenantID(c.TenantID), p.Chain, processed, len(created), promptTok, completionTok, rankFailures, rankAttempts)
+	remaining := countRemainingUncovered(pool, ownFilter, coveredNow)
+
+	log.Printf("[competitor-suggest] run tenant=%s chain=%s processed=%d created=%d remaining_uncovered=%d prompt_tokens=%d completion_tokens=%d rank_fail=%d/%d",
+		normalizeAuditTenantID(c.TenantID), p.Chain, processed, len(created), remaining, promptTok, completionTok, rankFailures, rankAttempts)
 	h.recordAudit(r, c, "RUN_COMPETITOR_SUGGESTIONS",
-		fmt.Sprintf("chain=%s processed=%d created=%d tokens=%d/%d rank_fail=%d/%d", p.Chain, processed, len(created), promptTok, completionTok, rankFailures, rankAttempts))
+		fmt.Sprintf("chain=%s processed=%d created=%d remaining=%d tokens=%d/%d rank_fail=%d/%d", p.Chain, processed, len(created), remaining, promptTok, completionTok, rankFailures, rankAttempts))
 
 	reasonCounts := map[string]int{}
 	for _, s := range skipped {
@@ -501,6 +520,7 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 		"suggestions":                  created,
 		"created_count":                len(created),
 		"processed_own":                processed,
+		"remaining_uncovered":          remaining,
 		"skipped":                      skipped,
 		"skipped_reason_counts":        reasonCounts,
 		"rank_attempts":                rankAttempts,
@@ -534,6 +554,30 @@ func formatSkippedReasonSummary(counts map[string]int) string {
 	}
 	sort.Strings(parts)
 	return strings.Join(parts, "؛ ")
+}
+
+// countRemainingUncovered returns own SKUs still eligible for a future /run batch:
+// no pending/rejected quarantine coverage, no approved mapping, and a non-empty category.
+// ownFilter (when set) scopes the count to the requested barcodes — otherwise whole pool.
+func countRemainingUncovered(pool suggestPools, ownFilter map[string]bool, coveredNow map[string]bool) int {
+	n := 0
+	for _, own := range pool.own {
+		bc := normBarcode(own.Barcode)
+		if len(ownFilter) > 0 && !ownFilter[bc] {
+			continue
+		}
+		if coveredNow[bc] || pool.ownHasPendingOrRejected[bc] {
+			continue
+		}
+		if pool.ownHasMapping[bc] {
+			continue
+		}
+		if strings.TrimSpace(own.Category) == "" {
+			continue
+		}
+		n++
+	}
+	return n
 }
 
 // HandleApproveSuggestion serves POST /api/v1/competitors/suggestions/approve
@@ -615,8 +659,14 @@ type suggestPools struct {
 	comp          []competitorsuggest.SkuCandidate
 	mappedPairs   map[string]bool // rejectedPairKey style for own|comp|chain already mapped
 	ownHasMapping map[string]bool
-	rejectedPairs map[string]bool
+	// ownHasPendingOrRejected: own barcodes that already have quarantine rows
+	// (pending or rejected). Batch /run skips these so each run advances.
+	ownHasPendingOrRejected map[string]bool
+	rejectedPairs           map[string]bool
 }
+
+// Arabic skip when /run encounters an own SKU already covered by quarantine rows.
+const skipReasonOwnAlreadyCovered = "الصنف مغطى باقتراحات سابقة"
 
 func (h *CompetitorSuggestionsHandler) loadSuggestPools(r *http.Request, tenantID, chain string, year int) (suggestPools, error) {
 	start, end := bigquery.CompetitiveMonthlyYearWindow(year)
@@ -639,14 +689,20 @@ func (h *CompetitorSuggestionsHandler) loadSuggestPools(r *http.Request, tenantI
 	}
 	existing, _ := h.repo.ListCompetitorSuggestions(r.Context(), tenantID, domain.CompetitorSuggestionFilter{Chain: chain})
 	rejected := map[string]bool{}
+	ownCovered := map[string]bool{}
 	for _, s := range existing {
-		if s.Status == domain.CompetitorSuggestionRejected {
+		switch s.Status {
+		case domain.CompetitorSuggestionRejected:
 			rejected[firestore.RejectedPairKey(s.OwnBarcode, s.CompetitorBarcode, s.RetailerChain)] = true
+			ownCovered[normBarcode(s.OwnBarcode)] = true
+		case domain.CompetitorSuggestionPending:
+			ownCovered[normBarcode(s.OwnBarcode)] = true
 		}
 	}
 	return suggestPools{
 		own: ownPool, comp: compPool,
-		mappedPairs: mappedPairs, ownHasMapping: ownHas, rejectedPairs: rejected,
+		mappedPairs: mappedPairs, ownHasMapping: ownHas,
+		ownHasPendingOrRejected: ownCovered, rejectedPairs: rejected,
 	}, nil
 }
 

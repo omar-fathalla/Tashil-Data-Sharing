@@ -71,6 +71,12 @@ class CompetitorSuggestionsReview extends StatefulWidget {
   /// Called after any approve so Compare can treat new mappings as ready.
   final VoidCallback? onMappingsChanged;
 
+  /// Per-chain /run cooldown (backend ~30s). Shorten in widget tests.
+  final Duration chainRunCooldown;
+
+  /// Backoff after HTTP 429 before retrying «توليد للكل».
+  final Duration rateLimitBackoff;
+
   const CompetitorSuggestionsReview({
     super.key,
     required this.apiClient,
@@ -78,6 +84,8 @@ class CompetitorSuggestionsReview extends StatefulWidget {
     required this.year,
     this.isOwner = true,
     this.onMappingsChanged,
+    this.chainRunCooldown = const Duration(seconds: 30),
+    this.rateLimitBackoff = const Duration(seconds: 35),
   });
 
   @override
@@ -90,14 +98,22 @@ class CompetitorSuggestionsReviewState
   List<CompetitorSuggestionModel> _items = const [];
   bool _loading = true;
   bool _running = false;
+  bool _generatingAll = false;
+  bool _stopGenerateAll = false;
   String? _error;
   int _batchSize = 10;
   String? _busyId;
   String? _busyGroupKey;
 
+  /// Progress for «توليد للكل»: covered so far / estimated total own SKUs.
+  int _generateAllDone = 0;
+  int _generateAllTotal = 0;
+
   /// Paginate grouped own-SKU cards (batch dropdown must NOT limit this list).
   static const int _pageSize = 20;
   int _pageIndex = 0;
+
+  bool get _busyBatch => _running || _generatingAll;
 
   @override
   void initState() {
@@ -154,7 +170,7 @@ class CompetitorSuggestionsReviewState
   }
 
   Future<void> _runBatch() async {
-    if (!widget.isOwner || _running) return;
+    if (!widget.isOwner || _busyBatch) return;
     setState(() {
       _running = true;
       _error = null;
@@ -182,6 +198,109 @@ class CompetitorSuggestionsReviewState
       _showRunFailure(detail);
     } finally {
       if (mounted) setState(() => _running = false);
+    }
+  }
+
+  void _requestStopGenerateAll() {
+    if (!_generatingAll) return;
+    setState(() => _stopGenerateAll = true);
+  }
+
+  /// Loops POST …/run batches until remaining_uncovered=0, user stops, or error.
+  /// Respects the ~30s per-chain rate limit; 429 uses a slightly longer backoff.
+  /// Never auto-approves — quarantine rows stay pending.
+  Future<void> _generateAll() async {
+    if (!widget.isOwner || _busyBatch) return;
+    setState(() {
+      _generatingAll = true;
+      _stopGenerateAll = false;
+      _error = null;
+      _generateAllDone = 0;
+      _generateAllTotal = 0;
+    });
+    var previousRemaining = -1;
+    try {
+      while (mounted && !_stopGenerateAll) {
+        Map<String, dynamic> result;
+        try {
+          result = await widget.apiClient.runCompetitorSuggestions(
+            chain: widget.chain,
+            limit: _batchSize,
+            year: widget.year,
+          );
+        } on CompetitorSuggestRateLimitException {
+          if (!mounted || _stopGenerateAll) break;
+          await Future<void>.delayed(widget.rateLimitBackoff);
+          continue;
+        }
+
+        final processed = (result['processed_own'] as num?)?.toInt() ?? 0;
+        final created = (result['created_count'] as num?)?.toInt() ?? 0;
+        final remaining =
+            (result['remaining_uncovered'] as num?)?.toInt() ?? 0;
+        final summary =
+            (result['summary_ar'] ?? result['error'])?.toString().trim() ?? '';
+        final rankFailures = (result['rank_failures'] as num?)?.toInt() ?? 0;
+
+        if (!mounted) return;
+        setState(() {
+          if (_generateAllTotal <= 0) {
+            _generateAllTotal = remaining + processed;
+            if (_generateAllTotal < 1) _generateAllTotal = 1;
+          }
+          _generateAllDone =
+              (_generateAllDone + processed).clamp(0, _generateAllTotal);
+        });
+
+        if (created == 0 && (summary.isNotEmpty || rankFailures > 0)) {
+          _showRunFailure(
+            summary.isNotEmpty ? summary : 'لم يتم إنشاء اقتراحات',
+          );
+          break;
+        }
+
+        await _reload();
+        if (!mounted || _stopGenerateAll) break;
+
+        if (remaining <= 0) break;
+        // Stall: empty-candidate / no-progress loops — stop cleanly.
+        if (processed == 0 ||
+            (created == 0 &&
+                previousRemaining >= 0 &&
+                remaining >= previousRemaining)) {
+          break;
+        }
+        previousRemaining = remaining;
+
+        // Wait out the per-chain cooldown before the next batch.
+        final cooldown = widget.chainRunCooldown;
+        if (cooldown > Duration.zero) {
+          final deadline = DateTime.now().add(cooldown);
+          while (mounted &&
+              !_stopGenerateAll &&
+              DateTime.now().isBefore(deadline)) {
+            final left = deadline.difference(DateTime.now());
+            final step = cooldown < const Duration(seconds: 1)
+                ? left
+                : (left > const Duration(seconds: 1)
+                    ? const Duration(seconds: 1)
+                    : left);
+            await Future<void>.delayed(step);
+          }
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final detail = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+      _showRunFailure(detail);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _generatingAll = false;
+          _stopGenerateAll = false;
+        });
+        await _reload();
+      }
     }
   }
 
@@ -278,7 +397,7 @@ class CompetitorSuggestionsReviewState
                       M3DropdownOption(5, '5'),
                       M3DropdownOption(10, '10'),
                     ],
-                    onChanged: _running
+                    onChanged: _busyBatch
                         ? null
                         : (v) => setState(() => _batchSize = v),
                   ),
@@ -286,24 +405,69 @@ class CompetitorSuggestionsReviewState
                 M3Spacing.gapSM,
                 FilledButton.tonalIcon(
                   key: const ValueKey('run-suggestions-batch'),
-                  onPressed: _running ? null : _runBatch,
-                  icon: _running
+                  onPressed: _busyBatch ? null : _runBatch,
+                  icon: _running && !_generatingAll
                       ? const SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.auto_awesome_rounded, size: 18),
-                  label: Text(_running ? 'جاري التشغيل…' : 'تشغيل دفعة'),
+                  label: Text(_running && !_generatingAll
+                      ? 'جاري التشغيل…'
+                      : 'تشغيل دفعة'),
                 ),
+                M3Spacing.gapSM,
+                if (_generatingAll)
+                  OutlinedButton.icon(
+                    key: const ValueKey('stop-generate-all-suggestions'),
+                    onPressed: _stopGenerateAll ? null : _requestStopGenerateAll,
+                    icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                    label: Text(_stopGenerateAll ? 'جارٍ الإيقاف…' : 'إيقاف'),
+                  )
+                else
+                  FilledButton.tonalIcon(
+                    key: const ValueKey('generate-all-suggestions'),
+                    onPressed: _busyBatch ? null : _generateAll,
+                    icon: const Icon(Icons.playlist_add_check_rounded, size: 18),
+                    label: const Text('توليد للكل'),
+                  ),
               ],
             ],
           ),
+          if (_generatingAll) ...[
+            M3Spacing.gapSM,
+            Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: cs.primary,
+                  ),
+                ),
+                M3Spacing.gapSM,
+                Expanded(
+                  child: Text(
+                    _generateAllTotal > 0
+                        ? '$_generateAllDone من $_generateAllTotal صنف'
+                        : 'جاري التوليد…',
+                    key: const ValueKey('generate-all-progress'),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           M3Spacing.gapSM,
           Text(
             'هذه القائمة تعرض الاقتراحات المخزّنة بانتظار الموافقة فقط '
             '(لا تُنشأ تلقائياً لكل أصناف الشركة). '
-            'تشغيل دفعة (حتى 10 أصناف) أو اختيار صنف في تبويب الأسعار يولّد اقتراحات جديدة. '
+            'تشغيل دفعة (حتى 10 أصناف) أو «توليد للكل» أو اختيار صنف في تبويب الأسعار يولّد اقتراحات جديدة (تبقى معلّقة). '
             'حجم الدفعة يخص التشغيل اليدوي فقط ولا يقيّد قائمة الانتظار. '
             'الاقتراحات المعلّقة لا تظهر في المقارنة أو مؤشرات الأداء حتى الموافقة.',
             style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
