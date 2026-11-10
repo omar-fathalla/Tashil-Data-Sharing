@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -122,6 +123,9 @@ void main() {
       (tester) async {
     var runCalls = 0;
     final store = <Map<String, dynamic>>[];
+    // Gate the 2nd /run so progress UI is observable mid-loop (zero cooldown
+    // would otherwise finish both batches before the assert).
+    final allowSecondRun = Completer<void>();
 
     MockClient fake() => MockClient((req) async {
           if (req.url.path.contains('/competitors/suggestions/run') &&
@@ -159,6 +163,7 @@ void main() {
                 200,
               );
             }
+            await allowSecondRun.future;
             store.add({
               'id': 'csug_b',
               'own_barcode': 'OWN2',
@@ -222,12 +227,16 @@ void main() {
 
       expect(find.text('توليد للكل'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('generate-all-suggestions')));
+      // First /run + reload; second /run is gated so progress stays visible.
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
       expect(find.byKey(const ValueKey('generate-all-progress')), findsOneWidget);
+      expect(find.textContaining('1 من'), findsWidgets);
+
+      allowSecondRun.complete();
       await tester.pumpAndSettle();
 
       expect(runCalls, 2);
-      expect(find.textContaining('من'), findsWidgets);
       expect(find.text('توليد للكل'), findsOneWidget);
       expect(store, hasLength(2));
     }, fake);

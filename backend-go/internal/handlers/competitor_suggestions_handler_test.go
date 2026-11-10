@@ -663,6 +663,129 @@ func TestCompetitorSuggestionsRunSkipsRejectedOwnAndReportsRemaining(t *testing.
 	}
 }
 
+func TestCompetitorSuggestionsRunAdvancesPastNoCandidateHead(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	// More than limit no-candidate owns at the head, then one with competitors.
+	items := make([]bigquery.CompetitiveMonthlyItem, 0, 14)
+	ownFilter := make([]string, 0, 13)
+	for i := 0; i < 12; i++ {
+		bc := fmt.Sprintf("OWN-EMPTY-%02d", i)
+		ownFilter = append(ownFilter, bc)
+		items = append(items, bigquery.CompetitiveMonthlyItem{
+			Barcode: bc, SKUName: fmt.Sprintf("عناية %d", i), Category: "عناية شخصية", IsOwnBrand: true,
+			Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 10, Units: 1, NetRevenue: 10}},
+		})
+	}
+	ownFilter = append(ownFilter, "OWN-DISH")
+	items = append(items,
+		bigquery.CompetitiveMonthlyItem{
+			Barcode: "OWN-DISH", SKUName: "فيبا 3 كجم", Category: "صابون سائل اطباق", IsOwnBrand: true,
+			Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 180, Units: 10, NetRevenue: 1800}},
+		},
+		bigquery.CompetitiveMonthlyItem{
+			Barcode: "COMP-PRIL", SKUName: "بريل 4 كجم", Category: "صابون سائل اطباق", IsOwnBrand: false,
+			Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 150, Units: 8, NetRevenue: 1200}},
+		},
+	)
+	h := NewCompetitorSuggestionsHandler(fs, fs, &memCatalog{res: bigquery.CompetitiveMonthlyResult{Year: 2026, Items: items}}, &competitorsuggest.GeminiRanker{UseMock: true})
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+
+	rec, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 10, "own_skus": ownFilter,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("run: %d %s", rec.Code, rec.Body.String())
+	}
+	// No-candidate owns must not consume the batch slot — OWN-DISH still processed.
+	if int(out["processed_own"].(float64)) != 1 {
+		t.Fatalf("processed_own want 1 (only OWN-DISH), got %v skipped=%v", out["processed_own"], out["skipped"])
+	}
+	if int(out["created_count"].(float64)) < 1 {
+		t.Fatalf("expected OWN-DISH suggestions, got %v", out)
+	}
+	noCandSkips := 0
+	for _, s := range out["skipped"].([]interface{}) {
+		m := s.(map[string]interface{})
+		if m["reason_ar"] == skipReasonNoCompetitors {
+			noCandSkips++
+		}
+	}
+	if noCandSkips != 12 {
+		t.Fatalf("want 12 no-candidate skips without slot burn, got %d", noCandSkips)
+	}
+	if int(out["remaining_uncovered"].(float64)) != 0 {
+		t.Fatalf("remaining_uncovered want 0 (no-candidate excluded), got %v", out["remaining_uncovered"])
+	}
+}
+
+func TestCompetitorSuggestionsRunRankFailureMarksAttemptAndAdvances(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	cat := seedCatalog()
+	cat.res.Items = append(cat.res.Items,
+		bigquery.CompetitiveMonthlyItem{
+			Barcode: "OWN-DISH-2", SKUName: "فيبا 2 كجم", Category: "صابون سائل اطباق", IsOwnBrand: true,
+			Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 170, Units: 6, NetRevenue: 1020}},
+		},
+	)
+	failOnce := true
+	ranker := &competitorsuggest.GeminiRanker{
+		CallJSON: func(ctx context.Context, model, prompt string) (string, competitorsuggest.TokenUsage, error) {
+			if failOnce {
+				failOnce = false
+				return "", competitorsuggest.TokenUsage{}, context.Canceled
+			}
+			return `{"suggestions":[{"competitor_barcode":"COMP-PRIL","reason_ar":"مناسب","confidence":0.9,"rank":1}]}`,
+				competitorsuggest.TokenUsage{PromptTokens: 1, CompletionTokens: 1}, nil
+		},
+	}
+	h := NewCompetitorSuggestionsHandler(fs, fs, cat, ranker)
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+
+	rec, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 1, "own_skus": []string{"OWN-DISH", "OWN-DISH-2"},
+	})
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("batch1 all-rank-fail: want 502, got %d %s", rec.Code, rec.Body.String())
+	}
+	attempted, _ := out["attempted_without_suggestions"].([]interface{})
+	if len(attempted) != 1 {
+		t.Fatalf("batch1 attempted_without_suggestions: %v", out["attempted_without_suggestions"])
+	}
+	if int(out["remaining_uncovered"].(float64)) != 1 {
+		t.Fatalf("batch1 remaining want 1 (OWN-DISH-2), got %v", out["remaining_uncovered"])
+	}
+
+	h.rateMu.Lock()
+	h.lastRun = map[string]time.Time{}
+	h.rateMu.Unlock()
+
+	rec, out = tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/run", map[string]interface{}{
+		"chain": "fathalla", "limit": 1, "own_skus": []string{"OWN-DISH", "OWN-DISH-2"},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("batch2: %d %s", rec.Code, rec.Body.String())
+	}
+	skippedAttempt := false
+	for _, s := range out["skipped"].([]interface{}) {
+		m := s.(map[string]interface{})
+		if m["barcode"] == "OWN-DISH" && m["reason_ar"] == skipReasonAttemptedEmpty {
+			skippedAttempt = true
+		}
+	}
+	if !skippedAttempt {
+		t.Fatalf("batch2 must skip previously failed OWN-DISH: %v", out["skipped"])
+	}
+	sugs := out["suggestions"].([]interface{})
+	if len(sugs) == 0 || sugs[0].(map[string]interface{})["own_barcode"] != "OWN-DISH-2" {
+		t.Fatalf("batch2 should advance to OWN-DISH-2, got %v", out["suggestions"])
+	}
+	if int(out["remaining_uncovered"].(float64)) != 0 {
+		t.Fatalf("batch2 remaining want 0, got %v", out["remaining_uncovered"])
+	}
+}
+
 func mustJSON(v interface{}) string {
 	b, _ := json.Marshal(v)
 	return string(b)

@@ -206,9 +206,11 @@ class CompetitorSuggestionsReviewState
     setState(() => _stopGenerateAll = true);
   }
 
+  static const int _maxRateLimitRetries = 5;
+
   /// Loops POST …/run batches until remaining_uncovered=0, user stops, or error.
-  /// Respects the ~30s per-chain rate limit; 429 uses a slightly longer backoff.
-  /// Never auto-approves — quarantine rows stay pending.
+  /// Respects the ~30s per-chain rate limit; 429 uses a slightly longer backoff
+  /// (capped at [_maxRateLimitRetries]). Never auto-approves — rows stay pending.
   Future<void> _generateAll() async {
     if (!widget.isOwner || _busyBatch) return;
     setState(() {
@@ -219,6 +221,7 @@ class CompetitorSuggestionsReviewState
       _generateAllTotal = 0;
     });
     var previousRemaining = -1;
+    var rateLimitRetries = 0;
     try {
       while (mounted && !_stopGenerateAll) {
         Map<String, dynamic> result;
@@ -228,8 +231,16 @@ class CompetitorSuggestionsReviewState
             limit: _batchSize,
             year: widget.year,
           );
-        } on CompetitorSuggestRateLimitException {
+          rateLimitRetries = 0;
+        } on CompetitorSuggestRateLimitException catch (e) {
           if (!mounted || _stopGenerateAll) break;
+          rateLimitRetries++;
+          if (rateLimitRetries > _maxRateLimitRetries) {
+            _showRunFailure(
+              'تم إيقاف التوليد بعد عدة تجاوزات لحد الطلبات (${e.message})',
+            );
+            break;
+          }
           await Future<void>.delayed(widget.rateLimitBackoff);
           continue;
         }
@@ -263,11 +274,14 @@ class CompetitorSuggestionsReviewState
         if (!mounted || _stopGenerateAll) break;
 
         if (remaining <= 0) break;
-        // Stall: empty-candidate / no-progress loops — stop cleanly.
+        // Stall: no progress — stop with a clear message (not silent).
         if (processed == 0 ||
             (created == 0 &&
                 previousRemaining >= 0 &&
                 remaining >= previousRemaining)) {
+          _showInfoMessage(
+            'توقف التوليد: لا تقدّم إضافي (المتبقي $remaining صنف)',
+          );
           break;
         }
         previousRemaining = remaining;
@@ -302,6 +316,12 @@ class CompetitorSuggestionsReviewState
         await _reload();
       }
     }
+  }
+
+  void _showInfoMessage(String message) {
+    setState(() => _error = message);
+    if (!mounted) return;
+    M3Feedback.showInfo(context, message);
   }
 
   /// Surfaces empty/failed batch runs with an Arabic snackbar (not silent empty).
@@ -422,7 +442,7 @@ class CompetitorSuggestionsReviewState
                   OutlinedButton.icon(
                     key: const ValueKey('stop-generate-all-suggestions'),
                     onPressed: _stopGenerateAll ? null : _requestStopGenerateAll,
-                    icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                    icon: const Icon(Icons.stop_circle_rounded, size: 18),
                     label: Text(_stopGenerateAll ? 'جارٍ الإيقاف…' : 'إيقاف'),
                   )
                 else
