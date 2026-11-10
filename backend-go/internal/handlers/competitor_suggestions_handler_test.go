@@ -375,24 +375,106 @@ func TestCompetitorSuggestionsForSkuEmptyCategoryArabic(t *testing.T) {
 	}
 }
 
-func TestCompetitorSuggestionsForSkuRateLimitOnGenerate(t *testing.T) {
+func TestCompetitorSuggestionsForSkuEmptyCacheAndPerSkuScope(t *testing.T) {
 	fs := firestore.NewClient("test-db", true)
 	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), &competitorsuggest.GeminiRanker{UseMock: true})
 	mux := suggestMux(h)
 	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
 
-	// First generate for OWN-CARE (no same-category comps → empty, still counts as generate)
+	// OWN-CARE has no same-category comps → empty generate (cached negatively).
+	rec, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
+		"barcode": "OWN-CARE", "chain": "fathalla",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first empty: %d %s", rec.Code, rec.Body.String())
+	}
+	if out["skipped_reason_ar"] != "لا يوجد منافسين في البيانات" {
+		t.Fatalf("skip: %v", out["skipped_reason_ar"])
+	}
+
+	// Re-select same SKU → empty cache hit (200), never 429.
+	rec, out = tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
+		"barcode": "OWN-CARE", "chain": "fathalla",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("empty cache: want 200, got %d %s", rec.Code, rec.Body.String())
+	}
+	if out["cached"] != true {
+		t.Fatalf("want cached empty, got %v", out)
+	}
+
+	// Different SKU must not share the CARE cooldown / cache — browsing one-per-SKU stays OK.
+	rec, out = tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
+		"barcode": "OWN-DISH", "chain": "fathalla",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("other SKU blocked by rate limit?: %d %s", rec.Code, rec.Body.String())
+	}
+	if out["cached"] == true && out["count"].(float64) == 0 {
+		t.Fatalf("OWN-DISH should generate suggestions, got %v", out)
+	}
+	if int(out["count"].(float64)) < 1 {
+		t.Fatalf("OWN-DISH want suggestions, got %v", out)
+	}
+}
+
+func TestCompetitorSuggestionsForSkuTimeoutArabic(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	ranker := &competitorsuggest.GeminiRanker{
+		CallJSON: func(ctx context.Context, model, prompt string) (string, competitorsuggest.TokenUsage, error) {
+			<-ctx.Done()
+			return "", competitorsuggest.TokenUsage{}, ctx.Err()
+		},
+	}
+	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), ranker)
+	// Shrink timeout for the test so we do not wait 28s.
+	prev := competitorSuggestRankTimeout
+	competitorSuggestRankTimeout = 50 * time.Millisecond
+	defer func() { competitorSuggestRankTimeout = prev }()
+
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+	rec, _ := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
+		"barcode": "OWN-DISH", "chain": "fathalla",
+	})
+	if rec.Code != http.StatusGatewayTimeout {
+		t.Fatalf("want 504 on rank timeout, got %d %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "انتهت مهلة") {
+		t.Fatalf("want Arabic timeout message, got %s", rec.Body.String())
+	}
+
+	// Failure must not stamp cooldown — immediate retry is allowed (still times out).
+	rec2, _ := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
+		"barcode": "OWN-DISH", "chain": "fathalla",
+	})
+	if rec2.Code == http.StatusTooManyRequests {
+		t.Fatal("timeout must not stamp per-SKU cooldown")
+	}
+	if rec2.Code != http.StatusGatewayTimeout {
+		t.Fatalf("retry after timeout: want 504, got %d %s", rec2.Code, rec2.Body.String())
+	}
+}
+
+func TestCompetitorSuggestionsForSkuCooldownAfterClearedEmptyCache(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), &competitorsuggest.GeminiRanker{UseMock: true})
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+
 	if rec, _ := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
 		"barcode": "OWN-CARE", "chain": "fathalla",
 	}); rec.Code != http.StatusOK {
 		t.Fatalf("first: %d", rec.Code)
 	}
-	// No pending cache (empty) → second generate within interval → 429
+	// Simulate empty-cache expiry while cooldown stamp remains → 429 on force re-generate.
+	rateKey := strings.ToLower("tenant-adeco|fathalla|own-care")
+	h.clearEmptySkuCache(rateKey)
 	rec, _ := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
 		"barcode": "OWN-CARE", "chain": "fathalla",
 	})
 	if rec.Code != http.StatusTooManyRequests {
-		t.Fatalf("want 429 on re-generate, got %d %s", rec.Code, rec.Body.String())
+		t.Fatalf("want 429 when empty cache cleared inside cooldown, got %d %s", rec.Code, rec.Body.String())
 	}
 }
 

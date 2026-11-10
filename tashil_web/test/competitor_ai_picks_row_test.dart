@@ -160,6 +160,59 @@ void main() {
   test('KPI averages flag stays OFF by default', () {
     expect(ApiClient.includeAiSuggestionsInKpiAverages, isFalse);
   });
+
+  test('suggestCompetitorsForSku surfaces Arabic timeout (never hangs forever)',
+      () async {
+    MockClient hang() => MockClient((req) async {
+          await Future<void>.delayed(const Duration(seconds: 60));
+          return http.Response('{"suggestions":[]}', 200);
+        });
+
+    final prev = ApiClient.suggestCompetitorsForSkuTimeout;
+    ApiClient.suggestCompetitorsForSkuTimeout = const Duration(milliseconds: 40);
+    addTearDown(() {
+      ApiClient.suggestCompetitorsForSkuTimeout = prev;
+    });
+
+    await http.runWithClient(() async {
+      expect(prev.inSeconds, lessThan(90));
+      expect(prev.inSeconds, greaterThan(28));
+      final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
+      Object? err;
+      try {
+        await api.suggestCompetitorsForSku(
+          barcode: 'X',
+          chain: 'fathalla',
+          year: 2026,
+        );
+      } catch (e) {
+        err = e;
+      }
+      expect(err, isNotNull);
+      expect(err.toString(), contains('انتهت مهلة'));
+    }, hang);
+  });
+
+  testWidgets('AI picks row shows Arabic empty hint after failure path',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: CompetitorAiPicksRow(
+            loading: false,
+            picks: [],
+            emptyHintAr: 'انتهت مهلة جلب اقتراحات المنافسين — حاول مرة أخرى',
+            onSelect: _noop,
+          ),
+        ),
+      ),
+    );
+    expect(
+      find.text('انتهت مهلة جلب اقتراحات المنافسين — حاول مرة أخرى'),
+      findsOneWidget,
+    );
+    expect(find.text('لا توجد اقتراحات متاحة لهذا الصنف'), findsNothing);
+  });
 }
 
 void _noop(CompetitorSkuComparisonModel _) {}

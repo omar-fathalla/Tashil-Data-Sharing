@@ -37,7 +37,7 @@ type Ranker interface {
 type GeminiRanker struct {
 	APIKey     string
 	Model      string
-	// Tier2Model is used when the primary model returns 404 / model-not-found.
+	// Tier2Model is used when the primary model fails (404, timeout, 5xx, etc.).
 	Tier2Model string
 	APIBase    string
 	HTTPClient *http.Client
@@ -61,8 +61,15 @@ type geminiPart struct {
 }
 
 type geminiGenerationConfig struct {
-	ResponseMimeType string  `json:"responseMimeType,omitempty"`
-	Temperature      float64 `json:"temperature"`
+	ResponseMimeType string                `json:"responseMimeType,omitempty"`
+	// Temperature omitted for Gemini 3.x (deprecated sampling param; can stall/reject).
+	Temperature    *float64              `json:"temperature,omitempty"`
+	ThinkingConfig *geminiThinkingConfig `json:"thinkingConfig,omitempty"`
+}
+
+// geminiThinkingConfig sets Gemini 3.x reasoning effort (low|medium|high).
+type geminiThinkingConfig struct {
+	ThinkingLevel string `json:"thinkingLevel,omitempty"`
 }
 
 type geminiResponse struct {
@@ -173,26 +180,54 @@ func (r *GeminiRanker) mockRank(own SkuCandidate, candidates []PrefScore) string
 }
 
 func (r *GeminiRanker) callGeminiJSON(ctx context.Context, model, prompt string) (string, TokenUsage, error) {
-	raw, usage, err := r.doGeminiJSON(ctx, model, prompt)
+	primaryCtx, cancel := context.WithTimeout(ctx, primaryAttemptBudget(ctx))
+	raw, usage, err := r.doGeminiJSON(primaryCtx, model, prompt)
+	cancel()
 	if err == nil {
 		return raw, usage, nil
 	}
 	fallback := r.tier2()
-	if fallback == "" || fallback == model || !isGeminiModelNotFound(err) {
+	// Fall back on any primary failure (404, timeout, 5xx) while parent ctx remains usable.
+	if fallback == "" || fallback == model || ctx.Err() != nil {
 		return "", usage, err
 	}
-	log.Printf("[competitor-suggest] model %q not found; falling back to GEMINI_TIER2_MODEL=%q", model, fallback)
+	log.Printf("[competitor-suggest] model %q failed (%v); falling back to GEMINI_TIER2_MODEL=%q", model, err, fallback)
 	return r.doGeminiJSON(ctx, fallback, prompt)
+}
+
+// primaryAttemptBudget leaves room for Tier2 when the parent deadline is generous.
+func primaryAttemptBudget(ctx context.Context) time.Duration {
+	const defaultPrimary = 18 * time.Second
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return defaultPrimary
+	}
+	remain := time.Until(deadline)
+	if remain <= 0 {
+		return time.Millisecond
+	}
+	// Reserve ~10s for Tier2 when possible.
+	if remain > 20*time.Second {
+		return remain - 10*time.Second
+	}
+	// Otherwise split so a slow primary cannot consume the whole parent deadline.
+	half := remain / 2
+	if half < 20*time.Millisecond {
+		return remain
+	}
+	return half
 }
 
 func (r *GeminiRanker) doGeminiJSON(ctx context.Context, model, prompt string) (string, TokenUsage, error) {
 	started := time.Now()
+	genCfg := &geminiGenerationConfig{
+		ResponseMimeType: "application/json",
+		// Competitor ranking is latency-critical; pin thinking to low for Gemini 3.x.
+		ThinkingConfig: &geminiThinkingConfig{ThinkingLevel: "low"},
+	}
 	body, err := json.Marshal(geminiRequest{
-		Contents: []geminiContent{{Role: "user", Parts: []geminiPart{{Text: prompt}}}},
-		GenerationConfig: &geminiGenerationConfig{
-			ResponseMimeType: "application/json",
-			Temperature:      0,
-		},
+		Contents:         []geminiContent{{Role: "user", Parts: []geminiPart{{Text: prompt}}}},
+		GenerationConfig: genCfg,
 	})
 	if err != nil {
 		return "", TokenUsage{}, err
@@ -204,7 +239,8 @@ func (r *GeminiRanker) doGeminiJSON(ctx context.Context, model, prompt string) (
 	endpoint := fmt.Sprintf("%s/v1beta/models/%s:generateContent", base, model)
 	client := r.HTTPClient
 	if client == nil {
-		client = &http.Client{Timeout: 45 * time.Second}
+		// Upper bound; request ctx deadline is the real guard (handler ~30s).
+		client = &http.Client{Timeout: 30 * time.Second}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
