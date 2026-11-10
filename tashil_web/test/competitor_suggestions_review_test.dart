@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -106,6 +107,8 @@ void main() {
       expect(find.text('موافقة على الكل'), findsOneWidget);
       expect(find.byKey(const ValueKey('run-suggestions-batch')), findsOneWidget);
       expect(find.text('تشغيل دفعة'), findsOneWidget);
+      expect(find.byKey(const ValueKey('generate-all-suggestions')), findsOneWidget);
+      expect(find.text('توليد للكل'), findsOneWidget);
       expect(find.text('صنف الشركة'), findsOneWidget);
       expect(find.text('المنافس المقترح'), findsOneWidget);
       expect(find.byKey(const ValueKey('suggestion-group-OWN1')), findsOneWidget);
@@ -113,6 +116,194 @@ void main() {
       await tester.tap(find.text('موافقة'));
       await tester.pumpAndSettle();
       expect(find.text('لا توجد اقتراحات بانتظار الموافقة'), findsOneWidget);
+    }, fake);
+  });
+
+  testWidgets('توليد للكل loops /run until remaining_uncovered=0 with progress',
+      (tester) async {
+    var runCalls = 0;
+    final store = <Map<String, dynamic>>[];
+    // Gate the 2nd /run so progress UI is observable mid-loop (zero cooldown
+    // would otherwise finish both batches before the assert).
+    final allowSecondRun = Completer<void>();
+
+    MockClient fake() => MockClient((req) async {
+          if (req.url.path.contains('/competitors/suggestions/run') &&
+              req.method == 'POST') {
+            runCalls++;
+            if (runCalls == 1) {
+              store.add({
+                'id': 'csug_a',
+                'own_barcode': 'OWN1',
+                'own_sku_name': 'صنف 1',
+                'own_category': 'صابون',
+                'competitor_barcode': 'C1',
+                'competitor_sku_name': 'منافس 1',
+                'competitor_brand': 'Brand',
+                'competitor_supplier': 'S',
+                'category': 'صابون',
+                'retailer_chain': 'fathalla',
+                'reason_ar': 'نفس الفئة',
+                'confidence': 0.8,
+                'rank': 1,
+                'status': 'pending',
+                'own_unit_price': 10.0,
+                'competitor_unit_price': 9.0,
+                'own_units': 1,
+                'competitor_units': 1,
+              });
+              return _json(
+                jsonEncode({
+                  'created_count': 1,
+                  'processed_own': 1,
+                  'remaining_uncovered': 1,
+                  'suggestions': [store.last],
+                  'skipped': [],
+                }),
+                200,
+              );
+            }
+            await allowSecondRun.future;
+            store.add({
+              'id': 'csug_b',
+              'own_barcode': 'OWN2',
+              'own_sku_name': 'صنف 2',
+              'own_category': 'صابون',
+              'competitor_barcode': 'C2',
+              'competitor_sku_name': 'منافس 2',
+              'competitor_brand': 'Brand',
+              'competitor_supplier': 'S',
+              'category': 'صابون',
+              'retailer_chain': 'fathalla',
+              'reason_ar': 'نفس الفئة',
+              'confidence': 0.8,
+              'rank': 1,
+              'status': 'pending',
+              'own_unit_price': 10.0,
+              'competitor_unit_price': 9.0,
+              'own_units': 1,
+              'competitor_units': 1,
+            });
+            return _json(
+              jsonEncode({
+                'created_count': 1,
+                'processed_own': 1,
+                'remaining_uncovered': 0,
+                'suggestions': [store.last],
+                'skipped': [],
+              }),
+              200,
+            );
+          }
+          if (req.url.path.contains('/competitors/suggestions') &&
+              req.method == 'GET') {
+            return _json(
+              jsonEncode({'suggestions': store, 'count': store.length}),
+              200,
+            );
+          }
+          return _json('{"error":"unhandled"}', 500);
+        });
+
+    await http.runWithClient(() async {
+      final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: CompetitorSuggestionsReview(
+                apiClient: api,
+                chain: 'fathalla',
+                year: 2026,
+                isOwner: true,
+                chainRunCooldown: Duration.zero,
+                rateLimitBackoff: Duration.zero,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('توليد للكل'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('generate-all-suggestions')));
+      // First /run + reload; second /run is gated so progress stays visible.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byKey(const ValueKey('generate-all-progress')), findsOneWidget);
+      expect(find.textContaining('1 من'), findsWidgets);
+
+      allowSecondRun.complete();
+      await tester.pumpAndSettle();
+
+      expect(runCalls, 2);
+      expect(find.text('توليد للكل'), findsOneWidget);
+      expect(store, hasLength(2));
+    }, fake);
+  });
+
+  testWidgets('توليد للكل stop button ends the loop early', (tester) async {
+    var runCalls = 0;
+    MockClient fake() => MockClient((req) async {
+          if (req.url.path.contains('/competitors/suggestions/run') &&
+              req.method == 'POST') {
+            runCalls++;
+            return _json(
+              jsonEncode({
+                'created_count': 1,
+                'processed_own': 1,
+                'remaining_uncovered': 50,
+                'suggestions': [],
+                'skipped': [],
+              }),
+              200,
+            );
+          }
+          if (req.url.path.contains('/competitors/suggestions') &&
+              req.method == 'GET') {
+            return _json(
+              jsonEncode({'suggestions': [], 'count': 0}),
+              200,
+            );
+          }
+          return _json('{"error":"unhandled"}', 500);
+        });
+
+    await http.runWithClient(() async {
+      final api = ApiClient(tenantId: 'tenant-adeco', allowMockFallback: false);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: CompetitorSuggestionsReview(
+                apiClient: api,
+                chain: 'fathalla',
+                year: 2026,
+                isOwner: true,
+                // Long cooldown so we can tap stop between batches.
+                chainRunCooldown: const Duration(seconds: 30),
+                rateLimitBackoff: Duration.zero,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('generate-all-suggestions')));
+      // Allow the first /run + reload to finish, then sit in the cooldown wait.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byKey(const ValueKey('stop-generate-all-suggestions')),
+          findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('stop-generate-all-suggestions')));
+      await tester.pump();
+      // Drain the remaining cooldown timer after stop was requested.
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
+
+      expect(runCalls, 1);
+      expect(find.text('توليد للكل'), findsOneWidget);
     }, fake);
   });
 

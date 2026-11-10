@@ -33,6 +33,9 @@ const (
 	competitorSuggestSkuInterval = 10 * time.Second
 	// Remember empty generates so re-selecting the same SKU does not re-call Gemini.
 	competitorSuggestEmptyCacheTTL = 10 * time.Minute
+	// Remember batch /run attempts that yielded no quarantine rows (empty Gemini / rank fail)
+	// so the next batch advances instead of re-hitting the same head SKUs.
+	competitorSuggestBatchAttemptTTL = 2 * time.Hour
 	// HOLD: AI picks must NOT feed Compare KPI averages until owner confirms.
 	competitorSuggestIncludeInKPIAverages = false
 )
@@ -65,7 +68,9 @@ type CompetitorSuggestionsHandler struct {
 	lastRun map[string]time.Time // tenant|chain → last batch run
 	lastSku map[string]time.Time // tenant|chain|barcode → last *completed* generate
 	emptySku map[string]skuEmptyCache // tenant|chain|barcode → empty result cache
-	skuSF   singleflight.Group        // coalesce concurrent generates for the same SKU
+	// batchAttempted: tenant|chain|barcode → last empty/fail batch attempt (in-memory TTL).
+	batchAttempted map[string]time.Time
+	skuSF          singleflight.Group // coalesce concurrent generates for the same SKU
 }
 
 // NewCompetitorSuggestionsHandler wires quarantine + ranking. ranker may be a mock.
@@ -79,14 +84,15 @@ func NewCompetitorSuggestionsHandler(
 		ranker = &competitorsuggest.GeminiRanker{UseMock: true}
 	}
 	return &CompetitorSuggestionsHandler{
-		repo:     repo,
-		audit:    audit,
-		catalog:  catalog,
-		ranker:   ranker,
-		eq:       competitorsuggest.DefaultCategoryEquivalence(),
-		lastRun:  make(map[string]time.Time),
-		lastSku:  make(map[string]time.Time),
-		emptySku: make(map[string]skuEmptyCache),
+		repo:           repo,
+		audit:          audit,
+		catalog:        catalog,
+		ranker:         ranker,
+		eq:             competitorsuggest.DefaultCategoryEquivalence(),
+		lastRun:        make(map[string]time.Time),
+		lastSku:        make(map[string]time.Time),
+		emptySku:       make(map[string]skuEmptyCache),
+		batchAttempted: make(map[string]time.Time),
 	}
 }
 
@@ -448,18 +454,56 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 
 	created := make([]domain.CompetitorSuggestion, 0)
 	skipped := make([]skipInfo, 0)
+	attemptedEmpty := make([]skipInfo, 0)
 	var promptTok, completionTok int
 	processed := 0
 	rankAttempts := 0
 	rankFailures := 0
+	// Track coverage mutations within this run for remaining_uncovered.
+	coveredNow := map[string]bool{}
+	for bc, ok := range pool.ownHasPendingOrRejected {
+		if ok {
+			coveredNow[bc] = true
+		}
+	}
+	attemptedNow := map[string]bool{}
+	tenantSlug := normalizeAuditTenantID(c.TenantID)
 
 	for _, own := range pool.own {
 		if processed >= limit {
 			break
 		}
-		if len(ownFilter) > 0 && !ownFilter[normBarcode(own.Barcode)] {
+		bc := normBarcode(own.Barcode)
+		if len(ownFilter) > 0 && !ownFilter[bc] {
 			continue
 		}
+		// Advance past own SKUs that already have pending or rejected suggestions.
+		// Does not consume a batch slot (same as approved mapping / missing category).
+		if pool.ownHasPendingOrRejected[bc] {
+			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skipReasonOwnAlreadyCovered})
+			continue
+		}
+		// Approved mapping (batch mode) — before pre-filter so a sole mapped
+		// competitor is not misreported as «لا يوجد منافسين».
+		if ctx.skipOwnWithAnyMapping && pool.ownHasMapping[bc] {
+			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skipReasonApprovedMapping})
+			continue
+		}
+		if strings.TrimSpace(own.Category) == "" {
+			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skipReasonMissingCategory})
+			continue
+		}
+		if h.hasBatchAttempt(tenantSlug, p.Chain, bc) {
+			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skipReasonAttemptedEmpty})
+			attemptedNow[bc] = true
+			continue
+		}
+		// No same-category competitors after pre-filter: skip without consuming a slot.
+		if !h.hasEligibleCompetitors(own, pool, p.Chain) {
+			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skipReasonNoCompetitors})
+			continue
+		}
+
 		rows, skip, usage, genErr := h.generateForOwn(r, ctx, pool, own)
 		promptTok += usage.PromptTokens
 		completionTok += usage.CompletionTokens
@@ -468,48 +512,66 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 			rankAttempts++
 			rankFailures++
 			log.Printf("[competitor-suggest] rank failed own=%s: %v", own.Barcode, genErr)
-			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: "تعذر ترتيب المرشحين"})
+			h.markBatchAttempt(tenantSlug, p.Chain, bc)
+			attemptedNow[bc] = true
+			info := skipInfo{Barcode: own.Barcode, Reason: skipReasonRankFailed}
+			skipped = append(skipped, info)
+			attemptedEmpty = append(attemptedEmpty, info)
 			processed++
 			continue
 		}
-		// Match prior batch semantics: approved mapping / missing category do not
-		// consume a batch slot; empty-candidate skips do. Neither counts as a rank attempt.
-		if skip == "يوجد تعيين معتمد مسبقاً" || skip == "فئة مفقودة في البيانات" {
+		// Approved mapping / missing category do not consume a batch slot.
+		if skip == skipReasonApprovedMapping || skip == skipReasonMissingCategory {
 			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skip})
 			continue
 		}
-		if skip != "" && len(rows) == 0 {
-			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skip})
+		if len(rows) == 0 {
+			// Gemini returned empty / unsaveable after eligible candidates existed.
+			rankAttempts++
+			reason := skip
+			if reason == "" || reason == skipReasonNoCompetitors {
+				reason = skipReasonAttemptedEmpty
+			}
+			h.markBatchAttempt(tenantSlug, p.Chain, bc)
+			attemptedNow[bc] = true
+			info := skipInfo{Barcode: own.Barcode, Reason: reason}
+			skipped = append(skipped, info)
+			attemptedEmpty = append(attemptedEmpty, info)
 			processed++
 			continue
 		}
 		rankAttempts++
 		created = append(created, rows...)
+		coveredNow[bc] = true
 		processed++
 	}
 
-	log.Printf("[competitor-suggest] run tenant=%s chain=%s processed=%d created=%d prompt_tokens=%d completion_tokens=%d rank_fail=%d/%d",
-		normalizeAuditTenantID(c.TenantID), p.Chain, processed, len(created), promptTok, completionTok, rankFailures, rankAttempts)
+	remaining := h.countRemainingUncovered(pool, ownFilter, coveredNow, attemptedNow, p.Chain, tenantSlug)
+
+	log.Printf("[competitor-suggest] run tenant=%s chain=%s processed=%d created=%d remaining_uncovered=%d attempted_empty=%d prompt_tokens=%d completion_tokens=%d rank_fail=%d/%d",
+		tenantSlug, p.Chain, processed, len(created), remaining, len(attemptedEmpty), promptTok, completionTok, rankFailures, rankAttempts)
 	h.recordAudit(r, c, "RUN_COMPETITOR_SUGGESTIONS",
-		fmt.Sprintf("chain=%s processed=%d created=%d tokens=%d/%d rank_fail=%d/%d", p.Chain, processed, len(created), promptTok, completionTok, rankFailures, rankAttempts))
+		fmt.Sprintf("chain=%s processed=%d created=%d remaining=%d attempted=%d tokens=%d/%d rank_fail=%d/%d", p.Chain, processed, len(created), remaining, len(attemptedEmpty), promptTok, completionTok, rankFailures, rankAttempts))
 
 	reasonCounts := map[string]int{}
 	for _, s := range skipped {
 		reasonCounts[s.Reason]++
 	}
 	payload := map[string]interface{}{
-		"suggestions":                  created,
-		"created_count":                len(created),
-		"processed_own":                processed,
-		"skipped":                      skipped,
-		"skipped_reason_counts":        reasonCounts,
-		"rank_attempts":                rankAttempts,
-		"rank_failures":                rankFailures,
-		"prompt_tokens":                promptTok,
-		"completion_tokens":            completionTok,
-		"limit":                        limit,
-		"include_in_kpi_averages":      competitorSuggestIncludeInKPIAverages,
-		"pending_category_equivalence": competitorsuggest.PendingCategoryEquivalencePairs,
+		"suggestions":                     created,
+		"created_count":                   len(created),
+		"processed_own":                   processed,
+		"remaining_uncovered":             remaining,
+		"attempted_without_suggestions":   attemptedEmpty,
+		"skipped":                         skipped,
+		"skipped_reason_counts":           reasonCounts,
+		"rank_attempts":                   rankAttempts,
+		"rank_failures":                   rankFailures,
+		"prompt_tokens":                   promptTok,
+		"completion_tokens":               completionTok,
+		"limit":                           limit,
+		"include_in_kpi_averages":         competitorSuggestIncludeInKPIAverages,
+		"pending_category_equivalence":    competitorsuggest.PendingCategoryEquivalencePairs,
 	}
 	// Prod silence: Gemini key/header failures yielded HTTP 200 + created_count=0.
 	// Surface a clear Arabic error when every ranking attempt failed.
@@ -534,6 +596,92 @@ func formatSkippedReasonSummary(counts map[string]int) string {
 	}
 	sort.Strings(parts)
 	return strings.Join(parts, "؛ ")
+}
+
+func (h *CompetitorSuggestionsHandler) batchAttemptKey(tenantSlug, chain, barcode string) string {
+	return strings.ToLower(tenantSlug + "|" + chain + "|" + barcode)
+}
+
+func (h *CompetitorSuggestionsHandler) hasBatchAttempt(tenantSlug, chain, barcode string) bool {
+	key := h.batchAttemptKey(tenantSlug, chain, barcode)
+	h.rateMu.Lock()
+	defer h.rateMu.Unlock()
+	at, ok := h.batchAttempted[key]
+	if !ok {
+		return false
+	}
+	if time.Since(at) > competitorSuggestBatchAttemptTTL {
+		delete(h.batchAttempted, key)
+		return false
+	}
+	return true
+}
+
+func (h *CompetitorSuggestionsHandler) markBatchAttempt(tenantSlug, chain, barcode string) {
+	key := h.batchAttemptKey(tenantSlug, chain, barcode)
+	h.rateMu.Lock()
+	defer h.rateMu.Unlock()
+	if h.batchAttempted == nil {
+		h.batchAttempted = make(map[string]time.Time)
+	}
+	h.batchAttempted[key] = time.Now()
+}
+
+// hasEligibleCompetitors is true when PreFilter finds same-category competitors
+// that are not already rejected or mapped for this own SKU.
+func (h *CompetitorSuggestionsHandler) hasEligibleCompetitors(
+	own competitorsuggest.SkuCandidate,
+	pool suggestPools,
+	chain string,
+) bool {
+	if strings.TrimSpace(own.Category) == "" {
+		return false
+	}
+	cands := competitorsuggest.PreFilterCandidates(own, pool.comp, h.eq)
+	for _, cand := range cands {
+		key := firestore.RejectedPairKey(own.Barcode, cand.Candidate.Barcode, chain)
+		if pool.rejectedPairs[key] || pool.mappedPairs[key] {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// countRemainingUncovered returns own SKUs still eligible for a future /run batch:
+// no pending/rejected coverage, no approved mapping, non-empty category, at least one
+// eligible competitor after pre-filter, and no in-memory empty/fail attempt marker.
+func (h *CompetitorSuggestionsHandler) countRemainingUncovered(
+	pool suggestPools,
+	ownFilter map[string]bool,
+	coveredNow map[string]bool,
+	attemptedNow map[string]bool,
+	chain, tenantSlug string,
+) int {
+	n := 0
+	for _, own := range pool.own {
+		bc := normBarcode(own.Barcode)
+		if len(ownFilter) > 0 && !ownFilter[bc] {
+			continue
+		}
+		if coveredNow[bc] || pool.ownHasPendingOrRejected[bc] {
+			continue
+		}
+		if attemptedNow[bc] || h.hasBatchAttempt(tenantSlug, chain, bc) {
+			continue
+		}
+		if pool.ownHasMapping[bc] {
+			continue
+		}
+		if strings.TrimSpace(own.Category) == "" {
+			continue
+		}
+		if !h.hasEligibleCompetitors(own, pool, chain) {
+			continue
+		}
+		n++
+	}
+	return n
 }
 
 // HandleApproveSuggestion serves POST /api/v1/competitors/suggestions/approve
@@ -615,8 +763,21 @@ type suggestPools struct {
 	comp          []competitorsuggest.SkuCandidate
 	mappedPairs   map[string]bool // rejectedPairKey style for own|comp|chain already mapped
 	ownHasMapping map[string]bool
-	rejectedPairs map[string]bool
+	// ownHasPendingOrRejected: own barcodes that already have quarantine rows
+	// (pending or rejected). Batch /run skips these so each run advances.
+	ownHasPendingOrRejected map[string]bool
+	rejectedPairs           map[string]bool
 }
+
+// Arabic skip reasons for batch /run advancement.
+const (
+	skipReasonOwnAlreadyCovered = "الصنف مغطى باقتراحات سابقة"
+	skipReasonNoCompetitors     = "لا يوجد منافسين في البيانات"
+	skipReasonAttemptedEmpty    = "تمت المحاولة بدون اقتراحات"
+	skipReasonRankFailed        = "تعذر ترتيب المرشحين"
+	skipReasonApprovedMapping   = "يوجد تعيين معتمد مسبقاً"
+	skipReasonMissingCategory   = "فئة مفقودة في البيانات"
+)
 
 func (h *CompetitorSuggestionsHandler) loadSuggestPools(r *http.Request, tenantID, chain string, year int) (suggestPools, error) {
 	start, end := bigquery.CompetitiveMonthlyYearWindow(year)
@@ -639,14 +800,20 @@ func (h *CompetitorSuggestionsHandler) loadSuggestPools(r *http.Request, tenantI
 	}
 	existing, _ := h.repo.ListCompetitorSuggestions(r.Context(), tenantID, domain.CompetitorSuggestionFilter{Chain: chain})
 	rejected := map[string]bool{}
+	ownCovered := map[string]bool{}
 	for _, s := range existing {
-		if s.Status == domain.CompetitorSuggestionRejected {
+		switch s.Status {
+		case domain.CompetitorSuggestionRejected:
 			rejected[firestore.RejectedPairKey(s.OwnBarcode, s.CompetitorBarcode, s.RetailerChain)] = true
+			ownCovered[normBarcode(s.OwnBarcode)] = true
+		case domain.CompetitorSuggestionPending:
+			ownCovered[normBarcode(s.OwnBarcode)] = true
 		}
 	}
 	return suggestPools{
 		own: ownPool, comp: compPool,
-		mappedPairs: mappedPairs, ownHasMapping: ownHas, rejectedPairs: rejected,
+		mappedPairs: mappedPairs, ownHasMapping: ownHas,
+		ownHasPendingOrRejected: ownCovered, rejectedPairs: rejected,
 	}, nil
 }
 
