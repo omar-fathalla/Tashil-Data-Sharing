@@ -326,3 +326,66 @@ func mustState(t *testing.T, s *memStore, tenant string) *domain.DataQualityStat
 	}
 	return st
 }
+
+func TestSummaryWithoutRunsUsesIssueCounts(t *testing.T) {
+	store := &memStore{m: map[string]*domain.DataQualityState{
+		"adeco": {
+			TenantID: "adeco",
+			Issues: []domain.DataQualityIssue{
+				{ID: "1", Source: domain.DQSourceProductMaster, Type: domain.DQTypeDuplicateBarcode, TypeLabel: "باركود مكرر",
+					Severity: domain.DQSeverityCritical, Row: 10, Status: domain.DQStatusOpen},
+				{ID: "2", Source: domain.DQSourceProductMaster, Type: domain.DQTypeDuplicateBarcode, TypeLabel: "باركود مكرر",
+					Severity: domain.DQSeverityCritical, Row: 11, Status: domain.DQStatusOpen},
+				{ID: "3", Source: domain.DQSourceProductMaster, Type: domain.DQTypeMissingBarcode, TypeLabel: "باركود ناقص",
+					Severity: domain.DQSeverityCritical, Row: 12, Status: domain.DQStatusResolved},
+				{ID: "4", Source: DQSourceSellInUploadPrefix + "in.xlsx", Type: DQTypeUnknownItem, TypeLabel: "صنف مش موجود",
+					Severity: domain.DQSeverityWarning, Row: 0, Status: domain.DQStatusOpen},
+			},
+			// Runs intentionally empty — matches prod after restart when PM file was never re-registered.
+		},
+	}}
+	svc := NewService(store, nil)
+	sum, err := svc.Summary(context.Background(), "adeco")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Open != 3 || sum.Resolved != 1 {
+		t.Fatalf("open/resolved = %d/%d, want 3/1", sum.Open, sum.Resolved)
+	}
+	if sum.TotalRows <= 0 {
+		t.Fatalf("TotalRows=%d, want >0 when open issues exist without Runs", sum.TotalRows)
+	}
+	if sum.CriticalRows < 2 {
+		t.Fatalf("CriticalRows=%d, want >=2", sum.CriticalRows)
+	}
+	if sum.CleanlinessPc >= 100 {
+		t.Fatalf("cleanliness=%.2f, want <100 with open critical rows", sum.CleanlinessPc)
+	}
+}
+
+func TestRecordSellInUnknownItemsWritesRun(t *testing.T) {
+	store := &memStore{}
+	svc := NewService(store, nil)
+	err := svc.RecordSellInUnknownItems(context.Background(), "adeco", "plan.xlsx", []UnknownItem{
+		{ItemCode: "X1", Barcode: "1", ItemName: "a", Rows: 41, Value: 100},
+		{ItemCode: "X2", Barcode: "2", ItemName: "b", Rows: 31, Value: 50},
+		{ItemCode: "X3", Barcode: "3", ItemName: "c", Rows: 6, Value: 10},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := mustState(t, store, "adeco")
+	if len(st.Runs) != 1 || st.Runs[0].TotalRows != 78 {
+		t.Fatalf("runs=%+v, want one run with 78 rows", st.Runs)
+	}
+	sum, err := svc.Summary(context.Background(), "adeco")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Open != 3 || sum.TotalRows != 78 {
+		t.Fatalf("summary open=%d total=%d, want 3/78", sum.Open, sum.TotalRows)
+	}
+	if sum.CleanlinessPc != 100 {
+		t.Fatalf("warnings-only cleanliness=%.2f, want 100", sum.CleanlinessPc)
+	}
+}

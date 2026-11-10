@@ -9721,6 +9721,10 @@ class ApiClient {
     return false;
   }
 
+  /// Client timeout for GET /product-master. Server must stay fast (O(1) pull-stats),
+  /// but cold Cloud Run + large catalog JSON still needs more than the old 10s ceiling.
+  static Duration productMasterTimeout = const Duration(seconds: 45);
+
   /// Fetches the Adeco Product Master & Official Price List (`كارتة الأصناف والأسعار`).
   Future<ProductMasterSummaryModel> getProductMaster({
     String? search,
@@ -9764,7 +9768,7 @@ class ApiClient {
       );
       final response = await BackendHttp
           .get(uri, headers: _headers)
-          .timeout(const Duration(seconds: 10));
+          .timeout(productMasterTimeout);
 
       if (response.statusCode == 200) {
         isServerOnline.value = true;
@@ -9772,8 +9776,17 @@ class ApiClient {
         final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
         return ProductMasterSummaryModel.fromJson(data);
       }
+      if (!allowMockFallback) {
+        isServerOnline.value = false;
+        lastConnectionError = 'HTTP ${response.statusCode}';
+        throw ServerConnectionException(
+          'تعذّر تحميل كارتة الأصناف والأسعار. حاول مرة أخرى بعد قليل.',
+          Exception('HTTP ${response.statusCode}'),
+        );
+      }
     } catch (e) {
       debugPrint('[ApiClient] Fallback getProductMaster: $e');
+      if (e is ServerConnectionException) rethrow;
       if (!allowMockFallback) {
         isServerOnline.value = false;
         lastConnectionError = e.toString();

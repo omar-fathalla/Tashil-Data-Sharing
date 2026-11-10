@@ -5,6 +5,7 @@ import (
 	"math"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 )
@@ -432,5 +433,52 @@ func TestCrosswalkDisambiguationAndCPFRReconciliation(t *testing.T) {
 	}
 }
 
+func TestGetProductMasterPullStatsSkipsFuzzyNameScan(t *testing.T) {
+	t.Setenv("TASHIL_PRODUCT_MASTER_DIR", filepath.Join(t.TempDir(), "pm_fast"))
+	ctx := context.Background()
+	client := NewClient("test-proj", "test-ds", true)
+	summary := &domain.ProductMasterSummaryResponse{
+		TenantID: "tenant-adeco", CompanyName: "أدكو", SheetDateLabel: "تحديث",
+		DefaultDiscountPct: 0.10, DefaultVATRate: 0.14,
+		Items: []domain.ProductMasterItem{{
+			SerialNo: 1, ItemCode: "FGCL-0550-0001", ItemCodePrefix: "FGCL",
+			Barcode: "6223000231227", OfficialName: "كلوريل أبيض 550 جم", Brand: "كلوريل",
+			ItemType: "عادي", PackagingType: "عبوة", UnitsPerCarton: 20,
+			VATRate: 0.14, UnitPriceExclVAT: 12, UnitPriceInclVAT: 14,
+			CartonPriceExclVAT: 240, CartonPriceInclVAT: 280, InvoiceDiscountPct: 0.10,
+		}},
+	}
+	if _, err := client.SetProductMaster(ctx, "tenant-adeco", summary); err != nil {
+		t.Fatal(err)
+	}
 
+	facts := make([]domain.SellOutFact, 0, 60000)
+	// Known barcode without item code — must still count via O(1) barcode index.
+	facts = append(facts, domain.SellOutFact{
+		TenantID: "tenant-adeco", Barcode: "6223000231227", SKUName: "كلوريل",
+		QuantitySold: 5, NetRevenue: 70, RetailerChain: "fathalla", IsOwnBrand: true,
+	})
+	// Tens of thousands of unmatched name-only rows previously triggered fuzzy scan per row.
+	for i := 0; i < 60000; i++ {
+		facts = append(facts, domain.SellOutFact{
+			TenantID: "tenant-adeco", Barcode: "", SKUName: "منظف غسيل سائل عشوائي " + string(rune('أ'+i%10)),
+			QuantitySold: 1, NetRevenue: 1, RetailerChain: "carrefour", IsOwnBrand: true,
+		})
+	}
+	if err := client.ReplaceTenantFacts(ctx, "tenant-adeco", facts); err != nil {
+		t.Fatal(err)
+	}
 
+	start := time.Now()
+	pm, err := client.GetProductMaster(ctx, "tenant-adeco", ProductMasterFilter{})
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if elapsed > 2*time.Second {
+		t.Fatalf("GetProductMaster took %s with 60k name-only POS rows; fuzzy scan likely still on the pull-stats path", elapsed)
+	}
+	if pm.ActiveInChainsCount != 1 || pm.Items[0].TotalPOSUnitsSold != 5 {
+		t.Fatalf("barcode-only pull stats broken: active=%d units=%d", pm.ActiveInChainsCount, pm.Items[0].TotalPOSUnitsSold)
+	}
+}
