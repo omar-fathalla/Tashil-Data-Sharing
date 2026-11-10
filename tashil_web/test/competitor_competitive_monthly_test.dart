@@ -176,15 +176,24 @@ void main() {
     }));
   });
 
-  test('timeout + !allowDemoSeedData → empty series, no seed Jan–Apr', () async {
+  test('timeout surfaces Arabic error (never silent empty / hang)', () async {
     await http.runWithClient(() async {
       final api = ApiClient(
         tenantId: 'tenant-adeco',
         allowMockFallback: true,
         allowDemoSeedData: false,
       );
-      final groups = await api.getCompetitiveComparisonGroups(chain: 'fathalla', year: 2026, month: 0);
-      expect(groups.every((g) => g.monthlyPrices.isEmpty), isTrue);
+      Object? err;
+      try {
+        await api.getCompetitiveComparisonGroups(chain: 'fathalla', year: 2026, month: 0);
+      } catch (e) {
+        err = e;
+      }
+      expect(err, isNotNull);
+      expect(
+        err.toString(),
+        contains('انتهت مهلة تحميل بيانات مقارنة الأسعار'),
+      );
     }, () => MockClient((req) async {
       if (req.url.path.contains('/api/v1/analytics/competitive-monthly')) {
         throw TimeoutException('competitive-monthly timed out');

@@ -285,6 +285,7 @@ class CompetitorSuggestionsReviewState
                 ),
                 M3Spacing.gapSM,
                 FilledButton.tonalIcon(
+                  key: const ValueKey('run-suggestions-batch'),
                   onPressed: _running ? null : _runBatch,
                   icon: _running
                       ? const SizedBox(
@@ -301,7 +302,7 @@ class CompetitorSuggestionsReviewState
           M3Spacing.gapSM,
           Text(
             'الاقتراحات المعلّقة لا تظهر في المقارنة أو مؤشرات الأداء حتى الموافقة. '
-            'حجم الدفعة يخص «تشغيل دفعة» فقط ولا يقيّد قائمة الانتظار.',
+            'حجم الدفعة يخص التشغيل اليدوي فقط ولا يقيّد قائمة الانتظار.',
             style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
           if (!_loading && groups.isNotEmpty) ...[

@@ -142,7 +142,8 @@ void main() {
       expect(find.byKey(const ValueKey('suggestion-group-OWN20')), findsNothing);
 
       // Batch dropdown still 5/10 only — does not shrink the pending count.
-      expect(find.textContaining('تشغيل دفعة'), findsOneWidget);
+      expect(find.byKey(const ValueKey('run-suggestions-batch')), findsOneWidget);
+      expect(find.text('تشغيل دفعة'), findsOneWidget);
 
       // M3 tonal/outlined actions — not solid dark-green FilledButton alone.
       expect(find.text('موافقة'), findsWidgets);
