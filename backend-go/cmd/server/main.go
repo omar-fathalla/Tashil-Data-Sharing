@@ -390,6 +390,7 @@ func main() {
 	// AI competitor suggestions quarantine — owner approval required; pending never feeds Compare KPIs.
 	mux.HandleFunc("GET /api/v1/competitors/suggestions", competitorSuggestionsHandler.HandleListSuggestions)
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/run", competitorSuggestionsHandler.HandleRunSuggestions)
+	mux.HandleFunc("POST /api/v1/competitors/suggestions/sku", competitorSuggestionsHandler.HandleSuggestForSku)
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/approve", competitorSuggestionsHandler.HandleApproveSuggestion)
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/reject", competitorSuggestionsHandler.HandleRejectSuggestion)
 

@@ -26,6 +26,7 @@ func suggestMux(h *CompetitorSuggestionsHandler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/competitors/suggestions", h.HandleListSuggestions)
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/run", h.HandleRunSuggestions)
+	mux.HandleFunc("POST /api/v1/competitors/suggestions/sku", h.HandleSuggestForSku)
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/approve", h.HandleApproveSuggestion)
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/reject", h.HandleRejectSuggestion)
 	mux.HandleFunc("GET /api/v1/competitors/mappings", NewCompetitorHandler(h.repo, nil).HandleListCompetitorMappings)
@@ -299,6 +300,99 @@ func TestPendingSuggestionsNeverInMappingsCount(t *testing.T) {
 	_, mout := tmDo(t, mux, admin, "GET", "/api/v1/competitors/mappings", nil)
 	if mout["count"].(float64) != 0 {
 		t.Fatal("pending must not count as mappings / Compare pins")
+	}
+}
+
+func TestCompetitorSuggestionsForSkuCacheAndGenerate(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), &competitorsuggest.GeminiRanker{UseMock: true})
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+	viewer := &domain.UserClaims{UserID: "u2", TenantID: "adeco", Email: "v@adeco.com", Role: domain.RoleExecutive}
+
+	if rec, _ := tmDo(t, mux, viewer, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
+		"barcode": "OWN-DISH", "chain": "fathalla",
+	}); rec.Code != http.StatusForbidden {
+		t.Fatalf("non-owner sku: want 403, got %d", rec.Code)
+	}
+
+	rec, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
+		"barcode": "OWN-DISH", "chain": "fathalla", "year": 2026,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("sku generate: %d %s", rec.Code, rec.Body.String())
+	}
+	if out["cached"] != false {
+		t.Fatalf("first call should generate, got cached=%v", out["cached"])
+	}
+	if out["include_in_kpi_averages"] != false {
+		t.Fatal("KPI averages flag must default OFF (HOLD)")
+	}
+	sugs := out["suggestions"].([]interface{})
+	if len(sugs) == 0 || len(sugs) > 3 {
+		t.Fatalf("want 1..3 suggestions, got %d", len(sugs))
+	}
+
+	// Cache hit — no regenerate even within rate window
+	rec, out = tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
+		"barcode": "OWN-DISH", "chain": "fathalla",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("sku cache: %d", rec.Code)
+	}
+	if out["cached"] != true {
+		t.Fatalf("second call should be cached, got %v", out)
+	}
+	if int(out["count"].(float64)) != len(sugs) {
+		t.Fatalf("cached count mismatch: %v vs %d", out["count"], len(sugs))
+	}
+
+	// Pending must still not write mappings (view without approve)
+	_, mout := tmDo(t, mux, admin, "GET", "/api/v1/competitors/mappings", nil)
+	if mout["count"].(float64) != 0 {
+		t.Fatal("sku suggestions must not auto-write competitor_mappings")
+	}
+}
+
+func TestCompetitorSuggestionsForSkuEmptyCategoryArabic(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	cat := seedCatalog()
+	cat.res.Items = append(cat.res.Items, bigquery.CompetitiveMonthlyItem{
+		Barcode: "OWN-NOCAT", SKUName: "بدون فئة", Category: "", IsOwnBrand: true,
+		Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 10, Units: 1, NetRevenue: 10}},
+	})
+	h := NewCompetitorSuggestionsHandler(fs, fs, cat, &competitorsuggest.GeminiRanker{UseMock: true})
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+	rec, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
+		"barcode": "OWN-NOCAT", "chain": "fathalla",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("want 200 with skip reason, got %d", rec.Code)
+	}
+	if out["skipped_reason_ar"] != "فئة مفقودة في البيانات" {
+		t.Fatalf("skip reason: %v", out["skipped_reason_ar"])
+	}
+}
+
+func TestCompetitorSuggestionsForSkuRateLimitOnGenerate(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	h := NewCompetitorSuggestionsHandler(fs, fs, seedCatalog(), &competitorsuggest.GeminiRanker{UseMock: true})
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+
+	// First generate for OWN-CARE (no same-category comps → empty, still counts as generate)
+	if rec, _ := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
+		"barcode": "OWN-CARE", "chain": "fathalla",
+	}); rec.Code != http.StatusOK {
+		t.Fatalf("first: %d", rec.Code)
+	}
+	// No pending cache (empty) → second generate within interval → 429
+	rec, _ := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
+		"barcode": "OWN-CARE", "chain": "fathalla",
+	})
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("want 429 on re-generate, got %d %s", rec.Code, rec.Body.String())
 	}
 }
 

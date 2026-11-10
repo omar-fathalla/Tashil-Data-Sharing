@@ -107,6 +107,8 @@ class ApiEndpoints {
   static String get competitorSuggestions => '$baseUrl/api/v1/competitors/suggestions';
   static String get competitorSuggestionsRun =>
       '$baseUrl/api/v1/competitors/suggestions/run';
+  static String get competitorSuggestionsSku =>
+      '$baseUrl/api/v1/competitors/suggestions/sku';
   static String get competitorSuggestionsApprove =>
       '$baseUrl/api/v1/competitors/suggestions/approve';
   static String get competitorSuggestionsReject =>

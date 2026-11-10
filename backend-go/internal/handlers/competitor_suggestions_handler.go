@@ -17,7 +17,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 )
 
-// Owner-only for run / approve / reject (company manager + super admin).
+// Owner-only for run / sku / approve / reject (company manager + super admin).
 var competitorSuggestOwnerRoles = map[domain.UserRole]bool{
 	domain.RoleSuperAdmin:  true,
 	domain.RoleVendorAdmin: true,
@@ -27,6 +27,9 @@ const (
 	competitorSuggestDefaultBatch = 10
 	competitorSuggestMaxBatch     = 10 // hard cap matches owner batch-size spec
 	competitorSuggestMinInterval  = 30 * time.Second
+	competitorSuggestSkuInterval  = 10 * time.Second // per-SKU generate (cache hits skip)
+	// HOLD: AI picks must NOT feed Compare KPI averages until owner confirms.
+	competitorSuggestIncludeInKPIAverages = false
 )
 
 // CompetitiveCatalogSource supplies Sell-Out barcode catalogue for suggestions.
@@ -35,15 +38,17 @@ type CompetitiveCatalogSource interface {
 }
 
 // CompetitorSuggestionsHandler serves the AI competitor-suggestion quarantine APIs.
-// Pending suggestions NEVER feed Compare KPIs or mappings until owner approve.
+// Pending suggestions NEVER feed Compare KPIs or mappings until owner approve
+// (and KPI averages stay owner-pinned while competitorSuggestIncludeInKPIAverages is false).
 type CompetitorSuggestionsHandler struct {
-	repo     firestore.CompetitorSkuRepository
-	audit    firestore.Repository
-	catalog  CompetitiveCatalogSource
-	ranker   competitorsuggest.Ranker
-	eq       competitorsuggest.CategoryEquivalence
-	rateMu   sync.Mutex
-	lastRun  map[string]time.Time // tenant|chain → last run
+	repo    firestore.CompetitorSkuRepository
+	audit   firestore.Repository
+	catalog CompetitiveCatalogSource
+	ranker  competitorsuggest.Ranker
+	eq      competitorsuggest.CategoryEquivalence
+	rateMu  sync.Mutex
+	lastRun map[string]time.Time // tenant|chain → last batch run
+	lastSku map[string]time.Time // tenant|chain|barcode → last generate
 }
 
 // NewCompetitorSuggestionsHandler wires quarantine + ranking. ranker may be a mock.
@@ -63,18 +68,30 @@ func NewCompetitorSuggestionsHandler(
 		ranker:  ranker,
 		eq:      competitorsuggest.DefaultCategoryEquivalence(),
 		lastRun: make(map[string]time.Time),
+		lastSku: make(map[string]time.Time),
 	}
 }
 
 type suggestRunPayload struct {
-	Chain     string   `json:"chain"`
-	OwnSKUs   []string `json:"own_skus"`
-	Limit     int      `json:"limit"`
-	Year      int      `json:"year"`
+	Chain   string   `json:"chain"`
+	OwnSKUs []string `json:"own_skus"`
+	Limit   int      `json:"limit"`
+	Year    int      `json:"year"`
+}
+
+type suggestSkuPayload struct {
+	Barcode string `json:"barcode"`
+	Chain   string `json:"chain"`
+	Year    int    `json:"year"`
 }
 
 type suggestDecidePayload struct {
 	ID string `json:"id"`
+}
+
+type skipInfo struct {
+	Barcode string `json:"barcode"`
+	Reason  string `json:"reason_ar"`
 }
 
 func (h *CompetitorSuggestionsHandler) ownerClaims(w http.ResponseWriter, r *http.Request) (*domain.UserClaims, bool) {
@@ -119,14 +136,133 @@ func (h *CompetitorSuggestionsHandler) HandleListSuggestions(w http.ResponseWrit
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"suggestions": items,
-		"count":       len(items),
+		"suggestions":                  items,
+		"count":                        len(items),
+		"include_in_kpi_averages":      competitorSuggestIncludeInKPIAverages,
 		"pending_category_equivalence": competitorsuggest.PendingCategoryEquivalencePairs,
 	})
 }
 
+// HandleSuggestForSku serves POST /api/v1/competitors/suggestions/sku (owner-only).
+// Returns cached pending suggestions for the own barcode, or generates up to 3.
+// Viewing/compare does not require approve; mappings still require explicit approve (batch tab).
+func (h *CompetitorSuggestionsHandler) HandleSuggestForSku(w http.ResponseWriter, r *http.Request) {
+	c, ok := h.ownerClaims(w, r)
+	if !ok {
+		return
+	}
+	var p suggestSkuPayload
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&p); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	p.Barcode = strings.TrimSpace(p.Barcode)
+	p.Chain = strings.TrimSpace(p.Chain)
+	if p.Barcode == "" {
+		writeErr(w, http.StatusBadRequest, "barcode is required")
+		return
+	}
+	if p.Chain == "" {
+		writeErr(w, http.StatusBadRequest, "chain is required")
+		return
+	}
+	if k := kamChain(c); k != "" && !strings.EqualFold(k, p.Chain) {
+		writeErr(w, http.StatusForbidden, "chain KAM can only request suggestions for the assigned chain")
+		return
+	}
+	year := p.Year
+	if year <= 0 {
+		year = time.Now().Year()
+	}
+
+	// Cache hit: return pending rows without regenerating or rate-limiting.
+	cached, err := h.repo.ListCompetitorSuggestions(r.Context(), c.TenantID, domain.CompetitorSuggestionFilter{
+		Chain: p.Chain, Status: domain.CompetitorSuggestionPending, OwnBarcode: p.Barcode,
+	})
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "failed to load cached suggestions")
+		return
+	}
+	if len(cached) > 0 {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"suggestions":             cached,
+			"count":                   len(cached),
+			"cached":                  true,
+			"barcode":                 p.Barcode,
+			"chain":                   p.Chain,
+			"include_in_kpi_averages": competitorSuggestIncludeInKPIAverages,
+		})
+		return
+	}
+
+	rateKey := strings.ToLower(normalizeAuditTenantID(c.TenantID) + "|" + p.Chain + "|" + p.Barcode)
+	h.rateMu.Lock()
+	if last, ok := h.lastSku[rateKey]; ok && time.Since(last) < competitorSuggestSkuInterval {
+		h.rateMu.Unlock()
+		writeErr(w, http.StatusTooManyRequests, "تم تجاوز حد الطلبات — انتظر قليلاً قبل إعادة توليد اقتراحات هذا الصنف")
+		return
+	}
+	h.lastSku[rateKey] = time.Now()
+	h.rateMu.Unlock()
+
+	if h.catalog == nil {
+		writeErr(w, http.StatusServiceUnavailable, "كتالوج المنافسة غير متاح حالياً")
+		return
+	}
+
+	ctx := suggestContext{
+		tenantID: c.TenantID,
+		chain:    p.Chain,
+		year:     year,
+		email:    c.Email,
+		// On-demand view: still suggest alongside owner pins; exclude already-mapped pairs.
+		skipOwnWithAnyMapping: false,
+	}
+	pool, err := h.loadSuggestPools(r, c.TenantID, p.Chain, year)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "تعذر تحميل بيانات المنافسة")
+		return
+	}
+
+	var own *competitorsuggest.SkuCandidate
+	for i := range pool.own {
+		if normBarcode(pool.own[i].Barcode) == normBarcode(p.Barcode) {
+			o := pool.own[i]
+			own = &o
+			break
+		}
+	}
+	if own == nil {
+		writeErr(w, http.StatusNotFound, "الصنف غير موجود في بيانات البيع لهذا التسلسل")
+		return
+	}
+
+	created, skip, usage, genErr := h.generateForOwn(r, ctx, pool, *own)
+	if genErr != nil {
+		log.Printf("[competitor-suggest] sku generate failed own=%s: %v", p.Barcode, genErr)
+		writeErr(w, http.StatusBadGateway, "تعذر ترتيب المرشحين عبر الذكاء الاصطناعي")
+		return
+	}
+
+	h.recordAudit(r, c, "SUGGEST_COMPETITOR_SKU",
+		fmt.Sprintf("chain=%s barcode=%s created=%d cached=false tokens=%d/%d skip=%s",
+			p.Chain, p.Barcode, len(created), usage.PromptTokens, usage.CompletionTokens, skip))
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"suggestions":             created,
+		"count":                   len(created),
+		"cached":                  false,
+		"barcode":                 p.Barcode,
+		"chain":                   p.Chain,
+		"skipped_reason_ar":       skip,
+		"prompt_tokens":           usage.PromptTokens,
+		"completion_tokens":       usage.CompletionTokens,
+		"include_in_kpi_averages": competitorSuggestIncludeInKPIAverages,
+	})
+}
+
 // HandleRunSuggestions serves POST /api/v1/competitors/suggestions/run (owner-only).
-// Manual trigger only — no background auto-run. Idempotent per own+competitor+chain.
+// Optional batch tab — manual trigger only. Idempotent per own+competitor+chain.
 func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWriter, r *http.Request) {
 	c, ok := h.ownerClaims(w, r)
 	if !ok {
@@ -172,29 +308,11 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 		writeErr(w, http.StatusServiceUnavailable, "competitive catalog unavailable")
 		return
 	}
-	start, end := bigquery.CompetitiveMonthlyYearWindow(year)
-	res := h.catalog.CompetitiveMonthly(c.TenantID, bigquery.RecordFilter{
-		RetailerChain: p.Chain,
-		Supplier:      "all_market",
-		StartDate:     start,
-		EndDate:       end,
-	})
 
-	ownPool, compPool := splitCatalog(res)
-	customs, _ := h.repo.ListCustomCompetitorSkus(r.Context(), c.TenantID, domain.CustomCompetitorSkuFilter{Chain: p.Chain})
-	compPool = append(compPool, customAsCandidates(customs)...)
-
-	mappings, _ := h.repo.ListCompetitorMappings(r.Context(), c.TenantID, domain.CompetitorMappingFilter{Chain: p.Chain})
-	approvedOwn := map[string]bool{}
-	for _, m := range mappings {
-		approvedOwn[normBarcode(m.OwnBarcode)] = true
-	}
-	existing, _ := h.repo.ListCompetitorSuggestions(r.Context(), c.TenantID, domain.CompetitorSuggestionFilter{Chain: p.Chain})
-	rejectedPairs := map[string]bool{}
-	for _, s := range existing {
-		if s.Status == domain.CompetitorSuggestionRejected {
-			rejectedPairs[firestore.RejectedPairKey(s.OwnBarcode, s.CompetitorBarcode, s.RetailerChain)] = true
-		}
+	pool, err := h.loadSuggestPools(r, c.TenantID, p.Chain, year)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "failed to load competitive catalog")
+		return
 	}
 
 	ownFilter := map[string]bool{}
@@ -205,10 +323,14 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 		}
 	}
 
-	type skipInfo struct {
-		Barcode string `json:"barcode"`
-		Reason  string `json:"reason_ar"`
+	ctx := suggestContext{
+		tenantID:              c.TenantID,
+		chain:                 p.Chain,
+		year:                  year,
+		email:                 c.Email,
+		skipOwnWithAnyMapping: true, // batch keeps prior behaviour
 	}
+
 	created := make([]domain.CompetitorSuggestion, 0)
 	skipped := make([]skipInfo, 0)
 	var promptTok, completionTok int
@@ -216,87 +338,38 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 	rankAttempts := 0
 	rankFailures := 0
 
-	for _, own := range ownPool {
+	for _, own := range pool.own {
 		if processed >= limit {
 			break
 		}
 		if len(ownFilter) > 0 && !ownFilter[normBarcode(own.Barcode)] {
 			continue
 		}
-		if approvedOwn[normBarcode(own.Barcode)] {
-			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: "يوجد تعيين معتمد مسبقاً"})
-			continue
-		}
-		if strings.TrimSpace(own.Category) == "" {
-			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: "فئة مفقودة في البيانات"})
-			continue
-		}
-		cands := competitorsuggest.PreFilterCandidates(own, compPool, h.eq)
-		// Drop remembered rejected pairs.
-		filtered := make([]competitorsuggest.PrefScore, 0, len(cands))
-		for _, cand := range cands {
-			key := firestore.RejectedPairKey(own.Barcode, cand.Candidate.Barcode, p.Chain)
-			if rejectedPairs[key] {
-				continue
-			}
-			filtered = append(filtered, cand)
-		}
-		if len(filtered) == 0 {
-			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: "لا يوجد منافسين في البيانات"})
-			processed++
-			continue
-		}
-		rankAttempts++
-		ranked, usage, err := h.ranker.Rank(r.Context(), own, filtered)
+		rows, skip, usage, genErr := h.generateForOwn(r, ctx, pool, own)
 		promptTok += usage.PromptTokens
 		completionTok += usage.CompletionTokens
-		if err != nil {
+		if genErr != nil {
+			// Rank was attempted and failed (Gemini key/header/model errors).
+			rankAttempts++
 			rankFailures++
-			log.Printf("[competitor-suggest] rank failed own=%s: %v", own.Barcode, err)
+			log.Printf("[competitor-suggest] rank failed own=%s: %v", own.Barcode, genErr)
 			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: "تعذر ترتيب المرشحين"})
 			processed++
 			continue
 		}
-		byBC := map[string]competitorsuggest.PrefScore{}
-		for _, f := range filtered {
-			byBC[f.Candidate.Barcode] = f
+		// Match prior batch semantics: approved mapping / missing category do not
+		// consume a batch slot; empty-candidate skips do. Neither counts as a rank attempt.
+		if skip == "يوجد تعيين معتمد مسبقاً" || skip == "فئة مفقودة في البيانات" {
+			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skip})
+			continue
 		}
-		for _, sug := range ranked {
-			ps := byBC[sug.CompetitorBarcode]
-			row := &domain.CompetitorSuggestion{
-				TenantID:            c.TenantID,
-				OwnBarcode:          own.Barcode,
-				OwnSkuName:          own.SKUName,
-				OwnCategory:         own.Category,
-				CompetitorBarcode:   sug.CompetitorBarcode,
-				CompetitorSkuName:   ps.Candidate.SKUName,
-				CompetitorBrand:     ps.Candidate.Brand,
-				CompetitorSupplier:  ps.Candidate.Supplier,
-				Category:            ps.Candidate.Category,
-				RetailerChain:       p.Chain,
-				ReasonAR:            sug.ReasonAR,
-				Confidence:          sug.Confidence,
-				Rank:                sug.Rank,
-				Status:              domain.CompetitorSuggestionPending,
-				OwnUnitPrice:        own.UnitPrice,
-				CompetitorUnitPrice: ps.Candidate.UnitPrice,
-				OwnUnits:            own.Units,
-				CompetitorUnits:     ps.Candidate.Units,
-				SizeLabelOwn:        ps.SizeLabelOwn,
-				SizeLabelCompetitor: ps.SizeLabelCand,
-				VariantBonus:        ps.VariantBonus,
-				PromptTokens:        usage.PromptTokens,
-				CompletionTokens:    usage.CompletionTokens,
-				CreatedBy:           c.Email,
-			}
-			if err := h.repo.SaveCompetitorSuggestion(r.Context(), row); err != nil {
-				log.Printf("[competitor-suggest] save failed: %v", err)
-				continue
-			}
-			if row.Status == domain.CompetitorSuggestionPending {
-				created = append(created, *row)
-			}
+		if skip != "" && len(rows) == 0 {
+			skipped = append(skipped, skipInfo{Barcode: own.Barcode, Reason: skip})
+			processed++
+			continue
 		}
+		rankAttempts++
+		created = append(created, rows...)
 		processed++
 	}
 
@@ -320,6 +393,7 @@ func (h *CompetitorSuggestionsHandler) HandleRunSuggestions(w http.ResponseWrite
 		"prompt_tokens":                promptTok,
 		"completion_tokens":            completionTok,
 		"limit":                        limit,
+		"include_in_kpi_averages":      competitorSuggestIncludeInKPIAverages,
 		"pending_category_equivalence": competitorsuggest.PendingCategoryEquivalencePairs,
 	}
 	// Prod silence: Gemini key/header failures yielded HTTP 200 + created_count=0.
@@ -411,6 +485,135 @@ func writeSuggestDecideErr(w http.ResponseWriter, err error) {
 	default:
 		writeErr(w, http.StatusInternalServerError, "failed to update suggestion")
 	}
+}
+
+type suggestContext struct {
+	tenantID              string
+	chain                 string
+	year                  int
+	email                 string
+	skipOwnWithAnyMapping bool
+}
+
+type suggestPools struct {
+	own           []competitorsuggest.SkuCandidate
+	comp          []competitorsuggest.SkuCandidate
+	mappedPairs   map[string]bool // rejectedPairKey style for own|comp|chain already mapped
+	ownHasMapping map[string]bool
+	rejectedPairs map[string]bool
+}
+
+func (h *CompetitorSuggestionsHandler) loadSuggestPools(r *http.Request, tenantID, chain string, year int) (suggestPools, error) {
+	start, end := bigquery.CompetitiveMonthlyYearWindow(year)
+	res := h.catalog.CompetitiveMonthly(tenantID, bigquery.RecordFilter{
+		RetailerChain: chain,
+		Supplier:      "all_market",
+		StartDate:     start,
+		EndDate:       end,
+	})
+	ownPool, compPool := splitCatalog(res)
+	customs, _ := h.repo.ListCustomCompetitorSkus(r.Context(), tenantID, domain.CustomCompetitorSkuFilter{Chain: chain})
+	compPool = append(compPool, customAsCandidates(customs)...)
+
+	mappings, _ := h.repo.ListCompetitorMappings(r.Context(), tenantID, domain.CompetitorMappingFilter{Chain: chain})
+	ownHas := map[string]bool{}
+	mappedPairs := map[string]bool{}
+	for _, m := range mappings {
+		ownHas[normBarcode(m.OwnBarcode)] = true
+		mappedPairs[firestore.RejectedPairKey(m.OwnBarcode, m.CompetitorBarcode, chain)] = true
+	}
+	existing, _ := h.repo.ListCompetitorSuggestions(r.Context(), tenantID, domain.CompetitorSuggestionFilter{Chain: chain})
+	rejected := map[string]bool{}
+	for _, s := range existing {
+		if s.Status == domain.CompetitorSuggestionRejected {
+			rejected[firestore.RejectedPairKey(s.OwnBarcode, s.CompetitorBarcode, s.RetailerChain)] = true
+		}
+	}
+	return suggestPools{
+		own: ownPool, comp: compPool,
+		mappedPairs: mappedPairs, ownHasMapping: ownHas, rejectedPairs: rejected,
+	}, nil
+}
+
+// generateForOwn ranks and persists up to MaxRank pending suggestions for one own SKU.
+// Returns Arabic skip reason when nothing is created (empty string on success).
+func (h *CompetitorSuggestionsHandler) generateForOwn(
+	r *http.Request,
+	ctx suggestContext,
+	pool suggestPools,
+	own competitorsuggest.SkuCandidate,
+) ([]domain.CompetitorSuggestion, string, competitorsuggest.TokenUsage, error) {
+	var usage competitorsuggest.TokenUsage
+	if ctx.skipOwnWithAnyMapping && pool.ownHasMapping[normBarcode(own.Barcode)] {
+		return nil, "يوجد تعيين معتمد مسبقاً", usage, nil
+	}
+	if strings.TrimSpace(own.Category) == "" {
+		return nil, "فئة مفقودة في البيانات", usage, nil
+	}
+	cands := competitorsuggest.PreFilterCandidates(own, pool.comp, h.eq)
+	filtered := make([]competitorsuggest.PrefScore, 0, len(cands))
+	for _, cand := range cands {
+		key := firestore.RejectedPairKey(own.Barcode, cand.Candidate.Barcode, ctx.chain)
+		if pool.rejectedPairs[key] {
+			continue
+		}
+		if pool.mappedPairs[key] {
+			continue
+		}
+		filtered = append(filtered, cand)
+	}
+	if len(filtered) == 0 {
+		return nil, "لا يوجد منافسين في البيانات", usage, nil
+	}
+	ranked, usage, err := h.ranker.Rank(r.Context(), own, filtered)
+	if err != nil {
+		return nil, "تعذر ترتيب المرشحين", usage, err
+	}
+	byBC := map[string]competitorsuggest.PrefScore{}
+	for _, f := range filtered {
+		byBC[f.Candidate.Barcode] = f
+	}
+	created := make([]domain.CompetitorSuggestion, 0, len(ranked))
+	for _, sug := range ranked {
+		ps := byBC[sug.CompetitorBarcode]
+		row := &domain.CompetitorSuggestion{
+			TenantID:            ctx.tenantID,
+			OwnBarcode:          own.Barcode,
+			OwnSkuName:          own.SKUName,
+			OwnCategory:         own.Category,
+			CompetitorBarcode:   sug.CompetitorBarcode,
+			CompetitorSkuName:   ps.Candidate.SKUName,
+			CompetitorBrand:     ps.Candidate.Brand,
+			CompetitorSupplier:  ps.Candidate.Supplier,
+			Category:            ps.Candidate.Category,
+			RetailerChain:       ctx.chain,
+			ReasonAR:            sug.ReasonAR,
+			Confidence:          sug.Confidence,
+			Rank:                sug.Rank,
+			Status:              domain.CompetitorSuggestionPending,
+			OwnUnitPrice:        own.UnitPrice,
+			CompetitorUnitPrice: ps.Candidate.UnitPrice,
+			OwnUnits:            own.Units,
+			CompetitorUnits:     ps.Candidate.Units,
+			SizeLabelOwn:        ps.SizeLabelOwn,
+			SizeLabelCompetitor: ps.SizeLabelCand,
+			VariantBonus:        ps.VariantBonus,
+			PromptTokens:        usage.PromptTokens,
+			CompletionTokens:    usage.CompletionTokens,
+			CreatedBy:           ctx.email,
+		}
+		if err := h.repo.SaveCompetitorSuggestion(r.Context(), row); err != nil {
+			log.Printf("[competitor-suggest] save failed: %v", err)
+			continue
+		}
+		if row.Status == domain.CompetitorSuggestionPending {
+			created = append(created, *row)
+		}
+	}
+	if len(created) == 0 {
+		return created, "لا يوجد منافسين في البيانات", usage, nil
+	}
+	return created, "", usage, nil
 }
 
 func normBarcode(s string) string {

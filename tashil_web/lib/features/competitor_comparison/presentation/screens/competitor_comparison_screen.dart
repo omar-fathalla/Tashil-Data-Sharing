@@ -11,10 +11,12 @@ import '../../../../core/data/result.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/competitor_comparison_repository.dart';
 import '../../domain/competitor_month_options.dart';
+import '../widgets/competitor_ai_picks_row.dart';
 import '../widgets/competitor_suggestions_review.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_states.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 
@@ -69,12 +71,18 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
   String _searchQuery = '';
   bool _showWhatIfSimulator = false;
   double? _simulatedOwnPrice;
-  /// 0 = مقارنة الأسعار, 1 = اقتراحات المنافسين (بانتظار الموافقة)
+  /// 0 = مقارنة الأسعار, 1 = اقتراحات المنافسين (بانتظار الموافقة) — optional batch tab
   int _mainTab = 0;
 
   /// Own-SKU master list pagination (0-based). Filters always reset to page 0.
   static const int _ownSkuPageSize = 10;
   int _ownSkuPageIndex = 0;
+
+  /// On-demand AI top-3 for the selected own SKU (view/compare without approve).
+  List<CompetitorSkuComparisonModel> _aiPicks = const [];
+  bool _aiPicksLoading = false;
+  String? _aiPicksEmptyHint;
+  int _aiPicksRequestSeq = 0;
 
   final TextEditingController _searchController = TextEditingController();
   late String _lastTenantId;
@@ -212,6 +220,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
           }
           _isLoading = false;
         });
+        _loadAiPicksForSelectedOwn();
       },
       failure: (error) {
         setState(() => _isLoading = false);
@@ -303,17 +312,22 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
         _selectedCompetitorBarcode = null;
       }
       final activeGroup = _selectedGroup;
-      if (activeGroup != null && activeGroup.competitors.isNotEmpty) {
-        final compExists = activeGroup.competitors
+      if (activeGroup != null) {
+        final pinnedExists = activeGroup.competitors
             .any((c) => c.barcode == _selectedCompetitorBarcode);
-        if (!compExists) {
-          _selectedCompetitorBarcode = activeGroup.competitors.first.barcode;
+        final aiExists =
+            _aiPicks.any((c) => c.barcode == _selectedCompetitorBarcode);
+        if (!pinnedExists && !aiExists) {
+          _selectedCompetitorBarcode = activeGroup.competitors.isNotEmpty
+              ? activeGroup.competitors.first.barcode
+              : (_aiPicks.isNotEmpty ? _aiPicks.first.barcode : null);
         }
       }
     } else {
       _selectedOwnBarcode = null;
       _simulatedOwnPrice = null;
       _selectedCompetitorBarcode = null;
+      _aiPicks = const [];
     }
   }
 
@@ -836,6 +850,66 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     return u.isSuperAdmin || u.role == 'vendor_admin';
   }
 
+  Future<void> _loadAiPicksForSelectedOwn() async {
+    if (!_canRunSuggestions) {
+      if (mounted) {
+        setState(() {
+          _aiPicks = const [];
+          _aiPicksLoading = false;
+          _aiPicksEmptyHint = null;
+        });
+      }
+      return;
+    }
+    final barcode = _selectedOwnBarcode;
+    if (barcode == null || barcode.isEmpty) return;
+    final seq = ++_aiPicksRequestSeq;
+    setState(() {
+      _aiPicksLoading = true;
+      _aiPicksEmptyHint = null;
+    });
+    try {
+      final result = await widget.apiClient.suggestCompetitorsForSku(
+        barcode: barcode,
+        chain: _selectedChain,
+        year: _selectedYear,
+      );
+      if (!mounted || seq != _aiPicksRequestSeq) return;
+      final pinned = _selectedGroup?.competitors.map((c) => c.barcode).toSet() ??
+          const <String>{};
+      // Owner-pinned mappings take priority — drop duplicates from AI row.
+      final models = <CompetitorSkuComparisonModel>[];
+      for (final s in result.suggestions) {
+        if (pinned.contains(s.competitorBarcode)) continue;
+        models.add(
+          widget.apiClient.competitorFromAiSuggestion(
+            s,
+            ownUnitPrice: _selectedGroup?.ownUnitPrice ?? s.ownUnitPrice,
+            year: _selectedYear,
+          ),
+        );
+        if (models.length >= 3) break;
+      }
+      setState(() {
+        _aiPicks = models;
+        _aiPicksLoading = false;
+        _aiPicksEmptyHint = models.isEmpty ? result.skippedReasonAr : null;
+      });
+    } catch (e) {
+      if (!mounted || seq != _aiPicksRequestSeq) return;
+      setState(() {
+        _aiPicks = const [];
+        _aiPicksLoading = false;
+        _aiPicksEmptyHint = null;
+      });
+      final msg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+      M3Feedback.showError(
+        context,
+        msg.isEmpty ? 'فشل جلب اقتراحات المنافسين' : msg,
+      );
+    }
+  }
+
   Widget _buildFilterToolbar(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -1350,6 +1424,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                 ? group.competitors.first.barcode
                 : null;
           });
+          _loadAiPicksForSelectedOwn();
         },
         child: AnimatedContainer(
           duration: M3Motion.short4,
@@ -1533,10 +1608,10 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
   }
 
   /// Detail Panel showing:
-  /// 1. Default Own SKU Spotlight Card
+  /// 1. Default Own SKU Spotlight Card (+ AI top-3 under KPI metrics)
   /// 2. Interactive What-If Price Simulator (if toggled)
-  /// 3. Single Clean Competitor Selector Row (1 card per competitor brand + its volume, e.g., Fairy 2L, Pril 4Kg, Wafeer 4Kg)
-  /// 4. Focused 1-vs-1 Monthly Price Trajectory Chart & 4-Month Comparison Grid (Jan, Feb, Mar, Apr) for Default Own SKU + Selected Competitor ONLY.
+  /// 3. Single Clean Competitor Selector Row (owner-pinned; AI picks are separate)
+  /// 4. Focused 1-vs-1 Monthly Price Trajectory Chart for Own SKU + Selected Competitor.
   Widget _buildCompetitorDetailPanel(
     BuildContext context,
     OwnSkuCompetitiveGroupModel group,
@@ -1550,7 +1625,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             (effectiveOwnPrice / group.packVolumeUnits).toStringAsFixed(2))
         : effectiveOwnPrice;
 
-    // Deduplicate by brand and recompute price context against effectiveOwnPrice
+    // Deduplicate by brand and recompute price context against effectiveOwnPrice.
+    // Owner-pinned only — AI picks stay out of KPI averages while the HOLD flag is OFF.
     final seenBrands = <String>{};
     final adjustedCompetitors = <CompetitorSkuComparisonModel>[];
     for (final c in group.competitors) {
@@ -1576,21 +1652,59 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       );
     }
 
-    // Resolve the currently selected single competitor (default to first competitor)
+    // Resolve selected competitor: owner pin first, else AI pick (view without approve).
     CompetitorSkuComparisonModel? selectedCompetitor;
-    if (adjustedCompetitors.isNotEmpty) {
-      selectedCompetitor = adjustedCompetitors.firstWhere(
-        (c) => c.barcode == _selectedCompetitorBarcode,
-        orElse: () => adjustedCompetitors.first,
-      );
+    for (final c in adjustedCompetitors) {
+      if (c.barcode == _selectedCompetitorBarcode) {
+        selectedCompetitor = c;
+        break;
+      }
+    }
+    if (selectedCompetitor == null) {
+      for (final c in _aiPicks) {
+        if (c.barcode == _selectedCompetitorBarcode) {
+          selectedCompetitor = c.copyWithPriceContext(
+            priceDiffEgp: double.parse(
+                (c.unitPrice - effectiveOwnPrice).toStringAsFixed(2)),
+            priceDiffPct: double.parse(
+              (effectiveOwnPrice > 0
+                      ? ((c.unitPrice - effectiveOwnPrice) / effectiveOwnPrice) *
+                          100.0
+                      : 0.0)
+                  .toStringAsFixed(1),
+            ),
+            pricePosition: (c.unitPrice - effectiveOwnPrice) /
+                        (effectiveOwnPrice > 0 ? effectiveOwnPrice : 1) *
+                        100 >
+                    1.5
+                ? 'higher'
+                : (c.unitPrice - effectiveOwnPrice) /
+                            (effectiveOwnPrice > 0 ? effectiveOwnPrice : 1) *
+                            100 <
+                        -1.5
+                    ? 'lower'
+                    : 'equal',
+          );
+          break;
+        }
+      }
+    }
+    if (selectedCompetitor == null && adjustedCompetitors.isNotEmpty) {
+      selectedCompetitor = adjustedCompetitors.first;
+    } else if (selectedCompetitor == null && _aiPicks.isNotEmpty) {
+      selectedCompetitor = _aiPicks.first;
     }
 
+    // KPI status pills: owner-pinned only unless HOLD flag is flipped ON.
+    final kpiCompetitors = ApiClient.includeAiSuggestionsInKpiAverages
+        ? [...adjustedCompetitors, ..._aiPicks]
+        : adjustedCompetitors;
     final higherCount =
-        adjustedCompetitors.where((c) => c.pricePosition == 'higher').length;
+        kpiCompetitors.where((c) => c.pricePosition == 'higher').length;
     final lowerCount =
-        adjustedCompetitors.where((c) => c.pricePosition == 'lower').length;
+        kpiCompetitors.where((c) => c.pricePosition == 'lower').length;
     final equalCount =
-        adjustedCompetitors.where((c) => c.pricePosition == 'equal').length;
+        kpiCompetitors.where((c) => c.pricePosition == 'equal').length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1618,7 +1732,9 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
 
         M3Spacing.gapMD,
 
-        if (adjustedCompetitors.isEmpty) ...[
+        if (adjustedCompetitors.isEmpty &&
+            _aiPicks.isEmpty &&
+            !_aiPicksLoading) ...[
           Container(
             padding: const EdgeInsets.all(16.0),
             decoration: BoxDecoration(
@@ -1669,8 +1785,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
               ),
             ),
           ],
-        ] else
-          // C. Clean M3 Competitor Brand Selector Row (1 Card per Brand with Pack Volume — e.g. Pril 4Kg, Fairy 2L, Wafeer 4Kg)
+        ] else if (adjustedCompetitors.isNotEmpty)
+          // C. Owner-pinned competitor selector (AI picks live under spotlight KPIs).
           _buildCompetitorBrandSelectorSection(
             context,
             group: group,
@@ -2849,6 +2965,18 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
               ),
             ],
           ),
+          if (_canRunSuggestions) ...[
+            const SizedBox(height: 16.0),
+            CompetitorAiPicksRow(
+              loading: _aiPicksLoading,
+              picks: _aiPicks,
+              selectedBarcode: _selectedCompetitorBarcode,
+              emptyHintAr: _aiPicksEmptyHint,
+              onSelect: (c) {
+                setState(() => _selectedCompetitorBarcode = c.barcode);
+              },
+            ),
+          ],
           const SizedBox(height: 16.0),
           const Divider(height: 1.0),
           const SizedBox(height: 12.0),
