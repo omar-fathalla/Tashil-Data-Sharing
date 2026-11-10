@@ -149,7 +149,11 @@ void main() {
       expect(find.text('موافقة'), findsWidgets);
       expect(find.text('رفض'), findsWidgets);
 
-      await tester.tap(find.byTooltip('الصفحة التالية'));
+      // Pager sits below ~20 tall cards; must scroll into the 800×600 test viewport.
+      final nextPage = find.byTooltip('الصفحة التالية');
+      await tester.ensureVisible(nextPage);
+      await tester.pumpAndSettle();
+      await tester.tap(nextPage);
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('suggestion-group-OWN20')), findsOneWidget);
       expect(find.text('موافقة على الكل'), findsNWidgets(5));
