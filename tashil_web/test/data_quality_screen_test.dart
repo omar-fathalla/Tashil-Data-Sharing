@@ -45,7 +45,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     // Prod bug shape: open/cards populated but cleanliness falsely 100% with 0 of 0 rows.
-    final broken = const DataQualitySummary(
+    const broken = DataQualitySummary(
       types: [
         DataQualityTypeSummary(
           source: 'product_master',
