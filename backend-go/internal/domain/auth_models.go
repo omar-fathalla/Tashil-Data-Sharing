@@ -83,9 +83,9 @@ type ForgotPasswordRequest struct {
 }
 
 // ForgotPasswordResponse confirms password reset request processing.
+// Never include the reset token — deliver out-of-band (email) only.
 type ForgotPasswordResponse struct {
-	Message    string `json:"message"`
-	ResetToken string `json:"reset_token,omitempty"` // populated for testing/direct flow
+	Message string `json:"message"`
 }
 
 // ResetPasswordRequest uses a reset token to update password.

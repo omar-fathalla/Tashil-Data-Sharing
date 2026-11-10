@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
@@ -12,24 +14,74 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 )
 
+// Generic forgot-password acknowledgement — identical for known and unknown emails
+// so responses never enumerate accounts or leak reset tokens.
+const forgotPasswordAckMessage = "إذا كان البريد مسجلاً، فسيتم إرسال رابط استعادة كلمة المرور"
+
+const (
+	authLoginMaxAttempts  = 10
+	authLoginWindow       = time.Minute
+	authForgotMaxAttempts = 5
+	authForgotWindow      = 15 * time.Minute
+)
+
 // AuthHandler coordinates authentication and password recovery endpoints.
 type AuthHandler struct {
 	fsRepo firestore.Repository
 	authMW *middleware.AuthMiddleware
+
+	rateMu     sync.Mutex
+	loginHits  map[string][]time.Time
+	forgotHits map[string][]time.Time
 }
 
 // NewAuthHandler constructs an AuthHandler.
 func NewAuthHandler(fsRepo firestore.Repository, authMW *middleware.AuthMiddleware) *AuthHandler {
 	return &AuthHandler{
-		fsRepo: fsRepo,
-		authMW: authMW,
+		fsRepo:     fsRepo,
+		authMW:     authMW,
+		loginHits:  make(map[string][]time.Time),
+		forgotHits: make(map[string][]time.Time),
 	}
+}
+
+func (h *AuthHandler) allowRate(bucket map[string][]time.Time, key string, max int, window time.Duration) bool {
+	now := time.Now()
+	cutoff := now.Add(-window)
+	h.rateMu.Lock()
+	defer h.rateMu.Unlock()
+	kept := bucket[key][:0]
+	for _, t := range bucket[key] {
+		if t.After(cutoff) {
+			kept = append(kept, t)
+		}
+	}
+	if len(kept) >= max {
+		bucket[key] = kept
+		return false
+	}
+	bucket[key] = append(kept, now)
+	return true
+}
+
+func authRateKey(r *http.Request, extra string) string {
+	ip := extractRequestIP(r)
+	extra = strings.ToLower(strings.TrimSpace(extra))
+	if extra == "" {
+		return ip
+	}
+	return ip + "|" + extra
 }
 
 // HandleLogin serves POST /api/v1/auth/login.
 func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !h.allowRate(h.loginHits, authRateKey(r, ""), authLoginMaxAttempts, authLoginWindow) {
+		http.Error(w, `{"error":"too many login attempts, try again later"}`, http.StatusTooManyRequests)
 		return
 	}
 
@@ -143,6 +195,8 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleForgotPassword serves POST /api/v1/auth/forgot-password.
+// Always returns the same generic 200 body; never returns the reset token.
+// Token is stored server-side for the reset-password endpoint (email OOB when wired).
 func (h *AuthHandler) HandleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
@@ -160,29 +214,37 @@ func (h *AuthHandler) HandleForgotPassword(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if !h.allowRate(h.forgotHits, authRateKey(r, req.Email), authForgotMaxAttempts, authForgotWindow) {
+		http.Error(w, `{"error":"too many reset requests, try again later"}`, http.StatusTooManyRequests)
+		return
+	}
+
+	writeForgotAck := func() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(domain.ForgotPasswordResponse{
+			Message: forgotPasswordAckMessage,
+		})
+	}
+
 	user, err := h.fsRepo.GetUserByEmail(r.Context(), req.TenantID, req.Email)
 	if err != nil {
-		// Secure response: do not reveal whether user exists or not, but return success
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(domain.ForgotPasswordResponse{
-			Message: "إذا كان البريد مسجلاً، فسيتم إرسال رابط استعادة كلمة المرور",
-		})
+		writeForgotAck()
 		return
 	}
 
 	resetToken := security.GenerateResetToken()
 	expiry := time.Now().Add(1 * time.Hour)
 
+	// Store server-side only. Deliver via email when an outbound mail channel exists;
+	// never put the token in the HTTP response.
 	if err := h.fsRepo.SetUserResetToken(r.Context(), user.UserID, resetToken, expiry); err != nil {
-		http.Error(w, `{"error":"failed to generate reset token"}`, http.StatusInternalServerError)
+		// Do not reveal whether the account exists; still return the generic ack.
+		writeForgotAck()
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(domain.ForgotPasswordResponse{
-		Message:    "تم توليد رمز استعادة كلمة المرور بنجاح",
-		ResetToken: resetToken,
-	})
+	writeForgotAck()
 }
 
 // HandleResetPassword serves POST /api/v1/auth/reset-password.
