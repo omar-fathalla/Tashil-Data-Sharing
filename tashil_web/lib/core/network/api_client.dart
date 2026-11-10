@@ -10616,7 +10616,12 @@ class ApiClient {
     if (s.contains('برسيل')) return 'برسيل (Persil)';
     if (s.contains('جنرال')) return 'جنرال (General)';
     if (s.contains('وفير')) return 'وفير (Wafeer)';
-    if (s.contains('اوكسى') || s.contains('أوكسي')) return 'أوكسي (Oxi)';
+    if (s.contains('اوكسى') ||
+        s.contains('أوكسى') ||
+        s.contains('اوكسي') ||
+        s.contains('أوكسي')) {
+      return 'أوكسي (Oxi)';
+    }
     if (s.contains('بريكس')) return 'بريكس (Brix)';
     if (s.contains('ريفولى')) return 'ريفولي (Rivoli)';
     if (s.contains('باهي') || s.contains('باهى')) return 'باهي (Bahi)';
@@ -10637,9 +10642,15 @@ class ApiClient {
     if (s.contains('فاى') || s.contains('فاي')) return 'فاي (Fay)';
     if (s.contains('فلاش')) return 'فلاش (Flash)';
     if (isOwn) return 'أدكو (Adeco)';
-    if (supplier.trim().isNotEmpty) return supplier.trim();
-    final words = s.split(' ');
-    return words.isNotEmpty ? words.first : 'علامة تجارية';
+    if (supplier.trim().isNotEmpty && supplier.trim() != 'منافس') {
+      return supplier.trim();
+    }
+    final words = s
+        .split(' ')
+        .where((w) => w.trim().isNotEmpty && w.trim() != 'منافس' && w.trim() != 'المنافس')
+        .toList();
+    if (words.isNotEmpty) return words.first;
+    return 'علامة تجارية';
   }
 
   static String formatArabicMonthOnly(int monthNum) {
@@ -11214,9 +11225,16 @@ class ApiClient {
         ),
       ];
     }
-    final brand = s.competitorBrand.isNotEmpty
-        ? s.competitorBrand
-        : (s.competitorSupplier.isNotEmpty ? s.competitorSupplier : 'منافس');
+    // Never fall back to generic «منافس» — chart legend/header need the real brand
+    // (e.g. أوكسي). Stored quarantine rows often omit brand/supplier when generated
+    // from CompetitiveMonthly (which historically dropped those fields).
+    final rawBrand = s.competitorBrand.trim();
+    final brand = (rawBrand.isNotEmpty && rawBrand != 'منافس')
+        ? rawBrand
+        : inferBrandFromSkuOrSupplier(
+            s.competitorSkuName,
+            s.competitorSupplier,
+          );
     return CompetitorSkuComparisonModel(
       skuName: s.competitorSkuName.isNotEmpty
           ? s.competitorSkuName

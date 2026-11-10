@@ -54,8 +54,10 @@ void main() {
   });
 
   testWidgets(
-      'pending tab lists ALL suggestions grouped by own SKU; batch size does not cap list',
+      'pending tab paginates many own-SKU groups (25+) without batch-size cap',
       (tester) async {
+    // Regression for live gap: with only 2 groups, pager was unverifiable.
+    // Keep a 25-group fixture so page 2 (OWN20+) is asserted.
     final store = <Map<String, dynamic>>[
       for (var i = 0; i < 25; i++) ...[
         {

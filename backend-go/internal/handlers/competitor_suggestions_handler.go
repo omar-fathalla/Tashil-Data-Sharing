@@ -691,6 +691,10 @@ func (h *CompetitorSuggestionsHandler) generateForOwn(
 	created := make([]domain.CompetitorSuggestion, 0, len(ranked))
 	for _, sug := range ranked {
 		ps := byBC[sug.CompetitorBarcode]
+		brand := strings.TrimSpace(ps.Candidate.Brand)
+		if brand == "" {
+			brand = domain.InferBrandFromItemName(ps.Candidate.SKUName, ps.Candidate.Category)
+		}
 		row := &domain.CompetitorSuggestion{
 			TenantID:            ctx.tenantID,
 			OwnBarcode:          own.Barcode,
@@ -698,7 +702,7 @@ func (h *CompetitorSuggestionsHandler) generateForOwn(
 			OwnCategory:         own.Category,
 			CompetitorBarcode:   sug.CompetitorBarcode,
 			CompetitorSkuName:   ps.Candidate.SKUName,
-			CompetitorBrand:     ps.Candidate.Brand,
+			CompetitorBrand:     brand,
 			CompetitorSupplier:  ps.Candidate.Supplier,
 			Category:            ps.Candidate.Category,
 			RetailerChain:       ctx.chain,
@@ -747,10 +751,16 @@ func splitCatalog(res bigquery.CompetitiveMonthlyResult) (own, comp []competitor
 		if units > 0 {
 			price = rev / float64(units)
 		}
+		brand := strings.TrimSpace(item.Brand)
+		if brand == "" {
+			brand = domain.InferBrandFromItemName(item.SKUName, item.Category)
+		}
 		c := competitorsuggest.SkuCandidate{
 			Barcode:    item.Barcode,
 			SKUName:    item.SKUName,
 			Category:   item.Category,
+			Supplier:   strings.TrimSpace(item.Supplier),
+			Brand:      brand,
 			UnitPrice:  price,
 			Units:      units,
 			IsOwnBrand: item.IsOwnBrand,

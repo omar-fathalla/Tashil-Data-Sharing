@@ -142,5 +142,16 @@ func TestAggregateCompetitiveMonthlyOwnSkusFromLiveMetadata(t *testing.T) {
 		if item.Barcode == "6221143099674" && item.IsOwnBrand {
 			t.Fatal("competitor marked as own")
 		}
+		if item.Barcode == "6221143099674" {
+			if item.Supplier != "هنكل" {
+				t.Fatalf("competitor supplier=%q want هنكل", item.Supplier)
+			}
+			if item.Brand == "" || item.Brand == "منافس" {
+				t.Fatalf("competitor brand must be inferred from SKU, got %q", item.Brand)
+			}
+			if !strings.Contains(item.Brand, "بريل") {
+				t.Fatalf("competitor brand=%q should contain بريل", item.Brand)
+			}
+		}
 	}
 }

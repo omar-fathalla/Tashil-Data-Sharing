@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -58,7 +59,7 @@ func seedCatalog() *memCatalog {
 				Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 90, Units: 3, NetRevenue: 270}},
 			},
 			{
-				Barcode: "COMP-GEL", SKUName: "منافس مسحوق جيل", Category: "مسحوق جيل اتوماتيك", IsOwnBrand: false,
+				Barcode: "COMP-GEL", SKUName: "أوكسى مسحوق جيل", Category: "مسحوق جيل اتوماتيك", IsOwnBrand: false,
 				Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 85, Units: 4, NetRevenue: 340}},
 			},
 		},
@@ -105,6 +106,13 @@ func TestCompetitorSuggestionsRunApproveRejectFlow(t *testing.T) {
 	pending := out["suggestions"].([]interface{})
 	if len(pending) == 0 {
 		t.Fatal("expected pending suggestions")
+	}
+	for _, raw := range pending {
+		row := raw.(map[string]interface{})
+		brand := strings.TrimSpace(fmt.Sprint(row["competitor_brand"]))
+		if brand == "" || brand == "منافس" {
+			t.Fatalf("suggestion %v missing real competitor_brand (got %q)", row["id"], brand)
+		}
 	}
 	// Pending must NOT appear as mappings yet.
 	_, mout := tmDo(t, mux, admin, "GET", "/api/v1/competitors/mappings?chain=fathalla", nil)
@@ -351,6 +359,49 @@ func TestCompetitorSuggestionsForSkuCacheAndGenerate(t *testing.T) {
 	_, mout := tmDo(t, mux, admin, "GET", "/api/v1/competitors/mappings", nil)
 	if mout["count"].(float64) != 0 {
 		t.Fatal("sku suggestions must not auto-write competitor_mappings")
+	}
+}
+
+func TestCompetitorSuggestionsBrandNotGenericCompetitor(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	cat := &memCatalog{res: bigquery.CompetitiveMonthlyResult{
+		Year: 2026, Months: []int{5},
+		Items: []bigquery.CompetitiveMonthlyItem{
+			{
+				Barcode: "OWN-GEL2", SKUName: "فيبا بلس اوكسي 3كجم", Category: "مساحيق جيل اتوماتيك",
+				IsOwnBrand: true,
+				Months:     []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 180, Units: 10, NetRevenue: 1800}},
+			},
+			{
+				Barcode: "COMP-OXI", SKUName: "أوكسى جيل اوتوماتيك نسيم العطور 3كجم",
+				Category: "مسحوق جيل اتوماتيك", Supplier: "هنكل", IsOwnBrand: false,
+				Months: []bigquery.CompetitiveMonthPoint{{MonthKey: "2026-05", Month: 5, UnitPrice: 150, Units: 8, NetRevenue: 1200}},
+			},
+		},
+	}}
+	h := NewCompetitorSuggestionsHandler(fs, fs, cat, &competitorsuggest.GeminiRanker{UseMock: true})
+	mux := suggestMux(h)
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+	rec, out := tmDo(t, mux, admin, "POST", "/api/v1/competitors/suggestions/sku", map[string]interface{}{
+		"barcode": "OWN-GEL2", "chain": "fathalla", "year": 2026,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("sku: %d %s", rec.Code, rec.Body.String())
+	}
+	sugs := out["suggestions"].([]interface{})
+	if len(sugs) == 0 {
+		t.Fatal("expected at least one suggestion")
+	}
+	for _, raw := range sugs {
+		row := raw.(map[string]interface{})
+		brand := strings.TrimSpace(fmt.Sprint(row["competitor_brand"]))
+		if brand == "" || brand == "منافس" {
+			t.Fatalf("want real brand, got %q for %v", brand, row["competitor_sku_name"])
+		}
+		if !strings.Contains(brand, "أوكسي") && !strings.Contains(brand, "أوكسى") {
+			// Mock ranker may pick the only candidate; brand must still be Oxi-derived.
+			t.Fatalf("brand=%q should resolve to أوكسي from SKU name", brand)
+		}
 	}
 }
 
