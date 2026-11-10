@@ -5,9 +5,9 @@
 # checks live in ci.yml / playwright_smoke.yml only.
 #
 # TODO(billing): TEMPORARY — ALL jobs (including await-ci) use Mac self-hosted until
-# GitHub billing is fixed. Single expression CI_RUNS_ON || ["self-hosted","tashil-mac"].
+# GitHub billing is fixed. Single expression CI_RUNS_ON || ["self-hosted","macOS","tashil-mac"].
 # Revert: restore await-ci to CI_HOSTED_RUNNER / ubuntu-latest (hybrid #56).
-# NEVER use GitHub-hosted macOS runners.
+# NEVER use GitHub-hosted macOS runners (macos-latest).
 # See docs/ci-self-hosted.md / #41 / #55 / #56.
 #
 # Note: tashil-mac … tashil-mac-4 share one physical Mac. Workflow concurrency queues
@@ -60,7 +60,7 @@ jobs:
   await-ci:
     name: Await CI tests
     if: github.event_name != 'merge_group' && github.ref == 'refs/heads/main'
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
@@ -115,7 +115,7 @@ jobs:
       group: tashil-deploy
       cancel-in-progress: false
     # TODO(billing): TEMP — same Mac expression as await-ci (was already Mac).
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # Observed ~4.5m; Cloud Run source deploy can spike — 30m ceiling.
     timeout-minutes: 30
     steps:
@@ -246,7 +246,7 @@ jobs:
       group: tashil-deploy
       cancel-in-progress: false
     # TODO(billing): TEMP — same Mac expression as await-ci (was already Mac).
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # Observed ~3m (flutter build + Firebase Hosting); 25m ceiling.
     timeout-minutes: 25
     steps:

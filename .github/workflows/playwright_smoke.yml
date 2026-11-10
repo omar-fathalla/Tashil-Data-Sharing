@@ -2,9 +2,9 @@ name: Playwright Semantics Smoke
 
 # TODO(billing): TEMPORARY — ALL jobs use Mac self-hosted until GitHub billing is
 # fixed (hosted jobs fail ~2s with runner_id=0 / payment failed). Single expression
-# CI_RUNS_ON || ["self-hosted","tashil-mac"]; revert by restoring hybrid
+# CI_RUNS_ON || ["self-hosted","macOS","tashil-mac"]; revert by restoring hybrid
 # CI_HOSTED_RUNNER (ubuntu-latest) for path detect / wait / gate.
-# NEVER use GitHub-hosted macOS runners.
+# NEVER use GitHub-hosted macOS runners (macos-latest).
 # Mac contention: smoke-run does NOT join a shared concurrency group (GitHub
 # pending-slot eviction cancels waiters). Queue natively on tashil-mac runners;
 # wait-ci-flutter still yields to same-SHA Flutter before smoke starts.
@@ -39,7 +39,7 @@ jobs:
   changes:
     name: Detect path changes
     # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 5
     outputs:
       smoke: ${{ steps.filter.outputs.smoke }}
@@ -69,7 +69,7 @@ jobs:
     name: Wait for CI Flutter before Mac smoke
     needs: changes
     if: always() && !cancelled() && needs.changes.result == 'success'
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 100
     outputs:
       run_smoke: ${{ steps.want.outputs.run }}
@@ -107,7 +107,7 @@ jobs:
     # No job concurrency group: pending-slot eviction cancels waiters. Native
     # runner queue never cancels. Cross-repo: MAC_SHARED_LOCK=1.
     # TODO(billing): TEMP — same Mac expression as light jobs (was already Mac).
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # Build web + Playwright (~15–25m healthy) + lock wait; acquire step < job.
     timeout-minutes: 45
     steps:
@@ -298,7 +298,7 @@ jobs:
     needs: [changes, wait-ci-flutter, smoke-run]
     if: always() && !cancelled()
     # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 5
     steps:
       - name: Evaluate smoke path filter / run result

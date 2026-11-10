@@ -4,12 +4,14 @@
 # fixed (hosted jobs fail ~2s with runner_id=0 / payment failed). Single expression
 # below; revert by restoring hybrid CI_HOSTED_RUNNER (ubuntu-latest) for light jobs
 # and CI_RUNS_ON only for heavy Flutter. See docs/ci-self-hosted.md.
-# TEMP default labels: ["self-hosted","tashil-mac"] (never macos-latest).
+# TEMP default labels: ["self-hosted","macOS","tashil-mac"] (never macos-latest).
 #
 # tashil-mac … tashil-mac-4 are four runners on one Mac — over-parallel heavy jobs
-# thrash Setup Node / flutter build. Heavy jobs queue natively on the runners (no
-# shared concurrency group — GitHub pending-slot eviction cancels the second waiter).
-# Deploys use tashil-deploy only. Prefer MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
+# thrash Setup Node / flutter build / go test. Heavy jobs queue natively on the
+# runners (no shared concurrency group — GitHub pending-slot eviction cancels the
+# second waiter). While all jobs are on Mac, test-flutter waits for test-backend so
+# go+emulator is not contended with Flutter. Deploys use tashil-deploy only.
+# Prefer MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
 #
 # merge_group: required checks must run in the GitHub merge queue. Deploy stays on
 # push-to-main only (see deploy.yml) — never on merge_group.
@@ -46,7 +48,7 @@ jobs:
   # Any .github/workflows/** change sets every filter true ("workflow changes run everything").
   changes:
     name: Detect path changes
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
@@ -87,7 +89,7 @@ jobs:
   guard-cloud-run-one-instance:
     needs: changes
     if: always() && !cancelled() && needs.changes.result == 'success'
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 5
     steps:
       - name: Path filter
@@ -111,7 +113,7 @@ jobs:
     needs: [changes, guard-cloud-run-one-instance]
     if: always() && !cancelled()
     # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 5
     steps:
       - name: Evaluate pin path filter / run result
@@ -150,9 +152,11 @@ jobs:
   test-backend:
     needs: changes
     if: always() && !cancelled() && needs.changes.result == 'success'
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
-    # ~20m class with emulator headroom (observed github-hosted go ~6m).
-    timeout-minutes: 25
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    # Mac TEMP (#95): observed ~22.5m job / ~19m go test when sharing the Mac with
+    # Flutter/smoke (hosted go alone ~6m). 40m gives headroom under contention;
+    # test-flutter is serialized after this job while billing forces Mac-only.
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: backend-go
@@ -321,7 +325,7 @@ jobs:
     needs: [changes, test-backend]
     if: always() && !cancelled()
     # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 5
     steps:
       - name: Evaluate backend path filter / run result
@@ -361,10 +365,13 @@ jobs:
     # No job concurrency group: GitHub keeps only one pending slot per group and
     # cancels the rest (pending-slot eviction). Let the 4 tashil-mac runners queue
     # natively instead. Cross-repo: MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
-    needs: changes
-    if: needs.changes.outputs.flutter == 'true'
+    # TODO(billing): TEMP — wait for test-backend so go test / Flutter don't thrash
+    # the one physical Mac (MAC_SHARED_LOCK was unset on #95; go alone ~19m).
+    # Revert needs to `changes` when light jobs return to hosted ubuntu.
+    needs: [changes, test-backend]
+    if: needs.changes.outputs.flutter == 'true' && needs.test-backend.result == 'success'
     # TODO(billing): TEMP — same Mac expression as light jobs (was already Mac).
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     # 35m: up to 8m lock wait + pub/analyze/test (20m was too tight with lock).
     timeout-minutes: 35
     defaults:
@@ -466,10 +473,10 @@ jobs:
   # Required-check gate: always reports "Flutter analyze & test" (success on path skip).
   test-flutter-gate:
     name: Flutter analyze & test
-    needs: [changes, test-flutter]
+    needs: [changes, test-backend, test-flutter]
     if: always() && !cancelled()
     # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 5
     steps:
       - name: Evaluate Flutter path filter / run result
@@ -489,7 +496,8 @@ jobs:
             exit 0
           fi
           result="${{ needs.test-flutter.result }}"
-          echo "test-flutter result=${result}"
+          backend_result="${{ needs.test-backend.result }}"
+          echo "test-flutter result=${result} test-backend result=${backend_result}"
           if [[ "${result}" == "abandoned" ]]; then
             echo "::error::test-flutter was abandoned (never ran). abandoned ≠ success. Re-run all jobs."
             exit 1
@@ -499,6 +507,11 @@ jobs:
             exit 1
           fi
           if [[ "${result}" == "skipped" ]]; then
+            # TEMP serialize: Flutter is not scheduled when test-backend did not succeed.
+            if [[ "${backend_result}" != "success" ]]; then
+              echo "Skipped — test-backend result=${backend_result} (Flutter not scheduled; see Backend Go tests)"
+              exit 0
+            fi
             echo "::error::test-flutter was skipped but flutter path filter was true."
             exit 1
           fi
@@ -509,7 +522,7 @@ jobs:
     needs: [test-backend, test-flutter]
     if: always() && github.event_name == 'pull_request' && (needs.test-backend.result == 'failure' || needs.test-flutter.result == 'failure')
     # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
     timeout-minutes: 5
     steps:
       - name: Post failure comment
