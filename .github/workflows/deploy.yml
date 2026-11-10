@@ -1,12 +1,17 @@
-# Production deploy on every push to main (backend → Cloud Run, web → Firebase Hosting).
+# Production deploy after CI tests succeed on main (backend → Cloud Run, web → Firebase Hosting).
 #
-# Intentionally NO merge_group trigger: one deploy per merged PR via push to main after CI
-# (await-ci → deploy-backend → deploy-web → livez/health smoke). Merge-queue required
-# checks live in ci.yml / playwright_smoke.yml only.
+# Trigger: workflow_run of "CI tests" completed successfully on main (no runner busy-wait).
+# Also workflow_dispatch for manual redeploys. Intentionally NO merge_group / push trigger —
+# one deploy per green main CI run. Merge-queue required checks live in ci.yml /
+# playwright_smoke.yml only.
 #
-# TODO(billing): TEMPORARY — ALL jobs (including await-ci) use Mac self-hosted until
-# GitHub billing is fixed. Single expression CI_RUNS_ON || ["self-hosted","tashil-mac"].
-# Revert: restore await-ci to CI_HOSTED_RUNNER / ubuntu-latest (hybrid #56).
+# Why not push + await-ci: after #95 routed all jobs to tashil-mac, await-ci busy-waited
+# ~2.5h on a Mac runner while CI gate jobs queued behind it (deadlock). workflow_run
+# waits in GitHub's event bus — zero runner minutes held.
+#
+# TODO(billing): TEMPORARY — ALL jobs use Mac self-hosted until GitHub billing is fixed.
+# Single expression CI_RUNS_ON || ["self-hosted","tashil-mac"].
+# Revert: restore light/gate jobs to CI_HOSTED_RUNNER / ubuntu-latest (hybrid #56).
 # NEVER use GitHub-hosted macOS runners.
 # See docs/ci-self-hosted.md / #41 / #55 / #56.
 #
@@ -18,8 +23,11 @@
 # Auth: Workload Identity Federation, no JSON keys. The provider only accepts tokens from
 # omar-fathalla/Tashil-Data-Sharing on refs/heads/main, impersonating tashil-gh-deployer.
 #
-# Tests: do not duplicate ci.yml go/flutter on Mac — await-ci waits for CI tests green.
+# Tests: do not duplicate ci.yml go/flutter on Mac — workflow_run only fires after CI green.
 # Smoke: hard-fail /api/v1/version + /livez + /api/v1/health (public probes; not /healthz).
+#
+# Skip: deploy-gate ignores docs/md/LICENSE/.gitignore and .github/workflows/** so CI-only
+# workflow edits (and docs-only pushes) do not deploy. workflow_run cannot use paths-ignore.
 #
 # Web version: CI never commits back to main (that would re-trigger this workflow). The version
 # shown in the sidebar is computed as  <tashil_web/deploy_version.txt> + <github.run_number>,
@@ -27,13 +35,10 @@
 name: Deploy production
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI tests"]
+    types: [completed]
     branches: [main]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "LICENSE"
-      - ".gitignore"
   workflow_dispatch:
 
 # One deploy queue for this workflow; never cancel an in-flight production deploy (#55).
@@ -55,74 +60,106 @@ env:
   FLUTTER_VERSION: "3.41.2"
 
 jobs:
-  # Await CI gate (#41). TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
-  # Guard: never schedule on non-main pushes; merge_group is not in workflow `on:` either.
-  await-ci:
-    name: Await CI tests
-    if: github.event_name != 'merge_group' && github.ref == 'refs/heads/main'
+  # Tiny gate: confirm CI success context + skip ignored paths. No busy-wait.
+  # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
+  deploy-gate:
+    name: Deploy gate
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
-    timeout-minutes: 240
+    timeout-minutes: 5
+    outputs:
+      should_deploy: ${{ steps.decide.outputs.should_deploy }}
+      sha: ${{ steps.decide.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # workflow_run: deploy the CI-green commit, not whatever tip holds this YAML.
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
 
-      - name: Deploy backend smoke unit test
-        run: |
-          chmod +x scripts/deploy_backend_smoke.sh scripts/deploy_backend_smoke_test.sh
-          bash scripts/deploy_backend_smoke_test.sh
-
-      - name: Wait for CI tests workflow success
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SHA: ${{ github.sha }}
+      - name: Decide whether to deploy
+        id: decide
         run: |
           set -euo pipefail
-          echo "Waiting for workflow 'CI tests' success on ${SHA}"
-          deadline=$((SECONDS + 220 * 60))
-          while (( SECONDS < deadline )); do
-            conclusion="$(gh run list \
-              --repo "${{ github.repository }}" \
-              --workflow "ci.yml" \
-              --commit "$SHA" \
-              --json databaseId,conclusion,status,event \
-              --limit 20 \
-              --jq '[.[] | select(.status == "completed")] | .[0].conclusion // empty')"
-            if [ -n "${conclusion}" ]; then
-              echo "CI tests conclusion=${conclusion}"
-              if [ "${conclusion}" = "success" ]; then
-                exit 0
-              fi
-              echo "::error::CI tests finished with conclusion=${conclusion}; refusing deploy"
-              exit 1
-            fi
-            status="$(gh run list \
-              --repo "${{ github.repository }}" \
-              --workflow "ci.yml" \
-              --commit "$SHA" \
-              --json status \
-              --limit 5 \
-              --jq '[.[].status] | join(",")')"
-            echo "No completed CI run yet (status=${status:-none}); sleeping 60s"
-            sleep 60
-          done
-          echo "::error::Timed out waiting for CI tests on ${SHA}"
-          exit 1
+          SHA="$(git rev-parse HEAD)"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "Resolved deploy SHA=${SHA}"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+            echo "workflow_dispatch: always deploy"
+            exit 0
+          fi
+
+          # Mirror former push paths-ignore + .github/workflows/** (workflow_run has no paths filter).
+          # Avoid mapfile — macOS /bin/bash is 3.2.
+          if git rev-parse --verify -q HEAD^ >/dev/null; then
+            file_list="$(git diff --name-only --diff-filter=ACDMRTUXB HEAD^ HEAD)"
+          else
+            file_list="$(git ls-tree -r --name-only HEAD)"
+          fi
+
+          if [ -z "${file_list}" ]; then
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            echo "No changed files vs parent; skipping deploy"
+            exit 0
+          fi
+
+          should_deploy=false
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              LICENSE|.gitignore) continue ;;
+            esac
+            case "$f" in
+              *.md|docs/*|.github/workflows/*) continue ;;
+            esac
+            should_deploy=true
+            break
+          done < <(printf '%s\n' "${file_list}")
+
+          echo "should_deploy=${should_deploy}" >> "$GITHUB_OUTPUT"
+          if [ "${should_deploy}" = "true" ]; then
+            echo "Non-ignored paths changed; proceed with deploy"
+            printf 'Changed files:\n%s\n' "${file_list}"
+          else
+            echo "Only ignored paths changed (docs/md/LICENSE/.gitignore/.github/workflows); skipping deploy"
+            printf 'Ignored files:\n%s\n' "${file_list}"
+          fi
 
   deploy-backend:
-    needs: [await-ci]
+    needs: [deploy-gate]
+    if: needs.deploy-gate.outputs.should_deploy == 'true'
     # Stay on Mac/self-hosted where gcloud WIF + toolchains work (#41 / #55 / #56).
     # Deploy-only concurrency (not shared with Flutter/smoke). Never cancel.
     concurrency:
       group: tashil-deploy
       cancel-in-progress: false
-    # TODO(billing): TEMP — same Mac expression as await-ci (was already Mac).
+    # TODO(billing): TEMP — same Mac expression as other jobs (was already Mac).
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
     # Observed ~4.5m; Cloud Run source deploy can spike — 30m ceiling.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
-          # Need the previous commit to decide whether backend sources changed.
+          ref: ${{ needs.deploy-gate.outputs.sha }}
+          # Need history to decide whether backend sources changed vs live.
           fetch-depth: 0
+
+      - name: Pin deploy SHA
+        run: |
+          set -euo pipefail
+          echo "DEPLOY_SHA=${{ needs.deploy-gate.outputs.sha }}" >> "$GITHUB_ENV"
+          echo "Deploying commit ${{ needs.deploy-gate.outputs.sha }}"
+
+      - name: Deploy backend smoke unit test
+        run: |
+          chmod +x scripts/deploy_backend_smoke.sh scripts/deploy_backend_smoke_test.sh
+          bash scripts/deploy_backend_smoke_test.sh
 
       - name: Per-runner toolchain env
         run: bash scripts/ci_runner_env.sh
@@ -157,9 +194,9 @@ jobs:
             echo "Could not read live /api/v1/version git_commit (empty/malformed/unreachable); redeploying backend"
             exit 0
           fi
-          if [ "${live_commit}" = "${GITHUB_SHA}" ]; then
+          if [ "${live_commit}" = "${DEPLOY_SHA}" ]; then
             echo "deploy=false" >> "$GITHUB_OUTPUT"
-            echo "Live backend already on ${GITHUB_SHA:0:7}; skipping Cloud Run deploy"
+            echo "Live backend already on ${DEPLOY_SHA:0:7}; skipping Cloud Run deploy"
             exit 0
           fi
           if ! git cat-file -e "${live_commit}^{commit}" 2>/dev/null; then
@@ -167,7 +204,7 @@ jobs:
             echo "Live commit ${live_commit:0:7} not in history; redeploying backend"
             exit 0
           fi
-          if git diff --quiet "${live_commit}" "${GITHUB_SHA}" -- backend-go/ .github/workflows/deploy.yml; then
+          if git diff --quiet "${live_commit}" "${DEPLOY_SHA}" -- backend-go/ .github/workflows/deploy.yml; then
             echo "deploy=false" >> "$GITHUB_OUTPUT"
             echo "backend-go/ and deploy.yml unchanged vs live ${live_commit:0:7}; skipping Cloud Run deploy"
           else
@@ -211,7 +248,7 @@ jobs:
 
       - name: Record git commit for /api/v1/version
         if: steps.backend_paths.outputs.deploy == 'true'
-        run: echo "${GITHUB_SHA}" > backend-go/data/build_commit.txt
+        run: echo "${DEPLOY_SHA}" > backend-go/data/build_commit.txt
 
       - name: Deploy to Cloud Run (from source, existing settings and env vars are kept)
         if: steps.backend_paths.outputs.deploy == 'true'
@@ -241,16 +278,23 @@ jobs:
         run: echo "Skipped Cloud Run deploy (web-only / non-backend change)." >> "$GITHUB_STEP_SUMMARY"
 
   deploy-web:
-    needs: [deploy-backend]
+    needs: [deploy-gate, deploy-backend]
     concurrency:
       group: tashil-deploy
       cancel-in-progress: false
-    # TODO(billing): TEMP — same Mac expression as await-ci (was already Mac).
+    # TODO(billing): TEMP — same Mac expression as other jobs (was already Mac).
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
-    # Observed ~3m (flutter build + Firebase Hosting); 25m ceiling.
-    timeout-minutes: 25
+    # Observed ~3m (flutter build + Firebase Hosting); 30m ceiling (Mac timeout policy).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.deploy-gate.outputs.sha }}
+
+      - name: Pin deploy SHA
+        run: |
+          set -euo pipefail
+          echo "DEPLOY_SHA=${{ needs.deploy-gate.outputs.sha }}" >> "$GITHUB_ENV"
 
       - name: Per-runner toolchain env
         run: bash scripts/ci_runner_env.sh
@@ -305,4 +349,4 @@ jobs:
         run: npx --yes firebase-tools@14 deploy --only hosting --project "$PROJECT_ID" --non-interactive
 
       - name: Summary
-        run: echo "Deployed web v${{ steps.ver.outputs.version }} (commit ${GITHUB_SHA::7})" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "Deployed web v${{ steps.ver.outputs.version }} (commit ${DEPLOY_SHA::7})" >> "$GITHUB_STEP_SUMMARY"

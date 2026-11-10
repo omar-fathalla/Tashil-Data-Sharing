@@ -4,9 +4,9 @@ CI uses a **hybrid runner split**:
 
 | Class | Jobs | Runner var | Default |
 |-------|------|------------|---------|
-| Light / fast | Go tests, path detect, Cloud Run pin, Flutter/smoke gates, deploy `test-*` | `CI_HOSTED_RUNNER` | `ubuntu-latest` (GitHub-hosted) |
-| Heavy | Flutter analyze/test (35m), Playwright smoke | `CI_RUNS_ON` | `["self-hosted","macOS","tashil-mac"]` |
-| Deploy | `deploy-backend` / `deploy-web` | `CI_RUNS_ON` | Mac (gcloud WIF / toolchains) |
+| Light / fast | Go tests, path detect, Cloud Run pin, Flutter/smoke gates, deploy gate | `CI_HOSTED_RUNNER` | `ubuntu-latest` (GitHub-hosted) |
+| Heavy | Flutter analyze/test (≤45m), Playwright smoke (≤45m) | `CI_RUNS_ON` | `["self-hosted","macOS","tashil-mac"]` |
+| Deploy | `deploy-backend` / `deploy-web` (≤30m) | `CI_RUNS_ON` | Mac (gcloud WIF / toolchains) |
 
 **Never** use GitHub-hosted macOS runners (`macos-latest`) — they are expensive.
 `deploy.yml` keeps `cancel-in-progress: false` so production deploys are never
@@ -34,7 +34,7 @@ dedicated / single-runner:
 
 | Lever | What it does | Who sets it |
 |-------|--------------|-------------|
-| **Hosted light gates** | Path detect, Cloud Run pin, Backend Go, Flutter/smoke gates, deploy `await-ci` stay on `CI_HOSTED_RUNNER` (default `ubuntu-latest`) so they never compete for Mac CPU/disk | Already in workflows — leave `CI_HOSTED_RUNNER` unset (or `"ubuntu-latest"`). **Do not** point it at Mac unless GitHub minutes are exhausted |
+| **Hosted light gates** | Path detect, Cloud Run pin, Backend Go, Flutter/smoke gates, deploy `deploy-gate` stay on `CI_HOSTED_RUNNER` (default `ubuntu-latest`) so they never compete for Mac CPU/disk | Already in workflows — leave `CI_HOSTED_RUNNER` unset (or `"ubuntu-latest"`). **Do not** point it at Mac unless GitHub minutes are exhausted |
 | **Native Mac runner queue** | `test-flutter` / `smoke-run` have **no** shared job concurrency group — the 4 `tashil-mac` runners queue them (runner queue never cancels). Avoids GitHub pending-slot eviction | Wired in workflows (this repo) |
 | **Job group `tashil-deploy`** | Deploy-only: `deploy-backend` / `deploy-web` serialize one-at-a-time (`cancel-in-progress: false`). Not shared with PR/test jobs | Wired in `deploy.yml` |
 | **`MAC_SHARED_LOCK=1`** | Cross-repo directory lock (`~/mac-resources/LOCK.d`) so other bots/repos on the same Mac serialize with our heavies | Repo variable (Actions → Variables) |
@@ -153,10 +153,12 @@ bash scripts/mac_lock_ci.sh release "$AGENT"
 
 | Job | Job concurrency? | Lock when `MAC_SHARED_LOCK=1`? | acquire step timeout | job timeout |
 |-----|-------------------|-------------------------------|----------------------|-------------|
-| Backend Go (+ emulator) | no (hosted by default) | yes (no-op on ubuntu) | 10m | 25m |
-| Flutter analyze & test (run) | no (native Mac queue) | yes | 8m | 35m |
+| Backend Go (+ emulator) | no (hosted by default) | yes (no-op on ubuntu) | 10m | 45m |
+| Flutter analyze & test (run) | no (native Mac queue) | yes | 8m | 45m |
 | Playwright Semantics smoke (run) | no (native Mac queue) | yes | 15m | 45m |
-| Deploy backend / web | **`tashil-deploy`** | no (deploy group + workflow queue) | — | 30m / 25m |
+| Wait CI Flutter (smoke) | no | **no** (poll only) | — | 45m (deadline 40m) |
+| Deploy gate | no | **no** | — | 5m |
+| Deploy backend / web | **`tashil-deploy`** | no (deploy group + workflow queue) | — | 30m / 30m |
 | Cloud Run pin / PR comment / path detect & gates | no | **no** | — | 5m (hosted via `CI_HOSTED_RUNNER`) |
 
 Path filters (`dorny/paths-filter`): no workflow-level `paths-ignore` — workflows always
@@ -178,8 +180,9 @@ so docs-only PRs do not spin a Mac runner. `test-flutter` keeps its job-level pa
 `abandoned` on failed-only re-runs).
 
 **Merge queue:** `ci.yml` and `playwright_smoke.yml` listen for `merge_group` so
-required checks run in the queue. `deploy.yml` does **not** — production stays
-one-deploy-per-merged-PR via `push` to `main` (`await-ci` → deploy → livez/health).
+required checks run in the queue. `deploy.yml` does **not** — production deploys
+via `workflow_run` after **CI tests** succeeds on `main` (`deploy-gate` →
+deploy → livez/health). No runner busy-wait.
 
 Self-hosted Flutter: prefer `$HOME/toolchains/flutter` (`scripts/ci_detect_flutter.sh`);
 **fail fast** if missing — never download via `flutter-action` on Mac. `PUB_CACHE` is
@@ -299,16 +302,39 @@ quotes) is **not** valid — use `"ubuntu-latest"` or leave the var unset.
 On Linux fallback, Playwright installs with `npx playwright install --with-deps chromium`.
 Emulator isolation scripts still probe free ports (safe on ubuntu-latest too).
 
+## Job timeout policy (Mac runners)
+
+Four `tashil-mac*` runners share one physical Mac. A job that busy-waits for hours
+holds a runner slot and deadlocks the queue (seen: deploy `await-ci` ~2.5h after
+#95 routed all jobs to Mac). **Every job must set `timeout-minutes`:**
+
+| Class | Jobs | `timeout-minutes` |
+|-------|------|-------------------|
+| Path detect + gates | `changes`, `*-gate`, Cloud Run pin, PR comment, deploy `deploy-gate`, smoke gate | **5** |
+| Test / heavy | `test-backend`, `test-flutter`, `smoke-run`, `wait-ci-flutter` | **~45** (`test-backend` ≥40 per #96 headroom) |
+| Deploy | `deploy-backend`, `deploy-web` | **30** |
+
+Never use multi-hour timeouts for polling. Prefer event triggers (`workflow_run`)
+over sleep-loops on Mac.
+
 ## Production deploy (`deploy.yml`)
 
-Hybrid (#56) + await-ci (#41). Concurrency `group: ${{ github.workflow }}` with
-`cancel-in-progress: false` (#55).
+Hybrid (#56) + **workflow_run** (replaces await-ci busy-wait from #41). Concurrency
+`group: ${{ github.workflow }}` with `cancel-in-progress: false` (#55).
+
+**Triggers:** `workflow_run` of workflow name `CI tests` / `types: [completed]` /
+`branches: [main]` (jobs require `conclusion == success`), plus `workflow_dispatch`.
+No `push` trigger — avoids scheduling deploy beside CI on the same Mac pool.
+
+**Path skip:** `workflow_run` cannot use `paths-ignore`. `deploy-gate` skips when the
+CI-green commit only touched `**.md`, `docs/**`, `LICENSE`, `.gitignore`, or
+`.github/workflows/**` (CI-only workflow edits must not deploy).
 
 | Job | Runner | Notes |
 |-----|--------|-------|
-| `await-ci` | `CI_HOSTED_RUNNER` (ubuntu) | `if: github.ref == 'refs/heads/main'`; waits for `ci.yml` success; runs smoke unit test — **no** `test-backend` / `test-web` Mac duplicate |
-| `deploy-backend` | `CI_RUNS_ON` (Mac) | job concurrency `tashil-deploy` (`cancel-in-progress: false`); gcloud WIF; `CLOUDSDK_CONFIG` under `$RUNNER_TEMP`; hard-fail smoke `/api/v1/version` + `/livez` + `/api/v1/health`; timeout 30m |
-| `deploy-web` | `CI_RUNS_ON` (Mac) | same `tashil-deploy` group; Flutter detect/require-preinstalled; gcloud isolation; timeout 25m |
+| `deploy-gate` | `CI_RUNS_ON` (Mac while TODO billing) | 5m; success-only `workflow_run` / always on dispatch; path skip; outputs `sha` + `should_deploy` — **no** polling |
+| `deploy-backend` | `CI_RUNS_ON` (Mac) | job concurrency `tashil-deploy` (`cancel-in-progress: false`); checks out gate SHA; smoke unit test; gcloud WIF; `CLOUDSDK_CONFIG` under `$RUNNER_TEMP`; hard-fail smoke `/api/v1/version` + `/livez` + `/api/v1/health`; timeout 30m; `--max-instances=1` unchanged |
+| `deploy-web` | `CI_RUNS_ON` (Mac) | same `tashil-deploy` group; Flutter detect/require-preinstalled; gcloud isolation; timeout 30m |
 
 ## Check / restart / re-register runners
 

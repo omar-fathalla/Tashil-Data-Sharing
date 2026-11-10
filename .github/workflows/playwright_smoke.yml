@@ -70,7 +70,8 @@ jobs:
     needs: changes
     if: always() && !cancelled() && needs.changes.result == 'success'
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
-    timeout-minutes: 100
+    # Mac timeout policy: never hold a runner for hours (was 100m busy-wait).
+    timeout-minutes: 45
     outputs:
       run_smoke: ${{ steps.want.outputs.run }}
     steps:
@@ -90,7 +91,7 @@ jobs:
         if: steps.want.outputs.run == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          WAIT_CI_FLUTTER_DEADLINE_MIN: "90"
+          WAIT_CI_FLUTTER_DEADLINE_MIN: "40"
           # PR workflows use a virtual merge GITHUB_SHA; CI runs are on the head tip.
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
