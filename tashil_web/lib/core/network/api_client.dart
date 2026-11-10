@@ -11512,9 +11512,12 @@ class ApiClient {
 
     final mergedMonths = months.toList()..sort();
     lastCompetitiveMonths = mergedMonths;
-    lastCompetitiveByBarcode = Map.unmodifiable(
-      byBarcode.map((k, v) => MapEntry(k, Map.unmodifiable(v))),
-    );
+    // Typed shallow copies — nested Map.unmodifiable widens to
+    // UnmodifiableMapView<dynamic, dynamic> and breaks record value casts.
+    lastCompetitiveByBarcode = {
+      for (final e in byBarcode.entries)
+        e.key: Map<String, ({double price, int units})>.of(e.value),
+    };
     return (
       byBarcode: byBarcode,
       metaByBarcode: metaByBarcode,
