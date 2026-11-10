@@ -21,9 +21,13 @@ void main() {
       expect(darkTheme.useMaterial3, isTrue);
     });
 
-    testWidgets('Single Seed Generation for Adeco Brand', (WidgetTester tester) async {
+    testWidgets('Single Seed Generation for Adeco Brand Green #35A211', (WidgetTester tester) async {
       final theme = AppTheme.light(seedColor: TenantBrandSeeds.adecoSeed);
-      expect(theme.colorScheme.primary, isNotNull);
+      expect(TenantBrandSeeds.brandGreen, const Color(0xFF35A211));
+      expect(TenantBrandSeeds.adecoSeed, TenantBrandSeeds.brandGreen);
+      expect(TenantBrandSeeds.adminSeed, TenantBrandSeeds.brandGreen);
+      // Fidelity keeps primary close to the seed (not forced blue).
+      expect(theme.colorScheme.primary.toARGB32() & 0x00FFFFFF, isNot(0x001565C0));
       expect(theme.colorScheme.surfaceContainerLow, isNotNull);
       expect(theme.colorScheme.surfaceContainer, isNotNull);
       expect(theme.colorScheme.surfaceContainerHigh, isNotNull);
@@ -31,14 +35,18 @@ void main() {
     });
 
     test('Tenant Seed Resolution', () {
-      expect(TenantBrandSeeds.getSeedForTenant('adeco'), TenantBrandSeeds.adecoSeed);
+      expect(TenantBrandSeeds.getSeedForTenant('adeco'), TenantBrandSeeds.brandGreen);
+      expect(TenantBrandSeeds.getSeedForTenant('admin'), TenantBrandSeeds.brandGreen);
+      expect(TenantBrandSeeds.parseHexColor('#1565C0'), TenantBrandSeeds.brandGreen);
       expect(TenantBrandSeeds.getSeedForTenant('unilever'), TenantBrandSeeds.unileverSeed);
       expect(TenantBrandSeeds.getSeedForTenant('pepsi'), TenantBrandSeeds.pepsiSeed);
     });
 
     test('8dp Baseline Spacing Scale Consistency', () {
+      expect(M3Spacing.s2, 2.0);
       expect(M3Spacing.xxs, 4.0);
       expect(M3Spacing.xs, 8.0);
+      expect(M3Spacing.s12, 12.0);
       expect(M3Spacing.sm, 16.0);
       expect(M3Spacing.md, 24.0);
       expect(M3Spacing.lg, 32.0);
@@ -85,8 +93,35 @@ void main() {
       expect(M3Shape.sm, 8.0);
       expect(M3Shape.md, 12.0);
       expect(M3Shape.lg, 16.0);
+      expect(M3Shape.largeIncreased, 20.0);
       expect(M3Shape.xl, 28.0);
+      expect(M3Shape.extraLargeIncreased, 32.0);
+      expect(M3Shape.extraExtraLarge, 48.0);
       expect(M3Shape.full, 999.0);
+    });
+
+    testWidgets('Official type scale + restored state layers + segmented secondary', (tester) async {
+      final theme = AppTheme.light();
+      expect(theme.textTheme.displayLarge?.fontSize, 57.0);
+      expect(theme.textTheme.headlineLarge?.fontSize, 32.0);
+      expect(theme.textTheme.titleLarge?.fontSize, 22.0);
+      expect(theme.textTheme.bodyLarge?.fontSize, 16.0);
+      expect(theme.textTheme.bodyMedium?.fontSize, 14.0);
+      expect(theme.visualDensity, VisualDensity.standard);
+      expect(theme.materialTapTargetSize, MaterialTapTargetSize.padded);
+      expect(theme.focusColor, isNot(Colors.transparent));
+      expect(theme.splashColor, isNot(Colors.transparent));
+      expect(theme.dataTableTheme.dataRowMinHeight, 48.0);
+      expect(theme.tabBarTheme.labelColor, theme.colorScheme.primary);
+      expect(
+        theme.navigationBarTheme.labelTextStyle
+            ?.resolve({WidgetState.selected})
+            ?.color,
+        theme.colorScheme.secondary,
+      );
+      final selectedBg = theme.segmentedButtonTheme.style?.backgroundColor
+          ?.resolve({WidgetState.selected});
+      expect(selectedBg, theme.colorScheme.secondaryContainer);
     });
 
     testWidgets('Status/chart ThemeExtension and full component themes', (tester) async {

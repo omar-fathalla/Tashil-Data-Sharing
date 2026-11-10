@@ -5,11 +5,17 @@ import 'package:flutter/widgets.dart';
 class M3Spacing {
   M3Spacing._();
 
+  /// 2.0dp - Connected button-group internal gap
+  static const double s2 = 2.0;
+
   /// 4.0dp - Micro alignment (badges, icon offsets, compact labels)
   static const double xxs = 4.0;
 
   /// 8.0dp - Tight spacing (compact list items, chip margins)
   static const double xs = 8.0;
+
+  /// 12.0dp - Standard M3 button-group between-space
+  static const double s12 = 12.0;
 
   /// 16.0dp - Standard card padding, compact grid gutter
   static const double sm = 16.0;

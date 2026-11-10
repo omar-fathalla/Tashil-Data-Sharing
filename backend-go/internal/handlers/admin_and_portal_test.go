@@ -36,8 +36,8 @@ func TestPortalMetaEndpoint(t *testing.T) {
 	if meta.Slug != "adeco" {
 		t.Errorf("expected slug adeco, got %s", meta.Slug)
 	}
-	if meta.BrandSeedColor != "#1E3A8A" {
-		t.Errorf("expected seed color #1E3A8A, got %s", meta.BrandSeedColor)
+	if meta.BrandSeedColor != "#35A211" {
+		t.Errorf("expected seed color #35A211, got %s", meta.BrandSeedColor)
 	}
 
 	// 2. Non-existent slug returns 404

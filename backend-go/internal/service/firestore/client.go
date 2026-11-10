@@ -695,7 +695,7 @@ func (c *Client) seedMetadata() {
 		ID:           "tenant-adeco",
 		Name:         "أديكو للصناعات الغذائية (Adeco)",
 		Code:         "adeco",
-		SeedColorHex: "#1E3A8A", // Deep Navy Blue
+		SeedColorHex: "#35A211", // ADCO logo green
 		Currency:     "EGP",
 		CreatedAt:    now.AddDate(0, -6, 0),
 	}
@@ -722,7 +722,7 @@ func (c *Client) seedMetadata() {
 		DisplayName:    "شركة أديكو للصناعات الغذائية (Adeco)",
 		Slug:           "adeco",
 		PortalURL:      "http://localhost:3000/portal/adeco",
-		BrandSeedColor: "#1E3A8A",
+		BrandSeedColor: "#35A211",
 		LogoURL:        "https://images.unsplash.com/photo-1542838132-92c53300491e?w=128&auto=format&fit=crop",
 		AdminEmail:     "admin@adeco-retail.com",
 		ActiveChains:   []string{"carrefour", "fathalla", "gomla"},

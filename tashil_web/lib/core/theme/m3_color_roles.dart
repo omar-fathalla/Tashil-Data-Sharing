@@ -22,14 +22,19 @@ extension M3ColorRolesExtension on ColorScheme {
 class TenantBrandSeeds {
   TenantBrandSeeds._();
 
-  /// Official Google Material Design 3 Standard Contrast Primary Blue (#1565C0)
+  /// Adeco / ADCO official brand green sampled from
+  /// https://www.adcoegypt.com/images/logo.png — dominant RGB(53,162,17).
+  static const Color brandGreen = Color(0xFF35A211);
+
+  /// Legacy M3 blue kept only for historical docs / migration notes.
+  @Deprecated('Use brandGreen for Adeco/admin; blue is no longer the platform seed')
   static const Color m3DefaultBlue = Color(0xFF1565C0);
 
-  /// Super Admin Platform - Material 3 Blue
-  static const Color adminSeed = Color(0xFF1565C0);
+  /// Super Admin Platform — same brand green as Adeco portal.
+  static const Color adminSeed = brandGreen;
 
-  /// Adeco (أديكو للصناعات المتطورة) - Material 3 Standard Contrast Blue
-  static const Color adecoSeed = Color(0xFF1565C0);
+  /// Adeco (شركة الاسكندرية للكيماويات و المنظفات / ADCO) — official logo green.
+  static const Color adecoSeed = brandGreen;
 
   /// Unilever (يونيليفر مشرق) - Dynamic Teal
   static const Color unileverSeed = Color(0xFF0D9488);
@@ -40,30 +45,23 @@ class TenantBrandSeeds {
   /// In-memory cache for provisioned tenant colors
   static final Map<String, Color> _dynamicSeeds = {};
 
-  static bool isDefaultBlueSeed(Color color) {
-    final v = color.toARGB32();
-    return v == 0xFF1565C0 || v == 0xFF0B57D0 || v == 0xFF1E3A8A;
-  }
-
-  /// Registers a custom brand color for a provisioned tenant
+  /// Registers a custom brand color for a provisioned tenant.
   static void registerTenantSeed(String slug, Color color) {
     final cleanSlug = slug.toLowerCase().replaceAll('tenant-', '');
-    if (cleanSlug == 'adeco' ||
-        cleanSlug == 'admin' ||
-        cleanSlug == 'system' ||
-        isDefaultBlueSeed(color)) {
-      _dynamicSeeds[cleanSlug] = m3DefaultBlue;
+    if (cleanSlug == 'adeco' || cleanSlug == 'admin' || cleanSlug == 'system') {
+      _dynamicSeeds[cleanSlug] = brandGreen;
       return;
     }
     _dynamicSeeds[cleanSlug] = color;
   }
 
-  /// Parses a hex color string like '#1E3A8A' or '1E3A8A' into a Flutter Color
+  /// Parses a hex color string like '#35A211' or '35A211' into a Flutter Color.
+  /// Legacy Adeco blues (#1565C0 / #0B57D0 / #1E3A8A) map to [brandGreen].
   static Color? parseHexColor(String? hex) {
     if (hex == null || hex.isEmpty) return null;
     var cleaned = hex.replaceAll('#', '').trim().toUpperCase();
     if (cleaned == '1E3A8A' || cleaned == '0B57D0' || cleaned == '1565C0') {
-      return m3DefaultBlue;
+      return brandGreen;
     }
     if (cleaned.length == 6) {
       cleaned = 'FF$cleaned';
@@ -83,7 +81,7 @@ class TenantBrandSeeds {
         code == 'superadmin' ||
         code == 'company' ||
         code == 'portal') {
-      return m3DefaultBlue;
+      return brandGreen;
     }
 
     if (hexOverride != null && hexOverride.isNotEmpty) {

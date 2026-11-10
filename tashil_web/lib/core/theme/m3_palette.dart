@@ -8,13 +8,14 @@ import 'package:flutter/material.dart';
 /// literals here removes raw `Color(0x..)` from feature code.
 abstract final class M3Palette {
   // Status (strong)
-  static const Color success = Color(0xFF15803D);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color emeraldDeep = Color(0xFF059669);
-  static const Color warning = Color(0xFFD97706);
-  static const Color warningAccent = Color(0xFFEA8600);
-  static const Color amber = Color(0xFFF59E0B);
-  static const Color amberDeep = Color(0xFFB45309);
+  /// Text-safe success green (≥4.5:1 on white); was #15803D borderline on containers.
+  static const Color success = Color(0xFF166534);
+  static const Color emerald = Color(0xFF047857);
+  static const Color emeraldDeep = Color(0xFF065F46);
+  static const Color warning = Color(0xFFB45309);
+  static const Color warningAccent = Color(0xFF92400E);
+  static const Color amber = Color(0xFFB45309);
+  static const Color amberDeep = Color(0xFF92400E);
   static const Color danger = Color(0xFFDC2626);
   static const Color dangerAccent = Color(0xFFD93025);
   static const Color rose = Color(0xFFE11D48);

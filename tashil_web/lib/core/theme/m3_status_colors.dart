@@ -44,7 +44,8 @@ class M3StatusColors extends ThemeExtension<M3StatusColors> {
 
   /// Fixed categorical colours for retailer chains (identity colours that
   /// must stay stable across light/dark and tenants).
-  static const Color chainFathalla = Color(0xFF10B981);
+  /// Darker emerald for ≥3:1 graphic contrast on light surfaces (was #10B981 ~2.3).
+  static const Color chainFathalla = Color(0xFF047857);
   static const Color chainGomla = Color(0xFFF59E0B);
   static const Color chainBeetElGomla = Color(0xFF7C3AED);
   static const Color chainCarrefour = Color(0xFF2563EB);
@@ -187,7 +188,35 @@ class M3StatusColors extends ThemeExtension<M3StatusColors> {
 /// (e.g. [positive] == Colors.green.shade700), so the look is unchanged.
 @immutable
 class M3AccentRoles {
-  const M3AccentRoles({this.positive = const Color(0xFF388E3C), this.positiveStrong = const Color(0xFF2E7D32), this.teal = const Color(0xFF00796B), this.tealStrong = const Color(0xFF00695C), this.tealDeep = const Color(0xFF004D40), this.tealSurface = const Color(0xFFE0F2F1), this.indigo = const Color(0xFF303F9F), this.caution = const Color(0xFFEF6C00), this.cautionStrong = const Color(0xFFE65100), this.cautionSurface = const Color(0xFFFFE0B2), this.alert = const Color(0xFFE64A19), this.alertStrong = const Color(0xFFD84315), this.highlight = const Color(0xFFFF6F00), this.highlightBorder = const Color(0xFFFFA000), this.highlightSurface = const Color(0xFFFFECB3), this.purple = const Color(0xFF7B1FA2), this.purpleStrong = const Color(0xFF6A1B9A), this.negative = const Color(0xFFD32F2F), this.neutral = const Color(0xFF455A64), this.tealBase = const Color(0xFF009688), this.redBase = const Color(0xFFF44336), this.orangeBase = const Color(0xFFFF9800), this.competitor = const Color(0xFF90A4AE), this.competitorStrong = const Color(0xFF607D8B), this.competitorSurface = const Color(0xFFCFD8DC)});
+  /// Defaults tuned for WCAG text ≥4.5:1 / graphics ≥3:1 on light surfaces
+  /// (G20). Prefer [tealDeep]/[cautionStrong]/[competitorStrong] for small text.
+  const M3AccentRoles({
+    this.positive = const Color(0xFF2E7D32),
+    this.positiveStrong = const Color(0xFF1B5E20),
+    this.teal = const Color(0xFF00695C),
+    this.tealStrong = const Color(0xFF004D40),
+    this.tealDeep = const Color(0xFF00352C),
+    this.tealSurface = const Color(0xFFE0F2F1),
+    this.indigo = const Color(0xFF303F9F),
+    this.caution = const Color(0xFFE65100),
+    this.cautionStrong = const Color(0xFFBF360C),
+    this.cautionSurface = const Color(0xFFFFE0B2),
+    this.alert = const Color(0xFFD84315),
+    this.alertStrong = const Color(0xFFBF360C),
+    this.highlight = const Color(0xFFE65100),
+    this.highlightBorder = const Color(0xFFFF8F00),
+    this.highlightSurface = const Color(0xFFFFECB3),
+    this.purple = const Color(0xFF6A1B9A),
+    this.purpleStrong = const Color(0xFF4A148C),
+    this.negative = const Color(0xFFC62828),
+    this.neutral = const Color(0xFF37474F),
+    this.tealBase = const Color(0xFF00695C),
+    this.redBase = const Color(0xFFC62828),
+    this.orangeBase = const Color(0xFFE65100),
+    this.competitor = const Color(0xFF546E7A),
+    this.competitorStrong = const Color(0xFF37474F),
+    this.competitorSurface = const Color(0xFFCFD8DC),
+  });
 
   final Color positive;
   final Color positiveStrong;
