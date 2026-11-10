@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
@@ -94,7 +95,7 @@ func TestLoginCrossTenantRejected(t *testing.T) {
 }
 
 func TestForgotPasswordAndResetFlow(t *testing.T) {
-	_, _, handler := setupAuthTest()
+	fsClient, _, handler := setupAuthTest()
 
 	// 1. Request forgot password
 	forgotBody, _ := json.Marshal(domain.ForgotPasswordRequest{
@@ -110,16 +111,33 @@ func TestForgotPasswordAndResetFlow(t *testing.T) {
 		t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var forgotResp domain.ForgotPasswordResponse
-	_ = json.NewDecoder(rec.Body).Decode(&forgotResp)
-	if forgotResp.ResetToken == "" {
-		t.Fatalf("expected reset token in test response")
+	raw := rec.Body.Bytes()
+	if bytes.Contains(raw, []byte("reset_token")) {
+		t.Fatalf("reset_token must never appear in forgot-password response: %s", raw)
 	}
 
-	// 2. Perform reset password with token
+	var forgotResp domain.ForgotPasswordResponse
+	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&forgotResp); err != nil {
+		t.Fatalf("failed to decode forgot-password response: %v", err)
+	}
+	if forgotResp.Message != forgotPasswordAckMessage {
+		t.Fatalf("expected generic ack message, got %q", forgotResp.Message)
+	}
+
+	// Token is server-side only — fetch from store for the reset step.
+	user, err := fsClient.GetUserByID(context.Background(), "user-adeco-admin-01")
+	if err != nil {
+		t.Fatalf("expected seeded adeco admin: %v", err)
+	}
+	if user.ResetToken == "" {
+		t.Fatalf("expected reset token stored server-side")
+	}
+	serverToken := user.ResetToken
+
+	// 2. Perform reset password with token from server store (not HTTP body)
 	newPassword := "test-only-new-adeco-pw"
 	resetBody, _ := json.Marshal(domain.ResetPasswordRequest{
-		Token:       forgotResp.ResetToken,
+		Token:       serverToken,
 		NewPassword: newPassword,
 	})
 
@@ -131,7 +149,7 @@ func TestForgotPasswordAndResetFlow(t *testing.T) {
 		t.Fatalf("expected HTTP 200 on reset, got %d: %s", recReset.Code, recReset.Body.String())
 	}
 
-	// 3. Verify user can now log in with the new password
+	// 3. Verify user can now log in with the new password (login flow unchanged)
 	loginBody, _ := json.Marshal(domain.LoginRequest{
 		TenantID: "adeco",
 		Email:    "admin@adeco-retail.com",
@@ -144,6 +162,195 @@ func TestForgotPasswordAndResetFlow(t *testing.T) {
 
 	if recLogin.Code != http.StatusOK {
 		t.Fatalf("expected successful login with new password, got %d", recLogin.Code)
+	}
+}
+
+func TestForgotPasswordNeverReturnsTokenOrEnumerates(t *testing.T) {
+	_, _, handler := setupAuthTest()
+
+	cases := []struct {
+		name  string
+		email string
+	}{
+		{name: "known", email: "admin@adeco-retail.com"},
+		{name: "unknown", email: "nobody@example.invalid"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body, _ := json.Marshal(domain.ForgotPasswordRequest{
+				TenantID: "adeco",
+				Email:    tc.email,
+			})
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/forgot-password", bytes.NewReader(body))
+			rec := httptest.NewRecorder()
+			handler.HandleForgotPassword(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+			}
+			raw := rec.Body.String()
+			if strings.Contains(raw, "reset_token") {
+				t.Fatalf("reset_token leaked in response for %s: %s", tc.name, raw)
+			}
+			var resp domain.ForgotPasswordResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if resp.Message != forgotPasswordAckMessage {
+				t.Fatalf("expected identical generic message, got %q", resp.Message)
+			}
+		})
+	}
+}
+
+func TestForgotPasswordRateLimit(t *testing.T) {
+	_, _, handler := setupAuthTest()
+	body, _ := json.Marshal(domain.ForgotPasswordRequest{
+		TenantID: "adeco",
+		Email:    "admin@adeco-retail.com",
+	})
+
+	for i := 0; i < authForgotMaxAttempts; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/forgot-password", bytes.NewReader(body))
+		req.RemoteAddr = "203.0.113.50:4444"
+		rec := httptest.NewRecorder()
+		handler.HandleForgotPassword(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("attempt %d: expected 200, got %d: %s", i+1, rec.Code, rec.Body.String())
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/forgot-password", bytes.NewReader(body))
+	req.RemoteAddr = "203.0.113.50:4444"
+	rec := httptest.NewRecorder()
+	handler.HandleForgotPassword(rec, req)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected HTTP 429 after rate limit, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), authForgotRateLimitMsg) {
+		t.Fatalf("expected Arabic 429 body, got %s", rec.Body.String())
+	}
+}
+
+func TestLoginRateLimit(t *testing.T) {
+	_, _, handler := setupAuthTest()
+	body, _ := json.Marshal(domain.LoginRequest{
+		TenantID: "adeco",
+		Email:    "admin@adeco-retail.com",
+		Password: "WrongPassword!",
+	})
+
+	for i := 0; i < authLoginMaxAttempts; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
+		req.RemoteAddr = "203.0.113.60:5555"
+		rec := httptest.NewRecorder()
+		handler.HandleLogin(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: expected 401, got %d", i+1, rec.Code)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
+	req.RemoteAddr = "203.0.113.60:5555"
+	rec := httptest.NewRecorder()
+	handler.HandleLogin(rec, req)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected HTTP 429 after login rate limit, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), authLoginRateLimitMsg) {
+		t.Fatalf("expected Arabic 429 body, got %s", rec.Body.String())
+	}
+}
+
+func TestLoginSuccessDoesNotConsumeRateLimit(t *testing.T) {
+	_, _, handler := setupAuthTest()
+	okBody, _ := json.Marshal(domain.LoginRequest{
+		TenantID: "adeco",
+		Email:    "admin@adeco-retail.com",
+		Password: testAdecoAdminPassword,
+	})
+	badBody, _ := json.Marshal(domain.LoginRequest{
+		TenantID: "adeco",
+		Email:    "admin@adeco-retail.com",
+		Password: "WrongPassword!",
+	})
+
+	for i := 0; i < authLoginMaxAttempts+2; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(okBody))
+		req.Header.Set("X-Forwarded-For", "198.51.100.10, 169.254.1.1")
+		rec := httptest.NewRecorder()
+		handler.HandleLogin(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("success %d: expected 200, got %d: %s", i+1, rec.Code, rec.Body.String())
+		}
+	}
+
+	for i := 0; i < authLoginMaxAttempts; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(badBody))
+		req.Header.Set("X-Forwarded-For", "198.51.100.10, 169.254.1.1")
+		rec := httptest.NewRecorder()
+		handler.HandleLogin(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("fail %d: expected 401 (successes must not consume limit), got %d", i+1, rec.Code)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(badBody))
+	req.Header.Set("X-Forwarded-For", "198.51.100.10, 169.254.1.1")
+	rec := httptest.NewRecorder()
+	handler.HandleLogin(rec, req)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 after failed-only budget exhausted, got %d", rec.Code)
+	}
+}
+
+func TestLoginRateLimitIndependentPerEmail(t *testing.T) {
+	_, _, handler := setupAuthTest()
+	adminBody, _ := json.Marshal(domain.LoginRequest{
+		TenantID: "adeco",
+		Email:    "admin@adeco-retail.com",
+		Password: "WrongPassword!",
+	})
+	kamBody, _ := json.Marshal(domain.LoginRequest{
+		TenantID: "adeco",
+		Email:    "kam.carrefour@adeco-retail.com",
+		Password: "WrongPassword!",
+	})
+
+	for i := 0; i < authLoginMaxAttempts; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(adminBody))
+		req.RemoteAddr = "203.0.113.70:9999"
+		rec := httptest.NewRecorder()
+		handler.HandleLogin(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("admin fail %d: expected 401, got %d", i+1, rec.Code)
+		}
+	}
+
+	reqAdmin := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(adminBody))
+	reqAdmin.RemoteAddr = "203.0.113.70:9999"
+	recAdmin := httptest.NewRecorder()
+	handler.HandleLogin(recAdmin, reqAdmin)
+	if recAdmin.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected admin email rate-limited (429), got %d", recAdmin.Code)
+	}
+
+	reqKam := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(kamBody))
+	reqKam.RemoteAddr = "203.0.113.70:9999"
+	recKam := httptest.NewRecorder()
+	handler.HandleLogin(recKam, reqKam)
+	if recKam.Code != http.StatusUnauthorized {
+		t.Fatalf("expected other email on same IP still independent (401), got %d: %s", recKam.Code, recKam.Body.String())
+	}
+}
+
+func TestExtractRequestIPUsesXForwardedForClient(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "10.0.0.1:1234"
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 169.254.169.126")
+	if got := extractRequestIP(req); got != "203.0.113.9" {
+		t.Fatalf("Cloud Run/GFE leftmost XFF client IP: got %q want 203.0.113.9", got)
 	}
 }
 

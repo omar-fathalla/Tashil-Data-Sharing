@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
@@ -12,18 +14,89 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 )
 
+// Generic forgot-password acknowledgement — identical for known and unknown emails
+// so responses never enumerate accounts or leak reset tokens.
+const forgotPasswordAckMessage = "إذا كان البريد مسجلاً، فسيتم إرسال رابط استعادة كلمة المرور"
+
+const (
+	authLoginRateLimitMsg  = "تم تجاوز عدد محاولات تسجيل الدخول. حاول مرة أخرى لاحقاً"
+	authForgotRateLimitMsg = "تم تجاوز عدد طلبات استعادة كلمة المرور. حاول مرة أخرى لاحقاً"
+
+	authLoginMaxAttempts  = 10
+	authLoginWindow       = time.Minute
+	authForgotMaxAttempts = 5
+	authForgotWindow      = 15 * time.Minute
+)
+
 // AuthHandler coordinates authentication and password recovery endpoints.
+// Rate-limit maps are in-memory only (acceptable while Cloud Run maxScale=1).
 type AuthHandler struct {
 	fsRepo firestore.Repository
 	authMW *middleware.AuthMiddleware
+
+	rateMu     sync.Mutex
+	loginHits  map[string][]time.Time // failed logins only: IP|email → timestamps
+	forgotHits map[string][]time.Time
 }
 
 // NewAuthHandler constructs an AuthHandler.
 func NewAuthHandler(fsRepo firestore.Repository, authMW *middleware.AuthMiddleware) *AuthHandler {
 	return &AuthHandler{
-		fsRepo: fsRepo,
-		authMW: authMW,
+		fsRepo:     fsRepo,
+		authMW:     authMW,
+		loginHits:  make(map[string][]time.Time),
+		forgotHits: make(map[string][]time.Time),
 	}
+}
+
+// pruneRateLocked drops expired hits and returns the remaining count for key.
+// Caller must hold h.rateMu.
+func (h *AuthHandler) pruneRateLocked(bucket map[string][]time.Time, key string, window time.Duration) int {
+	now := time.Now()
+	cutoff := now.Add(-window)
+	kept := bucket[key][:0]
+	for _, t := range bucket[key] {
+		if t.After(cutoff) {
+			kept = append(kept, t)
+		}
+	}
+	bucket[key] = kept
+	return len(kept)
+}
+
+func (h *AuthHandler) isRateLimited(bucket map[string][]time.Time, key string, max int, window time.Duration) bool {
+	h.rateMu.Lock()
+	defer h.rateMu.Unlock()
+	return h.pruneRateLocked(bucket, key, window) >= max
+}
+
+func (h *AuthHandler) recordRateHit(bucket map[string][]time.Time, key string, window time.Duration) {
+	h.rateMu.Lock()
+	defer h.rateMu.Unlock()
+	_ = h.pruneRateLocked(bucket, key, window)
+	bucket[key] = append(bucket[key], time.Now())
+}
+
+// allowRate records a hit unless the key is already at the limit (used for forgot-password).
+func (h *AuthHandler) allowRate(bucket map[string][]time.Time, key string, max int, window time.Duration) bool {
+	h.rateMu.Lock()
+	defer h.rateMu.Unlock()
+	if h.pruneRateLocked(bucket, key, window) >= max {
+		return false
+	}
+	bucket[key] = append(bucket[key], time.Now())
+	return true
+}
+
+// authRateKey uses extractRequestIP (X-Forwarded-For leftmost hop — Cloud Run/GFE
+// and Firebase Hosting populate this with the client IP) plus a normalized email.
+func authRateKey(r *http.Request, email string) string {
+	ip := extractRequestIP(r)
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return ip
+	}
+	return ip + "|" + email
 }
 
 // HandleLogin serves POST /api/v1/auth/login.
@@ -51,18 +124,31 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rateKey := authRateKey(r, req.Email)
+	if h.isRateLimited(h.loginHits, rateKey, authLoginMaxAttempts, authLoginWindow) {
+		writeErr(w, http.StatusTooManyRequests, authLoginRateLimitMsg)
+		return
+	}
+
+	recordLoginFailure := func() {
+		h.recordRateHit(h.loginHits, rateKey, authLoginWindow)
+	}
+
 	user, err := h.fsRepo.GetUserByEmail(r.Context(), req.TenantID, req.Email)
 	if err != nil {
+		recordLoginFailure()
 		http.Error(w, `{"error":"invalid credentials or unassigned company"}`, http.StatusUnauthorized)
 		return
 	}
 
 	if !user.Active {
+		recordLoginFailure()
 		http.Error(w, `{"error":"account is deactivated"}`, http.StatusForbidden)
 		return
 	}
 
 	if !security.CheckPassword(req.Password, user.PasswordHash) {
+		recordLoginFailure()
 		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
 		return
 	}
@@ -143,6 +229,8 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleForgotPassword serves POST /api/v1/auth/forgot-password.
+// Always returns the same generic 200 body; never returns the reset token.
+// Token is stored server-side for the reset-password endpoint (email OOB when wired).
 func (h *AuthHandler) HandleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
@@ -160,29 +248,37 @@ func (h *AuthHandler) HandleForgotPassword(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if !h.allowRate(h.forgotHits, authRateKey(r, req.Email), authForgotMaxAttempts, authForgotWindow) {
+		writeErr(w, http.StatusTooManyRequests, authForgotRateLimitMsg)
+		return
+	}
+
+	writeForgotAck := func() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(domain.ForgotPasswordResponse{
+			Message: forgotPasswordAckMessage,
+		})
+	}
+
 	user, err := h.fsRepo.GetUserByEmail(r.Context(), req.TenantID, req.Email)
 	if err != nil {
-		// Secure response: do not reveal whether user exists or not, but return success
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(domain.ForgotPasswordResponse{
-			Message: "إذا كان البريد مسجلاً، فسيتم إرسال رابط استعادة كلمة المرور",
-		})
+		writeForgotAck()
 		return
 	}
 
 	resetToken := security.GenerateResetToken()
 	expiry := time.Now().Add(1 * time.Hour)
 
+	// Store server-side only. Deliver via email when an outbound mail channel exists;
+	// never put the token in the HTTP response.
 	if err := h.fsRepo.SetUserResetToken(r.Context(), user.UserID, resetToken, expiry); err != nil {
-		http.Error(w, `{"error":"failed to generate reset token"}`, http.StatusInternalServerError)
+		// Do not reveal whether the account exists; still return the generic ack.
+		writeForgotAck()
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(domain.ForgotPasswordResponse{
-		Message:    "تم توليد رمز استعادة كلمة المرور بنجاح",
-		ResetToken: resetToken,
-	})
+	writeForgotAck()
 }
 
 // HandleResetPassword serves POST /api/v1/auth/reset-password.

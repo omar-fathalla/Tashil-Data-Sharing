@@ -147,12 +147,14 @@ class _TenantLoginScreenState extends State<TenantLoginScreen>
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        M3Feedback.showError(
-          context,
-          _isArabic
+        // Prefer backend Arabic error (e.g. rate-limit 429); avoid generic credentials copy.
+        var msg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '').trim();
+        if (msg.isEmpty) {
+          msg = _isArabic
               ? 'فشل تسجيل الدخول: يرجى التأكد من صحة البيانات'
-              : 'Login failed: Please verify your credentials',
-        );
+              : 'Login failed: Please verify your credentials';
+        }
+        M3Feedback.showError(context, msg);
       }
     }
   }
