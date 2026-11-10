@@ -1,18 +1,15 @@
-# Consolidated CI: hybrid runners.
-# Light/fast → GitHub-hosted (vars.CI_HOSTED_RUNNER, default ubuntu-latest).
-# Heavy → Mac self-hosted (vars.CI_RUNS_ON, default ["self-hosted","macOS","tashil-mac"]).
-# NEVER use GitHub-hosted macOS runners (macos-latest) — expensive.
+# Consolidated CI.
 #
-# Budget fallback (no code change): set CI_HOSTED_RUNNER to the same JSON array as
-# CI_RUNS_ON, e.g. ["self-hosted","macOS","tashil-mac"] — ALL light jobs move to Mac.
-# CI_HOSTED_RUNNER accepts a JSON string ("ubuntu-latest") or a JSON label array.
-# See docs/ci-self-hosted.md.
+# TODO(billing): TEMPORARY — ALL jobs use Mac self-hosted until GitHub billing is
+# fixed (hosted jobs fail ~2s with runner_id=0 / payment failed). Single expression
+# below; revert by restoring hybrid CI_HOSTED_RUNNER (ubuntu-latest) for light jobs
+# and CI_RUNS_ON only for heavy Flutter. See docs/ci-self-hosted.md.
+# TEMP default labels: ["self-hosted","tashil-mac"] (never macos-latest).
 #
 # tashil-mac … tashil-mac-4 are four runners on one Mac — over-parallel heavy jobs
-# thrash Setup Node / flutter build. Keep light jobs on CI_HOSTED_RUNNER; heavy Mac
-# test/smoke jobs queue natively on the runners (no shared concurrency group —
-# GitHub pending-slot eviction cancels the second waiter). Deploys use
-# tashil-deploy only. Prefer MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
+# thrash Setup Node / flutter build. Heavy jobs queue natively on the runners (no
+# shared concurrency group — GitHub pending-slot eviction cancels the second waiter).
+# Deploys use tashil-deploy only. Prefer MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
 #
 # merge_group: required checks must run in the GitHub merge queue. Deploy stays on
 # push-to-main only (see deploy.yml) — never on merge_group.
@@ -45,11 +42,11 @@ env:
 
 jobs:
   # Path filter so backend / Flutter / pin can skip while required-check gates still report.
-  # Light job → hosted by default (CI_HOSTED_RUNNER).
+  # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
   # Any .github/workflows/** change sets every filter true ("workflow changes run everything").
   changes:
     name: Detect path changes
-    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
     timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
@@ -84,13 +81,13 @@ jobs:
 
   # Stopgap until shared storage (#37): refuse deploy commands that omit or change the 1-instance pin.
   # Required check name is the gate job below (success when path-skipped).
-  # Hosted pin assert: always join the graph after `changes` succeeds so the gate
+  # Pin assert: always join the graph after `changes` succeeds so the gate
   # never sees needs.*.result=abandoned from a conditional job dropping out.
-  # Path skip is a successful no-op below (cheap on ubuntu).
+  # Path skip is a successful no-op. TODO(billing): TEMP — was hosted ubuntu.
   guard-cloud-run-one-instance:
     needs: changes
     if: always() && !cancelled() && needs.changes.result == 'success'
-    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
     timeout-minutes: 5
     steps:
       - name: Path filter
@@ -113,7 +110,8 @@ jobs:
     name: Cloud Run one-instance pin
     needs: [changes, guard-cloud-run-one-instance]
     if: always() && !cancelled()
-    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
     timeout-minutes: 5
     steps:
       - name: Evaluate pin path filter / run result
@@ -144,14 +142,15 @@ jobs:
           fi
           [[ "${result}" == "success" ]]
 
-  # Hosted Go+emulator: always join the graph after `changes` succeeds so the
+  # Go+emulator: always join the graph after `changes` succeeds so the
   # required-check gate cannot observe needs.test-backend.result=abandoned when a
   # job-level path `if:` drops the node (seen on main push db5888d / #71). Path
-  # skip is a successful no-op; runners stay CI_HOSTED_RUNNER (unchanged split).
+  # skip is a successful no-op.
+  # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest (hybrid split).
   test-backend:
     needs: changes
     if: always() && !cancelled() && needs.changes.result == 'success'
-    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
     # ~20m class with emulator headroom (observed github-hosted go ~6m).
     timeout-minutes: 25
     defaults:
@@ -321,7 +320,8 @@ jobs:
     name: Backend Go tests
     needs: [changes, test-backend]
     if: always() && !cancelled()
-    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
     timeout-minutes: 5
     steps:
       - name: Evaluate backend path filter / run result
@@ -363,7 +363,8 @@ jobs:
     # natively instead. Cross-repo: MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
     needs: changes
     if: needs.changes.outputs.flutter == 'true'
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    # TODO(billing): TEMP — same Mac expression as light jobs (was already Mac).
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
     # 35m: up to 8m lock wait + pub/analyze/test (20m was too tight with lock).
     timeout-minutes: 35
     defaults:
@@ -467,7 +468,8 @@ jobs:
     name: Flutter analyze & test
     needs: [changes, test-flutter]
     if: always() && !cancelled()
-    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
     timeout-minutes: 5
     steps:
       - name: Evaluate Flutter path filter / run result
@@ -506,7 +508,8 @@ jobs:
     name: Comment PR when tests fail
     needs: [test-backend, test-flutter]
     if: always() && github.event_name == 'pull_request' && (needs.test-backend.result == 'failure' || needs.test-flutter.result == 'failure')
-    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
     timeout-minutes: 5
     steps:
       - name: Post failure comment

@@ -4,17 +4,15 @@
 # (await-ci → deploy-backend → deploy-web → livez/health smoke). Merge-queue required
 # checks live in ci.yml / playwright_smoke.yml only.
 #
-# Hybrid runners (same pattern as ci.yml / #56):
-#   Light gate (await-ci) → CI_HOSTED_RUNNER (default ubuntu-latest) — no duplicate Mac test load
-#   deploy-backend / deploy-web → CI_RUNS_ON Mac self-hosted (gcloud WIF / toolchains)
+# TODO(billing): TEMPORARY — ALL jobs (including await-ci) use Mac self-hosted until
+# GitHub billing is fixed. Single expression CI_RUNS_ON || ["self-hosted","tashil-mac"].
+# Revert: restore await-ci to CI_HOSTED_RUNNER / ubuntu-latest (hybrid #56).
 # NEVER use GitHub-hosted macOS runners.
-# Budget fallback: set CI_HOSTED_RUNNER to the same JSON array as CI_RUNS_ON so the light
-# gate also lands on Mac. See docs/ci-self-hosted.md / #41 / #55 / #56.
+# See docs/ci-self-hosted.md / #41 / #55 / #56.
 #
-# Note: tashil-mac … tashil-mac-4 share one physical Mac. Keep light gates on hosted
-# ubuntu so deploy Mac jobs are not starved. Workflow concurrency queues deploys;
-# deploy-backend/web also join job group tashil-deploy (deploy-only — not shared
-# with Flutter/smoke, which queue natively to avoid pending-slot eviction).
+# Note: tashil-mac … tashil-mac-4 share one physical Mac. Workflow concurrency queues
+# deploys; deploy-backend/web also join job group tashil-deploy (deploy-only — not
+# shared with Flutter/smoke, which queue natively to avoid pending-slot eviction).
 # Prefer MAC_SHARED_LOCK=1 for cross-repo Mac overlap. See docs/ci-self-hosted.md.
 #
 # Auth: Workload Identity Federation, no JSON keys. The provider only accepts tokens from
@@ -57,12 +55,12 @@ env:
   FLUTTER_VERSION: "3.41.2"
 
 jobs:
-  # Light gate on hosted ubuntu — replaces duplicate test-backend/test-web Mac load (#41).
+  # Await CI gate (#41). TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
   # Guard: never schedule on non-main pushes; merge_group is not in workflow `on:` either.
   await-ci:
     name: Await CI tests
     if: github.event_name != 'merge_group' && github.ref == 'refs/heads/main'
-    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
@@ -116,7 +114,8 @@ jobs:
     concurrency:
       group: tashil-deploy
       cancel-in-progress: false
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    # TODO(billing): TEMP — same Mac expression as await-ci (was already Mac).
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
     # Observed ~4.5m; Cloud Run source deploy can spike — 30m ceiling.
     timeout-minutes: 30
     steps:
@@ -246,7 +245,8 @@ jobs:
     concurrency:
       group: tashil-deploy
       cancel-in-progress: false
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "tashil-mac"]') }}
+    # TODO(billing): TEMP — same Mac expression as await-ci (was already Mac).
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
     # Observed ~3m (flutter build + Firebase Hosting); 25m ceiling.
     timeout-minutes: 25
     steps:
