@@ -48,12 +48,16 @@ class CompetitorComparisonScreen extends StatefulWidget {
 class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen> with DataRefreshMixin<CompetitorComparisonScreen> {
   @override
   void onBackendDataChanged() {
+    // Silent refresh: never flash KPI skeletons / center spinner on SWR bumps.
+    // AI picks POST must not invalidate cache (see BackendHttp.invalidateCache);
+    // approve/reject and real writes still land here without a full-page hang.
     _loadAvailableMonths(force: true);
-    _loadCompetitiveData(forceRefresh: true);
+    _loadCompetitiveData(forceRefresh: true, silent: true);
   }
 
   bool _isLoading = true;
   bool _monthsLoadFinished = false;
+  int _competitiveLoadSeq = 0;
   late CompetitorComparisonSource _repo;
   List<OwnSkuCompetitiveGroupModel> _allGroups = [];
   List<OwnSkuCompetitiveGroupModel> _filteredGroups = [];
@@ -189,8 +193,15 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     });
   }
 
-  Future<void> _loadCompetitiveData({bool forceRefresh = false}) async {
-    setState(() => _isLoading = true);
+  Future<void> _loadCompetitiveData({
+    bool forceRefresh = false,
+    bool silent = false,
+  }) async {
+    final seq = ++_competitiveLoadSeq;
+    final showSpinner = !silent || _allGroups.isEmpty;
+    if (showSpinner) {
+      setState(() => _isLoading = true);
+    }
     final result = await _repo.loadGroups(
       chain: _selectedChain,
       year: _selectedYear,
@@ -198,7 +209,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       forceRefresh: forceRefresh,
     );
 
-    if (!mounted) return;
+    if (!mounted || seq != _competitiveLoadSeq) return;
     result.when(
       success: (groups) {
         // Prefer union of /sell-out/months and competitive-monthly months so a
@@ -221,12 +232,22 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
           }
           _isLoading = false;
         });
-        _loadAiPicksForSelectedOwn();
+        // Silent SWR refreshes must not restart AI picks (seq races swallow timeouts).
+        if (!silent) {
+          _loadAiPicksForSelectedOwn();
+        }
       },
       failure: (error) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text('تعذر تحميل بيانات المقارنة: $error')),
+        final raw = error.message;
+        final msg = raw.contains('انتهت مهلة')
+            ? raw.replaceFirst(RegExp(r'^Exception:\s*'), '')
+            : 'تعذر تحميل بيانات المقارنة: $raw';
+        M3Feedback.showError(
+          context,
+          msg.isEmpty
+              ? 'انتهت مهلة تحميل بيانات مقارنة الأسعار — حاول مرة أخرى'
+              : msg,
         );
       },
     );
@@ -700,6 +721,10 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                 chain: _selectedChain,
                 year: _selectedYear,
                 isOwner: _canRunSuggestions,
+                onMappingsChanged: () {
+                  // Approved mappings must feed Compare immediately (price tab ready).
+                  _loadCompetitiveData(forceRefresh: true, silent: true);
+                },
               ),
             ] else ...[
 

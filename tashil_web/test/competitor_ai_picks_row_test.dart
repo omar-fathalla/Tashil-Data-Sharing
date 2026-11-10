@@ -144,7 +144,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.textContaining('تشغيل دفعة'));
+      await tester.tap(find.byKey(const ValueKey('run-suggestions-batch')));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('كتالوج المنافسة غير متاح حالياً'), findsWidgets);

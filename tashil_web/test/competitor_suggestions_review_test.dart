@@ -103,9 +103,12 @@ void main() {
       expect(find.text('نفس الفئة وحجم قريب'), findsOneWidget);
       expect(find.text('موافقة'), findsOneWidget);
       expect(find.text('رفض'), findsOneWidget);
-      expect(find.textContaining('تشغيل دفعة'), findsOneWidget);
+      expect(find.text('موافقة على الكل'), findsOneWidget);
+      expect(find.byKey(const ValueKey('run-suggestions-batch')), findsOneWidget);
+      expect(find.text('تشغيل دفعة'), findsOneWidget);
       expect(find.text('صنف الشركة'), findsOneWidget);
       expect(find.text('المنافس المقترح'), findsOneWidget);
+      expect(find.byKey(const ValueKey('suggestion-group-OWN1')), findsOneWidget);
 
       await tester.tap(find.text('موافقة'));
       await tester.pumpAndSettle();
@@ -167,7 +170,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.textContaining('تشغيل دفعة'));
+      await tester.tap(find.byKey(const ValueKey('run-suggestions-batch')));
       await tester.pumpAndSettle();
 
       expect(find.byType(SnackBar), findsOneWidget);
