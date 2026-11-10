@@ -122,88 +122,16 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
             ),
             const SizedBox(width: 8.0),
           ],
-          // Right Button
-          Tooltip(
-            message: 'تحريك الجدول لليمين (الأعمدة الأولى)',
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: M3Shape.radiusSm,
-                onTap: _scrollRight,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 5.0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    borderRadius: M3Shape.radiusSm,
-                    border: Border.all(
-                      color: colorScheme.outlineVariant.withOpacity(0.8),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.arrow_forward_rounded,
-                        size: 14.0,
-                        color: colorScheme.onSurface,
-                      ),
-                      const SizedBox(width: 4.0),
-                      Text(
-                        'يمين',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          IconButton.outlined(
+            tooltip: 'تحريك الجدول لليمين (الأعمدة الأولى)',
+            onPressed: _scrollRight,
+            icon: const Icon(Icons.arrow_forward_rounded),
           ),
           const SizedBox(width: 6.0),
-          // Left Button
-          Tooltip(
-            message: 'تحريك الجدول لليسار (باقي الأعمدة)',
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: M3Shape.radiusSm,
-                onTap: _scrollLeft,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 5.0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    borderRadius: M3Shape.radiusSm,
-                    border: Border.all(
-                      color: colorScheme.outlineVariant.withOpacity(0.8),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'شمال',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(width: 4.0),
-                      Icon(
-                        Icons.arrow_back_rounded,
-                        size: 14.0,
-                        color: colorScheme.onSurface,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          IconButton.outlined(
+            tooltip: 'تحريك الجدول لليسار (باقي الأعمدة)',
+            onPressed: _scrollLeft,
+            icon: const Icon(Icons.arrow_back_rounded),
           ),
         ],
       ),
