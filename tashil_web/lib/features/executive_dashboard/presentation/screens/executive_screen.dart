@@ -1,13 +1,12 @@
 import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
-import 'package:tashil_web/core/theme/m3_typography.dart';
-import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/executive_dashboard_repository.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/widgets/m3_feedback.dart';
 import '../widgets/bento_kpi_grid.dart';
 import '../widgets/chain_share_pie.dart';
 import '../widgets/monthly_summary_card.dart';
@@ -35,7 +34,8 @@ class ExecutiveScreen extends StatefulWidget {
   State<ExecutiveScreen> createState() => _ExecutiveScreenState();
 }
 
-class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin<ExecutiveScreen> {
+class _ExecutiveScreenState extends State<ExecutiveScreen>
+    with DataRefreshMixin<ExecutiveScreen> {
   @override
   void onBackendDataChanged() {
     _loadData();
@@ -48,6 +48,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
   String selectedChain = 'all';
   bool isLoading = true;
   String? loadError;
+
   /// Period granularity for the Market Share overview: monthly | quarterly | yearly.
   String _periodMode = 'yearly';
   int _selectedQuarter = 1;
@@ -62,7 +63,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
   int _loadRequestId = 0;
   late ExecutiveDashboardRepository _repo;
 
-  static const List<({int number, String shortName, String fullName})> _months = [
+  static const List<({int number, String shortName, String fullName})> _months =
+      [
     (number: 0, shortName: 'All', fullName: 'كل الشهور'),
     (number: 1, shortName: 'Jan', fullName: 'January'),
     (number: 2, shortName: 'Feb', fullName: 'February'),
@@ -80,7 +82,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
 
   List<int> get _years => AvailableYears.current.including(selectedYear);
 
-  List<({String code, String shortName, String fullName})> get _availableChains {
+  List<({String code, String shortName, String fullName})>
+      get _availableChains {
     final list = <({String code, String shortName, String fullName})>[
       (code: 'all', shortName: 'All', fullName: 'كل السلاسل'),
     ];
@@ -92,7 +95,10 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
     final seen = <String>{};
     for (final item in items) {
       final code = item.retailerChain.trim().toLowerCase();
-      if (code.isEmpty || code == 'all' || code == 'nda_redacted' || seen.contains(code)) {
+      if (code.isEmpty ||
+          code == 'all' ||
+          code == 'nda_redacted' ||
+          seen.contains(code)) {
         continue;
       }
       seen.add(code);
@@ -104,7 +110,9 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
           : resolvedLabel;
 
       String shortName;
-      if (code == 'beet-elgomla' || code == 'beet_elgomla' || code == 'beet elgomla') {
+      if (code == 'beet-elgomla' ||
+          code == 'beet_elgomla' ||
+          code == 'beet elgomla') {
         shortName = 'Beet El Gomla';
       } else if (code == 'gomla') {
         shortName = 'Gomla';
@@ -165,7 +173,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
       _lastTenantId = widget.apiClient.tenantId;
       _lastRole = widget.apiClient.currentUser?.role;
       _lastAssignedChain = widget.apiClient.currentUser?.assignedChain;
-      _repo = widget.repository ?? ExecutiveDashboardRepository(widget.apiClient);
+      _repo =
+          widget.repository ?? ExecutiveDashboardRepository(widget.apiClient);
       _loadData();
     }
   }
@@ -181,7 +190,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
       final lastM = firstM + 2;
       final lastDay = DateTime(selectedYear, lastM + 1, 0).day;
       startDate = '$selectedYear-${firstM.toString().padLeft(2, '0')}-01';
-      endDate = '$selectedYear-${lastM.toString().padLeft(2, '0')}-${lastDay.toString().padLeft(2, '0')}';
+      endDate =
+          '$selectedYear-${lastM.toString().padLeft(2, '0')}-${lastDay.toString().padLeft(2, '0')}';
     } else if (selectedMonth == 0) {
       selectedPeriod = 'YTD';
       startDate = '$selectedYear-01-01';
@@ -232,9 +242,9 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
         loadError = error.toString();
       });
       debugPrint('Executive dashboard load failed: $error');
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(content: Text('تعذّر تحميل المؤشرات. حاول مرة أخرى.')),
-      );
+      if (ScaffoldMessenger.maybeOf(context) != null) {
+        M3Feedback.showError(context, 'تعذّر تحميل المؤشرات. حاول مرة أخرى.');
+      }
       return;
     }
     final result = loaded.valueOrNull!;
@@ -244,7 +254,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
       loadError = null;
       if (selectedChain != 'all') {
         final chains = _availableChains;
-        if (chains.every((c) => c.code.toLowerCase() != selectedChain.toLowerCase())) {
+        if (chains.every(
+            (c) => c.code.toLowerCase() != selectedChain.toLowerCase())) {
           selectedChain = 'all';
         }
       }
@@ -308,14 +319,12 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
   }
 
   Widget _buildPeriodControls(BuildContext context) {
-    final style = ButtonStyle(
-      visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 6.0)),
-      textStyle: WidgetStatePropertyAll(Theme.of(context).textTheme.labelMedium),
-    );
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    // M3: segmented buttons inherit the theme (standard density, 40dp,
+    // 48dp tap target, secondaryContainer selection). No local overrides.
+    return Wrap(
+      spacing: M3Spacing.s12,
+      runSpacing: M3Spacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         SegmentedButton<String>(
           key: const ValueKey('executive_period_segmented'),
@@ -326,7 +335,6 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
           ],
           selected: {_periodMode},
           showSelectedIcon: false,
-          style: style,
           onSelectionChanged: (sel) {
             final mode = sel.first;
             setState(() {
@@ -339,15 +347,14 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
           },
         ),
         if (_periodMode == 'quarterly') ...[
-          const SizedBox(width: 8.0),
           SegmentedButton<int>(
             key: const ValueKey('executive_quarter_segmented'),
             segments: [
-              for (var q = 1; q <= 4; q++) ButtonSegment(value: q, label: Text('Q$q')),
+              for (var q = 1; q <= 4; q++)
+                ButtonSegment(value: q, label: Text('Q$q')),
             ],
             selected: {_selectedQuarter},
             showSelectedIcon: false,
-            style: style,
             onSelectionChanged: (sel) {
               setState(() => _selectedQuarter = sel.first);
               _loadData();
@@ -358,7 +365,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
     );
   }
 
-  Widget _buildChainDropdown(BuildContext context, {bool isCompact = false}) {
+  Widget _buildChainDropdown(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final chains = _availableChains;
@@ -370,6 +377,9 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
     return _menuFilter<String>(
       key: const ValueKey('executive_chain_dropdown'),
       tooltip: 'تصفية حسب السلسلة',
+      icon: AppIcons.storeMatrix,
+      label: 'Chain: ${activeChain.shortName}',
+      active: selectedChain != 'all',
       onSelected: (chainCode) {
         setState(() => selectedChain = chainCode);
         _loadData();
@@ -392,16 +402,12 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
                   color: chainColor,
                 )
               else
-                Container(
-                  width: 10.0,
-                  height: 10.0,
-                  margin: const EdgeInsets.symmetric(horizontal: 4.0),
-                  decoration: BoxDecoration(
-                    color: chainColor,
-                    shape: BoxShape.circle,
-                  ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: M3Spacing.xxs),
+                  child: CircleAvatar(radius: 5.0, backgroundColor: chainColor),
                 ),
-              const SizedBox(width: 10.0),
+              const SizedBox(width: M3Spacing.s12),
               Flexible(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -411,8 +417,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
                       parts.ar,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                        color: isSelected ? chainColor : colorScheme.onSurface,
+                        fontWeight: isSelected ? FontWeight.w600 : null,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                     if (parts.en != null)
@@ -420,9 +426,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
                         parts.en!,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w500,
-                          color: isSelected ? chainColor : colorScheme.onSurfaceVariant,
-                          fontSize: M3FontSize.tinyPlus,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                   ],
@@ -432,42 +436,11 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
           ),
         );
       }).toList(),
-      child: Container(
-        height: 38.0,
-        padding: EdgeInsets.symmetric(horizontal: isCompact ? 10.0 : 14.0),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
-          borderRadius: M3Shape.radiusLg,
-          border: Border.all(
-            color: colorScheme.outlineVariant.withOpacity(0.8),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(AppIcons.storeMatrix, size: 15.0, color: colorScheme.primary),
-            const SizedBox(width: 6.0),
-            Text(
-              'Chain: ${activeChain.shortName}',
-              style: theme.textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(width: 4.0),
-            Icon(
-              AppIcons.dropDown,
-              size: 16.0,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ],
-        ),
-      ),
     );
   }
 
-  /// Connected Year & Month Buttons Group on a single row
-  Widget _buildYearMonthConnectedGroup(BuildContext context, {bool isCompact = false}) {
+  /// Year segmented button + Month menu filter on a single row.
+  Widget _buildYearMonthConnectedGroup(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final activeMonth = _months.firstWhere(
@@ -475,25 +448,21 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
       orElse: () => _months.first,
     );
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      spacing: M3Spacing.s12,
+      runSpacing: M3Spacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         // M3 SegmentedButton: the year filter has only a few fixed options.
         SegmentedButton<int>(
           key: const ValueKey('executive_year_segmented'),
           segments: [
             for (final y in _years)
-              ButtonSegment<int>(value: y, label: Text('$y'), tooltip: 'سنة $y'),
+              ButtonSegment<int>(
+                  value: y, label: Text('$y'), tooltip: 'سنة $y'),
           ],
           selected: {selectedYear},
           showSelectedIcon: false,
-          style: ButtonStyle(
-            visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            padding: const WidgetStatePropertyAll(
-                EdgeInsets.symmetric(horizontal: 6.0)),
-            textStyle: WidgetStatePropertyAll(Theme.of(context).textTheme.labelMedium),
-          ),
           onSelectionChanged: (s) {
             setState(() {
               selectedYear = s.first;
@@ -502,105 +471,69 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
             _loadData();
           },
         ),
-        const SizedBox(width: 8.0),
-        Container(
-      height: 38.0,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: M3Shape.radiusLg,
-        border: Border.all(
-          color: colorScheme.outlineVariant.withOpacity(0.8),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Month Dropdown Button Segment
-          _menuFilter<int>(
-            key: const ValueKey('executive_month_dropdown'),
-            tooltip: 'اختر الشهر',
-            minWidth: 220.0,
-            onSelected: (month) {
-              setState(() {
-                selectedMonth = month;
-                _periodMode = month == 0 ? 'yearly' : 'monthly';
-              });
-              _loadData();
-            },
-            items: _months.map((m) {
-              final isSelected = m.number == selectedMonth;
-              return (
-                m.number,
-                SizedBox(
-                  width: 210.0,
-                  child: Row(
-                    children: [
-                      if (isSelected)
-                        Icon(
-                          AppIcons.check,
-                          size: 18.0,
-                          color: colorScheme.primary,
-                        )
-                      else
-                        const SizedBox(width: 18.0),
-                      const SizedBox(width: 10.0),
-                      Expanded(
-                        child: Text(
-                          m.fullName,
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            color: isSelected
-                                ? colorScheme.primary
-                                : colorScheme.onSurface,
-                          ),
+        _menuFilter<int>(
+          key: const ValueKey('executive_month_dropdown'),
+          tooltip: 'اختر الشهر',
+          icon: AppIcons.calendar,
+          label: 'Month: ${activeMonth.shortName}',
+          active: selectedMonth != 0,
+          minWidth: 220.0,
+          onSelected: (month) {
+            setState(() {
+              selectedMonth = month;
+              _periodMode = month == 0 ? 'yearly' : 'monthly';
+            });
+            _loadData();
+          },
+          items: _months.map((m) {
+            final isSelected = m.number == selectedMonth;
+            return (
+              m.number,
+              SizedBox(
+                width: 210.0,
+                child: Row(
+                  children: [
+                    if (isSelected)
+                      Icon(
+                        AppIcons.check,
+                        size: 18.0,
+                        color: colorScheme.primary,
+                      )
+                    else
+                      const SizedBox(width: 18.0),
+                    const SizedBox(width: M3Spacing.s12),
+                    Expanded(
+                      child: Text(
+                        m.fullName,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: isSelected ? FontWeight.w600 : null,
+                          color: colorScheme.onSurface,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: isCompact ? 8.0 : 12.0),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(AppIcons.calendar, size: 14.0, color: colorScheme.primary),
-                  const SizedBox(width: 5.0),
-                  Text(
-                    'Month: ${activeMonth.shortName}',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: colorScheme.onSurface,
                     ),
-                  ),
-                  const SizedBox(width: 3.0),
-                  Icon(
-                    AppIcons.dropDown,
-                    size: 16.0,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ),
-        ],
-      ),
+            );
+          }).toList(),
         ),
       ],
     );
   }
 
-  /// M3 MenuAnchor-based filter menu.
+  /// M3 MenuAnchor filter trigger: a real button (40dp, 48dp target,
+  /// focus ring). Outlined at the default value, tonal when a filter is active.
   Widget _menuFilter<T>({
     required Key key,
     required String tooltip,
+    required IconData icon,
+    required String label,
+    required bool active,
     required List<(T, Widget)> items,
     required ValueChanged<T> onSelected,
-    required Widget child,
     double? minWidth,
   }) {
     return MenuAnchor(
@@ -608,21 +541,39 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
           ? null
           : MenuStyle(minimumSize: WidgetStatePropertyAll(Size(minWidth, 0))),
       menuChildren: [
-        for (final (value, label) in items)
-          MenuItemButton(onPressed: () => onSelected(value), child: label),
+        for (final (value, child) in items)
+          MenuItemButton(onPressed: () => onSelected(value), child: child),
       ],
-      builder: (context, controller, _) => Tooltip(
-        message: tooltip,
-        child: InkWell(
-          key: key,
-          borderRadius: M3Shape.radiusLg,
-          onTap: () => controller.isOpen ? controller.close() : controller.open(),
-          child: child,
-        ),
-      ),
+      builder: (context, controller, _) {
+        void toggle() =>
+            controller.isOpen ? controller.close() : controller.open();
+        final content = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label),
+            const SizedBox(width: M3Spacing.xxs),
+            const Icon(AppIcons.dropDown, size: 18.0),
+          ],
+        );
+        return Tooltip(
+          message: tooltip,
+          child: active
+              ? FilledButton.tonalIcon(
+                  key: key,
+                  onPressed: toggle,
+                  icon: Icon(icon, size: 18.0),
+                  label: content,
+                )
+              : OutlinedButton.icon(
+                  key: key,
+                  onPressed: toggle,
+                  icon: Icon(icon, size: 18.0),
+                  label: content,
+                ),
+        );
+      },
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -640,20 +591,33 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
             M3PageHeader(
               titleEn: 'Executive Dashboard',
               subtitleAr: 'أداء المبيعات في سلاسل التجزئة',
-              actions: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildChainDropdown(context, isCompact: isCompact),
-                    const SizedBox(width: 8.0),
-                    _buildYearMonthConnectedGroup(context, isCompact: isCompact),
-                    const SizedBox(width: 8.0),
-                    _buildPeriodControls(context),
-                  ],
-                ),
-              ),
+              // Compact: one horizontally scrollable row. Wider: the 40dp
+              // controls wrap onto a second line instead of scrolling off.
+              actions: isCompact
+                  ? SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildChainDropdown(context),
+                          const SizedBox(width: M3Spacing.s12),
+                          _buildYearMonthConnectedGroup(context),
+                          const SizedBox(width: M3Spacing.s12),
+                          _buildPeriodControls(context),
+                        ],
+                      ),
+                    )
+                  : Wrap(
+                      spacing: M3Spacing.s12,
+                      runSpacing: M3Spacing.xs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _buildChainDropdown(context),
+                        _buildYearMonthConnectedGroup(context),
+                        _buildPeriodControls(context),
+                      ],
+                    ),
             ),
 
             M3Spacing.gapMD,
@@ -666,7 +630,9 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
                       key: ValueKey('exec_loading_state'),
                       child: Padding(
                         padding: EdgeInsets.all(64.0),
-                        child: SizedBox(width: 240.0, child: LinearProgressIndicator(year2023: false)),
+                        child: SizedBox(
+                            width: 240.0,
+                            child: LinearProgressIndicator(year2023: false)),
                       ),
                     )
                   : kpis != null
@@ -679,9 +645,12 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
                             // Original top summary: the four KPI cards.
                             BentoKpiGrid(kpis: kpis!),
                             if (kpis!.monthlySummary != null &&
-                                kpis!.monthlySummary!.narrativeAr.trim().isNotEmpty) ...[
+                                kpis!.monthlySummary!.narrativeAr
+                                    .trim()
+                                    .isNotEmpty) ...[
                               M3Spacing.gapMD,
-                              MonthlySummaryCard(summary: kpis!.monthlySummary!),
+                              MonthlySummaryCard(
+                                  summary: kpis!.monthlySummary!),
                             ],
 
                             M3Spacing.gapMD,
@@ -725,10 +694,14 @@ class _ExecutiveScreenState extends State<ExecutiveScreen> with DataRefreshMixin
                           padding: const EdgeInsets.all(48.0),
                           child: Column(
                             children: [
-                              Icon(AppIcons.error, size: 40.0, color: Theme.of(context).colorScheme.error),
+                              Icon(AppIcons.error,
+                                  size: 40.0,
+                                  color: Theme.of(context).colorScheme.error),
                               M3Spacing.gapSM,
                               Text(
-                                loadError == null ? 'لا توجد بيانات لهذه الفترة' : 'تعذّر تحميل البيانات',
+                                loadError == null
+                                    ? 'لا توجد بيانات لهذه الفترة'
+                                    : 'تعذّر تحميل البيانات',
                                 style: Theme.of(context).textTheme.titleMedium,
                                 textAlign: TextAlign.center,
                               ),

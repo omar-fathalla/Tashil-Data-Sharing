@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/widgets/m3_status_tag.dart';
+import 'package:tashil_web/core/widgets/m3_tonal_surface.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../../../core/network/api_client.dart';
@@ -90,7 +92,12 @@ String _fmtInt(num v) {
 String _pct(double v) => '${v.toStringAsFixed(v >= 10 || v == 0 ? 0 : 1)}%';
 
 class _CardHeader extends StatelessWidget {
-  const _CardHeader({required this.icon, required this.title, required this.subtitle, required this.count, this.badgeKey});
+  const _CardHeader(
+      {required this.icon,
+      required this.title,
+      required this.subtitle,
+      required this.count,
+      this.badgeKey});
   final IconData icon;
   final String title;
   final String subtitle;
@@ -110,13 +117,19 @@ class _CardHeader extends StatelessWidget {
           Flexible(
             child: Text(title,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                style: theme.textTheme.titleMedium),
           ),
           M3Spacing.gapXS,
-          Badge.count(key: badgeKey, count: count, backgroundColor: cs.error, textColor: cs.onError),
+          Badge.count(
+              key: badgeKey,
+              count: count,
+              backgroundColor: cs.error,
+              textColor: cs.onError),
         ]),
         M3Spacing.gapXXS,
-        Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+        Text(subtitle,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant)),
       ],
     );
   }
@@ -133,11 +146,13 @@ class _EmptyNote extends StatelessWidget {
       key: keyName == null ? null : ValueKey<String>(keyName!),
       padding: M3Spacing.pLg,
       child: Column(children: [
-        Icon(AppIcons.empty, size: 32.0, color: theme.colorScheme.onSurfaceVariant),
+        Icon(AppIcons.empty,
+            size: 32.0, color: theme.colorScheme.onSurfaceVariant),
         M3Spacing.gapSM,
         Text(text,
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
       ]),
     );
   }
@@ -152,7 +167,13 @@ class _Legend extends StatelessWidget {
     return Wrap(spacing: 12.0, runSpacing: 4.0, children: [
       for (final (c, l) in items)
         Row(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 10.0, height: 10.0, decoration: BoxDecoration(color: c, borderRadius: M3Shape.radiusXs)),
+          M3TonalSurface(
+            color: c,
+            borderRadius: M3Shape.radiusXs,
+            width: 10.0,
+            height: 10.0,
+            child: const SizedBox.shrink(),
+          ),
           M3Spacing.gapXXS,
           Text(l, style: theme.textTheme.labelSmall),
         ]),
@@ -174,8 +195,14 @@ class _SkuShareCard extends StatelessWidget {
     final cs = theme.colorScheme;
     final acc = M3StatusColors.of(context).accents;
     final cats = {for (final c in kpis.categoryContributions) c.category: c};
-    final rows = <({ParetoSkuItemModel sku, double self, double ownOther, double comp})>[];
-    final skus = [...kpis.paretoSkus]..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
+    final rows = <({
+      ParetoSkuItemModel sku,
+      double self,
+      double ownOther,
+      double comp
+    })>[];
+    final skus = [...kpis.paretoSkus]
+      ..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
     for (final s in skus) {
       final c = cats[s.category];
       if (c == null || c.marketTotalRevenue <= 0) continue;
@@ -206,7 +233,8 @@ class _SkuShareCard extends StatelessWidget {
             ]),
             M3Spacing.gapSM,
             if (rows.isEmpty)
-              const _EmptyNote('لا توجد بيانات حصة للأصناف في هذه الفترة', keyName: 'share_per_sku_empty')
+              const _EmptyNote('لا توجد بيانات حصة للأصناف في هذه الفترة',
+                  keyName: 'share_per_sku_empty')
             else
               _GrowingColumn(
                 children: [
@@ -215,18 +243,22 @@ class _SkuShareCard extends StatelessWidget {
                       title: Text(rows[i].sku.skuName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+                          style: theme.textTheme.labelLarge
+                              ?.copyWith(fontWeight: FontWeight.w600)),
                       category: Text(rows[i].sku.category,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: cs.onSurfaceVariant)),
                       bar: ClipRRect(
                         key: ValueKey('sku_share_bar_$i'),
                         borderRadius: M3Shape.radiusSm,
                         child: Row(children: [
                           _seg(context, rows[i].self, cs.primary, cs.onPrimary),
-                          _seg(context, rows[i].ownOther, cs.primaryContainer, cs.onPrimaryContainer),
-                          _seg(context, rows[i].comp, acc.competitor, cs.onSurface),
+                          _seg(context, rows[i].ownOther, cs.primaryContainer,
+                              cs.onPrimaryContainer),
+                          _seg(context, rows[i].comp, acc.competitor,
+                              cs.onSurface),
                         ]),
                       ),
                     ),
@@ -249,7 +281,10 @@ class _SkuShareCard extends StatelessWidget {
         child: v >= 0.08
             ? Text(_pct(v * 100),
                 maxLines: 1,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: fg, fontWeight: FontWeight.w700))
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(color: fg, fontWeight: FontWeight.w600))
             : null,
       ),
     );
@@ -265,7 +300,9 @@ class _CategoryShareCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cats = kpis.categoryContributions.where((c) => c.marketTotalRevenue > 0).toList()
+    final cats = kpis.categoryContributions
+        .where((c) => c.marketTotalRevenue > 0)
+        .toList()
       ..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
     final top = cats.take(4).toList();
     return Card.outlined(
@@ -284,7 +321,8 @@ class _CategoryShareCard extends StatelessWidget {
             ),
             M3Spacing.gapSM,
             if (top.isEmpty)
-              const _EmptyNote('لا توجد بيانات للفئات في هذه الفترة', keyName: 'share_per_category_empty')
+              const _EmptyNote('لا توجد بيانات للفئات في هذه الفترة',
+                  keyName: 'share_per_category_empty')
             else
               _GrowingGrid(
                 spacing: 12.0,
@@ -318,11 +356,13 @@ class _CategoryTile extends StatelessWidget {
           value: ours / 100.0,
           label: _pct(ours),
         ),
-        details: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        details:
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(cat.category,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+              style: theme.textTheme.labelLarge
+                  ?.copyWith(fontWeight: FontWeight.w600)),
           M3Spacing.gapXXS,
           if (cat.tenantRank > 0)
             Text(
@@ -339,24 +379,27 @@ class _CategoryTile extends StatelessWidget {
           M3Spacing.gapXXS,
           if (cat.topCompetitors.isEmpty)
             Text('Competitors ${_pct(100.0 - ours)}',
-                style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant))
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: cs.onSurfaceVariant))
           else
             for (final (i, c) in cat.topCompetitors.take(3).indexed)
-              Row(key: ValueKey('category_competitor_${cat.category}_$i'), children: [
-                Container(
-                  width: 8.0,
-                  height: 8.0,
-                  decoration: BoxDecoration(color: _competitorShade(acc, i), shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 4.0),
-                Expanded(
-                  child: Text(c.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-                ),
-                Text(_pct(c.sharePct), style: theme.textTheme.labelSmall),
-              ]),
+              Row(
+                  key: ValueKey('category_competitor_${cat.category}_$i'),
+                  children: [
+                    CircleAvatar(
+                        radius: 4.0,
+                        backgroundColor: _competitorShade(
+                            acc, Theme.of(context).colorScheme, i)),
+                    const SizedBox(width: 4.0),
+                    Expanded(
+                      child: Text(c.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: cs.onSurfaceVariant)),
+                    ),
+                    Text(_pct(c.sharePct), style: theme.textTheme.labelSmall),
+                  ]),
         ]),
       ),
     );
@@ -385,8 +428,8 @@ class _SellInVsSellOut extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final header = Text('Sell-In vs Sell-Out',
-        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800));
+    final header =
+        Text('Sell-In vs Sell-Out', style: theme.textTheme.titleMedium);
     if (loading && cpfr == null) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         header,
@@ -395,7 +438,8 @@ class _SellInVsSellOut extends StatelessWidget {
       ]);
     }
     // Only months that have BOTH real Sell In and real Sell Out are compared.
-    final months = (cpfr?.monthlyReconciliation ?? const <ReconciliationMonthModel>[])
+    final months = (cpfr?.monthlyReconciliation ??
+            const <ReconciliationMonthModel>[])
         .where((m) =>
             m.year == year &&
             periodMonths.contains(m.monthNum) &&
@@ -421,16 +465,23 @@ class _SellInVsSellOut extends StatelessWidget {
     final through = sellIn > 0 ? sellOut / sellIn * 100.0 : 0.0;
     final acc = M3StatusColors.of(context).accents;
     final cs = theme.colorScheme;
-    final monthLabel = months.map((m) => m.monthEn.length > 3 ? m.monthEn.substring(0, 3) : m.monthEn).join(', ');
+    final monthLabel = months
+        .map(
+            (m) => m.monthEn.length > 3 ? m.monthEn.substring(0, 3) : m.monthEn)
+        .join(', ');
 
     final tiles = [
-      _KpiTile(label: 'Sell-In (وحدة)', value: _fmtInt(sellIn), color: cs.onSurface),
-      _KpiTile(label: 'Sell-Out (وحدة)', value: _fmtInt(sellOut), color: cs.onSurface),
+      _KpiTile(
+          label: 'Sell-In (وحدة)', value: _fmtInt(sellIn), color: cs.onSurface),
+      _KpiTile(
+          label: 'Sell-Out (وحدة)',
+          value: _fmtInt(sellOut),
+          color: cs.onSurface),
       _KpiTile(
           key: const ValueKey('kpi_net_accumulation'),
           label: 'تراكم المخزون (وحدة)',
           value: '${net > 0 ? '+' : ''}${_fmtInt(net)}',
-          color: acc.orangeBase),
+          color: acc.cautionStrong),
       _KpiTile(
           key: const ValueKey('kpi_sell_through'),
           label: 'نسبة التصريف',
@@ -444,7 +495,8 @@ class _SellInVsSellOut extends StatelessWidget {
       children: [
         header,
         Text('الأصناف والشهور المتطابقة: $monthLabel $year',
-            style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant)),
         M3Spacing.gapSM,
         LayoutBuilder(builder: (context, c) {
           final cols = c.maxWidth >= 700 ? 4 : 2;
@@ -459,10 +511,12 @@ class _SellInVsSellOut extends StatelessWidget {
           // (usually the table) and the chart stretches to fill it.
           IntrinsicHeight(
             key: const ValueKey('sell_in_vs_out_row'),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            child:
+                Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Expanded(flex: 3, child: _StockTable(cpfr: cpfr!)),
               M3Spacing.gapMD,
-              Expanded(flex: 2, child: _MonthlyBars(months: months, fill: true)),
+              Expanded(
+                  flex: 2, child: _MonthlyBars(months: months, fill: true)),
             ]),
           )
         else ...[
@@ -476,7 +530,11 @@ class _SellInVsSellOut extends StatelessWidget {
 }
 
 class _KpiTile extends StatelessWidget {
-  const _KpiTile({super.key, required this.label, required this.value, required this.color});
+  const _KpiTile(
+      {super.key,
+      required this.label,
+      required this.value,
+      required this.color});
   final String label;
   final String value;
   final Color color;
@@ -488,9 +546,13 @@ class _KpiTile extends StatelessWidget {
       child: Padding(
         padding: M3Spacing.pMd,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(label,
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           M3Spacing.gapXS,
-          Text(value, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: color)),
+          Text(value,
+              style: theme.textTheme.headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.w500, color: color)),
         ]),
       ),
     );
@@ -506,7 +568,8 @@ class _StockTable extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     // Aggregate per SKU (the report can list a SKU per branch/region).
-    final bySku = <String, ({String name, int sIn, int sOut, int stock, String status})>{};
+    final bySku = <String,
+        ({String name, int sIn, int sOut, int stock, String status})>{};
     for (final i in cpfr.inventoryAndPoItems) {
       final k = i.barcode.isNotEmpty ? i.barcode : i.itemCode;
       final p = bySku[k];
@@ -521,20 +584,24 @@ class _StockTable extends StatelessWidget {
     final rows = bySku.values.where((r) => r.sIn > 0).toList()
       ..sort((a, b) => b.sIn.compareTo(a.sIn));
     final top = rows.take(8).toList();
-    final label = theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w700);
+    final label = theme.textTheme.labelSmall
+        ?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600);
     final cell = theme.textTheme.bodySmall;
     return Card.outlined(
       key: const ValueKey('stock_per_sku_table'),
       margin: EdgeInsets.zero,
       child: Padding(
         padding: M3Spacing.pMd,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('المخزون حسب الصنف', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('المخزون حسب الصنف', style: theme.textTheme.titleSmall),
           Text('منذ بداية العام (وحدة) · الحالة من تقرير CPFR',
-              style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(color: cs.onSurfaceVariant)),
           M3Spacing.gapSM,
           if (top.isEmpty)
-            const _EmptyNote('لا توجد بيانات مخزون لهذه الفترة', keyName: 'stock_per_sku_empty')
+            const _EmptyNote('لا توجد بيانات مخزون لهذه الفترة',
+                keyName: 'stock_per_sku_empty')
           else
             Table(
               columnWidths: const {
@@ -548,22 +615,41 @@ class _StockTable extends StatelessWidget {
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
               children: [
                 TableRow(children: [
-                  for (final h in ['الصنف', 'Sell-In', 'Sell-Out', 'الفرق', 'نسبة التصريف', 'الحالة'])
-                    Padding(padding: const EdgeInsets.only(bottom: 6.0), child: Text(h, style: label)),
+                  for (final h in [
+                    'الصنف',
+                    'Sell-In',
+                    'Sell-Out',
+                    'الفرق',
+                    'نسبة التصريف',
+                    'الحالة'
+                  ])
+                    Padding(
+                        padding: const EdgeInsets.only(bottom: 6.0),
+                        child: Text(h, style: label)),
                 ]),
                 for (final r in top)
                   TableRow(
-                    decoration: BoxDecoration(border: Border(top: BorderSide(color: cs.outlineVariant))),
+                    decoration: ShapeDecoration(
+                        shape:
+                            Border(top: BorderSide(color: cs.outlineVariant))),
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6.0),
-                        child: Text(r.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: cell?.copyWith(fontWeight: FontWeight.w600)),
+                        child: Text(r.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: cell?.copyWith(fontWeight: FontWeight.w600)),
                       ),
                       Text(_fmtInt(r.sIn), style: cell),
                       Text(_fmtInt(r.sOut), style: cell),
-                      Text('${r.sIn - r.sOut > 0 ? '+' : ''}${_fmtInt(r.sIn - r.sOut)}', style: cell),
-                      Text(_pct(r.sIn > 0 ? r.sOut / r.sIn * 100.0 : 0.0), style: cell),
-                      Align(alignment: AlignmentDirectional.centerStart, child: _StatusChip(status: r.status)),
+                      Text(
+                          '${r.sIn - r.sOut > 0 ? '+' : ''}${_fmtInt(r.sIn - r.sOut)}',
+                          style: cell),
+                      Text(_pct(r.sIn > 0 ? r.sOut / r.sIn * 100.0 : 0.0),
+                          style: cell),
+                      Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: _StatusChip(status: r.status)),
                     ],
                   ),
               ],
@@ -573,7 +659,11 @@ class _StockTable extends StatelessWidget {
     );
   }
 
-  static const _rank = {'overstock': 3, 'urgent_replenishment': 2, 'optimal': 1};
+  static const _rank = {
+    'overstock': 3,
+    'urgent_replenishment': 2,
+    'optimal': 1
+  };
   static String _worse(String? a, String b) =>
       a == null ? b : ((_rank[a] ?? 0) >= (_rank[b] ?? 0) ? a : b);
 }
@@ -583,31 +673,23 @@ class _StatusChip extends StatelessWidget {
   final String status;
   @override
   Widget build(BuildContext context) {
-    final acc = M3StatusColors.of(context).accents;
-    final (Color c, IconData icon, String text) = switch (status) {
-      'optimal' => (acc.tealBase, AppIcons.success, 'Healthy'),
-      'overstock' => (acc.redBase, AppIcons.warning, 'Overstock'),
-      'urgent_replenishment' => (acc.orangeBase, AppIcons.info, 'Replenish'),
-      _ => (M3StatusColors.of(context).accents.neutral, AppIcons.info, status.isEmpty ? 'Unknown' : status),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
-      decoration: BoxDecoration(
-        color: c.withOpacity(0.12),
-        border: Border.all(color: c.withOpacity(0.6)),
-        borderRadius: M3Shape.radiusSm,
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 14.0, color: c),
-        M3Spacing.gapXXS,
-        Flexible(
-          child: Text(text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: c, fontWeight: FontWeight.w700)),
+    // M3StatusTag tones: container/on-container pairs (≥ 4.5:1), plus an icon
+    // so the state is not conveyed by colour alone.
+    final (M3StatusTone tone, IconData icon, String text) = switch (status) {
+      'optimal' => (M3StatusTone.success, AppIcons.success, 'Healthy'),
+      'overstock' => (M3StatusTone.error, AppIcons.warning, 'Overstock'),
+      'urgent_replenishment' => (
+          M3StatusTone.warning,
+          AppIcons.info,
+          'Replenish'
         ),
-      ]),
-    );
+      _ => (
+          M3StatusTone.neutral,
+          AppIcons.info,
+          status.isEmpty ? 'Unknown' : status
+        ),
+    };
+    return M3StatusTag(label: text, tone: tone, icon: icon);
   }
 }
 
@@ -622,16 +704,20 @@ class _MonthlyBars extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final acc = M3StatusColors.of(context).accents;
-    final maxV = months.fold<int>(1, (a, m) => [a, m.sellInUnits, m.sellOutUnits].reduce((x, y) => x > y ? x : y));
+    final maxV = months.fold<int>(
+        1,
+        (a, m) =>
+            [a, m.sellInUnits, m.sellOutUnits].reduce((x, y) => x > y ? x : y));
     const chartH = 180.0;
     return Card.outlined(
       key: const ValueKey('sell_in_vs_out_chart'),
       margin: EdgeInsets.zero,
       child: Padding(
         padding: M3Spacing.pMd,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('Monthly Sell-In vs Sell-Out (units)',
-              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+              style: theme.textTheme.titleSmall),
           M3Spacing.gapXS,
           _Legend([(cs.primary, 'Sell-In'), (acc.tealBase, 'Sell-Out')]),
           M3Spacing.gapMD,
@@ -640,17 +726,27 @@ class _MonthlyBars extends StatelessWidget {
               for (final m in months)
                 Expanded(
                   child: Tooltip(
-                    message: '${m.monthEn}: Sell-In ${_fmtInt(m.sellInUnits)} · Sell-Out ${_fmtInt(m.sellOutUnits)}',
-                    child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-                      Row(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-                        _bar(m.sellInUnits / maxV * chartH, cs.primary),
-                        const SizedBox(width: 3.0),
-                        _bar(m.sellOutUnits / maxV * chartH, acc.tealBase),
-                      ]),
-                      M3Spacing.gapXXS,
-                      Text(m.monthEn.length > 3 ? m.monthEn.substring(0, 3) : m.monthEn,
-                          style: theme.textTheme.labelSmall),
-                    ]),
+                    message:
+                        '${m.monthEn}: Sell-In ${_fmtInt(m.sellInUnits)} · Sell-Out ${_fmtInt(m.sellOutUnits)}',
+                    child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                _bar(m.sellInUnits / maxV * chartH, cs.primary),
+                                const SizedBox(width: 3.0),
+                                _bar(m.sellOutUnits / maxV * chartH,
+                                    acc.tealBase),
+                              ]),
+                          M3Spacing.gapXXS,
+                          Text(
+                              m.monthEn.length > 3
+                                  ? m.monthEn.substring(0, 3)
+                                  : m.monthEn,
+                              style: theme.textTheme.labelSmall),
+                        ]),
                   ),
                 ),
             ]),
@@ -662,22 +758,25 @@ class _MonthlyBars extends StatelessWidget {
   }
 
   Widget _plotArea(Widget plot, double minH) => fill
-      ? Expanded(child: ConstrainedBox(constraints: BoxConstraints(minHeight: minH), child: plot))
+      ? Expanded(
+          child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: minH), child: plot))
       : SizedBox(height: minH, child: plot);
 
-  Widget _bar(double h, Color c) => Container(
+  Widget _bar(double h, Color c) => M3TonalSurface(
+        color: c,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(4.0)),
         width: 16.0,
         height: h.clamp(2.0, 180.0),
-        decoration: BoxDecoration(
-          color: c,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(4.0)),
-        ),
+        child: const SizedBox.shrink(),
       );
 }
 
 /// Grey shades for the named competitors (strongest first); MD3 theme roles only.
-Color _competitorShade(M3AccentRoles acc, int i) =>
-    [acc.competitorStrong, acc.competitor, acc.competitorSurface][i.clamp(0, 2)];
+/// The 3rd shade uses `outline` (≈ 4.2:1 on surface); `competitorSurface`
+/// (≈ 1.4:1) is reserved for tracks/backgrounds, never for a visible mark.
+Color _competitorShade(M3AccentRoles acc, ColorScheme cs, int i) =>
+    [acc.competitorStrong, acc.competitor, cs.outline][i.clamp(0, 2)];
 
 /// Category share bar: ours, then the top 3 named competitors, then everyone else.
 class _CompetitorBar extends StatelessWidget {
@@ -695,7 +794,8 @@ class _CompetitorBar extends StatelessWidget {
     int f(double v) => (v * 10).round();
     final segs = <(double, Color)>[
       (ours, cs.primary),
-      for (final (i, c) in named.indexed) (c.sharePct, _competitorShade(acc, i)),
+      for (final (i, c) in named.indexed)
+        (c.sharePct, _competitorShade(acc, Theme.of(context).colorScheme, i)),
       (rest, cs.surfaceContainerHighest),
     ].where((e) => f(e.$1) > 0).toList();
     return ClipRRect(
@@ -703,7 +803,8 @@ class _CompetitorBar extends StatelessWidget {
       child: SizedBox(
         height: 6.0,
         child: Row(children: [
-          for (final e in segs) Expanded(flex: f(e.$1), child: ColoredBox(color: e.$2)),
+          for (final e in segs)
+            Expanded(flex: f(e.$1), child: ColoredBox(color: e.$2)),
         ]),
       ),
     );
@@ -738,7 +839,7 @@ class _Donut extends StatelessWidget {
             backgroundColor: acc.competitorSurface,
           ),
         ),
-        Text(label, style: style?.copyWith(fontWeight: FontWeight.w800)),
+        Text(label, style: style),
       ]);
     });
   }
@@ -760,7 +861,8 @@ class _EqualHeightRow extends MultiChildRenderObjectWidget {
       _RenderEqualHeightRow(spacing: spacing, textDirection: textDirection);
 
   @override
-  void updateRenderObject(BuildContext context, _RenderEqualHeightRow renderObject) {
+  void updateRenderObject(
+      BuildContext context, _RenderEqualHeightRow renderObject) {
     renderObject
       ..spacing = spacing
       ..textDirection = textDirection;
@@ -774,10 +876,12 @@ class _FillColumn extends MultiChildRenderObjectWidget {
   final TextDirection textDirection;
 
   @override
-  RenderObject createRenderObject(BuildContext context) => _RenderFillColumn(textDirection: textDirection);
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderFillColumn(textDirection: textDirection);
 
   @override
-  void updateRenderObject(BuildContext context, _RenderFillColumn renderObject) {
+  void updateRenderObject(
+      BuildContext context, _RenderFillColumn renderObject) {
     renderObject.textDirection = textDirection;
   }
 }
@@ -787,7 +891,8 @@ class _GrowingColumn extends MultiChildRenderObjectWidget {
   const _GrowingColumn({required super.children});
 
   @override
-  RenderObject createRenderObject(BuildContext context) => _RenderGrowingColumn();
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderGrowingColumn();
 }
 
 /// Category tile grid. Two columns from [twoColumnMinWidth], one below that.
@@ -811,7 +916,8 @@ class _GrowingGrid extends MultiChildRenderObjectWidget {
       );
 
   @override
-  void updateRenderObject(BuildContext context, _RenderGrowingGrid renderObject) {
+  void updateRenderObject(
+      BuildContext context, _RenderGrowingGrid renderObject) {
     renderObject
       ..spacing = spacing
       ..twoColumnMinWidth = twoColumnMinWidth
@@ -821,7 +927,8 @@ class _GrowingGrid extends MultiChildRenderObjectWidget {
 
 /// One SKU share row. Extra height thickens the bar, then the padding.
 class _SkuRow extends MultiChildRenderObjectWidget {
-  _SkuRow({required Widget title, required Widget category, required Widget bar})
+  _SkuRow(
+      {required Widget title, required Widget category, required Widget bar})
       : super(children: [title, category, bar]);
 
   @override
@@ -831,13 +938,17 @@ class _SkuRow extends MultiChildRenderObjectWidget {
 /// Category tile: donut on the start side, copy beside it. Extra height
 /// enlarges the donut (capped) and centers both in the tile.
 class _ShareTile extends MultiChildRenderObjectWidget {
-  _ShareTile({required Widget donut, required Widget details, required this.textDirection})
+  _ShareTile(
+      {required Widget donut,
+      required Widget details,
+      required this.textDirection})
       : super(children: [donut, details]);
 
   final TextDirection textDirection;
 
   @override
-  RenderObject createRenderObject(BuildContext context) => _RenderShareTile(textDirection: textDirection);
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderShareTile(textDirection: textDirection);
 
   @override
   void updateRenderObject(BuildContext context, _RenderShareTile renderObject) {
@@ -847,7 +958,8 @@ class _ShareTile extends MultiChildRenderObjectWidget {
 
 class _OffsetParentData extends ContainerBoxParentData<RenderBox> {}
 
-mixin _OffsetChildren on ContainerRenderObjectMixin<RenderBox, _OffsetParentData> {
+mixin _OffsetChildren
+    on ContainerRenderObjectMixin<RenderBox, _OffsetParentData> {
   void setupOffsetParentData(RenderBox child) {
     if (child.parentData is! _OffsetParentData) {
       child.parentData = _OffsetParentData();
@@ -882,7 +994,8 @@ mixin _OffsetChildren on ContainerRenderObjectMixin<RenderBox, _OffsetParentData
       final hit = result.addWithPaintOffset(
         offset: pd.offset,
         position: position,
-        hitTest: (BoxHitTestResult result, Offset transformed) => current.hitTest(result, position: transformed),
+        hitTest: (BoxHitTestResult result, Offset transformed) =>
+            current.hitTest(result, position: transformed),
       );
       if (hit) return true;
       child = pd.previousSibling;
@@ -892,8 +1005,11 @@ mixin _OffsetChildren on ContainerRenderObjectMixin<RenderBox, _OffsetParentData
 }
 
 class _RenderEqualHeightRow extends RenderBox
-    with ContainerRenderObjectMixin<RenderBox, _OffsetParentData>, _OffsetChildren {
-  _RenderEqualHeightRow({required double spacing, required TextDirection textDirection})
+    with
+        ContainerRenderObjectMixin<RenderBox, _OffsetParentData>,
+        _OffsetChildren {
+  _RenderEqualHeightRow(
+      {required double spacing, required TextDirection textDirection})
       : _spacing = spacing,
         _textDirection = textDirection;
 
@@ -923,7 +1039,8 @@ class _RenderEqualHeightRow extends RenderBox
   }
 
   @override
-  double computeMinIntrinsicHeight(double width) => computeMaxIntrinsicHeight(width);
+  double computeMinIntrinsicHeight(double width) =>
+      computeMaxIntrinsicHeight(width);
 
   @override
   double computeMaxIntrinsicHeight(double width) {
@@ -953,17 +1070,22 @@ class _RenderEqualHeightRow extends RenderBox
     final n = kids.length;
     for (var i = 0; i < n; i++) {
       final child = kids[i];
-      child.layout(BoxConstraints.tightFor(width: childW, height: maxH), parentUsesSize: true);
+      child.layout(BoxConstraints.tightFor(width: childW, height: maxH),
+          parentUsesSize: true);
       final slot = textDirection == TextDirection.rtl ? n - 1 - i : i;
-      (child.parentData! as _OffsetParentData).offset = Offset(slot * (childW + spacing), 0);
+      (child.parentData! as _OffsetParentData).offset =
+          Offset(slot * (childW + spacing), 0);
     }
     size = constraints.constrain(Size(width.isFinite ? width : 0, maxH));
   }
 }
 
 class _RenderFillColumn extends RenderBox
-    with ContainerRenderObjectMixin<RenderBox, _OffsetParentData>, _OffsetChildren {
-  _RenderFillColumn({required TextDirection textDirection}) : _textDirection = textDirection;
+    with
+        ContainerRenderObjectMixin<RenderBox, _OffsetParentData>,
+        _OffsetChildren {
+  _RenderFillColumn({required TextDirection textDirection})
+      : _textDirection = textDirection;
 
   TextDirection _textDirection;
   TextDirection get textDirection => _textDirection;
@@ -977,7 +1099,8 @@ class _RenderFillColumn extends RenderBox
   void setupParentData(RenderBox child) => setupOffsetParentData(child);
 
   @override
-  double computeMinIntrinsicHeight(double width) => computeMaxIntrinsicHeight(width);
+  double computeMinIntrinsicHeight(double width) =>
+      computeMaxIntrinsicHeight(width);
 
   @override
   double computeMaxIntrinsicHeight(double width) {
@@ -1006,7 +1129,8 @@ class _RenderFillColumn extends RenderBox
     var y = 0.0;
     for (final child in kids.sublist(0, kids.length - 1)) {
       child.layout(BoxConstraints(maxWidth: width), parentUsesSize: true);
-      final x = textDirection == TextDirection.rtl ? width - child.size.width : 0.0;
+      final x =
+          textDirection == TextDirection.rtl ? width - child.size.width : 0.0;
       (child.parentData! as _OffsetParentData).offset = Offset(x, y);
       y += child.size.height;
     }
@@ -1014,19 +1138,23 @@ class _RenderFillColumn extends RenderBox
     final flexH = constraints.hasBoundedHeight
         ? math.max(flexNatural, constraints.maxHeight - y)
         : flexNatural;
-    flex.layout(BoxConstraints.tightFor(width: width, height: flexH), parentUsesSize: true);
+    flex.layout(BoxConstraints.tightFor(width: width, height: flexH),
+        parentUsesSize: true);
     (flex.parentData! as _OffsetParentData).offset = Offset(0, y);
     size = constraints.constrain(Size(width, y + flex.size.height));
   }
 }
 
 class _RenderGrowingColumn extends RenderBox
-    with ContainerRenderObjectMixin<RenderBox, _OffsetParentData>, _OffsetChildren {
+    with
+        ContainerRenderObjectMixin<RenderBox, _OffsetParentData>,
+        _OffsetChildren {
   @override
   void setupParentData(RenderBox child) => setupOffsetParentData(child);
 
   @override
-  double computeMinIntrinsicHeight(double width) => computeMaxIntrinsicHeight(width);
+  double computeMinIntrinsicHeight(double width) =>
+      computeMaxIntrinsicHeight(width);
 
   @override
   double computeMaxIntrinsicHeight(double width) {
@@ -1047,14 +1175,19 @@ class _RenderGrowingColumn extends RenderBox
   void performLayout() {
     final width = constraints.hasBoundedWidth ? constraints.maxWidth : 0.0;
     final kids = offsetChildren();
-    final naturals = [for (final child in kids) child.getMaxIntrinsicHeight(width)];
+    final naturals = [
+      for (final child in kids) child.getMaxIntrinsicHeight(width)
+    ];
     final natural = naturals.fold<double>(0, (a, b) => a + b);
-    final avail = constraints.hasBoundedHeight ? math.max(constraints.maxHeight, natural) : natural;
+    final avail = constraints.hasBoundedHeight
+        ? math.max(constraints.maxHeight, natural)
+        : natural;
     final extra = kids.isEmpty ? 0.0 : (avail - natural) / kids.length;
     var y = 0.0;
     for (var i = 0; i < kids.length; i++) {
       final h = naturals[i] + extra;
-      kids[i].layout(BoxConstraints.tightFor(width: width, height: h), parentUsesSize: true);
+      kids[i].layout(BoxConstraints.tightFor(width: width, height: h),
+          parentUsesSize: true);
       (kids[i].parentData! as _OffsetParentData).offset = Offset(0, y);
       y += h;
     }
@@ -1063,7 +1196,9 @@ class _RenderGrowingColumn extends RenderBox
 }
 
 class _RenderGrowingGrid extends RenderBox
-    with ContainerRenderObjectMixin<RenderBox, _OffsetParentData>, _OffsetChildren {
+    with
+        ContainerRenderObjectMixin<RenderBox, _OffsetParentData>,
+        _OffsetChildren {
   _RenderGrowingGrid({
     required double spacing,
     required double twoColumnMinWidth,
@@ -1117,7 +1252,8 @@ class _RenderGrowingGrid extends RenderBox
   }
 
   @override
-  double computeMinIntrinsicHeight(double width) => computeMaxIntrinsicHeight(width);
+  double computeMinIntrinsicHeight(double width) =>
+      computeMaxIntrinsicHeight(width);
 
   @override
   double computeMaxIntrinsicHeight(double width) {
@@ -1137,7 +1273,9 @@ class _RenderGrowingGrid extends RenderBox
     final kids = offsetChildren();
     final cols = _columns(width, kids.length);
     final natural = _heightFor(width, kids, cols);
-    final avail = constraints.hasBoundedHeight ? math.max(constraints.maxHeight, natural) : natural;
+    final avail = constraints.hasBoundedHeight
+        ? math.max(constraints.maxHeight, natural)
+        : natural;
     if (kids.isEmpty) {
       size = constraints.constrain(Size(width, 0));
       return;
@@ -1146,7 +1284,8 @@ class _RenderGrowingGrid extends RenderBox
     final rows = (kids.length + cols - 1) ~/ cols;
     final rowH = List<double>.filled(rows, 0);
     for (var i = 0; i < kids.length; i++) {
-      rowH[i ~/ cols] = math.max(rowH[i ~/ cols], kids[i].getMaxIntrinsicHeight(cellW));
+      rowH[i ~/ cols] =
+          math.max(rowH[i ~/ cols], kids[i].getMaxIntrinsicHeight(cellW));
     }
     final extra = (avail - natural) / rows;
     var y = 0.0;
@@ -1155,7 +1294,8 @@ class _RenderGrowingGrid extends RenderBox
       for (var c = 0; c < cols; c++) {
         final i = r * cols + c;
         if (i >= kids.length) break;
-        kids[i].layout(BoxConstraints.tightFor(width: cellW, height: h), parentUsesSize: true);
+        kids[i].layout(BoxConstraints.tightFor(width: cellW, height: h),
+            parentUsesSize: true);
         final x = textDirection == TextDirection.rtl
             ? width - (c + 1) * cellW - c * spacing
             : c * (cellW + spacing);
@@ -1169,7 +1309,9 @@ class _RenderGrowingGrid extends RenderBox
 }
 
 class _RenderSkuRow extends RenderBox
-    with ContainerRenderObjectMixin<RenderBox, _OffsetParentData>, _OffsetChildren {
+    with
+        ContainerRenderObjectMixin<RenderBox, _OffsetParentData>,
+        _OffsetChildren {
   static const double _vPad = 6.0;
   static const double _gap = 4.0;
   static const double _barH = 18.0;
@@ -1185,7 +1327,8 @@ class _RenderSkuRow extends RenderBox
   }
 
   @override
-  double computeMinIntrinsicHeight(double width) => computeMaxIntrinsicHeight(width);
+  double computeMinIntrinsicHeight(double width) =>
+      computeMaxIntrinsicHeight(width);
 
   @override
   double computeMaxIntrinsicHeight(double width) {
@@ -1215,13 +1358,17 @@ class _RenderSkuRow extends RenderBox
     final loose = BoxConstraints(minWidth: width, maxWidth: width);
     kids[0].layout(loose, parentUsesSize: true);
     kids[1].layout(loose, parentUsesSize: true);
-    final natural = _vPad * 2 + kids[0].size.height + kids[1].size.height + _gap + _barH;
-    final used = constraints.hasBoundedHeight ? math.max(constraints.maxHeight, natural) : natural;
+    final natural =
+        _vPad * 2 + kids[0].size.height + kids[1].size.height + _gap + _barH;
+    final used = constraints.hasBoundedHeight
+        ? math.max(constraints.maxHeight, natural)
+        : natural;
     final extra = math.max(0.0, used - natural);
     final barExtra = math.min(_barExtraMax, extra);
     final vPad = _vPad + (extra - barExtra) / 2;
     final barH = _barH + barExtra;
-    kids[2].layout(BoxConstraints.tightFor(width: width, height: barH), parentUsesSize: true);
+    kids[2].layout(BoxConstraints.tightFor(width: width, height: barH),
+        parentUsesSize: true);
     var y = vPad;
     (kids[0].parentData! as _OffsetParentData).offset = Offset(0, y);
     y += kids[0].size.height;
@@ -1233,8 +1380,11 @@ class _RenderSkuRow extends RenderBox
 }
 
 class _RenderShareTile extends RenderBox
-    with ContainerRenderObjectMixin<RenderBox, _OffsetParentData>, _OffsetChildren {
-  _RenderShareTile({required TextDirection textDirection}) : _textDirection = textDirection;
+    with
+        ContainerRenderObjectMixin<RenderBox, _OffsetParentData>,
+        _OffsetChildren {
+  _RenderShareTile({required TextDirection textDirection})
+      : _textDirection = textDirection;
 
   static const double _minDonut = 64.0;
   static const double _maxDonut = 148.0;
@@ -1262,13 +1412,15 @@ class _RenderShareTile extends RenderBox
       math.max(0.0, width - pad * 2 - _gap - donut);
 
   @override
-  double computeMinIntrinsicHeight(double width) => computeMaxIntrinsicHeight(width);
+  double computeMinIntrinsicHeight(double width) =>
+      computeMaxIntrinsicHeight(width);
 
   @override
   double computeMaxIntrinsicHeight(double width) {
     final kids = _parts();
     if (kids == null) return 0;
-    final textH = kids[1].getMaxIntrinsicHeight(_textWidth(width, _minDonut, _pad));
+    final textH =
+        kids[1].getMaxIntrinsicHeight(_textWidth(width, _minDonut, _pad));
     return math.max(_minDonut, textH) + _pad * 2;
   }
 
@@ -1287,14 +1439,18 @@ class _RenderShareTile extends RenderBox
       return;
     }
     final natural = getMaxIntrinsicHeight(width);
-    final used = constraints.hasBoundedHeight ? math.max(constraints.maxHeight, natural) : natural;
+    final used = constraints.hasBoundedHeight
+        ? math.max(constraints.maxHeight, natural)
+        : natural;
     // Only the height added to match the sibling card enlarges the donut.
     // A tall competitor list keeps the compact 64dp ring.
     final extra = math.max(0.0, used - natural);
     final donut = (_minDonut + extra).clamp(_minDonut, _maxDonut);
     final textW = _textWidth(width, donut, _pad);
-    kids[1].layout(BoxConstraints(minWidth: textW, maxWidth: textW), parentUsesSize: true);
-    kids[0].layout(BoxConstraints.tightFor(width: donut, height: donut), parentUsesSize: true);
+    kids[1].layout(BoxConstraints(minWidth: textW, maxWidth: textW),
+        parentUsesSize: true);
+    kids[0].layout(BoxConstraints.tightFor(width: donut, height: donut),
+        parentUsesSize: true);
     final contentH = math.max(0.0, used - _pad * 2);
     final donutY = _pad + math.max(0.0, (contentH - donut) / 2);
     final textY = _pad + math.max(0.0, (contentH - kids[1].size.height) / 2);

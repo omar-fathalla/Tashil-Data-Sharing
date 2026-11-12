@@ -1,6 +1,6 @@
 import 'dart:math' as math;
-import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/widgets/m3_tonal_surface.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
@@ -178,7 +178,8 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
     }).toList();
   }
 
-  List<_ChainSeriesData> _extractSeries(List<DailyTrendItem> effectiveTrends, ColorScheme colorScheme) {
+  List<_ChainSeriesData> _extractSeries(
+      List<DailyTrendItem> effectiveTrends, ColorScheme colorScheme) {
     final chainTotals = <String, double>{};
     for (final t in effectiveTrends) {
       t.chainRevenues.forEach((chain, rev) {
@@ -188,13 +189,15 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
       });
       for (final d in t.chainDetails) {
         if (d.revenue > 0 && !chainTotals.containsKey(d.retailerChain)) {
-          chainTotals[d.retailerChain] = (chainTotals[d.retailerChain] ?? 0.0) + d.revenue;
+          chainTotals[d.retailerChain] =
+              (chainTotals[d.retailerChain] ?? 0.0) + d.revenue;
         }
       }
     }
 
     if (chainTotals.isEmpty) {
-      final totalRev = effectiveTrends.fold<double>(0.0, (s, e) => s + e.revenue);
+      final totalRev =
+          effectiveTrends.fold<double>(0.0, (s, e) => s + e.revenue);
       return [
         _ChainSeriesData(
           chainCode: 'total',
@@ -208,16 +211,26 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
       ];
     }
 
-    const preferredOrder = ['fathalla', 'gomla', 'beet-elgomla', 'carrefour', 'spinneys', 'metro', 'seoudi', 'kazyon'];
-    final activeChains = chainTotals.keys.where((k) => (chainTotals[k] ?? 0) > 0).toList()
-      ..sort((a, b) {
-        final idxA = preferredOrder.indexOf(a.toLowerCase());
-        final idxB = preferredOrder.indexOf(b.toLowerCase());
-        if (idxA != -1 && idxB != -1) return idxA.compareTo(idxB);
-        if (idxA != -1) return -1;
-        if (idxB != -1) return 1;
-        return (chainTotals[b] ?? 0).compareTo(chainTotals[a] ?? 0);
-      });
+    const preferredOrder = [
+      'fathalla',
+      'gomla',
+      'beet-elgomla',
+      'carrefour',
+      'spinneys',
+      'metro',
+      'seoudi',
+      'kazyon'
+    ];
+    final activeChains =
+        chainTotals.keys.where((k) => (chainTotals[k] ?? 0) > 0).toList()
+          ..sort((a, b) {
+            final idxA = preferredOrder.indexOf(a.toLowerCase());
+            final idxB = preferredOrder.indexOf(b.toLowerCase());
+            if (idxA != -1 && idxB != -1) return idxA.compareTo(idxB);
+            if (idxA != -1) return -1;
+            if (idxB != -1) return 1;
+            return (chainTotals[b] ?? 0).compareTo(chainTotals[a] ?? 0);
+          });
 
     return activeChains.map((code) {
       final values = <double>[];
@@ -271,7 +284,8 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
           width: double.infinity,
           height: 320.0,
           alignment: Alignment.center,
-          child: Text('لا توجد بيانات لهذه الفترة', style: theme.textTheme.bodyMedium),
+          child: Text('لا توجد بيانات لهذه الفترة',
+              style: theme.textTheme.bodyMedium),
         ),
       );
     }
@@ -290,7 +304,8 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
     }
     final showSellIn = seriesList.any((s) => s.hasSellIn);
     if (maxVal <= 0) {
-      maxVal = effectiveTrends.map((e) => e.revenue).fold<double>(0.0, math.max);
+      maxVal =
+          effectiveTrends.map((e) => e.revenue).fold<double>(0.0, math.max);
     }
     if (maxVal <= 0) maxVal = 1.0;
 
@@ -312,7 +327,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                     Text(
                       'اتجاه Sell-Out الشهري',
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -324,7 +339,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                           : 'Monthly Sell-Out Trend',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: colorScheme.primary,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         letterSpacing: 0.2,
                       ),
                       maxLines: 1,
@@ -346,25 +361,20 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                   spacing: 6.0,
                   runSpacing: 6.0,
                   children: seriesList.map<Widget>((series) {
-                    final parts = ChainSharePie.splitBilingualLabel(series.displayName);
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
-                      decoration: BoxDecoration(
-                        color: series.color.withOpacity(0.12),
-                        borderRadius: M3Shape.radiusLg,
-                        border: Border.all(color: series.color.withOpacity(0.4)),
-                      ),
+                    final parts =
+                        ChainSharePie.splitBilingualLabel(series.displayName);
+                    return M3TonalSurface(
+                      // Neutral tonal pill; the series colour is shown by the
+                      // dot (graphic ≥ 3:1), text stays onSurface.
+                      color: colorScheme.surfaceContainerHigh,
+                      borderRadius: M3Shape.radiusLg,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10.0, vertical: 5.0),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
-                            width: 9.0,
-                            height: 9.0,
-                            decoration: BoxDecoration(
-                              color: series.color,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
+                          CircleAvatar(
+                              radius: 4.5, backgroundColor: series.color),
                           const SizedBox(width: 6.0),
                           Flexible(
                             child: Column(
@@ -375,7 +385,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                                   parts.ar,
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: colorScheme.onSurface,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                   maxLines: 1,
@@ -386,7 +396,6 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.w600,
-                                      fontSize: M3FontSize.microPlus,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                     maxLines: 1,
@@ -426,10 +435,8 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                           return Text(
                             _formatYAxisLabel(val),
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant.withOpacity(0.85),
-                              fontWeight: FontWeight.bold,
-                              fontSize: M3FontSize.microPlus,
-                              fontFamily: 'Cairo',
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
                             ),
                           );
                         }),
@@ -445,12 +452,15 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                           onHover: (event) {
                             final count = effectiveTrends.length;
                             if (count <= 1) {
-                              if (hoveredIndex != 0) setState(() => hoveredIndex = 0);
+                              if (hoveredIndex != 0) {
+                                setState(() => hoveredIndex = 0);
+                              }
                               return;
                             }
                             final dx = event.localPosition.dx;
                             final step = constraints.maxWidth / count;
-                            final index = (dx / step).floor().clamp(0, count - 1);
+                            final index =
+                                (dx / step).floor().clamp(0, count - 1);
                             if (hoveredIndex != index) {
                               setState(() => hoveredIndex = index);
                             }
@@ -459,18 +469,20 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                           child: Stack(
                             children: [
                               CustomPaint(
-                                size: Size(constraints.maxWidth, constraints.maxHeight),
+                                size: Size(constraints.maxWidth,
+                                    constraints.maxHeight),
                                 painter: _TrendChartPainter(
                                   seriesList: seriesList,
                                   pointCount: effectiveTrends.length,
                                   maxVal: maxVal,
                                   hoveredIndex: hoveredIndex,
-                                  gridColor: colorScheme.outlineVariant.withOpacity(0.35),
+                                  gridColor: colorScheme.outlineVariant,
                                   surfaceColor: colorScheme.surface,
                                 ),
                               ),
                               // Hover tooltip
-                              if (hoveredIndex != null && hoveredIndex! < effectiveTrends.length)
+                              if (hoveredIndex != null &&
+                                  hoveredIndex! < effectiveTrends.length)
                                 _buildHoverIndicator(
                                   constraints.maxWidth,
                                   constraints.maxHeight,
@@ -509,28 +521,33 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 1.0),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 1.0),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
                                       label,
-                                      style: theme.textTheme.labelSmall?.copyWith(
-                                        color: isHovered ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                                        fontWeight: isHovered ? FontWeight.bold : FontWeight.w600,
-                                        fontSize: M3FontSize.tinyPlus,
-                                        fontFamily: 'Cairo',
+                                      style:
+                                          theme.textTheme.labelSmall?.copyWith(
+                                        color: isHovered
+                                            ? colorScheme.primary
+                                            : colorScheme.onSurfaceVariant,
+                                        fontWeight:
+                                            isHovered ? FontWeight.w600 : null,
                                       ),
                                     ),
                                     if (labelEn != null)
                                       Text(
                                         labelEn,
-                                        style: theme.textTheme.labelSmall?.copyWith(
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
                                           color: isHovered
                                               ? colorScheme.primary
-                                              : colorScheme.onSurfaceVariant.withOpacity(0.75),
-                                          fontWeight: isHovered ? FontWeight.bold : FontWeight.w500,
-                                          fontSize: M3FontSize.micro,
+                                              : colorScheme.onSurfaceVariant,
+                                          fontWeight: isHovered
+                                              ? FontWeight.w600
+                                              : null,
                                         ),
                                       ),
                                   ],
@@ -554,26 +571,25 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
   /// Legend key showing the line style used for Sell-Out (solid) or Sell-In (dashed).
   Widget _lineStyleKey(ThemeData theme, String label, {required bool dashed}) {
     final colorScheme = theme.colorScheme;
-    return Container(
+    return M3TonalSurface(
+      color: colorScheme.surfaceContainerHigh,
+      borderColor: colorScheme.outlineVariant,
+      borderRadius: M3Shape.radiusLg,
       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: M3Shape.radiusLg,
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           CustomPaint(
             size: const Size(22.0, 10.0),
-            painter: _LineKeyPainter(color: colorScheme.onSurfaceVariant, dashed: dashed),
+            painter: _LineKeyPainter(
+                color: colorScheme.onSurfaceVariant, dashed: dashed),
           ),
           const SizedBox(width: 6.0),
           Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(
               color: colorScheme.onSurface,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -617,13 +633,11 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
       left: (x - 95).clamp(0.0, math.max(0.0, width - 210.0)),
       top: (y - 95).clamp(0.0, math.max(0.0, height - 135.0)),
       child: IgnorePointer(
-        child: Container(
-          constraints: const BoxConstraints(minWidth: 175.0, maxWidth: 230.0),
+        child: M3TonalSurface(
+          color: colorScheme.inverseSurface,
+          borderRadius: M3Shape.radiusSm,
           padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-          decoration: BoxDecoration(
-            color: colorScheme.inverseSurface,
-            borderRadius: M3Shape.radiusSm,
-          ),
+          constraints: const BoxConstraints(minWidth: 175.0, maxWidth: 230.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -631,31 +645,32 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
               Text(
                 item.monthLabel.isNotEmpty ? item.monthLabel : item.date,
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onInverseSurface.withOpacity(0.95),
-                  fontWeight: FontWeight.bold,
-                  fontSize: M3FontSize.tinyPlus,
+                  color: colorScheme.onInverseSurface,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               if (hasDistinctDate)
                 Text(
                   item.date,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onInverseSurface.withOpacity(0.72),
-                    fontSize: M3FontSize.micro,
+                    color: colorScheme.onInverseSurface,
                   ),
                 ),
               const SizedBox(height: 5.0),
               ...seriesList.map((s) {
                 final val = idx < s.values.length ? s.values[idx] : 0.0;
-                final growth = idx < s.growthPcts.length ? s.growthPcts[idx] : 0.0;
+                final growth =
+                    idx < s.growthPcts.length ? s.growthPcts[idx] : 0.0;
                 final growthStr = (val > 0 && growth != 0.0)
                     ? ' (\u200E${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(1)}%\u200E)'
                     : '';
                 final sellOutText = val > 0
                     ? '${CurrencyFormatter.formatEGP(val)}$growthStr'
                     : 'لم تُرفع بيانات بعد';
-                final valueLabel = showSellIn ? 'Sell-Out: $sellOutText' : sellOutText;
-                final sellIn = idx < s.sellInValues.length ? s.sellInValues[idx] : null;
+                final valueLabel =
+                    showSellIn ? 'Sell-Out: $sellOutText' : sellOutText;
+                final sellIn =
+                    idx < s.sellInValues.length ? s.sellInValues[idx] : null;
                 final sellInLabel =
                     'Sell-In (صافي بعد المرتجعات): ${sellIn != null ? CurrencyFormatter.formatEGP(sellIn) : 'لا توجد بيانات'}';
                 final parts = ChainSharePie.splitBilingualLabel(s.displayName);
@@ -665,14 +680,12 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 7.0,
-                        height: 7.0,
-                        margin: const EdgeInsets.only(top: 4.0),
-                        decoration: BoxDecoration(
-                          color: val > 0 ? s.color : s.color.withOpacity(0.45),
-                          shape: BoxShape.circle,
-                        ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: CircleAvatar(
+                            radius: 3.5,
+                            backgroundColor:
+                                val > 0 ? s.color : colorScheme.outline),
                       ),
                       const SizedBox(width: 5.0),
                       Flexible(
@@ -685,9 +698,8 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: val > 0
                                     ? colorScheme.onInverseSurface
-                                    : colorScheme.onInverseSurface.withOpacity(0.65),
-                                fontWeight: FontWeight.bold,
-                                fontSize: M3FontSize.tinyPlus,
+                                    : colorScheme.onInverseSurface,
+                                fontWeight: FontWeight.w600,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -695,8 +707,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                               Text(
                                 parts.en!,
                                 style: theme.textTheme.labelSmall?.copyWith(
-                                  color: colorScheme.onInverseSurface.withOpacity(0.7),
-                                  fontSize: M3FontSize.micro,
+                                  color: colorScheme.onInverseSurface,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -705,10 +716,9 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                               valueLabel,
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: val > 0
-                                    ? colorScheme.onInverseSurface.withOpacity(0.95)
-                                    : colorScheme.onInverseSurface.withOpacity(0.65),
-                                fontWeight: val > 0 ? FontWeight.w700 : FontWeight.normal,
-                                fontSize: M3FontSize.tiny,
+                                    ? colorScheme.onInverseSurface
+                                    : colorScheme.onInverseSurface,
+                                fontWeight: val > 0 ? FontWeight.w600 : null,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -717,10 +727,11 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                                 sellInLabel,
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: sellIn != null
-                                      ? colorScheme.onInverseSurface.withOpacity(0.9)
-                                      : colorScheme.onInverseSurface.withOpacity(0.6),
-                                  fontWeight: sellIn != null ? FontWeight.w600 : FontWeight.normal,
-                                  fontSize: M3FontSize.tiny,
+                                      ? colorScheme.onInverseSurface
+                                      : colorScheme.onInverseSurface,
+                                  fontWeight: sellIn != null
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -732,36 +743,32 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                 );
               }),
               if (seriesList.length > 1) ...[
-                Divider(height: 6.0, color: colorScheme.onInverseSurface.withOpacity(0.2)),
+                Divider(height: 6.0, color: colorScheme.onInverseSurface),
                 Text(
                   'الإجمالي',
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onInverseSurface.withOpacity(0.85),
-                    fontWeight: FontWeight.bold,
-                    fontSize: M3FontSize.microPlus,
+                    color: colorScheme.onInverseSurface,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 Text(
                   CurrencyFormatter.formatEGP(item.revenue),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: colorScheme.onInverseSurface,
-                    fontWeight: FontWeight.bold,
-                    fontSize: M3FontSize.tiny,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 Text(
                   '${CurrencyFormatter.formatUnits(item.units)} وحدة',
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onInverseSurface.withOpacity(0.8),
-                    fontSize: M3FontSize.microPlus,
+                    color: colorScheme.onInverseSurface,
                   ),
                 ),
               ] else
                 Text(
                   '${CurrencyFormatter.formatUnits(item.units)} وحدة',
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onInverseSurface.withOpacity(0.8),
-                    fontSize: M3FontSize.tiny,
+                    color: colorScheme.onInverseSurface,
                   ),
                 ),
             ],
@@ -818,14 +825,15 @@ class _TrendChartPainter extends CustomPainter {
         if (val <= 0) continue;
         final y = baselineY - (val / maxVal * usableHeight);
         final offsetX = (sIdx - (seriesList.length - 1) / 2.0) * 28.0;
-        final pt = Offset((centerX + offsetX).clamp(24.0, size.width - 24.0), y);
+        final pt =
+            Offset((centerX + offsetX).clamp(24.0, size.width - 24.0), y);
 
         final guidePaint = Paint()
-          ..color = series.color.withOpacity(0.25)
+          ..color = series.color.withValues(alpha: 0.25)
           ..strokeWidth = 2.0;
         canvas.drawLine(Offset(0, y), Offset(size.width, y), guidePaint);
 
-        final glowPaint = Paint()..color = series.color.withOpacity(0.22);
+        final glowPaint = Paint()..color = series.color.withValues(alpha: 0.22);
         final dotBgPaint = Paint()..color = surfaceColor;
         final dotPaint = Paint()..color = series.color;
         canvas.drawCircle(pt, 12.0, glowPaint);
@@ -834,14 +842,19 @@ class _TrendChartPainter extends CustomPainter {
       }
       for (int sIdx = 0; sIdx < seriesList.length; sIdx++) {
         final series = seriesList[sIdx];
-        final v = series.sellInValues.isNotEmpty ? series.sellInValues.first : null;
+        final v =
+            series.sellInValues.isNotEmpty ? series.sellInValues.first : null;
         if (v == null || v <= 0) continue;
         final offsetX = (sIdx - (seriesList.length - 1) / 2.0) * 28.0 + 12.0;
         final pt = Offset((centerX + offsetX).clamp(24.0, size.width - 24.0),
             baselineY - (v / maxVal * usableHeight));
-        _drawDashedPath(canvas, Path()..moveTo(0, pt.dy)..lineTo(size.width, pt.dy),
+        _drawDashedPath(
+            canvas,
+            Path()
+              ..moveTo(0, pt.dy)
+              ..lineTo(size.width, pt.dy),
             Paint()
-              ..color = series.color.withOpacity(0.3)
+              ..color = series.color.withValues(alpha: 0.3)
               ..strokeWidth = 1.5
               ..style = PaintingStyle.stroke);
         _drawSellInDot(canvas, pt, series.color, true);
@@ -852,12 +865,15 @@ class _TrendChartPainter extends CustomPainter {
     final double stepX = size.width / pointCount;
 
     // Draw vertical hover guide line
-    if (hoveredIndex != null && hoveredIndex! >= 0 && hoveredIndex! < pointCount) {
+    if (hoveredIndex != null &&
+        hoveredIndex! >= 0 &&
+        hoveredIndex! < pointCount) {
       final hx = (hoveredIndex! + 0.5) * stepX;
       final hoverLinePaint = Paint()
-        ..color = gridColor.withOpacity(0.85)
+        ..color = gridColor
         ..strokeWidth = 1.2;
-      canvas.drawLine(Offset(hx, topPad), Offset(hx, baselineY), hoverLinePaint);
+      canvas.drawLine(
+          Offset(hx, topPad), Offset(hx, baselineY), hoverLinePaint);
     }
 
     // Draw each chain's curve in its own brand color
@@ -880,8 +896,8 @@ class _TrendChartPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          series.color.withOpacity(seriesList.length > 1 ? 0.16 : 0.25),
-          series.color.withOpacity(0.0),
+          series.color.withValues(alpha: seriesList.length > 1 ? 0.16 : 0.25),
+          series.color.withValues(alpha: 0.0),
         ],
       );
 
@@ -889,7 +905,7 @@ class _TrendChartPainter extends CustomPainter {
         final pt = activePoints.first;
         // Subtle dotted reference stem down to baseline
         final dashPaint = Paint()
-          ..color = series.color.withOpacity(0.35)
+          ..color = series.color.withValues(alpha: 0.35)
           ..strokeWidth = 1.5;
         double curY = baselineY;
         while (curY > pt.dy + 8.0) {
@@ -899,8 +915,10 @@ class _TrendChartPainter extends CustomPainter {
         }
 
         // Concentric glow rings for single recorded month
-        canvas.drawCircle(pt, 14.0, Paint()..color = series.color.withOpacity(0.18));
-        canvas.drawCircle(pt, 8.0, Paint()..color = series.color.withOpacity(0.35));
+        canvas.drawCircle(
+            pt, 14.0, Paint()..color = series.color.withValues(alpha: 0.18));
+        canvas.drawCircle(
+            pt, 8.0, Paint()..color = series.color.withValues(alpha: 0.35));
       } else {
         final path = Path();
         final fillPath = Path();
@@ -917,15 +935,18 @@ class _TrendChartPainter extends CustomPainter {
           final controlX2 = p0.dx + (p1.dx - p0.dx) / 2.0;
           final controlY2 = p1.dy;
 
-          path.cubicTo(controlX1, controlY1, controlX2, controlY2, p1.dx, p1.dy);
-          fillPath.cubicTo(controlX1, controlY1, controlX2, controlY2, p1.dx, p1.dy);
+          path.cubicTo(
+              controlX1, controlY1, controlX2, controlY2, p1.dx, p1.dy);
+          fillPath.cubicTo(
+              controlX1, controlY1, controlX2, controlY2, p1.dx, p1.dy);
         }
 
         fillPath.lineTo(activePoints.last.dx, baselineY);
         fillPath.close();
 
         final fillPaint = Paint()
-          ..shader = fillGradient.createShader(Rect.fromLTWH(0, 0, size.width, baselineY))
+          ..shader = fillGradient
+              .createShader(Rect.fromLTWH(0, 0, size.width, baselineY))
           ..style = PaintingStyle.fill;
         canvas.drawPath(fillPath, fillPaint);
 
@@ -949,11 +970,13 @@ class _TrendChartPainter extends CustomPainter {
           canvas.drawCircle(
             p,
             isHovered ? 10.0 : 9.0,
-            Paint()..color = series.color.withOpacity(0.28),
+            Paint()..color = series.color.withValues(alpha: 0.28),
           );
         }
-        canvas.drawCircle(p, (isHovered || isSingleActive) ? 5.6 : 4.0, dotBgPaint);
-        canvas.drawCircle(p, (isHovered || isSingleActive) ? 4.2 : 2.8, dotPaint);
+        canvas.drawCircle(
+            p, (isHovered || isSingleActive) ? 5.6 : 4.0, dotBgPaint);
+        canvas.drawCircle(
+            p, (isHovered || isSingleActive) ? 4.2 : 2.8, dotPaint);
       }
     }
 
@@ -964,14 +987,15 @@ class _TrendChartPainter extends CustomPainter {
 
   /// Dashed Sell-In curve in the chain's color, with hollow dots. Months without
   /// Sell-In data are skipped (the line joins the months that have data).
-  void _paintSellIn(Canvas canvas, _ChainSeriesData series, double stepX, double baselineY,
-      double usableHeight) {
+  void _paintSellIn(Canvas canvas, _ChainSeriesData series, double stepX,
+      double baselineY, double usableHeight) {
     final pts = <Offset>[];
     final idxs = <int>[];
     for (int i = 0; i < pointCount && i < series.sellInValues.length; i++) {
       final v = series.sellInValues[i];
       if (v == null || v <= 0) continue;
-      pts.add(Offset((i + 0.5) * stepX, baselineY - (v / maxVal * usableHeight)));
+      pts.add(
+          Offset((i + 0.5) * stepX, baselineY - (v / maxVal * usableHeight)));
       idxs.add(i);
     }
     if (pts.isEmpty) return;
@@ -987,7 +1011,7 @@ class _TrendChartPainter extends CustomPainter {
         canvas,
         path,
         Paint()
-          ..color = series.color.withOpacity(0.9)
+          ..color = series.color.withValues(alpha: 0.9)
           ..strokeWidth = 2.2
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round,
@@ -1045,7 +1069,8 @@ class _LineKeyPainter extends CustomPainter {
     }
     double x = 0.0;
     while (x < size.width) {
-      canvas.drawLine(Offset(x, y), Offset(math.min(x + 5.0, size.width), y), paint);
+      canvas.drawLine(
+          Offset(x, y), Offset(math.min(x + 5.0, size.width), y), paint);
       x += 8.0;
     }
   }

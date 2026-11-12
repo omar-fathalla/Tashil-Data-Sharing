@@ -49,12 +49,15 @@ class M3Feedback {
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
-              if (duplicateIdentifier != null && duplicateIdentifier.isNotEmpty) ...[
+              if (duplicateIdentifier != null &&
+                  duplicateIdentifier.isNotEmpty) ...[
                 M3Spacing.gapSM,
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12.0, vertical: 8.0),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    color: colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
                     borderRadius: M3Shape.radiusSm,
                   ),
                   child: Text(
@@ -133,7 +136,8 @@ class M3Feedback {
           identifier: TestIds.snackbarError,
           message: message,
           icon: Icons.error_outline_rounded,
-          iconColor: colorScheme.error,
+          // errorContainer on inverseSurface ≈ 10:1 (colorScheme.error ≈ 2:1).
+          iconColor: colorScheme.errorContainer,
           textColor: colorScheme.onInverseSurface,
         ),
       ),

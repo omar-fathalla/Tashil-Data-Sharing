@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/widgets/m3_card.dart';
 import 'package:tashil_web/core/network/api_client.dart';
-import 'package:tashil_web/core/theme/m3_shape.dart';
 import 'package:tashil_web/core/theme/m3_spacing.dart';
 import 'package:tashil_web/core/widgets/app_icons.dart';
 
@@ -27,14 +27,9 @@ class MonthlySummaryCard extends StatelessWidget {
     return Semantics(
       identifier: 'executive-monthly-summary',
       label: 'الملخص الشهري',
-      child: Container(
+      child: M3Card.outlined(
         key: const ValueKey('executive_monthly_summary'),
         padding: M3Spacing.pMd,
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerLow,
-          borderRadius: M3Shape.radiusLg,
-          border: Border.all(color: cs.outlineVariant.withOpacity(0.7)),
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -46,7 +41,7 @@ class MonthlySummaryCard extends StatelessWidget {
                   child: Text(
                     'الملخص الشهري التلقائي',
                     style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
