@@ -4,7 +4,7 @@ Desktop-first Material Design 3 (M3) executive web portal built for FMCG and ret
 
 ## Design System & M3 Standards
 - **Google Material Design 3 (M3)**: Full `useMaterial3: true` adherence with single seed dynamic color derivation (`ColorScheme.fromSeed`).
-- **Multi-Tenant Branding**: Dynamic seed switching between Adeco (`#1E3A8A`), Unilever (`#0D9488`), and PepsiCo (`#B91C1C`).
+- **Multi-Tenant Branding**: Dynamic seed switching between Adeco (`#35A211` ADCO logo green), Unilever (`#0D9488`), and PepsiCo (`#B91C1C`).
 - **Surface Container Tiers**: Explicit application of `surfaceContainerLow` (cards), `surfaceContainer` (sidebar), `surfaceContainerHigh` (dialogs/elevated metrics), and `surfaceContainerHighest` (inputs).
 - **Arabic RTL-First**: Native right-to-left layout directionality with Google Fonts **Cairo** (`GoogleFonts.cairoTextTheme`).
 - **M3 Window Size Classes**: Responsive breakpoints (<600dp Compact, 600-839dp Medium, 840-1199dp Expanded, 1200-1599dp Large, ≥1600dp Extra Large).

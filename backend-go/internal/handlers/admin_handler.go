@@ -448,7 +448,7 @@ func (h *AdminHandler) HandleCreateTenant(w http.ResponseWriter, r *http.Request
 
 	brandColor := strings.TrimSpace(req.BrandSeedColor)
 	if brandColor == "" {
-		brandColor = "#1E3A8A" // Default primary seed
+		brandColor = "#35A211" // ADCO logo green
 	}
 
 	portalURL := fmt.Sprintf("http://localhost:3000/portal/%s", slug)

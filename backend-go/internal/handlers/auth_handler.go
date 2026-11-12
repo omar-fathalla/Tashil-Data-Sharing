@@ -195,7 +195,7 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 				DisplayName:    user.FullName,
 				Slug:           user.TenantID,
 				PortalURL:      "http://localhost:3000/portal/" + user.TenantID,
-				BrandSeedColor: "#1E3A8A",
+				BrandSeedColor: "#35A211",
 				AdminEmail:     user.Email,
 			}
 		}
