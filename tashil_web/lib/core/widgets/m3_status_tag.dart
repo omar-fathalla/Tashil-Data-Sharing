@@ -11,6 +11,7 @@ class M3StatusTag extends StatelessWidget {
     this.tone = M3StatusTone.neutral,
     this.color,
     this.onColor,
+    this.icon,
   });
 
   final String label;
@@ -18,14 +19,23 @@ class M3StatusTag extends StatelessWidget {
   final Color? color;
   final Color? onColor;
 
+  /// Optional leading icon (14dp) so status is not conveyed by colour alone.
+  final IconData? icon;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final status = M3StatusColors.of(context);
     final (bg, fg) = switch (tone) {
-      M3StatusTone.success => (status.successContainer, status.onSuccessContainer),
-      M3StatusTone.warning => (status.warningContainer, status.onWarningContainer),
+      M3StatusTone.success => (
+          status.successContainer,
+          status.onSuccessContainer
+        ),
+      M3StatusTone.warning => (
+          status.warningContainer,
+          status.onWarningContainer
+        ),
       M3StatusTone.error => (cs.errorContainer, cs.onErrorContainer),
       M3StatusTone.info => (status.infoContainer, status.onInfoContainer),
       M3StatusTone.neutral => (cs.surfaceContainerHighest, cs.onSurfaceVariant),
@@ -36,13 +46,26 @@ class M3StatusTag extends StatelessWidget {
         color: color ?? bg,
         borderRadius: M3Shape.radiusSm,
       ),
-      child: Text(
-        label,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: onColor ?? fg,
-          fontWeight: FontWeight.w500,
-        ),
+      child: _content(theme, onColor ?? fg),
+    );
+  }
+
+  Widget _content(ThemeData theme, Color fg) {
+    final text = Text(
+      label,
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: fg,
+        fontWeight: FontWeight.w500,
       ),
+    );
+    if (icon == null) return text;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14.0, color: fg),
+        const SizedBox(width: 4.0),
+        Flexible(child: text),
+      ],
     );
   }
 }

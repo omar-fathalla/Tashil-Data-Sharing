@@ -1,6 +1,6 @@
 import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
-import 'package:tashil_web/core/theme/m3_typography.dart';
+import 'package:tashil_web/core/widgets/m3_tonal_surface.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/network/api_client.dart';
@@ -92,7 +92,8 @@ class ChainSharePie extends StatelessWidget {
       final lastOpen = trimmed.lastIndexOf('(');
       if (lastOpen > 0) {
         final first = trimmed.substring(0, lastOpen).trim();
-        final second = trimmed.substring(lastOpen + 1, trimmed.length - 1).trim();
+        final second =
+            trimmed.substring(lastOpen + 1, trimmed.length - 1).trim();
         final arabicRegex = RegExp(r'[\u0600-\u06FF]');
         final latinRegex = RegExp(r'[A-Za-z]');
         final firstHasAr = arabicRegex.hasMatch(first);
@@ -133,7 +134,7 @@ class ChainSharePie extends StatelessWidget {
                       Text(
                         'حصة كل سلسلة من المبيعات',
                         style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 2.0),
@@ -141,7 +142,7 @@ class ChainSharePie extends StatelessWidget {
                         'Sales by Chain',
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: colorScheme.primary,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           letterSpacing: 0.2,
                         ),
                       ),
@@ -149,12 +150,11 @@ class ChainSharePie extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8.0),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer.withOpacity(0.5),
-                    borderRadius: M3Shape.radiusMd,
-                  ),
+                M3TonalSurface(
+                  color: colorScheme.secondaryContainer,
+                  borderRadius: M3Shape.radiusMd,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10.0, vertical: 4.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     mainAxisSize: MainAxisSize.min,
@@ -163,7 +163,7 @@ class ChainSharePie extends StatelessWidget {
                         '${chainShares.length} ${chainShares.length == 1 ? "سلسلة نشطة" : "سلاسل نشطة"}',
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: colorScheme.primary,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       Text(
@@ -171,7 +171,6 @@ class ChainSharePie extends StatelessWidget {
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.w600,
-                          fontSize: M3FontSize.microPlus,
                         ),
                       ),
                     ],
@@ -204,7 +203,8 @@ class ChainSharePie extends StatelessWidget {
                       return Expanded(
                         flex: (item.marketShare * 10).round().clamp(1, 1000),
                         child: Tooltip(
-                          message: '${item.displayName}: ${item.marketShare.toStringAsFixed(1)}%',
+                          message:
+                              '${item.displayName}: ${item.marketShare.toStringAsFixed(1)}%',
                           child: Container(color: color),
                         ),
                       );
@@ -231,14 +231,7 @@ class ChainSharePie extends StatelessWidget {
 
                 return Row(
                   children: [
-                    Container(
-                      width: 12.0,
-                      height: 12.0,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
+                    CircleAvatar(radius: 6.0, backgroundColor: color),
                     M3Spacing.gapSM,
                     Expanded(
                       child: Column(
@@ -247,7 +240,7 @@ class ChainSharePie extends StatelessWidget {
                           Text(
                             parts.ar,
                             style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                           if (parts.en != null) ...[
@@ -257,7 +250,6 @@ class ChainSharePie extends StatelessWidget {
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: colorScheme.primary,
                                 fontWeight: FontWeight.w600,
-                                fontSize: M3FontSize.labelSmall,
                               ),
                             ),
                           ],
@@ -266,7 +258,6 @@ class ChainSharePie extends StatelessWidget {
                             '${CurrencyFormatter.formatUnits(item.totalUnits)} وحدة',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
-                              fontSize: M3FontSize.labelSmall,
                             ),
                           ),
                         ],
@@ -278,21 +269,19 @@ class ChainSharePie extends StatelessWidget {
                         Text(
                           CurrencyFormatter.formatCompactEGP(item.totalRevenue),
                           style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
-                          decoration: BoxDecoration(
-                            color: color.withOpacity(0.12),
-                            borderRadius: M3Shape.radiusSm,
-                          ),
+                        M3TonalSurface(
+                          color: colorScheme.surfaceContainerHigh,
+                          borderRadius: M3Shape.radiusSm,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6.0, vertical: 2.0),
                           child: Text(
                             '${item.marketShare.toStringAsFixed(1)}%',
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: color,
-                              fontWeight: FontWeight.bold,
-                              fontSize: M3FontSize.tiny,
+                              color: colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
