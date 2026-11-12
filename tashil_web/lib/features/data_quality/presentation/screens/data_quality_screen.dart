@@ -242,7 +242,10 @@ class _SummaryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final pct = summary.cleanlinessPct.clamp(0, 100) / 100;
+    // Defensive empty-state UI. Backend row totals when Runs are missing are
+    // fixed in PR #86 / TDS-76 — keep this guard so 0 rows never show 100%.
+    final hasRows = summary.totalRows > 0;
+    final pct = hasRows ? summary.cleanlinessPct.clamp(0, 100) / 100 : 0.0;
     final gauge = Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -256,22 +259,37 @@ class _SummaryRow extends StatelessWidget {
                 children: [
                   SizedBox.expand(
                     child: CircularProgressIndicator(
-                      value: pct.toDouble(),
+                      value: hasRows ? pct.toDouble() : null,
                       strokeWidth: 10.0,
                       backgroundColor: cs.surfaceContainerHighest,
-                      color: pct >= 0.95 ? cs.primary : (pct >= 0.85 ? cs.tertiary : cs.error),
+                      color: !hasRows
+                          ? cs.outlineVariant
+                          : (pct >= 0.95
+                              ? cs.primary
+                              : (pct >= 0.85 ? cs.tertiary : cs.error)),
                     ),
                   ),
-                  Text('${summary.cleanlinessPct.toStringAsFixed(1)}%',
-                      key: const ValueKey('dq_cleanliness'),
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  Text(
+                    hasRows
+                        ? '${summary.cleanlinessPct.toStringAsFixed(1)}%'
+                        : '—',
+                    key: const ValueKey('dq_cleanliness'),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: hasRows ? null : cs.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 8.0),
             Text('نظافة البيانات', style: theme.textTheme.labelLarge),
-            Text('${summary.totalRows - summary.criticalRows} من ${summary.totalRows} صف بدون أخطاء حرجة',
-                style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            Text(
+              hasRows
+                  ? '${summary.totalRows - summary.criticalRows} من ${summary.totalRows} صف بدون أخطاء حرجة'
+                  : 'مفيش صفوف اتفحصت',
+              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
             const SizedBox(height: 4.0),
             Text('مفتوحة ${summary.open} · اتصلّحت ${summary.resolved} · متجاهلة ${summary.ignored}',
                 key: const ValueKey('dq_counts'), style: theme.textTheme.bodySmall),

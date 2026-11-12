@@ -1527,33 +1527,36 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     },
                   ),
 
-                  // Year Switcher Chips (Default: 2026, 2025, All)
-                  for (final yrItem in [
-                    (year: _currentYear, label: 'سنة $_currentYear'),
-                    (year: _currentYear - 1, label: 'سنة ${_currentYear - 1}'),
-                    (year: 0, label: 'الكل'),
-                  ])
-                    ChoiceChip(
-                      key: ValueKey('branch_chart_year_${yrItem.year}'),
-                      label: Text(
-                        yrItem.label,
-                        style: M3TextVariants.cellHeavy.copyWith(color: _selectedYear == yrItem.year
-                              ? colorScheme.onPrimary
-                              : colorScheme.onSurface),
+                  // Year switcher — SegmentedButton (M3 connected selection; no clipped chips)
+                  SegmentedButton<int>(
+                    key: const ValueKey('branch_chart_year_segmented'),
+                    segments: [
+                      ButtonSegment<int>(
+                        value: _currentYear,
+                        label: Text('سنة $_currentYear'),
+                        tooltip: 'سنة $_currentYear',
                       ),
-                      selected: _selectedYear == yrItem.year,
-                      selectedColor: colorScheme.primary,
-                      backgroundColor: colorScheme.surfaceContainerHighest.withOpacity(0.45),
-                      showCheckmark: false,
-                      visualDensity: VisualDensity.compact,
-                      onSelected: (_) {
-                        setState(() {
-                          _selectedYear = yrItem.year;
-                          selectedDateRange = null;
-                        });
-                        _loadRecords();
-                      },
-                    ),
+                      ButtonSegment<int>(
+                        value: _currentYear - 1,
+                        label: Text('سنة ${_currentYear - 1}'),
+                        tooltip: 'سنة ${_currentYear - 1}',
+                      ),
+                      const ButtonSegment<int>(
+                        value: 0,
+                        label: Text('الكل'),
+                        tooltip: 'كل السنوات',
+                      ),
+                    ],
+                    selected: {_selectedYear},
+                    onSelectionChanged: (next) {
+                      setState(() {
+                        _selectedYear = next.first;
+                        selectedDateRange = null;
+                      });
+                      _loadRecords();
+                    },
+                    showSelectedIcon: false,
+                  ),
 
                   // Sort High-to-Low vs Low-to-High Button
                   OutlinedButton.icon(

@@ -329,8 +329,9 @@ class _CategoryTile extends StatelessWidget {
               'Rank #${cat.tenantRank}${cat.supplierCount > 0 ? ' of ${cat.supplierCount}' : ''}',
               key: ValueKey('category_rank_${cat.category}'),
               style: theme.textTheme.labelMedium?.copyWith(
-                color: cat.tenantRank == 1 ? acc.tealBase : cs.onSurface,
-                fontWeight: FontWeight.w800,
+                // tealBase (#009688) fails WCAG on surface (~3.33:1); use deep teal for text.
+                color: cat.tenantRank == 1 ? acc.tealDeep : cs.onSurface,
+                fontWeight: FontWeight.w600,
               ),
             ),
           M3Spacing.gapXXS,

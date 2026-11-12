@@ -118,4 +118,28 @@ void main() {
     expect(find.byKey(const ValueKey('dq_empty')), findsOneWidget);
     await tester.pumpWidget(const SizedBox()); // dispose timer
   });
+
+  testWidgets('empty rows show em-dash gauge, not 100%', (tester) async {
+    tester.view.physicalSize = const Size(1500, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final empty = DataQualitySummary(
+      types: const [],
+      totalRows: 0,
+      criticalRows: 0,
+      cleanlinessPct: 100,
+      open: 79,
+      updatedAt: DateTime.utc(2026, 11, 10),
+    );
+    final src = _FakeSource(empty, const []);
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(body: DataQualityScreen(dataSource: src)),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('—'), findsOneWidget);
+    expect(find.text('مفيش صفوف اتفحصت'), findsOneWidget);
+    expect(find.text('100.0%'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
 }
