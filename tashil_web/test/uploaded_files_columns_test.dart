@@ -106,7 +106,7 @@ void main() {
       ],
     });
     await _pump(tester, SellInExplorerScreen(apiClient: api));
-    await tester.tap(find.textContaining(RegExp('^Uploaded Files')).first);
+    await tester.tap(find.textContaining(RegExp('^الملفات المرفوعة')).first);
     await tester.pumpAndSettle();
     expect(_text(tester, 'sellin_file_rows_in_a'),
         CurrencyFormatter.formatNumber(40927));

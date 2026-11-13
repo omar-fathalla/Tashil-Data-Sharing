@@ -1,3 +1,8 @@
+import '../../../../core/widgets/m3_toolbar_button.dart';
+import '../../../../core/widgets/m3_section_title.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_table_surface.dart';
 import 'dart:async';
 import 'package:tashil_web/core/utils/sheet_name_utils.dart';
 import 'package:tashil_web/core/widgets/m3_states.dart';
@@ -479,7 +484,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
           shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusLg),
           title: Row(
             children: [
-              Icon(Icons.delete_forever_rounded, color: cs.error, size: 26.0),
+              Icon(Icons.delete_forever_rounded, color: cs.error, size: 24.0),
               const SizedBox(width: 10.0),
               const Expanded(
                 child: Text(
@@ -511,7 +516,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                     const SizedBox(height: 4.0),
                     Text(
                       'السلسلة ${file.retailChain.toUpperCase()} • الصفوف ${file.rowsIngested} • صافي Sell-In ${CurrencyFormatter.formatCompactEGP(file.totalRevenue)}',
-                      style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontSize: M3FontSize.bodySmallPlus)),
+                      style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontSize: M3FontSize.bodySmall)),
                     ),
                   ],
                 ),
@@ -833,7 +838,8 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     final colorScheme = theme.colorScheme;
     final isCompact = MediaQuery.sizeOf(context).width < 600.0;
 
-    return SingleChildScrollView(
+    return M3ToolbarButtonTheme(
+      child: SingleChildScrollView(
       padding: isCompact ? M3Spacing.pSm : M3Spacing.pMd,
       child: M3ContentBoundary(
         maxWidth: double.infinity,
@@ -852,36 +858,31 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
             // Top Tab Switcher: 100% Responsive Full-Width MD3 Large Tab Bar (4 Symmetrical Tabs)
             M3ResponsiveTabBar<int>(
               textDirection: TextDirection.ltr,
-              height: 60.0,
               selectedValue: _activeTab,
               items: [
                 const M3ResponsiveTabItem<int>(
                   value: 0,
                   icon: Icons.local_shipping_rounded,
                   selectedIcon: Icons.local_shipping_rounded,
-                  label: 'Sell-In Data',
-                  subtitle: 'بيانات التوريد',
+                  label: 'بيانات التوريد',
                 ),
                 const M3ResponsiveTabItem<int>(
                   value: 1,
                   icon: Icons.warehouse_rounded,
                   selectedIcon: Icons.warehouse_rounded,
-                  label: 'Stock & Reorder',
-                  subtitle: 'المخزون وإعادة الطلب',
+                  label: 'المخزون وإعادة الطلب',
                 ),
                 const M3ResponsiveTabItem<int>(
                   value: 2,
                   icon: Icons.track_changes_rounded,
                   selectedIcon: Icons.track_changes_rounded,
-                  label: 'Targets',
-                  subtitle: 'المستهدفات',
+                  label: 'المستهدفات',
                 ),
                 M3ResponsiveTabItem<int>(
                   value: 3,
                   icon: Icons.folder_copy_rounded,
                   selectedIcon: Icons.folder_copy_rounded,
-                  label: 'Uploaded Files (${_archivedSellInFiles.length})',
-                  subtitle: 'الملفات المرفوعة',
+                  label: 'الملفات المرفوعة (${_archivedSellInFiles.length})',
                   semanticsIdentifier: TestIds.sellinUploadedFiles,
                 ),
               ],
@@ -912,13 +913,14 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                 key: const ValueKey('sell_in_error_state'),
                 title: 'تعذّر تحميل بيانات Sell-In',
                 message: _loadError,
-                retryLabel: 'Retry',
+                retryLabel: 'إعادة المحاولة',
                 onRetry: _loadSellInRecords,
               )
             else
               _buildSellInExplorerTab(context, theme, colorScheme),
           ],
         ),
+      ),
       ),
     );
   }
@@ -1077,18 +1079,18 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                   vertical: 2.0,
                 ),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withOpacity(0.6),
-                  borderRadius: M3Shape.radiusFull,
+                  color: colorScheme.surfaceContainerHigh,
+                  borderRadius: M3Shape.radiusSm,
                 ),
                 child: Text(
                   _chainNameAr(r.retailerChain),
-                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.tinyPlus,                                           fontWeight: FontWeight.w800,                                           color: colorScheme.onPrimaryContainer,                                         )),
+                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.labelSmall,                                           fontWeight: FontWeight.w600,                                           color: colorScheme.onSurfaceVariant,                                         )),
                 ),
               ),
               const SizedBox(width: 8.0),
               Text(
                 r.governorate,
-                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.labelSmallPlus,                                         color: colorScheme.onSurfaceVariant,                                       )),
+                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.labelSmall,                                         color: colorScheme.onSurfaceVariant,                                       )),
               ),
             ],
           ),
@@ -1114,7 +1116,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                     children: [
                       Icon(
                         Icons.badge_rounded,
-                        size: 15.0,
+                        size: 18.0,
                         color: colorScheme.primary,
                       ),
                       const SizedBox(width: 4.0),
@@ -1123,7 +1125,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                           r.itemName,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                                   fontWeight: FontWeight.w800,                                                   fontSize: M3FontSize.bodySmallPlus,                                                 )),
+                          style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                                   fontWeight: FontWeight.w800,                                                   fontSize: M3FontSize.bodySmall,                                                 )),
                         ),
                       ),
                     ],
@@ -1158,7 +1160,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
               if (r.departmentAr.isNotEmpty)
                 Text(
                   r.departmentAr,
-                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.tinyPlus,                                           color: colorScheme.onSurfaceVariant,                                         )),
+                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.labelSmall,                                           color: colorScheme.onSurfaceVariant,                                         )),
                 ),
             ],
           ),
@@ -1171,11 +1173,11 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
             children: [
               Text(
                 '${CurrencyFormatter.formatNumber(r.netQtyCases.round())} كرتونة',
-                style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontWeight: FontWeight.w800,                                         fontSize: M3FontSize.bodySmallPlus,                                       )),
+                style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                         fontWeight: FontWeight.w800,                                         fontSize: M3FontSize.bodySmall,                                       )),
               ),
               Text(
                 '${CurrencyFormatter.formatNumber(unitsSupplied)} وحدة (${r.unitsPerCarton > 0 ? '${r.unitsPerCarton} وحدات/كرتونة' : 'وحدات/كرتونة غير معروفة'})',
-                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.tinyPlus,                                         fontWeight: FontWeight.w700,                                         color: M3StatusColors.of(context).accents.teal,                                       )),
+                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.labelSmall,                                         fontWeight: FontWeight.w700,                                         color: M3StatusColors.of(context).accents.teal,                                       )),
               ),
             ],
           ),
@@ -1194,14 +1196,14 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                   r.effectiveDiscountPct > 0
                       ? 'القائمة: ${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp)} (خصم ${r.effectiveDiscountPct.toStringAsFixed(1)}%)'
                       : 'القائمة: ${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp)}',
-                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.tinyPlus,                                           color: colorScheme.onSurfaceVariant,                                         )),
+                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.labelSmall,                                           color: colorScheme.onSurfaceVariant,                                         )),
                 ),
               if (r.officialCartonExclVatEgp > 0 &&
                   r.effectiveDiscountPct <= 0 &&
                   r.pricingWaveStatus.isNotEmpty)
                 Text(
                   r.pricingWaveStatus,
-                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.tinyPlus, fontWeight: FontWeight.w200,                                           color: colorScheme.onSurfaceVariant,                                         )),
+                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.labelSmall, fontWeight: FontWeight.w200,                                           color: colorScheme.onSurfaceVariant,                                         )),
                 ),
             ],
           ),
@@ -1222,11 +1224,11 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
             children: [
               Text(
                 CurrencyFormatter.formatEGP(grossInclVat),
-                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontWeight: FontWeight.w900,                                         color: M3StatusColors.of(context).accents.tealStrong,                                         fontSize: M3FontSize.bodySmallPlus,                                       )),
+                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontWeight: FontWeight.w900,                                         color: M3StatusColors.of(context).accents.tealStrong,                                         fontSize: M3FontSize.bodySmall,                                       )),
               ),
               Text(
                 'الضريبة: ${CurrencyFormatter.formatEGP(vatAmount)}',
-                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.tinyPlus,                                         color: colorScheme.onSurfaceVariant,                                       )),
+                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.labelSmall,                                         color: colorScheme.onSurfaceVariant,                                       )),
               ),
             ],
           ),
@@ -1304,7 +1306,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
             children: [
               Text(
                 labelAr,
-                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.labelSmallPlus,                   fontWeight: FontWeight.w700,                   color: cs.onSurfaceVariant,                 )),
+                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.labelSmall,                   fontWeight: FontWeight.w700,                   color: cs.onSurfaceVariant,                 )),
               ),
               const SizedBox(height: 2.0),
               if (_isLoading) ...[
@@ -1314,11 +1316,11 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
               ] else ...[
                 Text(
                   valueText,
-                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.bodyMediumLarge,                   fontWeight: FontWeight.w900,                   color: accentColor,                 )),
+                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.bodyLarge,                   fontWeight: FontWeight.w900,                   color: accentColor,                 )),
                 ),
                 Text(
                   subText,
-                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.tinyPlus,                   fontWeight: FontWeight.w600,                   color: cs.onSurfaceVariant,                 )),
+                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.labelSmall,                   fontWeight: FontWeight.w600,                   color: cs.onSurfaceVariant,                 )),
                 ),
               ],
             ],
@@ -1419,17 +1421,13 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
 
         // 1.B Tax & Discount Waterfall Banner (Product Master Official Price vs Net Invoice vs 14% VAT)
         Container(
-          padding: const EdgeInsets.all(14.0),
+          key: const ValueKey('sellin_waterfall_strip'),
+          padding: M3Spacing.pSm,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                colorScheme.primaryContainer.withOpacity(0.32),
-                colorScheme.secondaryContainer.withOpacity(0.24),
-              ],
-            ),
+            color: colorScheme.surfaceContainerHigh,
             borderRadius: M3Shape.radiusLg,
             border: Border.all(
-              color: colorScheme.primary.withOpacity(0.28),
+              color: colorScheme.outlineVariant.withOpacity(0.5),
             ),
           ),
           child: Column(
@@ -1445,7 +1443,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                   const SizedBox(width: 8.0),
                   Expanded(
                     child: Text(
-                      'من السعر الرسمي إلى الفاتورة (Price-to-Invoice Waterfall)',
+                      'من السعر الرسمي إلى الفاتورة',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w900,
                         color: colorScheme.onSurface,
@@ -1458,12 +1456,12 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                       vertical: 4.0,
                     ),
                     decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.12),
-                      borderRadius: M3Shape.radiusFull,
+                      color: colorScheme.surfaceContainerHigh,
+                      borderRadius: M3Shape.radiusSm,
                     ),
                     child: Text(
                       'اضغط على الصنف لعرض بياناته.',
-                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                         fontSize: M3FontSize.labelSmall,                         fontWeight: FontWeight.w800,                         color: colorScheme.primary,                       )),
+                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                         fontSize: M3FontSize.labelSmall,                         fontWeight: FontWeight.w600,                         color: colorScheme.onSurfaceVariant,                       )),
                     ),
                   ),
                 ],
@@ -1556,7 +1554,8 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
 
         // 2. Filter & Upload Toolbar
         Container(
-          padding: const EdgeInsets.all(14.0),
+          key: const ValueKey('sellin_data_filter_bar'),
+          padding: M3Spacing.pSm,
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
             borderRadius: M3Shape.radiusLg,
@@ -1565,21 +1564,21 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
             ),
           ),
           child: Wrap(
-            spacing: 12.0,
-            runSpacing: 10.0,
+            spacing: M3Spacing.sm,
+            runSpacing: M3Spacing.xs,
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Wrap(
-                spacing: 10.0,
-                runSpacing: 8.0,
+                spacing: M3Spacing.sm,
+                runSpacing: M3Spacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   SizedBox(
                     width: 190.0,
                     child: M3Dropdown<String>(
 value: _selectedChain,
-label: 'Chain',
+label: 'السلسلة',
 options: m3OptionsFromMenuItems<String>([
                         const DropdownMenuItem(
                           value: 'all',
@@ -1602,7 +1601,7 @@ onChanged: m3Legacy<String>((v) {
                     width: 130.0,
                     child: M3Dropdown<int>(
 value: _selectedYear,
-label: 'Year',
+label: 'سنة البيانات',
 options: m3OptionsFromMenuItems<int>([
                         const DropdownMenuItem(value: 0, child: Text('كل السنوات')),
                         for (final y in AvailableYears.current.including(_selectedYear))
@@ -1624,21 +1623,21 @@ onChanged: m3Legacy<int>((v) {
                     width: 150.0,
                     child: M3Dropdown<int>(
 value: _selectedMonth,
-label: 'Month',
+label: 'الشهر',
 options: m3OptionsFromMenuItems<int>([
                         const DropdownMenuItem(value: 0, child: Text('كل الشهور')),
-                        const DropdownMenuItem(value: 1, child: Text('January (01)')),
-                        const DropdownMenuItem(value: 2, child: Text('February (02)')),
-                        const DropdownMenuItem(value: 3, child: Text('March (03)')),
-                        const DropdownMenuItem(value: 4, child: Text('April (04)')),
-                        const DropdownMenuItem(value: 5, child: Text('May (05)')),
-                        const DropdownMenuItem(value: 6, child: Text('June (06)')),
-                        const DropdownMenuItem(value: 7, child: Text('July (07)')),
-                        const DropdownMenuItem(value: 8, child: Text('August (08)')),
-                        const DropdownMenuItem(value: 9, child: Text('September (09)')),
-                        const DropdownMenuItem(value: 10, child: Text('October (10)')),
-                        const DropdownMenuItem(value: 11, child: Text('November (11)')),
-                        const DropdownMenuItem(value: 12, child: Text('December (12)')),
+                        const DropdownMenuItem(value: 1, child: Text('يناير (01)')),
+                        const DropdownMenuItem(value: 2, child: Text('فبراير (02)')),
+                        const DropdownMenuItem(value: 3, child: Text('مارس (03)')),
+                        const DropdownMenuItem(value: 4, child: Text('أبريل (04)')),
+                        const DropdownMenuItem(value: 5, child: Text('مايو (05)')),
+                        const DropdownMenuItem(value: 6, child: Text('يونيو (06)')),
+                        const DropdownMenuItem(value: 7, child: Text('يوليو (07)')),
+                        const DropdownMenuItem(value: 8, child: Text('أغسطس (08)')),
+                        const DropdownMenuItem(value: 9, child: Text('سبتمبر (09)')),
+                        const DropdownMenuItem(value: 10, child: Text('أكتوبر (10)')),
+                        const DropdownMenuItem(value: 11, child: Text('نوفمبر (11)')),
+                        const DropdownMenuItem(value: 12, child: Text('ديسمبر (12)')),
                       ]),
 onChanged: m3Legacy<int>((v) {
                         if (v != null) {
@@ -1692,7 +1691,7 @@ onChanged: m3Legacy<int>((v) {
         // 3. Sell-In Records Table
         Container(
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLowest,
+            color: M3TableSurface.color(colorScheme),
             borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
@@ -1815,17 +1814,13 @@ onChanged: m3Legacy<int>((v) {
       children: [
         // 0. Matched Period vs Full YTD Toggle Banner + Pending Sell-Out Notice
         Container(
-          padding: const EdgeInsets.all(14.0),
+          key: const ValueKey('sellin_period_strip'),
+          padding: M3Spacing.pSm,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                colorScheme.primaryContainer.withOpacity(0.35),
-                colorScheme.tertiaryContainer.withOpacity(0.25),
-              ],
-            ),
+            color: colorScheme.surfaceContainerHigh,
             borderRadius: M3Shape.radiusLg,
             border: Border.all(
-              color: colorScheme.primary.withOpacity(0.3),
+              color: colorScheme.outlineVariant.withOpacity(0.5),
             ),
           ),
           child: Wrap(
@@ -1840,7 +1835,7 @@ onChanged: m3Legacy<int>((v) {
                   Icon(
                     Icons.sync_alt_rounded,
                     color: colorScheme.primary,
-                    size: 22.0,
+                    size: 24.0,
                   ),
                   const SizedBox(width: 10.0),
                   // Flexible lets the long title wrap inside the Wrap run instead of
@@ -1850,7 +1845,7 @@ onChanged: m3Legacy<int>((v) {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'مطابقة Sell-In وSell-Out وقائمة الأصناف',
+                        'مطابقة Sell-In و Sell-Out وقائمة الأصناف',
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w900,
                         ),
@@ -1907,13 +1902,13 @@ onChanged: m3Legacy<int>((v) {
                         children: [
                           Icon(
                             Icons.hourglass_top_rounded,
-                            size: 15.0,
+                            size: 18.0,
                             color: M3StatusColors.of(context).accents.highlight,
                           ),
                           const SizedBox(width: 6.0),
                           Text(
                             'بانتظار Sell-Out ($pendingLabel): ${CurrencyFormatter.formatNumber(d.pendingSellOutCases.round())} كرتونة (${CurrencyFormatter.formatCompactEGP(d.pendingSellOutValueEgp)})',
-                            style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                               fontSize: M3FontSize.labelSmallPlus,                               fontWeight: FontWeight.w800,                               color: M3StatusColors.of(context).accents.highlight,                             )),
+                            style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                               fontSize: M3FontSize.labelSmall,                               fontWeight: FontWeight.w800,                               color: M3StatusColors.of(context).accents.highlight,                             )),
                           ),
                         ],
                       ),
@@ -1978,6 +1973,7 @@ onChanged: m3Legacy<int>((v) {
               card2,
               card3,
               card4,
+              id: 'stock',
             );
           },
         ),
@@ -2003,34 +1999,23 @@ onChanged: m3Legacy<int>((v) {
                   ? Theme.of(context).colorScheme.error
                   : M3StatusColors.of(context).accents.positiveStrong,
             );
-            final yoySign = d.matchedYoyValueGrowthPct >= 0 ? '+' : '';
-            final yoyUnitsSign = d.matchedYoyUnitsGrowthPct >= 0 ? '+' : '';
             final yoyCard = _buildSummaryCard(
               context,
               titleAr: 'نمو Sell-Out مقارنة بالعام السابق',
               titleEn: 'Sell-Out Growth YoY',
-              value: '$yoySign${d.matchedYoyValueGrowthPct.toStringAsFixed(1)}% بالقيمة',
+              value: '${CurrencyFormatter.formatSignedPct(d.matchedYoyValueGrowthPct)} بالقيمة',
               subtitle:
-                  'بالكمية: $yoyUnitsSign${d.matchedYoyUnitsGrowthPct.toStringAsFixed(1)}% عن نفس الفترة من العام السابق',
+                  'بالكمية: ${CurrencyFormatter.formatSignedPct(d.matchedYoyUnitsGrowthPct)} عن نفس الفترة من العام السابق',
               icon: Icons.trending_up_rounded,
               color: M3StatusColors.of(context).accents.purpleStrong,
             );
 
-            if (constraints.maxWidth < 760) {
-              return Column(
-                children: [
-                  marginCard,
-                  const SizedBox(height: 10.0),
-                  yoyCard,
-                ],
-              );
-            }
-            return Row(
-              children: [
-                Expanded(child: marginCard),
-                const SizedBox(width: 12.0),
-                Expanded(child: yoyCard),
-              ],
+            return M3EqualHeightGrid(
+              key: const ValueKey('sellin_kpi_grid_linkage'),
+              columns: constraints.maxWidth < 760 ? 1 : 2,
+              spacing: M3Spacing.sm,
+              runSpacing: M3Spacing.sm,
+              children: [marginCard, yoyCard],
             );
           },
         ),
@@ -2044,7 +2029,8 @@ onChanged: m3Legacy<int>((v) {
 
         // 2. Filter & Export Bar for Stock Balance Reports
         Container(
-          padding: const EdgeInsets.all(14.0),
+          key: const ValueKey('sellin_stock_filter_bar'),
+          padding: M3Spacing.pSm,
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
             borderRadius: M3Shape.radiusLg,
@@ -2053,21 +2039,21 @@ onChanged: m3Legacy<int>((v) {
             ),
           ),
           child: Wrap(
-            spacing: 12.0,
-            runSpacing: 10.0,
+            spacing: M3Spacing.sm,
+            runSpacing: M3Spacing.xs,
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Wrap(
-                spacing: 10.0,
-                runSpacing: 8.0,
+                spacing: M3Spacing.sm,
+                runSpacing: M3Spacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   SizedBox(
                     width: 190.0,
                     child: M3Dropdown<String>(
 value: _selectedChain,
-label: 'Chain',
+label: 'السلسلة',
 options: m3OptionsFromMenuItems<String>([
                         const DropdownMenuItem(value: 'all', child: Text('كل السلاسل')),
                         for (final c in _chains)
@@ -2087,7 +2073,7 @@ onChanged: m3Legacy<String>((v) {
                     width: 140.0,
                     child: M3Dropdown<int>(
 value: _selectedYear,
-label: 'Year',
+label: 'سنة البيانات',
 options: m3OptionsFromMenuItems<int>([
                         const DropdownMenuItem(value: 0, child: Text('كل السنوات')),
                         for (final y in AvailableYears.current.including(_selectedYear))
@@ -2140,25 +2126,11 @@ onChanged: m3Legacy<String>((v) {
                 runSpacing: 8.0,
                 children: [
                   OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 44.0),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18.0,
-                        vertical: 10.0,
-                      ),
-                    ),
                     onPressed: _handleExportStockBalanceExcel,
                     icon: const Icon(Icons.download_rounded, size: 20.0),
                     label: const Text('تصدير CSV'),
                   ),
                   FilledButton.tonalIcon(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 44.0),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18.0,
-                        vertical: 10.0,
-                      ),
-                    ),
                     onPressed: _handlePrintStockBalancePdf,
                     icon: const Icon(Icons.print_rounded, size: 20.0),
                     label: const Text('طباعة'),
@@ -2175,7 +2147,7 @@ onChanged: m3Legacy<String>((v) {
         Container(
           padding: const EdgeInsets.all(18.0),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLowest,
+            color: M3TableSurface.color(colorScheme),
             borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
@@ -2193,7 +2165,7 @@ onChanged: m3Legacy<String>((v) {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '1. المخزون الشهري (Monthly Stock Balance)',
+                          '1. المخزون الشهري',
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
@@ -2234,7 +2206,6 @@ onChanged: m3Legacy<String>((v) {
                   ],
                   rows: visibleMonthlyRows.map((m) {
                     final isPositiveClosing = m.closingStockValueEgp >= 0;
-                    final yoySign = m.yoySellOutGrowthPct >= 0 ? '+' : '';
                     return DataRow(
                       cells: [
                         DataCell(
@@ -2249,7 +2220,7 @@ onChanged: m3Legacy<String>((v) {
                               if (!m.hasActualSellOut)
                                 Text(
                                   'بانتظار ملف Sell-Out',
-                                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.tinyPlus,                                     fontWeight: FontWeight.w700,                                     color: M3StatusColors.of(context).accents.highlight,                                   )),
+                                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.labelSmall,                                     fontWeight: FontWeight.w700,                                     color: M3StatusColors.of(context).accents.highlight,                                   )),
                                 ),
                             ],
                           ),
@@ -2280,13 +2251,13 @@ onChanged: m3Legacy<String>((v) {
                                 ),
                               ),
                               Text(
-                                '+${CurrencyFormatter.formatNumber(m.sellInCases.round())} كرتونة (${CurrencyFormatter.formatNumber(m.sellInUnits)} وحدة)',
-                                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                   fontSize: M3FontSize.tinyPlus,                                   fontWeight: FontWeight.w700,                                   color: colorScheme.onSurfaceVariant,                                 )),
+                                '${_signedCount(m.sellInCases.round(), positive: true)} كرتونة (${CurrencyFormatter.formatNumber(m.sellInUnits)} وحدة)',
+                                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                   fontSize: M3FontSize.labelSmall,                                   fontWeight: FontWeight.w700,                                   color: colorScheme.onSurfaceVariant,                                 )),
                               ),
                               if (m.sellInGrossInclVatEgp > 0)
                                 Text(
                                   'شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(m.sellInGrossInclVatEgp)}',
-                                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.tiny,                                     color: M3StatusColors.of(context).accents.tealStrong,                                   )),
+                                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.labelSmall,                                     color: M3StatusColors.of(context).accents.tealStrong,                                   )),
                                 ),
                             ],
                           ),
@@ -2305,19 +2276,19 @@ onChanged: m3Legacy<String>((v) {
                                       ),
                                     ),
                                     Text(
-                                      '−${CurrencyFormatter.formatNumber(m.sellOutEstCases.round())} كرتونة (${CurrencyFormatter.formatNumber(m.sellOutUnits)} وحدة)',
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.tinyPlus,                                         fontWeight: FontWeight.w700,                                         color: colorScheme.onSurfaceVariant,                                       )),
+                                      '${_signedCount(m.sellOutEstCases.round(), positive: false)} كرتونة (${CurrencyFormatter.formatNumber(m.sellOutUnits)} وحدة)',
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.labelSmall,                                         fontWeight: FontWeight.w700,                                         color: colorScheme.onSurfaceVariant,                                       )),
                                     ),
                                     if (m.sellOutFactoryCostExclVatEgp > 0)
                                       Text(
                                         'تكلفة المصنع: ${CurrencyFormatter.formatCompactEGP(m.sellOutFactoryCostExclVatEgp)}',
-                                        style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.tiny,                                           color: colorScheme.onSurfaceVariant,                                         )),
+                                        style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.labelSmall,                                           color: colorScheme.onSurfaceVariant,                                         )),
                                       ),
                                   ],
                                 )
                               : Text(
                                   'بانتظار ملف Sell-Out',
-                                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.labelSmallPlus,                                     fontWeight: FontWeight.w700,                                     color: M3StatusColors.of(context).accents.highlight,                                   )),
+                                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.labelSmall,                                     fontWeight: FontWeight.w700,                                     color: M3StatusColors.of(context).accents.highlight,                                   )),
                                 ),
                         ),
                         DataCell(
@@ -2337,7 +2308,7 @@ onChanged: m3Legacy<String>((v) {
                                     ),
                                     Text(
                                       'هامش السلسلة: ${CurrencyFormatter.formatMarginPct(m.chainGrossMarginPct)}',
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.tinyPlus,                                         fontWeight: FontWeight.w700,                                         color: M3StatusColors.of(context).accents.positive,                                       )),
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.labelSmall,                                         fontWeight: FontWeight.w700,                                         color: M3StatusColors.of(context).accents.positive,                                       )),
                                     ),
                                   ],
                                 )
@@ -2350,7 +2321,7 @@ onChanged: m3Legacy<String>((v) {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      '$yoySign${m.yoySellOutGrowthPct.toStringAsFixed(1)}%',
+                                      CurrencyFormatter.formatSignedPct(m.yoySellOutGrowthPct),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w900,
                                         color: m.yoySellOutGrowthPct >= 0
@@ -2360,7 +2331,7 @@ onChanged: m3Legacy<String>((v) {
                                     ),
                                     Text(
                                       'العام السابق: ${CurrencyFormatter.formatCompactEGP(m.prevYearSellOutValueEgp)}',
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.tinyPlus,                                         color: colorScheme.onSurfaceVariant,                                       )),
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.labelSmall,                                         color: colorScheme.onSurfaceVariant,                                       )),
                                     ),
                                   ],
                                 )
@@ -2524,7 +2495,7 @@ onChanged: m3Legacy<String>((v) {
             return Container(
               padding: const EdgeInsets.all(18.0),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerLowest,
+                color: M3TableSurface.color(colorScheme),
                 borderRadius: M3Shape.radiusLg,
                 border: Border.all(
                   color: colorScheme.outlineVariant.withOpacity(0.5),
@@ -2543,14 +2514,14 @@ onChanged: m3Legacy<String>((v) {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '2. المخزون وإعادة الطلب حسب الصنف (Stock & Reorder by SKU)',
+                              '2. المخزون وإعادة الطلب حسب الصنف',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
                             const SizedBox(height: 2.0),
                             Text(
-                              'لكل صنف: Sell-In وSell-Out والمخزون وأيام التغطية والكمية المقترحة.',
+                              'لكل صنف: Sell-In و Sell-Out والمخزون وأيام التغطية والكمية المقترحة.',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
                               ),
@@ -2564,7 +2535,7 @@ onChanged: m3Legacy<String>((v) {
 
                   // Filter & Search Controls Bar
                   Container(
-                    padding: const EdgeInsets.all(14.0),
+                    padding: M3Spacing.pSm,
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHigh.withOpacity(0.35),
                       borderRadius: M3Shape.radiusMd,
@@ -2818,7 +2789,7 @@ onChanged: m3Legacy<String>((val) {
                                   children: [
                                     Text('المخزون'),
                                     SizedBox(width: 4.0),
-                                    Icon(Icons.swap_vert_rounded, size: 16),
+                                    Icon(Icons.swap_vert_rounded, size: 18.0),
                                   ],
                                 ),
                           ),
@@ -2836,7 +2807,7 @@ onChanged: m3Legacy<String>((val) {
                                   children: [
                                     Text('أيام التغطية'),
                                     SizedBox(width: 4.0),
-                                    Icon(Icons.swap_vert_rounded, size: 16),
+                                    Icon(Icons.swap_vert_rounded, size: 18.0),
                                   ],
                                 ),
                           ),
@@ -2910,14 +2881,14 @@ onChanged: m3Legacy<String>((val) {
                                           const SizedBox(width: 4.0),
                                           Icon(
                                             Icons.badge_rounded,
-                                            size: 15.0,
+                                            size: 18.0,
                                             color: colorScheme.primary,
                                           ),
                                         ],
                                       ),
                                       Text(
                                         'كود: ${item.itemCode.isNotEmpty ? item.itemCode : "-"} • باركود: ${item.barcode.isNotEmpty ? item.barcode : "-"} • $packUnits وحدات/كرتونة',
-                                        style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontFamily: 'monospace',                                           fontSize: M3FontSize.tinyPlus,                                           color: colorScheme.primary,                                           fontWeight: FontWeight.w700,                                         )),
+                                        style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontFamily: 'monospace',                                           fontSize: M3FontSize.labelSmall,                                           color: colorScheme.primary,                                           fontWeight: FontWeight.w700,                                         )),
                                       ),
                                     ],
                                   ),
@@ -2936,7 +2907,7 @@ onChanged: m3Legacy<String>((val) {
                                   if (item.officialCartonExclVatEgp > 0)
                                     Text(
                                       'سعر القائمة: ${CurrencyFormatter.formatEGP(item.officialCartonExclVatEgp)}',
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.tinyPlus,                                         color: colorScheme.onSurfaceVariant,                                       )),
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.labelSmall,                                         color: colorScheme.onSurfaceVariant,                                       )),
                                     ),
                                 ],
                               ),
@@ -2968,7 +2939,7 @@ onChanged: m3Legacy<String>((val) {
                                   ),
                                   Text(
                                     'Sell-Out: ${CurrencyFormatter.formatCompactEGP(item.sellOutValueEgp)}${item.retailerMarginPct != 0 ? " (هامش ${item.retailerMarginPct.toStringAsFixed(0)}%)" : ""}',
-                                    style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.tinyPlus,                                       color: M3StatusColors.of(context).accents.teal,                                       fontWeight: FontWeight.w700,                                     )),
+                                    style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.labelSmall,                                       color: M3StatusColors.of(context).accents.teal,                                       fontWeight: FontWeight.w700,                                     )),
                                   ),
                                 ],
                               ),
@@ -3021,7 +2992,7 @@ onChanged: m3Legacy<String>((val) {
                                 ),
                                 child: Text(
                                   item.stockStatusAr,
-                                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.labelSmallPlus,                                     fontWeight: FontWeight.w800,                                     color: isUrgent                                         ? colorScheme.onErrorContainer                                         : isOverstock                                             ? M3StatusColors.of(context).accents.cautionStrong                                             : M3StatusColors.of(context).accents.tealDeep,                                   )),
+                                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.labelSmall,                                     fontWeight: FontWeight.w800,                                     color: isUrgent                                         ? colorScheme.onErrorContainer                                         : isOverstock                                             ? M3StatusColors.of(context).accents.cautionStrong                                             : M3StatusColors.of(context).accents.tealDeep,                                   )),
                                 ),
                               ),
                             ),
@@ -3037,7 +3008,7 @@ onChanged: m3Legacy<String>((val) {
                                         ),
                                         Text(
                                           'شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(poGrossInclVat)}',
-                                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                             fontSize: M3FontSize.tinyPlus,                                             fontWeight: FontWeight.w700,                                             color: M3StatusColors.of(context).accents.tealStrong,                                           )),
+                                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                             fontSize: M3FontSize.labelSmall,                                             fontWeight: FontWeight.w700,                                             color: M3StatusColors.of(context).accents.tealStrong,                                           )),
                                         ),
                                       ],
                                     )
@@ -3064,7 +3035,13 @@ onChanged: m3Legacy<String>((val) {
                       borderRadius: M3Shape.radiusMd,
                       border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.4)),
                     ),
-                    child: Row(
+                    // Wraps on phones so the pager never overflows at 390dp.
+                    child: Wrap(
+                      key: const ValueKey('sellin_sku_pager'),
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: M3Spacing.sm,
+                      runSpacing: M3Spacing.xs,
                       children: [
                         Text(
                           'عرض ${totalSkuCount == 0 ? 0 : startIdx + 1} - $endIdx من إجمالي $totalSkuCount صنف (25 صنف بالصفحة)',
@@ -3073,46 +3050,42 @@ onChanged: m3Legacy<String>((val) {
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
-                        const Spacer(),
+                        Wrap(
+                          spacing: M3Spacing.xs,
+                          runSpacing: M3Spacing.xs,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
                         // Previous Page Button
                         OutlinedButton.icon(
                           icon: const Icon(Icons.arrow_forward_rounded, size: 18.0),
                           label: const Text('السابق'),
-                          style: OutlinedButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
-                          ),
                           onPressed: clampedCurrentPage > 0
                               ? () => setState(() => _skuCurrentPage = clampedCurrentPage - 1)
                               : null,
                         ),
-                        const SizedBox(width: 10.0),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 6.0),
                           decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer.withOpacity(0.7),
+                            color: colorScheme.surfaceContainerHigh,
                             borderRadius: M3Shape.radiusSm,
                           ),
                           child: Text(
                             'صفحة ${totalSkuPages == 0 ? 0 : clampedCurrentPage + 1} من ${totalSkuPages == 0 ? 1 : totalSkuPages}',
                             style: TextStyle(
                               fontWeight: FontWeight.w900,
-                              color: colorScheme.onPrimaryContainer,
+                              color: colorScheme.onSurface,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10.0),
                         // Next Page Button
                         FilledButton.tonalIcon(
                           icon: const Icon(Icons.arrow_back_rounded, size: 18.0),
                           label: const Text('التالي'),
-                          style: FilledButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
-                          ),
                           onPressed: clampedCurrentPage < totalSkuPages - 1
                               ? () => setState(() => _skuCurrentPage = clampedCurrentPage + 1)
                               : null,
+                        ),
+                          ],
                         ),
                       ],
                     ),
@@ -3189,14 +3162,14 @@ onChanged: m3Legacy<String>((val) {
               ),
               const SizedBox(height: 16.0),
               Wrap(
-                spacing: 12.0,
-                runSpacing: 10.0,
+                spacing: M3Spacing.sm,
+                runSpacing: M3Spacing.xs,
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Wrap(
-                    spacing: 10.0,
-                    runSpacing: 8.0,
+                    spacing: M3Spacing.sm,
+                    runSpacing: M3Spacing.xs,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       SizedBox(
@@ -3217,7 +3190,7 @@ onChanged: m3Legacy<String>((v) {
                         width: 155.0,
                         child: M3Dropdown<int>(
 value: _archiveUploadYear,
-label: 'Year (Optional)',
+label: 'السنة (اختياري)',
 options: m3OptionsFromMenuItems<int>([
                             const DropdownMenuItem(
                               value: 0,
@@ -3237,24 +3210,24 @@ onChanged: m3Legacy<int>((v) {
                         width: 175.0,
                         child: M3Dropdown<int>(
 value: _archiveUploadMonth,
-label: 'Month (Optional)',
+label: 'الشهر (اختياري)',
 options: m3OptionsFromMenuItems<int>([
                             const DropdownMenuItem(
                               value: 0,
                               child: Text('من الملف تلقائيًا'),
                             ),
-                            const DropdownMenuItem(value: 1, child: Text('January (01)')),
-                            const DropdownMenuItem(value: 2, child: Text('February (02)')),
-                            const DropdownMenuItem(value: 3, child: Text('March (03)')),
-                            const DropdownMenuItem(value: 4, child: Text('April (04)')),
-                            const DropdownMenuItem(value: 5, child: Text('May (05)')),
-                            const DropdownMenuItem(value: 6, child: Text('June (06)')),
-                            const DropdownMenuItem(value: 7, child: Text('July (07)')),
-                            const DropdownMenuItem(value: 8, child: Text('August (08)')),
-                            const DropdownMenuItem(value: 9, child: Text('September (09)')),
-                            const DropdownMenuItem(value: 10, child: Text('October (10)')),
-                            const DropdownMenuItem(value: 11, child: Text('November (11)')),
-                            const DropdownMenuItem(value: 12, child: Text('December (12)')),
+                            const DropdownMenuItem(value: 1, child: Text('يناير (01)')),
+                            const DropdownMenuItem(value: 2, child: Text('فبراير (02)')),
+                            const DropdownMenuItem(value: 3, child: Text('مارس (03)')),
+                            const DropdownMenuItem(value: 4, child: Text('أبريل (04)')),
+                            const DropdownMenuItem(value: 5, child: Text('مايو (05)')),
+                            const DropdownMenuItem(value: 6, child: Text('يونيو (06)')),
+                            const DropdownMenuItem(value: 7, child: Text('يوليو (07)')),
+                            const DropdownMenuItem(value: 8, child: Text('أغسطس (08)')),
+                            const DropdownMenuItem(value: 9, child: Text('سبتمبر (09)')),
+                            const DropdownMenuItem(value: 10, child: Text('أكتوبر (10)')),
+                            const DropdownMenuItem(value: 11, child: Text('نوفمبر (11)')),
+                            const DropdownMenuItem(value: 12, child: Text('ديسمبر (12)')),
                           ]),
 onChanged: m3Legacy<int>((v) {
                             if (v != null) {
@@ -3266,8 +3239,8 @@ onChanged: m3Legacy<int>((v) {
                     ],
                   ),
                   Wrap(
-                    spacing: 10.0,
-                    runSpacing: 8.0,
+                    spacing: M3Spacing.sm,
+                    runSpacing: M3Spacing.xs,
                     children: [
                       TestSemantics.button(
                         identifier: TestIds.sellinUploadButton,
@@ -3285,13 +3258,6 @@ onChanged: m3Legacy<int>((v) {
                                       : null,
                                 ),
                         child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(0, 44.0),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20.0,
-                              vertical: 10.0,
-                            ),
-                          ),
                           onPressed: _isUploading || !isExplicitChain(_archiveUploadChain)
                               ? null
                               : () => _pickAndUploadSellInFile(
@@ -3314,13 +3280,6 @@ onChanged: m3Legacy<int>((v) {
                         ),
                       ),
                       OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 44.0),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 10.0,
-                          ),
-                        ),
                         onPressed: _isLoadingArchive ? null : _loadSellInArchive,
                         icon: const Icon(Icons.refresh_rounded, size: 18.0),
                         label: const Text('تحديث'),
@@ -3338,11 +3297,12 @@ onChanged: m3Legacy<int>((v) {
         // 2. Uploaded Sell-In Sheets Table
         TestSemantics(
           identifier: TestIds.uploadedFilesList,
-          label: 'Uploaded Files (${_archivedSellInFiles.length})',
+          label: 'الملفات المرفوعة (${_archivedSellInFiles.length})',
           container: true,
           child: Container(
+            key: const ValueKey('sellin_uploaded_files_section'),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerLowest,
+              color: M3TableSurface.color(colorScheme),
               borderRadius: M3Shape.radiusLg,
               border: Border.all(
                 color: colorScheme.outlineVariant.withOpacity(0.5),
@@ -3396,32 +3356,30 @@ onChanged: m3Legacy<int>((v) {
                     : TableScrollContainer(
                         controller: _archiveSheetsScrollController,
                         showSwipeHint: true,
+                        // Actions pinned at the row end (same as Sell-Out) so
+                        // they stay on screen at 1280dp without scrolling.
+                        pinnedEnd: _buildArchiveActionsColumn(context),
                         child: DataTable(
+                          key: const ValueKey('sellin_uploaded_files_table'),
+                          columnSpacing: M3Spacing.sm,
+                          horizontalMargin: M3Spacing.sm,
+                          headingRowHeight: _archiveHeadingHeight,
+                          dataRowMinHeight: _archiveRowHeight,
+                          dataRowMaxHeight: _archiveRowHeight,
                           headingRowColor: WidgetStatePropertyAll(
                             colorScheme.surfaceContainerHigh.withOpacity(0.5),
                           ),
                           columns: const [
                             DataColumn(label: Text('الملف')),
-                            DataColumn(label: Text('Chain')),
-                            DataColumn(label: Text('Period')),
-                            DataColumn(label: Text('Transactions'), numeric: true),
-                            DataColumn(
-                              label: Text('Cases'),
-                              numeric: true,
-                            ),
-                            DataColumn(
-                              label: Text('Net Sell-In (EGP)'),
-                              numeric: true,
-                            ),
-                            DataColumn(label: Text('Tons'), numeric: true),
+                            DataColumn(label: Text('السلسلة')),
+                            DataColumn(label: Text('الفترة')),
+                            DataColumn(label: Text('المعاملات'), numeric: true),
+                            DataColumn(label: Text('الكراتين'), numeric: true),
+                            DataColumn(label: Text('صافي Sell-In (ج.م)'), numeric: true),
+                            DataColumn(label: Text('الوزن (طن)'), numeric: true),
                             DataColumn(label: Text('تاريخ الرفع')),
-                            DataColumn(
-                              label: Text('Actions'),
-                            ),
                           ],
                           rows: _archivedSellInFiles.map((file) {
-                            final isDeleting = _deletingFileId == file.id;
-                            final isReplacing = _replacingFileId == file.id;
                             final periodText = file.targetMonth.isNotEmpty &&
                                     file.targetMonth != 'auto'
                                 ? '${file.targetMonth} / ${file.targetYear}'
@@ -3468,19 +3426,12 @@ onChanged: m3Legacy<int>((v) {
                                   ),
                                 ),
                                 DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8.0,
-                                      vertical: 3.0,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          colorScheme.primaryContainer.withOpacity(0.6),
-                                      borderRadius: M3Shape.radiusFull,
-                                    ),
+                                  M3ChipSurface(
+                                    key: const ValueKey('sellin_file_chain_chip'),
+                                    color: colorScheme.surfaceContainerHigh,
                                     child: Text(
                                       file.retailChain.toUpperCase(),
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.labelSmall,                                       fontWeight: FontWeight.w800,                                       color: colorScheme.onPrimaryContainer,                                     )),
+                                      style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant),
                                     ),
                                   ),
                                 ),
@@ -3516,7 +3467,8 @@ onChanged: m3Legacy<int>((v) {
                                 ),
                                 DataCell(
                                   Text(
-                                    '${file.totalWeightTons.toStringAsFixed(1)} طن',
+                                    file.totalWeightTons.toStringAsFixed(1),
+                                    key: ValueKey('sellin_file_tons_${file.id}'),
                                   ),
                                 ),
                                 DataCell(
@@ -3529,8 +3481,58 @@ onChanged: m3Legacy<int>((v) {
                                     style: M3TextVariants.cell.copyWith(color: colorScheme.onSurfaceVariant),
                                   ),
                                 ),
-                                DataCell(
-                                  ArchiveActionsGroup(
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Signed whole count with the sign before the number in RTL (U+2212 for
+  /// minus, wrapped in an LTR isolate), e.g. "+1,200" / "−300"; zero is unsigned.
+  static String _signedCount(int n, {required bool positive}) {
+    final body = CurrencyFormatter.formatNumber(n.abs());
+    if (n == 0) return '\u2066$body\u2069';
+    return '\u2066${positive ? '+' : '\u2212'}$body\u2069';
+  }
+
+  static const double _archiveHeadingHeight = 48.0;
+  static const double _archiveRowHeight = 56.0;
+
+  Widget _buildArchiveActionsColumn(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final divider = Divider.createBorderSide(context, width: 1.0);
+    return IntrinsicWidth(
+      key: const ValueKey('sellin_uploaded_files_actions_column'),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: BorderDirectional(start: BorderSide(color: colorScheme.outlineVariant)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: _archiveHeadingHeight,
+              alignment: AlignmentDirectional.centerStart,
+              padding: const EdgeInsets.symmetric(horizontal: M3Spacing.sm),
+              color: colorScheme.surfaceContainerHigh.withOpacity(0.5),
+              child: Text('الإجراءات', style: theme.dataTableTheme.headingTextStyle ?? theme.textTheme.titleSmall),
+            ),
+            for (final file in _archivedSellInFiles)
+              Container(
+                height: _archiveRowHeight,
+                alignment: AlignmentDirectional.centerStart,
+                padding: const EdgeInsets.symmetric(horizontal: M3Spacing.sm),
+                decoration: BoxDecoration(border: Border(top: divider)),
+                child: Builder(builder: (context) {
+                  final isDeleting = _deletingFileId == file.id;
+                  final isReplacing = _replacingFileId == file.id;
+                  return ArchiveActionsGroup(
                                     archiveId: file.id,
                                     fileName: file.fileName,
                                     // Replacing a Sell-In archive deletes the old one: super_admin only
@@ -3548,16 +3550,12 @@ onChanged: m3Legacy<int>((v) {
                                     onDelete: (isDeleting || isReplacing)
                                         ? null
                                         : () => _confirmAndDeleteSellInSheet(file),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }).toList(),
-                        ),
-                      ),
-          ),
+                                  );
+                }),
+              ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -3613,7 +3611,7 @@ onChanged: m3Legacy<int>((v) {
     final hasItems = items.isNotEmpty;
     final fg = hasItems ? status.onWarningContainer : colorScheme.onSurfaceVariant;
     return Container(
-      padding: const EdgeInsets.all(14.0),
+      padding: M3Spacing.pSm,
       decoration: BoxDecoration(
         color: hasItems ? status.warningContainer : colorScheme.surfaceContainerLow,
         borderRadius: M3Shape.radiusLg,
@@ -3703,54 +3701,18 @@ onChanged: m3Legacy<int>((v) {
     Widget card1,
     Widget card2,
     Widget card3,
-    Widget card4,
-  ) {
-    if (maxWidth >= 960) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: card1),
-          const SizedBox(width: 12.0),
-          Expanded(child: card2),
-          const SizedBox(width: 12.0),
-          Expanded(child: card3),
-          const SizedBox(width: 12.0),
-          Expanded(child: card4),
-        ],
-      );
-    } else if (maxWidth >= 580) {
-      return Column(
-        children: [
-          Row(
-            children: [
-              Expanded(child: card1),
-              const SizedBox(width: 12.0),
-              Expanded(child: card2),
-            ],
-          ),
-          const SizedBox(height: 12.0),
-          Row(
-            children: [
-              Expanded(child: card3),
-              const SizedBox(width: 12.0),
-              Expanded(child: card4),
-            ],
-          ),
-        ],
-      );
-    } else {
-      return Column(
-        children: [
-          card1,
-          const SizedBox(height: 12.0),
-          card2,
-          const SizedBox(height: 12.0),
-          card3,
-          const SizedBox(height: 12.0),
-          card4,
-        ],
-      );
-    }
+    Widget card4, {
+    String id = 'main',
+  }) {
+    // Same equal-height grid and gutters as the Sell-Out KPI row.
+    final columns = maxWidth >= 960 ? 4 : (maxWidth >= 580 ? 2 : 1);
+    return M3EqualHeightGrid(
+      key: ValueKey('sellin_kpi_grid_$id'),
+      columns: columns,
+      spacing: M3Spacing.sm,
+      runSpacing: M3Spacing.sm,
+      children: [card1, card2, card3, card4],
+    );
   }
 
   Widget _buildSummaryCard(
@@ -3765,6 +3727,7 @@ onChanged: m3Legacy<int>((v) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Container(
+      key: ValueKey('kpi_card_$titleEn'),
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
@@ -3786,50 +3749,44 @@ onChanged: m3Legacy<int>((v) {
                 ),
                 child: Icon(icon, color: color, size: 20.0),
               ),
-              const SizedBox(width: 10.0),
+              const SizedBox(width: 8.0),
+              // Arabic-only title; [titleEn] is kept as the stable key id.
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      titleAr,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 1.0),
-                    Text(
-                      titleEn,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                        fontSize: M3FontSize.labelSmallPlus,
-                      ),
-                    ),
-                  ],
+                // Two lines so long Arabic titles are not cut at 1280–1440dp.
+                child: M3SectionTitle(
+                  titleAr,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12.0),
+          M3Spacing.gapSM,
           // Never show the previous filter's numbers while a new response is loading.
           if (_isLoading) ...[
             const M3SkeletonBox(key: ValueKey('sell_in_kpi_skeleton'), width: 120.0, height: 28.0),
             const SizedBox(height: 8.0),
             const M3SkeletonBox(width: 180.0, height: 12.0),
           ] else ...[
-            Text(
-              value,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: colorScheme.onSurface,
+            // Up to 2 lines; the full value is always in the tooltip.
+            Tooltip(
+              message: value,
+              child: Text(
+                value,
+                key: ValueKey('kpi_value_$titleEn'),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: colorScheme.onSurface,
+                ),
               ),
             ),
-            const SizedBox(height: 6.0),
+            const SizedBox(height: 4.0),
             Text(
               subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -3889,7 +3846,7 @@ class _HoverCopyCodeState extends State<_HoverCopyCode> {
     final hasValue = widget.value.isNotEmpty;
     final style = Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(
           fontFamily: 'monospace',
-          fontSize: M3FontSize.tinyPlus,
+          fontSize: M3FontSize.labelSmall,
           fontWeight: FontWeight.w700,
           color: cs.primary,
         ));
@@ -3909,7 +3866,7 @@ class _HoverCopyCodeState extends State<_HoverCopyCode> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.icon, size: 12.0, color: cs.primary),
+              Icon(widget.icon, size: 18.0, color: cs.primary),
               const SizedBox(width: 4.0),
               Text(
                 '${widget.label}: ${hasValue ? widget.value : "-"}',
@@ -3919,7 +3876,7 @@ class _HoverCopyCodeState extends State<_HoverCopyCode> {
                 const SizedBox(width: 4.0),
                 Tooltip(
                   message: 'نسخ',
-                  child: Icon(AppIcons.copy, size: 12.0, color: cs.primary),
+                  child: Icon(AppIcons.copy, size: 18.0, color: cs.primary),
                 ),
               ],
             ],
