@@ -84,21 +84,6 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
     'Dec',
   ];
 
-  static String _formatYAxisLabel(double amount) {
-    if (amount <= 0) return '0 ج.م';
-    if (amount >= 1000000) {
-      final inM = amount / 1000000.0;
-      if (inM >= 10 || inM == inM.roundToDouble()) {
-        return '${inM.toStringAsFixed(inM == inM.roundToDouble() ? 0 : 1)}مليون ج.م';
-      }
-      return '${inM.toStringAsFixed(1)}مليون ج.م';
-    } else if (amount >= 1000) {
-      final inK = amount / 1000.0;
-      return '${inK.toStringAsFixed(0)}ألف ج.م';
-    }
-    return '${amount.round()} ج.م';
-  }
-
   String _formatAxisLabel(DailyTrendItem item) {
     if (item.monthKey.trim().isNotEmpty) {
       final parts = item.monthKey.trim().split('-');
@@ -325,23 +310,8 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'اتجاه Sell-Out الشهري',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2.0),
-                    Text(
-                      showSellIn
-                          ? 'Monthly Sell-Out & Net Sell-In (after returns)'
-                          : 'Monthly Sell-Out Trend',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.2,
-                      ),
+                      'الاتجاه الشهري (\u2068Sell-Out\u2069)',
+                      style: theme.textTheme.titleMedium,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -424,19 +394,31 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                 children: [
                   // Vertical Financial Axis (Y-Axis)
                   SizedBox(
-                    width: 62.0,
+                    // "19.1 مليون ج.م" ≈ 69px at 11sp; 84 leaves a margin.
+                    width: 84.0,
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 10.0, bottom: 10.0),
+                      padding: const EdgeInsets.symmetric(vertical: 10.0),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: List.generate(5, (i) {
                           final val = maxVal * (4 - i) / 4.0;
-                          return Text(
-                            _formatYAxisLabel(val),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
+                          // Longer values (billions) scale down, never wrap.
+                          return FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: Text(
+                              CurrencyFormatter.formatCompactEGP(val,
+                                  words: true, isolate: true),
+                              maxLines: 1,
+                              softWrap: false,
+                              textDirection: TextDirection.rtl,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
                             ),
                           );
                         }),
@@ -528,6 +510,8 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                                   children: [
                                     Text(
                                       label,
+                                      maxLines: 1,
+                                      softWrap: false,
                                       style:
                                           theme.textTheme.labelSmall?.copyWith(
                                         color: isHovered
@@ -540,6 +524,8 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                                     if (labelEn != null)
                                       Text(
                                         labelEn,
+                                        maxLines: 1,
+                                        softWrap: false,
                                         style: theme.textTheme.labelSmall
                                             ?.copyWith(
                                           color: isHovered

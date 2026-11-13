@@ -505,8 +505,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('اتجاه Sell-Out الشهري'), findsOneWidget);
-    expect(find.text('Monthly Sell-Out Trend'), findsOneWidget);
+    expect(find.text('الاتجاه الشهري (\u2068Sell-Out\u2069)'), findsOneWidget);
+    expect(find.text('Monthly Sell-Out Trend'), findsNothing);
     expect(find.text('أسواق فتح الله'), findsOneWidget);
     expect(find.text('Fathalla Market'), findsOneWidget);
     expect(find.text('جملة ماركت'), findsOneWidget);

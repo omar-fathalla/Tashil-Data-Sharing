@@ -15,19 +15,38 @@ class CurrencyFormatter {
     return '${_integerFormat.format(amount.round())} ج.م';
   }
 
-  /// Compact formatting for Bento cards: e.g. "1.45M ج.م" or "250K ج.م"
-  static String formatCompactEGP(double amount) {
+  /// Compact EGP for charts & cards, one place for spacing/rounding.
+  /// - `words: false` (default) → "127.14M ج.م" / "250.0K ج.م" (KPI cards, unchanged).
+  /// - `words: true` → "19.1 مليون ج.م" / "950 ألف ج.م" / "1.2 مليار ج.م" (chart axes).
+  /// Always a normal space between number, scale word and currency; [isolate]
+  /// wraps the value in FSI…PDI so it never reorders inside RTL text.
+  static String formatCompactEGP(double amount,
+      {bool words = false, int? decimals, bool isolate = false}) {
     if (amount < 0) {
-      return '−${formatCompactEGP(-amount)}';
+      return '−${formatCompactEGP(-amount, words: words, decimals: decimals, isolate: isolate)}';
     }
-    if (amount >= 1000000) {
-      final inM = amount / 1000000.0;
-      return '${inM.toStringAsFixed(2)}M ج.م';
-    } else if (amount >= 1000) {
-      final inK = amount / 1000.0;
-      return '${inK.toStringAsFixed(1)}K ج.م';
+    String trim(double v, int d) {
+      final s = v.toStringAsFixed(d);
+      return d > 0 && s.contains('.')
+          ? s.replaceFirst(RegExp(r'\.?0+$'), '')
+          : s; // 19.0 → 19
     }
-    return '${amount.toStringAsFixed(0)} ج.م';
+
+    final String out;
+    if (words && amount >= 1e9) {
+      out = '${trim(amount / 1e9, decimals ?? 1)} مليار ج.م';
+    } else if (amount >= 1e6) {
+      out = words
+          ? '${trim(amount / 1e6, decimals ?? 1)} مليون ج.م'
+          : '${(amount / 1e6).toStringAsFixed(decimals ?? 2)}M ج.م';
+    } else if (amount >= 1e3) {
+      out = words
+          ? '${trim(amount / 1e3, decimals ?? 0)} ألف ج.م'
+          : '${(amount / 1e3).toStringAsFixed(decimals ?? 1)}K ج.م';
+    } else {
+      out = '${amount.toStringAsFixed(0)} ج.م';
+    }
+    return isolate ? '\u2068$out\u2069' : out;
   }
 
   /// Formats integer count with thousands separators: e.g. "125,400"
