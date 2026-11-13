@@ -2919,12 +2919,10 @@ onChanged: m3Legacy<String>((v) {
                     runSpacing: 8.0,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      SizedBox(
-                        width: 200.0,
-                        child: M3Dropdown<String>(
+                      M3Dropdown<String>(
 value: _archiveUploadChain,
+fitOptions: true,
 label: 'السلسلة',
-expand: true,
 options: m3OptionsFromMenuItems<String>([
                             const DropdownMenuItem(value: 'fathalla', child: Text('Fathalla Market')),
                             const DropdownMenuItem(value: 'gomla', child: Text('Gomla Market')),
@@ -2937,13 +2935,10 @@ onChanged: m3Legacy<String>((v) {
                             }
                           }),
 ),
-                      ),
-                      SizedBox(
-                        width: 155.0,
-                        child: M3Dropdown<int>(
+                      M3Dropdown<int>(
 value: _archiveUploadYear,
+fitOptions: true,
 label: 'السنة (اختياري)',
-expand: true,
 options: m3OptionsFromMenuItems<int>([
                             const DropdownMenuItem(value: 0, child: Text('من الملف تلقائيًا')),
                             for (final y in _recentYears) DropdownMenuItem(value: y, child: Text('$y')),
@@ -2954,13 +2949,10 @@ onChanged: m3Legacy<int>((v) {
                             }
                           }),
 ),
-                      ),
-                      SizedBox(
-                        width: 190.0,
-                        child: M3Dropdown<int>(
+                      M3Dropdown<int>(
 value: _archiveUploadMonth,
+fitOptions: true,
 label: 'الشهر (اختياري)',
-expand: true,
 options: m3OptionsFromMenuItems<int>([
                             const DropdownMenuItem(value: 0, child: Text('من الملف تلقائيًا')),
                             const DropdownMenuItem(value: 1, child: Text('يناير')),
@@ -2982,7 +2974,6 @@ onChanged: m3Legacy<int>((v) {
                             }
                           }),
 ),
-                      ),
                     ],
                   ),
                   Wrap(
