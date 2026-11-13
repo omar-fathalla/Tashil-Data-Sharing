@@ -112,7 +112,10 @@ void main() {
     expect(find.text('المرتجعات'), findsWidgets);
     expect(find.textContaining('قيمة المرتجعات'), findsOneWidget);
     expect(find.textContaining('كمية المرتجعات'), findsOneWidget);
+    // #141 shortened the KPI title so the 138px card matches Sell-Out;
+    // the rest of the phrase is the subtitle («من الإجمالي · Returns ÷ Gross»).
     expect(find.text('نسبة المرتجع'), findsOneWidget);
+    expect(find.textContaining('من الإجمالي'), findsWidgets);
     expect(find.textContaining('التغير الشهري'), findsOneWidget);
 
     // Phase-2: top returned products + Excel export; alert cards removed.

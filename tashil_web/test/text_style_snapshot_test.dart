@@ -31,6 +31,7 @@ List<String> _collect(WidgetTester tester, {List<Key> exclude = const []}) {
         skip.add(r);
         r.visitChildren(walk);
       }
+
       final r = e.renderObject;
       if (r != null) walk(r);
     }
@@ -50,13 +51,15 @@ List<String> _collect(WidgetTester tester, {List<Key> exclude = const []}) {
         }
       }
     }
+
     visit(ro.text, null);
   }
   out.sort();
   return out;
 }
 
-Future<void> _check(WidgetTester tester, String name, {List<Key> exclude = const []}) async {
+Future<void> _check(WidgetTester tester, String name,
+    {List<Key> exclude = const []}) async {
   final lines = _collect(tester, exclude: exclude);
   final f = File('test/snapshots/$name.txt');
   if (_update || !f.existsSync()) {
@@ -91,6 +94,10 @@ Future<void> _tab(WidgetTester tester, Pattern label) async {
 void main() {
   GoogleFonts.config.allowRuntimeFetching = false;
 
+  // sell_out_tab0 / sell_out_tab1 were re-recorded after #141: display-only
+  // stripSharedLeadingPrefix removes the repeated branch prefix, so labels
+  // such as «فرع فتح الله - نيس2» now read «نيس2». Typography (size, weight,
+  // color, letterSpacing, height) of the pre-existing strings is unchanged.
   testWidgets('Sell-Out explorer text styles are unchanged', (tester) async {
     await _pump(tester, SellOutExplorerScreen(apiClient: ApiClient()));
     await _check(tester, 'sell_out_tab0');
@@ -113,7 +120,8 @@ void main() {
     await _check(tester, 'sell_in_sheets');
   });
 
-  testWidgets('Executive dashboard text/icon styles are unchanged', (tester) async {
+  testWidgets('Executive dashboard text/icon styles are unchanged',
+      (tester) async {
     await _pump(tester, ExecutiveScreen(apiClient: ApiClient()));
     const newSections = [
       ValueKey('market_share_section'),
@@ -124,7 +132,8 @@ void main() {
     for (final k in ['executive_chain_dropdown', 'executive_month_dropdown']) {
       await tester.tap(find.byKey(ValueKey(k)));
       await tester.pumpAndSettle();
-      await _check(tester, 'executive_menu_${k.split('_')[1]}', exclude: newSections);
+      await _check(tester, 'executive_menu_${k.split('_')[1]}',
+          exclude: newSections);
       await tester.tapAt(const Offset(5, 5));
       await tester.pumpAndSettle();
     }

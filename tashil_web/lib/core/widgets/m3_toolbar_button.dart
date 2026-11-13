@@ -20,6 +20,8 @@ abstract final class M3ToolbarButton {
   static const ButtonStyle style = ButtonStyle(
     shape: WidgetStatePropertyAll(shape),
     minimumSize: WidgetStatePropertyAll(Size(0.0, height)),
+    maximumSize: WidgetStatePropertyAll(Size(double.infinity, height)),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     iconSize: WidgetStatePropertyAll(iconSize),
     padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 16.0)),
   );

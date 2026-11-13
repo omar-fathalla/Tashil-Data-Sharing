@@ -64,7 +64,7 @@ class M3ButtonGroup extends StatelessWidget {
             tooltip: 'المزيد',
             onPressed: () =>
                 controller.isOpen ? controller.close() : controller.open(),
-            icon: const Icon(Icons.more_vert),
+            icon: const Icon(Icons.more_vert_rounded),
           ),
           menuChildren: [
             for (final i in overflow)

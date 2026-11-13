@@ -107,15 +107,16 @@ void main() {
     expect(cellRect.center.dx, closeTo(headX, 12.0),
         reason: 'barcode cell centre ${cellRect.center.dx} vs header $headX');
     // Header column box: glyphs sit in its middle, not at the start.
-    final col = tester.getRect(find.byKey(const ValueKey('sort_header_barcode')));
+    final col =
+        tester.getRect(find.byKey(const ValueKey('sort_header_barcode')));
     expect(headX, closeTo(col.center.dx, 2.0));
   });
 
   testWidgets('CPFR Suggested Orders: item names wrap up to 3 lines',
       (tester) async {
-    await _pump(tester, CPFRDashboardScreen(apiClient: _PoApi()),
-        height: 4000);
-    await tester.tap(find.text('2. Suggested PO & Replenishment').first);
+    await _pump(tester, CPFRDashboardScreen(apiClient: _PoApi()), height: 4000);
+    // #142 moved the tab index into a badge; the label is the title only.
+    await tester.tap(find.byKey(const ValueKey('cpfr_tab_label_2')));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     final name = find.text(_longName);
