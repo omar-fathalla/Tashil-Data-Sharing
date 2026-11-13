@@ -3255,7 +3255,7 @@ onChanged: m3Legacy<int>((v) {
           children: [
             Container(
               height: _archiveHeadingHeight,
-              alignment: AlignmentDirectional.centerStart,
+              alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(horizontal: M3Spacing.sm),
               color: colorScheme.surfaceContainerHigh.withOpacity(0.5),
               child: Text('الإجراءات', style: theme.dataTableTheme.headingTextStyle ?? theme.textTheme.titleSmall),
@@ -3263,7 +3263,7 @@ onChanged: m3Legacy<int>((v) {
             for (final file in _archivedSellOutFiles)
               Container(
                 height: _archiveRowHeight,
-                alignment: AlignmentDirectional.centerStart,
+                alignment: Alignment.center,
                 padding: const EdgeInsets.symmetric(horizontal: M3Spacing.sm),
                 decoration: BoxDecoration(border: Border(top: divider)),
                 child: Builder(builder: (context) {

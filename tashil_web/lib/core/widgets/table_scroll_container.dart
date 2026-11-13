@@ -33,6 +33,12 @@ class TableScrollContainer extends StatefulWidget {
   /// while the other columns scroll. Its rows must use the table's heights.
   final Widget? pinnedStart;
 
+  /// Optional relative widths for a DataTable child. The table still fills the
+  /// available width, but the extra space is split by these weights instead of
+  /// equally, so a wide column (e.g. a status chip) gets more room and narrow
+  /// ones less. Length must match the column count; otherwise ignored.
+  final List<double>? columnFlex;
+
   const TableScrollContainer({
     super.key,
     required this.child,
@@ -47,6 +53,7 @@ class TableScrollContainer extends StatefulWidget {
     this.padding,
     this.decoration,
     this.pinnedEnd,
+    this.columnFlex,
     this.pinnedStart,
   });
 
@@ -373,10 +380,25 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
               colCount;
       final minColWidth = rawMinColWidth.clamp(0.0, double.infinity);
 
+      final flex = widget.columnFlex;
+      final useFlex = flex != null &&
+          flex.length == colCount &&
+          flex.every((f) => f > 0);
+      final flexSum = useFlex ? flex.fold<double>(0, (a, b) => a + b) : 0.0;
+      var colIndex = 0;
       final expandedColumns = dt.columns.map((col) {
-        final sortAllowance = col.onSort != null ? 20.0 : 0.0;
-        final colMin =
-            (minColWidth - sortAllowance).clamp(0.0, double.infinity);
+        final i = colIndex++;
+        final share = useFlex
+            ? minColWidth * colCount * flex[i] / flexSum
+            : minColWidth;
+        // A sortable header adds the arrow (16 + 2); a centred one adds the
+        // same spacer on the other side to keep the label centred.
+        final sortAllowance = col.onSort == null
+            ? 0.0
+            : col.headingRowAlignment == MainAxisAlignment.center
+                ? 36.0
+                : 20.0;
+        final colMin = (share - sortAllowance).clamp(0.0, double.infinity);
         return DataColumn(
           numeric: col.numeric,
           tooltip: col.tooltip,
