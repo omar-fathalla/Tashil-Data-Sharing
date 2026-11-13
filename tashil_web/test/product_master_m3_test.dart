@@ -1,0 +1,178 @@
+// Product Master: Sell-Out M3 treatment — live 1280+250dp sidebar, Cairo,
+// live-scale values, and the Noto Sans Symbols 2 fallback used for ▲▼.
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:tashil_web/core/data/app_cache.dart';
+import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
+import 'package:tashil_web/core/widgets/m3_toolbar_button.dart';
+import 'package:tashil_web/core/widgets/table_scroll_container.dart';
+import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
+
+import 'support/live_viewport.dart';
+import 'support/product_master_m3_support.dart';
+
+class _KpiMetrics {
+  _KpiMetrics(this.size, this.padding, this.iconSize, this.fonts, this.weights);
+  final Size size;
+  final EdgeInsetsGeometry? padding;
+  final double? iconSize;
+  final List<double?> fonts;
+  final List<FontWeight?> weights;
+  @override
+  String toString() =>
+      'size=$size padding=$padding icon=$iconSize fonts=$fonts weights=$weights';
+}
+
+_KpiMetrics _kpi(WidgetTester tester, Finder card) {
+  final texts = find.descendant(of: card, matching: find.byType(Text));
+  final styles = [
+    for (final e in texts.evaluate())
+      (find
+              .descendant(
+                  of: find.byWidget(e.widget), matching: find.byType(RichText))
+              .evaluate()
+              .first
+              .widget as RichText)
+          .text
+          .style,
+  ];
+  return _KpiMetrics(
+    tester.getSize(card),
+    tester
+        .widget<Container>(
+            find.descendant(of: card, matching: find.byType(Container)).first)
+        .padding,
+    tester
+        .widget<Icon>(
+            find.descendant(of: card, matching: find.byType(Icon)).first)
+        .size,
+    [for (final st in styles) st?.fontSize],
+    [for (final st in styles) st?.fontWeight],
+  );
+}
+
+double? _horizontalExtent(WidgetTester tester) {
+  final table = find.byType(TableScrollContainer);
+  if (table.evaluate().isEmpty) return null;
+  final hScroll = find.descendant(
+    of: table.first,
+    matching: find.byWidgetPredicate((w) =>
+        w is Scrollable &&
+        (w.axisDirection == AxisDirection.left ||
+            w.axisDirection == AxisDirection.right)),
+  );
+  if (hScroll.evaluate().isEmpty) return 0;
+  return tester.state<ScrollableState>(hScroll.first).position.maxScrollExtent;
+}
+
+Finder _pmCards() => find.byWidgetPredicate((w) =>
+    w is M3SummaryKpiCard &&
+    w.key is ValueKey<String> &&
+    (w.key as ValueKey<String>).value.startsWith('pm_kpi_card_'));
+
+void main() {
+  ignoreGoogleFontLoadErrors();
+  setUpAll(loadProductMasterFonts);
+  setUp(AppCache.clear);
+
+  testWidgets(
+      'live 1280 shell: KPI height matches Sell-Out 138, typography, no h-scroll',
+      (tester) async {
+    await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 2400,
+      withSidebar: true,
+      page: SellOutExplorerScreen(apiClient: ApiClient()),
+    );
+    final ref = _kpi(
+      tester,
+      find.byKey(const ValueKey('kpi_card_Net Sales (EGP)')),
+    );
+
+    final errors = await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 2400,
+      withSidebar: true,
+    );
+    expect(errors, isEmpty, reason: errors.map((e) => e.exception).join('\n'));
+
+    final cards = _pmCards();
+    expect(cards, findsNWidgets(5));
+    expect(find.text('إجمالي الأصناف'), findsWidgets);
+    expect(find.text('أصناف العروض'), findsWidgets);
+    expect(find.text('الباركودات الفريدة'), findsWidgets);
+    expect(find.text('التغطية بالسلاسل'), findsWidgets);
+    expect(find.text('إجمالي الأصناف المسجلة بالكارتة'), findsNothing);
+    expect(find.text('الباركودات الفريدة وسعة الكرتونة'), findsNothing);
+
+    for (final e in cards.evaluate()) {
+      final m = _kpi(tester, find.byWidget(e.widget));
+      final why = 'live-shell ${e.widget.key}: $m\nsell-out: $ref';
+      expect(m.padding, ref.padding, reason: why);
+      expect(m.iconSize, ref.iconSize, reason: why);
+      expect(m.iconSize, M3SummaryKpiStyle.iconSize, reason: why);
+      expect(m.padding, M3SummaryKpiStyle.padding, reason: why);
+      expect(m.size.height, closeTo(ref.size.height, 0.5), reason: why);
+      expect(m.size.height, closeTo(138.0, 1.0), reason: why);
+    }
+
+    expect(find.textContaining('كلوريل أبيض مركز'), findsWidgets);
+    expect(_horizontalExtent(tester), lessThanOrEqualTo(2.0),
+        reason: 'catalog still scrolls horizontally');
+
+    final export = find.text('تصدير Excel (CSV)');
+    expect(export, findsOneWidget);
+    final button = find.ancestor(
+      of: export,
+      matching: find.byType(OutlinedButton),
+    );
+    expect(button, findsOneWidget);
+    final material =
+        find.descendant(of: button, matching: find.byType(Material)).first;
+    expect(
+        tester.getSize(material).height, closeTo(M3ToolbarButton.height, 0.5));
+    expect(tester.widget<Material>(material).shape, isA<StadiumBorder>());
+
+    expect(find.textContaining('البادئة'), findsWidgets);
+    expect(find.textContaining('العلامة'), findsWidgets);
+    expect(find.text('بحث بكود الصنف أو الباركود أو الاسم'), findsWidgets);
+  });
+
+  testWidgets('1024+sidebar: KPI height 138, no horizontal scroll, no overflow',
+      (tester) async {
+    await pumpProductMaster(
+      tester,
+      width: 1024,
+      height: 2400,
+      withSidebar: true,
+      page: SellOutExplorerScreen(apiClient: ApiClient()),
+    );
+    final ref = _kpi(
+      tester,
+      find.byKey(const ValueKey('kpi_card_Net Sales (EGP)')),
+    );
+    final errors = await pumpProductMaster(
+      tester,
+      width: 1024,
+      height: 2400,
+      withSidebar: true,
+    );
+    expect(errors, isEmpty, reason: errors.map((e) => e.exception).join('\n'));
+    final cards = _pmCards();
+    expect(cards, findsNWidgets(5));
+    for (final e in cards.evaluate()) {
+      final m = _kpi(tester, find.byWidget(e.widget));
+      final why = '1024 ${e.widget.key}: $m\nsell-out: $ref';
+      expect(m.padding, ref.padding, reason: why);
+      expect(m.iconSize, ref.iconSize, reason: why);
+      expect(m.size.height, closeTo(ref.size.height, 0.5), reason: why);
+      expect(m.size.height, closeTo(138.0, 1.0), reason: why);
+    }
+    expect(_horizontalExtent(tester), lessThanOrEqualTo(2.0),
+        reason: 'catalog still scrolls horizontally at 1024');
+    expect(find.textContaining('كلوريل أبيض مركز'), findsWidgets);
+  });
+}

@@ -159,7 +159,7 @@ void main() {
   });
 
   testWidgets(
-      'Product Master dialog KPI titles wrap up to 2 lines and are not ellipsized',
+      'Product Master KPI titles stay fully visible and are not ellipsized',
       (tester) async {
     final api = _FitApiClient();
     await pumpPricing(
@@ -180,22 +180,16 @@ void main() {
     expect(grid, findsOneWidget);
 
     for (final title in [
-      'إجمالي الأصناف المسجلة بالكارتة',
+      'إجمالي الأصناف',
       'أصناف البيع العادي',
-      'أصناف العروض الترويجية',
-      'الباركودات الفريدة وسعة الكرتونة',
-      'التغطية والسحب بالسلاسل',
+      'أصناف العروض',
+      'الباركودات الفريدة',
+      'التغطية بالسلاسل',
     ]) {
       expect(find.text(title), findsOneWidget, reason: title);
       expect(_onScreen(tester, find.text(title)), isTrue, reason: title);
     }
 
-    for (final e in find
-        .descendant(of: grid, matching: find.byType(M3SectionTitle))
-        .evaluate()) {
-      final title = e.widget as M3SectionTitle;
-      expect(title.maxLines, 2);
-    }
-    expect(_ellipsizedBefore(tester, grid, 2), isEmpty);
+    expect(_ellipsizedBefore(tester, grid, 1), isEmpty);
   });
 }

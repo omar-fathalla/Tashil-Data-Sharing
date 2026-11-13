@@ -17,7 +17,11 @@ import '../../../../core/data/data_refresh_mixin.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_toolbar_button.dart';
+import '../../../../core/widgets/m3_wrap_text.dart';
+import '../../../../core/widgets/table_scroll_container.dart';
 
 /// Adeco Canonical Product Master & Official Price List Screen (`كارتة الأصناف والأسعار`).
 /// Provides:
@@ -585,11 +589,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                             Row(
                                               children: [
                                                 Flexible(
-                                                  child: Text(
+                                                  child: M3WrapText(
                                                     file.fileName,
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
+                                                    maxLines: 3,
                                                     style: const TextStyle(
                                                       fontWeight:
                                                           FontWeight.w900,
@@ -846,10 +848,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                     ),
                                     const SizedBox(width: 8.0),
                                     Expanded(
-                                      child: Text(
+                                      child: M3WrapText(
                                         '[${item.itemCode}] ${item.officialName}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 3,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: M3FontSize.bodySmall,
@@ -1106,7 +1107,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
 
     return Scaffold(
       backgroundColor: cs.surface,
-      body: NestedScrollView(
+      body: M3ToolbarButtonTheme(
+        child: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverToBoxAdapter(
             child: Padding(
@@ -1167,6 +1169,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             _buildUploadAndArchiveTab(theme, cs, summary),
           ],
         ),
+        ),
       ),
     );
   }
@@ -1177,40 +1180,29 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     required String titleEn,
   }) {
     return Tab(
-      height: 54.0,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18.0),
-          const SizedBox(width: 8.0),
-          Flexible(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  titleAr,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: M3FontSize.bodySmallPlus,
-                  ),
+      height: 56.0,
+      child: Tooltip(
+        message: titleEn,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18.0),
+            const SizedBox(width: 8.0),
+            Flexible(
+              child: Text(
+                titleAr,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: M3FontSize.bodySmallPlus,
                 ),
-                Text(
-                  titleEn,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: M3FontSize.tiny,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1265,6 +1257,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   children: [
                     Text(
                       'كارتة الأصناف والأسعار المعتمدة • أدكو (Adeco)',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w900,
                         color: cs.onSurface,
@@ -1273,6 +1267,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                     const SizedBox(height: 2.0),
                     Text(
                       'Canonical Product Master, Item Codes (كود الصنف), Barcodes & Official Carton/Unit Pricing',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: cs.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
@@ -1502,9 +1498,11 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        // Live 1280+sidebar content is ~982 (3 columns). 1024+sidebar is
+        // ~726, the same band as Sell-Out's 2-column row, so cards stay 138.
         final columns = constraints.maxWidth >= 1050
             ? 5
-            : (constraints.maxWidth >= 700
+            : (constraints.maxWidth >= 900
                 ? 3
                 : (constraints.maxWidth >= 520 ? 2 : 1));
         final regularShare = summary.totalSkus > 0
@@ -1519,8 +1517,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           children: [
             M3SummaryKpiCard(
               key: const ValueKey('pm_kpi_card_Total Registered'),
-              title: 'إجمالي الأصناف المسجلة بالكارتة',
-              titleMaxLines: 2,
+              title: 'إجمالي الأصناف',
+              titleMaxLines: 1,
               subtitleMaxLines: 2,
               value: countSku(summary.totalSkus),
               subtitle: 'المعروض بالفلتر الحالي: ${countSku(filteredCount)}',
@@ -1531,7 +1529,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             M3SummaryKpiCard(
               key: const ValueKey('pm_kpi_card_Regular Catalog'),
               title: 'أصناف البيع العادي',
-              titleMaxLines: 2,
+              titleMaxLines: 1,
               subtitleMaxLines: 2,
               value: countSku(summary.regularSkusCount),
               subtitle: 'تمثل $regularShare% من إجمالي الكارتة',
@@ -1540,18 +1538,18 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             ),
             M3SummaryKpiCard(
               key: const ValueKey('pm_kpi_card_Promos'),
-              title: 'أصناف العروض الترويجية',
-              titleMaxLines: 2,
+              title: 'أصناف العروض',
+              titleMaxLines: 1,
               subtitleMaxLines: 2,
               value: '${_intFmt.format(summary.promoSkusCount)} عرض',
-              subtitle: 'أكواد العروض الخاصة والشرنك والباقات الترويجية',
+              subtitle: 'عروض وشرنك وباقات ترويجية',
               icon: Icons.local_offer_rounded,
               color: M3Palette.warning,
             ),
             M3SummaryKpiCard(
               key: const ValueKey('pm_kpi_card_Unique Barcodes'),
-              title: 'الباركودات الفريدة وسعة الكرتونة',
-              titleMaxLines: 2,
+              title: 'الباركودات الفريدة',
+              titleMaxLines: 1,
               subtitleMaxLines: 2,
               value: '${_intFmt.format(summary.uniqueBarcodesCount)} باركود',
               subtitle:
@@ -1561,8 +1559,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             ),
             M3SummaryKpiCard(
               key: const ValueKey('pm_kpi_card_Chain Coverage'),
-              title: 'التغطية والسحب بالسلاسل',
-              titleMaxLines: 2,
+              title: 'التغطية بالسلاسل',
+              titleMaxLines: 1,
               subtitleMaxLines: 2,
               value: '${_intFmt.format(summary.activeInChainsCount)} نشط',
               subtitle:
@@ -1623,7 +1621,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                 children: [
                   Expanded(
                     flex: 3,
-                    child: TextField(
+                    child: M3SearchFieldWidth(
+                      hintText: 'بحث بكود الصنف أو الباركود أو الاسم',
+                      child: TextField(
                       key: const ValueKey('product_master_search_input'),
                       controller: _searchController,
                       onChanged: (_) => setState(() => _currentPage = 0),
@@ -1638,7 +1638,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 },
                               )
                             : null,
-                        hintText: 'بحث بكود الصنف',
+                        hintText: 'بحث بكود الصنف أو الباركود أو الاسم',
                         filled: true,
                         fillColor: cs.surface,
                         contentPadding: const EdgeInsets.symmetric(
@@ -1649,6 +1649,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           borderRadius: M3Shape.radiusMd,
                         ),
                       ),
+                    ),
                     ),
                   ),
                   const SizedBox(width: 12.0),
@@ -1690,7 +1691,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                 children: [
                   // Item Code Prefix dropdown filter
                   _buildDropdownFilter(
-                    labelAr: 'بادئة كود الصنف (Item Code Prefix)',
+                    labelAr: 'البادئة',
                     value: _selectedPrefix,
                     items: {
                       'all': 'الكل (All)',
@@ -1704,7 +1705,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   ),
                   // Brand filter
                   _buildDropdownFilter(
-                    labelAr: 'العلامة التجارية (Brand)',
+                    labelAr: 'العلامة',
                     value: _selectedBrand,
                     items: {
                       'all':
@@ -1718,7 +1719,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   ),
                   // Item Type filter
                   _buildDropdownFilter(
-                    labelAr: 'نوع الصنف (Item Type)',
+                    labelAr: 'النوع',
                     value: _selectedItemType,
                     items: {
                       'all': 'الكل (عادي + عرض)',
@@ -1732,7 +1733,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   ),
                   // Packaging filter
                   _buildDropdownFilter(
-                    labelAr: 'نوع التعبئة (Packaging)',
+                    labelAr: 'التعبئة',
                     value: _selectedPackaging,
                     items: {
                       'all': 'كل أنواع التعبئة',
@@ -1745,7 +1746,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   ),
                   // Chain Pull Status filter
                   _buildDropdownFilter(
-                    labelAr: 'حالة السحب بالسلاسل (Pull Status)',
+                    labelAr: 'السحب',
                     value: _selectedPullStatus,
                     items: {
                       'all': 'الكل (${summary.totalSkus})',
@@ -1858,75 +1859,81 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   ),
                 )
               else
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+                LayoutBuilder(builder: (context, tableConstraints) {
+                final w = _catalogColumnWidths(tableConstraints.maxWidth);
+                Widget box(int i, Widget child) =>
+                    SizedBox(width: w[i], child: child);
+                return TableScrollContainer(
+                  showSwipeHint: false,
+                  showControls: false,
                   child: DataTable(
                     headingRowColor: WidgetStateProperty.all(
                       cs.surfaceContainerHighest.withValues(alpha: 0.45),
                     ),
-                    dataRowMinHeight: 56.0,
-                    dataRowMaxHeight: 68.0,
-                    columnSpacing: 18.0,
+                    dataRowMinHeight: 52.0,
+                    dataRowMaxHeight: 108.0,
+                    headingRowHeight: 44.0,
+                    columnSpacing: 6.0,
+                    horizontalMargin: 8.0,
                     showCheckboxColumn: false,
                     columns: [
-                      DataColumn(label: _buildColHeader('م', '#')),
                       DataColumn(
-                        label: _buildColHeader('كود الصنف', 'Item Code'),
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: box(0, _buildColHeader('م', '#')),
                       ),
                       DataColumn(
-                        label: _buildColHeader(
-                          'الاسم الرسمي للصنف والعلامة',
-                          'Official SKU Name & Brand',
-                        ),
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: box(1, _buildColHeader('كود الصنف', 'Item Code')),
                       ),
                       DataColumn(
-                        label: _buildColHeader('الباركود', 'Barcode (GTIN)'),
+                        label: box(2, _buildColHeader('اسم الصنف', 'Official SKU Name')),
                       ),
                       DataColumn(
-                        label: _buildColHeader(
-                          'التعبئة والشدة',
-                          'Pack & Units/Carton',
-                        ),
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: box(3, _buildColHeader('الباركود', 'Barcode')),
                       ),
                       DataColumn(
-                        numeric: true,
-                        label: _buildColHeader(
-                          'سعر الوحدة (ق.ض)',
-                          'Unit Excl. VAT',
-                        ),
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: box(4, _buildColHeader('التعبئة', 'Pack')),
                       ),
                       DataColumn(
                         numeric: true,
-                        label: _buildColHeader(
-                          'سعر الوحدة (ش.ض 14%)',
-                          'Unit Incl. VAT',
-                        ),
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: box(5, _buildColHeader('سعر الوحدة', 'Excl. VAT')),
                       ),
                       DataColumn(
                         numeric: true,
-                        label: _buildColHeader(
-                          'سعر الكرتونة (ش.ض)',
-                          'Carton Incl. VAT',
-                        ),
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: box(6, _buildColHeader('السعر ش.ض', 'Incl. VAT')),
                       ),
                       DataColumn(
                         numeric: true,
-                        label: _buildColHeader(
-                          'صافي الوحدة بعد الخصم',
-                          'Net Unit Cost (-${summary.defaultDiscountPct.toStringAsFixed(0)}%)',
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: box(7, _buildColHeader('سعر الكرتونة', 'Carton')),
+                      ),
+                      DataColumn(
+                        numeric: true,
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: box(
+                          8,
+                          _buildColHeader(
+                            'الصافي',
+                            'Net (-${summary.defaultDiscountPct.toStringAsFixed(0)}%)',
+                          ),
                         ),
                       ),
                       DataColumn(
-                        label: _buildColHeader(
-                            'نوع الصنف والسحب', 'Type & Chain Pull'),
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: box(9, _buildColHeader('النوع', 'Type')),
                       ),
                       DataColumn(
-                        label: _buildColHeader('إجراءات', 'Actions'),
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: box(10, _buildColHeader('إجراءات', 'Actions')),
                       ),
                     ],
                     rows: pageItems.map((item) {
                       final isPromo = item.itemType == 'عرض';
-                      return DataRow(
+                      final raw = DataRow(
                         onSelectChanged: (_) async {
                           await ProductMasterScreen.showProductIdCardModal(
                             context,
@@ -1957,8 +1964,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                               borderRadius: M3Shape.radiusSm,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8.0,
-                                  vertical: 4.0,
+                                  horizontal: 4.0,
+                                  vertical: 2.0,
                                 ),
                                 decoration: BoxDecoration(
                                   color: cs.primaryContainer
@@ -1968,56 +1975,42 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                     color: cs.primary.withValues(alpha: 0.35),
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      item.itemCode,
-                                      style: const TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: M3FontSize.bodySmall,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4.0),
-                                    Icon(
-                                      Icons.copy_rounded,
-                                      size: 12.0,
-                                      color: cs.primary,
-                                    ),
-                                  ],
+                                child: M3WrapText(
+                                  item.itemCode,
+                                  maxLines: 2,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: M3FontSize.bodySmall,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                           // Official Name & Brand
                           DataCell(
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 290),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.officialName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                    ),
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                M3WrapText(
+                                  item.officialName,
+                                  maxLines: 2,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
                                   ),
-                                  const SizedBox(height: 2.0),
-                                  Text(
-                                    '${item.brand} • ${item.category}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: cs.onSurfaceVariant,
-                                      fontSize: M3FontSize.tinyPlus,
-                                    ),
+                                ),
+                                const SizedBox(height: 2.0),
+                                M3WrapText(
+                                  '${item.brand} • ${item.category}',
+                                  maxLines: 1,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                    fontSize: M3FontSize.tinyPlus,
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
                           // Barcode
@@ -2028,31 +2021,23 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                               borderRadius: M3Shape.radiusSm,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8.0,
-                                  vertical: 4.0,
+                                  horizontal: 4.0,
+                                  vertical: 2.0,
                                 ),
                                 decoration: BoxDecoration(
                                   color: cs.surfaceContainerHighest
                                       .withValues(alpha: 0.6),
                                   borderRadius: M3Shape.radiusSm,
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.qr_code_rounded,
-                                      size: 13.0,
-                                    ),
-                                    const SizedBox(width: 4.0),
-                                    Text(
-                                      item.barcode,
-                                      style: const TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: M3FontSize.bodySmall,
-                                      ),
-                                    ),
-                                  ],
+                                child: M3WrapText(
+                                  item.barcode,
+                                  maxLines: 2,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: M3FontSize.bodySmall,
+                                  ),
                                 ),
                               ),
                             ),
@@ -2061,16 +2046,20 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           DataCell(
                             Column(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Text(
-                                  '${item.unitsPerCarton} وحدة / كرتونة',
+                                M3WrapText(
+                                  '${item.unitsPerCarton} / كرتونة',
+                                  maxLines: 2,
+                                  textAlign: TextAlign.center,
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                Text(
-                                  'التعبئة: ${item.packagingType}',
+                                M3WrapText(
+                                  item.packagingType,
+                                  maxLines: 1,
+                                  textAlign: TextAlign.center,
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: cs.onSurfaceVariant,
                                   ),
@@ -2080,8 +2069,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           ),
                           // Unit Price Excl VAT
                           DataCell(
-                            Text(
+                            M3WrapText(
                               '${_currFmt.format(item.unitPriceExclVat)} ج.م',
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
@@ -2093,8 +2084,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           ),
                           // Carton Price Incl VAT
                           DataCell(
-                            Text(
+                            M3WrapText(
                               '${_currFmt.format(item.cartonPriceInclVat)} ج.م',
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 fontWeight: FontWeight.w800,
                               ),
@@ -2106,15 +2099,19 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Text(
+                                M3WrapText(
                                   '${_currFmt.format(item.netUnitInvoiceCost)} ج.م',
+                                  maxLines: 2,
+                                  textAlign: TextAlign.center,
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     fontWeight: FontWeight.w800,
                                     color: M3Palette.teal,
                                   ),
                                 ),
-                                Text(
+                                M3WrapText(
                                   'كرتونة: ${_currFmt.format(item.netCartonInvoiceCost)}',
+                                  maxLines: 1,
+                                  textAlign: TextAlign.center,
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     fontSize: M3FontSize.tiny,
                                     color: cs.onSurfaceVariant,
@@ -2143,7 +2140,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                     borderRadius: M3Shape.radiusFull,
                                   ),
                                   child: Text(
-                                    isPromo ? 'عرض (Promo)' : 'عادي (Regular)',
+                                    isPromo ? 'عرض' : 'عادي',
                                     style: TextStyle(
                                       fontSize: M3FontSize.tinyPlus,
                                       fontWeight: FontWeight.w800,
@@ -2154,10 +2151,12 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                   ),
                                 ),
                                 const SizedBox(height: 3.0),
-                                Text(
+                                M3WrapText(
                                   item.isActiveInChains
-                                      ? 'مسحوب بالسلاسل (${_intFmt.format(item.totalPosUnitsSold)} وحدة)'
-                                      : 'غير مسحوب • فرصة توزيع',
+                                      ? 'مسحوب (${_intFmt.format(item.totalPosUnitsSold)} وحدة)'
+                                      : 'غير مسحوب',
+                                  maxLines: 2,
+                                  textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: M3FontSize.tiny,
                                     fontWeight: FontWeight.w700,
@@ -2171,10 +2170,21 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           ),
                           // Actions
                           DataCell(
-                            Row(
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 28.0,
+                                    minHeight: 28.0,
+                                  ),
+                                  style: IconButton.styleFrom(
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    minimumSize: const Size(28.0, 28.0),
+                                  ),
                                   icon: const Icon(
                                     Icons.badge_rounded,
                                     size: 18.0,
@@ -2197,6 +2207,16 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                   },
                                 ),
                                 IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 28.0,
+                                    minHeight: 28.0,
+                                  ),
+                                  style: IconButton.styleFrom(
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    minimumSize: const Size(28.0, 28.0),
+                                  ),
                                   icon: const Icon(
                                     Icons.calculate_rounded,
                                     size: 18.0,
@@ -2214,14 +2234,52 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           ),
                         ],
                       );
+                      return DataRow(
+                        onSelectChanged: raw.onSelectChanged,
+                        cells: [
+                          for (var i = 0; i < raw.cells.length; i++)
+                            DataCell(box(i, raw.cells[i].child)),
+                        ],
+                      );
                     }).toList(),
                   ),
-                ),
+                );
+                }),
             ],
           ),
         ),
       ],
     );
+  }
+
+  static const _catalogColMins = <double>[
+    24, 92, 120, 92, 60, 52, 52, 52, 60, 60, 52,
+  ];
+
+  /// Column content widths that fill [available] (table chrome included)
+  /// so the 11-column catalog fits the live 1030 content shell.
+  List<double> _catalogColumnWidths(double available) {
+    const spacing = 6.0;
+    const margin = 8.0;
+    final mins = _catalogColMins;
+    // +8dp slack so rounding / heading insets don't leave a 3–9dp scroll.
+    final chrome = margin * 2 + spacing * (mins.length - 1) + 16.0;
+    var leftover = available - chrome - mins.fold<double>(0, (a, b) => a + b);
+    final widths = List<double>.from(mins);
+    if (leftover > 0) {
+      widths[2] += leftover;
+    } else if (leftover < 0) {
+      // Shrink the name column first, then the others, never below 85% of min.
+      for (final i in [2, 9, 4, 8, 1, 3, 10, 5, 6, 7, 0]) {
+        if (leftover >= 0) break;
+        final reducible = widths[i] - mins[i] * 0.85;
+        if (reducible <= 0) continue;
+        final cut = reducible < -leftover ? reducible : -leftover;
+        widths[i] -= cut;
+        leftover += cut;
+      }
+    }
+    return widths;
   }
 
   Widget _buildQuickPriceChangeFilterBar(
@@ -2379,21 +2437,20 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${_currFmt.format(item.unitPriceInclVat)} ج.م',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: cs.primary,
-              ),
-            ),
-            if (isUp || isDown || isNew) ...[
-              const SizedBox(width: 5.0),
-              Container(
+        M3WrapText(
+          '${_currFmt.format(item.unitPriceInclVat)} ج.م',
+          maxLines: 2,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: cs.primary,
+          ),
+        ),
+        if (isUp || isDown || isNew) ...[
+          const SizedBox(height: 2.0),
+          Container(
                 key: ValueKey('price_indicator_${item.itemCode}_$dir'),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 6.0,
@@ -2407,45 +2464,24 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           : M3Palette.info.withValues(alpha: 0.14),
                   borderRadius: M3Shape.radiusFull,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isUp
-                          ? Icons.arrow_upward_rounded
-                          : isDown
-                              ? Icons.arrow_downward_rounded
-                              : Icons.fiber_new_rounded,
-                      size: 11.0,
-                      color: isUp
-                          ? M3Palette.danger
-                          : isDown
-                              ? M3Palette.teal
-                              : M3Palette.info,
-                    ),
-                    const SizedBox(width: 2.0),
-                    Text(
-                      isNew
-                          ? 'جديد'
-                          : isUp
-                              ? 'زاد ${item.priceChangePct > 0 ? '+${item.priceChangePct.toStringAsFixed(1)}%' : ''}'
-                              : 'قل ${item.priceChangePct != 0 ? '${item.priceChangePct.toStringAsFixed(1)}%' : ''}',
-                      style: TextStyle(
-                        fontSize: M3FontSize.microPlus,
-                        fontWeight: FontWeight.w900,
-                        color: isUp
-                            ? M3Palette.danger
-                            : isDown
-                                ? M3Palette.teal
-                                : M3Palette.info,
-                      ),
-                    ),
-                  ],
+                child: M3WrapText(
+                  isNew
+                      ? 'جديد'
+                      : '${item.priceChangePct > 0 ? '+' : ''}${item.priceChangePct.toStringAsFixed(1)}%',
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: M3FontSize.microPlus,
+                    fontWeight: FontWeight.w900,
+                    color: isUp
+                        ? M3Palette.danger
+                        : isDown
+                            ? M3Palette.teal
+                            : M3Palette.info,
+                  ),
                 ),
               ),
-            ],
-          ],
-        ),
+        ],
         if ((isUp || isDown) && item.prevUnitPriceInclVat > 0)
           Text(
             'كان: ${_currFmt.format(item.prevUnitPriceInclVat)} ج.م',
@@ -2497,6 +2533,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         DropdownButtonHideUnderline(
           child: M3Dropdown<String>(
             value: safeValue,
+            fitOptions: true,
             options: m3OptionsFromMenuItems<String>(items.entries
                 .map((e) => DropdownMenuItem<String>(
                       value: e.key,
@@ -2989,12 +3026,14 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   backgroundColor: cs.primaryContainer,
                   child: Icon(Icons.table_view_rounded, color: cs.primary),
                 ),
-                title: Text(
+                title: M3WrapText(
                   file.fileName,
+                  maxLines: 3,
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
-                subtitle: Text(
-                  'عدد الأصناف: ${file.rowsIngested} صنف • تاريخ الرفع: ${file.uploadedAt}',
+                subtitle: M3WrapText(
+                  '${countSku(file.rowsIngested)} • تاريخ الرفع: ${file.uploadedAt}',
+                  maxLines: 2,
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
