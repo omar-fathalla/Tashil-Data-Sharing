@@ -34,6 +34,10 @@ import '../widgets/sell_table_shared.dart';
 import '../widgets/target_management_panel.dart';
 import '../widgets/virtualized_sku_table.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
+import '../../../../core/widgets/m3_toolbar_button.dart';
+import '../../../../core/widgets/m3_section_title.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
 
 /// SellOutExplorerScreen provides comprehensive retailer Sell-Out analytics:
 /// - Tab 0: Sell-Out Data & Operations (Transactions Table, 4 KPI cards, Upload & Export Actions)
@@ -551,7 +555,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
           shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusLg),
           title: Row(
             children: [
-              Icon(Icons.delete_forever_rounded, color: cs.error, size: 26.0),
+              Icon(Icons.delete_forever_rounded, color: cs.error, size: 24.0),
               const SizedBox(width: 10.0),
               const Expanded(
                 child: Text(
@@ -583,7 +587,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     const SizedBox(height: 4.0),
                     Text(
                       'السلسلة ${file.retailChain.toUpperCase()} • الصفوف ${file.rowsIngested} • صافي المبيعات ${CurrencyFormatter.formatCompactEGP(file.totalRevenue)}',
-                      style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontSize: M3FontSize.bodySmallPlus)),
+                      style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontSize: M3FontSize.bodySmall)),
                     ),
                   ],
                 ),
@@ -775,7 +779,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final colorScheme = theme.colorScheme;
     final isCompact = MediaQuery.sizeOf(context).width < 600.0;
 
-    return SingleChildScrollView(
+    return M3ToolbarButtonTheme(
+      child: SingleChildScrollView(
       padding: isCompact ? M3Spacing.pSm : M3Spacing.pMd,
       child: M3ContentBoundary(
         maxWidth: double.infinity,
@@ -801,25 +806,25 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   value: 0,
                   icon: Icons.point_of_sale_rounded,
                   selectedIcon: Icons.point_of_sale_rounded,
-                  label: 'Sales Data',
+                  label: 'بيانات المبيعات',
                 ),
                 const M3ResponsiveTabItem<int>(
                   value: 1,
                   icon: Icons.insights_rounded,
                   selectedIcon: Icons.insights_rounded,
-                  label: 'Store Performance',
+                  label: 'أداء الفروع',
                 ),
                 const M3ResponsiveTabItem<int>(
                   value: 2,
                   icon: Icons.track_changes_rounded,
                   selectedIcon: Icons.track_changes_rounded,
-                  label: 'Targets',
+                  label: 'المستهدفات',
                 ),
                 M3ResponsiveTabItem<int>(
                   value: 3,
                   icon: Icons.folder_copy_rounded,
                   selectedIcon: Icons.folder_copy_rounded,
-                  label: 'Uploaded Files (${_archivedSellOutFiles.length})',
+                  label: 'الملفات المرفوعة (${_archivedSellOutFiles.length})',
                   semanticsIdentifier: TestIds.selloutUploadedFiles,
                 ),
               ],
@@ -858,6 +863,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               _buildSellOutExplorerTab(context, theme, colorScheme),
           ],
         ),
+      ),
       ),
     );
   }
@@ -905,8 +911,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     String yoySubtitleSuffix = '';
     if (_selectedYear == _currentYear && _prevYearTotalChainRevenue > 0 && totalNetRevenue > 0) {
       final yoyPct = ((totalNetRevenue - _prevYearTotalChainRevenue) / _prevYearTotalChainRevenue) * 100.0;
-      final sign = yoyPct >= 0 ? '+' : '';
-      yoySubtitleSuffix = ' • نمو $sign${yoyPct.toStringAsFixed(1)}% مقارنة بالعام السابق';
+      yoySubtitleSuffix = ' • نمو ${CurrencyFormatter.formatSignedPct(yoyPct)} مقارنة بالعام السابق';
     }
 
     final String shortYearAr = selectedDateRange != null
@@ -996,7 +1001,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               ],
             ),
           ),
-          M3Spacing.gapSM,
+          M3Spacing.gapMD,
         ],
 
         // 2. Full-Width Chain Branches Sales Ranking Chart (High to Low with Year 2026 Default & 2025 Switcher)
@@ -1036,15 +1041,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
             setState(() => selectedDateRange = range);
             _loadRecords();
           },
-          onYearChanged: (yr) {
-            if (yr != null) {
-              setState(() {
-                _selectedYear = yr;
-                selectedDateRange = null;
-              });
-              _loadRecords();
-            }
-          },
+          // One year selector per page: the data year lives in the ranking
+          // card header ('سنة البيانات') and drives the whole tab; the
+          // toolbar keeps only the date-range override.
           onSearchChanged: (val) {
             searchQuery = val;
             _loadRecords();
@@ -1166,6 +1165,16 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final negMarginCount = allItems.where((s) => _matchesPriceMatrixFilter(s, 'negative_margin')).length;
     final promoCount = allItems.where((s) => _matchesPriceMatrixFilter(s, 'promo')).length;
 
+    // Readable M3 table roles: labelMedium headers, bodyMedium cells,
+    // onSurfaceVariant for secondary (reference) prices.
+    final headStyle = theme.textTheme.labelMedium?.copyWith(
+      color: colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+    );
+    final cellStyle = theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurface);
+    final cellStrong = cellStyle?.copyWith(fontWeight: FontWeight.w600);
+    final cellMuted = cellStyle?.copyWith(color: colorScheme.onSurfaceVariant);
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -1186,17 +1195,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.price_check_rounded, color: colorScheme.primary, size: 22.0),
+                    Icon(Icons.price_check_rounded, color: colorScheme.onSurfaceVariant, size: 20.0),
                     const SizedBox(width: 8.0),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'الأسعار وهامش السلسلة',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
+                        const M3SectionTitle('الأسعار وهامش السلسلة'),
                         Text(
                           'سعر البيع الفعلي مقابل قائمة الأسعار • ${_recordsSummary.matchedSkusCount} صنف مطابق',
                           style: theme.textTheme.bodySmall?.copyWith(
@@ -1207,23 +1211,19 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     ),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer.withOpacity(0.55),
-                    borderRadius: M3Shape.radiusSm,
-                  ),
+                M3ChipSurface(
+                  key: const ValueKey('price_summary_strip'),
+                  color: colorScheme.surfaceContainerHigh,
                   child: Text(
                     'الكراتين المباعة ${CurrencyFormatter.formatNumber(_recordsSummary.totalCartonsSold.round())} كرتونة • تكلفة المصنع ${CurrencyFormatter.formatCompactEGP(_recordsSummary.totalFactoryCost)} • هامش السلسلة ${CurrencyFormatter.formatMarginSummary(_recordsSummary.totalRetailerGrossProfit, _recordsSummary.avgRetailerMarginPct)}',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: colorScheme.onPrimaryContainer,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10.0),
+            M3Spacing.gapSM,
             // Shared filter chips (same widget as the Sell-In table)
             SellTableFilterChips(
               options: SellTableFilterChips.marginOptions(
@@ -1236,7 +1236,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               selected: _priceMatrixFilter,
               onSelected: (v) => setState(() => _priceMatrixFilter = v),
             ),
-            const SizedBox(height: 12.0),
+            M3Spacing.gapSM,
             LayoutBuilder(
               key: const ValueKey('price_matrix_table'),
               builder: (context, constraints) => SingleChildScrollView(
@@ -1244,28 +1244,29 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minWidth: constraints.maxWidth),
                   child: DataTable(
-                headingRowHeight: 42.0,
-                dataRowMinHeight: 42.0,
-                dataRowMaxHeight: 48.0,
-                columnSpacing: 18.0,
+                headingRowHeight: 48.0,
+                dataRowMinHeight: 52.0,
+                dataRowMaxHeight: 64.0,
+                columnSpacing: 24.0,
+                headingTextStyle: headStyle,
+                dataTextStyle: cellStyle,
                 columns: const [
-                  DataColumn(label: Text('كود الصنف', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(label: Text('الصنف الرسمي', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('وحدات/كرتونة', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('الوحدات', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('الكراتين', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('سعر القائمة (شامل الضريبة)', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('سعر البيع الفعلي', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('فرق السعر %', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('تكلفة المصنع للقطعة', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('صافي سعر الكرتونة (فاتورة)', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('صافي المبيعات', style: M3TextVariants.denseLabelBold)),
-                  DataColumn(numeric: true, label: Text('هامش السلسلة', style: M3TextVariants.denseLabelBold)),
+                  DataColumn(label: Text('كود الصنف')),
+                  DataColumn(label: Text('الصنف الرسمي')),
+                  DataColumn(numeric: true, label: Text('وحدات/كرتونة')),
+                  DataColumn(numeric: true, label: Text('الوحدات')),
+                  DataColumn(numeric: true, label: Text('الكراتين')),
+                  DataColumn(numeric: true, label: Text('سعر القائمة (شامل الضريبة)')),
+                  DataColumn(numeric: true, label: Text('سعر البيع الفعلي')),
+                  DataColumn(numeric: true, label: Text('فرق السعر %')),
+                  DataColumn(numeric: true, label: Text('تكلفة المصنع للقطعة')),
+                  DataColumn(numeric: true, label: Text('صافي سعر الكرتونة (فاتورة)')),
+                  DataColumn(numeric: true, label: Text('صافي المبيعات')),
+                  DataColumn(numeric: true, label: Text('هامش السلسلة')),
                 ],
                 rows: filteredItems.map((s) {
                   final isNegMargin = s.retailerMarginPct < 0;
                   final marginColor = isNegMargin ? colorScheme.error : colorScheme.secondary;
-                  final deltaSign = s.priceDeltaPct >= 0 ? '+' : '';
                   return DataRow(
                     cells: [
                       DataCell(
@@ -1273,7 +1274,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                           onTap: () => _openProductIdCardForSummary(s),
                           child: Text(
                             s.itemCode.isNotEmpty ? s.itemCode : s.barcode,
-                            style: M3TextVariants.microHeavy.copyWith(fontFamily: 'monospace', color: colorScheme.primary, decoration: TextDecoration.underline),
+                            style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace', color: colorScheme.primary, decoration: TextDecoration.underline),
                           ),
                         ),
                       ),
@@ -1281,38 +1282,43 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                         InkWell(
                           onTap: () => _openProductIdCardForSummary(s),
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 230.0),
-                            child: Text(
-                              s.skuName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w700, fontSize: M3FontSize.bodySmall)),
+                            constraints: const BoxConstraints(maxWidth: 260.0),
+                            child: Tooltip(
+                              message: s.skuName,
+                              child: Text(
+                                s.skuName,
+                                key: const ValueKey('price_matrix_sku_name'),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: cellStrong,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                      DataCell(Text('${s.unitsPerCarton}', style: M3TextVariants.denseLabel)),
-                      DataCell(Text(CurrencyFormatter.formatNumber(s.totalUnitsSold), style: M3TextVariants.denseLabelBold)),
-                      DataCell(Text(s.totalCartonsSold.toStringAsFixed(1), style: M3TextVariants.denseLabelBold)),
-                      DataCell(Text(s.officialConsumerRsp > 0 ? '${s.officialConsumerRsp.toStringAsFixed(2)} ج.م' : '—', style: M3TextVariants.denseLabel)),
-                      DataCell(Text('${s.avgSellingPrice.toStringAsFixed(2)} ج.م', style: M3TextVariants.denseLabelBold)),
+                      DataCell(Text('${s.unitsPerCarton}', style: cellMuted)),
+                      DataCell(Text(CurrencyFormatter.formatNumber(s.totalUnitsSold), style: cellStrong)),
+                      DataCell(Text(s.totalCartonsSold.toStringAsFixed(1), style: cellStrong)),
+                      DataCell(Text(s.officialConsumerRsp > 0 ? '${s.officialConsumerRsp.toStringAsFixed(2)} ج.م' : '—', style: cellMuted)),
+                      DataCell(Text('${s.avgSellingPrice.toStringAsFixed(2)} ج.م', style: cellStrong)),
                       DataCell(
                         Text(
-                          s.officialConsumerRsp > 0 ? '$deltaSign${s.priceDeltaPct.toStringAsFixed(1)}%' : '—',
-                          style: M3TextVariants.denseLabelBold.copyWith(color: s.priceDeltaPct < -5.0
+                          s.officialConsumerRsp > 0 ? CurrencyFormatter.formatSignedPct(s.priceDeltaPct) : '—',
+                          key: const ValueKey('price_matrix_delta_pct'),
+                          style: cellStrong?.copyWith(color: s.priceDeltaPct < -5.0
                                 ? colorScheme.tertiary
                                 : (s.priceDeltaPct > 5.0 ? colorScheme.error : colorScheme.onSurfaceVariant)),
                         ),
                       ),
-                      DataCell(Text(s.factoryUnitCost > 0 ? '${s.factoryUnitCost.toStringAsFixed(2)} ج.م' : '—', style: M3TextVariants.denseLabel)),
-                      DataCell(Text(s.netCartonInvoiceCost > 0 ? '${s.netCartonInvoiceCost.toStringAsFixed(2)} ج.م' : '—', style: M3TextVariants.denseLabel)),
-                      DataCell(Text(CurrencyFormatter.formatCompactEGP(s.totalNetRevenue), style: M3TextVariants.denseLabelHeavy.copyWith(color: colorScheme.primary))),
+                      DataCell(Text(s.factoryUnitCost > 0 ? '${s.factoryUnitCost.toStringAsFixed(2)} ج.م' : '—', style: cellMuted)),
+                      DataCell(Text(s.netCartonInvoiceCost > 0 ? '${s.netCartonInvoiceCost.toStringAsFixed(2)} ج.م' : '—', style: cellMuted)),
+                      DataCell(Text(CurrencyFormatter.formatCompactEGP(s.totalNetRevenue), style: cellStrong?.copyWith(color: colorScheme.primary))),
                       DataCell(
                         Text(
                           s.retailerMarginPct != 0
                               ? CurrencyFormatter.formatMarginSummary(s.retailerGrossProfit, s.retailerMarginPct)
                               : '—',
-                          style: M3TextVariants.denseLabelHeavy.copyWith(color: marginColor),
+                          style: cellStrong?.copyWith(color: marginColor),
                         ),
                       ),
                     ],
@@ -1445,46 +1451,22 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     Flexible(child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: M3Shape.radiusMd,
-                    ),
-                    child: Icon(
-                      Icons.bar_chart_rounded,
-                      color: colorScheme.onPrimaryContainer,
-                      size: 24.0,
-                    ),
+                  Icon(
+                    Icons.bar_chart_rounded,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 20.0,
                   ),
-                  const SizedBox(width: 12.0),
+                  const SizedBox(width: 8.0),
                   Flexible(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        const M3SectionTitle('ترتيب الفروع حسب المبيعات'),
+                        const SizedBox(height: 4.0),
                         Text(
-                          'ترتيب الفروع حسب المبيعات',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            height: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 2.0),
-                        Text(
-                          'Store Ranking by Sales',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                        const SizedBox(height: 3.0),
-                        Text(
-                          '${_formatChainDisplayAr(activeChainCode)} • ${_selectedYear > 0 ? "سنة $_selectedYear" : "كل السنوات"} • ${rawBranches.length} فرع • إجمالي السلسلة: ${CurrencyFormatter.formatCompactEGP(totalChainRev)}${chainYoYPct != 0 ? " (${chainYoYPct >= 0 ? "+" : ""}${chainYoYPct.toStringAsFixed(1)}% عن $compYear)" : ""}',
+                          '${_formatChainDisplayAr(activeChainCode)} • ${_selectedYear > 0 ? "سنة $_selectedYear" : "كل السنوات"} • ${rawBranches.length} فرع • إجمالي السلسلة: ${CurrencyFormatter.formatCompactEGP(totalChainRev)}${chainYoYPct != 0 ? " (${CurrencyFormatter.formatSignedPct(chainYoYPct)} عن $compYear)" : ""}',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: M3FontSize.labelSmall,
-                            color: colorScheme.onSurfaceVariant.withOpacity(0.85),
-                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -1516,7 +1498,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                       M3DropdownOption('beet-elgomla', 'بيت الجملة'),
                       M3DropdownOption('carrefour', 'كارفور'),
                       M3DropdownOption('spinneys', 'سبينيس'),
-                      M3DropdownOption('all', 'كل السلاسل (All Chains)'),
+                      M3DropdownOption('all', 'كل السلاسل'),
                     ],
                     onChanged: (val) {
                       setState(() {
@@ -1532,11 +1514,11 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   // line, 40dp; outlined at the current year, tonal otherwise.
                   M3MenuFilter<int>(
                     buttonKey: const ValueKey('branch_chart_year_dropdown'),
-                    tooltip: 'اختر السنة',
+                    tooltip: 'سنة البيانات — تُطبَّق على المؤشرات والترتيب والجداول',
                     icon: AppIcons.event,
                     label: _selectedYear == 0
-                        ? 'السنة: الكل'
-                        : 'السنة: $_selectedYear',
+                        ? 'سنة البيانات: الكل'
+                        : 'سنة البيانات: $_selectedYear',
                     active: _selectedYear != _currentYear,
                     onSelected: (y) {
                       setState(() {
@@ -1558,22 +1540,15 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   // Sort High-to-Low vs Low-to-High Button
                   OutlinedButton.icon(
                     key: const ValueKey('branch_chart_sort_toggle'),
-                    style: OutlinedButton.styleFrom(
-                      // 40dp, same family as the year filter beside it.
-                      minimumSize: const Size(0, 40.0),
-                      padding: const EdgeInsetsDirectional.fromSTEB(
-                          12.0, 0.0, 16.0, 0.0),
-                    ),
                     onPressed: () {
                       setState(() => _chartSortAscending = !_chartSortAscending);
                     },
                     icon: Icon(
                       _chartSortAscending ? Icons.trending_up_rounded : Icons.trending_down_rounded,
-                      size: 16.0,
+                      size: 18.0,
                     ),
                     label: Text(
                       _chartSortAscending ? 'الأقل للأعلى' : 'الأعلى للأقل',
-                      style: M3TextVariants.denseLabelHeavy,
                     ),
                   ),
 
@@ -1583,7 +1558,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
             ],
           ),
 
-          const SizedBox(height: 14.0),
+          M3Spacing.gapSM,
 
           // 2. Quick Executive Branch Highlights Strip (4 Single-Line Cards on One Row + Theme-Derived Palette)
           if (_branchChartExpanded && rawBranches.isNotEmpty) ...[
@@ -1644,11 +1619,11 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                       Row(
                         children: [
                           Expanded(child: cards[0]),
-                          const SizedBox(width: 10.0),
+                          M3Spacing.hGapSM,
                           Expanded(child: cards[1]),
-                          const SizedBox(width: 10.0),
+                          M3Spacing.hGapSM,
                           Expanded(child: cards[2]),
-                          const SizedBox(width: 10.0),
+                          M3Spacing.hGapSM,
                           Expanded(child: cards[3]),
                         ],
                       ),
@@ -1657,7 +1632,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                         Align(
                           alignment: AlignmentDirectional.centerStart,
                           child: ActionChip(
-                            avatar: const Icon(Icons.filter_alt_off_rounded, size: 16.0),
+                            avatar: const Icon(Icons.filter_alt_off_rounded, size: 18.0),
                             label: const Text('عرض كل الفروع'),
                             onPressed: () {
                               setState(() => selectedStoreId = null);
@@ -1671,13 +1646,13 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                 }
 
                 return Wrap(
-                  spacing: 10.0,
-                  runSpacing: 8.0,
+                  spacing: M3Spacing.sm,
+                  runSpacing: M3Spacing.xs,
                   children: [
                     ...cards,
                     if (selectedStoreId != null)
                       ActionChip(
-                        avatar: const Icon(Icons.filter_alt_off_rounded, size: 16.0),
+                        avatar: const Icon(Icons.filter_alt_off_rounded, size: 18.0),
                         label: const Text('عرض كل الفروع'),
                         onPressed: () {
                           setState(() => selectedStoreId = null);
@@ -1688,7 +1663,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                 );
               },
             ),
-            const SizedBox(height: 14.0),
+            M3Spacing.gapSM,
           ],
 
           // 3. All Branches Visual Chart Area (Split Across Two Rows for Maximum Clarity & Breathing Room)
@@ -1758,16 +1733,16 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                             width: 34.0,
                             child: Text(
                               '#${b.rank}',
-                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontWeight: FontWeight.w900,                                 fontSize: M3FontSize.bodySmall,                                 color: b.rank <= 3 ? colorScheme.primary : colorScheme.onSurfaceVariant,                               )),
+                              style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: b.rank <= 3 ? colorScheme.primary : colorScheme.onSurfaceVariant),
                             ),
                           ),
                           SizedBox(
-                            width: 175.0,
+                            width: 190.0,
                             child: Text(
                               _shortenBranchName(b.storeName),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmallPlus)),
+                              style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmall)),
                             ),
                           ),
                           const SizedBox(width: 10.0),
@@ -1788,7 +1763,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                             child: Text(
                               CurrencyFormatter.formatCompactEGP(b.totalRevenue),
                               textAlign: TextAlign.end,
-                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontWeight: FontWeight.w900,                                 fontSize: M3FontSize.bodySmallPlus,                                 color: barColor,                               )),
+                              style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: barColor),
                             ),
                           ),
                           const SizedBox(width: 8.0),
@@ -1797,7 +1772,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                             child: Text(
                               '${sharePct.toStringAsFixed(1)}%',
                               textAlign: TextAlign.end,
-                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontSize: M3FontSize.labelSmallPlus,                                 fontWeight: FontWeight.w700,                                 color: colorScheme.onSurfaceVariant,                               )),
+                              style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant),
                             ),
                           ),
                           const SizedBox(width: 8.0),
@@ -1807,7 +1782,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                             child: branchYoY == null
                                 ? const SizedBox.shrink()
                                 : Text(
-                                    '${branchYoY >= 0 ? "+" : ""}${branchYoY.toStringAsFixed(0)}%',
+                                    CurrencyFormatter.formatSignedPct(branchYoY, decimals: 0),
                                     textAlign: TextAlign.end,
                                     style: Theme.of(context)
                                         .textTheme
@@ -1865,7 +1840,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               color: color.withOpacity(0.12),
               borderRadius: M3Shape.radiusSm,
             ),
-            child: Icon(icon, size: 15.0, color: color),
+            child: Icon(icon, size: 18.0, color: color),
           ),
           const SizedBox(width: 8.0),
           Expanded(
@@ -1877,16 +1852,15 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
             ),
           ),
           const SizedBox(width: 6.0),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
-            decoration: BoxDecoration(
+          Flexible(
+            child: M3ChipSurface(
               color: color.withOpacity(0.10),
-              borderRadius: M3Shape.radiusFull,
-            ),
-            child: Text(
-              valueText,
-              maxLines: 1,
-              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                 fontSize: M3FontSize.labelSmall,                 fontWeight: FontWeight.w900,                 color: color,               )),
+              child: Text(
+                valueText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: color),
+              ),
             ),
           ),
         ],
@@ -2210,7 +2184,7 @@ key: const ValueKey('perf_year_dropdown'),
 value: [..._recentYears, 0].contains(_selectedYear)
                           ? _selectedYear
                           : _currentYear,
-label: 'السنة',
+label: 'سنة البيانات',
 leadingIcon: Icons.calendar_today_rounded,
 expand: true,
 options: m3OptionsFromMenuItems<int>([
@@ -2231,7 +2205,7 @@ onChanged: m3Legacy<int>((v) {
 
                   // 2. Month Filter (Default: All Months / 0)
                   SizedBox(
-                    width: 175.0,
+                    width: 190.0,
                     child: M3Dropdown<int>(
 key: const ValueKey('perf_month_dropdown'),
 value: _selectedMonth,
@@ -2263,7 +2237,7 @@ onChanged: m3Legacy<int>((v) {
 
                   // 3. Chain Filter
                   SizedBox(
-                    width: 175.0,
+                    width: 190.0,
                     child: M3Dropdown<String>(
 value: _perfChain,
 label: 'السلسلة',
@@ -2311,6 +2285,7 @@ onChanged: m3Legacy<String>((v) {
                   SizedBox(
                     width: 220.0,
                     child: TextField(
+                      key: const ValueKey('perf_search_field'),
                       controller: _perfSearchController,
                       decoration: InputDecoration(
                         hintText: 'ابحث بالفرع أو المنطقة أو الصنف',
@@ -2318,7 +2293,7 @@ onChanged: m3Legacy<String>((v) {
                         prefixIcon: const Icon(Icons.search_rounded, size: 18.0),
                         suffixIcon: _perfSearch.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.clear_rounded, size: 16.0),
+                                icon: const Icon(Icons.clear_rounded, size: 18.0),
                                 onPressed: () {
                                   _perfSearchController.clear();
                                   setState(() {
@@ -2327,7 +2302,9 @@ onChanged: m3Legacy<String>((v) {
                                 },
                               )
                             : null,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                        // Same 40dp field as the M3Dropdown filters beside it.
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                        constraints: const BoxConstraints(maxHeight: M3ToolbarButton.height),
                         border: const OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                       ),
                       onChanged: (val) {
@@ -2344,10 +2321,6 @@ onChanged: m3Legacy<String>((v) {
                 runSpacing: 8.0,
                 children: [
                   OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 42.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    ),
                     onPressed: () {
                       final headers = ['الترتيب', 'اسم الصنف', 'العلامة التجارية', 'الفئة', 'الوحدات المباعة', 'صافي المبيعات (ج.م)', 'نسبة المساهمة'];
                       final rows = filteredSkus.asMap().entries.map((entry) {
@@ -2365,10 +2338,6 @@ onChanged: m3Legacy<String>((v) {
                     label: const Text('تصدير CSV'),
                   ),
                   FilledButton.tonalIcon(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 42.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    ),
                     onPressed: () {
                       final headers = ['الفرع', 'السلسلة', 'الوحدات المباعة', 'صافي المبيعات (ج.م)', 'الحصة %'];
                       final rows = branchList.map((b) {
@@ -2415,18 +2384,13 @@ onChanged: m3Legacy<String>((v) {
                 padding: const EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 8.0),
                 child: Row(
                   children: [
-                    Icon(Icons.storefront_rounded, color: colorScheme.primary, size: 22.0),
+                    Icon(Icons.storefront_rounded, color: colorScheme.onSurfaceVariant, size: 20.0),
                     const SizedBox(width: 8.0),
-                    Text(
-                      'أداء الفروع',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                    const M3SectionTitle('أداء الفروع'),
                     const Spacer(),
                     Text(
                       '${branchList.length} فرع نشط',
-                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                         fontSize: M3FontSize.bodySmall,                         fontWeight: FontWeight.w700,                         color: colorScheme.onSurfaceVariant,                       )),
+                      style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -2468,15 +2432,11 @@ onChanged: m3Legacy<String>((v) {
                         ),
                         DataCell(Text(b.storeName, style: const TextStyle(fontWeight: FontWeight.w700))),
                         DataCell(
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
-                            decoration: BoxDecoration(
-                              color: colorScheme.secondaryContainer.withOpacity(0.6),
-                              borderRadius: M3Shape.radiusFull,
-                            ),
-                            child: Text(
+                          M3ChipSurface(
+                              color: colorScheme.surfaceContainerHigh,
+                              child: Text(
                               b.chain.toUpperCase(),
-                              style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontSize: M3FontSize.labelSmall,                                 fontWeight: FontWeight.w800,                                 color: colorScheme.onSecondaryContainer,                               )),
+                              style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant),
                             ),
                           ),
                         ),
@@ -2565,20 +2525,17 @@ onChanged: m3Legacy<String>((v) {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
+                              M3SectionTitle(
                                 'نمو الفروع: $currYearLabel مقابل $compYear',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                ),
                               ),
                               const SizedBox(height: 2.0),
                               Text(
                                 'نمو الفروع (سنوي وشهري) • $perfPeriodBadgeAr',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: M3TextVariants.denseLabelSemi.copyWith(color: colorScheme.onSurfaceVariant),
+                                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                               ),
                             ],
                           ),
@@ -2631,9 +2588,8 @@ onChanged: m3Legacy<String>((v) {
                     final tone4 = Color.lerp(colorScheme.primary, colorScheme.outline, 0.35) ?? colorScheme.primary;
 
                     final isPosTotal = totalMatrixVarianceEgp >= 0;
-                    final totalSign = isPosTotal ? '+' : '';
                     final totalYoYBadge = totalMatrixYoYPct != null
-                        ? '$totalSign${totalMatrixYoYPct.toStringAsFixed(1)}% (${CurrencyFormatter.formatCompactEGP(totalMatrixVarianceEgp)})'
+                        ? '${CurrencyFormatter.formatSignedPct(totalMatrixYoYPct)} (${CurrencyFormatter.formatCompactEGP(totalMatrixVarianceEgp)})'
                         : CurrencyFormatter.formatCompactEGP(totalCurrMatrixRev);
 
                     final stripCards = [
@@ -2651,7 +2607,7 @@ onChanged: m3Legacy<String>((v) {
                         label: 'أسرع فرع نمواً',
                         branchName: fastestGrowingBranch?.storeName ?? '—',
                         valueText: fastestGrowingBranch != null
-                            ? '${(fastestGrowingBranch.yoyGrowthPct ?? 0) >= 0 ? "+" : ""}${(fastestGrowingBranch.yoyGrowthPct ?? 0).toStringAsFixed(1)}%'
+                            ? CurrencyFormatter.formatSignedPct(fastestGrowingBranch.yoyGrowthPct ?? 0)
                             : '—',
                         color: tone2,
                         icon: Icons.rocket_launch_rounded,
@@ -2778,7 +2734,7 @@ onChanged: m3Legacy<String>((v) {
                             children: [
                               Text(
                                 item.storeName,
-                                style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.labelMediumPlus)),
+                                style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodyMedium)),
                               ),
                               Text(
                                 '${item.chain.toUpperCase()} • ${item.region}',
@@ -2825,12 +2781,12 @@ onChanged: m3Legacy<String>((v) {
                                       yoyPct >= 0
                                           ? Icons.arrow_upward_rounded
                                           : Icons.arrow_downward_rounded,
-                                      size: 14.0,
+                                      size: 18.0,
                                       color: yoyPct >= 0 ? colorScheme.primary : colorScheme.error,
                                     ),
                                     const SizedBox(width: 4.0),
                                     Text(
-                                      '${yoyPct >= 0 ? "+" : ""}${yoyPct.toStringAsFixed(1)}%',
+                                      CurrencyFormatter.formatSignedPct(yoyPct),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w900,
                                         color: yoyPct >= 0 ? colorScheme.primary : colorScheme.error,
@@ -2840,7 +2796,7 @@ onChanged: m3Legacy<String>((v) {
                                 )
                               : Text(
                                   'جديد ($currYearLabel)',
-                                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.labelSmallPlus,                                     fontWeight: FontWeight.w700,                                     color: colorScheme.tertiary,                                   )),
+                                  style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.tertiary),
                                 ),
                         ),
                         DataCell(
@@ -2850,20 +2806,16 @@ onChanged: m3Legacy<String>((v) {
                           ),
                         ),
                         DataCell(
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                            decoration: BoxDecoration(
+                          M3ChipSurface(
                               color: statusBg,
-                              borderRadius: M3Shape.radiusFull,
-                            ),
-                            child: Row(
+                              child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(statusIcon, size: 14.0, color: statusFg),
+                                Icon(statusIcon, size: 18.0, color: statusFg),
                                 const SizedBox(width: 4.0),
                                 Text(
                                   statusLabel,
-                                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.labelSmallPlus,                                     fontWeight: FontWeight.w800,                                     color: statusFg,                                   )),
+                                  style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: statusFg),
                                 ),
                               ],
                             ),
@@ -2898,7 +2850,7 @@ onChanged: m3Legacy<String>((v) {
       children: [
         // 1. Cumulative Upload Banner & Chain/Year/Month Controls
         Container(
-          padding: const EdgeInsets.all(18.0),
+          padding: const EdgeInsets.all(16.0),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
             borderRadius: M3Shape.radiusLg,
@@ -2911,29 +2863,17 @@ onChanged: m3Legacy<String>((v) {
             children: [
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: M3Shape.radiusMd,
-                    ),
-                    child: Icon(
-                      Icons.cloud_upload_rounded,
-                      color: colorScheme.onPrimaryContainer,
-                      size: 24.0,
-                    ),
+                  Icon(
+                    Icons.cloud_upload_rounded,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 20.0,
                   ),
-                  const SizedBox(width: 12.0),
+                  const SizedBox(width: 8.0),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'ملفات Sell-Out المرفوعة',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
+                        const M3SectionTitle('ملفات Sell-Out المرفوعة'),
                         const SizedBox(height: 4.0),
                         Text(
                           'ارفع ملف كل شهر، ويمكنك استبداله أو تنزيله أو حذفه.',
@@ -2995,7 +2935,7 @@ onChanged: m3Legacy<int>((v) {
 ),
                       ),
                       SizedBox(
-                        width: 175.0,
+                        width: 190.0,
                         child: M3Dropdown<int>(
 value: _archiveUploadMonth,
 label: 'الشهر (اختياري)',
@@ -3043,10 +2983,6 @@ onChanged: m3Legacy<int>((v) {
                                       : null,
                                 ),
                         child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(0, 44.0),
-                            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-                          ),
                           onPressed: _isUploading
                               ? null
                               : () => _pickAndUploadSellOutFile(
@@ -3065,10 +3001,6 @@ onChanged: m3Legacy<int>((v) {
                         ),
                       ),
                       OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 44.0),
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-                        ),
                         onPressed: _isLoadingArchive ? null : _loadSellOutArchive,
                         icon: const Icon(Icons.refresh_rounded, size: 18.0),
                         label: const Text('تحديث'),
@@ -3086,7 +3018,7 @@ onChanged: m3Legacy<int>((v) {
         // 2. Uploaded Sell-Out Sheets Table
         TestSemantics(
           identifier: TestIds.uploadedFilesList,
-          label: 'Uploaded Files (${_archivedSellOutFiles.length})',
+          label: 'الملفات المرفوعة (${_archivedSellOutFiles.length})',
           container: true,
           child: Container(
             decoration: BoxDecoration(
@@ -3140,13 +3072,13 @@ onChanged: m3Legacy<int>((v) {
                           ),
                           columns: const [
                             DataColumn(label: Text('الملف')),
-                            DataColumn(label: Text('Chain')),
-                            DataColumn(label: Text('Period')),
-                            DataColumn(label: Text('Transactions'), numeric: true),
+                            DataColumn(label: Text('السلسلة')),
+                            DataColumn(label: Text('الفترة')),
+                            DataColumn(label: Text('المعاملات'), numeric: true),
                             DataColumn(label: Text('الوحدات المباعة'), numeric: true),
                             DataColumn(label: Text('صافي Sell-Out (ج.م)'), numeric: true),
                             DataColumn(label: Text('تاريخ الرفع')),
-                            DataColumn(label: Text('Actions')),
+                            DataColumn(label: Text('الإجراءات')),
                           ],
                           rows: _archivedSellOutFiles.map((file) {
                             final isDeleting = _deletingFileId == file.id;
@@ -3196,15 +3128,11 @@ onChanged: m3Legacy<int>((v) {
                                   ),
                                 ),
                                 DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.primaryContainer.withOpacity(0.6),
-                                      borderRadius: M3Shape.radiusFull,
-                                    ),
-                                    child: Text(
+                                  M3ChipSurface(
+                              color: colorScheme.surfaceContainerHigh,
+                              child: Text(
                                       file.retailChain.toUpperCase(),
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.labelSmall,                                       fontWeight: FontWeight.w800,                                       color: colorScheme.onPrimaryContainer,                                     )),
+                                      style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant),
                                     ),
                                   ),
                                 ),
@@ -3294,40 +3222,14 @@ onChanged: m3Legacy<int>((v) {
     Widget card3,
     Widget card4,
   ) {
-    Widget row(List<Widget> cards) {
-      final children = <Widget>[];
-      for (var k = 0; k < cards.length; k++) {
-        if (k > 0) children.add(const SizedBox(width: 12.0));
-        children.add(Expanded(flex: 1, child: cards[k]));
-      }
-      return IntrinsicHeight(
-        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
-      );
-    }
-
-    if (maxWidth >= 960) {
-      return KeyedSubtree(key: const ValueKey('kpi_cards_row'), child: row([card1, card2, card3, card4]));
-    } else if (maxWidth >= 580) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          row([card1, card2]),
-          const SizedBox(height: 12.0),
-          row([card3, card4]),
-        ],
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        card1,
-        const SizedBox(height: 12.0),
-        card2,
-        const SizedBox(height: 12.0),
-        card3,
-        const SizedBox(height: 12.0),
-        card4,
-      ],
+    // Same equal-height grid and 16dp gutters as the dashboard KPI row.
+    final columns = maxWidth >= 960 ? 4 : (maxWidth >= 580 ? 2 : 1);
+    return M3EqualHeightGrid(
+      key: const ValueKey('kpi_cards_row'),
+      columns: columns,
+      spacing: M3Spacing.sm,
+      runSpacing: M3Spacing.sm,
+      children: [card1, card2, card3, card4],
     );
   }
 
@@ -3365,38 +3267,18 @@ onChanged: m3Legacy<int>((v) {
                 ),
                 child: Icon(icon, color: color, size: 20.0),
               ),
-              const SizedBox(width: 10.0),
+              const SizedBox(width: 8.0),
+              // Arabic-only title; [titleEn] is kept as the stable key id.
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      titleAr,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 1.0),
-                    Text(
-                      titleEn,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                        fontSize: M3FontSize.labelSmallPlus,
-                      ),
-                    ),
-                  ],
+                child: M3SectionTitle(
+                  titleAr,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12.0),
+          M3Spacing.gapSM,
           Text(
             value,
             maxLines: 1,
@@ -3406,7 +3288,7 @@ onChanged: m3Legacy<int>((v) {
               color: colorScheme.onSurface,
             ),
           ),
-          const SizedBox(height: 6.0),
+          const SizedBox(height: 4.0),
           Text(
             subtitle,
             maxLines: 1,

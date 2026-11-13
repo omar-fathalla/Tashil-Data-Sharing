@@ -2,6 +2,17 @@ import 'package:intl/intl.dart';
 
 /// Formatter for Egyptian Pounds (EGP) and large metric numbers.
 class CurrencyFormatter {
+  /// Signed percentage for RTL text: '+' / U+2212 MINUS SIGN stay on the
+  /// left of the digits ("−3.5%", "+12.0%") because the whole value
+  /// sits in an LRI…PDI isolate; a bare '-' in Arabic text renders as
+  /// "3.5-%". A value that rounds to zero has no sign.
+  static String formatSignedPct(double pct, {int decimals = 1}) {
+    final abs = pct.abs().toStringAsFixed(decimals);
+    final isZero = double.parse(abs) == 0.0;
+    final sign = isZero ? '' : (pct > 0 ? '+' : '\u2212');
+    return '\u2066$sign$abs%\u2069';
+  }
+
   CurrencyFormatter._();
 
   static final NumberFormat _currencyFormat = NumberFormat('#,##0.00', 'en_US');

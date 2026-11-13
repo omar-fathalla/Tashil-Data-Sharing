@@ -18,24 +18,18 @@
 2027 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
 2028 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
 2028 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
-Actual Sell-Out (EGP) | 11.5 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
-Actual Sell-Out (EGP) | 11.5 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
-Overall Achievement % | 11.5 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
-Overall Achievement % | 11.5 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
-Sales Data | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
-Sales Data | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
-Sell-Out Target (EGP) | 11.5 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
-Sell-Out Target (EGP) | 11.5 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
+Actual Sell-Out (EGP) | 12.0 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
+Actual Sell-Out (EGP) | 12.0 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
+Overall Achievement % | 12.0 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
+Overall Achievement % | 12.0 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
+Sell-Out Target (EGP) | 12.0 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
+Sell-Out Target (EGP) | 12.0 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
 Sell-Out | 14.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
 Sell-Out | 14.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
-Store Performance | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
-Store Performance | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
-Targets | 14.0 | FontWeight.w800 | ff3d4b36 | 0.25 | 1.4285714285714286
-Targets | 14.0 | FontWeight.w800 | ff3d4b36 | 0.25 | 1.4285714285714286
-Uploaded Files (3) | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
-Uploaded Files (3) | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
-Variance | 11.5 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
-Variance | 11.5 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
+Variance | 12.0 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
+Variance | 12.0 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
+أداء الفروع | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
+أداء الفروع | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
 أسواق فتح الله | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
 أسواق فتح الله | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
 أضف مستهدفًا أو ارفع ملف المستهدفات لمقارنته بالمحقق. | 14.0 | FontWeight.w400 | ff43483f | 0.25 | 1.5
@@ -46,9 +40,9 @@ Variance | 11.5 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
 إضافة مستهدف | 14.0 | FontWeight.w500 | ffffffff | 0.1 | 1.4285714285714286
 إضافة مستهدف | 14.0 | FontWeight.w500 | ffffffff | 0.1 | 1.4285714285714286
 إضافة مستهدف | 14.0 | FontWeight.w500 | ffffffff | 0.1 | 1.4285714285714286
-إضافة مستهدف | 14.0 | FontWeight.w600 | ffffffff | null | null
-إضافة مستهدف | 14.0 | FontWeight.w600 | ffffffff | null | null
-إضافة مستهدف | 14.0 | FontWeight.w600 | ffffffff | null | null
+إضافة مستهدف | 14.0 | FontWeight.w500 | ffffffff | 0.1 | 1.4285714285714286
+إضافة مستهدف | 14.0 | FontWeight.w500 | ffffffff | 0.1 | 1.4285714285714286
+إضافة مستهدف | 14.0 | FontWeight.w500 | ffffffff | 0.1 | 1.4285714285714286
 السلسلة | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
 السلسلة | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
 السلسلة | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
@@ -67,21 +61,27 @@ Variance | 11.5 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
 الفرق | 14.0 | FontWeight.w800 | ff191d17 | -0.2 | 1.4285714285714286
 المحقق (Sell-Out) | 14.0 | FontWeight.w800 | ff191d17 | -0.2 | 1.4285714285714286
 المحقق (Sell-Out) | 14.0 | FontWeight.w800 | ff191d17 | -0.2 | 1.4285714285714286
+المستهدفات | 14.0 | FontWeight.w800 | ff3d4b36 | 0.25 | 1.4285714285714286
+المستهدفات | 14.0 | FontWeight.w800 | ff3d4b36 | 0.25 | 1.4285714285714286
+الملفات المرفوعة (3) | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
+الملفات المرفوعة (3) | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
 الوكالة | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
 الوكالة | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+بيانات المبيعات | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
+بيانات المبيعات | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
 بيت الجملة | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
 بيت الجملة | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
-تصدير | 14.0 | FontWeight.w600 | ff426834 | null | null
-تصدير | 14.0 | FontWeight.w600 | ff426834 | null | null
-تصدير | 14.0 | FontWeight.w600 | ff426834 | null | null
-تنزيل القالب | 14.0 | FontWeight.w600 | ff426834 | null | null
-تنزيل القالب | 14.0 | FontWeight.w600 | ff426834 | null | null
-تنزيل القالب | 14.0 | FontWeight.w600 | ff426834 | null | null
+تصدير | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+تصدير | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+تصدير | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+تنزيل القالب | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+تنزيل القالب | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+تنزيل القالب | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
 جملة ماركت | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
 جملة ماركت | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
-رفع ملف المستهدفات | 14.0 | FontWeight.w600 | ff3d4b36 | null | null
-رفع ملف المستهدفات | 14.0 | FontWeight.w600 | ff3d4b36 | null | null
-رفع ملف المستهدفات | 14.0 | FontWeight.w600 | ff3d4b36 | null | null
+رفع ملف المستهدفات | 14.0 | FontWeight.w500 | ff3d4b36 | 0.1 | 1.4285714285714286
+رفع ملف المستهدفات | 14.0 | FontWeight.w500 | ff3d4b36 | 0.1 | 1.4285714285714286
+رفع ملف المستهدفات | 14.0 | FontWeight.w500 | ff3d4b36 | 0.1 | 1.4285714285714286
 سبينيس | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
 سبينيس | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
 فوق المستهدف | 12.0 | FontWeight.w700 | ff43483f | 0.4 | 1.3333333333333333
@@ -110,21 +110,21 @@ Variance | 11.5 | FontWeight.w600 | d943483f | 0.4 | 1.3333333333333333
 • Below target | 11.0 | FontWeight.w400 | b343483f | 0.4 | 1.3333333333333333
 • Target Units | 11.0 | FontWeight.w400 | b343483f | 0.4 | 1.3333333333333333
 • Target Units | 11.0 | FontWeight.w400 | b343483f | 0.4 | 1.3333333333333333
-󰂚 | 22.0 | null | ffba1a1a | null | 1.0
+󰂚 | 24.0 | null | ffba1a1a | null | 1.0
 󰂭 | 20.0 | null | ff43483f | null | 1.0
-󰈑 | 20.0 | null | ff426834 | null | 1.0
+󰈑 | 18.0 | null | ff426834 | null | 1.0
 󰉈 | 20.0 | null | ff3d4b36 | null | 1.0
-󰉔 | 22.0 | null | ff2e7d32 | null | 1.0
-󰉪 | 20.0 | null | ff3d4b36 | null | 1.0
-󰌜 | 22.0 | null | ff426834 | null | 1.0
+󰉔 | 24.0 | null | ff2e7d32 | null | 1.0
+󰉪 | 18.0 | null | ff3d4b36 | null | 1.0
+󰌜 | 24.0 | null | ff426834 | null | 1.0
 󰌞 | 20.0 | null | ff43483f | null | 1.0
- | 52.0 | null | bf426834 | null | 1.0
- | 20.0 | null | ffffffff | null | 1.0
- | 20.0 | null | ffffffff | null | 1.0
+ | 48.0 | null | bf426834 | null | 1.0
+ | 18.0 | null | ffffffff | null | 1.0
+ | 18.0 | null | ffffffff | null | 1.0
  | 18.0 | null | ff43483f | null | 1.0
  | 18.0 | null | ff43483f | null | 1.0
  | 24.0 | null | ff43483f | null | 1.0
  | 24.0 | null | ff43483f | null | 1.0
- | 20.0 | null | ff426834 | null | 1.0
+ | 18.0 | null | ff426834 | null | 1.0
  | 20.0 | null | ff43483f | null | 1.0
- | 22.0 | null | ff00695c | null | 1.0
+ | 24.0 | null | ff00695c | null | 1.0

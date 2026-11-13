@@ -32,24 +32,24 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 1. Verify 4 Symmetrical Tabs (English Only) in SegmentedButton
-      expect(find.text('Sales Data'), findsOneWidget);
-      expect(find.text('Store Performance'), findsOneWidget);
-      expect(find.text('Targets'), findsOneWidget);
-      expect(find.textContaining('Uploaded Files'), findsOneWidget);
+      // 1. Verify 4 Symmetrical Tabs (Arabic content labels)
+      expect(find.text('بيانات المبيعات'), findsOneWidget);
+      expect(find.text('أداء الفروع'), findsOneWidget);
+      expect(find.text('المستهدفات'), findsOneWidget);
+      expect(find.textContaining('الملفات المرفوعة'), findsOneWidget);
 
       // 2. Verify 4 Executive KPI Cards on Tab 0
       expect(find.text('صافي المبيعات'), findsOneWidget);
-      expect(find.text('Net Sales (EGP)'), findsOneWidget);
+      expect(find.text('Net Sales (EGP)'), findsNothing);
 
       expect(find.text('إجمالي الكمية المباعة'), findsOneWidget);
-      expect(find.text('Total Units Sold'), findsOneWidget);
+      expect(find.text('Total Units Sold'), findsNothing);
 
       expect(find.text('الأصناف النشطة'), findsOneWidget);
-      expect(find.text('Active SKUs'), findsOneWidget);
+      expect(find.text('Active SKUs'), findsNothing);
 
       expect(find.text('الفروع النشطة'), findsOneWidget);
-      expect(find.text('Active Stores'), findsOneWidget);
+      expect(find.text('Active Stores'), findsNothing);
 
       // 2b. All 4 KPI cards share identical width, height and top/bottom edges
       final kpiRects = [
@@ -68,7 +68,7 @@ void main() {
       // 3. Verify Full-Width Branch Sales Ranking Chart with Year 2026 Default & Two-Row Layout
       expect(find.byKey(const ValueKey('full_width_branch_sales_chart')), findsOneWidget);
       expect(find.text('ترتيب الفروع حسب المبيعات'), findsOneWidget);
-      expect(find.text('Store Ranking by Sales'), findsOneWidget);
+      expect(find.text('Store Ranking by Sales'), findsNothing);
       // Vertical columns mode is removed entirely; chart starts collapsed.
       expect(find.textContaining('الصف الأول: الفروع الأعلى مبيعاً'), findsNothing);
       expect(find.byKey(const ValueKey('branch_chart_layout_toggle')), findsNothing);
@@ -96,10 +96,10 @@ void main() {
       expect(find.byIcon(AppIcons.expandMore), findsOneWidget);
       final yearBtn = find.byKey(const ValueKey('branch_chart_year_dropdown'));
       expect(yearBtn, findsOneWidget);
-      expect(find.text('السنة: 2026'), findsOneWidget);
+      expect(find.text('سنة البيانات: 2026'), findsOneWidget);
       // One line, 40dp (was a 3-segment control that wrapped and clipped).
       expect(tester.getSize(yearBtn).height, greaterThanOrEqualTo(40.0));
-      expect(tester.getSize(find.text('السنة: 2026')).height, lessThanOrEqualTo(20.5));
+      expect(tester.getSize(find.text('سنة البيانات: 2026')).height, lessThanOrEqualTo(20.5));
       expect(tester.getSize(find.byKey(const ValueKey('branch_chart_sort_toggle'))).height,
           greaterThanOrEqualTo(40.0));
 
@@ -151,7 +151,7 @@ void main() {
       await tester.tap(find.descendant(of: yearMenu, matching: find.text('2025')));
       await tester.pumpAndSettle();
 
-      expect(find.text('السنة: 2025'), findsOneWidget);
+      expect(find.text('سنة البيانات: 2025'), findsOneWidget);
       expect(find.textContaining('سنة 2025'), findsWidgets);
     });
 
@@ -175,18 +175,18 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to Tab 1
-      await tester.tap(find.text('Store Performance'));
+      await tester.tap(find.text('أداء الفروع').first);
       await tester.pumpAndSettle();
 
       // Verify Tab 1 KPI Cards
       expect(find.text('الصنف الأعلى مبيعًا'), findsOneWidget);
-      expect(find.text('Top SKU'), findsOneWidget);
+      expect(find.text('Top SKU'), findsNothing);
       expect(find.text('حصة أعلى 20% من الأصناف'), findsOneWidget);
-      expect(find.text("Top 20% SKUs' Share"), findsOneWidget);
+      expect(find.text("Top 20% SKUs' Share"), findsNothing);
       expect(find.text('الفرع الأعلى مبيعًا'), findsOneWidget);
-      expect(find.text('Top Store'), findsOneWidget);
+      expect(find.text('Top Store'), findsNothing);
       expect(find.text('متوسط مبيعات الفرع'), findsOneWidget);
-      expect(find.text('Avg. Sales per Store'), findsOneWidget);
+      expect(find.text('Avg. Sales per Store'), findsNothing);
 
       // Verify Tab 1 Year (2026 Default) and Month Filter Dropdowns
       expect(find.byKey(const ValueKey('perf_year_dropdown')), findsOneWidget);
@@ -223,7 +223,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to Tab 2
-      await tester.tap(find.text('Targets'));
+      await tester.tap(find.text('المستهدفات'));
       await tester.pumpAndSettle();
 
       expect(find.byKey(ValueKey('sell_out_targets_${apiClient.tenantId}')), findsOneWidget);
@@ -263,7 +263,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to Tab 3
-      final tab3Finder = find.textContaining('Uploaded Files');
+      final tab3Finder = find.textContaining('الملفات المرفوعة');
       await tester.ensureVisible(tab3Finder);
       await tester.tap(tab3Finder);
       await tester.pumpAndSettle();

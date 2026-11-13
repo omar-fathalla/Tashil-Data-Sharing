@@ -567,8 +567,8 @@ Year | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
 󰄽 | 20.0 | null | ff43483f | null | 1.0
 󰇼 | 16.0 | null | dd000000 | null | 1.0
 󰇼 | 16.0 | null | dd000000 | null | 1.0
-󰇾 | 15.0 | null | ff426834 | null | 1.0
-󰇾 | 15.0 | null | ff426834 | null | 1.0
+󰇾 | 18.0 | null | ff426834 | null | 1.0
+󰇾 | 18.0 | null | ff426834 | null | 1.0
 󰈄 | 22.0 | null | ff426834 | null | 1.0
 󰉈 | 20.0 | null | ff43483f | null | 1.0
 󰉔 | 18.0 | null | ff426834 | null | 1.0

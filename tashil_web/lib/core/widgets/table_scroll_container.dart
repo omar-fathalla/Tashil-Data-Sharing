@@ -109,7 +109,7 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
           if (widget.showSwipeHint && !compact) ...[
             Icon(
               Icons.swipe_rounded,
-              size: 15.0,
+              size: 18.0,
               color: colorScheme.primary,
             ),
             const SizedBox(width: 6.0),

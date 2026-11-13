@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/widgets/m3_button_group.dart';
 import '../../../../core/widgets/app_icons.dart';
+import '../../../../core/widgets/m3_toolbar_button.dart';
 
 /// Shared Sell-Out / Sell-In toolbar actions as real M3 buttons (tonal group).
 /// Replaces the old InkWell+Container fakes (G21). Prefer [M3ButtonGroup] directly
@@ -18,6 +19,7 @@ class SellActionButtons {
   }) {
     return FilledButton.tonalIcon(
       key: key,
+      style: M3ToolbarButton.style,
       onPressed: isUploading ? null : onTap,
       icon: isUploading
           ? const SizedBox(
@@ -37,6 +39,7 @@ class SellActionButtons {
   }) {
     return FilledButton.tonalIcon(
       key: const ValueKey('export_pdf_button'),
+      style: M3ToolbarButton.style,
       onPressed: onTap,
       icon: const Icon(AppIcons.print),
       label: const Text('طباعة'),
@@ -50,6 +53,7 @@ class SellActionButtons {
   }) {
     return OutlinedButton.icon(
       key: const ValueKey('export_excel_button'),
+      style: M3ToolbarButton.style,
       onPressed: onTap,
       icon: const Icon(AppIcons.fileDownload),
       label: const Text('تصدير'),
@@ -151,10 +155,7 @@ class SellTableFilterChips extends StatelessWidget {
             count: negativeMargin,
             icon: AppIcons.error),
         SellTableFilterOption(
-            value: 'promo',
-            label: 'عروض',
-            count: promo,
-            icon: AppIcons.promo),
+            value: 'promo', label: 'عروض', count: promo, icon: AppIcons.promo),
       ];
 
   @override
