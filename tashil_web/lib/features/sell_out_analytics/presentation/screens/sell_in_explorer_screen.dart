@@ -3476,16 +3476,15 @@ onChanged: m3Legacy<int>((v) {
                                 DataCell(
                                   Text(
                                     CurrencyFormatter.formatNumber(file.rowsIngested),
+                                    key: ValueKey('sellin_file_rows_${file.id}'),
                                     style: const TextStyle(fontWeight: FontWeight.w700),
                                   ),
                                 ),
                                 DataCell(
+                                  // Cases from the file (total_cases); never the row count.
                                   Text(
-                                    CurrencyFormatter.formatNumber(
-                                      file.totalCases > 0
-                                          ? file.totalCases.round()
-                                          : file.rowsIngested,
-                                    ),
+                                    CurrencyFormatter.formatNumber(file.totalCases.round()),
+                                    key: ValueKey('sellin_file_cases_${file.id}'),
                                     style: const TextStyle(fontWeight: FontWeight.w700),
                                   ),
                                 ),

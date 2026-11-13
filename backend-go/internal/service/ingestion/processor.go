@@ -114,6 +114,7 @@ type StagedUpload struct {
 	ArchRows       int
 	ArchStores     int
 	ArchRevenue    float64
+	ArchUnits      float64
 	// CorrectedPlan is an optional human column-map correction saved before commit.
 	CorrectedPlan *gemini.ColumnMapPlan
 }
@@ -889,6 +890,9 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			reportedValidRows,
 			len(discoveredStores),
 			totalRevenue,
+			0,
+			0,
+			float64(totalQuantity),
 		)
 	}
 	archiveID := ""
@@ -971,6 +975,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			ArchRows:               reportedValidRows,
 			ArchStores:             len(discoveredStores),
 			ArchRevenue:            totalRevenue,
+			ArchUnits:              float64(totalQuantity),
 		}
 		p.stagedMu.Unlock()
 		_, interactive := uploadGuards(ctx)
@@ -1092,7 +1097,7 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 			archYear, archMonth = commitYear, commitMonth
 		}
 		updatedArchived = p.SaveArchivedFile(tenantID, batchID, staged.Filename, staged.FileBytes, chainToUse,
-			archYear, archMonth, staged.ArchRows, len(staged.DiscoveredStores), staged.ArchRevenue)
+			archYear, archMonth, staged.ArchRows, len(staged.DiscoveredStores), staged.ArchRevenue, 0, 0, staged.ArchUnits)
 	}
 	if requestedPeriodDate != "" && commitChoice != "sheet" && (staged.Result == nil || len(staged.Result.DetectedSheets) <= 1 || commitChoice == "form") {
 		for i := range staged.ValidFacts {

@@ -2043,6 +2043,10 @@ class ArchivedExcelFileModel {
   final double totalRevenue;
   final double totalCases;
   final double totalWeightTons;
+  /// Units sold in a Sell-Out file (backend `total_units`, own-brand
+  /// SUM(quantity_sold) of the stored rows). Null when the backend did not
+  /// send it — never fall back to [rowsIngested].
+  final double? totalUnits;
   final String uploadedAt;
   /// Always refreshed on re-ingest; [uploadedAt] may keep the original first upload.
   final String lastIngestedAt;
@@ -2065,6 +2069,7 @@ class ArchivedExcelFileModel {
     required this.totalRevenue,
     this.totalCases = 0.0,
     this.totalWeightTons = 0.0,
+    this.totalUnits,
     required this.uploadedAt,
     this.lastIngestedAt = '',
   });
@@ -2101,6 +2106,7 @@ class ArchivedExcelFileModel {
       totalRevenue: (json['total_revenue'] as num?)?.toDouble() ?? 0.0,
       totalCases: (json['total_cases'] as num?)?.toDouble() ?? 0.0,
       totalWeightTons: (json['total_weight_tons'] as num?)?.toDouble() ?? 0.0,
+      totalUnits: (json['total_units'] as num?)?.toDouble(),
       uploadedAt: json['uploaded_at'] as String? ?? '',
       lastIngestedAt: json['last_ingested_at'] as String? ?? '',
     );
@@ -2124,6 +2130,7 @@ class ArchivedExcelFileModel {
         'total_revenue': totalRevenue,
         'total_cases': totalCases,
         'total_weight_tons': totalWeightTons,
+        if (totalUnits != null) 'total_units': totalUnits,
         'uploaded_at': uploadedAt,
         'last_ingested_at': lastIngestedAt,
       };
@@ -2158,6 +2165,7 @@ class ArchivedExcelFileModel {
       totalRevenue: totalRevenue,
       totalCases: totalCases ?? this.totalCases,
       totalWeightTons: totalWeightTons ?? this.totalWeightTons,
+      totalUnits: totalUnits,
       uploadedAt: uploadedAt ?? this.uploadedAt,
       lastIngestedAt: lastIngestedAt ?? this.lastIngestedAt,
     );
@@ -4101,6 +4109,7 @@ class ApiClient {
         targetYear: '2026',
         targetMonth: '01-12',
         rowsIngested: 164733,
+        totalUnits: 1286410,
         branchesCount: 35,
         totalRevenue: 9537094.70,
         uploadedAt: '2026-03-08T10:00:00Z',
@@ -4118,6 +4127,7 @@ class ApiClient {
         targetYear: '2026',
         targetMonth: '01',
         rowsIngested: 5330,
+        totalUnits: 48215,
         branchesCount: 33,
         totalRevenue: 6573015.00,
         uploadedAt: '2026-03-08T09:30:00Z',
@@ -4135,6 +4145,7 @@ class ApiClient {
         targetYear: '2026',
         targetMonth: '01-12',
         rowsIngested: 256735,
+        totalUnits: 2391870,
         branchesCount: 30,
         totalRevenue: 47080999.14,
         uploadedAt: '2026-03-08T09:00:00Z',
