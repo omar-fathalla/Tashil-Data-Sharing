@@ -138,3 +138,112 @@ List<OwnSkuCompetitiveGroupModel> compareFixtureGroups() {
     g(2, 'مبيض ملابس تجريبي شديد الفعالية للألوان البيضاء عبوة عائلية', const []),
   ];
 }
+
+OwnSkuCompetitiveGroupModel _scaleGroup(int i,
+        {required List<SkuMonthlyPricePointModel> monthly,
+        List<CompetitorSkuComparisonModel> competitors = const []}) =>
+    OwnSkuCompetitiveGroupModel(
+      ownBarcode: '6221${i.toString().padLeft(9, '0')}',
+      ownSkuName: 'صنف تجريبي رقم $i',
+      ownBrand: 'علامة تجريبية',
+      category: 'منظفات أرضيات',
+      packSizeLabel: '3 كجم',
+      packVolumeUnits: 3,
+      volumeUnitLabel: 'كجم',
+      ownUnitPrice: 160,
+      ownRecommendedPrice: 160,
+      ownPricePerUnitVolume: 53.3,
+      ownUnitsSold: 300 + i,
+      ownNetRevenue: 48000,
+      ownCategorySharePct: 30,
+      avgCompetitorPrice: 150,
+      minCompetitorPrice: 140,
+      maxCompetitorPrice: 170,
+      priceIndex: 106.7,
+      ownChainPrices: const {'fathalla': 160},
+      competitors: competitors,
+      monthlyPrices: monthly,
+      allMonthlyPrices: monthly,
+      selectedYear: 2026,
+      selectedMonth: 0,
+    );
+
+List<SkuMonthlyPricePointModel> _series(double Function(int m) price,
+        {int fromMonth = 1, int throughMonth = 10}) =>
+    [
+      for (var m = fromMonth; m <= throughMonth; m++)
+        SkuMonthlyPricePointModel(
+          monthKey: '2026-${m.toString().padLeft(2, '0')}',
+          year: 2026,
+          monthNum: m,
+          monthNameAr: ApiClient.formatArabicMonthOnly(m),
+          monthLabelAr: '${ApiClient.formatArabicMonthOnly(m)} 2026',
+          unitPrice: price(m),
+          unitsSold: 100 + m,
+          netRevenue: price(m) * (100 + m),
+          priceChangeEgp: m == fromMonth ? 0 : price(m) - price(m - 1),
+          priceChangePct: m == fromMonth
+              ? 0
+              : (price(m) - price(m - 1)) / price(m - 1) * 100,
+          trendDirection: m == fromMonth
+              ? 'baseline'
+              : price(m) > price(m - 1)
+                  ? 'up'
+                  : price(m) < price(m - 1)
+                      ? 'down'
+                      : 'flat',
+        ),
+    ];
+
+/// Live-scale KPI fixture (made-up numbers, live-like magnitudes):
+/// 302 own SKUs — 243 price rises, 46 drops, 12 mapped with 105 competitors.
+List<OwnSkuCompetitiveGroupModel> compareLiveScaleGroups() => [
+      for (var i = 0; i < 302; i++)
+        _scaleGroup(
+          i,
+          monthly: i < 243
+              ? _series((m) => 100.0 + 5 * m)
+              : i < 289
+                  ? _series((m) => 200.0 - 5 * m)
+                  : _series((m) => 150.0),
+          competitors: i < 12
+              ? [
+                  for (var k = 0; k < (i < 9 ? 9 : 8); k++)
+                    _competitor(i * 10 + k, 'منافس تجريبي $i-$k', 140.0 + k),
+                ]
+              : const [],
+        ),
+    ];
+
+/// One own SKU whose only competitor has prices for May–Oct only
+/// (Jan–Apr missing), with prices that cross ours.
+List<OwnSkuCompetitiveGroupModel> compareGappyCompetitorGroups() {
+  final comp = _competitor(7, 'منافس بشهور ناقصة', 180);
+  final gappy = _series((m) => 260.0 - 10 * m, fromMonth: 5);
+  return [
+    _scaleGroup(0,
+        monthly: _series((m) => 150.0 + 10 * m),
+        competitors: [
+          CompetitorSkuComparisonModel(
+            skuName: comp.skuName,
+            barcode: comp.barcode,
+            supplierName: comp.supplierName,
+            brand: 'منافس ناقص',
+            category: comp.category,
+            packSizeLabel: comp.packSizeLabel,
+            packVolumeUnits: comp.packVolumeUnits,
+            volumeUnitLabel: comp.volumeUnitLabel,
+            unitPrice: comp.unitPrice,
+            pricePerUnitVolume: comp.pricePerUnitVolume,
+            priceDiffEgp: comp.priceDiffEgp,
+            priceDiffPct: comp.priceDiffPct,
+            pricePosition: 'more_expensive',
+            unitsSold: comp.unitsSold,
+            netRevenue: comp.netRevenue,
+            categorySharePct: comp.categorySharePct,
+            monthlyPrices: gappy,
+            allMonthlyPrices: gappy,
+          ),
+        ]),
+  ];
+}

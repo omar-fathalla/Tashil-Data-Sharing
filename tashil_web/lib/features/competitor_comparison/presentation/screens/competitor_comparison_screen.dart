@@ -14,6 +14,7 @@ import '../../data/competitor_comparison_repository.dart';
 import '../../domain/competitor_month_options.dart';
 import '../widgets/competitor_ai_picks_row.dart';
 import '../widgets/competitor_suggestions_review.dart';
+import '../utils/chart_callout_layout.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
@@ -760,8 +761,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     context: context,
                     title: 'حركة الأسعار $_selectedYear',
                     value:
-                        '▲ $priceIncreasedSkusCount زاد | ▼ $priceDecreasedSkusCount نزل',
-                    subtitle: 'الفترة: $_monthRangeLabel',
+                        '▲$priceIncreasedSkusCount ▼$priceDecreasedSkusCount',
+                    subtitle: '▲ زاد · ▼ نزل · $_monthRangeLabel',
                     icon: Icons.show_chart_rounded,
                     color: M3Palette.warning,
                     isLoading: _isLoading,
@@ -1901,46 +1902,28 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
 
           const SizedBox(height: 16.0),
 
-          // Responsive Grid/Row of Single-Brand Competitor Cards
+          // Responsive equal-height grid of competitor cards: wraps into
+          // rows instead of squeezing every competitor into one row.
           LayoutBuilder(
             builder: (context, constraints) {
               final count = competitors.length;
-              final isDesktop = constraints.maxWidth >= 720.0;
-              if (isDesktop && count > 0) {
-                return IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (int i = 0; i < count; i++) ...[
-                        Expanded(
-                          child: _buildSingleBrandCompetitorTile(
-                            context,
-                            competitor: competitors[i],
-                            isSelected: selectedCompetitor?.barcode ==
-                                competitors[i].barcode,
-                            effectiveOwnPrice: effectiveOwnPrice,
-                          ),
-                        ),
-                        if (i < count - 1) const SizedBox(width: 12.0),
-                      ],
-                    ],
-                  ),
-                );
-              }
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              if (count == 0) return const SizedBox.shrink();
+              final w = constraints.maxWidth;
+              final columns =
+                  math.min(count, w >= 720.0 ? 3 : (w >= 480.0 ? 2 : 1));
+              return M3EqualHeightGrid(
+                key: const ValueKey('compare_competitor_grid'),
+                columns: columns,
+                spacing: M3Spacing.s12,
+                runSpacing: M3Spacing.s12,
                 children: [
-                  for (int i = 0; i < count; i++) ...[
+                  for (final c in competitors)
                     _buildSingleBrandCompetitorTile(
                       context,
-                      competitor: competitors[i],
-                      isSelected:
-                          selectedCompetitor?.barcode == competitors[i].barcode,
+                      competitor: c,
+                      isSelected: selectedCompetitor?.barcode == c.barcode,
                       effectiveOwnPrice: effectiveOwnPrice,
                     ),
-                    if (i < count - 1) const SizedBox(height: 10.0),
-                  ],
                 ],
               );
             },
@@ -2540,13 +2523,12 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     int year,
     int monthNum,
   ) {
+    // Exact (year, month) only: a month the competitor has no price for
+    // shows «no price», never another month's (or year's) value.
     for (final pt in list) {
       if (pt.year == year && pt.monthNum == monthNum) return pt;
     }
-    for (final pt in list) {
-      if (pt.monthNum == monthNum) return pt;
-    }
-    return list.isNotEmpty ? list.last : null;
+    return null;
   }
 
   /// Single Month Card (e.g. يناير 2026) comparing:
@@ -2646,7 +2628,9 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                               ? 'المنافس +${gapEgp.toStringAsFixed(1)} ج'
                               : compLower
                                   ? 'المنافس ${gapEgp.toStringAsFixed(1)} ج'
-                                  : 'سعر متقارب',
+                                  : compPoint == null
+                                      ? '—'
+                                      : 'سعر متقارب',
                           style: TextStyle(
                             fontSize: M3FontSize.tinyPlus,
                             fontWeight: FontWeight.w900,
@@ -2735,6 +2719,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
               // Row 2: Selected Competitor in this month
               if (compPoint != null)
                 Container(
+                  key: ValueKey(
+                      'compare_month_comp_${ownPoint.year}_${ownPoint.monthNum}'),
                   padding: const EdgeInsets.all(10.0),
                   decoration: BoxDecoration(
                     color: compColor.withValues(alpha: 0.07),
@@ -2791,6 +2777,25 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                         ],
                       ),
                     ],
+                  ),
+                )
+              else
+                Container(
+                  key: ValueKey(
+                      'compare_month_no_comp_${ownPoint.year}_${ownPoint.monthNum}'),
+                  padding: const EdgeInsets.all(10.0),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                    borderRadius: M3Shape.radiusMd,
+                  ),
+                  child: Text(
+                    'لا يوجد سعر لـ $compBrand في هذا الشهر',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
             ],
@@ -3474,80 +3479,43 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
       tp.dispose();
     }
 
-    // 3. Draw Selected Competitor Line + Callouts
-    if (competitorSeries.isNotEmpty) {
-      final compPath = Path();
-      final cn = competitorSeries.length;
-      for (int i = 0; i < cn; i++) {
-        final x = indexToX(i, cn);
-        final y = priceToY(competitorSeries[i].unitPrice);
-        if (i == 0) {
-          compPath.moveTo(x, y);
-        } else {
-          compPath.lineTo(x, y);
-        }
+    // 3. Selected competitor line, aligned to our months by (year, month):
+    // a competitor month with no price is a gap, never another month's value.
+    final comp = alignSeriesToMonths(ownSeries, competitorSeries);
+    final compPath = Path();
+    var penDown = false;
+    for (int i = 0; i < n; i++) {
+      final pt = comp[i];
+      if (pt == null) {
+        penDown = false;
+        continue;
       }
-      canvas.drawPath(
-        compPath,
-        Paint()
-          ..color = compColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3.0
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round,
-      );
-
-      for (int i = 0; i < cn; i++) {
-        final pt = competitorSeries[i];
-        final x = indexToX(i, cn);
-        final y = priceToY(pt.unitPrice);
-
-        canvas.drawCircle(Offset(x, y), 6.0, Paint()..color = Colors.white);
-        canvas.drawCircle(Offset(x, y), 4.5, Paint()..color = compColor);
-
-        final String arrow = pt.trendDirection == 'up'
-            ? '▲'
-            : pt.trendDirection == 'down'
-                ? '▼'
-                : '';
-        final calloutText = '${pt.unitPrice.toStringAsFixed(1)} $arrow'.trim();
-        final tp = TextPainter(
-          text: TextSpan(
-            text: calloutText,
-            style: TextStyle(
-              color: compColor,
-              fontSize: M3FontSize.tinyPlus,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          textDirection: TextDirection.rtl,
-        )..layout();
-
-        // Position callout below point if competitor price is lower than own price, else above
-        final ownPtY = i < ownSeries.length
-            ? priceToY(ownSeries[i].unitPrice)
-            : y;
-        final double dyOffset = (y >= ownPtY) ? 16.0 : -16.0;
-
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromCenter(
-              center: Offset(x, y + dyOffset),
-              width: tp.width + 10.0,
-              height: tp.height + 4.0,
-            ),
-            const Radius.circular(6.0),
-          ),
-          Paint()..color = Colors.white.withValues(alpha: 0.92),
-        );
-        tp.paint(
-          canvas,
-          Offset(x - tp.width / 2, y + dyOffset - tp.height / 2),
-        );
+      final o = Offset(indexToX(i, n), priceToY(pt.unitPrice));
+      if (penDown) {
+        compPath.lineTo(o.dx, o.dy);
+      } else {
+        compPath.moveTo(o.dx, o.dy);
+        penDown = true;
       }
     }
+    canvas.drawPath(
+      compPath,
+      Paint()
+        ..color = compColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.0
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+    for (int i = 0; i < n; i++) {
+      final pt = comp[i];
+      if (pt == null) continue;
+      final o = Offset(indexToX(i, n), priceToY(pt.unitPrice));
+      canvas.drawCircle(o, 6.0, Paint()..color = Colors.white);
+      canvas.drawCircle(o, 4.5, Paint()..color = compColor);
+    }
 
-    // 4. Draw Own SKU Area Fill + Thick Primary Line + Data Callouts
+    // 4. Own SKU area fill + thick line + points.
     final ownPath = Path();
     final fillPath = Path();
     for (int i = 0; i < n; i++) {
@@ -3566,7 +3534,6 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
         fillPath.close();
       }
     }
-
     canvas.drawPath(
       fillPath,
       Paint()
@@ -3579,7 +3546,6 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
           end: Alignment.bottomCenter,
         ).createShader(Rect.fromLTWH(leftPad, topPad, chartW, chartH)),
     );
-
     canvas.drawPath(
       ownPath,
       Paint()
@@ -3589,24 +3555,47 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
     );
-
     for (int i = 0; i < n; i++) {
-      final pt = ownSeries[i];
-      final x = indexToX(i, n);
-      final y = priceToY(pt.unitPrice);
+      final o = Offset(indexToX(i, n), priceToY(ownSeries[i].unitPrice));
+      canvas.drawCircle(o, 7.0, Paint()..color = Colors.white);
+      canvas.drawCircle(o, 5.2, Paint()..color = ownColor);
+    }
 
-      canvas.drawCircle(Offset(x, y), 7.0, Paint()..color = Colors.white);
-      canvas.drawCircle(Offset(x, y), 5.2, Paint()..color = ownColor);
-
-      final String arrow = pt.trendDirection == 'up'
+    // 5. Price callouts, laid out together so they never collide (near line
+    // crossings the lower-priority one flips side, moves out, or is hidden).
+    String calloutText(SkuMonthlyPricePointModel pt) {
+      final arrow = pt.trendDirection == 'up'
           ? '▲'
           : pt.trendDirection == 'down'
               ? '▼'
               : '';
-      final calloutText = '${pt.unitPrice.toStringAsFixed(1)} $arrow'.trim();
+      return '${pt.unitPrice.toStringAsFixed(1)} $arrow'.trim();
+    }
+
+    final painters = <TextPainter>[];
+    final colors = <Color>[];
+    final requests = <CalloutRequest>[];
+    final markers = <Rect>[];
+    for (int i = 0; i < n; i++) {
+      final x = indexToX(i, n);
+      final yOwn = priceToY(ownSeries[i].unitPrice);
+      markers.add(Rect.fromCircle(center: Offset(x, yOwn), radius: 7.0));
+      final c = comp[i];
+      if (c != null) {
+        markers.add(Rect.fromCircle(
+            center: Offset(x, priceToY(c.unitPrice)), radius: 6.0));
+      }
+    }
+    // Own callouts first (priority), then the competitor's.
+    for (int i = 0; i < n; i++) {
+      final pt = ownSeries[i];
+      final x = indexToX(i, n);
+      final y = priceToY(pt.unitPrice);
+      final c = comp[i];
+      final compY = c == null ? y + 20.0 : priceToY(c.unitPrice);
       final tp = TextPainter(
         text: TextSpan(
-          text: calloutText,
+          text: calloutText(pt),
           style: TextStyle(
             color: ownColor,
             fontSize: M3FontSize.labelSmall,
@@ -3615,24 +3604,56 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
         ),
         textDirection: TextDirection.rtl,
       )..layout();
-
-      final compPtY = i < competitorSeries.length
-          ? priceToY(competitorSeries[i].unitPrice)
-          : y + 20.0;
-      final double dyOffset = (y <= compPtY) ? -17.0 : 17.0;
-
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: Offset(x, y + dyOffset),
-            width: tp.width + 10.0,
-            height: tp.height + 4.0,
+      painters.add(tp);
+      colors.add(Colors.white.withValues(alpha: 0.94));
+      requests.add(CalloutRequest(
+        anchor: Offset(x, y),
+        size: Size(tp.width + 10.0, tp.height + 4.0),
+        preferredDy: y <= compY ? -17.0 : 17.0,
+      ));
+    }
+    for (int i = 0; i < n; i++) {
+      final pt = comp[i];
+      if (pt == null) continue;
+      final x = indexToX(i, n);
+      final y = priceToY(pt.unitPrice);
+      final ownY = priceToY(ownSeries[i].unitPrice);
+      final tp = TextPainter(
+        text: TextSpan(
+          text: calloutText(pt),
+          style: TextStyle(
+            color: compColor,
+            fontSize: M3FontSize.tinyPlus,
+            fontWeight: FontWeight.w900,
           ),
-          const Radius.circular(6.0),
         ),
-        Paint()..color = Colors.white.withValues(alpha: 0.94),
-      );
-      tp.paint(canvas, Offset(x - tp.width / 2, y + dyOffset - tp.height / 2));
+        textDirection: TextDirection.rtl,
+      )..layout();
+      painters.add(tp);
+      colors.add(Colors.white.withValues(alpha: 0.92));
+      requests.add(CalloutRequest(
+        anchor: Offset(x, y),
+        size: Size(tp.width + 10.0, tp.height + 4.0),
+        preferredDy: y >= ownY ? 16.0 : -16.0,
+      ));
+    }
+    final rects = layoutCallouts(
+      requests,
+      bounds: Rect.fromLTWH(0, 0, size.width, topPad + chartH),
+      markers: markers,
+    );
+    for (int k = 0; k < rects.length; k++) {
+      final r = rects[k];
+      final tp = painters[k];
+      if (r != null) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(r, const Radius.circular(6.0)),
+          Paint()..color = colors[k],
+        );
+        tp.paint(canvas,
+            Offset(r.center.dx - tp.width / 2, r.center.dy - tp.height / 2));
+      }
+      tp.dispose();
     }
   }
 
