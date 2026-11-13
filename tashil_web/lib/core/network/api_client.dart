@@ -790,6 +790,10 @@ class ExecutiveKPIsModel {
   final double unitsGrowthPct;
   final double unitsYoyPct;
   final double unitsMomPct;
+
+  /// False when no selected month has last-year data (backend
+  /// `yoy_available`); the YoY % is then not a real 0 and shows as "—".
+  final bool yoyAvailable;
   final int activeStoresCount;
   final double oosRatePct;
   final double osaRatePct;
@@ -819,6 +823,7 @@ class ExecutiveKPIsModel {
     required this.unitsGrowthPct,
     double? unitsYoyPct,
     double? unitsMomPct,
+    this.yoyAvailable = true,
     required this.activeStoresCount,
     required this.oosRatePct,
     double? osaRatePct,
@@ -872,6 +877,7 @@ class ExecutiveKPIsModel {
       unitsGrowthPct: uGrowth,
       unitsYoyPct: uYoy,
       unitsMomPct: uMom,
+      yoyAvailable: json['yoy_available'] as bool? ?? true,
       activeStoresCount: (json['active_stores_count'] as num?)?.toInt() ?? 0,
       oosRatePct: oos,
       osaRatePct: osa,
@@ -924,6 +930,7 @@ class ExecutiveKPIsModel {
         'units_growth_pct': unitsGrowthPct,
         'units_yoy_pct': unitsYoyPct,
         'units_mom_pct': unitsMomPct,
+        'yoy_available': yoyAvailable,
         'active_stores_count': activeStoresCount,
         'oos_rate_pct': oosRatePct,
         'osa_rate_pct': osaRatePct,
@@ -3040,6 +3047,7 @@ class ApiClient {
         unitsGrowthPct: kpis.unitsGrowthPct,
         unitsYoyPct: kpis.unitsYoyPct,
         unitsMomPct: kpis.unitsMomPct,
+        yoyAvailable: kpis.yoyAvailable,
         activeStoresCount: kpis.activeStoresCount,
         oosRatePct: kpis.oosRatePct,
         osaRatePct: kpis.osaRatePct,
@@ -3308,6 +3316,7 @@ class ApiClient {
         totalRevenue: 0,
         revenueGrowthPct: 0,
         revenueYoyPct: 0,
+        yoyAvailable: false,
         revenueMomPct: 0,
         totalUnitsSold: 0,
         unitsGrowthPct: 0,
@@ -3612,6 +3621,9 @@ class ApiClient {
     int? month,
     String? startDate,
     String? endDate,
+    // With no month: keep only the calendar months that have data in this
+    // year (previous-year matrix compared on the same months).
+    int? sameMonthsAs,
   }) async {
     final effectiveChain = (currentUser?.role == 'chain_kam' &&
             currentUser?.assignedChain != null &&
@@ -3645,6 +3657,9 @@ class ApiClient {
       }
       if (endDate != null && endDate.isNotEmpty) {
         params['end_date'] = endDate;
+      }
+      if (sameMonthsAs != null && sameMonthsAs > 0 && (month == null || month <= 0)) {
+        params['same_months_as'] = sameMonthsAs.toString();
       }
 
       final uri = Uri.parse(ApiEndpoints.storeMatrix).replace(queryParameters: params.isEmpty ? null : params);
@@ -5777,6 +5792,7 @@ class ApiClient {
         competitorsCount: 0,
         revenueGrowthPct: 0.0,
         revenueYoyPct: 0.0,
+        yoyAvailable: false,
         revenueMomPct: 0.0,
         totalUnitsSold: 0,
         unitsGrowthPct: 0.0,
@@ -5872,6 +5888,7 @@ class ApiClient {
       unitsGrowthPct: base.unitsGrowthPct,
       unitsYoyPct: base.unitsYoyPct,
       unitsMomPct: base.unitsMomPct,
+      yoyAvailable: base.yoyAvailable,
       activeStoresCount: base.activeStoresCount,
       oosRatePct: base.oosRatePct,
       osaRatePct: base.osaRatePct,

@@ -311,6 +311,7 @@ type CPFRDashboardPayload struct {
 	MissingCostItems                []MissingCostItem `json:"missing_cost_items"`    // أصناف بدون سعر/تكلفة حقيقية مطلوبة من أدكو
 	MatchedYoYUnitsGrowthPct        float64 `json:"matched_yoy_units_growth_pct"`         // نمو مبيعات القطع 2026 مقابل 2025 لنفس الأشهر %
 	MatchedYoYValueGrowthPct        float64 `json:"matched_yoy_value_growth_pct"`         // نمو مبيعات القيمة 2026 مقابل 2025 لنفس الأشهر %
+	MatchedYoYAvailable             bool    `json:"matched_yoy_available"`                // false = no matched month has last-year Sell-Out (show "—")
 	PendingSellOutMonthsCount       int     `json:"pending_sell_out_months_count"`        // عدد أشهر التوريد بانتظار شيت الكاشير (e.g. 2: Sep-Oct)
 	PendingSellOutPeriodLabel       string  `json:"pending_sell_out_period_label"`        // "سبتمبر - أكتوبر 2026"
 	PendingSellOutCases             float64 `json:"pending_sell_out_cases"`               // كراتين موردة في سبتمبر وأكتوبر بانتظار شيت الكاشير

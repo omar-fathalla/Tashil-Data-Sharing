@@ -2108,9 +2108,13 @@ onChanged: m3Legacy<int>((v) {
               context,
               titleAr: 'نمو Sell-Out مقارنة بالعام السابق',
               titleEn: 'Sell-Out Growth YoY',
-              value: '${CurrencyFormatter.formatSignedPct(d.matchedYoyValueGrowthPct)} بالقيمة',
-              subtitle:
-                  'بالكمية: ${CurrencyFormatter.formatSignedPct(d.matchedYoyUnitsGrowthPct)} عن نفس الفترة من العام السابق',
+              // No matched month with last-year data: "—", not a fake +0.0%.
+              value: d.matchedYoyAvailable
+                  ? '${CurrencyFormatter.formatSignedPct(d.matchedYoyValueGrowthPct)} بالقيمة'
+                  : '—',
+              subtitle: d.matchedYoyAvailable
+                  ? 'بالكمية: ${CurrencyFormatter.formatSignedPct(d.matchedYoyUnitsGrowthPct)} عن نفس الفترة من العام السابق'
+                  : 'لا توجد بيانات للعام السابق',
               icon: Icons.trending_up_rounded,
               color: M3StatusColors.of(context).accents.purpleStrong,
             );

@@ -15,6 +15,9 @@ class BentoKpiGrid extends StatelessWidget {
     required this.kpis,
   });
 
+  /// Shown instead of "+0.0%" when there is no last-year data to compare.
+  static const String noLastYearLabel = '— لا توجد بيانات للعام السابق';
+
   static String _formatSignedPctValue(double pct) {
     final sign = pct >= 0 ? '+' : '';
     return '$sign$pct%';
@@ -92,8 +95,9 @@ class BentoKpiGrid extends StatelessWidget {
                 growthPct: kpis.revenueGrowthPct,
                 badgeLabel:
                     '${_formatSignedPctValue(kpis.revenueMomPct)} مقارنة بالشهر السابق',
-                secondaryBadgeLabel:
-                    '${_formatSignedPctValue(kpis.revenueYoyPct)} مقارنة بالعام السابق',
+                secondaryBadgeLabel: kpis.yoyAvailable
+                    ? '${_formatSignedPctValue(kpis.revenueYoyPct)} مقارنة بالعام السابق'
+                    : noLastYearLabel,
                 isPositive: kpis.revenueMomPct >= 0,
               ),
             ),
@@ -109,8 +113,9 @@ class BentoKpiGrid extends StatelessWidget {
                 growthPct: kpis.unitsGrowthPct,
                 badgeLabel:
                     '${_formatSignedPctValue(kpis.unitsMomPct)} مقارنة بالشهر السابق',
-                secondaryBadgeLabel:
-                    '${_formatSignedPctValue(kpis.unitsYoyPct)} مقارنة بالعام السابق',
+                secondaryBadgeLabel: kpis.yoyAvailable
+                    ? '${_formatSignedPctValue(kpis.unitsYoyPct)} مقارنة بالعام السابق'
+                    : noLastYearLabel,
                 isPositive: kpis.unitsMomPct >= 0,
               ),
             ),

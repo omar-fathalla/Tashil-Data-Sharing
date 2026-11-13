@@ -878,7 +878,9 @@ onChanged: m3Legacy<int>((v) {
                             const SizedBox(height: 6.0),
                             _buildSimMetricRow(
                               'الزيادة المتوقعة عن العام السابق (YoY Lift):',
-                              '+${CurrencyFormatter.formatEGP(yoyLift)} (+${yoyPct.toStringAsFixed(1)}%)',
+                              lastYearSales > 0
+                                  ? '+${CurrencyFormatter.formatEGP(yoyLift)} (+${yoyPct.toStringAsFixed(1)}%)'
+                                  : '— لا توجد بيانات للعام السابق',
                               M3Palette.info,
                               isBold: true,
                             ),
@@ -1001,8 +1003,12 @@ onChanged: m3Legacy<int>((v) {
                         _buildMiniDrillCard(
                           titleAr: 'النمو عن نفس الشهر بالعام السابق (YoY)',
                           titleEn: 'vs. Last Year (${CurrencyFormatter.formatEGP(summary.lastYearSameMonthSalesEgp)})',
-                          value: '${summary.yoyLiftEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(summary.yoyLiftEgp)}',
-                          sub: '${summary.yoyGrowthPct >= 0 ? '+' : ''}${summary.yoyGrowthPct.toStringAsFixed(1)}% YoY Growth',
+                          value: summary.hasYoY
+                              ? '${summary.yoyLiftEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(summary.yoyLiftEgp)}'
+                              : '—',
+                          sub: summary.hasYoY
+                              ? '${summary.yoyGrowthPct >= 0 ? '+' : ''}${summary.yoyGrowthPct.toStringAsFixed(1)}% YoY Growth'
+                              : 'لا توجد بيانات للعام السابق',
                           color: summary.yoyGrowthPct >= 0 ? M3Palette.info : M3Palette.danger,
                         ),
                       ],
@@ -1153,8 +1159,8 @@ onChanged: m3Legacy<int>((v) {
         s.momLiftEgp.toStringAsFixed(0),
         '${s.momGrowthPct.toStringAsFixed(1)}%',
         s.lastYearSameMonthSalesEgp.toStringAsFixed(0),
-        s.yoyLiftEgp.toStringAsFixed(0),
-        '${s.yoyGrowthPct.toStringAsFixed(1)}%',
+        s.hasYoY ? s.yoyLiftEgp.toStringAsFixed(0) : '—',
+        s.hasYoY ? '${s.yoyGrowthPct.toStringAsFixed(1)}%' : '—',
         '${s.spendToSalesRatioPct.toStringAsFixed(1)}%',
         '${s.romiMultiple.toStringAsFixed(2)}x',
         s.verdictAr,
@@ -1194,7 +1200,7 @@ onChanged: m3Legacy<int>((v) {
         CurrencyFormatter.formatEGP(s.previousMonthSalesEgp),
         CurrencyFormatter.formatEGP(s.currentMonthSalesEgp),
         '${s.momGrowthPct >= 0 ? '+' : ''}${s.momGrowthPct.toStringAsFixed(1)}%',
-        '${s.yoyGrowthPct >= 0 ? '+' : ''}${s.yoyGrowthPct.toStringAsFixed(1)}%',
+        s.hasYoY ? '${s.yoyGrowthPct >= 0 ? '+' : ''}${s.yoyGrowthPct.toStringAsFixed(1)}%' : '—',
         '${s.romiMultiple.toStringAsFixed(2)}x',
         s.verdictAr,
       ];
@@ -1229,8 +1235,13 @@ onChanged: m3Legacy<int>((v) {
     final totalMomLift = totalCurrentSales - totalPrevSales;
     final totalMomPct = totalPrevSales > 0 ? (totalMomLift / totalPrevSales) * 100.0 : 0.0;
 
-    final totalYoyLift = totalCurrentSales - totalLastYearSales;
-    final totalYoyPct = totalLastYearSales > 0 ? (totalYoyLift / totalLastYearSales) * 100.0 : 0.0;
+    // YoY compares the same months only: current sales count only for
+    // rows whose same month last year has Sell-Out.
+    final totalYoyCurrentSales =
+        summaries.where((e) => e.hasYoY).fold<double>(0.0, (s, e) => s + e.currentMonthSalesEgp);
+    final totalYoyAvailable = totalLastYearSales > 0;
+    final totalYoyLift = totalYoyCurrentSales - totalLastYearSales;
+    final totalYoyPct = totalYoyAvailable ? (totalYoyLift / totalLastYearSales) * 100.0 : 0.0;
 
     final overallRomi = totalSpend > 0 ? (totalMomLift / totalSpend) : 0.0;
     final spendRatioPct = totalCurrentSales > 0 ? (totalSpend / totalCurrentSales) * 100.0 : 0.0;
@@ -1273,6 +1284,7 @@ onChanged: m3Legacy<int>((v) {
                 totalMomPct: totalMomPct,
                 totalYoyLift: totalYoyLift,
                 totalYoyPct: totalYoyPct,
+                totalYoyAvailable: totalYoyAvailable,
                 overallRomi: overallRomi,
                 spendRatioPct: spendRatioPct,
               ),
@@ -1347,6 +1359,7 @@ onChanged: m3Legacy<int>((v) {
     required double totalMomPct,
     required double totalYoyLift,
     required double totalYoyPct,
+    required bool totalYoyAvailable,
     required double overallRomi,
     required double spendRatioPct,
   }) {
@@ -1381,8 +1394,12 @@ onChanged: m3Legacy<int>((v) {
             colorScheme: colorScheme,
             titleAr: 'نمو المبيعات عن العام السابق',
             titleEn: 'YoY Same-Month Sales Lift',
-            primaryValue: '${totalYoyLift >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(totalYoyLift)}',
-            badgeText: '${totalYoyPct >= 0 ? '+' : ''}${totalYoyPct.toStringAsFixed(1)}% YoY',
+            primaryValue: totalYoyAvailable
+                ? '${totalYoyLift >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(totalYoyLift)}'
+                : '—',
+            badgeText: totalYoyAvailable
+                ? '${totalYoyPct >= 0 ? '+' : ''}${totalYoyPct.toStringAsFixed(1)}% YoY'
+                : 'لا توجد بيانات للعام السابق',
             subText: 'مقارنة بنفس الشهر من السنة السابقة',
             icon: Icons.calendar_month_rounded,
             accentColor: totalYoyLift >= 0 ? M3Palette.info : M3Palette.danger,
@@ -2029,7 +2046,9 @@ onChanged: m3Legacy<String>((v) {
                                 borderRadius: M3Shape.radiusFull,
                               ),
                               child: Text(
-                                '${yoyPositive ? '+' : ''}${s.yoyGrowthPct.toStringAsFixed(1)}% YoY',
+                                s.hasYoY
+                                    ? '${yoyPositive ? '+' : ''}${s.yoyGrowthPct.toStringAsFixed(1)}% YoY'
+                                    : '— لا توجد بيانات للعام السابق',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   fontSize: M3FontSize.labelSmallPlus,
@@ -2039,7 +2058,7 @@ onChanged: m3Legacy<String>((v) {
                             ),
                             const SizedBox(height: 2.0),
                             Text(
-                              '${yoyPositive ? '+' : ''}${CurrencyFormatter.formatEGP(s.yoyLiftEgp)}',
+                              s.hasYoY ? '${yoyPositive ? '+' : ''}${CurrencyFormatter.formatEGP(s.yoyLiftEgp)}' : '—',
                               style: TextStyle(
                                 fontSize: M3FontSize.labelSmallPlus,
                                 fontWeight: FontWeight.w700,

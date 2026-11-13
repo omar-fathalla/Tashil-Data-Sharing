@@ -27,6 +27,21 @@ class SellOutExplorerData {
   final Object? sideError;
 }
 
+/// Shifts a 'YYYY-MM-DD' date by [years] (29 Feb becomes 28 Feb). Null or
+/// unparsable input returns null.
+String? shiftDateByYears(String? date, int years) {
+  if (date == null || date.length < 10) return null;
+  final y = int.tryParse(date.substring(0, 4));
+  final m = int.tryParse(date.substring(5, 7));
+  final d = int.tryParse(date.substring(8, 10));
+  if (y == null || m == null || d == null) return null;
+  final ny = y + years;
+  final lastDay = DateTime(ny, m + 1, 0).day;
+  final nd = d > lastDay ? lastDay : d;
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${ny.toString().padLeft(4, '0')}-${two(m)}-${two(nd)}${date.substring(10)}';
+}
+
 /// Filter combo used both for the request and as the cache key.
 class SellOutExplorerQuery {
   final String? chain;
@@ -112,7 +127,17 @@ class SellOutExplorerRepository {
               const <StoreBenchmarkItem>[],
             ),
             side<Object>(
-              api.getStoreBenchmarkMatrix(chain: q.matrixChain, year: q.compYear, month: q.month),
+              api.getStoreBenchmarkMatrix(
+                chain: q.matrixChain,
+                year: q.compYear,
+                month: q.month,
+                // Same period last year: the date range is shifted one year
+                // and, with no month picked, only the months present in the
+                // compared year are counted (Jan-Oct vs Jan-Oct).
+                startDate: shiftDateByYears(q.startDate, -1),
+                endDate: shiftDateByYears(q.endDate, -1),
+                sameMonthsAs: q.compYear + 1,
+              ),
               const <StoreBenchmarkItem>[],
             ),
           ]);

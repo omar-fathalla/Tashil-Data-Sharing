@@ -178,6 +178,10 @@ class MonthlyChainRoiSummary {
   /// YoY incremental sales lift in EGP (Current Month - Same Month Last Year)
   double get yoyLiftEgp => currentMonthSalesEgp - lastYearSameMonthSalesEgp;
 
+  /// True only when the same month last year has Sell-Out; otherwise YoY is
+  /// not a real 0 and the UI shows "—" (no comparable year).
+  bool get hasYoY => lastYearSameMonthSalesEgp > 0;
+
   /// YoY growth percentage
   double get yoyGrowthPct => lastYearSameMonthSalesEgp > 0
       ? ((currentMonthSalesEgp - lastYearSameMonthSalesEgp) / lastYearSameMonthSalesEgp) * 100.0

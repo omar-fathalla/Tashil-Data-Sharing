@@ -211,3 +211,22 @@ func TestTradeMarketingUploadXLSXAndCSV(t *testing.T) {
 		t.Fatalf("pdf upload: want 400 got %d", rec.Code)
 	}
 }
+
+func TestTradeMarketingROIYoYAvailableFlag(t *testing.T) {
+	fs := firestore.NewClient("test-db", true)
+	mux := roiMux(NewTradeMarketingHandler(fs, fs).WithSalesSource(roiFixture()))
+	admin := &domain.UserClaims{UserID: "u1", TenantID: "adeco", Email: "a@adeco.com", Role: domain.RoleVendorAdmin}
+	for _, ch := range []string{"Fathalla", "Beet El Gomla"} {
+		if rec, _ := tmDo(t, mux, admin, "POST", "/api/v1/trade-marketing/expenses", validExpense(ch)); rec.Code != http.StatusCreated {
+			t.Fatalf("create %s: %d", ch, rec.Code)
+		}
+	}
+	_, out := tmDo(t, mux, admin, "GET", "/api/v1/trade-marketing/roi?year=2026&month=2", nil)
+	for _, s := range out["summaries"].([]interface{}) {
+		m := s.(map[string]interface{})
+		want := m["chain_name"] == "Fathalla" // only Fathalla has Feb 2025 sales
+		if got, ok := m["yoy_available"].(bool); !ok || got != want {
+			t.Errorf("%v: yoy_available want %v got %v", m["chain_name"], want, m["yoy_available"])
+		}
+	}
+}
