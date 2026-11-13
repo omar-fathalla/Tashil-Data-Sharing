@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../testing/test_semantics.dart';
 import '../theme/m3_shape.dart';
+import '../theme/m3_spacing.dart';
 import 'm3_button_group.dart';
 
 /// M3Button adheres strictly to Google Material Design 3 button specifications.
@@ -194,24 +195,32 @@ class M3ActionButtonGroup extends StatelessWidget {
   }
 }
 
-/// M3PageHeader enforces the unified Tashil Portal header layout across all 7 screens:
-/// - Line 1 (LEFT-aligned, LTR): Large bold English page title (`headlineMedium`),
-///   with optional trailing action buttons/controls.
-/// - Line 2 (RIGHT-aligned, RTL): Smaller descriptive Arabic subtitle (`bodyMedium`)
-///   positioned on the far right below the title.
+/// M3PageHeader: unified Tashil Portal page header.
+/// - [title]: Arabic page title (`headlineSmall`, onSurface).
+/// - [subtitle]: optional secondary line (`bodyMedium`, onSurfaceVariant).
+/// - [actions]: trailing controls; below [stackActionsBelow] they drop under
+///   the title as their own row, otherwise they sit at the end of the title row.
+///
+/// [subtitleAr]/[titleEn] are the legacy names (title/subtitle) kept so the
+/// other pages keep working unchanged.
 class M3PageHeader extends StatelessWidget {
-  final String titleEn;
-  final String subtitleAr;
+  final String title;
+  final String? subtitle;
   final Widget? actions;
   final Widget? leading;
+  final double stackActionsBelow;
 
   const M3PageHeader({
     super.key,
-    required this.titleEn,
-    required this.subtitleAr,
+    String? title,
+    String? subtitle,
+    String? subtitleAr,
+    String? titleEn,
     this.actions,
     this.leading,
-  });
+    this.stackActionsBelow = 600.0,
+  })  : title = title ?? subtitleAr ?? '',
+        subtitle = subtitle ?? titleEn;
 
   @override
   Widget build(BuildContext context) {
@@ -219,141 +228,76 @@ class M3PageHeader extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isCompact = screenWidth < 600;
+    final stacked = screenWidth < stackActionsBelow;
 
-    return Container(
-      padding: EdgeInsets.only(bottom: isCompact ? 10.0 : 12.0),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: colorScheme.outlineVariant.withOpacity(0.45),
-            width: 1.0,
+    final titleRow = Row(
+      mainAxisSize: stacked ? MainAxisSize.max : MainAxisSize.min,
+      children: [
+        if (leading != null) ...[
+          leading!,
+          const SizedBox(width: M3Spacing.s12),
+        ],
+        Flexible(
+          child: Text(
+            title,
+            style: theme.textTheme.headlineSmall
+                ?.copyWith(color: colorScheme.onSurface),
           ),
         ),
-      ),
-      child: isCompact
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Line 1: Bold Arabic Title
-                Directionality(
-                  textDirection: TextDirection.rtl,
-                  child: Row(
-                    children: [
-                      if (leading != null) ...[
-                        leading!,
-                        const SizedBox(width: 10.0),
-                      ],
-                      Expanded(
-                        child: Text(
-                          subtitleAr,
-                          textDirection: TextDirection.rtl,
-                          textAlign: TextAlign.right,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+      ],
+    );
+    final titleBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        titleRow,
+        if (subtitle != null && subtitle!.isNotEmpty) ...[
+          const SizedBox(height: M3Spacing.xxs),
+          Text(
+            subtitle!,
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ],
+    );
+
+    final Widget content = stacked
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              titleBlock,
+              if (actions != null) ...[
+                const SizedBox(height: M3Spacing.s12),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: actions!,
                 ),
-                const SizedBox(height: 3.0),
-                // Line 2: English Title directly underneath
-                Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: Text(
-                      titleEn,
-                      textDirection: TextDirection.ltr,
-                      textAlign: TextAlign.right,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.15,
-                      ),
-                    ),
-                  ),
-                ),
-                // Line 3: Actions / Buttons Group placed AFTER Subtitle
-                if (actions != null) ...[
-                  const SizedBox(height: 10.0),
-                  Directionality(
-                    textDirection: TextDirection.rtl,
-                    child: Align(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: actions!,
-                    ),
-                  ),
-                ],
               ],
-            )
-          : LayoutBuilder(
-              builder: (context, constraints) => Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Directionality(
-                          textDirection: TextDirection.rtl,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (leading != null) ...[
-                                leading!,
-                                const SizedBox(width: 10.0),
-                              ],
-                              Flexible(
-                                child: Text(
-                                  subtitleAr,
-                                  textDirection: TextDirection.rtl,
-                                  style: theme.textTheme.headlineSmall?.copyWith(
-                                    color: colorScheme.onSurface,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 3.0),
-                        Directionality(
-                          textDirection: TextDirection.ltr,
-                          child: Text(
-                            titleEn,
-                            textDirection: TextDirection.ltr,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.15,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (actions != null) ...[
-                    const SizedBox(width: 16.0),
-                    // Cap the actions so a narrow content area (e.g. ~900px
-                    // window minus the sidebar) cannot overflow the row; a
-                    // scrollable actions widget then scrolls instead.
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: constraints.maxWidth.isFinite
-                            ? constraints.maxWidth * 0.65
-                            : double.infinity,
-                      ),
-                      child: Directionality(
-                        textDirection: TextDirection.rtl,
-                        child: actions!,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+            ],
+          )
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: titleBlock),
+              if (actions != null) ...[
+                const SizedBox(width: M3Spacing.sm),
+                Flexible(child: actions!),
+              ],
+            ],
+          );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(
+              bottom: isCompact ? M3Spacing.xs : M3Spacing.s12),
+          child: content,
+        ),
+        const Divider(height: 1.0, thickness: 1.0),
+      ],
     );
   }
 }

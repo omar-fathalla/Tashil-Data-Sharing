@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
-import '../theme/m3_shape.dart';
 import '../theme/m3_spacing.dart';
+import 'app_icons.dart';
+import 'm3_status_tag.dart';
 
-/// Unified M3 KPI card (outlined card, tonal icon container, status badges).
+/// Unified M3 KPI card: outlined card, icon + title row, value, subtitle and
+/// neutral/error status tags. Use this for every KPI tile in the app.
 ///
-/// Use this for every KPI tile in the app.
+/// [titleEn], [badgeLabelEn], [secondaryBadgeLabelEn] and [usePrimaryBadge]
+/// are kept for API compatibility but are no longer rendered: the M3 card is
+/// Arabic-only and its tags use calm neutral roles (≥ 4.5:1).
 class KpiCard extends StatelessWidget {
   final String title;
   final String titleEn;
@@ -23,7 +27,7 @@ class KpiCard extends StatelessWidget {
   const KpiCard({
     super.key,
     required this.title,
-    required this.titleEn,
+    this.titleEn = '',
     required this.value,
     required this.subtitle,
     required this.icon,
@@ -40,24 +44,9 @@ class KpiCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    final Color badgeBg;
-    final Color badgeFg;
-
-    if (isAlert) {
-      badgeBg = colorScheme.errorContainer;
-      badgeFg = colorScheme.onErrorContainer;
-    } else if (usePrimaryBadge) {
-      badgeBg = colorScheme.primaryContainer;
-      badgeFg = colorScheme.onPrimaryContainer;
-    } else if (isPositive) {
-      badgeBg = colorScheme.secondaryContainer;
-      badgeFg = colorScheme.onSecondaryContainer;
-    } else {
-      badgeBg = colorScheme.errorContainer;
-      badgeFg = colorScheme.onErrorContainer;
-    }
+    final cs = theme.colorScheme;
+    final badgeTone =
+        isAlert || !isPositive ? M3StatusTone.error : M3StatusTone.neutral;
 
     return Card.outlined(
       child: Padding(
@@ -66,138 +55,60 @@ class KpiCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(M3Spacing.xs),
-                  decoration: BoxDecoration(
-                    color: isAlert
-                        ? colorScheme.errorContainer.withOpacity(0.4)
-                        : colorScheme.primaryContainer.withOpacity(0.5),
-                    borderRadius: M3Shape.radiusSm,
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 20.0,
-                    color: isAlert ? colorScheme.error : colorScheme.primary,
-                  ),
+                Icon(
+                  icon,
+                  size: 20.0,
+                  color: isAlert ? cs.error : cs.onSurfaceVariant,
                 ),
-                Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                    decoration: BoxDecoration(
-                      color: badgeBg,
-                      borderRadius: M3Shape.radiusSm,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          badgeLabel,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: badgeFg,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (badgeLabelEn != null)
-                          Text(
-                            badgeLabelEn!,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: badgeFg.withOpacity(0.85),
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                      ],
-                    ),
+                M3Spacing.gapXS,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(color: cs.onSurface),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-            M3Spacing.gapSM,
-            Text(
-              title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w800,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2.0),
-            Text(
-              titleEn,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: isAlert ? colorScheme.error : colorScheme.primary,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.15,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 6.0),
+            M3Spacing.gapXS,
             Text(
               value,
               style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: isAlert ? colorScheme.error : colorScheme.onSurface,
+                color: isAlert ? cs.error : cs.onSurface,
               ),
             ),
-            const SizedBox(height: 2.0),
             Text(
               subtitle,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: cs.onSurfaceVariant),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            if (secondaryBadgeLabel != null) ...[
-              const SizedBox(height: 6.0),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
-                decoration: BoxDecoration(
-                  color: isAlert
-                      ? colorScheme.errorContainer.withOpacity(0.65)
-                      : colorScheme.primaryContainer.withOpacity(0.55),
-                  borderRadius: M3Shape.radiusSm,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      secondaryBadgeLabel!,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: isAlert
-                            ? colorScheme.onErrorContainer
-                            : colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (secondaryBadgeLabelEn != null)
-                      Text(
-                        secondaryBadgeLabelEn!,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: (isAlert
-                                  ? colorScheme.onErrorContainer
-                                  : colorScheme.onPrimaryContainer)
-                              .withOpacity(0.8),
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                  ],
-                ),
-              ),
-            ],
+            M3Spacing.gapXS,
+            Wrap(
+              spacing: M3Spacing.xs,
+              runSpacing: M3Spacing.xs,
+              children: [
+                if (badgeLabel.isNotEmpty)
+                  M3StatusTag(
+                    label: badgeLabel,
+                    tone: badgeTone,
+                    icon: isAlert
+                        ? AppIcons.warning
+                        : (isPositive
+                            ? AppIcons.trendingUp
+                            : AppIcons.trendingDown),
+                  ),
+                if (secondaryBadgeLabel != null)
+                  M3StatusTag(
+                    label: secondaryBadgeLabel!,
+                    tone: isAlert ? M3StatusTone.error : M3StatusTone.neutral,
+                  ),
+              ],
+            ),
           ],
         ),
       ),

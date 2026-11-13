@@ -240,16 +240,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    M3TonalSurface(
-                      color: colorScheme.secondaryContainer,
-                      borderRadius: M3Shape.radiusSm,
-                      padding: const EdgeInsets.all(8.0),
-                      child: Icon(
-                        AppIcons.pieChart,
-                        size: 20.0,
-                        color: colorScheme.primary,
-                      ),
-                    ),
+                    Icon(AppIcons.pieChart, size: 20.0, color: colorScheme.onSurfaceVariant),
                     M3Spacing.hGapXS,
                     Flexible(
                       child: Column(
@@ -265,8 +256,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                           Text(
                             'Market Share vs Competitors',
                             style: theme.textTheme.labelMedium?.copyWith(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w600,
+                              color: colorScheme.onSurfaceVariant,
                             ),
                           ),
                           const SizedBox(height: 2.0),
@@ -287,11 +277,12 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     M3TonalSurface(
-                      color: colorScheme.secondaryContainer,
+                      color: colorScheme.surfaceContainerLowest,
+                      borderColor: colorScheme.outlineVariant,
                       borderRadius: M3Shape.radiusSm,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10.0,
-                        vertical: 6.0,
+                        horizontal: M3Spacing.xs,
+                        vertical: M3Spacing.xs,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -299,7 +290,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                           Icon(
                             AppIcons.leaderboard,
                             size: 15.0,
-                            color: colorScheme.onSecondaryContainer,
+                            color: colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 5.0),
                           Flexible(
@@ -308,7 +299,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelMedium?.copyWith(
-                                color: colorScheme.onSecondaryContainer,
+                                color: colorScheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -322,8 +313,8 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                         borderColor: colorScheme.outlineVariant,
                         borderRadius: M3Shape.radiusSm,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10.0,
-                          vertical: 6.0,
+                          horizontal: M3Spacing.xs,
+                          vertical: M3Spacing.xs,
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -353,8 +344,8 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                         borderColor: colorScheme.outlineVariant,
                         borderRadius: M3Shape.radiusSm,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10.0,
-                          vertical: 6.0,
+                          horizontal: M3Spacing.xs,
+                          vertical: M3Spacing.xs,
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -416,7 +407,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                   isTenant ? colorScheme.primary : colorScheme.secondary;
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
+                padding: const EdgeInsets.only(bottom: M3Spacing.s12),
                 child: M3TonalSurface(
                   color: isTenant
                       ? colorScheme.secondaryContainer
@@ -424,7 +415,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                   borderColor: isTenant ? null : colorScheme.outlineVariant,
                   borderWidth: isTenant ? 1.5 : 1.0,
                   borderRadius: M3Shape.radiusMd,
-                  padding: const EdgeInsets.all(14.0),
+                  padding: const EdgeInsets.all(M3Spacing.sm),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -447,7 +438,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                     : colorScheme.outlineVariant,
                                 borderRadius: M3Shape.radiusSm,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10.0, vertical: 5.0),
+                                    horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
                                 child: Text(
                                   '#$rank',
                                   style: theme.textTheme.labelMedium?.copyWith(
@@ -495,7 +486,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 borderColor: colorScheme.outlineVariant,
                                 borderRadius: M3Shape.radiusLg,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 9.0, vertical: 4.5),
+                                    horizontal: M3Spacing.xs, vertical: 4.5),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -523,17 +514,18 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               // 4. Leader Status Chip (For Adeco)
                               if (isTenant)
                                 M3TonalSurface(
-                                  color: colorScheme.secondaryContainer,
+                                  color: colorScheme.surfaceContainerLowest,
+                                  borderColor: colorScheme.outlineVariant,
                                   borderRadius: M3Shape.radiusLg,
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 9.0, vertical: 4.5),
+                                      horizontal: M3Spacing.xs, vertical: 4.5),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
                                         AppIcons.premium,
                                         size: 15.0,
-                                        color: colorScheme.onSecondaryContainer,
+                                        color: colorScheme.onSurfaceVariant,
                                       ),
                                       const SizedBox(width: 5.0),
                                       Flexible(
@@ -586,10 +578,10 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               M3TonalSurface(
                                 color: isTenant
                                     ? colorScheme.primary
-                                    : colorScheme.secondaryContainer,
+                                    : colorScheme.surfaceContainerHighest,
                                 borderRadius: M3Shape.radiusSm,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10.0, vertical: 5.5),
+                                    horizontal: M3Spacing.xs, vertical: 5.5),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -598,7 +590,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                       size: 14.0,
                                       color: isTenant
                                           ? colorScheme.onPrimary
-                                          : colorScheme.onSecondaryContainer,
+                                          : colorScheme.onSurfaceVariant,
                                     ),
                                     const SizedBox(width: 5.0),
                                     Flexible(
@@ -629,7 +621,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                     : colorScheme.outlineVariant,
                                 borderRadius: M3Shape.radiusSm,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10.0, vertical: 5.5),
+                                    horizontal: M3Spacing.xs, vertical: 5.5),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -704,7 +696,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
             // Summary row for Remaining Competitors to make total equal 100% of the market
             if (hasOthers)
               Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
+                padding: const EdgeInsets.only(bottom: M3Spacing.s12),
                 child: M3TonalSurface(
                   onTap: widget.supplierShares.length > 8
                       ? () => setState(() => _showAll = true)
@@ -712,7 +704,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                   color: colorScheme.surfaceContainer,
                   borderColor: colorScheme.outlineVariant,
                   borderRadius: M3Shape.radiusMd,
-                  padding: const EdgeInsets.all(14.0),
+                  padding: const EdgeInsets.all(M3Spacing.sm),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -730,7 +722,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 borderColor: colorScheme.outlineVariant,
                                 borderRadius: M3Shape.radiusSm,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10.0, vertical: 5.0),
+                                    horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
                                 child: Text(
                                   '#9+',
                                   style: theme.textTheme.labelMedium?.copyWith(
@@ -752,7 +744,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 borderColor: colorScheme.outlineVariant,
                                 borderRadius: M3Shape.radiusLg,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 9.0, vertical: 4.5),
+                                    horizontal: M3Spacing.xs, vertical: 4.5),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -777,7 +769,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 Text(
                                   'عرض الكل',
                                   style: theme.textTheme.labelSmall?.copyWith(
-                                    color: colorScheme.primary,
+                                    color: colorScheme.onSurfaceVariant,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -790,24 +782,25 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               M3TonalSurface(
-                                color: colorScheme.secondaryContainer,
+                                color: colorScheme.surfaceContainerLowest,
+                                borderColor: colorScheme.outlineVariant,
                                 borderRadius: M3Shape.radiusSm,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10.0, vertical: 5.5),
+                                    horizontal: M3Spacing.xs, vertical: 5.5),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
                                       AppIcons.pieChart,
                                       size: 14.0,
-                                      color: colorScheme.onSecondaryContainer,
+                                      color: colorScheme.onSurfaceVariant,
                                     ),
                                     const SizedBox(width: 5.0),
                                     Text(
                                       '${remainingSharePct.toStringAsFixed(2)}%',
                                       style:
                                           theme.textTheme.labelMedium?.copyWith(
-                                        color: colorScheme.onSecondaryContainer,
+                                        color: colorScheme.onSurfaceVariant,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -819,7 +812,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 borderColor: colorScheme.outlineVariant,
                                 borderRadius: M3Shape.radiusSm,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10.0, vertical: 5.5),
+                                    horizontal: M3Spacing.xs, vertical: 5.5),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -952,16 +945,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
           children: [
             Row(
               children: [
-                M3TonalSurface(
-                  color: colorScheme.secondaryContainer,
-                  borderRadius: M3Shape.radiusSm,
-                  padding: const EdgeInsets.all(8.0),
-                  child: Icon(
-                    AppIcons.productMaster,
-                    size: 20.0,
-                    color: colorScheme.primary,
-                  ),
-                ),
+                Icon(AppIcons.productMaster, size: 20.0, color: colorScheme.onSurfaceVariant),
                 M3Spacing.hGapXS,
                 Expanded(
                   child: Column(
@@ -977,8 +961,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                       Text(
                         'Category Contribution',
                         style: theme.textTheme.labelMedium?.copyWith(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 2.0),
@@ -1016,13 +999,13 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
             M3Spacing.gapMD,
             // Column Guide Header Bar to explicitly clarify both percentage metrics
             Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
+              padding: const EdgeInsets.only(bottom: M3Spacing.s12),
               child: M3TonalSurface(
                 color: colorScheme.surfaceContainer,
                 borderColor: colorScheme.outlineVariant,
                 borderRadius: M3Shape.radiusSm,
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                    const EdgeInsets.symmetric(horizontal: M3Spacing.s12, vertical: M3Spacing.xs),
                 child: Wrap(
                   spacing: 16.0,
                   runSpacing: 8.0,
@@ -1035,13 +1018,14 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         M3TonalSurface(
-                          color: colorScheme.secondaryContainer,
+                          color: colorScheme.surfaceContainerLowest,
+                          borderColor: colorScheme.outlineVariant,
                           circle: true,
-                          padding: const EdgeInsets.all(4.0),
+                          padding: const EdgeInsets.all(M3Spacing.xxs),
                           child: Icon(
                             AppIcons.pieChart,
                             size: 13.0,
-                            color: colorScheme.onSecondaryContainer,
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                         Text(
@@ -1052,14 +1036,15 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                           ),
                         ),
                         M3TonalSurface(
-                          color: colorScheme.secondaryContainer,
+                          color: colorScheme.surfaceContainerLowest,
+                          borderColor: colorScheme.outlineVariant,
                           borderRadius: M3Shape.radiusSm,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6.0, vertical: 1.5),
+                              horizontal: M3Spacing.xs, vertical: 1.5),
                           child: Text(
                             'حصتنا السوقية %',
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSecondaryContainer,
+                              color: colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -1072,13 +1057,14 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         M3TonalSurface(
-                          color: colorScheme.secondaryContainer,
+                          color: colorScheme.surfaceContainerLowest,
+                          borderColor: colorScheme.outlineVariant,
                           circle: true,
-                          padding: const EdgeInsets.all(4.0),
+                          padding: const EdgeInsets.all(M3Spacing.xxs),
                           child: Icon(
                             AppIcons.donutChart,
                             size: 13.0,
-                            color: colorScheme.onSecondaryContainer,
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                         Text(
@@ -1089,14 +1075,15 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                           ),
                         ),
                         M3TonalSurface(
-                          color: colorScheme.secondaryContainer,
+                          color: colorScheme.surfaceContainerLowest,
+                          borderColor: colorScheme.outlineVariant,
                           borderRadius: M3Shape.radiusSm,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6.0, vertical: 1.5),
+                              horizontal: M3Spacing.xs, vertical: 1.5),
                           child: Text(
                             '% من مبيعاتنا',
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSecondaryContainer,
+                              color: colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -1117,16 +1104,16 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                       widget.selectedCategory!.trim().toLowerCase();
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
+                padding: const EdgeInsets.only(bottom: M3Spacing.xs),
                 child: M3TonalSurface(
                   onTap: () => widget.onCategorySelected(cat.category),
                   color: isSelected
                       ? colorScheme.secondaryContainer
-                      : Colors.transparent,
+                      : colorScheme.surface,
                   borderColor: isSelected ? null : colorScheme.outlineVariant,
                   borderRadius: M3Shape.radiusSm,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10.0, vertical: 8.0),
+                      horizontal: M3Spacing.xs, vertical: M3Spacing.xs),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1153,8 +1140,8 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                   color: colorScheme.surfaceContainerHighest,
                                   borderRadius: M3Shape.radiusSm,
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 6.0,
-                                    vertical: 2.0,
+                                    horizontal: M3Spacing.xs,
+                                    vertical: M3Spacing.s2,
                                   ),
                                   child: Text(
                                     '${cat.skuCount} صنف',
@@ -1165,17 +1152,18 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                 ),
                                 if (cat.tenantCategorySharePct > 0)
                                   M3TonalSurface(
-                                    color: colorScheme.secondaryContainer,
+                                    color: colorScheme.surfaceContainerLowest,
+                                    borderColor: colorScheme.outlineVariant,
                                     borderRadius: M3Shape.radiusSm,
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 6.0,
-                                      vertical: 2.0,
+                                      horizontal: M3Spacing.xs,
+                                      vertical: M3Spacing.s2,
                                     ),
                                     child: Text(
                                       'حصتنا السوقية ${cat.tenantCategorySharePct.toStringAsFixed(1)}%',
                                       style:
                                           theme.textTheme.labelSmall?.copyWith(
-                                        color: colorScheme.onSecondaryContainer,
+                                        color: colorScheme.onSurfaceVariant,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -1199,7 +1187,8 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                 '${cat.sharePct.toStringAsFixed(1)}%',
                                 style: theme.textTheme.labelLarge?.copyWith(
                                   fontWeight: FontWeight.w600,
-                                  color: barColor,
+                                  // Palette colour stays on the bar; text ≥ 4.5:1.
+                                  color: colorScheme.onSurface,
                                 ),
                               ),
                               const SizedBox(width: 4.0),
@@ -1256,7 +1245,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
             // Summary row for other categories so that portfolio contributions sum to 100%
             if (hasOtherCategories)
               Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
+                padding: const EdgeInsets.only(bottom: M3Spacing.xs),
                 child: M3TonalSurface(
                   onTap: widget.categories.length > 10
                       ? () => setState(() => _showAll = true)
@@ -1266,7 +1255,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                   borderWidth: 1.0,
                   borderRadius: M3Shape.radiusSm,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10.0, vertical: 8.0),
+                      horizontal: M3Spacing.xs, vertical: M3Spacing.xs),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1291,8 +1280,8 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                   color: colorScheme.surfaceContainerHighest,
                                   borderRadius: M3Shape.radiusSm,
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 6.0,
-                                    vertical: 2.0,
+                                    horizontal: M3Spacing.xs,
+                                    vertical: M3Spacing.s2,
                                   ),
                                   child: Text(
                                     'فئات أخرى',
@@ -1305,7 +1294,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                   Text(
                                     'عرض الكل',
                                     style: theme.textTheme.labelSmall?.copyWith(
-                                      color: colorScheme.primary,
+                                      color: colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -1455,16 +1444,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                M3TonalSurface(
-                  color: colorScheme.secondaryContainer,
-                  borderRadius: M3Shape.radiusSm,
-                  padding: const EdgeInsets.all(8.0),
-                  child: Icon(
-                    AppIcons.insights,
-                    size: 20.0,
-                    color: colorScheme.primary,
-                  ),
-                ),
+                Icon(AppIcons.insights, size: 20.0, color: colorScheme.onSurfaceVariant),
                 M3Spacing.hGapXS,
                 Expanded(
                   child: Column(
@@ -1485,8 +1465,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                               'Top SKUs (Pareto 80/20)',
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelMedium?.copyWith(
-                                color: colorScheme.primary,
-                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
@@ -1520,25 +1499,26 @@ class _ParetoPowerSkusCard extends StatelessWidget {
             // Filter status banner
             if (isFiltered) ...[
               Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
+                padding: const EdgeInsets.only(bottom: M3Spacing.s12),
                 child: M3TonalSurface(
-                  color: colorScheme.secondaryContainer,
+                  color: colorScheme.surfaceContainerLowest,
+                  borderColor: colorScheme.outlineVariant,
                   borderRadius: M3Shape.radiusSm,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12.0, vertical: 8.0),
+                      horizontal: M3Spacing.s12, vertical: M3Spacing.xs),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
                         children: [
                           Icon(AppIcons.filterAlt,
-                              size: 16.0, color: colorScheme.primary),
+                              size: 16.0, color: colorScheme.onSurfaceVariant),
                           const SizedBox(width: 6.0),
                           Text(
                             '$selectedCategory · ${skusToDisplay.length} صنف',
                             style: theme.textTheme.labelMedium?.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: colorScheme.onSecondaryContainer,
+                              color: colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -1586,17 +1566,15 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                   builder: (context, cardConstraints) {
                     final isCompact = cardConstraints.maxWidth < 460;
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0),
+                      padding: const EdgeInsets.only(bottom: M3Spacing.xs),
                       child: M3TonalSurface(
-                        color: isClassA
-                            ? colorScheme.secondaryContainer
-                            : colorScheme.surfaceContainerLowest,
-                        borderColor:
-                            isClassA ? null : colorScheme.outlineVariant,
+                        // Calm outlined rows; class A shows via its info tag.
+                        color: colorScheme.surface,
+                        borderColor: colorScheme.outlineVariant,
                         borderRadius: M3Shape.radiusSm,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 14.0,
-                          vertical: 10.0,
+                          horizontal: M3Spacing.sm,
+                          vertical: M3Spacing.xs,
                         ),
                         width: double.infinity,
                         constraints:
@@ -1627,7 +1605,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                                 .surfaceContainerHighest,
                                         borderRadius: M3Shape.radiusSm,
                                         padding: const EdgeInsets.symmetric(
-                                            horizontal: 8.0, vertical: 4.0),
+                                            horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
                                         child: Text(
                                           isClassA ? 'تصنيف A' : 'تصنيف B/C',
                                           style: theme.textTheme.labelSmall
@@ -1736,8 +1714,8 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                         : colorScheme.surfaceContainerHighest,
                                     borderRadius: M3Shape.radiusSm,
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 9.0,
-                                      vertical: 5.0,
+                                      horizontal: M3Spacing.xs,
+                                      vertical: M3Spacing.xxs,
                                     ),
                                     child: Text(
                                       isClassA ? 'تصنيف A' : 'تصنيف B/C',

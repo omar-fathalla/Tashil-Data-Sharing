@@ -63,21 +63,21 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
   int _loadRequestId = 0;
   late ExecutiveDashboardRepository _repo;
 
-  static const List<({int number, String shortName, String fullName})> _months =
-      [
-    (number: 0, shortName: 'All', fullName: 'كل الشهور'),
-    (number: 1, shortName: 'Jan', fullName: 'January'),
-    (number: 2, shortName: 'Feb', fullName: 'February'),
-    (number: 3, shortName: 'Mar', fullName: 'March'),
-    (number: 4, shortName: 'Apr', fullName: 'April'),
-    (number: 5, shortName: 'May', fullName: 'May'),
-    (number: 6, shortName: 'Jun', fullName: 'June'),
-    (number: 7, shortName: 'Jul', fullName: 'July'),
-    (number: 8, shortName: 'Aug', fullName: 'August'),
-    (number: 9, shortName: 'Sep', fullName: 'September'),
-    (number: 10, shortName: 'Oct', fullName: 'October'),
-    (number: 11, shortName: 'Nov', fullName: 'November'),
-    (number: 12, shortName: 'Dec', fullName: 'December'),
+  static const List<
+      ({int number, String shortName, String fullName, String nameAr})> _months = [
+    (number: 0, shortName: 'All', fullName: 'كل الشهور', nameAr: 'الكل'),
+    (number: 1, shortName: 'Jan', fullName: 'January', nameAr: 'يناير'),
+    (number: 2, shortName: 'Feb', fullName: 'February', nameAr: 'فبراير'),
+    (number: 3, shortName: 'Mar', fullName: 'March', nameAr: 'مارس'),
+    (number: 4, shortName: 'Apr', fullName: 'April', nameAr: 'أبريل'),
+    (number: 5, shortName: 'May', fullName: 'May', nameAr: 'مايو'),
+    (number: 6, shortName: 'Jun', fullName: 'June', nameAr: 'يونيو'),
+    (number: 7, shortName: 'Jul', fullName: 'July', nameAr: 'يوليو'),
+    (number: 8, shortName: 'Aug', fullName: 'August', nameAr: 'أغسطس'),
+    (number: 9, shortName: 'Sep', fullName: 'September', nameAr: 'سبتمبر'),
+    (number: 10, shortName: 'Oct', fullName: 'October', nameAr: 'أكتوبر'),
+    (number: 11, shortName: 'Nov', fullName: 'November', nameAr: 'نوفمبر'),
+    (number: 12, shortName: 'Dec', fullName: 'December', nameAr: 'ديسمبر'),
   ];
 
   List<int> get _years => AvailableYears.current.including(selectedYear);
@@ -318,23 +318,26 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
     return {selectedMonth};
   }
 
+  static Widget _segLabel(String s) =>
+      Text(s, maxLines: 1, softWrap: false, overflow: TextOverflow.visible);
+
   Widget _buildPeriodControls(BuildContext context) {
-    // M3: segmented buttons inherit the theme (standard density, 40dp,
-    // 48dp tap target, secondaryContainer selection). No local overrides.
+    // M3: segmented buttons inherit the theme (112x40 equal segments, 48dp
+    // tap target, secondaryContainer selection + check). No local overrides.
     return Wrap(
-      spacing: M3Spacing.s12,
+      spacing: M3Spacing.xs,
       runSpacing: M3Spacing.xs,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         SegmentedButton<String>(
           key: const ValueKey('executive_period_segmented'),
-          segments: const [
-            ButtonSegment(value: 'monthly', label: Text('شهري')),
-            ButtonSegment(value: 'quarterly', label: Text('ربع سنوي')),
-            ButtonSegment(value: 'yearly', label: Text('سنوي')),
+          segments: [
+            ButtonSegment(value: 'monthly', label: _segLabel('شهري')),
+            ButtonSegment(value: 'quarterly', label: _segLabel('ربع سنوي')),
+            ButtonSegment(value: 'yearly', label: _segLabel('سنوي')),
           ],
           selected: {_periodMode},
-          showSelectedIcon: false,
+          showSelectedIcon: true,
           onSelectionChanged: (sel) {
             final mode = sel.first;
             setState(() {
@@ -349,9 +352,13 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
         if (_periodMode == 'quarterly') ...[
           SegmentedButton<int>(
             key: const ValueKey('executive_quarter_segmented'),
+            style: const ButtonStyle(
+              // 4 short options: no 112dp floor.
+              minimumSize: WidgetStatePropertyAll(Size(56.0, 40.0)),
+            ),
             segments: [
               for (var q = 1; q <= 4; q++)
-                ButtonSegment(value: q, label: Text('Q$q')),
+                ButtonSegment(value: q, label: _segLabel('Q$q')),
             ],
             selected: {_selectedQuarter},
             showSelectedIcon: false,
@@ -378,7 +385,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
       key: const ValueKey('executive_chain_dropdown'),
       tooltip: 'تصفية حسب السلسلة',
       icon: AppIcons.storeMatrix,
-      label: 'Chain: ${activeChain.shortName}',
+      label:
+          'السلسلة: ${selectedChain == 'all' ? 'الكل' : ChainSharePie.splitBilingualLabel(activeChain.fullName).ar}',
       active: selectedChain != 'all',
       onSelected: (chainCode) {
         setState(() => selectedChain = chainCode);
@@ -439,88 +447,123 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
     );
   }
 
-  /// Year segmented button + Month menu filter on a single row.
-  Widget _buildYearMonthConnectedGroup(BuildContext context) {
+  /// Arabic tenant name for the header subtitle ("أديكو (Adeco)" → "أديكو").
+  String _tenantNameAr() =>
+      ChainSharePie.splitBilingualLabel(
+              ApiClient.getDisplayNameForTenant(widget.apiClient.tenantId))
+          .ar;
+
+  /// Menu item label: leading check (primary) on the selected value.
+  Widget _menuItemText(BuildContext context, String text, bool selected) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final cs = theme.colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 18.0,
+          child: selected
+              ? Icon(AppIcons.check, size: 18.0, color: cs.primary)
+              : null,
+        ),
+        const SizedBox(width: M3Spacing.s12),
+        Text(
+          text,
+          maxLines: 1,
+          softWrap: false,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: cs.onSurface,
+            fontWeight: selected ? FontWeight.w600 : null,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Year menu filter: outlined at the default year, tonal once changed
+  /// (same rule as the other filters).
+  Widget _buildYearFilter(BuildContext context) => _menuFilter<int>(
+        key: const ValueKey('executive_year_dropdown'),
+        tooltip: 'اختر السنة',
+        icon: AppIcons.event,
+        label: 'السنة: $selectedYear',
+        active: selectedYear != AvailableYears.current.defaultYear,
+        onSelected: (y) {
+          setState(() {
+            selectedYear = y;
+            _yearTouched = true;
+          });
+          _loadData();
+        },
+        items: [
+          for (final y in _years)
+            (y, _menuItemText(context, '$y', y == selectedYear)),
+        ],
+      );
+
+  Widget _buildMonthFilter(BuildContext context) {
     final activeMonth = _months.firstWhere(
       (m) => m.number == selectedMonth,
       orElse: () => _months.first,
     );
+    return _menuFilter<int>(
+      key: const ValueKey('executive_month_dropdown'),
+      tooltip: 'اختر الشهر',
+      icon: AppIcons.calendar,
+      label: 'الشهر: ${activeMonth.nameAr}',
+      active: selectedMonth != 0,
+      minWidth: 220.0,
+      onSelected: (month) {
+        setState(() {
+          selectedMonth = month;
+          _periodMode = month == 0 ? 'yearly' : 'monthly';
+        });
+        _loadData();
+      },
+      items: [
+        for (final m in _months)
+          (
+            m.number,
+            _menuItemText(context, m.number == 0 ? 'كل الشهور' : m.nameAr,
+                m.number == selectedMonth),
+          ),
+      ],
+    );
+  }
 
+  /// Header controls (RTL from the start): period segmented | divider |
+  /// month, year, chain. Compact: one horizontally scrollable row.
+  Widget _buildHeaderControls(BuildContext context, bool isCompact) {
+    final children = <Widget>[
+      _buildPeriodControls(context),
+      const SizedBox(
+        height: 24.0,
+        child: VerticalDivider(width: M3Spacing.xs * 2),
+      ),
+      _buildMonthFilter(context),
+      _buildYearFilter(context),
+      _buildChainDropdown(context),
+    ];
+    if (isCompact) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (i, w) in children.indexed) ...[
+              if (i > 0) const SizedBox(width: M3Spacing.xs),
+              w,
+            ],
+          ],
+        ),
+      );
+    }
     return Wrap(
-      spacing: M3Spacing.s12,
+      spacing: M3Spacing.xs,
       runSpacing: M3Spacing.xs,
       crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        // M3 SegmentedButton: the year filter has only a few fixed options.
-        SegmentedButton<int>(
-          key: const ValueKey('executive_year_segmented'),
-          segments: [
-            for (final y in _years)
-              ButtonSegment<int>(
-                  value: y, label: Text('$y'), tooltip: 'سنة $y'),
-          ],
-          selected: {selectedYear},
-          showSelectedIcon: false,
-          onSelectionChanged: (s) {
-            setState(() {
-              selectedYear = s.first;
-              _yearTouched = true;
-            });
-            _loadData();
-          },
-        ),
-        _menuFilter<int>(
-          key: const ValueKey('executive_month_dropdown'),
-          tooltip: 'اختر الشهر',
-          icon: AppIcons.calendar,
-          label: 'Month: ${activeMonth.shortName}',
-          active: selectedMonth != 0,
-          minWidth: 220.0,
-          onSelected: (month) {
-            setState(() {
-              selectedMonth = month;
-              _periodMode = month == 0 ? 'yearly' : 'monthly';
-            });
-            _loadData();
-          },
-          items: _months.map((m) {
-            final isSelected = m.number == selectedMonth;
-            return (
-              m.number,
-              SizedBox(
-                width: 210.0,
-                child: Row(
-                  children: [
-                    if (isSelected)
-                      Icon(
-                        AppIcons.check,
-                        size: 18.0,
-                        color: colorScheme.primary,
-                      )
-                    else
-                      const SizedBox(width: 18.0),
-                    const SizedBox(width: M3Spacing.s12),
-                    Expanded(
-                      child: Text(
-                        m.fullName,
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontWeight: isSelected ? FontWeight.w600 : null,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
+      children: children,
     );
   }
 
@@ -545,29 +588,46 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
           MenuItemButton(onPressed: () => onSelected(value), child: child),
       ],
       builder: (context, controller, _) {
+        final cs = Theme.of(context).colorScheme;
         void toggle() =>
             controller.isOpen ? controller.close() : controller.open();
         final content = Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label),
+            Text(label, maxLines: 1, softWrap: false),
             const SizedBox(width: M3Spacing.xxs),
             const Icon(AppIcons.dropDown, size: 18.0),
           ],
+        );
+        // Icon-start M3 button + trailing caret; one 40dp stadium family.
+        const pad = EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 8.0, 0.0);
+        final outlined = OutlinedButton.styleFrom(
+          foregroundColor: cs.onSurfaceVariant,
+          iconColor: cs.onSurfaceVariant,
+          padding: pad,
+          iconSize: 18.0,
+          minimumSize: const Size(0.0, 40.0),
+        );
+        final tonal = FilledButton.styleFrom(
+          padding: pad,
+          iconSize: 18.0,
+          minimumSize: const Size(0.0, 40.0),
         );
         return Tooltip(
           message: tooltip,
           child: active
               ? FilledButton.tonalIcon(
                   key: key,
+                  style: tonal,
                   onPressed: toggle,
-                  icon: Icon(icon, size: 18.0),
+                  icon: Icon(icon),
                   label: content,
                 )
               : OutlinedButton.icon(
                   key: key,
+                  style: outlined,
                   onPressed: toggle,
-                  icon: Icon(icon, size: 18.0),
+                  icon: Icon(icon),
                   label: content,
                 ),
         );
@@ -589,35 +649,12 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
           children: [
             // Top Bar: Unified M3 Left English Title + Right Arabic Subtitle + Filter Controls
             M3PageHeader(
-              titleEn: 'Executive Dashboard',
-              subtitleAr: 'أداء المبيعات في سلاسل التجزئة',
-              // Compact: one horizontally scrollable row. Wider: the 40dp
-              // controls wrap onto a second line instead of scrolling off.
-              actions: isCompact
-                  ? SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _buildChainDropdown(context),
-                          const SizedBox(width: M3Spacing.s12),
-                          _buildYearMonthConnectedGroup(context),
-                          const SizedBox(width: M3Spacing.s12),
-                          _buildPeriodControls(context),
-                        ],
-                      ),
-                    )
-                  : Wrap(
-                      spacing: M3Spacing.s12,
-                      runSpacing: M3Spacing.xs,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        _buildChainDropdown(context),
-                        _buildYearMonthConnectedGroup(context),
-                        _buildPeriodControls(context),
-                      ],
-                    ),
+              title: 'أداء المبيعات في سلاسل التجزئة',
+              subtitle: 'لوحة الأداء التنفيذية · ${_tenantNameAr()}',
+              // Mockup: up to 1440 (sidebar + content ≈ 1140dp) the
+              // controls sit under the title as one full row.
+              stackActionsBelow: 1600.0,
+              actions: _buildHeaderControls(context, isCompact),
             ),
 
             M3Spacing.gapMD,

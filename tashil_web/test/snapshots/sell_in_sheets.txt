@@ -1,115 +1,114 @@
-2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-April (04) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-April (04) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-August (08) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-August (08) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-December (12) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-February (02) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-February (02) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-January (01) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-January (01) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-July (07) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-July (07) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-June (06) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-June (06) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-March (03) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-March (03) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-May (05) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-May (05) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Month (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Month (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Month (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Month (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Month (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Month (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Month (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-November (11) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-October (10) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-October (10) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Sell-In Data | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
-Sell-In Data | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
-Sell-In | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-In | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-In | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-September (09) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-September (09) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Stock & Reorder | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
-Stock & Reorder | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
-Targets | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
-Targets | 13.0 | FontWeight.w400 | ff45464f | 0.1 | 1.43
-Uploaded Files (0) | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
-Uploaded Files (0) | 13.0 | FontWeight.w400 | ff404659 | 0.1 | 1.43
-Year (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Year (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Year (Optional) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-Year (Optional) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-أسواق فتح الله (Fathalla Market) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-أسواق فتح الله (Fathalla Market) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-اختار السلسلة | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
-اختار السلسلة | 13.0 | FontWeight.w600 | ff45464f | 0.5 | 1.5
-ارفع أول ملف لتبدأ. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-ارفع أول ملف لتبدأ. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-ارفع ملف كل شهر (أو أكثر من شهر في ملف واحد)، ولن تُحذف الشهور السابقة. يمكنك استبدال أي ملف أو حذفه. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-ارفع ملف كل شهر (أو أكثر من شهر في ملف واحد)، ولن تُحذف الشهور السابقة. يمكنك استبدال أي ملف أو حذفه. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-التوريد للسلاسل والمخزون المتبقي والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
-التوريد للسلاسل والمخزون المتبقي والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
-التوريد للسلاسل والمخزون المتبقي والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
-السلسلة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-السلسلة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-السلسلة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-المخزون وإعادة الطلب | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
-المخزون وإعادة الطلب | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
-المستهدفات | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
-المستهدفات | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
-الملفات المرفوعة | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
-الملفات المرفوعة | 11.0 | FontWeight.w300 | ff404659 | 0.5 | 1.45
-الوكالة (El Wakala) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-الوكالة (El Wakala) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-بيانات التوريد | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
-بيانات التوريد | 11.0 | FontWeight.w300 | ff45464f | 0.5 | 1.45
-بيت الجملة (Beet El Gomla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-بيت الجملة (Beet El Gomla) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-تحديث | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-تحديث | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-تحديث | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-جملة ماركت (Gomla Market) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-جملة ماركت (Gomla Market) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-رفع ملف Sell-In | 14.0 | FontWeight.w600 | 611a1b21 | 0.1 | null
-رفع ملف Sell-In | 14.0 | FontWeight.w600 | 611a1b21 | 0.1 | null
-رفع ملف Sell-In | 14.0 | FontWeight.w600 | 611a1b21 | 0.1 | null
-لا توجد ملفات مرفوعة بعد. | 15.0 | FontWeight.w500 | ff45464f | 0.15 | 1.5
-لا توجد ملفات مرفوعة بعد. | 15.0 | FontWeight.w500 | ff45464f | 0.15 | 1.5
-ملفات Sell-In المرفوعة | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
-ملفات Sell-In المرفوعة | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
-من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-󰃩 | 18.0 | null | ff1565c0 | null | 1.0
-󰉈 | 20.0 | null | ff45464f | null | 1.0
-󰉪 | 20.0 | null | 611a1b21 | null | 1.0
-󰌞 | 20.0 | null | ff404659 | null | 1.0
-󰌠 | 48.0 | null | ff45464f | null | 1.0
-󰎲 | 20.0 | null | ff45464f | null | 1.0
- | 18.0 | null | ff45464f | null | 1.0
- | 18.0 | null | ff45464f | null | 1.0
- | 18.0 | null | ff45464f | null | 1.0
- | 24.0 | null | ff45464f | null | 1.0
- | 24.0 | null | ff45464f | null | 1.0
- | 24.0 | null | ff45464f | null | 1.0
- | 24.0 | null | ff304578 | null | 1.0
- | 20.0 | null | ff45464f | null | 1.0
+2024 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+2024 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+2025 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+2025 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+April (04) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+April (04) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+August (08) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+August (08) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+December (12) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+December (12) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+February (02) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+February (02) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+January (01) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+January (01) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+July (07) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+July (07) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+June (06) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+June (06) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+March (03) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+March (03) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+May (05) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+May (05) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+Month (Optional) | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+Month (Optional) | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+Month (Optional) | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+Month (Optional) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+Month (Optional) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+Month (Optional) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+Month (Optional) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+November (11) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+November (11) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+October (10) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+October (10) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+Sell-In Data | 14.0 | FontWeight.w400 | ff43483f | 0.1 | 1.4285714285714286
+Sell-In Data | 14.0 | FontWeight.w400 | ff43483f | 0.1 | 1.4285714285714286
+Sell-In | 14.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+Sell-In | 14.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+September (09) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+September (09) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+Stock & Reorder | 14.0 | FontWeight.w400 | ff43483f | 0.1 | 1.4285714285714286
+Stock & Reorder | 14.0 | FontWeight.w400 | ff43483f | 0.1 | 1.4285714285714286
+Targets | 14.0 | FontWeight.w400 | ff43483f | 0.1 | 1.4285714285714286
+Targets | 14.0 | FontWeight.w400 | ff43483f | 0.1 | 1.4285714285714286
+Uploaded Files (0) | 14.0 | FontWeight.w400 | ff3d4b36 | 0.1 | 1.4285714285714286
+Uploaded Files (0) | 14.0 | FontWeight.w400 | ff3d4b36 | 0.1 | 1.4285714285714286
+Year (Optional) | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+Year (Optional) | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+Year (Optional) | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+Year (Optional) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+Year (Optional) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+Year (Optional) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+Year (Optional) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+أسواق فتح الله (Fathalla Market) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+أسواق فتح الله (Fathalla Market) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+اختار السلسلة | 14.0 | FontWeight.w500 | ff43483f | 0.5 | 1.4285714285714286
+اختار السلسلة | 14.0 | FontWeight.w500 | ff43483f | 0.5 | 1.4285714285714286
+ارفع أول ملف لتبدأ. | 12.0 | FontWeight.w400 | ff43483f | 0.4 | 1.3333333333333333
+ارفع أول ملف لتبدأ. | 12.0 | FontWeight.w400 | ff43483f | 0.4 | 1.3333333333333333
+ارفع ملف كل شهر (أو أكثر من شهر في ملف واحد)، ولن تُحذف الشهور السابقة. يمكنك استبدال أي ملف أو حذفه. | 12.0 | FontWeight.w400 | ff43483f | 0.4 | 1.3333333333333333
+ارفع ملف كل شهر (أو أكثر من شهر في ملف واحد)، ولن تُحذف الشهور السابقة. يمكنك استبدال أي ملف أو حذفه. | 12.0 | FontWeight.w400 | ff43483f | 0.4 | 1.3333333333333333
+التوريد للسلاسل والمخزون المتبقي والمستهدفات | 24.0 | FontWeight.w400 | ff191d17 | 0.0 | 1.3333333333333333
+التوريد للسلاسل والمخزون المتبقي والمستهدفات | 24.0 | FontWeight.w400 | ff191d17 | 0.0 | 1.3333333333333333
+التوريد للسلاسل والمخزون المتبقي والمستهدفات | 24.0 | FontWeight.w400 | ff191d17 | 0.0 | 1.3333333333333333
+السلسلة | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+السلسلة | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+السلسلة | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+السلسلة | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+السلسلة | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+السلسلة | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+السلسلة | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+المخزون وإعادة الطلب | 11.0 | FontWeight.w300 | ff43483f | 0.5 | 1.4545454545454546
+المخزون وإعادة الطلب | 11.0 | FontWeight.w300 | ff43483f | 0.5 | 1.4545454545454546
+المستهدفات | 11.0 | FontWeight.w300 | ff43483f | 0.5 | 1.4545454545454546
+المستهدفات | 11.0 | FontWeight.w300 | ff43483f | 0.5 | 1.4545454545454546
+الملفات المرفوعة | 11.0 | FontWeight.w300 | ff3d4b36 | 0.5 | 1.4545454545454546
+الملفات المرفوعة | 11.0 | FontWeight.w300 | ff3d4b36 | 0.5 | 1.4545454545454546
+الوكالة (El Wakala) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+الوكالة (El Wakala) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+بيانات التوريد | 11.0 | FontWeight.w300 | ff43483f | 0.5 | 1.4545454545454546
+بيانات التوريد | 11.0 | FontWeight.w300 | ff43483f | 0.5 | 1.4545454545454546
+بيت الجملة (Beet El Gomla) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+بيت الجملة (Beet El Gomla) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+تحديث | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+تحديث | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+تحديث | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+جملة ماركت (Gomla Market) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+جملة ماركت (Gomla Market) | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+رفع ملف Sell-In | 14.0 | FontWeight.w500 | 61191d17 | 0.1 | 1.4285714285714286
+رفع ملف Sell-In | 14.0 | FontWeight.w500 | 61191d17 | 0.1 | 1.4285714285714286
+رفع ملف Sell-In | 14.0 | FontWeight.w500 | 61191d17 | 0.1 | 1.4285714285714286
+لا توجد ملفات مرفوعة بعد. | 16.0 | FontWeight.w500 | ff43483f | 0.15 | 1.5
+لا توجد ملفات مرفوعة بعد. | 16.0 | FontWeight.w500 | ff43483f | 0.15 | 1.5
+ملفات Sell-In المرفوعة | 16.0 | FontWeight.w800 | ff191d17 | 0.15 | 1.5
+ملفات Sell-In المرفوعة | 16.0 | FontWeight.w800 | ff191d17 | 0.15 | 1.5
+من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+󰃩 | 18.0 | null | ff426834 | null | 1.0
+󰉈 | 20.0 | null | ff43483f | null | 1.0
+󰉪 | 20.0 | null | 61191d17 | null | 1.0
+󰌞 | 20.0 | null | ff3d4b36 | null | 1.0
+󰌠 | 48.0 | null | ff43483f | null | 1.0
+󰎲 | 20.0 | null | ff43483f | null | 1.0
+ | 18.0 | null | ff43483f | null | 1.0
+ | 18.0 | null | ff43483f | null | 1.0
+ | 18.0 | null | ff43483f | null | 1.0
+ | 24.0 | null | ff43483f | null | 1.0
+ | 24.0 | null | ff43483f | null | 1.0
+ | 24.0 | null | ff43483f | null | 1.0
+ | 24.0 | null | ff2b4f1e | null | 1.0
+ | 20.0 | null | ff43483f | null | 1.0

@@ -79,17 +79,35 @@ void main() {
       expect(find.byKey(const ValueKey('stock_per_sku_table')), findsOneWidget);
       expect(find.byKey(const ValueKey('sell_in_vs_out_chart')), findsOneWidget);
 
-      // Stock per SKU table and the monthly chart sit side by side at equal height.
+      // Row A: SKU share + stock by SKU; row B: category share + monthly chart.
+      final skuR = tester.getRect(find.byKey(const ValueKey('share_per_sku_card')));
       final table = tester.getRect(find.byKey(const ValueKey('stock_per_sku_table')));
+      final catR = tester.getRect(find.byKey(const ValueKey('share_per_category_card')));
       final chart = tester.getRect(find.byKey(const ValueKey('sell_in_vs_out_chart')));
-      if (find.byKey(const ValueKey('sell_in_vs_out_row')).evaluate().isNotEmpty) {
-        expect(chart.top, closeTo(table.top, 1));
-        expect(chart.height, closeTo(table.height, 1));
-        expect(chart.left, greaterThan(table.right - 1));
+      final tilesR = tester.getRect(find.byKey(const ValueKey('sell_in_vs_out_section')));
+      expect(find.byKey(const ValueKey('exec_row_a')), findsOneWidget);
+      expect(find.byKey(const ValueKey('exec_row_b')), findsOneWidget);
+      if (skuR.top == table.top) {
+        // Wide (RTL): SKU at the start (right), equal heights per row.
+        expect(skuR.height, closeTo(table.height, 1));
+        final rtl = Directionality.of(tester.element(
+                find.byKey(const ValueKey('share_per_sku_card')))) ==
+            TextDirection.rtl;
+        expect(rtl ? skuR.left : table.left,
+            greaterThan((rtl ? table.right : skuR.right) - 1));
+        expect(chart.top, closeTo(catR.top, 1));
+        expect(chart.height, closeTo(catR.height, 1));
+        expect(rtl ? catR.left : chart.left,
+            greaterThan((rtl ? chart.right : catR.right) - 1));
       } else {
-        // Narrow: stacked, table first, nothing stretched.
-        expect(chart.top, greaterThanOrEqualTo(table.bottom - 1));
+        // Narrow: one column — SKU, stock, tiles, category, monthly.
+        expect(table.top, greaterThanOrEqualTo(skuR.bottom - 1));
+        expect(catR.top, greaterThanOrEqualTo(table.bottom - 1));
+        expect(chart.top, greaterThanOrEqualTo(catR.bottom - 1));
       }
+      // The four Sell-In/Sell-Out tiles sit full width between the rows.
+      expect(tilesR.top, greaterThanOrEqualTo(table.bottom - 1));
+      expect(catR.top, greaterThanOrEqualTo(tilesR.bottom - 1));
 
       // The original four KPI cards open the page; market share sits under them,
       // and the older sections (category contribution, trend, Pareto) stay below that.
@@ -98,10 +116,10 @@ void main() {
       final categoryTop = tester.getTopLeft(find.text('Category Contribution').first).dy;
       expect(kpiTop, lessThan(shareTop));
       expect(shareTop, lessThan(categoryTop));
-      expect(find.text('Total Sell-Out (EGP)'), findsOneWidget);
-      expect(find.text('Total Units Sold'), findsOneWidget);
-      expect(find.text('Active Stores'), findsOneWidget);
-      expect(find.text('OOS Rate'), findsOneWidget);
+      expect(find.text('إجمالي Sell-Out'), findsOneWidget);
+      expect(find.text('إجمالي الوحدات المباعة'), findsOneWidget);
+      expect(find.text('الفروع النشطة'), findsOneWidget);
+      expect(find.text('نسبة نفاد المخزون (OOS)'), findsOneWidget);
     });
   }
 
@@ -243,35 +261,43 @@ void main() {
   }
 
   for (final width in [1280.0, 1440.0, 1920.0]) {
-    testWidgets('Share cards are equal height at ${width.toInt()}px and category donuts grow', (tester) async {
+    testWidgets('Row A / row B cards are equal height at ${width.toInt()}px', (tester) async {
       await pumpShare(tester, width, shareFixture());
       expect(tester.takeException(), isNull);
+      // Row A pairs SKU share with stock; row B pairs category with monthly.
       final sku = tester.getRect(find.byKey(const ValueKey('share_per_sku_card')));
+      final stock = tester.getRect(find.byKey(const ValueKey('stock_per_sku_table')));
       final cat = tester.getRect(find.byKey(const ValueKey('share_per_category_card')));
-      expect(sku.height, closeTo(cat.height, 1));
-      expect(sku.top, closeTo(cat.top, 1));
-      // RTL: category card is the second child, so it sits on the left.
-      expect(cat.right, lessThanOrEqualTo(sku.left + 1));
+      final bars = tester.getRect(find.byKey(const ValueKey('sell_in_vs_out_chart')));
+      expect(sku.height, closeTo(stock.height, 1));
+      expect(sku.top, closeTo(stock.top, 1));
+      expect(cat.height, closeTo(bars.height, 1));
+      expect(cat.top, closeTo(bars.top, 1));
+      expect(cat.top, greaterThanOrEqualTo(sku.bottom - 1));
+      // RTL: the stock / monthly cards are the second child, so they sit on the left.
+      expect(stock.right, lessThanOrEqualTo(sku.left + 1));
+      expect(bars.right, lessThanOrEqualTo(cat.left + 1));
       expect(find.text('Test SKU 0'), findsOneWidget);
       expect(find.text('Test SKU 5'), findsOneWidget);
       expect(find.text('Rank #1 of 14'), findsOneWidget);
       expect(find.text('Competitor Floor cleaner 0'), findsOneWidget);
       expect(find.text('هذا الصنف'), findsOneWidget);
       expect(find.text('أصنافنا الأخرى'), findsOneWidget);
-      expect(find.text('Competitors'), findsWidgets);
+      expect(find.text('المنافسون'), findsWidgets);
       final donut = tester.getSize(find.byKey(const ValueKey('category_donut_Floor cleaner')));
-      expect(donut.height, greaterThan(64));
+      // Compact 64dp unless row B stretches the category card.
+      expect(donut.height, greaterThanOrEqualTo(64));
       expect(donut.width, closeTo(donut.height, 1));
     });
   }
 
-  testWidgets('When category tiles are taller, SKU bars grow and cards still match', (tester) async {
+  testWidgets('Tall category tiles: row B cards still match; SKU card keeps its bar', (tester) async {
     await pumpShare(tester, 1280, shareFixture(skuCount: 1, tallCategories: true));
     expect(tester.takeException(), isNull);
-    final sku = tester.getRect(find.byKey(const ValueKey('share_per_sku_card')));
     final cat = tester.getRect(find.byKey(const ValueKey('share_per_category_card')));
-    expect(sku.height, closeTo(cat.height, 1));
-    expect(tester.getSize(find.byKey(const ValueKey('sku_share_bar_0'))).height, greaterThan(18));
+    final bars = tester.getRect(find.byKey(const ValueKey('sell_in_vs_out_chart')));
+    expect(cat.height, closeTo(bars.height, 1));
+    expect(tester.getSize(find.byKey(const ValueKey('sku_share_bar_0'))).height, greaterThan(12));
     expect(find.text('Test SKU 0'), findsOneWidget);
     expect(find.text('Rank #2 of 8'), findsOneWidget);
     expect(find.text('Competitor Bleach 2'), findsOneWidget);
@@ -321,13 +347,18 @@ void main() {
   }
 
   for (final width in [1280.0, 1920.0]) {
-    testWidgets('Stock per SKU table and monthly chart are equal height at ${width.toInt()}px', (tester) async {
+    testWidgets('Stock per SKU sits in row A, monthly chart in row B at ${width.toInt()}px', (tester) async {
       await pumpSellIn(tester, width);
       expect(tester.takeException(), isNull);
+      final sku = tester.getRect(find.byKey(const ValueKey('share_per_sku_card')));
       final table = tester.getRect(find.byKey(const ValueKey('stock_per_sku_table')));
+      final cat = tester.getRect(find.byKey(const ValueKey('share_per_category_card')));
       final chart = tester.getRect(find.byKey(const ValueKey('sell_in_vs_out_chart')));
-      expect(chart.top, closeTo(table.top, 1));
-      expect(chart.height, closeTo(table.height, 1));
+      expect(table.top, closeTo(sku.top, 1));
+      expect(table.height, closeTo(sku.height, 1));
+      expect(chart.top, closeTo(cat.top, 1));
+      expect(chart.height, closeTo(cat.height, 1));
+      expect(chart.top, greaterThanOrEqualTo(table.bottom - 1));
       for (var i = 0; i < 8; i++) {
         expect(find.text('Stock SKU $i'), findsOneWidget);
       }

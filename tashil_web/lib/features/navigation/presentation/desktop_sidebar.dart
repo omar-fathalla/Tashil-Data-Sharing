@@ -124,226 +124,245 @@ class DesktopSidebar extends StatelessWidget {
       ),
     ];
 
-    return Container(
-      width: 250.0,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
-        border: BorderDirectional(
-          end: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5), width: 1.0),
-        ),
+    return Material(
+      color: colorScheme.surfaceContainer,
+      shape: BorderDirectional(
+        end: BorderSide(color: colorScheme.outlineVariant, width: 1.0),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header: Brand & App Title
-          Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(16.0, 24.0, 16.0, 16.0),
-            child: Row(
-              children: [
-                const DataSharingLogo(
-                  size: 40.0,
-                  showSquircle: true,
-                ),
-                M3Spacing.gapSM,
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              'Tashil Portal',
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6.0),
-                          Text(
-                            AppVersion.label,
-                            key: const ValueKey('sidebar-app-version'),
-                            textDirection: TextDirection.ltr,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant.withOpacity(0.7),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        'Data Sharing Platform',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+      child: SizedBox(
+        width: 250.0,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header: Brand & App Title
+            Padding(
+              padding:
+                  const EdgeInsetsDirectional.fromSTEB(16.0, 24.0, 16.0, 16.0),
+              child: Row(
+                children: [
+                  const DataSharingLogo(
+                    size: 40.0,
+                    showSquircle: true,
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          // Tenant Profile Switcher
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: TenantProfileCard(
-              activeTenant: activeTenant,
-              currentUser: currentUser,
-              onTenantChanged: onTenantChanged,
-              onOpenProfile: onOpenProfile,
-              onNavigateToAdmin: onNavigateToAdmin,
-              isSuperAdmin: isSuperAdmin,
-            ),
-          ),
-
-          M3Spacing.gapMD,
-
-          // Navigation Items
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 12.0, 12.0),
-              itemCount: destinations.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 4.0),
-              itemBuilder: (context, index) {
-                final dest = destinations[index];
-                final isSelected = selectedIndex == index;
-
-                Widget item = InkWell(
-                  onTap: () => onDestinationSelected(index),
-                  borderRadius: M3Shape.radiusXl, // M3 pill shape
-                  child: AnimatedContainer(
-                    duration: M3Motion.short4,
-                    curve: M3Motion.standard,
-                    height: 52.0,
-                    padding: const EdgeInsetsDirectional.symmetric(horizontal: 16.0),
-                    decoration: BoxDecoration(
-                      color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
-                      borderRadius: M3Shape.radiusXl,
-                    ),
-                    child: Row(
+                  M3Spacing.gapSM,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        AnimatedSwitcher(
-                          duration: M3Motion.short3,
-                          transitionBuilder: (child, anim) => ScaleTransition(
-                            scale: Tween<double>(begin: 0.85, end: 1.0).animate(anim),
-                            child: FadeTransition(opacity: anim, child: child),
-                          ),
-                          child: Icon(
-                            isSelected ? dest.selectedIcon : dest.icon,
-                            key: ValueKey('${index}_$isSelected'),
-                            size: 22.0,
-                            color: isSelected
-                                ? colorScheme.onSecondaryContainer
-                                : colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        M3Spacing.gapSM,
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                dest.label,
-                                maxLines: 1,
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'Tashil Portal',
                                 overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  color: isSelected
-                                      ? colorScheme.onSecondaryContainer
-                                      : colorScheme.onSurface,
-                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                        if (dest.badgeCount != null && dest.badgeCount! > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
-                            decoration: BoxDecoration(
-                              color: colorScheme.error,
-                              borderRadius: M3Shape.radiusSm,
                             ),
-                            child: Text(
-                              dest.badgeCount.toString(),
+                            const SizedBox(width: 6.0),
+                            Text(
+                              AppVersion.label,
+                              key: const ValueKey('sidebar-app-version'),
+                              textDirection: TextDirection.ltr,
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: colorScheme.onError,
-                                fontSize: M3FontSize.tiny,
-                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
+                          ],
+                        ),
+                        Text(
+                          'Data Sharing Platform',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
+                        ),
                       ],
                     ),
                   ),
-                );
-                final id = dest.semanticsIdentifier;
-                if (id != null && id.isNotEmpty) {
-                  item = TestSemantics.navTarget(
-                    identifier: id,
-                    label: dest.label,
-                    child: item,
-                  );
-                }
-                return item;
-              },
-            ),
-          ),
-
-          // Super Admin Return Button (Visible ONLY to authenticated Super Admin inspecting a portal)
-          if (isSuperAdmin && onNavigateToAdmin != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-              child: OutlinedButton.icon(
-                key: const ValueKey('sidebar_super_admin_button'),
-                onPressed: onNavigateToAdmin,
-                icon: Icon(
-                  Icons.admin_panel_settings_rounded,
-                  size: 18.0,
-                  color: colorScheme.primary,
-                ),
-                label: Text(
-                  'Back to Super Admin',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.primary,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-                  side: BorderSide(color: colorScheme.primary.withOpacity(0.5)),
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: M3Shape.radiusSm,
-                  ),
-                ),
+                ],
               ),
             ),
 
-          // System Health footer: fixed below the scrollable list (never overlaps it).
-          const Divider(height: 1.0),
-          Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(16.0, 8.0, 16.0, 12.0),
-            child: Row(
-              key: const ValueKey('sidebar_footer_status'),
-              children: [
-                Icon(Icons.bolt_rounded, size: 16.0, color: colorScheme.primary),
-                const SizedBox(width: 6.0),
-                Expanded(
-                  child: Text(
-                    'Smart Ingestion Active',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
+            // Tenant Profile Switcher
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: TenantProfileCard(
+                activeTenant: activeTenant,
+                currentUser: currentUser,
+                onTenantChanged: onTenantChanged,
+                onOpenProfile: onOpenProfile,
+                onNavigateToAdmin: onNavigateToAdmin,
+                isSuperAdmin: isSuperAdmin,
+              ),
+            ),
+
+            M3Spacing.gapMD,
+
+            // Navigation Items
+            Expanded(
+              child: ListView.separated(
+                padding:
+                    const EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 12.0, 12.0),
+                itemCount: destinations.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 4.0),
+                itemBuilder: (context, index) {
+                  final dest = destinations[index];
+                  final isSelected = selectedIndex == index;
+
+                  Widget item = InkWell(
+                    onTap: () => onDestinationSelected(index),
+                    borderRadius: M3Shape.radiusXl, // M3 pill shape
+                    child: AnimatedContainer(
+                      duration: M3Motion.short4,
+                      curve: M3Motion.standard,
+                      height: 52.0,
+                      padding: const EdgeInsetsDirectional.symmetric(
+                          horizontal: 16.0),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? colorScheme.secondaryContainer
+                            : Colors.transparent,
+                        borderRadius: M3Shape.radiusXl,
+                      ),
+                      child: Row(
+                        children: [
+                          AnimatedSwitcher(
+                            duration: M3Motion.short3,
+                            transitionBuilder: (child, anim) => ScaleTransition(
+                              scale: Tween<double>(begin: 0.85, end: 1.0)
+                                  .animate(anim),
+                              child:
+                                  FadeTransition(opacity: anim, child: child),
+                            ),
+                            child: Icon(
+                              isSelected ? dest.selectedIcon : dest.icon,
+                              key: ValueKey('${index}_$isSelected'),
+                              size: 22.0,
+                              color: isSelected
+                                  ? colorScheme.onSecondaryContainer
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          M3Spacing.gapSM,
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  dest.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: isSelected
+                                        ? colorScheme.onSecondaryContainer
+                                        : colorScheme.onSurface,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (dest.badgeCount != null && dest.badgeCount! > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6.0, vertical: 2.0),
+                              decoration: BoxDecoration(
+                                color: colorScheme.error,
+                                borderRadius: M3Shape.radiusSm,
+                              ),
+                              child: Text(
+                                dest.badgeCount.toString(),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onError,
+                                  fontSize: M3FontSize.tiny,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                  final id = dest.semanticsIdentifier;
+                  if (id != null && id.isNotEmpty) {
+                    item = TestSemantics.navTarget(
+                      identifier: id,
+                      label: dest.label,
+                      child: item,
+                    );
+                  }
+                  return item;
+                },
+              ),
+            ),
+
+            // Super Admin Return Button (Visible ONLY to authenticated Super Admin inspecting a portal)
+            if (isSuperAdmin && onNavigateToAdmin != null)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+                child: OutlinedButton.icon(
+                  key: const ValueKey('sidebar_super_admin_button'),
+                  onPressed: onNavigateToAdmin,
+                  icon: Icon(
+                    Icons.admin_panel_settings_rounded,
+                    size: 18.0,
+                    color: colorScheme.primary,
+                  ),
+                  label: Text(
+                    'Back to Super Admin',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0, vertical: 10.0),
+                    side:
+                        BorderSide(color: colorScheme.outline),
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: M3Shape.radiusSm,
                     ),
                   ),
                 ),
-              ],
+              ),
+
+            // System Health footer: fixed below the scrollable list (never overlaps it).
+            const Divider(height: 1.0),
+            Padding(
+              padding:
+                  const EdgeInsetsDirectional.fromSTEB(16.0, 8.0, 16.0, 12.0),
+              child: Row(
+                key: const ValueKey('sidebar_footer_status'),
+                children: [
+                  // Only the status dot uses primary; icon + text stay neutral.
+                  CircleAvatar(
+                      radius: 4.0, backgroundColor: colorScheme.primary),
+                  const SizedBox(width: 6.0),
+                  Icon(Icons.bolt_rounded,
+                      size: 16.0, color: colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 6.0),
+                  Expanded(
+                    child: Text(
+                      'Smart Ingestion Active',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

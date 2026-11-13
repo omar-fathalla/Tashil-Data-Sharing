@@ -57,13 +57,13 @@ void main() {
     );
 
     expect(find.text('إجمالي Sell-Out'), findsOneWidget);
-    expect(find.text('Total Sell-Out (EGP)'), findsOneWidget);
+    expect(find.text('Total Sell-Out (EGP)'), findsNothing); // Arabic-only M3 KPI card
     expect(find.text('إجمالي الوحدات المباعة'), findsOneWidget);
-    expect(find.text('Total Units Sold'), findsOneWidget);
+    expect(find.text('Total Units Sold'), findsNothing); // Arabic-only M3 KPI card
     expect(find.text('الفروع النشطة'), findsOneWidget);
-    expect(find.text('Active Stores'), findsOneWidget);
+    expect(find.text('Active Stores'), findsNothing); // Arabic-only M3 KPI card
     expect(find.text('نسبة نفاد المخزون (OOS)'), findsOneWidget);
-    expect(find.text('OOS Rate'), findsOneWidget);
+    expect(find.text('OOS Rate'), findsNothing); // Arabic-only M3 KPI card
 
     expect(find.text('16 فرع'), findsOneWidget);
     expect(find.text('4.2%'), findsOneWidget);
@@ -110,11 +110,11 @@ void main() {
       ),
     );
 
-    // Must format negative percentages cleanly without '+-' with Arabic on Line 1 and English on Line 2
+    // Must format negative percentages cleanly without '+-' (Arabic-only tags)
     expect(find.text('-16.0% مقارنة بالشهر السابق'), findsOneWidget);
-    expect(find.text('MoM'), findsWidgets);
+    expect(find.text('MoM'), findsNothing);
     expect(find.text('-4.5% مقارنة بالعام السابق'), findsOneWidget);
-    expect(find.text('YoY'), findsWidgets);
+    expect(find.text('YoY'), findsNothing);
     expect(find.text('-8.2% مقارنة بالشهر السابق'), findsOneWidget);
     expect(find.textContaining('+-'), findsNothing);
 
@@ -169,7 +169,7 @@ void main() {
 
     // Verify 3 dropdowns exist
     expect(find.byKey(const ValueKey('executive_chain_dropdown')), findsOneWidget);
-    expect(find.byKey(const ValueKey('executive_year_segmented')), findsOneWidget);
+    expect(find.byKey(const ValueKey('executive_year_dropdown')), findsOneWidget);
     expect(find.byKey(const ValueKey('executive_month_dropdown')), findsOneWidget);
 
     // Open Month dropdown and choose 'كل الشهور'
@@ -180,20 +180,17 @@ void main() {
     await tester.tap(find.text('كل الشهور'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Month: All'), findsOneWidget);
+    expect(find.text('الشهر: الكل'), findsOneWidget);
 
-    // Select 2025 in the M3 SegmentedButton year filter
-    await tester.tap(find.descendant(
-        of: find.byKey(const ValueKey('executive_year_segmented')),
-        matching: find.text('2025')));
+    // Select 2025 in the year menu filter
+    await tester.tap(find.byKey(const ValueKey('executive_year_dropdown')));
     await tester.pumpAndSettle();
-
-    final seg = tester.widget<SegmentedButton<int>>(
-        find.byKey(const ValueKey('executive_year_segmented')));
-    expect(seg.selected, {2025});
+    await tester.tap(find.text('2025').last);
+    await tester.pumpAndSettle();
+    expect(find.text('السنة: 2025'), findsOneWidget);
   });
 
-  testWidgets('ExecutiveScreen Month dropdown displays pure English month names without Arabic parentheticals', (WidgetTester tester) async {
+  testWidgets('ExecutiveScreen Month dropdown displays Arabic month names', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -216,21 +213,18 @@ void main() {
     await tester.tap(monthDropdown);
     await tester.pumpAndSettle();
 
-    // Verify pure English month names are rendered in the dropdown menu
-    expect(find.text('January'), findsOneWidget);
-    expect(find.text('February'), findsOneWidget);
-    expect(find.text('March'), findsOneWidget);
-    expect(find.text('April'), findsOneWidget);
+    // Arabic month names in the menu (no English / mixed parentheticals)
+    expect(find.text('يناير'), findsOneWidget);
+    expect(find.text('فبراير'), findsOneWidget);
+    expect(find.text('مارس'), findsOneWidget);
+    expect(find.text('أبريل'), findsOneWidget);
+    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('January')), findsNothing);
+    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('(')), findsNothing);
 
-    // Verify NO mixed Arabic parentheticals appear in the month dropdown
-    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('يناير')), findsNothing);
-    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('فبراير')), findsNothing);
-    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('مارس')), findsNothing);
-
-    // Select February and verify the pill updates to 'Month: Feb'
-    await tester.tap(find.text('February'));
+    // Select February and verify the trigger updates to 'الشهر: فبراير'
+    await tester.tap(find.text('فبراير'));
     await tester.pumpAndSettle();
-    expect(find.text('Month: Feb'), findsOneWidget);
+    expect(find.text('الشهر: فبراير'), findsOneWidget);
   });
 
   testWidgets('UploadPortalScreen file picker parses real CSV bytes and excludes anomalous rows from valid count', (WidgetTester tester) async {
@@ -426,20 +420,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Ensure Month dropdown is visible on narrow < 360px viewport and opens cleanly with English months
+    // Ensure Month dropdown is visible on narrow < 360px viewport and opens cleanly with Arabic months
     final monthDropdown = find.byKey(const ValueKey('executive_month_dropdown'));
     expect(monthDropdown, findsOneWidget);
     await tester.ensureVisible(monthDropdown);
     await tester.tap(monthDropdown);
     await tester.pumpAndSettle();
 
-    expect(find.text('January'), findsOneWidget);
-    expect(find.text('December'), findsOneWidget);
-    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('يناير')), findsNothing);
+    expect(find.text('يناير'), findsOneWidget);
+    expect(find.text('ديسمبر'), findsOneWidget);
+    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('January')), findsNothing);
 
-    await tester.tap(find.text('March'));
+    await tester.tap(find.text('مارس'));
     await tester.pumpAndSettle();
-    expect(find.text('Month: Mar'), findsOneWidget);
+    expect(find.text('الشهر: مارس'), findsOneWidget);
 
     // Switch Month to All Months
     await tester.ensureVisible(monthDropdown);
@@ -447,7 +441,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('كل الشهور'));
     await tester.pumpAndSettle();
-    expect(find.text('Month: All'), findsOneWidget);
+    expect(find.text('الشهر: الكل'), findsOneWidget);
   });
 
   testWidgets('SelloutTrendChart renders multi-chain monthly curves with distinct chain legend pills and supports single-month data', (WidgetTester tester) async {
@@ -511,8 +505,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('اتجاه Sell-Out الشهري'), findsOneWidget);
-    expect(find.text('Monthly Sell-Out Trend'), findsOneWidget);
+    expect(find.text('الاتجاه الشهري (\u2068Sell-Out\u2069)'), findsOneWidget);
+    expect(find.text('Monthly Sell-Out Trend'), findsNothing);
     expect(find.text('أسواق فتح الله'), findsOneWidget);
     expect(find.text('Fathalla Market'), findsOneWidget);
     expect(find.text('جملة ماركت'), findsOneWidget);
@@ -626,7 +620,7 @@ void main() {
 
     final chainDropdown = find.byKey(const ValueKey('executive_chain_dropdown'));
     expect(chainDropdown, findsOneWidget);
-    expect(find.text('Chain: All'), findsOneWidget);
+    expect(find.text('السلسلة: الكل'), findsOneWidget);
 
     await tester.tap(chainDropdown);
     await tester.pumpAndSettle();
@@ -642,7 +636,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('Chain: Gomla'), findsOneWidget);
+    expect(find.text('السلسلة: جملة ماركت'), findsOneWidget);
     expect(find.text('100.0%'), findsOneWidget);
 
     // Verify ParetoCategorySection cards also render Arabic on Line 1 and English on Line 2

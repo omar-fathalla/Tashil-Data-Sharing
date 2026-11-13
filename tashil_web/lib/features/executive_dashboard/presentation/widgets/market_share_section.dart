@@ -46,38 +46,60 @@ class MarketShareSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, c) {
       final wide = c.maxWidth >= 900;
+      final months = _matchedMonths(cpfr, year, periodMonths);
       final sku = _SkuShareCard(kpis: kpis);
+      final stock = _StockCard(
+          cpfr: cpfr, loading: cpfrLoading, error: cpfrError, kpis: kpis);
       final cat = _CategoryShareCard(kpis: kpis);
+      final bars = _MonthlyBarsCard(
+          months: months,
+          loading: cpfrLoading && cpfr == null,
+          error: cpfrError,
+          fill: wide);
+      Widget row(Widget a, Widget b, Key key) => wide
+          ? _EqualHeightRow(
+              key: key,
+              spacing: M3Spacing.md,
+              textDirection: Directionality.of(context),
+              children: [a, b],
+            )
+          : Column(
+              key: key,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [a, M3Spacing.gapMD, b],
+            );
       return Column(
         key: const ValueKey('market_share_section'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (wide)
-            _EqualHeightRow(
-              spacing: M3Spacing.md,
-              textDirection: Directionality.of(context),
-              children: [sku, cat],
-            )
-          else ...[
-            sku,
+          // Row A: share by SKU (start) + stock by SKU (end).
+          row(sku, stock, const ValueKey('exec_row_a')),
+          if (months.isNotEmpty) ...[
             M3Spacing.gapMD,
-            cat,
+            _SellInOutTiles(months: months, year: year),
           ],
-          M3Spacing.gapLG,
-          _SellInVsSellOut(
-            cpfr: cpfr,
-            loading: cpfrLoading,
-            error: cpfrError,
-            periodMonths: periodMonths,
-            year: year,
-            wide: wide,
-          ),
+          M3Spacing.gapMD,
+          // Row B: share by category (start) + monthly Sell-In vs Sell-Out (end).
+          row(cat, bars, const ValueKey('exec_row_b')),
           M3Spacing.gapLG,
         ],
       );
     });
   }
 }
+
+/// Only months that have BOTH real Sell In and real Sell Out are compared.
+List<ReconciliationMonthModel> _matchedMonths(
+        CPFRDashboardModel? cpfr, int year, Set<int> periodMonths) =>
+    (cpfr?.monthlyReconciliation ?? const <ReconciliationMonthModel>[])
+        .where((m) =>
+            m.year == year &&
+            periodMonths.contains(m.monthNum) &&
+            m.hasActualSellOut &&
+            m.sellInUnits > 0 &&
+            m.sellOutUnits > 0)
+        .toList()
+      ..sort((a, b) => a.monthNum.compareTo(b.monthNum));
 
 String _fmtInt(num v) {
   final s = v.round().abs().toString();
@@ -97,11 +119,15 @@ class _CardHeader extends StatelessWidget {
       required this.title,
       required this.subtitle,
       required this.count,
+      this.unit = '',
       this.badgeKey});
   final IconData icon;
   final String title;
   final String subtitle;
   final int count;
+
+  /// Count unit shown in the neutral tag, e.g. "أصناف" → "6 أصناف".
+  final String unit;
   final Key? badgeKey;
 
   @override
@@ -112,7 +138,7 @@ class _CardHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          Icon(icon, size: 20.0, color: cs.primary),
+          Icon(icon, size: 20.0, color: cs.onSurfaceVariant),
           M3Spacing.gapXS,
           Flexible(
             child: Text(title,
@@ -120,11 +146,12 @@ class _CardHeader extends StatelessWidget {
                 style: theme.textTheme.titleMedium),
           ),
           M3Spacing.gapXS,
-          Badge.count(
-              key: badgeKey,
-              count: count,
-              backgroundColor: cs.error,
-              textColor: cs.onError),
+          // Neutral count tag (not an error-red badge).
+          M3StatusTag(
+            key: badgeKey,
+            label: unit.isEmpty ? '$count' : '$count $unit',
+            icon: AppIcons.filterList,
+          ),
         ]),
         M3Spacing.gapXXS,
         Text(subtitle,
@@ -193,7 +220,6 @@ class _SkuShareCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final acc = M3StatusColors.of(context).accents;
     final cats = {for (final c in kpis.categoryContributions) c.category: c};
     final rows = <({
       ParetoSkuItemModel sku,
@@ -223,13 +249,14 @@ class _SkuShareCard extends StatelessWidget {
               title: 'الحصة حسب الصنف',
               subtitle: 'حصة أهم الأصناف من مبيعات الفئة',
               count: rows.length,
+              unit: 'أصناف',
               badgeKey: const ValueKey('share_per_sku_badge'),
             ),
             M3Spacing.gapSM,
             _Legend([
               (cs.primary, 'هذا الصنف'),
-              (cs.primaryContainer, 'أصنافنا الأخرى'),
-              (acc.competitor, 'Competitors'),
+              (cs.tertiaryContainer, 'أصنافنا الأخرى'),
+              (cs.surfaceContainerHighest, 'المنافسون'),
             ]),
             M3Spacing.gapSM,
             if (rows.isEmpty)
@@ -240,25 +267,28 @@ class _SkuShareCard extends StatelessWidget {
                 children: [
                   for (var i = 0; i < rows.length; i++)
                     _SkuRow(
-                      title: Text(rows[i].sku.skuName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelLarge
-                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      title: Tooltip(
+                        message: rows[i].sku.skuName,
+                        child: Text(rows[i].sku.skuName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall
+                                ?.copyWith(color: cs.onSurface)),
+                      ),
                       category: Text(rows[i].sku.category,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall
+                          style: theme.textTheme.bodySmall
                               ?.copyWith(color: cs.onSurfaceVariant)),
                       bar: ClipRRect(
                         key: ValueKey('sku_share_bar_$i'),
                         borderRadius: M3Shape.radiusSm,
                         child: Row(children: [
                           _seg(context, rows[i].self, cs.primary, cs.onPrimary),
-                          _seg(context, rows[i].ownOther, cs.primaryContainer,
-                              cs.onPrimaryContainer),
-                          _seg(context, rows[i].comp, acc.competitor,
-                              cs.onSurface),
+                          _seg(context, rows[i].ownOther, cs.tertiaryContainer,
+                              cs.onTertiaryContainer),
+                          _seg(context, rows[i].comp, cs.surfaceContainerHighest,
+                              cs.onSurfaceVariant),
                         ]),
                       ),
                     ),
@@ -284,7 +314,7 @@ class _SkuShareCard extends StatelessWidget {
                 style: Theme.of(context)
                     .textTheme
                     .labelSmall
-                    ?.copyWith(color: fg, fontWeight: FontWeight.w600))
+                    ?.copyWith(color: fg))
             : null,
       ),
     );
@@ -317,6 +347,7 @@ class _CategoryShareCard extends StatelessWidget {
               title: 'الحصة حسب الفئة',
               subtitle: 'حصتنا في كل فئة',
               count: top.length,
+              unit: 'فئات',
               badgeKey: const ValueKey('share_per_category_badge'),
             ),
             M3Spacing.gapSM,
@@ -409,56 +440,14 @@ class _CategoryTile extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Sell In vs Sell Out (CPFR reconciliation report).
 // ---------------------------------------------------------------------------
-class _SellInVsSellOut extends StatelessWidget {
-  const _SellInVsSellOut({
-    required this.cpfr,
-    required this.loading,
-    required this.error,
-    required this.periodMonths,
-    required this.year,
-    required this.wide,
-  });
-  final CPFRDashboardModel? cpfr;
-  final bool loading;
-  final String? error;
-  final Set<int> periodMonths;
+class _SellInOutTiles extends StatelessWidget {
+  const _SellInOutTiles({required this.months, required this.year});
+  final List<ReconciliationMonthModel> months;
   final int year;
-  final bool wide;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final header =
-        Text('Sell-In vs Sell-Out', style: theme.textTheme.titleMedium);
-    if (loading && cpfr == null) {
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        header,
-        M3Spacing.gapSM,
-        const LinearProgressIndicator(year2023: false),
-      ]);
-    }
-    // Only months that have BOTH real Sell In and real Sell Out are compared.
-    final months = (cpfr?.monthlyReconciliation ??
-            const <ReconciliationMonthModel>[])
-        .where((m) =>
-            m.year == year &&
-            periodMonths.contains(m.monthNum) &&
-            m.hasActualSellOut &&
-            m.sellInUnits > 0 &&
-            m.sellOutUnits > 0)
-        .toList()
-      ..sort((a, b) => a.monthNum.compareTo(b.monthNum));
-    if (months.isEmpty) {
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        header,
-        _EmptyNote(
-          error != null
-              ? 'تعذّر تحميل بيانات Sell-In/Sell-Out'
-              : 'لا توجد شهور بها بيانات Sell-In وSell-Out معًا',
-          keyName: 'sell_in_vs_out_empty',
-        ),
-      ]);
-    }
     final sellIn = months.fold<int>(0, (a, m) => a + m.sellInUnits);
     final sellOut = months.fold<int>(0, (a, m) => a + m.sellOutUnits);
     final net = sellIn - sellOut;
@@ -493,7 +482,7 @@ class _SellInVsSellOut extends StatelessWidget {
       key: const ValueKey('sell_in_vs_out_section'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        header,
+        Text('Sell-In vs Sell-Out', style: theme.textTheme.titleMedium),
         Text('الأصناف والشهور المتطابقة: $monthLabel $year',
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: cs.onSurfaceVariant)),
@@ -505,25 +494,6 @@ class _SellInVsSellOut extends StatelessWidget {
             for (final t in tiles) SizedBox(width: w, child: t),
           ]);
         }),
-        M3Spacing.gapMD,
-        if (wide)
-          // Equal height: the row takes the taller card's natural height
-          // (usually the table) and the chart stretches to fill it.
-          IntrinsicHeight(
-            key: const ValueKey('sell_in_vs_out_row'),
-            child:
-                Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Expanded(flex: 3, child: _StockTable(cpfr: cpfr!)),
-              M3Spacing.gapMD,
-              Expanded(
-                  flex: 2, child: _MonthlyBars(months: months, fill: true)),
-            ]),
-          )
-        else ...[
-          _StockTable(cpfr: cpfr!),
-          M3Spacing.gapMD,
-          _MonthlyBars(months: months),
-        ],
       ],
     );
   }
@@ -559,22 +529,46 @@ class _KpiTile extends StatelessWidget {
   }
 }
 
-class _StockTable extends StatelessWidget {
-  const _StockTable({required this.cpfr});
-  final CPFRDashboardModel cpfr;
+class _StockCard extends StatelessWidget {
+  const _StockCard({
+    required this.cpfr,
+    required this.loading,
+    required this.error,
+    required this.kpis,
+  });
+  final CPFRDashboardModel? cpfr;
+  final bool loading;
+  final String? error;
+  final ExecutiveKPIsModel kpis;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    // SKU category: from the executive Pareto SKUs (barcode / item code).
+    final catBy = <String, String>{
+      for (final p in kpis.paretoSkus) ...{
+        if (p.barcode.isNotEmpty) p.barcode: p.category,
+        if (p.itemCode.isNotEmpty) p.itemCode: p.category,
+      },
+    };
     // Aggregate per SKU (the report can list a SKU per branch/region).
     final bySku = <String,
-        ({String name, int sIn, int sOut, int stock, String status})>{};
-    for (final i in cpfr.inventoryAndPoItems) {
+        ({
+      String name,
+      String category,
+      int sIn,
+      int sOut,
+      int stock,
+      String status
+    })>{};
+    for (final i in cpfr?.inventoryAndPoItems ??
+        const <SKUBranchInventoryModel>[]) {
       final k = i.barcode.isNotEmpty ? i.barcode : i.itemCode;
       final p = bySku[k];
       bySku[k] = (
         name: i.skuName,
+        category: catBy[i.barcode] ?? catBy[i.itemCode] ?? i.departmentAr,
         sIn: (p?.sIn ?? 0) + i.sellInUnits,
         sOut: (p?.sOut ?? 0) + i.sellOutUnits,
         stock: (p?.stock ?? 0) + i.estimatedStockUnits,
@@ -586,7 +580,11 @@ class _StockTable extends StatelessWidget {
     final top = rows.take(8).toList();
     final label = theme.textTheme.labelSmall
         ?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600);
-    final cell = theme.textTheme.bodySmall;
+    final cell = theme.textTheme.bodySmall?.copyWith(
+      color: cs.onSurface,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    Widget num(String v) => Text(v, style: cell, textAlign: TextAlign.end);
     return Card.outlined(
       key: const ValueKey('stock_per_sku_table'),
       margin: EdgeInsets.zero,
@@ -594,12 +592,21 @@ class _StockTable extends StatelessWidget {
         padding: M3Spacing.pMd,
         child:
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('المخزون حسب الصنف', style: theme.textTheme.titleSmall),
-          Text('منذ بداية العام (وحدة) · الحالة من تقرير CPFR',
-              style: theme.textTheme.labelSmall
-                  ?.copyWith(color: cs.onSurfaceVariant)),
+          _CardHeader(
+            icon: AppIcons.units,
+            title: 'المخزون حسب الصنف',
+            subtitle: 'منذ بداية العام (وحدة) · الحالة من تقرير CPFR',
+            count: top.length,
+            unit: 'أصناف',
+            badgeKey: const ValueKey('stock_per_sku_badge'),
+          ),
           M3Spacing.gapSM,
-          if (top.isEmpty)
+          if (loading && cpfr == null)
+            const LinearProgressIndicator(year2023: false)
+          else if (cpfr == null && error != null)
+            const _EmptyNote('تعذّر تحميل بيانات المخزون',
+                keyName: 'stock_per_sku_empty')
+          else if (top.isEmpty)
             const _EmptyNote('لا توجد بيانات مخزون لهذه الفترة',
                 keyName: 'stock_per_sku_empty')
           else
@@ -624,7 +631,7 @@ class _StockTable extends StatelessWidget {
                     'الحالة'
                   ])
                     Padding(
-                        padding: const EdgeInsets.only(bottom: 6.0),
+                        padding: const EdgeInsets.only(bottom: M3Spacing.xs),
                         child: Text(h, style: label)),
                 ]),
                 for (final r in top)
@@ -634,22 +641,40 @@ class _StockTable extends StatelessWidget {
                             Border(top: BorderSide(color: cs.outlineVariant))),
                     children: [
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6.0),
-                        child: Text(r.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: cell?.copyWith(fontWeight: FontWeight.w600)),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: M3Spacing.xs),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Tooltip(
+                              message: r.name,
+                              child: Text(r.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleSmall
+                                      ?.copyWith(color: cs.onSurface)),
+                            ),
+                            if (r.category.isNotEmpty)
+                              Text(r.category,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall
+                                      ?.copyWith(color: cs.onSurfaceVariant)),
+                          ],
+                        ),
                       ),
-                      Text(_fmtInt(r.sIn), style: cell),
-                      Text(_fmtInt(r.sOut), style: cell),
-                      Text(
-                          '${r.sIn - r.sOut > 0 ? '+' : ''}${_fmtInt(r.sIn - r.sOut)}',
-                          style: cell),
-                      Text(_pct(r.sIn > 0 ? r.sOut / r.sIn * 100.0 : 0.0),
-                          style: cell),
-                      Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: _StatusChip(status: r.status)),
+                      num(_fmtInt(r.sIn)),
+                      num(_fmtInt(r.sOut)),
+                      num('${r.sIn - r.sOut > 0 ? '+' : ''}${_fmtInt(r.sIn - r.sOut)}'),
+                      num(_pct(r.sIn > 0 ? r.sOut / r.sIn * 100.0 : 0.0)),
+                      Padding(
+                        padding:
+                            const EdgeInsetsDirectional.only(start: M3Spacing.xs),
+                        child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: _StatusChip(status: r.status)),
+                      ),
                     ],
                   ),
               ],
@@ -693,9 +718,16 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-class _MonthlyBars extends StatelessWidget {
-  const _MonthlyBars({required this.months, this.fill = false});
+class _MonthlyBarsCard extends StatelessWidget {
+  const _MonthlyBarsCard({
+    required this.months,
+    required this.loading,
+    required this.error,
+    this.fill = false,
+  });
   final List<ReconciliationMonthModel> months;
+  final bool loading;
+  final String? error;
 
   /// When true (wide row), the plot area grows to fill the card's height.
   final bool fill;
@@ -703,56 +735,77 @@ class _MonthlyBars extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final acc = M3StatusColors.of(context).accents;
     final maxV = months.fold<int>(
         1,
         (a, m) =>
             [a, m.sellInUnits, m.sellOutUnits].reduce((x, y) => x > y ? x : y));
     const chartH = 180.0;
+    final header = _CardHeader(
+      icon: AppIcons.barChart,
+      title: '\u2068Sell-In\u2069 مقابل \u2068Sell-Out\u2069 شهرياً',
+      subtitle: 'بالوحدات · إيقاع الأعمدة تقريبي للعرض',
+      count: months.length,
+      unit: 'شهور',
+      badgeKey: const ValueKey('sell_in_vs_out_badge'),
+    );
     return Card.outlined(
       key: const ValueKey('sell_in_vs_out_chart'),
       margin: EdgeInsets.zero,
       child: Padding(
         padding: M3Spacing.pMd,
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Monthly Sell-In vs Sell-Out (units)',
-              style: theme.textTheme.titleSmall),
-          M3Spacing.gapXS,
-          _Legend([(cs.primary, 'Sell-In'), (acc.tealBase, 'Sell-Out')]),
-          M3Spacing.gapMD,
-          _plotArea(
-            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              for (final m in months)
-                Expanded(
-                  child: Tooltip(
-                    message:
-                        '${m.monthEn}: Sell-In ${_fmtInt(m.sellInUnits)} · Sell-Out ${_fmtInt(m.sellOutUnits)}',
-                    child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              header,
+              M3Spacing.gapSM,
+              if (loading)
+                const LinearProgressIndicator(year2023: false)
+              else if (months.isEmpty)
+                _EmptyNote(
+                  error != null
+                      ? 'تعذّر تحميل بيانات Sell-In/Sell-Out'
+                      : 'لا توجد شهور بها بيانات Sell-In وSell-Out معًا',
+                  keyName: 'sell_in_vs_out_empty',
+                )
+              else ...[
+                // Sell-Out is the hero series; Sell-In is the neutral reference.
+                _Legend([(cs.primary, 'Sell-Out'), (cs.outline, 'Sell-In')]),
+                M3Spacing.gapMD,
+                _plotArea(
+                  Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    for (final m in months)
+                      Expanded(
+                        child: Tooltip(
+                          message:
+                              '${m.monthEn}: Sell-In ${_fmtInt(m.sellInUnits)} · Sell-Out ${_fmtInt(m.sellOutUnits)}',
+                          child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
                               children: [
-                                _bar(m.sellInUnits / maxV * chartH, cs.primary),
-                                const SizedBox(width: 3.0),
-                                _bar(m.sellOutUnits / maxV * chartH,
-                                    acc.tealBase),
+                                Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      _bar(m.sellOutUnits / maxV * chartH,
+                                          cs.primary),
+                                      const SizedBox(width: 3.0),
+                                      _bar(m.sellInUnits / maxV * chartH,
+                                          cs.outline),
+                                    ]),
+                                M3Spacing.gapXXS,
+                                Text(
+                                    m.monthEn.length > 3
+                                        ? m.monthEn.substring(0, 3)
+                                        : m.monthEn,
+                                    maxLines: 1,
+                                    style: theme.textTheme.labelSmall),
                               ]),
-                          M3Spacing.gapXXS,
-                          Text(
-                              m.monthEn.length > 3
-                                  ? m.monthEn.substring(0, 3)
-                                  : m.monthEn,
-                              style: theme.textTheme.labelSmall),
-                        ]),
-                  ),
+                        ),
+                      ),
+                  ]),
+                  chartH + 20.0,
                 ),
+              ],
             ]),
-            chartH + 20.0,
-          ),
-        ]),
       ),
     );
   }
@@ -848,6 +901,7 @@ class _Donut extends StatelessWidget {
 /// Side-by-side cards that share the height of the taller card.
 class _EqualHeightRow extends MultiChildRenderObjectWidget {
   const _EqualHeightRow({
+    super.key,
     required this.spacing,
     required this.textDirection,
     required super.children,

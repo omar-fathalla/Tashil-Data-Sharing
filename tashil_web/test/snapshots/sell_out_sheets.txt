@@ -1,242 +1,243 @@
-01 / 2026 | 13.0 | FontWeight.w600 | ff1a1b21 | 0.25 | 1.43
-01 / 2026 | 13.0 | FontWeight.w600 | ff1a1b21 | 0.25 | 1.43
-01 / 2026 | 13.0 | FontWeight.w600 | ff1a1b21 | 0.25 | 1.43
-01 / 2026 | 13.0 | FontWeight.w600 | ff1a1b21 | 0.25 | 1.43
-01-12 / 2026 | 13.0 | FontWeight.w600 | ff1a1b21 | 0.25 | 1.43
-01-12 / 2026 | 13.0 | FontWeight.w600 | ff1a1b21 | 0.25 | 1.43
-01-12 / 2026 | 13.0 | FontWeight.w600 | ff1a1b21 | 0.25 | 1.43
-01-12 / 2026 | 13.0 | FontWeight.w600 | ff1a1b21 | 0.25 | 1.43
-01-12 / 2026 | 13.0 | FontWeight.w600 | ff1a1b21 | 0.25 | 1.43
-01-12 / 2026 | 13.0 | FontWeight.w600 | ff1a1b21 | 0.25 | 1.43
-01-12 / 2026 | 13.0 | FontWeight.w600 | ff1a1b21 | 0.25 | 1.43
-01-12 / 2026 | 13.0 | FontWeight.w600 | ff1a1b21 | 0.25 | 1.43
-12.92 MB | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-12.92 MB | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-13.17 MB | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-13.17 MB | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-164,733 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-164,733 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-164,733 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-164,733 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-164,733 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-164,733 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-164,733 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-164,733 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-2024 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-2025 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-2026 | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-2026-03-08 09:00 | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-2026-03-08 09:00 | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-2026-03-08 09:00 | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-2026-03-08 09:00 | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-2026-03-08 09:30 | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-2026-03-08 09:30 | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-2026-03-08 09:30 | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-2026-03-08 09:30 | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-2026-03-08 10:00 | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-2026-03-08 10:00 | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-2026-03-08 10:00 | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-2026-03-08 10:00 | 12.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-252.6 KB | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-252.6 KB | 11.0 | FontWeight.w400 | ff45464f | 0.25 | 1.43
-256,735 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-256,735 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-256,735 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-256,735 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-256,735 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-256,735 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-256,735 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-256,735 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-40 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-40 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-47,080,999 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-47,080,999 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-47,080,999 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-47,080,999 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-5,330 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-5,330 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-5,330 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-5,330 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-5,330 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-5,330 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-5,330 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-5,330 | 13.0 | FontWeight.w700 | ff1a1b21 | 0.25 | 1.43
-6,573,015 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-6,573,015 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-6,573,015 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-6,573,015 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-9,537,095 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-9,537,095 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-9,537,095 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-9,537,095 ج.م | 13.0 | FontWeight.w800 | ff1565c0 | 0.25 | 1.43
-Actions | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-Actions | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-BEET-ELGOMLA | 11.0 | FontWeight.w800 | ff304578 | 0.25 | 1.43
-BEET-ELGOMLA | 11.0 | FontWeight.w800 | ff304578 | 0.25 | 1.43
-Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Beet El Gomla | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Book1 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-Book1 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-Book6 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-Book6 | 13.0 | FontWeight.w800 | ff1a1b21 | 0.25 | 1.43
-Chain | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-Chain | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
-Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
-Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
-Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
-Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
-Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
-Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
-Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
-Delete | 14.0 | FontWeight.w600 | ffba1a1a | 0.1 | null
-Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Download | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-Edit | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-El Wakala | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-FATHALLA | 11.0 | FontWeight.w800 | ff304578 | 0.25 | 1.43
-FATHALLA | 11.0 | FontWeight.w800 | ff304578 | 0.25 | 1.43
-Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Fathalla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-GOMLA | 11.0 | FontWeight.w800 | ff304578 | 0.25 | 1.43
-GOMLA | 11.0 | FontWeight.w800 | ff304578 | 0.25 | 1.43
-Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Gomla Market | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-Period | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-Period | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-Sales Data | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Sales Data | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Sell-Out | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-Out | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Sell-Out | 13.0 | FontWeight.w700 | ff1565c0 | 0.15 | 1.43
-Store Performance | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Store Performance | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Targets | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Targets | 14.0 | FontWeight.w700 | ff45464f | 0.25 | 1.43
-Transactions | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-Transactions | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-Uploaded Files (3) | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
-Uploaded Files (3) | 14.0 | FontWeight.w800 | ff404659 | 0.25 | 1.43
-أبريل | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-أبريل | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-أغسطس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-أغسطس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-أكتوبر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-أكتوبر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-ارفع ملف كل شهر، ويمكنك استبداله أو تنزيله أو حذفه. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-ارفع ملف كل شهر، ويمكنك استبداله أو تنزيله أو حذفه. | 12.0 | FontWeight.w400 | ff45464f | 0.4 | 1.33
-اسحب أو تحرك: | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-اسحب أو تحرك: | 11.0 | FontWeight.w600 | ff45464f | 0.5 | 1.45
-السلسلة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-السلسلة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-السلسلة | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-السلسلة | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-السنة (اختياري) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-السنة (اختياري) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-السنة (اختياري) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-السنة (اختياري) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-السنة (اختياري) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-السنة (اختياري) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-السنة (اختياري) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-الشهر (اختياري) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-الشهر (اختياري) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-الشهر (اختياري) | 13.0 | FontWeight.w600 | ff1a1b21 | null | null
-الشهر (اختياري) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-الشهر (اختياري) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-الشهر (اختياري) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-الشهر (اختياري) | 15.0 | FontWeight.w400 | ff45464f | 0.5 | 1.0
-الملف | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-الملف | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-الوحدات المباعة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-الوحدات المباعة | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-تاريخ الرفع | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-تاريخ الرفع | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-تحديث | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-تحديث | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-تحديث | 14.0 | FontWeight.w600 | ff1565c0 | 0.1 | null
-ديسمبر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-ديسمبر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-رفع ملف Sell-Out | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
-رفع ملف Sell-Out | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
-رفع ملف Sell-Out | 14.0 | FontWeight.w600 | ffffffff | 0.1 | null
-سبتمبر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-سبتمبر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-شمال | 11.0 | FontWeight.w700 | ff1d1b20 | 0.5 | 1.45
-شمال | 11.0 | FontWeight.w700 | ff1d1b20 | 0.5 | 1.45
-صافي Sell-Out (ج.م) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-صافي Sell-Out (ج.م) | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | 1.43
-فبراير | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-فبراير | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-مارس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-مارس | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-مايو | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-مايو | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-مبيعات السلاسل للمستهلك وأداء الفروع والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
-مبيعات السلاسل للمستهلك وأداء الفروع والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
-مبيعات السلاسل للمستهلك وأداء الفروع والمستهدفات | 18.0 | FontWeight.w800 | ff1a1b21 | 0.0 | 1.27
-ملفات Sell-Out المرفوعة | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
-ملفات Sell-Out المرفوعة | 15.0 | FontWeight.w800 | ff1a1b21 | 0.15 | 1.5
-من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-نوفمبر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-نوفمبر | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-يمين | 11.0 | FontWeight.w700 | ff1d1b20 | 0.5 | 1.45
-يمين | 11.0 | FontWeight.w700 | ff1d1b20 | 0.5 | 1.45
-يناير | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-يناير | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-يوليو | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-يوليو | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-يونيو | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-يونيو | 14.0 | FontWeight.w600 | ff1a1b21 | 0.1 | null
-󰂭 | 20.0 | null | ff45464f | null | 1.0
-󰃩 | 18.0 | null | ff1565c0 | null | 1.0
-󰇾 | 15.0 | null | ff1565c0 | null | 1.0
-󰉈 | 20.0 | null | ff45464f | null | 1.0
+01 / 2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.25 | 1.4285714285714286
+01 / 2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.25 | 1.4285714285714286
+01 / 2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.25 | 1.4285714285714286
+01 / 2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.25 | 1.4285714285714286
+01-12 / 2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.25 | 1.4285714285714286
+01-12 / 2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.25 | 1.4285714285714286
+01-12 / 2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.25 | 1.4285714285714286
+01-12 / 2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.25 | 1.4285714285714286
+01-12 / 2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.25 | 1.4285714285714286
+01-12 / 2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.25 | 1.4285714285714286
+01-12 / 2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.25 | 1.4285714285714286
+01-12 / 2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.25 | 1.4285714285714286
+12.92 MB | 11.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+12.92 MB | 11.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+13.17 MB | 11.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+13.17 MB | 11.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+164,733 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+164,733 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+164,733 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+164,733 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+164,733 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+164,733 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+164,733 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+164,733 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+2024 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+2024 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+2025 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+2025 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+2026 | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+2026-03-08 09:00 | 12.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+2026-03-08 09:00 | 12.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+2026-03-08 09:00 | 12.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+2026-03-08 09:00 | 12.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+2026-03-08 09:30 | 12.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+2026-03-08 09:30 | 12.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+2026-03-08 09:30 | 12.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+2026-03-08 09:30 | 12.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+2026-03-08 10:00 | 12.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+2026-03-08 10:00 | 12.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+2026-03-08 10:00 | 12.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+2026-03-08 10:00 | 12.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+252.6 KB | 11.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+252.6 KB | 11.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+256,735 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+256,735 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+256,735 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+256,735 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+256,735 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+256,735 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+256,735 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+256,735 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+40 | 14.0 | FontWeight.w800 | ff191d17 | 0.25 | 1.4285714285714286
+40 | 14.0 | FontWeight.w800 | ff191d17 | 0.25 | 1.4285714285714286
+47,080,999 ج.م | 14.0 | FontWeight.w800 | ff426834 | 0.25 | 1.4285714285714286
+47,080,999 ج.م | 14.0 | FontWeight.w800 | ff426834 | 0.25 | 1.4285714285714286
+47,080,999 ج.م | 14.0 | FontWeight.w800 | ff426834 | 0.25 | 1.4285714285714286
+47,080,999 ج.م | 14.0 | FontWeight.w800 | ff426834 | 0.25 | 1.4285714285714286
+5,330 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+5,330 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+5,330 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+5,330 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+5,330 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+5,330 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+5,330 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+5,330 | 14.0 | FontWeight.w700 | ff191d17 | 0.25 | 1.4285714285714286
+6,573,015 ج.م | 14.0 | FontWeight.w800 | ff426834 | 0.25 | 1.4285714285714286
+6,573,015 ج.م | 14.0 | FontWeight.w800 | ff426834 | 0.25 | 1.4285714285714286
+6,573,015 ج.م | 14.0 | FontWeight.w800 | ff426834 | 0.25 | 1.4285714285714286
+6,573,015 ج.م | 14.0 | FontWeight.w800 | ff426834 | 0.25 | 1.4285714285714286
+9,537,095 ج.م | 14.0 | FontWeight.w800 | ff426834 | 0.25 | 1.4285714285714286
+9,537,095 ج.م | 14.0 | FontWeight.w800 | ff426834 | 0.25 | 1.4285714285714286
+9,537,095 ج.م | 14.0 | FontWeight.w800 | ff426834 | 0.25 | 1.4285714285714286
+9,537,095 ج.م | 14.0 | FontWeight.w800 | ff426834 | 0.25 | 1.4285714285714286
+Actions | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+Actions | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+BEET-ELGOMLA | 11.0 | FontWeight.w800 | ff2b4f1e | 0.25 | 1.4285714285714286
+BEET-ELGOMLA | 11.0 | FontWeight.w800 | ff2b4f1e | 0.25 | 1.4285714285714286
+Beet El Gomla | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+Beet El Gomla | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+Book1 | 14.0 | FontWeight.w800 | ff191d17 | 0.25 | 1.4285714285714286
+Book1 | 14.0 | FontWeight.w800 | ff191d17 | 0.25 | 1.4285714285714286
+Book6 | 14.0 | FontWeight.w800 | ff191d17 | 0.25 | 1.4285714285714286
+Book6 | 14.0 | FontWeight.w800 | ff191d17 | 0.25 | 1.4285714285714286
+Chain | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+Chain | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+Delete | 14.0 | FontWeight.w500 | ffba1a1a | 0.1 | 1.4285714285714286
+Delete | 14.0 | FontWeight.w500 | ffba1a1a | 0.1 | 1.4285714285714286
+Delete | 14.0 | FontWeight.w500 | ffba1a1a | 0.1 | 1.4285714285714286
+Delete | 14.0 | FontWeight.w500 | ffba1a1a | 0.1 | 1.4285714285714286
+Delete | 14.0 | FontWeight.w500 | ffba1a1a | 0.1 | 1.4285714285714286
+Delete | 14.0 | FontWeight.w500 | ffba1a1a | 0.1 | 1.4285714285714286
+Delete | 14.0 | FontWeight.w500 | ffba1a1a | 0.1 | 1.4285714285714286
+Delete | 14.0 | FontWeight.w500 | ffba1a1a | 0.1 | 1.4285714285714286
+Delete | 14.0 | FontWeight.w500 | ffba1a1a | 0.1 | 1.4285714285714286
+Download | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Download | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Download | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Download | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Download | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Download | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Download | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Download | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Download | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Edit | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Edit | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Edit | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Edit | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Edit | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Edit | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Edit | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Edit | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+Edit | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+El Wakala | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+El Wakala | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+FATHALLA | 11.0 | FontWeight.w800 | ff2b4f1e | 0.25 | 1.4285714285714286
+FATHALLA | 11.0 | FontWeight.w800 | ff2b4f1e | 0.25 | 1.4285714285714286
+Fathalla Market | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+Fathalla Market | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+GOMLA | 11.0 | FontWeight.w800 | ff2b4f1e | 0.25 | 1.4285714285714286
+GOMLA | 11.0 | FontWeight.w800 | ff2b4f1e | 0.25 | 1.4285714285714286
+Gomla Market | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+Gomla Market | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+Period | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+Period | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+Sales Data | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
+Sales Data | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
+Sell-Out | 14.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+Sell-Out | 14.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
+Store Performance | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
+Store Performance | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
+Targets | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
+Targets | 14.0 | FontWeight.w700 | ff43483f | 0.25 | 1.4285714285714286
+Transactions | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+Transactions | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+Uploaded Files (3) | 14.0 | FontWeight.w800 | ff3d4b36 | 0.25 | 1.4285714285714286
+Uploaded Files (3) | 14.0 | FontWeight.w800 | ff3d4b36 | 0.25 | 1.4285714285714286
+أبريل | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+أبريل | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+أغسطس | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+أغسطس | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+أكتوبر | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+أكتوبر | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+ارفع ملف كل شهر، ويمكنك استبداله أو تنزيله أو حذفه. | 12.0 | FontWeight.w400 | ff43483f | 0.4 | 1.3333333333333333
+ارفع ملف كل شهر، ويمكنك استبداله أو تنزيله أو حذفه. | 12.0 | FontWeight.w400 | ff43483f | 0.4 | 1.3333333333333333
+اسحب أو تحرك: | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
+اسحب أو تحرك: | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
+السلسلة | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+السلسلة | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+السلسلة | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+السلسلة | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+السلسلة | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+السلسلة | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+السلسلة | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+السنة (اختياري) | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+السنة (اختياري) | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+السنة (اختياري) | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+السنة (اختياري) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+السنة (اختياري) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+السنة (اختياري) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+السنة (اختياري) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+الشهر (اختياري) | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+الشهر (اختياري) | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+الشهر (اختياري) | 14.0 | FontWeight.w500 | ff191d17 | null | 1.4285714285714286
+الشهر (اختياري) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+الشهر (اختياري) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+الشهر (اختياري) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+الشهر (اختياري) | 16.0 | FontWeight.w400 | ff43483f | 0.5 | 1.0
+الملف | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+الملف | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+الوحدات المباعة | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+الوحدات المباعة | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+تاريخ الرفع | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+تاريخ الرفع | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+تحديث | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+تحديث | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+تحديث | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+ديسمبر | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+ديسمبر | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+رفع ملف Sell-Out | 14.0 | FontWeight.w500 | ffffffff | 0.1 | 1.4285714285714286
+رفع ملف Sell-Out | 14.0 | FontWeight.w500 | ffffffff | 0.1 | 1.4285714285714286
+رفع ملف Sell-Out | 14.0 | FontWeight.w500 | ffffffff | 0.1 | 1.4285714285714286
+سبتمبر | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+سبتمبر | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+شمال | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+شمال | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+شمال | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+صافي Sell-Out (ج.م) | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+صافي Sell-Out (ج.م) | 14.0 | FontWeight.w500 | ff191d17 | 0.25 | 1.4285714285714286
+فبراير | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+فبراير | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+مارس | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+مارس | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+مايو | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+مايو | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+مبيعات السلاسل للمستهلك وأداء الفروع والمستهدفات | 24.0 | FontWeight.w400 | ff191d17 | 0.0 | 1.3333333333333333
+مبيعات السلاسل للمستهلك وأداء الفروع والمستهدفات | 24.0 | FontWeight.w400 | ff191d17 | 0.0 | 1.3333333333333333
+مبيعات السلاسل للمستهلك وأداء الفروع والمستهدفات | 24.0 | FontWeight.w400 | ff191d17 | 0.0 | 1.3333333333333333
+ملفات Sell-Out المرفوعة | 16.0 | FontWeight.w800 | ff191d17 | 0.15 | 1.5
+ملفات Sell-Out المرفوعة | 16.0 | FontWeight.w800 | ff191d17 | 0.15 | 1.5
+من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+من الملف تلقائيًا | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+نوفمبر | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+نوفمبر | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+يمين | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+يمين | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+يمين | 14.0 | FontWeight.w500 | ff426834 | 0.1 | 1.4285714285714286
+يناير | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+يناير | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+يوليو | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+يوليو | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+يونيو | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+يونيو | 14.0 | FontWeight.w600 | ff191d17 | 0.1 | 1.4285714285714286
+󰂭 | 20.0 | null | ff43483f | null | 1.0
+󰃩 | 18.0 | null | ff426834 | null | 1.0
+󰇾 | 15.0 | null | ff426834 | null | 1.0
+󰉈 | 20.0 | null | ff43483f | null | 1.0
 󰉪 | 20.0 | null | ffffffff | null | 1.0
-󰌞 | 20.0 | null | ff404659 | null | 1.0
- | 14.0 | null | ff1a1b21 | null | 1.0
- | 18.0 | null | ff45464f | null | 1.0
- | 18.0 | null | ff45464f | null | 1.0
- | 18.0 | null | ff45464f | null | 1.0
- | 24.0 | null | ff45464f | null | 1.0
- | 24.0 | null | ff45464f | null | 1.0
- | 24.0 | null | ff45464f | null | 1.0
- | 14.0 | null | ff1a1b21 | null | 1.0
- | 24.0 | null | ff304578 | null | 1.0
- | 16.0 | null | ffba1a1a | null | 1.0
- | 16.0 | null | ffba1a1a | null | 1.0
- | 16.0 | null | ffba1a1a | null | 1.0
- | 20.0 | null | ff388e3c | null | 1.0
- | 20.0 | null | ff388e3c | null | 1.0
- | 20.0 | null | ff388e3c | null | 1.0
- | 16.0 | null | ff1565c0 | null | 1.0
- | 16.0 | null | ff1565c0 | null | 1.0
- | 16.0 | null | ff1565c0 | null | 1.0
- | 16.0 | null | ff1565c0 | null | 1.0
- | 16.0 | null | ff1565c0 | null | 1.0
- | 16.0 | null | ff1565c0 | null | 1.0
- | 20.0 | null | ff45464f | null | 1.0
+󰌞 | 20.0 | null | ff3d4b36 | null | 1.0
+ | 18.0 | null | ff426834 | null | 1.0
+ | 18.0 | null | ff43483f | null | 1.0
+ | 18.0 | null | ff43483f | null | 1.0
+ | 18.0 | null | ff43483f | null | 1.0
+ | 24.0 | null | ff43483f | null | 1.0
+ | 24.0 | null | ff43483f | null | 1.0
+ | 24.0 | null | ff43483f | null | 1.0
+ | 18.0 | null | ff426834 | null | 1.0
+ | 24.0 | null | ff2b4f1e | null | 1.0
+ | 20.0 | null | ffba1a1a | null | 1.0
+ | 20.0 | null | ffba1a1a | null | 1.0
+ | 20.0 | null | ffba1a1a | null | 1.0
+ | 20.0 | null | ff2e7d32 | null | 1.0
+ | 20.0 | null | ff2e7d32 | null | 1.0
+ | 20.0 | null | ff2e7d32 | null | 1.0
+ | 20.0 | null | ff426834 | null | 1.0
+ | 20.0 | null | ff426834 | null | 1.0
+ | 20.0 | null | ff426834 | null | 1.0
+ | 20.0 | null | ff426834 | null | 1.0
+ | 20.0 | null | ff426834 | null | 1.0
+ | 20.0 | null | ff426834 | null | 1.0
+ | 20.0 | null | ff43483f | null | 1.0
