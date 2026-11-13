@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
-import 'package:tashil_web/core/widgets/kpi_card.dart';
+import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/widgets/m3_status_tag.dart';
@@ -44,7 +44,7 @@ void main() {
     testWidgets('all KPI cards share one height @${width.toInt()}',
         (tester) async {
       await _pump(tester, width);
-      final cards = find.byType(KpiCard);
+      final cards = find.byType(M3SummaryKpiCard);
       expect(cards, findsNWidgets(4));
       final heights = cards
           .evaluate()
@@ -53,6 +53,7 @@ void main() {
       for (final h in heights) {
         expect(h, moreOrLessEquals(heights.first, epsilon: 0.5),
             reason: 'KPI heights $heights');
+        expect(h, closeTo(138.0, 2.0), reason: 'vs Sell-Out 138: $heights');
       }
     });
   }

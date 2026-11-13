@@ -1,26 +1,38 @@
 import 'package:flutter/material.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
-import '../../../../core/widgets/kpi_card.dart';
-import '../../../../core/widgets/m3_equal_height_grid.dart';
-import '../../../../core/widgets/app_icons.dart';
+import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/shared_display_prefix.dart';
+import '../../../../core/widgets/app_icons.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
 
-/// BentoKpiGrid renders executive KPIs in an M3 Bento-style asymmetric card layout.
+/// Executive summary KPIs, using the shared Sell-Out card (138px, 1+1 lines).
 class BentoKpiGrid extends StatelessWidget {
   final ExecutiveKPIsModel kpis;
 
-  const BentoKpiGrid({
-    super.key,
-    required this.kpis,
-  });
+  const BentoKpiGrid({super.key, required this.kpis});
 
-  /// Shown instead of "+0.0%" when there is no last-year data to compare.
-  static const String noLastYearLabel = '— لا توجد بيانات للعام السابق';
+  /// Shown on the detail line when there is no last-year data to compare.
+  static const String noLastYearLabel = 'لا توجد بيانات للعام السابق';
 
-  static String _formatSignedPctValue(double pct) {
+  static String _formatSignedPct(double pct) {
     final sign = pct >= 0 ? '+' : '';
-    return '$sign$pct%';
+    return '$sign${pct.toStringAsFixed(1)}%';
+  }
+
+  /// One-line YoY/MoM detail. When last-year data is missing, the value is
+  /// «—» and the explanation sits on the same detail line (Sell-Out 138px).
+  static String _yearDetail({
+    required bool yoyAvailable,
+    required double momPct,
+    required double yoyPct,
+  }) {
+    if (!yoyAvailable) {
+      return '— · $noLastYearLabel';
+    }
+    return '${_formatSignedPct(momPct)} شهر · ${_formatSignedPct(yoyPct)} مقارنة بالعام السابق';
   }
 
   static String _shortChainNameAr(ChainShareItem item) {
@@ -47,7 +59,9 @@ class BentoKpiGrid extends StatelessWidget {
         .where((c) => c.totalRevenue > 0 || c.totalUnits > 0)
         .toList();
     if (activeChains.isNotEmpty) {
-      final names = activeChains.map(_shortChainNameAr).toList();
+      final names = stripSharedLeadingPrefix(
+        activeChains.map(_shortChainNameAr).toList(),
+      );
       if (names.length == 1) {
         return 'فروع ${names.first} من الملف المرفوع';
       }
@@ -61,9 +75,9 @@ class BentoKpiGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Adaptive grid columns based on width
         final int crossAxisCount;
         if (constraints.maxWidth >= 1000) {
           crossAxisCount = 4;
@@ -75,10 +89,8 @@ class BentoKpiGrid extends StatelessWidget {
 
         final double cardWidth =
             (constraints.maxWidth - ((crossAxisCount - 1) * M3Spacing.sm)) /
-                crossAxisCount;
+            crossAxisCount;
 
-        // All KPI cards share the tallest card's height (OOS has two tag
-        // lines).
         return M3EqualHeightGrid(
           key: const ValueKey('exec_kpi_grid'),
           columns: crossAxisCount,
@@ -87,70 +99,65 @@ class BentoKpiGrid extends StatelessWidget {
           children: [
             SizedBox(
               width: cardWidth,
-              child: KpiCard(
+              child: M3SummaryKpiCard(
+                key: const ValueKey('kpi_card_exec_sellout'),
+                valueKey: const ValueKey('kpi_value_exec_sellout'),
+                subtitleKey: const ValueKey('kpi_subtitle_exec_sellout'),
                 title: 'إجمالي Sell-Out',
                 value: CurrencyFormatter.formatCompactEGP(kpis.totalRevenue),
-                subtitle: CurrencyFormatter.formatEGP(kpis.totalRevenue),
+                subtitle: _yearDetail(
+                  yoyAvailable: kpis.yoyAvailable,
+                  momPct: kpis.revenueMomPct,
+                  yoyPct: kpis.revenueYoyPct,
+                ),
                 icon: AppIcons.money,
-                growthPct: kpis.revenueGrowthPct,
-                badgeLabel:
-                    '${_formatSignedPctValue(kpis.revenueMomPct)} مقارنة بالشهر السابق',
-                secondaryBadgeLabel: kpis.yoyAvailable
-                    ? '${_formatSignedPctValue(kpis.revenueYoyPct)} مقارنة بالعام السابق'
-                    : noLastYearLabel,
-                isPositive: kpis.revenueMomPct >= 0,
+                color: colorScheme.primary,
               ),
             ),
             SizedBox(
               width: cardWidth,
-              child: KpiCard(
+              child: M3SummaryKpiCard(
+                key: const ValueKey('kpi_card_exec_units'),
+                valueKey: const ValueKey('kpi_value_exec_units'),
+                subtitleKey: const ValueKey('kpi_subtitle_exec_units'),
                 title: 'إجمالي الوحدات المباعة',
-                value:
-                    CurrencyFormatter.formatCompactUnits(kpis.totalUnitsSold),
-                subtitle:
-                    '${CurrencyFormatter.formatUnits(kpis.totalUnitsSold)} وحدة',
+                value: CurrencyFormatter.formatCompactUnits(
+                  kpis.totalUnitsSold,
+                ),
+                subtitle: _yearDetail(
+                  yoyAvailable: kpis.yoyAvailable,
+                  momPct: kpis.unitsMomPct,
+                  yoyPct: kpis.unitsYoyPct,
+                ),
                 icon: AppIcons.units,
-                growthPct: kpis.unitsGrowthPct,
-                badgeLabel:
-                    '${_formatSignedPctValue(kpis.unitsMomPct)} مقارنة بالشهر السابق',
-                secondaryBadgeLabel: kpis.yoyAvailable
-                    ? '${_formatSignedPctValue(kpis.unitsYoyPct)} مقارنة بالعام السابق'
-                    : noLastYearLabel,
-                isPositive: kpis.unitsMomPct >= 0,
+                color: colorScheme.tertiary,
               ),
             ),
             SizedBox(
               width: cardWidth,
-              child: KpiCard(
+              child: M3SummaryKpiCard(
+                key: const ValueKey('kpi_card_exec_stores'),
+                valueKey: const ValueKey('kpi_value_exec_stores'),
+                subtitleKey: const ValueKey('kpi_subtitle_exec_stores'),
                 title: 'الفروع النشطة',
-                value:
-                    '${kpis.activeStoresCount} ${kpis.activeStoresCount >= 3 && kpis.activeStoresCount <= 10 ? 'فروع' : 'فرع'}',
+                value: countBranches(kpis.activeStoresCount),
                 subtitle: _buildActiveBranchesSubtitle(),
                 icon: AppIcons.store,
-                growthPct: 0.0,
-                badgeLabel:
-                    kpis.activeStoresCount > 0 ? 'نشطة' : 'لا توجد فروع نشطة',
-                secondaryBadgeLabel: kpis.tenantMarketSharePct > 0
-                    ? 'الحصة السوقية ${kpis.tenantMarketSharePct.toStringAsFixed(2)}% • ${kpis.totalSkusCount} صنف'
-                    : null,
-                isPositive: true,
+                color: colorScheme.secondary,
               ),
             ),
             SizedBox(
               width: cardWidth,
-              child: KpiCard(
+              child: M3SummaryKpiCard(
+                key: const ValueKey('kpi_card_exec_oos'),
+                valueKey: const ValueKey('kpi_value_exec_oos'),
+                subtitleKey: const ValueKey('kpi_subtitle_exec_oos'),
                 title: 'نسبة نفاد المخزون (OOS)',
                 value: '${kpis.oosRatePct.toStringAsFixed(1)}%',
                 subtitle:
-                    'المبيعات المفقودة (تقديري): ${CurrencyFormatter.formatCompactEGP(kpis.estimatedLostRevenue)}',
+                    'OSA ${kpis.osaRatePct.toStringAsFixed(1)}% · نفاد المخزون ${kpis.oosRatePct.toStringAsFixed(1)}%',
                 icon: AppIcons.warning,
-                growthPct: -kpis.oosRatePct,
-                badgeLabel:
-                    'التوفر على الرف (OSA) ${kpis.osaRatePct.toStringAsFixed(1)}%',
-                secondaryBadgeLabel:
-                    'نفاد المخزون ${kpis.oosRatePct.toStringAsFixed(1)}% • ${kpis.totalOOSIncidents} حالة نفاد',
-                isPositive: false,
-                isAlert: true,
+                color: colorScheme.error,
               ),
             ),
           ],

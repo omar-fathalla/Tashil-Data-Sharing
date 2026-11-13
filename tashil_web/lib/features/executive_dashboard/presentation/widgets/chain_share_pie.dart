@@ -1,5 +1,6 @@
 import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/utils/shared_display_prefix.dart';
 import 'package:tashil_web/core/utils/arabic_plural.dart';
 import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
@@ -14,10 +15,7 @@ import '../../../../core/utils/currency_formatter.dart';
 class ChainSharePie extends StatelessWidget {
   final List<ChainShareItem> chainShares;
 
-  const ChainSharePie({
-    super.key,
-    required this.chainShares,
-  });
+  const ChainSharePie({super.key, required this.chainShares});
 
   static const List<Color> _chainColors = M3StatusColors.chainPalette;
 
@@ -95,8 +93,9 @@ class ChainSharePie extends StatelessWidget {
       final lastOpen = trimmed.lastIndexOf('(');
       if (lastOpen > 0) {
         final first = trimmed.substring(0, lastOpen).trim();
-        final second =
-            trimmed.substring(lastOpen + 1, trimmed.length - 1).trim();
+        final second = trimmed
+            .substring(lastOpen + 1, trimmed.length - 1)
+            .trim();
         final arabicRegex = RegExp(r'[\u0600-\u06FF]');
         final latinRegex = RegExp(r'[A-Za-z]');
         final firstHasAr = arabicRegex.hasMatch(first);
@@ -119,6 +118,11 @@ class ChainSharePie extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final displayNames = displayNamesWithoutSharedPrefix(
+      chainShares.map((c) => c.displayName),
+    );
+    String labelOf(ChainShareItem item) =>
+        displayNames[item.displayName] ?? item.displayName;
 
     return Card.outlined(
       child: Padding(
@@ -133,20 +137,20 @@ class ChainSharePie extends StatelessWidget {
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      M3SectionTitle('حصة كل سلسلة من المبيعات'),
-                    ],
+                    children: [M3SectionTitle('حصة كل سلسلة من المبيعات')],
                   ),
                 ),
                 const SizedBox(width: 8.0),
                 M3StatusTag(
-                  label:
-                      countActiveChains(chainShares.length),
+                  label: countActiveChains(chainShares.length),
                   icon: AppIcons.filterList,
                 ),
                 const SizedBox(width: 6.0),
-                Icon(AppIcons.pieChart,
-                    size: 20.0, color: colorScheme.onSurfaceVariant),
+                Icon(
+                  AppIcons.pieChart,
+                  size: 20.0,
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ],
             ),
             const SizedBox(height: 4.0),
@@ -173,7 +177,7 @@ class ChainSharePie extends StatelessWidget {
                         flex: (item.marketShare * 10).round().clamp(1, 1000),
                         child: Tooltip(
                           message:
-                              '${item.displayName}: ${item.marketShare.toStringAsFixed(1)}%',
+                              '${labelOf(item)}: ${item.marketShare.toStringAsFixed(1)}%',
                           child: Container(color: color),
                         ),
                       );
@@ -191,10 +195,11 @@ class ChainSharePie extends StatelessWidget {
               itemBuilder: (context, index) {
                 final item = chainShares[index];
                 final color = colorForChain(item.retailerChain, index);
-                final rawLabel = (item.displayName.trim().isNotEmpty &&
+                final rawLabel =
+                    (item.displayName.trim().isNotEmpty &&
                         item.displayName.trim().toLowerCase() !=
                             item.retailerChain.trim().toLowerCase())
-                    ? item.displayName
+                    ? labelOf(item)
                     : labelForChain(item.retailerChain);
                 final parts = splitBilingualLabel(rawLabel);
 
