@@ -23,11 +23,15 @@ class AnomalyResolutionTable extends StatelessWidget {
           padding: M3Spacing.pMd,
           child: Row(
             children: [
-              const Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 20.0),
+              const Icon(Icons.check_circle_outline_rounded,
+                  color: Colors.green, size: 20.0),
               M3Spacing.gapSM,
-              Text(
-                'لم يتم رصد أي شذوذ في البيانات؛ جميع السجلات مطابقة للمعايير القياسية بنسبة 100%.',
-                style: theme.textTheme.bodyMedium,
+              Expanded(
+                child: Text(
+                  'لم يتم رصد أي شذوذ في البيانات؛ جميع السجلات مطابقة للمعايير القياسية بنسبة 100%.',
+                  maxLines: 3,
+                  style: theme.textTheme.bodyMedium,
+                ),
               ),
             ],
           ),
@@ -43,12 +47,14 @@ class AnomalyResolutionTable extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.rule_folder_rounded, color: Colors.amber, size: 20.0),
+                const Icon(Icons.rule_folder_rounded,
+                    color: Colors.amber, size: 20.0),
                 M3Spacing.gapSM,
-                Text(
-                  'تقرير المعالجة الدلالية وكشف الشذوذ (Semantic Resolutions)',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    'تقرير المعالجة الدلالية وكشف الشذوذ (Semantic Resolutions)',
+                    maxLines: 3,
+                    style: theme.textTheme.titleMedium,
                   ),
                 ),
               ],
@@ -56,6 +62,7 @@ class AnomalyResolutionTable extends StatelessWidget {
             const SizedBox(height: 4.0),
             Text(
               'سجل الحالات التي تم فحصها وتصحيحها تلقائياً بواسطة وكيل الذكاء الاصطناعي',
+              maxLines: 3,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -74,13 +81,16 @@ class AnomalyResolutionTable extends StatelessWidget {
 
                 final badgeColor = issueType == 'invalid_barcode'
                     ? Colors.purple
-                    : (issueType == 'unmapped_store' ? Colors.blue : Colors.amber.shade800);
+                    : (issueType == 'unmapped_store'
+                        ? Colors.blue
+                        : Colors.amber.shade800);
 
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8.0, vertical: 2.0),
                       decoration: BoxDecoration(
                         color: badgeColor.withOpacity(0.12),
                         borderRadius: M3Shape.radiusSm,
@@ -98,6 +108,8 @@ class AnomalyResolutionTable extends StatelessWidget {
                     Expanded(
                       child: Text(
                         desc,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontSize: M3FontSize.labelMediumPlus,
                         ),

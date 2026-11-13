@@ -146,6 +146,7 @@ class _RegisterChainDialogState extends State<RegisterChainDialog> {
               ),
               const SizedBox(height: M3Spacing.sm),
               M3Dropdown<String>(
+                fitOptions: true,
                 key: const ValueKey('register_chain_type'),
                 value: _type,
                 label: 'النوع',

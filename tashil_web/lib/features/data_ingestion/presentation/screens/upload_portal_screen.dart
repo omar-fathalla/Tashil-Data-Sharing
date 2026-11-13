@@ -9,11 +9,21 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
-import '../../../../core/widgets/app_icons.dart';
+import '../../../../core/utils/arabic_plural.dart';
+import '../../../../core/widgets/archive_actions_group.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_button_group.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
 import '../../../../core/widgets/m3_feedback.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_search_field.dart';
+import '../../../../core/widgets/m3_section_title.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
+import '../../../../core/widgets/m3_states.dart';
+import '../../../../core/widgets/m3_table_surface.dart';
+import '../../../../core/widgets/m3_toolbar_button.dart';
+import '../../../../core/widgets/table_scroll_container.dart';
 import '../widgets/ai_analysis_progress_card.dart';
 import '../widgets/anomaly_resolution_table.dart';
 import '../widgets/dropzone_file_picker.dart';
@@ -38,7 +48,8 @@ class UploadPortalScreen extends StatefulWidget {
   State<UploadPortalScreen> createState() => _UploadPortalScreenState();
 }
 
-class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefreshMixin<UploadPortalScreen> {
+class _UploadPortalScreenState extends State<UploadPortalScreen>
+    with DataRefreshMixin<UploadPortalScreen> {
   @override
   void onBackendDataChanged() {
     _loadArchive();
@@ -74,7 +85,12 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
   bool _archiveLoadFailed = false;
   String? _downloadingArchiveId;
   String? _deletingArchiveId;
-  final TextEditingController _archiveSearchController = TextEditingController();
+  final TextEditingController _archiveSearchController =
+      TextEditingController();
+  final ScrollController _archiveSheetsScrollController = ScrollController();
+
+  static const double _archiveHeadingHeight = 48.0;
+  static const double _archiveRowHeight = 72.0;
 
   static const Map<String, String> _monthNamesAr = {
     '1': '1 - يناير (Jan)',
@@ -127,7 +143,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
   void initState() {
     super.initState();
     _lastTenantId = widget.apiClient.tenantId;
-    _selectedTenant = ApiClient.normalizeDataTenantSlug(widget.apiClient.tenantId);
+    _selectedTenant =
+        ApiClient.normalizeDataTenantSlug(widget.apiClient.tenantId);
     _loadContext();
     _loadArchive();
     AvailableYears.load(widget.apiClient).then((_) {
@@ -143,7 +160,9 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
   /// Runs an upload/commit call, asking the user each server question (409) and resending with the answer.
   /// Returns null when the user cancels a question (nothing saved).
   Future<IngestionResultModel?> _withUploadQuestions(
-    Future<IngestionResultModel> Function(bool replaceConfirmed, String? periodChoice) call,
+    Future<IngestionResultModel> Function(
+            bool replaceConfirmed, String? periodChoice)
+        call,
   ) async {
     for (var attempt = 0; attempt < 4; attempt++) {
       try {
@@ -169,12 +188,14 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
   void dispose() {
     _newChainNameController.dispose();
     _archiveSearchController.dispose();
+    _archiveSheetsScrollController.dispose();
     super.dispose();
   }
 
   Future<void> _loadContext() async {
     setState(() => _isLoadingContext = true);
-    final chains = await widget.apiClient.getRetailChains(targetTenant: _selectedTenant);
+    final chains =
+        await widget.apiClient.getRetailChains(targetTenant: _selectedTenant);
     if (mounted) {
       setState(() {
         _availableChains = chains;
@@ -203,7 +224,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
       (c) =>
           c.code.toLowerCase() == generatedCode.toLowerCase() ||
           c.displayName.trim().toLowerCase() == rawName.toLowerCase() ||
-          c.displayName.trim().toLowerCase() == formattedBilingual.toLowerCase(),
+          c.displayName.trim().toLowerCase() ==
+              formattedBilingual.toLowerCase(),
     );
     if (existingIdx >= 0) {
       final existing = _availableChains[existingIdx];
@@ -226,12 +248,12 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
         code: generatedCode,
         targetTenant: _selectedTenant,
       );
-      final refreshed = await widget.apiClient.getRetailChains(targetTenant: _selectedTenant);
+      final refreshed =
+          await widget.apiClient.getRetailChains(targetTenant: _selectedTenant);
       if (mounted) {
         setState(() {
-          _availableChains = refreshed.isNotEmpty
-              ? refreshed
-              : [..._availableChains, created];
+          _availableChains =
+              refreshed.isNotEmpty ? refreshed : [..._availableChains, created];
           _selectedChain = created.code;
           _showChainRequiredError = false;
           _isAddingChain = false;
@@ -270,7 +292,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
                   color: colorScheme.primaryContainer,
                   borderRadius: M3Shape.radiusSm,
                 ),
-                child: Icon(Icons.edit_note_rounded, color: colorScheme.onPrimaryContainer, size: 22.0),
+                child: Icon(Icons.edit_note_rounded,
+                    color: colorScheme.onPrimaryContainer, size: 22.0),
               ),
               const SizedBox(width: 10.0),
               Expanded(
@@ -278,8 +301,12 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('تعديل سلسلة التجزئة', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    Text('Edit Retail Chain (Arabic / English)', style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant)),
+                    Text('تعديل سلسلة التجزئة',
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    Text('Edit Retail Chain (Arabic / English)',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -299,8 +326,10 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
                     decoration: InputDecoration(
                       labelText: 'اسم السلسلة بالعربية (Arabic)',
                       hintText: 'مثال: الوكالة، أسواق فتح الله...',
-                      prefixIcon: const Icon(Icons.language_rounded, size: 18.0),
-                      border: const OutlineInputBorder(borderRadius: M3Shape.radiusMd),
+                      prefixIcon:
+                          const Icon(Icons.language_rounded, size: 18.0),
+                      border: const OutlineInputBorder(
+                          borderRadius: M3Shape.radiusMd),
                       filled: true,
                       fillColor: colorScheme.surfaceContainerHigh,
                     ),
@@ -313,8 +342,10 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
                     decoration: InputDecoration(
                       labelText: 'اسم السلسلة بالإنجليزية (English)',
                       hintText: 'e.g. El Wakala, Fathalla Market...',
-                      prefixIcon: const Icon(Icons.translate_rounded, size: 18.0),
-                      border: const OutlineInputBorder(borderRadius: M3Shape.radiusMd),
+                      prefixIcon:
+                          const Icon(Icons.translate_rounded, size: 18.0),
+                      border: const OutlineInputBorder(
+                          borderRadius: M3Shape.radiusMd),
                       filled: true,
                       fillColor: colorScheme.surfaceContainerHigh,
                     ),
@@ -457,7 +488,9 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
       final resp = await widget.apiClient.getUploadedFilesArchive(
         chain: _archiveChainFilter == 'all' ? null : _archiveChainFilter,
         year: _archiveYearFilter == 'all' ? null : _archiveYearFilter,
-        searchQuery: _archiveSearchQuery.trim().isEmpty ? null : _archiveSearchQuery.trim(),
+        searchQuery: _archiveSearchQuery.trim().isEmpty
+            ? null
+            : _archiveSearchQuery.trim(),
         targetTenant: _selectedTenant,
       );
       if (mounted) {
@@ -486,7 +519,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
         _lastTenantId != widget.apiClient.tenantId) {
       setState(() {
         _lastTenantId = widget.apiClient.tenantId;
-        _selectedTenant = ApiClient.normalizeDataTenantSlug(widget.apiClient.tenantId);
+        _selectedTenant =
+            ApiClient.normalizeDataTenantSlug(widget.apiClient.tenantId);
         _selectedChain = null;
         _showChainRequiredError = false;
         isProcessing = false;
@@ -502,7 +536,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
   }
 
   String _getChainDisplayName(String? code) {
-    if (code == null || code.isEmpty) return '-- اختر سلسلة التجزئة المستهدفة --';
+    if (code == null || code.isEmpty)
+      return '-- اختر سلسلة التجزئة المستهدفة --';
     final match = _availableChains.where((c) => c.code == code);
     if (match.isNotEmpty) return match.first.displayName;
     return ApiClient.getRetailChainDisplayName(code);
@@ -541,12 +576,14 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
 
     final activeChain = _selectedChain!;
     final effectivePeriodDate = _buildEffectivePeriodDate();
-    final fileKey = '$filename-${bytes.length}-$_selectedTenant-$activeChain-${effectivePeriodDate ?? 'auto'}';
+    final fileKey =
+        '$filename-${bytes.length}-$_selectedTenant-$activeChain-${effectivePeriodDate ?? 'auto'}';
     if (_processedFiles.contains(fileKey)) {
       await M3Feedback.showDuplicateWarning(
         context,
         title: 'تم رفض المعالجة: ملف مكرر',
-        message: 'تم استيعاب هذا الملف ومطابقة معاملاته في قاعدة بيانات BigQuery مسبقاً. تم رفض إعادة المعالجة لمنع تكرار البيانات المالية.',
+        message:
+            'تم استيعاب هذا الملف ومطابقة معاملاته في قاعدة بيانات BigQuery مسبقاً. تم رفض إعادة المعالجة لمنع تكرار البيانات المالية.',
         duplicateIdentifier: 'اسم الملف: $filename (سلسلة: $activeChain)',
       );
       return;
@@ -565,16 +602,17 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
 
     try {
       // Single upload: server folds preupload.Check into dry-run (no second file POST).
-      final res = await _withUploadQuestions((replaceConfirmed, periodChoice) => widget.apiClient.uploadFile(
-            filename,
-            bytes,
-            targetChain: activeChain,
-            targetTenant: _selectedTenant,
-            periodDate: effectivePeriodDate,
-            dryRun: true,
-            replaceConfirmed: replaceConfirmed,
-            periodChoice: periodChoice,
-          ));
+      final res = await _withUploadQuestions(
+          (replaceConfirmed, periodChoice) => widget.apiClient.uploadFile(
+                filename,
+                bytes,
+                targetChain: activeChain,
+                targetTenant: _selectedTenant,
+                periodDate: effectivePeriodDate,
+                dryRun: true,
+                replaceConfirmed: replaceConfirmed,
+                periodChoice: periodChoice,
+              ));
       if (res == null) {
         if (mounted) {
           setState(() => isProcessing = false);
@@ -585,7 +623,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
       widget.apiClient.recordAuditLog(
         action: 'INGEST_ANALYZE',
         resource: filename,
-        details: 'تحليل أولي لملف $filename لسلسلة $activeChain وشركة $_selectedTenant (${res.validRows} صف صالح • ${res.autoCreatedStoresCount} فرع) - قيد المراجعة',
+        details:
+            'تحليل أولي لملف $filename لسلسلة $activeChain وشركة $_selectedTenant (${res.validRows} صف صالح • ${res.autoCreatedStoresCount} فرع) - قيد المراجعة',
       );
       await _loadArchive();
       if (mounted) {
@@ -595,7 +634,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
         });
 
         if (res.chainMismatchDetected) {
-          final discoveredName = res.suggestedChainName ?? res.discoveredRetailer;
+          final discoveredName =
+              res.suggestedChainName ?? res.discoveredRetailer;
           M3Feedback.showWarning(
             context,
             'تنبيه تعارض السلسلة: محتوى الملف يشير إلى "$discoveredName" بينما السلسلة المحددة هي "${_getChainDisplayName(activeChain)}". راجع البيانات أدناه.',
@@ -633,7 +673,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
     if (result?.suggestedChain == null) return;
     final oldChain = _selectedChain ?? result!.targetRetailer;
     final newChain = result!.suggestedChain!;
-    final newName = result!.suggestedChainName ?? _getChainDisplayName(newChain);
+    final newName =
+        result!.suggestedChainName ?? _getChainDisplayName(newChain);
     final batchId = result!.batchId;
     widget.apiClient.updateStagedArchiveChain(
       batchId,
@@ -677,13 +718,16 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
 
         return AlertDialog(
           icon: Icon(
-            hasMismatch ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
+            hasMismatch
+                ? Icons.warning_amber_rounded
+                : Icons.check_circle_rounded,
             color: hasMismatch ? Colors.amber.shade800 : colorScheme.primary,
             size: 32.0,
           ),
           title: Text(
             'تأكيد اعتماد وحفظ البيانات',
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           content: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480.0),
@@ -698,12 +742,14 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
                     decoration: BoxDecoration(
                       color: Colors.amber.withOpacity(0.15),
                       borderRadius: M3Shape.radiusSm,
-                      border: Border.all(color: Colors.amber.shade700.withOpacity(0.4)),
+                      border: Border.all(
+                          color: Colors.amber.shade700.withOpacity(0.4)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.warning_amber_rounded, color: Colors.amber.shade900, size: 22.0),
+                        Icon(Icons.warning_amber_rounded,
+                            color: Colors.amber.shade900, size: 22.0),
                         const SizedBox(width: 8.0),
                         Expanded(
                           child: Text(
@@ -733,15 +779,23 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
                     children: [
                       _buildDialogRow('اسم الملف:', result!.filename, theme),
                       const Divider(height: 12.0),
-                      _buildDialogRow('سلسلة التجزئة:', chainDisplayName, theme),
+                      _buildDialogRow(
+                          'سلسلة التجزئة:', chainDisplayName, theme),
                       const Divider(height: 12.0),
-                      _buildDialogRow('الفترة الزمنية:', _describeTargetPeriod(), theme),
+                      _buildDialogRow(
+                          'الفترة الزمنية:', _describeTargetPeriod(), theme),
                       const Divider(height: 12.0),
-                      _buildDialogRow('السجلات الصالحة:', '${result!.validRows} صف', theme),
+                      _buildDialogRow(
+                          'السجلات الصالحة:', '${result!.validRows} صف', theme),
                       const Divider(height: 12.0),
-                      _buildDialogRow('الفروع المكتشفة:', '${result!.autoCreatedStoresCount} فرع', theme),
+                      _buildDialogRow('الفروع المكتشفة:',
+                          '${result!.autoCreatedStoresCount} فرع', theme),
                       const Divider(height: 12.0),
-                      _buildDialogRow('إجمالي المبيعات:', CurrencyFormatter.formatCompactEGP(result!.totalRevenue), theme),
+                      _buildDialogRow(
+                          'إجمالي المبيعات:',
+                          CurrencyFormatter.formatCompactEGP(
+                              result!.totalRevenue),
+                          theme),
                     ],
                   ),
                 ),
@@ -769,14 +823,16 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
 
     try {
       final batchId = result!.batchId;
-      final committedResult = await _withUploadQuestions((replaceConfirmed, periodChoice) => widget.apiClient.commitStagedUpload(
-            batchId: batchId,
-            targetChain: activeChain,
-            targetTenant: _selectedTenant,
-            periodDate: _buildEffectivePeriodDate(),
-            replaceConfirmed: replaceConfirmed,
-            periodChoice: periodChoice,
-          ));
+      final committedResult = await _withUploadQuestions(
+          (replaceConfirmed, periodChoice) =>
+              widget.apiClient.commitStagedUpload(
+                batchId: batchId,
+                targetChain: activeChain,
+                targetTenant: _selectedTenant,
+                periodDate: _buildEffectivePeriodDate(),
+                replaceConfirmed: replaceConfirmed,
+                periodChoice: periodChoice,
+              ));
       if (committedResult == null) {
         if (mounted) {
           setState(() => isCommitting = false);
@@ -788,7 +844,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
       widget.apiClient.recordAuditLog(
         action: 'INGEST_COMMIT',
         resource: result!.filename,
-        details: 'حفظ واعتماد بيانات ملف ${result!.filename} لسلسلة $activeChain (${committedResult.validRows} صف)',
+        details:
+            'حفظ واعتماد بيانات ملف ${result!.filename} لسلسلة $activeChain (${committedResult.validRows} صف)',
       );
 
       if (_stagedFileKey != null) {
@@ -813,7 +870,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
       if (mounted) {
         setState(() => isCommitting = false);
         // Any 4xx/5xx from the commit (410 expired preview, 409 changed file...) in an M3 dialog.
-        await showUploadFailureDialog(context, result?.filename ?? '', e, title: 'الحفظ ماتمش ومفيش حاجة اتحفظت');
+        await showUploadFailureDialog(context, result?.filename ?? '', e,
+            title: 'الحفظ ماتمش ومفيش حاجة اتحفظت');
       }
     }
   }
@@ -853,7 +911,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
       widget.apiClient.recordAuditLog(
         action: 'ARCHIVE_DOWNLOAD',
         resource: file.fileName,
-        details: 'تحميل شيت الإكسيل المؤرشف ${file.fileName} لسلسلة ${file.chainNameAr}',
+        details:
+            'تحميل شيت الإكسيل المؤرشف ${file.fileName} لسلسلة ${file.chainNameAr}',
       );
       if (mounted) {
         M3Feedback.showSuccess(
@@ -878,7 +937,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        icon: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent, size: 32.0),
+        icon: const Icon(Icons.delete_forever_rounded,
+            color: Colors.redAccent, size: 32.0),
         title: const Text('حذف شيت الإكسيل والبيانات المستوردة'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -906,7 +966,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
               ),
               child: Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded, size: 20.0, color: Colors.red.shade800),
+                  Icon(Icons.warning_amber_rounded,
+                      size: 20.0, color: Colors.red.shade800),
                   const SizedBox(width: 8.0),
                   Expanded(
                     child: Text(
@@ -952,12 +1013,15 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
       widget.apiClient.recordAuditLog(
         action: 'ARCHIVE_DELETE',
         resource: file.fileName,
-        details: 'حذف شيت الإكسيل المؤرشف ${file.fileName} لسلسلة ${file.chainNameAr} ومسح سجلاته',
+        details:
+            'حذف شيت الإكسيل المؤرشف ${file.fileName} لسلسلة ${file.chainNameAr} ومسح سجلاته',
       );
       if (mounted) {
         if (ok) {
           setState(() {
-            _archivedFiles = _archivedFiles.where((f) => f.id != file.id && f.fileName != file.fileName).toList();
+            _archivedFiles = _archivedFiles
+                .where((f) => f.id != file.id && f.fileName != file.fileName)
+                .toList();
           });
           M3Feedback.showSuccess(
             context,
@@ -986,13 +1050,16 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        Text(label,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
         const SizedBox(width: 8.0),
         Flexible(
           child: Text(
             value,
             textAlign: TextAlign.end,
-            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
         ),
       ],
@@ -1017,16 +1084,19 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
               titleEn: 'Smart Data Ingestion Portal',
               subtitleAr: 'مبيعات الفروع وأرشفة شيتات الإكسيل حسب السلاسل',
               actions: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer.withOpacity(0.5),
                   borderRadius: M3Shape.radiusLg,
-                  border: Border.all(color: colorScheme.primary.withOpacity(0.35)),
+                  border:
+                      Border.all(color: colorScheme.primary.withOpacity(0.35)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.layers_rounded, size: 16.0, color: colorScheme.primary),
+                    Icon(Icons.layers_rounded,
+                        size: 16.0, color: colorScheme.primary),
                     const SizedBox(width: 6.0),
                     Text(
                       'Multi-Tab Ingestion',
@@ -1053,7 +1123,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.lock_person_rounded, color: colorScheme.error, size: 20.0),
+                    Icon(Icons.lock_person_rounded,
+                        color: colorScheme.error, size: 20.0),
                     M3Spacing.hGapXS,
                     Expanded(
                       child: Text(
@@ -1102,7 +1173,8 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
               child: result == null
                   ? const SizedBox.shrink(key: ValueKey('upload_idle'))
                   : Column(
-                      key: ValueKey('upload_status_${result!.isStaged}_${result!.isCommitted}'),
+                      key: ValueKey(
+                          'upload_status_${result!.isStaged}_${result!.isCommitted}'),
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         if (result!.isStaged) ...[
@@ -1206,9 +1278,10 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
   }
 
   Widget _buildContextSelectorBar(ColorScheme colorScheme, ThemeData theme) {
-    final hasSelectedChain =
-        _selectedChain != null && _availableChains.any((c) => c.code == _selectedChain);
-    final chainName = hasSelectedChain ? _getChainDisplayName(_selectedChain) : null;
+    final hasSelectedChain = _selectedChain != null &&
+        _availableChains.any((c) => c.code == _selectedChain);
+    final chainName =
+        hasSelectedChain ? _getChainDisplayName(_selectedChain) : null;
     final periodLabel = _describeTargetPeriod();
 
     return Container(
@@ -1246,14 +1319,13 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const M3SectionTitle(
                       'سياق استيعاب البيانات وتوجيه الذكاء الاصطناعي (Ingestion Context)',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      maxLines: 3,
                     ),
                     Text(
                       'حدد سلسلة التجزئة والسنة/الشهر المستهدف لضمان مطابقة الفروع وتوجيه البيانات في التاريخ الصحيح',
+                      maxLines: 3,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -1286,100 +1358,96 @@ class _UploadPortalScreenState extends State<UploadPortalScreen> with DataRefres
               // Under 600px the fields stack and the labels are short Arabic (no clipped English).
               final compact = constraints.maxWidth < 600;
               final chainDropdown = M3Dropdown<String?>(
-key: const ValueKey('ingestion_retail_chain_dropdown'),
-value: hasSelectedChain ? _selectedChain : null,
-label: compact ? 'السلسلة *' : 'سلسلة التجزئة المستهدفة (Target Retail Chain) *',
-leadingIcon: Icons.store_mall_directory_rounded,
-expand: true,
-errorText: _showChainRequiredError ? 'مطلوب' : null,
-options: m3OptionsFromMenuItems<String?>(_availableChains.map((c) {
-                  final label = c.storeCount > 0 ? '${c.displayName} (${c.storeCount} فرع)' : c.displayName;
-                  return DropdownMenuItem<String>(
-                    value: c.code,
-                    child: Text(
-                      label,
-                      overflow: TextOverflow.ellipsis,
+                key: const ValueKey('ingestion_retail_chain_dropdown'),
+                value: hasSelectedChain ? _selectedChain : null,
+                label: compact
+                    ? 'السلسلة *'
+                    : 'سلسلة التجزئة المستهدفة (Target Retail Chain) *',
+                leadingIcon: Icons.store_mall_directory_rounded,
+                fitOptions: true,
+                expand: compact || constraints.maxWidth >= 1000,
+                errorText: _showChainRequiredError ? 'مطلوب' : null,
+                options: [
+                  for (final c in _availableChains)
+                    M3DropdownOption<String?>(
+                      c.code,
+                      c.storeCount > 0
+                          ? '${c.displayName} (${countBranches(c.storeCount)})'
+                          : c.displayName,
                     ),
-                  );
-                }).toList()),
-onChanged: m3Legacy<String?>((val) {
+                ],
+                onChanged: (val) {
                   if (val != null) {
                     setState(() {
                       _selectedChain = val;
                       _showChainRequiredError = false;
                     });
                   }
-                }),
-);
+                },
+              );
 
               final yearDropdown = M3Dropdown<String>(
-key: const ValueKey('ingestion_year_dropdown'),
-value: _selectedYear,
-label: compact ? 'السنة' : 'سنة البيانات (Target Year)',
-leadingIcon: Icons.calendar_today_rounded,
-expand: true,
-options: m3OptionsFromMenuItems<String>([
-                  const DropdownMenuItem(value: 'auto', child: Text('تلقائي من الشيت (Auto)', overflow: TextOverflow.ellipsis)),
-                  for (final y in AvailableYears.current.including(int.tryParse(_selectedYear) ?? 0))
-                    DropdownMenuItem(value: '$y', child: Text('سنة $y', overflow: TextOverflow.ellipsis)),
-                ]),
-onChanged: m3Legacy<String>((val) {
-                  if (val != null) {
-                    setState(() => _selectedYear = val);
-                  }
-                }),
-);
+                key: const ValueKey('ingestion_year_dropdown'),
+                value: _selectedYear,
+                label: compact ? 'السنة' : 'سنة البيانات (Target Year)',
+                leadingIcon: Icons.calendar_today_rounded,
+                fitOptions: true,
+                expand: compact || constraints.maxWidth >= 1000,
+                options: [
+                  const M3DropdownOption('auto', 'تلقائي من الشيت (Auto)'),
+                  for (final y in AvailableYears.current
+                      .including(int.tryParse(_selectedYear) ?? 0))
+                    M3DropdownOption('$y', 'سنة $y'),
+                ],
+                onChanged: (val) => setState(() => _selectedYear = val),
+              );
 
               final monthDropdown = M3Dropdown<String>(
-key: const ValueKey('ingestion_month_dropdown'),
-value: _selectedMonth,
-label: compact ? 'الشهر' : 'الشهر المستهدف (Target Month)',
-leadingIcon: Icons.date_range_rounded,
-expand: true,
-options: m3OptionsFromMenuItems<String>([
-                  const DropdownMenuItem(value: 'auto', child: Text('تلقائي (Auto)', overflow: TextOverflow.ellipsis)),
-                  ..._monthNamesAr.entries.map(
-                    (e) => DropdownMenuItem(
-                      value: e.key,
-                      child: Text(e.value, overflow: TextOverflow.ellipsis),
-                    ),
-                  ),
-                ]),
-onChanged: m3Legacy<String>((val) {
-                  if (val != null) {
-                    setState(() => _selectedMonth = val);
-                  }
-                }),
-);
+                key: const ValueKey('ingestion_month_dropdown'),
+                value: _selectedMonth,
+                label: compact ? 'الشهر' : 'الشهر المستهدف (Target Month)',
+                leadingIcon: Icons.date_range_rounded,
+                fitOptions: true,
+                expand: compact || constraints.maxWidth >= 1000,
+                options: [
+                  const M3DropdownOption('auto', 'تلقائي (Auto)'),
+                  for (final e in _monthNamesAr.entries)
+                    M3DropdownOption(e.key, e.value),
+                ],
+                onChanged: (val) => setState(() => _selectedMonth = val),
+              );
 
-              if (constraints.maxWidth >= 820) {
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    chainDropdown,
+                    M3Spacing.gapXS,
+                    yearDropdown,
+                    M3Spacing.gapXS,
+                    monthDropdown,
+                  ],
+                );
+              }
+              if (constraints.maxWidth >= 1000) {
                 return Row(
                   children: [
-                    Expanded(flex: 5, child: chainDropdown),
-                    M3Spacing.hGapSM,
+                    Expanded(flex: 4, child: chainDropdown),
+                    const SizedBox(width: M3Spacing.xs),
                     Expanded(flex: 3, child: yearDropdown),
-                    M3Spacing.hGapSM,
+                    const SizedBox(width: M3Spacing.xs),
                     Expanded(flex: 3, child: monthDropdown),
                   ],
                 );
               }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              return Wrap(
+                spacing: M3Spacing.xs,
+                runSpacing: M3Spacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   chainDropdown,
-                  M3Spacing.gapSM,
-                  if (compact) ...[
-                    yearDropdown,
-                    M3Spacing.gapSM,
-                    monthDropdown,
-                  ] else
-                    Row(
-                      children: [
-                        Expanded(child: yearDropdown),
-                        M3Spacing.hGapSM,
-                        Expanded(child: monthDropdown),
-                      ],
-                    ),
+                  yearDropdown,
+                  monthDropdown,
                 ],
               );
             },
@@ -1388,7 +1456,8 @@ onChanged: m3Legacy<String>((val) {
           // AI Context Badge
           Container(
             key: const ValueKey('ai_ingestion_context_status_bar'),
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
             decoration: BoxDecoration(
               color: hasSelectedChain
                   ? colorScheme.secondaryContainer.withOpacity(0.4)
@@ -1483,11 +1552,13 @@ onChanged: m3Legacy<String>((val) {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8.0, vertical: 2.0),
                       decoration: BoxDecoration(
                         color: colorScheme.tertiaryContainer.withOpacity(0.55),
                         borderRadius: M3Shape.radiusSm,
-                        border: Border.all(color: colorScheme.tertiary.withOpacity(0.45)),
+                        border: Border.all(
+                            color: colorScheme.tertiary.withOpacity(0.45)),
                       ),
                       child: Text(
                         'لم يتم الحفظ في BigQuery بعد',
@@ -1516,7 +1587,9 @@ onChanged: m3Legacy<String>((val) {
   }
 
   Widget _buildChainMismatchCard(ColorScheme colorScheme, ThemeData theme) {
-    final suggestedName = result!.suggestedChainName ?? result!.suggestedChain ?? result!.discoveredRetailer;
+    final suggestedName = result!.suggestedChainName ??
+        result!.suggestedChain ??
+        result!.discoveredRetailer;
     final currentChainName = _getChainDisplayName(_selectedChain);
 
     return Container(
@@ -1599,7 +1672,8 @@ onChanged: m3Legacy<String>((val) {
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         borderRadius: M3Shape.radiusLg,
-        border: Border.all(color: colorScheme.primary.withOpacity(0.4), width: 1.5),
+        border:
+            Border.all(color: colorScheme.primary.withOpacity(0.4), width: 1.5),
       ),
       child: Wrap(
         alignment: WrapAlignment.spaceBetween,
@@ -1610,7 +1684,8 @@ onChanged: m3Legacy<String>((val) {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.verified_rounded, color: colorScheme.primary, size: 24.0),
+              Icon(Icons.verified_rounded,
+                  color: colorScheme.primary, size: 24.0),
               const SizedBox(width: 8.0),
               Flexible(
                 child: Column(
@@ -1659,8 +1734,10 @@ onChanged: m3Legacy<String>((val) {
     );
   }
 
-  Widget _buildCommittedSuccessBanner(ColorScheme colorScheme, ThemeData theme) {
-    final chainDisplayName = _getChainDisplayName(_selectedChain ?? result!.retailerDetected);
+  Widget _buildCommittedSuccessBanner(
+      ColorScheme colorScheme, ThemeData theme) {
+    final chainDisplayName =
+        _getChainDisplayName(_selectedChain ?? result!.retailerDetected);
     return Container(
       key: const ValueKey('committed_success_banner'),
       padding: M3Spacing.pMd,
@@ -1740,7 +1817,8 @@ onChanged: m3Legacy<String>((val) {
           borderRadius: M3Shape.radiusMd,
           borderSide: BorderSide(color: colorScheme.primary, width: 2.0),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
       ),
     );
 
@@ -1769,7 +1847,8 @@ onChanged: m3Legacy<String>((val) {
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         borderRadius: M3Shape.radiusLg,
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.7), width: 1.0),
+        border: Border.all(
+            color: colorScheme.outlineVariant.withOpacity(0.7), width: 1.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1782,16 +1861,14 @@ onChanged: m3Legacy<String>((val) {
                   color: colorScheme.primaryContainer,
                   borderRadius: M3Shape.radiusSm,
                 ),
-                child: Icon(Icons.storefront_rounded, size: 20.0, color: colorScheme.onPrimaryContainer),
+                child: Icon(Icons.storefront_rounded,
+                    size: 20.0, color: colorScheme.onPrimaryContainer),
               ),
               const SizedBox(width: 10.0),
               Expanded(
-                child: Text(
-                  'نظام إدخال سلاسل التجزئة بالشركة (${_availableChains.length} سلسلة مسجلة)',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
+                child: M3SectionTitle(
+                  'نظام إدخال سلاسل التجزئة بالشركة (${countRegisteredChains(_availableChains.length)})',
+                  maxLines: 3,
                 ),
               ),
             ],
@@ -1799,11 +1876,12 @@ onChanged: m3Legacy<String>((val) {
           const SizedBox(height: 6.0),
           Text(
             'أضف سلاسل التجزئة التي تتعامل معها شركتك هنا؛ كل سلسلة تضيفها تظهر فوراً في القائمة وفي شريط الأرشيف بالأسفل (الكل / السلاسل)',
+            maxLines: 3,
             style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 12.0),
+          const SizedBox(height: M3Spacing.xs),
           if (isCompact) ...[
             inputField,
             const SizedBox(height: 8.0),
@@ -1857,11 +1935,13 @@ onChanged: m3Legacy<String>((val) {
     );
   }
 
-  Widget _buildChainButtonSegment(RetailChainModel c, ColorScheme colorScheme, ThemeData theme) {
+  Widget _buildChainButtonSegment(
+      RetailChainModel c, ColorScheme colorScheme, ThemeData theme) {
     final isSelected = _selectedChain == c.code;
     final shortLabel = _getShortChainTabLabel(c.code);
     final sheetCount = _archiveChainCounts[c.code.toLowerCase()] ?? 0;
-    final labelWithCount = sheetCount > 0 ? '$shortLabel ($sheetCount)' : shortLabel;
+    final labelWithCount =
+        sheetCount > 0 ? '$shortLabel ($sheetCount)' : shortLabel;
 
     return Material(
       color: isSelected ? colorScheme.primary : Colors.transparent,
@@ -1882,21 +1962,27 @@ onChanged: m3Legacy<String>((val) {
         child: Tooltip(
           message: c.displayName,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  isSelected ? Icons.check_circle_rounded : Icons.store_mall_directory_rounded,
+                  isSelected
+                      ? Icons.check_circle_rounded
+                      : Icons.store_mall_directory_rounded,
                   size: 16.0,
-                  color: isSelected ? colorScheme.onPrimary : colorScheme.primary,
+                  color:
+                      isSelected ? colorScheme.onPrimary : colorScheme.primary,
                 ),
                 const SizedBox(width: 8.0),
                 Text(
                   labelWithCount,
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
+                    color: isSelected
+                        ? colorScheme.onPrimary
+                        : colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(width: 8.0),
@@ -1910,7 +1996,9 @@ onChanged: m3Legacy<String>((val) {
                     child: Icon(
                       Icons.edit_rounded,
                       size: 14.0,
-                      color: isSelected ? colorScheme.onPrimary.withOpacity(0.9) : colorScheme.primary,
+                      color: isSelected
+                          ? colorScheme.onPrimary.withOpacity(0.9)
+                          : colorScheme.primary,
                     ),
                   ),
                 ),
@@ -1925,7 +2013,9 @@ onChanged: m3Legacy<String>((val) {
                     child: Icon(
                       Icons.close_rounded,
                       size: 15.0,
-                      color: isSelected ? colorScheme.onPrimary.withOpacity(0.9) : colorScheme.error,
+                      color: isSelected
+                          ? colorScheme.onPrimary.withOpacity(0.9)
+                          : colorScheme.error,
                     ),
                   ),
                 ),
@@ -1941,60 +2031,72 @@ onChanged: m3Legacy<String>((val) {
   // Persistent Retail Chain Excel Archive Section
   // ---------------------------------------------------------------------------
   Widget _buildExcelArchiveSection(ColorScheme colorScheme, ThemeData theme) {
-    final totalAllChains = _archiveChainCounts.values.fold<int>(0, (sum, c) => sum + c);
+    final totalAllChains =
+        _archiveChainCounts.values.fold<int>(0, (sum, c) => sum + c);
     final chainKeys = <String>{
       ..._availableChains.map((c) => c.code.toLowerCase()),
       ..._archiveChainCounts.keys.map((k) => k.toLowerCase()),
     }.toList();
     final isCompact = MediaQuery.sizeOf(context).width < 600.0;
 
-    final searchBox = TextField(
-      key: const ValueKey('archive_search_field'),
-      controller: _archiveSearchController,
-      decoration: InputDecoration(
-        hintText: 'ابحث باسم ملف الإكسيل أو السلسلة (مثال: 40-Adco أو Book1)...',
-        prefixIcon: const Icon(Icons.search_rounded, size: 20.0),
-        suffixIcon: _archiveSearchQuery.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.clear_rounded, size: 18.0),
-                onPressed: () {
-                  _archiveSearchController.clear();
-                  setState(() => _archiveSearchQuery = '');
-                  _loadArchive();
-                },
-              )
-            : null,
-        isDense: true,
-        filled: true,
-        fillColor: colorScheme.surface,
-        border: const OutlineInputBorder(
-          borderRadius: M3Shape.radiusMd,
+    const searchHint =
+        'ابحث باسم ملف الإكسيل أو السلسلة (مثال: 40-Adco أو Book1)...';
+    final searchBox = M3SearchFieldWidth(
+      hintText: searchHint,
+      child: TextField(
+        key: const ValueKey('archive_search_field'),
+        controller: _archiveSearchController,
+        decoration: InputDecoration(
+          hintText: searchHint,
+          prefixIcon: const Icon(Icons.search_rounded, size: 18.0),
+          suffixIcon: _archiveSearchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 18.0),
+                  onPressed: () {
+                    _archiveSearchController.clear();
+                    setState(() => _archiveSearchQuery = '');
+                    _loadArchive();
+                  },
+                )
+              : null,
+          isDense: true,
+          filled: true,
+          fillColor: colorScheme.surface,
+          border: const OutlineInputBorder(
+            borderRadius: M3Shape.radiusMd,
+          ),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          constraints: const BoxConstraints(maxHeight: M3ToolbarButton.height),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+        onChanged: (v) {
+          setState(() => _archiveSearchQuery = v);
+          _loadArchive();
+        },
       ),
-      onChanged: (v) {
-        setState(() => _archiveSearchQuery = v);
+    );
+
+    final yearDropdown = M3Dropdown<String>(
+      key: const ValueKey('archive_year_filter_dropdown'),
+      value: _archiveYearFilter,
+      label: 'تصفية بالسنة',
+      fitOptions: true,
+      options: [
+        const M3DropdownOption('all', 'كل السنوات'),
+        for (final y in AvailableYears.current
+            .including(int.tryParse(_archiveYearFilter) ?? 0))
+          M3DropdownOption('$y', 'سنة $y'),
+      ],
+      onChanged: (val) {
+        setState(() => _archiveYearFilter = val);
         _loadArchive();
       },
     );
 
-    final yearDropdown = M3Dropdown<String>(
-key: const ValueKey('archive_year_filter_dropdown'),
-value: _archiveYearFilter,
-label: 'تصفية بالسنة',
-expand: true,
-options: m3OptionsFromMenuItems<String>([
-        const DropdownMenuItem(value: 'all', child: Text('كل السنوات')),
-        for (final y in AvailableYears.current.including(int.tryParse(_archiveYearFilter) ?? 0))
-          DropdownMenuItem(value: '$y', child: Text('سنة $y')),
-      ]),
-onChanged: m3Legacy<String>((val) {
-        if (val != null) {
-          setState(() => _archiveYearFilter = val);
-          _loadArchive();
-        }
-      }),
-);
+    final totalRows = _archivedFiles.fold<int>(0, (s, f) => s + f.rowsIngested);
+    final totalRevenue =
+        _archivedFiles.fold<double>(0, (s, f) => s + f.totalRevenue);
+    final chainCount = chainKeys.length;
 
     return Container(
       key: const ValueKey('excel_upload_archive_section'),
@@ -2007,18 +2109,17 @@ onChanged: m3Legacy<String>((val) {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Section Header
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: M3Spacing.md,
-            runSpacing: M3Spacing.sm,
+            spacing: M3Spacing.xs,
+            runSpacing: M3Spacing.xs,
             children: [
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10.0),
+                    padding: const EdgeInsets.all(M3Spacing.xs),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer,
                       borderRadius: M3Shape.radiusMd,
@@ -2026,23 +2127,22 @@ onChanged: m3Legacy<String>((val) {
                     child: Icon(
                       Icons.inventory_2_rounded,
                       color: colorScheme.onPrimaryContainer,
-                      size: 24.0,
+                      size: 20.0,
                     ),
                   ),
-                  M3Spacing.hGapSM,
+                  const SizedBox(width: M3Spacing.xs),
                   Flexible(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const M3SectionTitle(
                           'أرشيف شيتات الإكسيل المرفوعة حسب السلاسل',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          maxLines: 3,
                         ),
-                        const SizedBox(height: 2.0),
+                        const SizedBox(height: M3Spacing.xxs),
                         Text(
                           'يتم حفظ وأرشفة كافة شيتات الإكسيل وملفات CSV المرفوعة بنظام السلاسل لتتمكن من استرجاعها وتحميلها في أي وقت',
+                          maxLines: 3,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -2053,21 +2153,17 @@ onChanged: m3Legacy<String>((val) {
                 ],
               ),
               Wrap(
-                spacing: 8.0,
-                runSpacing: 8.0,
+                spacing: M3Spacing.xs,
+                runSpacing: M3Spacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
-                    decoration: BoxDecoration(
-                      color: colorScheme.secondaryContainer.withOpacity(0.6),
-                      borderRadius: M3Shape.radiusLg,
-                    ),
+                  M3ChipSurface(
+                    color: colorScheme.secondaryContainer.withOpacity(0.6),
                     child: Text(
-                      'إجمالي الملفات: $totalAllChains شيت',
+                      countSheets(totalAllChains),
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: colorScheme.onSecondaryContainer,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -2080,10 +2176,67 @@ onChanged: m3Legacy<String>((val) {
               ),
             ],
           ),
-
-          M3Spacing.gapMD,
-
-          // Retail Chain Filter Segmented Group
+          M3Spacing.gapSM,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 960
+                  ? 4
+                  : (constraints.maxWidth >= 580 ? 2 : 1);
+              return M3EqualHeightGrid(
+                key: const ValueKey('kpi_cards_row'),
+                columns: columns,
+                spacing: M3Spacing.sm,
+                runSpacing: M3Spacing.sm,
+                children: [
+                  M3SummaryKpiCard(
+                    key: const ValueKey('kpi_card_Files'),
+                    valueKey: const ValueKey('kpi_value_Files'),
+                    title: 'إجمالي الملفات',
+                    titleMaxLines: 3,
+                    subtitleMaxLines: 3,
+                    value: CurrencyFormatter.formatNumber(totalAllChains),
+                    subtitle: countFiles(totalAllChains),
+                    icon: Icons.inventory_2_rounded,
+                    color: colorScheme.primary,
+                  ),
+                  M3SummaryKpiCard(
+                    key: const ValueKey('kpi_card_Chains'),
+                    valueKey: const ValueKey('kpi_value_Chains'),
+                    title: 'السلاسل',
+                    titleMaxLines: 3,
+                    subtitleMaxLines: 3,
+                    value: CurrencyFormatter.formatNumber(chainCount),
+                    subtitle: countRegisteredChains(chainCount),
+                    icon: Icons.storefront_rounded,
+                    color: colorScheme.secondary,
+                  ),
+                  M3SummaryKpiCard(
+                    key: const ValueKey('kpi_card_Records'),
+                    valueKey: const ValueKey('kpi_value_Records'),
+                    title: 'إجمالي السجلات',
+                    titleMaxLines: 3,
+                    subtitleMaxLines: 3,
+                    value: CurrencyFormatter.formatNumber(totalRows),
+                    subtitle: countRecords(totalRows),
+                    icon: Icons.fact_check_rounded,
+                    color: colorScheme.tertiary,
+                  ),
+                  M3SummaryKpiCard(
+                    key: const ValueKey('kpi_card_Revenue'),
+                    valueKey: const ValueKey('kpi_value_Revenue'),
+                    title: 'إجمالي المبيعات',
+                    titleMaxLines: 3,
+                    subtitleMaxLines: 3,
+                    value: CurrencyFormatter.formatCompactEGP(totalRevenue),
+                    subtitle: 'مجموع الملفات الظاهرة',
+                    icon: Icons.payments_rounded,
+                    color: colorScheme.primary,
+                  ),
+                ],
+              );
+            },
+          ),
+          M3Spacing.gapSM,
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: M3SegmentedButtonGroup<String>(
@@ -2103,334 +2256,336 @@ onChanged: m3Legacy<String>((val) {
                   );
                 }),
               ],
-              selectedValue: chainKeys.contains(_archiveChainFilter) ? _archiveChainFilter : 'all',
+              selectedValue: chainKeys.contains(_archiveChainFilter)
+                  ? _archiveChainFilter
+                  : 'all',
               onSelectionChanged: (val) {
                 setState(() => _archiveChainFilter = val);
                 _loadArchive();
               },
             ),
           ),
-
+          M3Spacing.gapXS,
+          M3FlexWrap(
+            spacing: M3Spacing.xs,
+            runSpacing: M3Spacing.xs,
+            children: [
+              M3FlexWrapFill(child: searchBox),
+              yearDropdown,
+            ],
+          ),
           M3Spacing.gapSM,
-
-          // Search & Year filter bar (Stacked on Compact mobile, Row on Tablet/Desktop)
-          if (isCompact) ...[
-            searchBox,
-            const SizedBox(height: 8.0),
-            yearDropdown,
-          ] else
-            Row(
-              children: [
-                Expanded(
-                  flex: 4,
-                  child: searchBox,
-                ),
-                M3Spacing.hGapSM,
-                SizedBox(
-                  width: 170.0,
-                  child: yearDropdown,
-                ),
-              ],
-            ),
-
-          M3Spacing.gapMD,
-
           if (_isLoadingArchive)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24.0),
               child: Center(child: CircularProgressIndicator()),
             )
           else if (_archiveLoadFailed)
-            Container(
+            Padding(
               key: const Key('archive_load_failed'),
-              padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16.0),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: M3Shape.radiusLg,
-                border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.4)),
-              ),
-              child: Column(
-                children: [
-                  Icon(AppIcons.cloudOff, size: 40.0, color: colorScheme.error),
-                  const SizedBox(height: 8.0),
-                  Text(
-                    'مقدرناش نحمّل الأرشيف',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8.0),
-                  TextButton.icon(
-                    onPressed: _loadArchive,
-                    icon: const Icon(AppIcons.refresh),
-                    label: const Text('إعادة المحاولة'),
-                  ),
-                ],
+              padding: const EdgeInsets.all(24.0),
+              child: M3ErrorState(
+                title: 'مقدرناش نحمّل الأرشيف',
+                message:
+                    'الخادم مشغول أو الاتصال انقطع. حاول مرة أخرى بعد لحظات.',
+                onRetry: _loadArchive,
               ),
             )
           else if (_archivedFiles.isEmpty)
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
+              padding:
+                  const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
               decoration: BoxDecoration(
-                color: colorScheme.surface,
+                color: M3TableSurface.color(colorScheme),
                 borderRadius: M3Shape.radiusLg,
-                border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.4)),
+                border: Border.all(
+                    color: colorScheme.outlineVariant.withOpacity(0.4)),
               ),
               child: Column(
                 children: [
                   Icon(
                     Icons.folder_off_rounded,
-                    size: 40.0,
-                    color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                    size: 48.0,
+                    color: colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(height: 8.0),
+                  const SizedBox(height: 12.0),
                   Text(
                     'لا توجد ملفات إكسيل مؤرشفة مطابقة للفلتر المحدد حالياً',
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    maxLines: 3,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
             )
-          else
+          else if (isCompact)
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: _archivedFiles
-                  .map((file) => _buildArchivedFileCard(file, colorScheme, theme))
-                  .toList(),
+              children: [
+                for (final file in _archivedFiles)
+                  _buildCompactArchiveCard(file, colorScheme, theme),
+              ],
+            )
+          else
+            Container(
+              decoration: BoxDecoration(
+                color: M3TableSurface.color(colorScheme),
+                borderRadius: M3Shape.radiusLg,
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withOpacity(0.5),
+                ),
+              ),
+              child: TableScrollContainer(
+                controller: _archiveSheetsScrollController,
+                showSwipeHint: true,
+                columnFlex: const [1.4, 0.9, 0.8, 0.7, 0.8, 0.95, 1.1],
+                pinnedEnd: _buildArchiveActionsColumn(context),
+                child: DataTable(
+                  key: const ValueKey('upload_archive_files_table'),
+                  columnSpacing: M3Spacing.sm,
+                  horizontalMargin: M3Spacing.sm,
+                  headingRowHeight: _archiveHeadingHeight,
+                  dataRowMinHeight: _archiveRowHeight,
+                  dataRowMaxHeight: _archiveRowHeight,
+                  headingRowColor: WidgetStatePropertyAll(
+                    colorScheme.surfaceContainerHigh.withOpacity(0.5),
+                  ),
+                  columns: const [
+                    DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: Text('الملف')),
+                    DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: Text('السلسلة')),
+                    DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: Text('الفترة')),
+                    DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: Text('الفروع'),
+                        numeric: true),
+                    DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: Text('السجلات'),
+                        numeric: true),
+                    DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: Text('المبيعات')),
+                    DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: Text('الحجم')),
+                    DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: Text('تاريخ الرفع')),
+                  ],
+                  rows: [
+                    for (final file in _archivedFiles)
+                      _buildArchiveDataRow(file, colorScheme, theme),
+                  ],
+                ),
+              ),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildArchivedFileCard(
+  Widget _buildCompactArchiveCard(
     ArchivedExcelFileModel file,
     ColorScheme colorScheme,
     ThemeData theme,
   ) {
-    final isExcel = file.fileName.toLowerCase().endsWith('.xlsx') ||
-        file.fileName.toLowerCase().endsWith('.xls');
-    final chainColor = _chainBadgeColor(file.retailChain, colorScheme);
-    final isDownloading = _downloadingArchiveId == file.id;
-    final isDeleting = _deletingArchiveId == file.id;
-
+    final periodText = file.targetMonth.isNotEmpty && file.targetMonth != 'auto'
+        ? '${file.targetMonth} / ${file.targetYear}'
+        : 'سنة ${file.targetYear}';
     return Container(
       key: ValueKey('archive_file_card_${file.id}'),
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12.0),
-      padding: M3Spacing.pMd,
+      margin: const EdgeInsets.only(bottom: M3Spacing.xs),
+      padding: M3Spacing.pSm,
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.55)),
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 700;
-
-          final fileInfoWidget = Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(12.0),
-                decoration: BoxDecoration(
-                  color: isExcel
-                      ? colorScheme.secondaryContainer
-                      : colorScheme.primaryContainer,
-                  borderRadius: M3Shape.radiusMd,
-                ),
-                child: Icon(
-                  isExcel ? Icons.table_view_rounded : Icons.description_rounded,
-                  color: isExcel
-                      ? colorScheme.onSecondaryContainer
-                      : colorScheme.onPrimaryContainer,
-                  size: 26.0,
-                ),
-              ),
-              M3Spacing.hGapSM,
+              Icon(Icons.description_rounded,
+                  color: colorScheme.primary, size: 20.0),
+              const SizedBox(width: M3Spacing.xs),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 8.0,
-                      runSpacing: 4.0,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          file.fileName,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 3.0),
-                          decoration: BoxDecoration(
-                            color: chainColor.withOpacity(0.14),
-                            borderRadius: M3Shape.radiusLg,
-                            border: Border.all(color: chainColor.withOpacity(0.45)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.storefront_rounded, size: 13.0, color: chainColor),
-                              const SizedBox(width: 4.0),
-                              Flexible(
-                                child: Text(
-                                  file.chainNameAr,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: chainColor,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
-                          decoration: BoxDecoration(
-                            color: colorScheme.secondaryContainer.withOpacity(0.5),
-                            borderRadius: M3Shape.radiusSm,
-                          ),
-                          child: Text(
-                            'سنة ${file.targetYear}',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSecondaryContainer,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        if (file.fileType == 'product_master')
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
-                            decoration: BoxDecoration(
-                              color: colorScheme.tertiaryContainer.withOpacity(0.6),
-                              borderRadius: M3Shape.radiusSm,
-                            ),
-                            child: Text(
-                              'كارتة الأصناف والأسعار (Product Master)',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: colorScheme.onTertiaryContainer,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                      ],
+                    Tooltip(
+                      message: file.fileName,
+                      child: Text(
+                        file.fileName,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.start,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
                     ),
-                    const SizedBox(height: 6.0),
-                    Wrap(
-                      spacing: 14.0,
-                      runSpacing: 4.0,
-                      children: [
-                        _buildArchiveMetaChip(
-                          Icons.account_tree_rounded,
-                          'عدد الفروع: ${file.branchesCount} فرع',
-                          theme,
-                        ),
-                        _buildArchiveMetaChip(
-                          Icons.fact_check_rounded,
-                          'عدد السجلات: ${file.rowsIngested} سجل',
-                          theme,
-                        ),
-                        _buildArchiveMetaChip(
-                          Icons.payments_rounded,
-                          'إجمالي المبيعات: ${CurrencyFormatter.formatCompactEGP(file.totalRevenue)}',
-                          theme,
-                        ),
-                        _buildArchiveMetaChip(
-                          Icons.sd_storage_rounded,
-                          'حجم الملف: ${_formatFileSize(file.fileSizeBytes)}',
-                          theme,
-                        ),
-                        _buildArchiveMetaChip(
-                          Icons.schedule_rounded,
-                          'تاريخ الرفع: ${_formatArchiveDate(file.uploadedAt)}',
-                          theme,
-                        ),
-                        if (file.lastIngestedAt.isNotEmpty &&
-                            file.lastIngestedAt != file.uploadedAt)
-                          _buildArchiveMetaChip(
-                            Icons.update_rounded,
-                            'آخر استيراد: ${_formatArchiveDate(file.lastIngestedAt)}',
-                            theme,
-                          ),
-                      ],
+                    Text(
+                      _formatFileSize(file.fileSizeBytes),
+                      maxLines: 3,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
-          );
-
-          // Connected M3 Button Group for Download + Delete (as requested by user)
-          final actionsWidget = M3ActionButtonGroup(
-            key: ValueKey('archive_action_group_${file.id}'),
-            actions: [
-              M3ActionItem(
-                label: 'Download',
-                icon: Icons.download_rounded,
-                isPrimary: true,
-                isLoading: isDownloading,
-                onPressed: (isDownloading || isDeleting)
-                    ? null
-                    : () => _handleDownloadArchivedFile(file),
-              ),
-              M3ActionItem(
-                label: 'Delete',
-                icon: Icons.delete_outline_rounded,
-                isDestructive: true,
-                isLoading: isDeleting,
-                onPressed: (isDownloading || isDeleting)
-                    ? null
-                    : () => _handleDeleteArchivedFile(file),
-              ),
-            ],
-          );
-
-          if (isNarrow) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                fileInfoWidget,
-                const SizedBox(height: 12.0),
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: actionsWidget,
-                ),
-              ],
-            );
-          }
-
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          ),
+          const SizedBox(height: M3Spacing.xs),
+          Wrap(
+            spacing: M3Spacing.xs,
+            runSpacing: M3Spacing.xxs,
             children: [
-              Expanded(child: fileInfoWidget),
-              const SizedBox(width: 16.0),
-              actionsWidget,
+              M3ChipSurface(
+                color: colorScheme.surfaceContainerHigh,
+                child: Text(
+                  file.chainNameAr.isNotEmpty
+                      ? file.chainNameAr
+                      : file.retailChain.toUpperCase(),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              Text(periodText,
+                  maxLines: 3,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall),
             ],
-          );
-        },
+          ),
+          const SizedBox(height: M3Spacing.xs),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: _archiveActions(file),
+          ),
+        ],
       ),
     );
   }
 
-  static Widget _buildArchiveMetaChip(IconData icon, String text, ThemeData theme) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14.0, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(width: 4.0),
-        Flexible(
-          child: Text(
-            text,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
+  DataRow _buildArchiveDataRow(
+    ArchivedExcelFileModel file,
+    ColorScheme colorScheme,
+    ThemeData theme,
+  ) {
+    final periodText = file.targetMonth.isNotEmpty && file.targetMonth != 'auto'
+        ? '${file.targetMonth} / ${file.targetYear}'
+        : 'سنة ${file.targetYear}';
+    final uploaded = _formatArchiveDateTime(file.uploadedAt);
+    final dateText = (file.lastIngestedAt.isNotEmpty &&
+            file.lastIngestedAt != file.uploadedAt)
+        ? '$uploaded\nآخر استيراد: ${_formatArchiveDateTime(file.lastIngestedAt)}'
+        : uploaded;
+
+    return DataRow(
+      cells: [
+        DataCell(
+          KeyedSubtree(
+            key: ValueKey('archive_file_card_${file.id}'),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.description_rounded,
+                  color: colorScheme.primary,
+                  size: 20.0,
+                ),
+                const SizedBox(width: M3Spacing.xs),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Tooltip(
+                        message: file.fileName,
+                        child: Text(
+                          file.fileName,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.start,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      Text(
+                        _formatFileSize(file.fileSizeBytes),
+                        maxLines: 3,
+                        textAlign: TextAlign.start,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        DataCell(
+          M3ChipSurface(
+            color: colorScheme.surfaceContainerHigh,
+            child: Text(
+              file.chainNameAr.isNotEmpty
+                  ? file.chainNameAr
+                  : file.retailChain.toUpperCase(),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
+        DataCell(_archiveCenteredText(periodText, theme)),
+        DataCell(_archiveCenteredText(
+          CurrencyFormatter.formatNumber(file.branchesCount),
+          theme,
+          key: ValueKey('file_branches_${file.id}'),
+          weight: FontWeight.w700,
+        )),
+        DataCell(_archiveCenteredText(
+          CurrencyFormatter.formatNumber(file.rowsIngested),
+          theme,
+          key: ValueKey('file_rows_${file.id}'),
+          weight: FontWeight.w700,
+        )),
+        DataCell(_archiveCenteredText(
+          CurrencyFormatter.formatCompactEGP(file.totalRevenue),
+          theme,
+          weight: FontWeight.w800,
+          color: colorScheme.primary,
+        )),
+        DataCell(
+            _archiveCenteredText(_formatFileSize(file.fileSizeBytes), theme)),
+        DataCell(
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 96.0),
+            child: Text(
+              dateText,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ),
@@ -2438,17 +2593,82 @@ onChanged: m3Legacy<String>((val) {
     );
   }
 
-  static Color _chainBadgeColor(String chainCode, ColorScheme colorScheme) {
-    switch (chainCode.trim().toLowerCase()) {
-      case 'fathalla':
-        return colorScheme.primary;
-      case 'gomla':
-        return colorScheme.secondary;
-      case 'carrefour':
-        return colorScheme.tertiary;
-      default:
-        return colorScheme.primary;
-    }
+  static Widget _archiveCenteredText(
+    String text,
+    ThemeData theme, {
+    Key? key,
+    FontWeight weight = FontWeight.w600,
+    Color? color,
+  }) {
+    return Text(
+      text,
+      key: key,
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        fontWeight: weight,
+        color: color,
+      ),
+    );
+  }
+
+  Widget _buildArchiveActionsColumn(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final divider = Divider.createBorderSide(context, width: 1.0);
+    return IntrinsicWidth(
+      key: const ValueKey('upload_archive_actions_column'),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: BorderDirectional(
+              start: BorderSide(color: colorScheme.outlineVariant)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: _archiveHeadingHeight,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: M3Spacing.sm),
+              color: colorScheme.surfaceContainerHigh.withOpacity(0.5),
+              child: Text(
+                'الإجراءات',
+                style: theme.dataTableTheme.headingTextStyle ??
+                    theme.textTheme.titleSmall,
+              ),
+            ),
+            for (final file in _archivedFiles)
+              Container(
+                height: _archiveRowHeight,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: M3Spacing.sm),
+                decoration: BoxDecoration(border: Border(top: divider)),
+                child: _archiveActions(file),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _archiveActions(ArchivedExcelFileModel file) {
+    return ArchiveActionsGroup(
+      key: ValueKey('archive_action_group_${file.id}'),
+      archiveId: file.id,
+      fileName: file.fileName,
+      showEdit: false,
+      isDeleting: _deletingArchiveId == file.id,
+      onEdit: null,
+      onDownload:
+          (_downloadingArchiveId == file.id || _deletingArchiveId == file.id)
+              ? null
+              : () => _handleDownloadArchivedFile(file),
+      onDelete:
+          (_downloadingArchiveId == file.id || _deletingArchiveId == file.id)
+              ? null
+              : () => _handleDeleteArchivedFile(file),
+    );
   }
 
   static String _formatFileSize(int bytes) {
@@ -2460,8 +2680,9 @@ onChanged: m3Legacy<String>((val) {
     return '${mb.toStringAsFixed(2)} MB';
   }
 
-  static String _formatArchiveDate(String iso) {
+  static String _formatArchiveDateTime(String iso) {
     if (iso.isEmpty) return '2026-03-08';
+    if (iso.length >= 16) return iso.substring(0, 16).replaceAll('T', ' ');
     if (iso.length >= 10) return iso.substring(0, 10);
     return iso;
   }
