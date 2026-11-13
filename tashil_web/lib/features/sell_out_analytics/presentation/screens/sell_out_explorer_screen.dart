@@ -36,6 +36,7 @@ import '../widgets/target_management_panel.dart';
 import '../widgets/virtualized_sku_table.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 import '../../../../core/widgets/m3_toolbar_button.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../../core/widgets/m3_section_title.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
@@ -3324,68 +3325,17 @@ onChanged: m3Legacy<int>((v) {
     required Color color,
     bool textValue = false,
   }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return Container(
+    // Shared reference KPI card (Sell-Out is the reference; Compare mirrors it).
+    // Arabic-only title; [titleEn] is kept as the stable key id.
+    return M3SummaryKpiCard(
       key: ValueKey('kpi_card_$titleEn'),
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: M3Shape.radiusLg,
-        border: Border.all(
-          color: colorScheme.outlineVariant.withOpacity(0.5),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  borderRadius: M3Shape.radiusMd,
-                ),
-                child: Icon(icon, color: color, size: 20.0),
-              ),
-              const SizedBox(width: 8.0),
-              // Arabic-only title; [titleEn] is kept as the stable key id.
-              Expanded(
-                child: M3SectionTitle(
-                  titleAr,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          M3Spacing.gapSM,
-          // Up to 2 lines; the full value is always in the tooltip.
-          Tooltip(
-            message: value,
-            child: Text(
-              value,
-              key: ValueKey('kpi_value_$titleEn'),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: (textValue ? theme.textTheme.titleLarge : theme.textTheme.headlineSmall)?.copyWith(
-                fontWeight: textValue ? FontWeight.w700 : FontWeight.w900,
-                color: colorScheme.onSurface,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4.0),
-          Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
+      valueKey: ValueKey('kpi_value_$titleEn'),
+      title: titleAr,
+      value: value,
+      subtitle: subtitle,
+      icon: icon,
+      color: color,
+      textValue: textValue,
     );
   }
 }

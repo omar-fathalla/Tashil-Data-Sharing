@@ -189,7 +189,7 @@ class _AiPickCard extends StatelessWidget {
               ),
               Text(
                 competitor.skuName,
-                maxLines: 2,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w700,

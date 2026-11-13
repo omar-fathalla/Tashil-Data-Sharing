@@ -3,6 +3,7 @@ import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_shape.dart';
 import 'package:tashil_web/core/theme/m3_spacing.dart';
+import 'package:tashil_web/core/utils/arabic_plural.dart';
 import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:tashil_web/core/widgets/m3_dropdown.dart';
 import 'package:tashil_web/core/widgets/m3_feedback.dart';
@@ -280,7 +281,7 @@ class CompetitorSuggestionsReviewState
                 previousRemaining >= 0 &&
                 remaining >= previousRemaining)) {
           _showInfoMessage(
-            'توقف التوليد: لا تقدّم إضافي (المتبقي $remaining صنف)',
+            'توقف التوليد: لا تقدّم إضافي (المتبقي ${countSku(remaining)})',
           );
           break;
         }
@@ -470,7 +471,7 @@ fitOptions: true,
                 Expanded(
                   child: Text(
                     _generateAllTotal > 0
-                        ? '$_generateAllDone من $_generateAllTotal صنف'
+                        ? '$_generateAllDone من ${countSku(_generateAllTotal)}'
                         : 'جاري التوليد…',
                     key: const ValueKey('generate-all-progress'),
                     style: theme.textTheme.labelLarge?.copyWith(
@@ -494,7 +495,7 @@ fitOptions: true,
           if (!_loading && groups.isNotEmpty) ...[
             M3Spacing.gapXS,
             Text(
-              '${groups.length} صنف · ${_items.length} اقتراح بانتظار الموافقة',
+              '${countSku(groups.length)} · ${arabicCount(_items.length, one: 'اقتراح واحد', two: 'اقتراحان', few: 'اقتراحات', many: 'اقتراحًا', hundred: 'اقتراح')} بانتظار الموافقة',
               key: const ValueKey('pending-suggestions-count'),
               style: theme.textTheme.labelMedium?.copyWith(
                 color: cs.onSurfaceVariant,

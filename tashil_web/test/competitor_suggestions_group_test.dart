@@ -137,7 +137,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // 25 own SKUs × 2 suggestions; page size 20 → first page shows 20 group cards.
-      expect(find.textContaining('25 صنف · 50 اقتراح'), findsOneWidget);
+      expect(find.textContaining('25 صنفًا · 50 اقتراحًا'), findsOneWidget);
       expect(find.text('موافقة على الكل'), findsNWidgets(20));
       expect(find.byKey(const ValueKey('suggestion-group-OWN0')), findsOneWidget);
       expect(find.byKey(const ValueKey('suggestion-group-OWN19')), findsOneWidget);
