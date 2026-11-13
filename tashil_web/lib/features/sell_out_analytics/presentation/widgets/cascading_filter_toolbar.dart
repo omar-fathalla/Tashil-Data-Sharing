@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/widgets/app_icons.dart';
@@ -9,6 +8,8 @@ import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import 'barcode_scanner_dialog.dart';
 import 'sell_table_shared.dart';
+import '../../../../core/widgets/m3_toolbar_button.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
 
 /// CascadingFilterToolbar provides multi-dimensional cascading filter controls
 /// where selecting a chain filters the available stores, and category filters SKUs.
@@ -138,7 +139,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                               Icon(
                                 Icons.calendar_month_rounded,
                                 color: colorScheme.primary,
-                                size: 22.0,
+                                size: 24.0,
                               ),
                               const SizedBox(width: 8.0),
                               Text(
@@ -152,7 +153,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                           IconButton(
                             icon: const Icon(Icons.close_rounded, size: 20.0),
                             onPressed: () => Navigator.of(dialogCtx).pop(),
-                            tooltip: 'Close',
+                            tooltip: 'إغلاق',
                           ),
                         ],
                       ),
@@ -172,8 +173,8 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                         runSpacing: 6.0,
                         children: [
                           ActionChip(
-                            label: const Text('January 2026'),
-                            avatar: const Icon(Icons.verified_rounded, size: 16.0),
+                            label: const Text('يناير 2026'),
+                            avatar: const Icon(Icons.verified_rounded, size: 18.0),
                             onPressed: () {
                               setDialogState(() {
                                 tempStart = DateTime(2026, 1, 1);
@@ -182,7 +183,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                             },
                           ),
                           ActionChip(
-                            label: const Text('Last 7 Days'),
+                            label: const Text('آخر 7 أيام'),
                             onPressed: () {
                               final now = DateTime.now();
                               setDialogState(() {
@@ -192,7 +193,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                             },
                           ),
                           ActionChip(
-                            label: const Text('Last 30 Days'),
+                            label: const Text('آخر 30 يومًا'),
                             onPressed: () {
                               final now = DateTime.now();
                               setDialogState(() {
@@ -243,7 +244,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'From:',
+                                      'من:',
                                       style: theme.textTheme.labelSmall?.copyWith(
                                         color: colorScheme.onSurfaceVariant,
                                       ),
@@ -287,7 +288,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'To:',
+                                      'إلى:',
                                       style: theme.textTheme.labelSmall?.copyWith(
                                         color: colorScheme.onSurfaceVariant,
                                       ),
@@ -452,7 +453,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
     Widget buildSearchField({required double? width}) {
       return Container(
         width: width,
-        height: 44.0,
+        height: M3ToolbarButton.height,
         decoration: controlDecoration,
         alignment: Alignment.center,
         child: Directionality(
@@ -486,16 +487,16 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                 size: 20.0,
                 color: colorScheme.onSurfaceVariant,
               ),
-              prefixIconConstraints: const BoxConstraints(minWidth: 38.0, minHeight: 44.0),
+              prefixIconConstraints: const BoxConstraints(minWidth: 38.0, minHeight: M3ToolbarButton.height),
               suffixIcon: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (_searchController.text.isNotEmpty)
                     IconButton(
                       icon: const Icon(Icons.clear_rounded, size: 18.0),
-                      tooltip: 'Clear',
+                      tooltip: 'مسح',
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32.0, minHeight: 44.0),
+                      constraints: const BoxConstraints(minWidth: 32.0, minHeight: M3ToolbarButton.height),
                       splashRadius: 18.0,
                       onPressed: () {
                         setState(() {
@@ -513,13 +514,13 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                     ),
                     tooltip: 'امسح الباركود',
                     padding: const EdgeInsetsDirectional.only(end: 6.0),
-                    constraints: const BoxConstraints(minWidth: 38.0, minHeight: 44.0),
+                    constraints: const BoxConstraints(minWidth: 38.0, minHeight: M3ToolbarButton.height),
                     splashRadius: 18.0,
                     onPressed: _openBarcodeScanner,
                   ),
                 ],
               ),
-              suffixIconConstraints: const BoxConstraints(minHeight: 44.0),
+              suffixIconConstraints: const BoxConstraints(minHeight: M3ToolbarButton.height),
             ),
           ),
         ),
@@ -602,18 +603,18 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
     Widget buildDateRangeButton({bool expand = false}) {
       final child = InkWell(
         key: const ValueKey('sellout_date_range_chip'),
-        borderRadius: M3Shape.radiusLg,
+        borderRadius: M3ChipStyle.radius,
         onTap: () => _showCompactDateRangeBubble(context),
         child: AnimatedContainer(
           duration: M3Motion.short4,
           curve: M3Motion.standard,
-          height: 38.0,
-          padding: const EdgeInsets.symmetric(horizontal: 10.0),
+          height: M3ToolbarButton.height,
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
           decoration: BoxDecoration(
             color: hasDateRange
                 ? colorScheme.primaryContainer.withOpacity(0.55)
                 : colorScheme.surfaceContainerHighest.withOpacity(0.45),
-            borderRadius: M3Shape.radiusLg,
+            borderRadius: M3ChipStyle.radius,
             border: Border.all(
               color: hasDateRange
                   ? colorScheme.primary.withOpacity(0.6)
@@ -626,19 +627,16 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
             children: [
               Icon(
                 Icons.date_range_rounded,
-                size: 15.0,
+                size: M3ToolbarButton.iconSize,
                 color: hasDateRange ? colorScheme.primary : colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(width: 5.0),
+              const SizedBox(width: 8.0),
               Flexible(
                 child: Text(
                   dateRangeLabel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontFamily: 'Cairo',
-                    fontWeight: FontWeight.w700,
-                    fontSize: M3FontSize.labelSmall,
+                  style: theme.textTheme.labelLarge?.copyWith(
                     color: hasDateRange ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
                   ),
                 ),
@@ -650,7 +648,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                   borderRadius: M3Shape.radiusSm,
                   child: Icon(
                     Icons.close_rounded,
-                    size: 14.0,
+                    size: M3ToolbarButton.iconSize,
                     color: colorScheme.primary,
                   ),
                 ),
@@ -666,7 +664,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
       if (widget.onUpload == null) return const SizedBox.shrink();
       return SellActionButtons.upload(
         context,
-        label: 'Upload Sell-Out',
+        label: 'رفع ملف Sell-Out',
         onTap: widget.onUpload,
         isUploading: widget.isUploading,
         expand: expand,
@@ -690,7 +688,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        padding: M3Spacing.pSm,
         child: LayoutBuilder(
           builder: (context, constraints) {
             final isCompact = constraints.maxWidth < 600.0;
@@ -723,19 +721,19 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
                     ],
                   ),
                 ],
-                const SizedBox(height: 12.0),
+                M3Spacing.gapSM,
                 // Scope & Actions Row: Date Range, Upload, Print PDF, and Export Excel
                 if (constraints.maxWidth < 750.0) ...[
                   Row(
                     children: [
                       Expanded(child: buildDateRangeButton(expand: false)),
                       if (widget.onUpload != null) ...[
-                        const SizedBox(width: 6.0),
+                        const SizedBox(width: 8.0),
                         Expanded(child: buildUploadSellOutButton(expand: false)),
                       ],
-                      const SizedBox(width: 6.0),
+                      const SizedBox(width: 8.0),
                       Expanded(child: buildPrintPdfButton(expand: false)),
-                      const SizedBox(width: 6.0),
+                      const SizedBox(width: 8.0),
                       Expanded(child: buildExportExcelButton(expand: false)),
                     ],
                   ),

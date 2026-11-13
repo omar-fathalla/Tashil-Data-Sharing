@@ -8,6 +8,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
 
 /// VirtualizedSkuTable renders sell-out transactions with pinned columns
 /// (GTIN Barcode & SKU Name remain sticky/fixed while metric columns scroll horizontally),
@@ -29,7 +30,7 @@ class VirtualizedSkuTable extends StatefulWidget {
 }
 
 class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
-  static const double _rowHeight = 52.0;
+  static const double _rowHeight = 64.0;
   static const double _headerHeight = 56.0;
 
   String? _sortColumn;
@@ -157,7 +158,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                 _sortAscending
                     ? Icons.arrow_upward_rounded
                     : Icons.arrow_downward_rounded,
-                size: 14.0,
+                size: 18.0,
                 color: colorScheme.primary,
               ),
             ],
@@ -198,7 +199,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                     children: [
                       Icon(
                         Icons.sort_rounded,
-                        size: 16.0,
+                        size: 18.0,
                         color: colorScheme.primary,
                       ),
                       const SizedBox(width: 6.0),
@@ -207,7 +208,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                         style: theme.textTheme.labelMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                           color: colorScheme.onSurface,
-                          fontSize: M3FontSize.labelMediumPlus,
+                          fontSize: M3FontSize.bodyMedium,
                         ),
                       ),
                     ],
@@ -228,7 +229,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   ? Icons.arrow_upward_rounded
                                   : Icons.arrow_downward_rounded)
                               : Icons.payments_rounded,
-                          size: 14.0,
+                          size: 18.0,
                         ),
                       ),
                       ButtonSegment<String>(
@@ -240,7 +241,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   ? Icons.arrow_upward_rounded
                                   : Icons.arrow_downward_rounded)
                               : Icons.shopping_basket_rounded,
-                          size: 14.0,
+                          size: 18.0,
                         ),
                       ),
                       ButtonSegment<String>(
@@ -252,7 +253,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   ? Icons.arrow_upward_rounded
                                   : Icons.arrow_downward_rounded)
                               : Icons.category_rounded,
-                          size: 14.0,
+                          size: 18.0,
                         ),
                       ),
                       ButtonSegment<String>(
@@ -264,7 +265,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   ? Icons.arrow_upward_rounded
                                   : Icons.arrow_downward_rounded)
                               : Icons.calendar_today_rounded,
-                          size: 14.0,
+                          size: 18.0,
                         ),
                       ),
                     ],
@@ -292,7 +293,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                       textStyle: theme.textTheme.labelSmall?.copyWith(
                         fontFamily: 'Cairo',
                         fontWeight: FontWeight.w700,
-                        fontSize: M3FontSize.labelSmallPlus,
+                        fontSize: M3FontSize.bodySmall,
                       ),
                     ),
                   ),
@@ -302,7 +303,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
           ),
           const SizedBox(height: 6.0),
           ...pageRecords.map((r) {
-            final brandStyle = _getChainBrandStyle(r.retailerChain, colorScheme);
+            final brandStyle = _neutralChainStyle(_getChainBrandStyle(r.retailerChain, colorScheme), colorScheme);
             return Card(
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -356,7 +357,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     children: [
                                       Icon(
                                         brandStyle.icon,
-                                        size: 13.0,
+                                        size: 18.0,
                                         color: brandStyle.foreground,
                                       ),
                                       const SizedBox(width: 4.0),
@@ -387,7 +388,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     children: [
                                       Icon(
                                         Icons.calendar_today_rounded,
-                                        size: 11.5,
+                                        size: 18.0,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                       const SizedBox(width: 4.0),
@@ -412,7 +413,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                               r.skuName,
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w800,
-                                fontSize: M3FontSize.bodyMediumPlus,
+                                fontSize: M3FontSize.bodyMedium,
                                 color: colorScheme.onSurface,
                                 height: 1.3,
                               ),
@@ -444,7 +445,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                         r.itemCode,
                                         style: TextStyle(
                                           fontFamily: 'monospace',
-                                          fontSize: M3FontSize.tinyPlus,
+                                          fontSize: M3FontSize.labelSmall,
                                           fontWeight: FontWeight.w800,
                                           color: colorScheme.primary,
                                           decoration: widget.onRecordTap != null
@@ -470,7 +471,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     children: [
                                       Icon(
                                         Icons.qr_code_2_rounded,
-                                        size: 13.0,
+                                        size: 18.0,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                       const SizedBox(width: 4.0),
@@ -502,7 +503,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     children: [
                                       Icon(
                                         Icons.storefront_rounded,
-                                        size: 13.0,
+                                        size: 18.0,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                       const SizedBox(width: 4.0),
@@ -533,7 +534,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       children: [
                                         Icon(
                                           Icons.sell_rounded,
-                                          size: 12.0,
+                                          size: 18.0,
                                           color: colorScheme.onSurfaceVariant,
                                         ),
                                         const SizedBox(width: 4.0),
@@ -595,7 +596,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                               : '× ${r.unitPrice.toStringAsFixed(2)} ج.م',
                                           style: theme.textTheme.labelSmall?.copyWith(
                                             color: colorScheme.onSurfaceVariant,
-                                            fontSize: M3FontSize.tinyPlus,
+                                            fontSize: M3FontSize.labelSmall,
                                           ),
                                         ),
                                       ],
@@ -637,7 +638,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             color: r.retailerMarginPct < 0
                                                 ? colorScheme.error
                                                 : colorScheme.primary.withOpacity(0.75),
-                                            fontSize: M3FontSize.tinyPlus,
+                                            fontSize: M3FontSize.labelSmall,
                                             fontFamily: 'monospace',
                                           ),
                                         ),
@@ -692,7 +693,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.inbox_rounded, size: 40.0, color: colorScheme.onSurfaceVariant),
+                Icon(Icons.inbox_rounded, size: 48.0, color: colorScheme.onSurfaceVariant),
                 M3Spacing.gapSM,
                 Text(
                   'لا توجد نتائج. جرّب تغيير الفلاتر.',
@@ -736,7 +737,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
             ),
             child: Row(
               children: [
-                Icon(Icons.push_pin_rounded, size: 16.0, color: colorScheme.primary),
+                Icon(Icons.push_pin_rounded, size: 18.0, color: colorScheme.primary),
                 const SizedBox(width: 8.0),
                 Expanded(
                   child: Text(
@@ -846,7 +847,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                 _buildSortableHeaderCell(
                                   context: context,
                                   columnKey: 'barcode',
-                                  label: 'GTIN / Barcode',
+                                  label: 'الباركود',
                                   width: barcodeColWidth,
                                 ),
                                 const SizedBox(width: 8.0),
@@ -895,10 +896,9 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                                 : null,
                                             child: Text(
                                               r.itemCode,
-                                              style: TextStyle(
+                                              style: theme.textTheme.bodySmall?.copyWith(
                                                 fontFamily: 'monospace',
-                                                fontSize: M3FontSize.tiny,
-                                                fontWeight: FontWeight.w800,
+                                                fontWeight: FontWeight.w600,
                                                 color: colorScheme.primary,
                                                 decoration: widget.onRecordTap != null
                                                     ? TextDecoration.underline
@@ -910,12 +910,12 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           ),
                                         Row(
                                           children: [
-                                            Icon(Icons.qr_code_2_rounded, size: 13.0, color: colorScheme.onSurfaceVariant),
-                                            const SizedBox(width: 3.0),
+                                            Icon(Icons.qr_code_2_rounded, size: 18.0, color: colorScheme.onSurfaceVariant),
+                                            const SizedBox(width: 4.0),
                                             Expanded(
                                               child: SelectableText(
                                                 r.barcode,
-                                                style: const TextStyle(fontFamily: 'monospace', fontSize: M3FontSize.tinyPlus),
+                                                style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace', color: colorScheme.onSurfaceVariant),
                                                 maxLines: 1,
                                               ),
                                             ),
@@ -936,8 +936,9 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             : r.skuName,
                                         child: Text(
                                           r.skuName,
-                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: M3FontSize.bodySmall),
-                                          maxLines: 1,
+                                          key: const ValueKey('sku_table_sku_name'),
+                                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                                          maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
@@ -976,13 +977,13 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   _buildSortableHeaderCell(
                                     context: context,
                                     columnKey: 'retailerChain',
-                                    label: 'Chain',
+                                    label: 'السلسلة',
                                     width: colChainWidth,
                                   ),
                                   _buildSortableHeaderCell(
                                     context: context,
                                     columnKey: 'storeName',
-                                    label: 'Store / Branch',
+                                    label: 'الفرع',
                                     width: colStoreWidth,
                                   ),
                                   _buildSortableHeaderCell(
@@ -1021,7 +1022,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                               final idx = entry.key;
                               final r = entry.value;
                               final isEven = idx % 2 == 0;
-                              final brandStyle = _getChainBrandStyle(r.retailerChain, colorScheme);
+                              final brandStyle = _neutralChainStyle(_getChainBrandStyle(r.retailerChain, colorScheme), colorScheme);
 
                               // RepaintBoundary isolates each row so hover/scroll repaints stay local.
                               return RepaintBoundary(child: Container(
@@ -1044,22 +1045,15 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       width: colChainWidth,
                                       child: Align(
                                         alignment: AlignmentDirectional.centerStart,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
-                                          decoration: BoxDecoration(
-                                            color: brandStyle.background,
-                                            borderRadius: M3Shape.radiusSm,
-                                            border: Border.all(
-                                              color: brandStyle.border,
-                                              width: 1.0,
-                                            ),
-                                          ),
+                                        child: M3ChipSurface(
+                                          key: const ValueKey('sku_table_chain_chip'),
+                                          color: brandStyle.background,
                                           child: Text(
                                             brandStyle.displayNameEn,
-                                            style: TextStyle(
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: theme.textTheme.labelMedium?.copyWith(
                                               color: brandStyle.foreground,
-                                              fontSize: M3FontSize.labelSmall,
-                                              fontWeight: FontWeight.bold,
                                             ),
                                           ),
                                         ),
@@ -1069,7 +1063,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       width: colStoreWidth,
                                       child: Text(
                                         r.storeName,
-                                        style: const TextStyle(fontSize: M3FontSize.bodySmall),
+                                        style: theme.textTheme.bodyMedium,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -1083,14 +1077,13 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           Text(
                                             '${CurrencyFormatter.formatUnits(r.quantitySold)} وحدة',
                                             textAlign: TextAlign.end,
-                                            style: const TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w600),
+                                            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                                           ),
                                           if (r.cartonsSold > 0)
                                             Text(
                                               '${r.cartonsSold.toStringAsFixed(1)} كرتونة (${r.unitsPerCarton}/ك)',
                                               textAlign: TextAlign.end,
-                                              style: TextStyle(
-                                                fontSize: M3FontSize.microPlus,
+                                              style: theme.textTheme.bodySmall?.copyWith(
                                                 color: colorScheme.onSurfaceVariant,
                                               ),
                                               maxLines: 1,
@@ -1103,7 +1096,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       width: colUnitPriceWidth,
                                       child: _maybeTooltip(
                                         message: (r.recommendedPrice > 0 || r.factoryUnitCost > 0)
-                                            ? 'سعر الكارتة: ${r.recommendedPrice.toStringAsFixed(2)} ج.م • تكلفة المصنع للقطعة: ${r.factoryUnitCost.toStringAsFixed(2)} ج.م • صافي الكرتونة: ${r.netCartonInvoiceCost.toStringAsFixed(2)} ج.م • انحراف السعر: ${r.priceDeltaPct >= 0 ? "+" : ""}${r.priceDeltaPct.toStringAsFixed(1)}%'
+                                            ? 'سعر الكارتة: ${r.recommendedPrice.toStringAsFixed(2)} ج.م • تكلفة المصنع للقطعة: ${r.factoryUnitCost.toStringAsFixed(2)} ج.م • صافي الكرتونة: ${r.netCartonInvoiceCost.toStringAsFixed(2)} ج.م • انحراف السعر: ${CurrencyFormatter.formatSignedPct(r.priceDeltaPct)}'
                                             : null,
                                         child: Column(
                                           mainAxisAlignment: MainAxisAlignment.center,
@@ -1112,14 +1105,13 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             Text(
                                               '${r.unitPrice.toStringAsFixed(2)} ج.م',
                                               textAlign: TextAlign.end,
-                                              style: const TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w600),
+                                              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                                             ),
                                             if (r.recommendedPrice > 0 || r.factoryUnitCost > 0)
                                               Text(
                                                 'كارتة ${r.recommendedPrice.toStringAsFixed(2)} • مصنع ${r.factoryUnitCost.toStringAsFixed(2)}',
                                                 textAlign: TextAlign.end,
-                                                style: TextStyle(
-                                                  fontSize: M3FontSize.micro,
+                                                style: theme.textTheme.bodySmall?.copyWith(
                                                   color: colorScheme.onSurfaceVariant,
                                                 ),
                                                 maxLines: 1,
@@ -1133,7 +1125,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       width: colNetRevenueWidth,
                                       child: _maybeTooltip(
                                         message: (r.retailerMarginPct != 0 || r.retailerGrossProfit != 0)
-                                            ? 'مجمل ربح السلسلة: ${CurrencyFormatter.formatMarginSummary(r.retailerGrossProfit, r.retailerMarginPct, compact: false)} • انحراف السعر: ${r.priceDeltaPct >= 0 ? "+" : ""}${r.priceDeltaPct.toStringAsFixed(1)}%'
+                                            ? 'مجمل ربح السلسلة: ${CurrencyFormatter.formatMarginSummary(r.retailerGrossProfit, r.retailerMarginPct, compact: false)} • انحراف السعر: ${CurrencyFormatter.formatSignedPct(r.priceDeltaPct)}'
                                             : null,
                                         child: Column(
                                           mainAxisAlignment: MainAxisAlignment.center,
@@ -1142,9 +1134,8 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             Text(
                                               '${CurrencyFormatter.formatUnits(r.netRevenue.round())} ج.م',
                                               textAlign: TextAlign.end,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: M3FontSize.labelSmallPlus,
+                                              style: theme.textTheme.bodyMedium?.copyWith(
+                                                fontWeight: FontWeight.w600,
                                                 color: colorScheme.primary,
                                               ),
                                             ),
@@ -1152,9 +1143,8 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                               Text(
                                                 CurrencyFormatter.formatMarginSummary(r.retailerGrossProfit, r.retailerMarginPct, compact: false),
                                                 textAlign: TextAlign.end,
-                                                style: TextStyle(
-                                                  fontSize: M3FontSize.micro,
-                                                  fontWeight: FontWeight.w700,
+                                                style: theme.textTheme.bodySmall?.copyWith(
+                                                  fontWeight: FontWeight.w600,
                                                   color: r.retailerMarginPct < 0
                                                       ? colorScheme.error
                                                       : colorScheme.secondary,
@@ -1171,7 +1161,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       child: Text(
                                         r.transactionDate,
                                         textAlign: TextAlign.center,
-                                        style: const TextStyle(fontSize: M3FontSize.labelSmall),
+                                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                                       ),
                                     ),
                                   ],
@@ -1255,7 +1245,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                               : null,
                         ),
                         Text(
-                          'Page ${safePage + 1} of $totalPages',
+                          'صفحة ${safePage + 1} من $totalPages',
                           style: theme.textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -1281,6 +1271,18 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
       ),
     );
   }
+
+  /// Chain chips use the page's neutral roles (like the dashboard chips);
+  /// only the chain name differs.
+  ChainBrandStyle _neutralChainStyle(ChainBrandStyle b, ColorScheme cs) => ChainBrandStyle(
+        background: cs.surfaceContainerHigh,
+        border: cs.outlineVariant,
+        foreground: cs.onSurfaceVariant,
+        accent: cs.outlineVariant,
+        icon: b.icon,
+        displayNameAr: b.displayNameAr,
+        displayNameEn: b.displayNameEn,
+      );
 
   ChainBrandStyle _getChainBrandStyle(String chain, ColorScheme colorScheme) {
     final c = chain.toLowerCase().trim();

@@ -128,7 +128,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                         child: Icon(
                           Icons.qr_code_scanner_rounded,
                           color: colorScheme.onPrimaryContainer,
-                          size: 22.0,
+                          size: 24.0,
                         ),
                       ),
                       const SizedBox(width: 12.0),
@@ -250,7 +250,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog>
                                       _isDetecting ? 'DETECTED' : 'LIVE 60FPS',
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: M3FontSize.tiny,
+                                        fontSize: M3FontSize.labelSmall,
                                         fontWeight: FontWeight.bold,
                                         letterSpacing: 0.5,
                                       ),

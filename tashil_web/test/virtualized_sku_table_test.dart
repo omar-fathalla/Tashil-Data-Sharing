@@ -56,7 +56,7 @@ void main() {
       expect(find.text('2 صف'), findsOneWidget);
 
       // Verify Pinned Column Headers
-      expect(find.text('GTIN / Barcode'), findsOneWidget);
+      expect(find.text('الباركود'), findsOneWidget);
       expect(find.text('الصنف'), findsOneWidget);
 
       // Verify Pinned Column Data
@@ -66,8 +66,8 @@ void main() {
       expect(find.text('سمن أديكو نقي 750 جم'), findsOneWidget);
 
       // Verify Scrollable Metrics Headers
-      expect(find.text('Chain'), findsOneWidget);
-      expect(find.text('Store / Branch'), findsOneWidget);
+      expect(find.text('السلسلة'), findsOneWidget);
+      expect(find.text('الفرع'), findsOneWidget);
       expect(find.text('الوحدات المباعة'), findsOneWidget);
       expect(find.text('سعر الوحدة'), findsOneWidget);
       expect(find.text('صافي المبيعات (ج.م)'), findsOneWidget);
