@@ -2843,101 +2843,90 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               const SizedBox(height: 20.0),
               const Divider(),
               const SizedBox(height: 12.0),
-              Wrap(
-                spacing: 16.0,
-                runSpacing: 16.0,
-                children: [
-                  _buildCalcResultTile(
-                    cs,
-                    'إجمالي الوحدات بالطلبية',
-                    'Total Units Ordered',
-                    '${_intFmt.format(totalUnits)} وحدة (${sku.packagingType})',
-                    cs.primary,
-                  ),
-                  _buildCalcResultTile(
-                    cs,
-                    'إجمالي القيمة قبل الضريبة',
-                    'Gross Value Excl. VAT',
-                    '${_currFmt.format(grossExclVat)} ج.م',
-                    cs.onSurface,
-                  ),
-                  _buildCalcResultTile(
-                    cs,
-                    'قيمة ضريبة القيمة المضافة (14%)',
-                    'VAT Amount (14%)',
-                    '${_currFmt.format(vatAmount)} ج.م',
-                    M3Palette.warning,
-                  ),
-                  _buildCalcResultTile(
-                    cs,
-                    'إجمالي قيمة الخصومات التجارية',
-                    'Total Invoice & Extra Discounts',
-                    '-${_currFmt.format(totalDiscountEgp)} ج.م',
-                    M3Palette.danger,
-                  ),
-                  _buildCalcResultTile(
-                    cs,
-                    'صافي الفاتورة المستحق لأدكو',
-                    'Net Payable Invoice Value',
-                    '${_currFmt.format(netPayable)} ج.م (الوحدة: ${_currFmt.format(netUnitCost)})',
-                    M3Palette.teal,
-                  ),
-                  _buildCalcResultTile(
-                    cs,
-                    'هامش ربح السلسلة المتوقع',
-                    'Projected Retailer Shelf Margin',
-                    '${retailerMarginPct.toStringAsFixed(1)}% (${_currFmt.format(retailerProfitEgp)} ج.م)',
-                    M3Palette.indigo,
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, calcConstraints) {
+                  // Same 138dp shared cards as the Product Master / Sell-Out
+                  // KPIs. 3 columns at the live 1030 shell (inner ~942 after
+                  // page + card padding); 2 columns on the 1024 shell.
+                  final columns = calcConstraints.maxWidth >= 720
+                      ? 3
+                      : (calcConstraints.maxWidth >= 520 ? 2 : 1);
+                  return M3EqualHeightGrid(
+                    key: const ValueKey('pm_calc_result_grid'),
+                    columns: columns,
+                    spacing: M3Spacing.sm,
+                    runSpacing: M3Spacing.sm,
+                    children: [
+                      M3SummaryKpiCard(
+                        key: const ValueKey('pm_calc_card_total_units'),
+                        title: 'إجمالي الوحدات بالطلبية',
+                        titleMaxLines: 2,
+                        subtitleMaxLines: 2,
+                        value: '${_intFmt.format(totalUnits)} وحدة',
+                        subtitle: 'Total Units Ordered · ${sku.packagingType}',
+                        icon: Icons.inventory_2_rounded,
+                        color: cs.primary,
+                      ),
+                      M3SummaryKpiCard(
+                        key: const ValueKey('pm_calc_card_gross'),
+                        title: 'إجمالي القيمة قبل الضريبة',
+                        titleMaxLines: 2,
+                        subtitleMaxLines: 2,
+                        value: '${_currFmt.format(grossExclVat)} ج.م',
+                        subtitle: 'Gross Value Excl. VAT',
+                        icon: Icons.payments_rounded,
+                        color: cs.onSurface,
+                      ),
+                      M3SummaryKpiCard(
+                        key: const ValueKey('pm_calc_card_vat'),
+                        title: 'قيمة ضريبة القيمة المضافة (14%)',
+                        titleMaxLines: 2,
+                        subtitleMaxLines: 2,
+                        value: '${_currFmt.format(vatAmount)} ج.م',
+                        subtitle: 'VAT Amount (14%)',
+                        icon: Icons.receipt_long_rounded,
+                        color: M3Palette.warning,
+                      ),
+                      M3SummaryKpiCard(
+                        key: const ValueKey('pm_calc_card_discounts'),
+                        title: 'إجمالي قيمة الخصومات التجارية',
+                        titleMaxLines: 2,
+                        subtitleMaxLines: 2,
+                        value: '-${_currFmt.format(totalDiscountEgp)} ج.م',
+                        subtitle: 'Total Invoice & Extra Discounts',
+                        icon: Icons.discount_rounded,
+                        color: M3Palette.danger,
+                      ),
+                      M3SummaryKpiCard(
+                        key: const ValueKey('pm_calc_card_net'),
+                        title: 'صافي الفاتورة المستحق لأدكو',
+                        titleMaxLines: 2,
+                        subtitleMaxLines: 2,
+                        value: '${_currFmt.format(netPayable)} ج.م',
+                        subtitle:
+                            'Net Payable Invoice Value · الوحدة: ${_currFmt.format(netUnitCost)}',
+                        icon: Icons.account_balance_wallet_rounded,
+                        color: M3Palette.teal,
+                      ),
+                      M3SummaryKpiCard(
+                        key: const ValueKey('pm_calc_card_margin'),
+                        title: 'هامش ربح السلسلة المتوقع',
+                        titleMaxLines: 2,
+                        subtitleMaxLines: 2,
+                        value: '${retailerMarginPct.toStringAsFixed(1)}%',
+                        subtitle:
+                            'Projected Retailer Shelf Margin · ${_currFmt.format(retailerProfitEgp)} ج.م',
+                        icon: Icons.trending_up_rounded,
+                        color: M3Palette.indigo,
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildCalcResultTile(
-    ColorScheme cs,
-    String titleAr,
-    String titleEn,
-    String value,
-    Color color,
-  ) {
-    return Container(
-      width: 280,
-      padding: const EdgeInsets.all(14.0),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: M3Shape.radiusMd,
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            titleAr,
-            style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: M3FontSize.bodySmallPlus),
-          ),
-          Text(
-            titleEn,
-            style: TextStyle(
-                fontSize: M3FontSize.tinyPlus, color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(height: 8.0),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: M3FontSize.bodyMediumLargePlus,
-              color: color,
-            ),
-          ),
-        ],
-      ),
     );
   }
 

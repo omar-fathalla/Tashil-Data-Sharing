@@ -11,6 +11,7 @@ import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell
 
 import 'support/live_viewport.dart';
 import 'support/product_master_m3_support.dart';
+import 'support/text_visibility.dart';
 
 class _KpiMetrics {
   _KpiMetrics(this.size, this.padding, this.iconSize, this.fonts, this.weights);
@@ -174,5 +175,78 @@ void main() {
     expect(_horizontalExtent(tester), lessThanOrEqualTo(2.0),
         reason: 'catalog still scrolls horizontally at 1024');
     expect(find.textContaining('كلوريل أبيض مركز'), findsWidgets);
+  });
+
+  testWidgets(
+      'calculator output cards match Sell-Out 138 at the live 1280 shell',
+      (tester) async {
+    await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 3600,
+      withSidebar: true,
+      page: SellOutExplorerScreen(apiClient: ApiClient()),
+    );
+    final ref = _kpi(
+      tester,
+      find.byKey(const ValueKey('kpi_card_Net Sales (EGP)')),
+    );
+
+    final errors = await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 3600,
+      withSidebar: true,
+    );
+    expect(errors, isEmpty, reason: errors.map((e) => e.exception).join('\n'));
+
+    await tester.tap(find.textContaining('حاسبة الطلبيات والخصومات والهامش'));
+    await tester.pumpAndSettle();
+
+    final cards = find.byWidgetPredicate((w) =>
+        w is M3SummaryKpiCard &&
+        w.key is ValueKey<String> &&
+        (w.key as ValueKey<String>).value.startsWith('pm_calc_card_'));
+    expect(cards, findsNWidgets(6));
+    expect(find.byKey(const ValueKey('pm_calc_result_grid')), findsOneWidget);
+
+    for (final e in cards.evaluate()) {
+      final m = _kpi(tester, find.byWidget(e.widget));
+      final why = 'calc ${e.widget.key}: $m\nsell-out: $ref';
+      expect(m.padding, ref.padding, reason: why);
+      expect(m.iconSize, ref.iconSize, reason: why);
+      expect(m.iconSize, M3SummaryKpiStyle.iconSize, reason: why);
+      expect(m.padding, M3SummaryKpiStyle.padding, reason: why);
+      expect(m.size.height, closeTo(ref.size.height, 0.5), reason: why);
+      expect(m.size.height, closeTo(138.0, 1.0), reason: why);
+    }
+
+    for (final title in [
+      'إجمالي الوحدات بالطلبية',
+      'إجمالي القيمة قبل الضريبة',
+      'قيمة ضريبة القيمة المضافة (14%)',
+      'إجمالي قيمة الخصومات التجارية',
+      'صافي الفاتورة المستحق لأدكو',
+      'هامش ربح السلسلة المتوقع',
+    ]) {
+      final card = cards
+          .evaluate()
+          .map((e) => e.widget)
+          .cast<M3SummaryKpiCard>()
+          .firstWhere(
+            (c) => c.title == title,
+            orElse: () => throw StateError('missing calc card $title'),
+          );
+      expect(
+        labelFullyVisible(
+          tester,
+          title,
+          scope: find.byWidget(card),
+          minMaxLines: 2,
+        ),
+        isTrue,
+        reason: 'calculator title "$title" must sit fully inside the 138 card',
+      );
+    }
   });
 }

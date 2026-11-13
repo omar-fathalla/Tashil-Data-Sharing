@@ -20,27 +20,47 @@ class _FakeSource implements DataQualityDataSource {
   }
 
   @override
-  Future<DataQualityIssue> updateStatus(String id, String status, String reason) async {
+  Future<DataQualityIssue> updateStatus(
+      String id, String status, String reason) async {
     calls.add('patch:$id:$status:$reason');
     return list.first;
   }
 }
 
 const _dup = DataQualityIssue(
-  id: 'a1', source: 'product_master', type: 'duplicate_barcode', typeLabel: 'باركود مكرر',
-  severity: kDqCritical, row: 299, itemCode: 'FGHC-0700-0214', barcode: '6223000233436', status: kDqOpen,
+  id: 'a1',
+  source: 'product_master',
+  type: 'duplicate_barcode',
+  typeLabel: 'باركود مكرر',
+  severity: kDqCritical,
+  row: 299,
+  itemCode: 'FGHC-0700-0214',
+  barcode: '6223000233436',
+  status: kDqOpen,
 );
 
 DataQualitySummary _s(int open, double pct, DateTime at) => DataQualitySummary(
       types: [
-        DataQualityTypeSummary(source: 'product_master', type: 'duplicate_barcode', typeLabel: 'باركود مكرر',
-            severity: kDqCritical, total: 45, open: open, impactEgp: 1000),
+        DataQualityTypeSummary(
+            source: 'product_master',
+            type: 'duplicate_barcode',
+            typeLabel: 'باركود مكرر',
+            severity: kDqCritical,
+            total: 45,
+            open: open,
+            impactEgp: 1000),
       ],
-      totalRows: 389, criticalRows: 38, cleanlinessPct: pct, open: open, updatedAt: at,
+      totalRows: 389,
+      criticalRows: 38,
+      cleanlinessPct: pct,
+      open: open,
+      updatedAt: at,
     );
 
 void main() {
-  testWidgets('summary gauge reflects real row counts (not 0/0 at 100% with open issues)', (tester) async {
+  testWidgets(
+      'summary gauge reflects real row counts (not 0/0 at 100% with open issues)',
+      (tester) async {
     tester.view.physicalSize = const Size(1500, 1200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -75,7 +95,9 @@ void main() {
     final src = _FakeSource(fixed, [_dup]);
     await tester.pumpWidget(MaterialApp(
       theme: AppTheme.light(),
-      home: Scaffold(body: DataQualityScreen(dataSource: src, pollInterval: const Duration(hours: 1))),
+      home: Scaffold(
+          body: DataQualityScreen(
+              dataSource: src, pollInterval: const Duration(hours: 1))),
     ));
     await tester.pumpAndSettle();
     expect(find.text('90.2%'), findsOneWidget);
@@ -86,18 +108,24 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('shows summary + table, ignore needs a reason, auto-refreshes on new version', (tester) async {
+  testWidgets(
+      'shows summary + table, ignore needs a reason, auto-refreshes on new version',
+      (tester) async {
     tester.view.physicalSize = const Size(1500, 1200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    final src = _FakeSource(_s(68, 90.23, DateTime.utc(2026, 10, 25, 9)), [_dup]);
+    final src =
+        _FakeSource(_s(68, 90.23, DateTime.utc(2026, 10, 25, 9)), [_dup]);
     await tester.pumpWidget(MaterialApp(
       theme: AppTheme.light(),
-      home: Scaffold(body: DataQualityScreen(dataSource: src, pollInterval: const Duration(seconds: 1))),
+      home: Scaffold(
+          body: DataQualityScreen(
+              dataSource: src, pollInterval: const Duration(seconds: 1))),
     ));
     await tester.pumpAndSettle();
     expect(find.text('90.2%'), findsOneWidget);
-    expect(find.text('FGHC-0700-0214'), findsOneWidget);
+    expect(find.byKey(const ValueKey('dq_item_code_FGHC-0700-0214')),
+        findsOneWidget);
     expect(src.calls.first, 'issues:'); // default = open only
 
     final statusBtn = find.byKey(const ValueKey('dq_status_a1'));
@@ -109,7 +137,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('dq_status_save')));
     await tester.pumpAndSettle();
     expect(find.text('السبب مطلوب عند التجاهل'), findsOneWidget);
-    await tester.enterText(find.byKey(const ValueKey('dq_status_reason')), 'عرض بنفس الباركود');
+    await tester.enterText(
+        find.byKey(const ValueKey('dq_status_reason')), 'عرض بنفس الباركود');
     await tester.tap(find.byKey(const ValueKey('dq_status_save')));
     await tester.pumpAndSettle();
     expect(src.calls, contains('patch:a1:$kDqIgnored:عرض بنفس الباركود'));
@@ -139,7 +168,9 @@ void main() {
     final src = _FakeSource(empty, const []);
     await tester.pumpWidget(MaterialApp(
       theme: AppTheme.light(),
-      home: Scaffold(body: DataQualityScreen(dataSource: src, pollInterval: const Duration(hours: 1))),
+      home: Scaffold(
+          body: DataQualityScreen(
+              dataSource: src, pollInterval: const Duration(hours: 1))),
     ));
     await tester.pumpAndSettle();
     expect(find.text('—'), findsOneWidget);

@@ -12,19 +12,19 @@ import 'package:tashil_web/features/data_quality/data/data_quality_repository.da
 
 import 'support/real_fonts.dart';
 
-/// Made-up live-like values long enough to wrap (same shape as production).
+/// Live production values from the v148 Errors review (1280 shell, Cairo).
+/// The previous over-long type/found/expected fixtures were longer than
+/// production and starved the code and name columns in the 1030 budget.
 const kLongSkuName =
-    'فيبا سائل غسيل أطباق بالليمون المركز عبوة اقتصادية كبيرة الحجم مع مضخة معطرة للأواني الزجاجية والبلاستيك';
-const kLongSkuName2 =
-    'ديفا مسحوق غسيل أوتوماتيك مركز للأقمشة الملونة والبيضاء عبوة 8 كجم اقتصادية مع إنزيمات إزالة البقع الصعبة';
-const kLongTypeMissing =
-    'صنف موجود في المبيعات وغير موجود في كارتة الأصناف الأساسية بعد توحيد التشكيلة';
-const kLongTypeDuplicate = 'باركود مكرر على أكثر من صنف في نفس الشيت';
-const kLongTypeMismatch =
-    'سعر البيع أقل من التكلفة بعد خصم العرض الأسبوعي لسلسلة التجزئة';
-const kLongFound =
-    'عائلة فتح الله ماركت - مخزن الافوكادو / سعر 12.50 بدل 18.75';
-const kLongExpected = 'السعر المعتمد في الكارتة 18.75 ج.م بعد الضريبة';
+    'عرض شركه 1 عبوة رابيدو 700 مل منظف وملمع الاطارات والجنوط & 1 عبوة رابيدو 300 مل ووش اند واكس - 7 مج';
+const kLongSkuName2 = 'رابيدو 700 مل منظف وملمع الاطارات والجنوط';
+const kLiveMissingCode = 'QA-NOT-IN-MASTER-999';
+const kLiveFgccCode = 'FGCC-0700-0002';
+const kLongTypeMissing = 'صنف مش موجود في كارتة الأصناف';
+const kLongTypeDuplicate = 'باركود مكرر على أكثر من صنف';
+const kLongTypeMismatch = 'سعر البيع أقل من التكلفة';
+const kLongFound = '1 صف';
+const kLongExpected = 'الصنف يضاف لكارتة الأصناف';
 const kLongReason = 'نفس الباركود مستخدم لصنفين في شيت نوفمبر بعد الدمج اليدوي';
 
 class ErrorsShotSource implements DataQualityDataSource {
@@ -102,7 +102,7 @@ const kErrorsLiveIssues = [
     sheet: 'مبيعات نوفمبر',
     row: 1284,
     column: 'اسم الصنف',
-    itemCode: 'FGCL-0550-0001-XL',
+    itemCode: kLiveMissingCode,
     barcode: '6221133011903',
     itemName: kLongSkuName,
     foundValue: kLongFound,
@@ -120,7 +120,7 @@ const kErrorsLiveIssues = [
     sheet: 'كارتة الأصناف',
     row: 299,
     column: 'الباركود',
-    itemCode: 'FGHC-0700-0214',
+    itemCode: kLiveFgccCode,
     barcode: '6223000233436',
     itemName: kLongSkuName2,
     foundValue: '6223000233436 على صنفين مختلفين',
@@ -140,7 +140,8 @@ const kErrorsLiveIssues = [
     column: 'السعر',
     itemCode: 'FGNV-0800-0003',
     barcode: '6221133011905',
-    itemName: 'نيفيا كريم ترطيب عميق للبشرة الجافة 250 مل عبوة التوفير العائلية',
+    itemName:
+        'نيفيا كريم ترطيب عميق للبشرة الجافة 250 مل عبوة التوفير العائلية',
     foundValue: '9.5',
     expectedValue: '18.75',
     impactEgp: 96500,

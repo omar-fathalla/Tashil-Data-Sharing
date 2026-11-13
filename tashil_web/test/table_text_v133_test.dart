@@ -39,13 +39,31 @@ Future<void> _pump(WidgetTester tester, Widget page,
 }
 
 double _glyphCenterX(WidgetTester tester, Finder finder) {
-  final p = tester.renderObject<RenderParagraph>(finder);
-  final len = p.text.toPlainText().length;
-  final boxes =
-      p.getBoxesForSelection(TextSelection(baseOffset: 0, extentOffset: len));
-  final l = boxes.map((b) => b.left).reduce((a, b) => a < b ? a : b);
-  final r = boxes.map((b) => b.right).reduce((a, b) => a > b ? a : b);
-  return p.localToGlobal(Offset((l + r) / 2, 0)).dx;
+  final rich = find.descendant(of: finder, matching: find.byType(RichText));
+  // Collect global glyph bounds across one or more paragraphs (hyphenated
+  // item codes are split into one Text per token).
+  double? minL, maxR;
+  final elements =
+      rich.evaluate().isEmpty ? finder.evaluate() : rich.evaluate();
+  for (final e in elements) {
+    final p = tester
+        .renderObject<RenderParagraph>(find.byElementPredicate((x) => x == e));
+    final len = p.text.toPlainText().length;
+    final boxes =
+        p.getBoxesForSelection(TextSelection(baseOffset: 0, extentOffset: len));
+    if (boxes.isEmpty) continue;
+    final origin = p.localToGlobal(Offset.zero);
+    for (final b in boxes) {
+      final l = origin.dx + b.left;
+      final r = origin.dx + b.right;
+      minL = minL == null ? l : (l < minL ? l : minL);
+      maxR = maxR == null ? r : (r > maxR ? r : maxR);
+    }
+  }
+  if (minL == null || maxR == null) {
+    throw StateError('no glyphs for $finder');
+  }
+  return (minL + maxR) / 2;
 }
 
 class _Src implements DataQualityDataSource {
@@ -113,8 +131,10 @@ void main() {
 
   testWidgets('Data Quality table: columns centred except the item name',
       (tester) async {
-    await _pump(tester, DataQualityScreen(dataSource: _Src(),
-        pollInterval: const Duration(hours: 1)));
+    await _pump(
+        tester,
+        DataQualityScreen(
+            dataSource: _Src(), pollInterval: const Duration(hours: 1)));
     expect(tester.takeException(), isNull);
     final table = find.byKey(const ValueKey('dq_table'));
     expect(table, findsOneWidget);
@@ -129,12 +149,12 @@ void main() {
       }
     }
     for (final (head, cell) in [
-      ('كود الصنف', 'TEST-0001'),
-      ('الباركود', '0000000000001'),
-      ('النوع', 'باركود مكرر'),
+      ('كود الصنف', find.byKey(const ValueKey('dq_item_code_TEST-0001'))),
+      ('الباركود', find.text('0000000000001')),
+      ('النوع', find.text('باركود مكرر')),
     ]) {
       final h = find.descendant(of: table, matching: find.text(head));
-      final c = find.descendant(of: table, matching: find.text(cell));
+      final c = find.descendant(of: table, matching: cell);
       expect(_glyphCenterX(tester, c), closeTo(_glyphCenterX(tester, h), 2.0),
           reason: head);
     }
@@ -147,7 +167,8 @@ void main() {
 
   // 1024 ≈ the content width at a 1280 window beside the navigation rail (4 KPI cards per row, the narrowest case).
   for (final width in [1280.0, 1024.0]) {
-    testWidgets('Sell-In stock matched-period KPI is not cut at '
+    testWidgets(
+        'Sell-In stock matched-period KPI is not cut at '
         '${width.toInt()}', (tester) async {
       await _pump(tester, SellInExplorerScreen(apiClient: _MatchedApi()),
           width: width, height: 3000);
@@ -162,9 +183,8 @@ void main() {
               of: card, matching: find.textContaining('أكتوبر 2026')),
           findsWidgets);
       final cut = <String>[];
-      for (final p in tester
-          .renderObjectList<RenderParagraph>(
-              find.descendant(of: card, matching: find.byType(RichText)))) {
+      for (final p in tester.renderObjectList<RenderParagraph>(
+          find.descendant(of: card, matching: find.byType(RichText)))) {
         if (p.didExceedMaxLines) cut.add(p.text.toPlainText());
       }
       expect(cut, isEmpty);
