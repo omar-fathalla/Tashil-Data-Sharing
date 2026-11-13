@@ -6,6 +6,7 @@ import '../../data/executive_dashboard_repository.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/widgets/m3_segment_label.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../widgets/bento_kpi_grid.dart';
 import '../widgets/chain_share_pie.dart';
@@ -318,12 +319,14 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
     return {selectedMonth};
   }
 
-  static Widget _segLabel(String s) =>
-      Text(s, maxLines: 1, softWrap: false, overflow: TextOverflow.visible);
+  /// Single-line segment label with a min width (SegmentedButton ignores
+  /// ButtonStyle.minimumSize), so each period segment is ≥ 112dp.
+  static Widget _segLabel(String s, {double minWidth = 64.0}) =>
+      M3SegmentLabel(s, minWidth: minWidth);
 
   Widget _buildPeriodControls(BuildContext context) {
-    // M3: segmented buttons inherit the theme (112x40 equal segments, 48dp
-    // tap target, secondaryContainer selection + check). No local overrides.
+    // M3: equal single-line segments ≥ 112dp (width from _segLabel), 40dp,
+    // 48dp tap target, secondaryContainer selection + check.
     return Wrap(
       spacing: M3Spacing.xs,
       runSpacing: M3Spacing.xs,
@@ -352,13 +355,9 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
         if (_periodMode == 'quarterly') ...[
           SegmentedButton<int>(
             key: const ValueKey('executive_quarter_segmented'),
-            style: const ButtonStyle(
-              // 4 short options: no 112dp floor.
-              minimumSize: WidgetStatePropertyAll(Size(56.0, 40.0)),
-            ),
             segments: [
               for (var q = 1; q <= 4; q++)
-                ButtonSegment(value: q, label: _segLabel('Q$q')),
+                ButtonSegment(value: q, label: _segLabel('Q$q', minWidth: 32.0)),
             ],
             selected: {_selectedQuarter},
             showSelectedIcon: false,

@@ -293,8 +293,8 @@ class AppTheme {
             textTheme.labelLarge,
           ),
           side: sideWithFocus(BorderSide(color: colorScheme.outline)),
-          // Equal, single-line segments: 112 x 40 (mockup .seg button).
-          minimumSize: const WidgetStatePropertyAll(Size(112.0, 40.0)),
+          // Width: SegmentedButton does not forward minimumSize to segments,
+          // so the ≥ 112dp segment width comes from M3SegmentLabel.
           padding: const WidgetStatePropertyAll(
               EdgeInsets.symmetric(horizontal: M3Spacing.s12)),
           iconSize: const WidgetStatePropertyAll(18.0),
