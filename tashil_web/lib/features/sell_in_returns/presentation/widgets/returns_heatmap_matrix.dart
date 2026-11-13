@@ -74,16 +74,16 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
       fontWeight: FontWeight.w800,
       color: cs.onSurfaceVariant,
     );
-    final bodyStyle =
-        theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
-    final boldStyle =
-        theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w900);
+    final bodyStyle = theme.textTheme.bodyMedium?.copyWith(
+      fontWeight: FontWeight.w600,
+    );
+    final boldStyle = theme.textTheme.bodyMedium?.copyWith(
+      fontWeight: FontWeight.w900,
+    );
 
     final display = branchDisplayNames.isNotEmpty
         ? branchDisplayNames
-        : displayNamesWithoutSharedPrefix(
-            branches.map((b) => b.branchName),
-          );
+        : displayNamesWithoutSharedPrefix(branches.map((b) => b.branchName));
 
     String labelOf(SellInReturnsBranchRow b) =>
         display[b.branchName] ?? b.branchName;
@@ -130,15 +130,28 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
       return tp.width;
     }
 
+    /// Prefer a single compact line (`993.0K ج.م`). If that overflows the
+    /// cell, put the currency on a second line so the value never ellipsizes.
+    String fitValue(String text, TextStyle? style, double maxWidth) {
+      if (maxWidth <= 0 || measureWidth(text, style) <= maxWidth + 0.5) {
+        return text;
+      }
+      final idx = text.lastIndexOf(' ');
+      if (idx <= 0) return text;
+      return '${text.substring(0, idx)}\n${text.substring(idx + 1)}';
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        final available =
-            constraints.maxWidth.isFinite ? constraints.maxWidth : 0.0;
+        final available = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : 0.0;
 
         var labelW = 0.0;
         for (final m in months) {
-          final label =
-              (m >= 1 && m < monthLabelsAr.length) ? monthLabelsAr[m] : '$m';
+          final label = (m >= 1 && m < monthLabelsAr.length)
+              ? monthLabelsAr[m]
+              : '$m';
           labelW = math.max(labelW, measureWidth(label, headerStyle));
         }
         final comfortableMonth = math.max(preferredMonthW, labelW + hPad * 2);
@@ -183,21 +196,71 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
               vPad * 2,
         );
 
+        final valueW = math.max(0.0, monthW - cellGap);
+        final totalInnerW = math.max(0.0, totalW - hPad * 2);
+
+        double valueBlockH(String text, TextStyle? style, double maxWidth) {
+          final fitted = fitValue(text, style, maxWidth);
+          final lines = fitted.contains('\n') ? 2 : 1;
+          return measure(
+            text: fitted,
+            style: style,
+            maxWidth: maxWidth,
+            maxLines: lines,
+          );
+        }
+
         final rowHeights = <double>[
           for (final b in branches)
             math.max(
               minRowH,
-              measure(
-                    text: labelOf(b),
-                    style: bodyStyle,
-                    maxWidth: branchW - hPad * 2,
-                    maxLines: 3,
-                  ) +
-                  vPad * 2,
+              math.max(
+                measure(
+                      text: labelOf(b),
+                      style: bodyStyle,
+                      maxWidth: branchW - hPad * 2,
+                      maxLines: 3,
+                    ) +
+                    vPad * 2,
+                math.max(
+                  valueBlockH(fmt(b.total), boldStyle, totalInnerW) + vPad * 2,
+                  months.isEmpty
+                      ? 0.0
+                      : months
+                            .map(
+                              (m) => valueBlockH(
+                                fmt(b.byMonth[m] ?? const SellInReturnsCell()),
+                                bodyStyle,
+                                valueW,
+                              ),
+                            )
+                            .reduce(math.max),
+                ),
+              ),
             ),
         ];
 
-        final totalsH = minRowH;
+        var totalsH = minRowH;
+        if (months.isNotEmpty) {
+          totalsH = math.max(
+            totalsH,
+            months
+                .map(
+                  (m) =>
+                      valueBlockH(
+                        fmt(columnTotals[m] ?? const SellInReturnsCell()),
+                        boldStyle,
+                        valueW,
+                      ) +
+                      cellGap,
+                )
+                .reduce(math.max),
+          );
+        }
+        totalsH = math.max(
+          totalsH,
+          valueBlockH(fmt(grandTotal), boldStyle, totalInnerW) + vPad * 2,
+        );
 
         Widget box({
           required double width,
@@ -216,8 +279,9 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
               decoration: BoxDecoration(
                 color: bg,
                 border: Border(
-                  bottom:
-                      BorderSide(color: cs.outlineVariant.withOpacity(0.35)),
+                  bottom: BorderSide(
+                    color: cs.outlineVariant.withOpacity(0.35),
+                  ),
                   left: boldEdge
                       ? BorderSide(color: cs.outlineVariant.withOpacity(0.55))
                       : BorderSide.none,
@@ -238,6 +302,7 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
           required TextStyle? style,
           required TextAlign align,
           int maxLines = 1,
+          TextOverflow overflow = TextOverflow.ellipsis,
           Color? bg,
           bool boldEdge = false,
           Key? key,
@@ -245,8 +310,8 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
           final alignment = align == TextAlign.center
               ? Alignment.center
               : align == TextAlign.end
-                  ? AlignmentDirectional.centerEnd
-                  : AlignmentDirectional.centerStart;
+              ? AlignmentDirectional.centerEnd
+              : AlignmentDirectional.centerStart;
           return box(
             key: key,
             width: width,
@@ -254,8 +319,10 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
             bg: bg,
             boldEdge: boldEdge,
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+              padding: const EdgeInsets.symmetric(
+                horizontal: hPad,
+                vertical: vPad,
+              ),
               child: Align(
                 alignment: alignment,
                 child: Text(
@@ -263,21 +330,27 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
                   style: style,
                   textAlign: align,
                   maxLines: maxLines,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: overflow,
                 ),
               ),
             ),
           );
         }
 
-        Widget heatCell(SellInReturnsCell cell, double height,
-            {TextStyle? style}) {
+        Widget heatCell(
+          SellInReturnsCell cell,
+          double height, {
+          TextStyle? style,
+        }) {
           final raw = rawOf(cell);
           final t = maxRet <= 0 ? 0.0 : (raw / maxRet).clamp(0.0, 1.0);
           final bg = raw <= 0
               ? cs.surface
               : Color.lerp(
-                  cs.surface, status.warningContainer.withOpacity(0.9), t);
+                  cs.surface,
+                  status.warningContainer.withOpacity(0.9),
+                  t,
+                );
           return Padding(
             padding: const EdgeInsets.all(cellGap / 2),
             child: SizedBox(
@@ -286,16 +359,17 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: bg,
-                  border:
-                      Border.all(color: cs.outlineVariant.withOpacity(0.25)),
+                  border: Border.all(
+                    color: cs.outlineVariant.withOpacity(0.25),
+                  ),
                 ),
                 child: Center(
                   child: Text(
-                    fmt(cell),
+                    fitValue(fmt(cell), style ?? bodyStyle, valueW),
                     style: style ?? bodyStyle,
                     textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                    overflow: TextOverflow.clip,
                   ),
                 ),
               ),
@@ -304,8 +378,9 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
         }
 
         Widget monthHeader(int m) {
-          final label =
-              (m >= 1 && m < monthLabelsAr.length) ? monthLabelsAr[m] : '$m';
+          final label = (m >= 1 && m < monthLabelsAr.length)
+              ? monthLabelsAr[m]
+              : '$m';
           return Padding(
             padding: const EdgeInsets.all(cellGap / 2),
             child: SizedBox(
@@ -314,8 +389,9 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHighest.withOpacity(0.45),
-                  border:
-                      Border.all(color: cs.outlineVariant.withOpacity(0.25)),
+                  border: Border.all(
+                    color: cs.outlineVariant.withOpacity(0.25),
+                  ),
                 ),
                 child: Center(
                   child: TestSemantics(
@@ -429,19 +505,27 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
               for (var i = 0; i < branches.length; i++)
                 textCell(
                   key: totalCellKey(branches[i].branchKey),
-                  text: fmt(branches[i].total),
+                  text: fitValue(
+                    fmt(branches[i].total),
+                    boldStyle,
+                    totalInnerW,
+                  ),
                   width: totalW,
                   height: rowHeights[i],
                   style: boldStyle,
                   align: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.clip,
                   boldEdge: true,
                 ),
               textCell(
-                text: fmt(grandTotal),
+                text: fitValue(fmt(grandTotal), boldStyle, totalInnerW),
                 width: totalW,
                 height: totalsH,
                 style: boldStyle,
                 align: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.clip,
                 bg: totalsBg,
                 boldEdge: true,
               ),
@@ -461,11 +545,7 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
                 key: monthsRowKey(branches[i].branchKey),
                 branch: branches[i],
               ),
-            monthsRow(
-              height: totalsH,
-              key: totalsRowKey,
-              isTotals: true,
-            ),
+            monthsRow(height: totalsH, key: totalsRowKey, isTotals: true),
           ],
         );
 

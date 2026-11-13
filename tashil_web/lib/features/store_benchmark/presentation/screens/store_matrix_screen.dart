@@ -56,6 +56,10 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
   String _selectedChain =
       'all'; // 'all', 'fathalla', 'gomla', 'beet-elgomla', etc.
   List<StoreBenchmarkItem> _stores = [];
+
+  /// Stable name list for display-only prefix stripping, so labels do not
+  /// grow a prefix back when a region/tier filter returns a smaller set.
+  final Set<String> _prefixNameCorpus = {};
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -85,33 +89,44 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
     return _stores.where(matches).toList();
   }
 
-  /// Display-only map: strips a leading prefix shared by every loaded store
-  /// name (t438u). Never changes stored or uploaded data.
-  Map<String, String> get _storeDisplayNames =>
-      displayNamesWithoutSharedPrefix(_stores.map((s) => s.storeName));
+  /// Display-only map: uses the shared prefix helper (multiple clusters,
+  /// ≥2 names, typo-tolerant, never empty, never colliding). Never changes
+  /// stored or uploaded data.
+  Map<String, String> get _storeDisplayNames => displayNamesWithoutSharedPrefix(
+        _prefixNameCorpus.isEmpty
+            ? _stores.map((s) => s.storeName)
+            : _prefixNameCorpus,
+      );
 
   String _displayStoreName(StoreBenchmarkItem store) =>
       _storeDisplayNames[store.storeName] ?? store.storeName;
 
   final List<M3SegmentItem<String>> _regionSegments = const [
     M3SegmentItem(
-        value: 'الكل', label: 'كافة المناطق', icon: Icons.public_rounded),
+      value: 'الكل',
+      label: 'كافة المناطق',
+      icon: Icons.public_rounded,
+    ),
     M3SegmentItem(
-        value: 'شرق الإسكندرية',
-        label: 'شرق الإسكندرية',
-        icon: Icons.location_city_rounded),
+      value: 'شرق الإسكندرية',
+      label: 'شرق الإسكندرية',
+      icon: Icons.location_city_rounded,
+    ),
     M3SegmentItem(
-        value: 'غرب الإسكندرية',
-        label: 'غرب الإسكندرية',
-        icon: Icons.location_on_rounded),
+      value: 'غرب الإسكندرية',
+      label: 'غرب الإسكندرية',
+      icon: Icons.location_on_rounded,
+    ),
     M3SegmentItem(
-        value: 'الدلتا والبحيرة',
-        label: 'الدلتا والبحيرة',
-        icon: Icons.map_rounded),
+      value: 'الدلتا والبحيرة',
+      label: 'الدلتا والبحيرة',
+      icon: Icons.map_rounded,
+    ),
     M3SegmentItem(
-        value: 'القاهرة الكبرى',
-        label: 'القاهرة الكبرى',
-        icon: Icons.apartment_rounded),
+      value: 'القاهرة الكبرى',
+      label: 'القاهرة الكبرى',
+      icon: Icons.apartment_rounded,
+    ),
   ];
 
   @override
@@ -142,6 +157,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
       _selectedYear = 2026;
       _selectedMonth = 0;
       _selectedChain = 'all';
+      _prefixNameCorpus.clear();
       _loadStoreMatrix();
     }
   }
@@ -160,6 +176,16 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
     result.when(
       success: (results) => setState(() {
         _stores = results;
+        if (_selectedRegion == 'الكل' &&
+            _selectedTier == 'الكل' &&
+            _selectedChain == 'all') {
+          _prefixNameCorpus
+            ..clear()
+            ..addAll(results.map((s) => s.storeName));
+        } else {
+          _prefixNameCorpus.addAll(results.map((s) => s.storeName));
+        }
+
         _isLoading = false;
       }),
       failure: (error) {
@@ -222,12 +248,18 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
     final tierBStores = visible.where((s) => s.tier == 'Tier B').toList();
     final tierCStores = visible.where((s) => s.tier == 'Tier C').toList();
 
-    final tierARevenue =
-        tierAStores.fold<double>(0.0, (sum, s) => sum + s.totalRevenue);
-    final tierBRevenue =
-        tierBStores.fold<double>(0.0, (sum, s) => sum + s.totalRevenue);
-    final tierCRevenue =
-        tierCStores.fold<double>(0.0, (sum, s) => sum + s.totalRevenue);
+    final tierARevenue = tierAStores.fold<double>(
+      0.0,
+      (sum, s) => sum + s.totalRevenue,
+    );
+    final tierBRevenue = tierBStores.fold<double>(
+      0.0,
+      (sum, s) => sum + s.totalRevenue,
+    );
+    final tierCRevenue = tierCStores.fold<double>(
+      0.0,
+      (sum, s) => sum + s.totalRevenue,
+    );
 
     final isCompactScreen = MediaQuery.sizeOf(context).width < 600.0;
 
@@ -262,11 +294,13 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                 shape: RoundedRectangleBorder(
                   borderRadius: M3Shape.radiusLg,
                   side: BorderSide(
-                      color: colorScheme.outlineVariant.withOpacity(0.5)),
+                    color: colorScheme.outlineVariant.withOpacity(0.5),
+                  ),
                 ),
                 child: Padding(
                   padding: EdgeInsets.all(
-                      isCompactScreen ? M3Spacing.sm : M3Spacing.md),
+                    isCompactScreen ? M3Spacing.sm : M3Spacing.md,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -284,14 +318,21 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                             value: _selectedYear,
                             items: const [
                               DropdownMenuItem(
-                                  value: 0,
-                                  child: Text('كافة السنوات (إجمالي)')),
+                                value: 0,
+                                child: Text('كافة السنوات (إجمالي)'),
+                              ),
                               DropdownMenuItem(
-                                  value: 2026, child: Text('عام 2026')),
+                                value: 2026,
+                                child: Text('عام 2026'),
+                              ),
                               DropdownMenuItem(
-                                  value: 2025, child: Text('عام 2025')),
+                                value: 2025,
+                                child: Text('عام 2025'),
+                              ),
                               DropdownMenuItem(
-                                  value: 2024, child: Text('عام 2024')),
+                                value: 2024,
+                                child: Text('عام 2024'),
+                              ),
                             ],
                             onChanged: (val) {
                               if (val != null && val != _selectedYear) {
@@ -309,32 +350,57 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                             value: _selectedMonth,
                             items: const [
                               DropdownMenuItem(
-                                  value: 0,
-                                  child: Text('كافة الشهور (إجمالي السنة)')),
+                                value: 0,
+                                child: Text('كافة الشهور (إجمالي السنة)'),
+                              ),
                               DropdownMenuItem(
-                                  value: 1, child: Text('01 - يناير')),
+                                value: 1,
+                                child: Text('01 - يناير'),
+                              ),
                               DropdownMenuItem(
-                                  value: 2, child: Text('02 - فبراير')),
+                                value: 2,
+                                child: Text('02 - فبراير'),
+                              ),
                               DropdownMenuItem(
-                                  value: 3, child: Text('03 - مارس')),
+                                value: 3,
+                                child: Text('03 - مارس'),
+                              ),
                               DropdownMenuItem(
-                                  value: 4, child: Text('04 - أبريل')),
+                                value: 4,
+                                child: Text('04 - أبريل'),
+                              ),
                               DropdownMenuItem(
-                                  value: 5, child: Text('05 - مايو')),
+                                value: 5,
+                                child: Text('05 - مايو'),
+                              ),
                               DropdownMenuItem(
-                                  value: 6, child: Text('06 - يونيو')),
+                                value: 6,
+                                child: Text('06 - يونيو'),
+                              ),
                               DropdownMenuItem(
-                                  value: 7, child: Text('07 - يوليو')),
+                                value: 7,
+                                child: Text('07 - يوليو'),
+                              ),
                               DropdownMenuItem(
-                                  value: 8, child: Text('08 - أغسطس')),
+                                value: 8,
+                                child: Text('08 - أغسطس'),
+                              ),
                               DropdownMenuItem(
-                                  value: 9, child: Text('09 - سبتمبر')),
+                                value: 9,
+                                child: Text('09 - سبتمبر'),
+                              ),
                               DropdownMenuItem(
-                                  value: 10, child: Text('10 - أكتوبر')),
+                                value: 10,
+                                child: Text('10 - أكتوبر'),
+                              ),
                               DropdownMenuItem(
-                                  value: 11, child: Text('11 - نوفمبر')),
+                                value: 11,
+                                child: Text('11 - نوفمبر'),
+                              ),
                               DropdownMenuItem(
-                                  value: 12, child: Text('12 - ديسمبر')),
+                                value: 12,
+                                child: Text('12 - ديسمبر'),
+                              ),
                             ],
                             onChanged: (val) {
                               if (val != null && val != _selectedMonth) {
@@ -352,19 +418,29 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                             value: _selectedChain,
                             items: const [
                               DropdownMenuItem(
-                                  value: 'all', child: Text('كافة السلاسل')),
+                                value: 'all',
+                                child: Text('كافة السلاسل'),
+                              ),
                               DropdownMenuItem(
-                                  value: 'fathalla',
-                                  child: Text('أسواق فتح الله')),
+                                value: 'fathalla',
+                                child: Text('أسواق فتح الله'),
+                              ),
                               DropdownMenuItem(
-                                  value: 'gomla', child: Text('جملة ماركت')),
+                                value: 'gomla',
+                                child: Text('جملة ماركت'),
+                              ),
                               DropdownMenuItem(
-                                  value: 'beet-elgomla',
-                                  child: Text('بيت الجملة')),
+                                value: 'beet-elgomla',
+                                child: Text('بيت الجملة'),
+                              ),
                               DropdownMenuItem(
-                                  value: 'carrefour', child: Text('كارفور')),
+                                value: 'carrefour',
+                                child: Text('كارفور'),
+                              ),
                               DropdownMenuItem(
-                                  value: 'spinneys', child: Text('سبينيس')),
+                                value: 'spinneys',
+                                child: Text('سبينيس'),
+                              ),
                             ],
                             onChanged: (val) {
                               if (val != null && val != _selectedChain) {
@@ -386,12 +462,16 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                           decoration: InputDecoration(
                             hintText:
                                 'ابحث باسم الفرع أو السلسلة أو المنطقة...',
-                            prefixIcon:
-                                const Icon(Icons.search_rounded, size: 18.0),
+                            prefixIcon: const Icon(
+                              Icons.search_rounded,
+                              size: 18.0,
+                            ),
                             suffixIcon: _searchQuery.isNotEmpty
                                 ? IconButton(
-                                    icon: const Icon(Icons.clear_rounded,
-                                        size: 18.0),
+                                    icon: const Icon(
+                                      Icons.clear_rounded,
+                                      size: 18.0,
+                                    ),
                                     onPressed: () {
                                       _searchController.clear();
                                       setState(() => _searchQuery = '');
@@ -405,9 +485,12 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                               borderRadius: M3Shape.radiusMd,
                             ),
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12.0, vertical: 8.0),
+                              horizontal: 12.0,
+                              vertical: 8.0,
+                            ),
                             constraints: const BoxConstraints(
-                                maxHeight: M3ToolbarButton.height),
+                              maxHeight: M3ToolbarButton.height,
+                            ),
                           ),
                           onChanged: (v) => setState(() => _searchQuery = v),
                         ),
@@ -481,22 +564,25 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                           : 280.0;
                                   const tiers = <M3SegmentItem<String>>[
                                     M3SegmentItem(
-                                        value: 'الكل',
-                                        label: 'الكل',
-                                        icon: Icons.apps_rounded),
+                                      value: 'الكل',
+                                      label: 'الكل',
+                                      icon: Icons.apps_rounded,
+                                    ),
                                     M3SegmentItem(
-                                        value: 'Tier A',
-                                        label: 'Tier A',
-                                        icon: Icons.star_rounded),
+                                      value: 'Tier A',
+                                      label: 'Tier A',
+                                      icon: Icons.star_rounded,
+                                    ),
                                     M3SegmentItem(
-                                        value: 'Tier B',
-                                        label: 'Tier B',
-                                        icon: Icons.storefront_rounded),
+                                      value: 'Tier B',
+                                      label: 'Tier B',
+                                      icon: Icons.storefront_rounded,
+                                    ),
                                     M3SegmentItem(
-                                        value: 'Tier C',
-                                        label: 'Tier C',
-                                        icon:
-                                            Icons.store_mall_directory_rounded),
+                                      value: 'Tier C',
+                                      label: 'Tier C',
+                                      icon: Icons.store_mall_directory_rounded,
+                                    ),
                                   ];
                                   return Wrap(
                                     spacing: M3Spacing.xs,
@@ -585,7 +671,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                 shape: RoundedRectangleBorder(
                   borderRadius: M3Shape.radiusLg,
                   side: BorderSide(
-                      color: colorScheme.outlineVariant.withOpacity(0.5)),
+                    color: colorScheme.outlineVariant.withOpacity(0.5),
+                  ),
                 ),
                 child: Padding(
                   padding: EdgeInsets.all(isCompactScreen ? 12.0 : 16.0),
@@ -602,9 +689,11 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                 Expanded(
                                   child: Row(
                                     children: [
-                                      Icon(Icons.leaderboard_rounded,
-                                          color: colorScheme.primary,
-                                          size: 24.0),
+                                      Icon(
+                                        Icons.leaderboard_rounded,
+                                        color: colorScheme.primary,
+                                        size: 24.0,
+                                      ),
                                       const SizedBox(width: M3Spacing.xs),
                                       Expanded(
                                         child: M3SectionTitle(
@@ -623,21 +712,26 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 10.0, vertical: 4.0),
+                                        horizontal: 10.0,
+                                        vertical: 4.0,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: colorScheme.primaryContainer
                                             .withOpacity(0.4),
                                         borderRadius: M3Shape.radiusMd,
                                         border: Border.all(
-                                            color: colorScheme.primary
-                                                .withOpacity(0.2)),
+                                          color: colorScheme.primary
+                                              .withOpacity(0.2),
+                                        ),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(Icons.calendar_today_rounded,
-                                              size: 13.0,
-                                              color: colorScheme.primary),
+                                          Icon(
+                                            Icons.calendar_today_rounded,
+                                            size: 13.0,
+                                            color: colorScheme.primary,
+                                          ),
                                           const SizedBox(width: 4.0),
                                           Text(
                                             _activePeriodLabel,
@@ -652,7 +746,9 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                     ),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 10.0, vertical: 4.0),
+                                        horizontal: 10.0,
+                                        vertical: 4.0,
+                                      ),
                                       decoration: BoxDecoration(
                                         color:
                                             colorScheme.surfaceContainerHighest,
@@ -677,8 +773,11 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.leaderboard_rounded,
-                                      color: colorScheme.primary, size: 22.0),
+                                  Icon(
+                                    Icons.leaderboard_rounded,
+                                    color: colorScheme.primary,
+                                    size: 22.0,
+                                  ),
                                   const SizedBox(width: M3Spacing.xs),
                                   Expanded(
                                     child: M3SectionTitle(
@@ -695,21 +794,27 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 10.0, vertical: 4.0),
+                                      horizontal: 10.0,
+                                      vertical: 4.0,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: colorScheme.primaryContainer
                                           .withOpacity(0.4),
                                       borderRadius: M3Shape.radiusMd,
                                       border: Border.all(
-                                          color: colorScheme.primary
-                                              .withOpacity(0.2)),
+                                        color: colorScheme.primary.withOpacity(
+                                          0.2,
+                                        ),
+                                      ),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.calendar_today_rounded,
-                                            size: 13.0,
-                                            color: colorScheme.primary),
+                                        Icon(
+                                          Icons.calendar_today_rounded,
+                                          size: 13.0,
+                                          color: colorScheme.primary,
+                                        ),
                                         const SizedBox(width: 4.0),
                                         Text(
                                           _activePeriodLabel,
@@ -724,7 +829,9 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                   ),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 10.0, vertical: 4.0),
+                                      horizontal: 10.0,
+                                      vertical: 4.0,
+                                    ),
                                     decoration: BoxDecoration(
                                       color:
                                           colorScheme.surfaceContainerHighest,
@@ -751,8 +858,9 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                             ? const Padding(
                                 key: ValueKey('store_matrix_loading'),
                                 padding: EdgeInsets.all(40.0),
-                                child:
-                                    Center(child: CircularProgressIndicator()),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
                               )
                             : visible.isEmpty
                                 ? Padding(
@@ -761,10 +869,11 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                     child: Center(
                                       child: Column(
                                         children: [
-                                          Icon(Icons.search_off_rounded,
-                                              size: 48.0,
-                                              color:
-                                                  colorScheme.onSurfaceVariant),
+                                          Icon(
+                                            Icons.search_off_rounded,
+                                            size: 48.0,
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
                                           const SizedBox(height: 12.0),
                                           Text(
                                             'لا توجد فروع مطابقة لمعايير البحث الحالية',
@@ -780,7 +889,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                   )
                                 : LayoutBuilder(
                                     key: ValueKey(
-                                        'store_matrix_table_${_selectedRegion}_${_selectedTier}_${visible.length}'),
+                                      'store_matrix_table_${_selectedRegion}_${_selectedTier}_${visible.length}',
+                                    ),
                                     builder: (context, tableConstraints) {
                                       final availableWidth = tableConstraints
                                               .maxWidth.isFinite
@@ -794,7 +904,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                           children: visible.map((store) {
                                             return Container(
                                               margin: const EdgeInsets.only(
-                                                  bottom: 10.0),
+                                                bottom: 10.0,
+                                              ),
                                               padding:
                                                   const EdgeInsets.all(14.0),
                                               decoration: BoxDecoration(
@@ -873,7 +984,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                                           children: [
                                                             Text(
                                                               _displayStoreName(
-                                                                  store),
+                                                                store,
+                                                              ),
                                                               maxLines: 3,
                                                               overflow:
                                                                   TextOverflow
@@ -891,7 +1003,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                                               ),
                                                             ),
                                                             const SizedBox(
-                                                                height: 2.0),
+                                                              height: 2.0,
+                                                            ),
                                                             Wrap(
                                                               spacing: 8.0,
                                                               runSpacing: 2.0,
@@ -913,18 +1026,24 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                                                           BoxDecoration(
                                                                         shape: BoxShape
                                                                             .circle,
-                                                                        color: _getChainColor(
-                                                                            store.retailerChain),
+                                                                        color:
+                                                                            _getChainColor(
+                                                                          store
+                                                                              .retailerChain,
+                                                                        ),
                                                                       ),
                                                                     ),
                                                                     const SizedBox(
-                                                                        width:
-                                                                            5.0),
+                                                                      width:
+                                                                          5.0,
+                                                                    ),
                                                                     Flexible(
                                                                       child:
                                                                           Text(
                                                                         _getChainDisplayName(
-                                                                            store.retailerChain),
+                                                                          store
+                                                                              .retailerChain,
+                                                                        ),
                                                                         maxLines:
                                                                             3,
                                                                         overflow:
@@ -956,8 +1075,9 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                                                           .onSurfaceVariant,
                                                                     ),
                                                                     const SizedBox(
-                                                                        width:
-                                                                            2.0),
+                                                                      width:
+                                                                          2.0,
+                                                                    ),
                                                                     Flexible(
                                                                       child:
                                                                           Text(
@@ -983,7 +1103,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                                               ],
                                                             ),
                                                             const SizedBox(
-                                                                height: 4.0),
+                                                              height: 4.0,
+                                                            ),
                                                             _buildTierBadge(
                                                               context,
                                                               store.tier,
@@ -996,7 +1117,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                                   const Padding(
                                                     padding:
                                                         EdgeInsets.symmetric(
-                                                            vertical: 8.0),
+                                                      vertical: 8.0,
+                                                    ),
                                                     child: Divider(height: 1.0),
                                                   ),
                                                   Wrap(
@@ -1024,12 +1146,14 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                                             ),
                                                           ),
                                                           const SizedBox(
-                                                              height: 2.0),
+                                                            height: 2.0,
+                                                          ),
                                                           Text(
                                                             CurrencyFormatter
                                                                 .formatCompactEGP(
-                                                                    store
-                                                                        .totalRevenue),
+                                                              store
+                                                                  .totalRevenue,
+                                                            ),
                                                             style: theme
                                                                 .textTheme
                                                                 .bodyMedium
@@ -1059,7 +1183,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                                             ),
                                                           ),
                                                           const SizedBox(
-                                                              height: 2.0),
+                                                            height: 2.0,
+                                                          ),
                                                           Text(
                                                             '${CurrencyFormatter.formatUnits(store.totalUnits)} وحدة',
                                                             style: theme
@@ -1100,7 +1225,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                                                   .onSecondaryContainer,
                                                             ),
                                                             const SizedBox(
-                                                                width: 4.0),
+                                                              width: 4.0,
+                                                            ),
                                                             Text(
                                                               '${store.velocityUnitsPerDay.toStringAsFixed(1)} / يوم',
                                                               style: TextStyle(
@@ -1493,14 +1619,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
       ],
     );
     final button = selected
-        ? FilledButton.tonal(
-            onPressed: () => onSelected(value),
-            child: child,
-          )
-        : OutlinedButton(
-            onPressed: () => onSelected(value),
-            child: child,
-          );
+        ? FilledButton.tonal(onPressed: () => onSelected(value), child: child)
+        : OutlinedButton(onPressed: () => onSelected(value), child: child);
     return KeyedSubtree(
       key: ValueKey('store_matrix_filter_$value'),
       child: ConstrainedBox(
