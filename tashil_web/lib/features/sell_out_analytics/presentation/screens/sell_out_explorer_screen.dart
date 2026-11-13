@@ -3096,6 +3096,8 @@ onChanged: m3Legacy<int>((v) {
                     : TableScrollContainer(
                         controller: _archiveSheetsScrollController,
                         showSwipeHint: true,
+                        // File name is the widest column.
+                        columnFlex: const [1.3, 0.95, 0.85, 0.85, 0.95, 0.95, 1.2],
                         // Actions pinned at the row end so they stay on
                         // screen without horizontal scrolling.
                         pinnedEnd: _buildArchiveActionsColumn(context),
@@ -3111,14 +3113,14 @@ onChanged: m3Legacy<int>((v) {
                           headingRowColor: WidgetStatePropertyAll(
                             colorScheme.surfaceContainerHigh.withOpacity(0.5),
                           ),
-                          columns: const [
-                            DataColumn(label: Text('الملف')),
-                            DataColumn(label: Text('السلسلة')),
-                            DataColumn(label: Text('الفترة')),
-                            DataColumn(label: Text('المعاملات'), numeric: true),
-                            DataColumn(label: Text('الوحدات المباعة'), numeric: true),
-                            DataColumn(label: Text('صافي Sell-Out (ج.م)'), numeric: true),
-                            DataColumn(label: Text('تاريخ الرفع')),
+                          columns: [
+                            const DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الملف')),
+                            const DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('السلسلة')),
+                            const DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الفترة')),
+                            const DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('المعاملات'), numeric: true),
+                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 64.0), child: const Text('الوحدات المباعة', maxLines: 2, softWrap: true, textAlign: TextAlign.center)), numeric: true),
+                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 64.0), child: const Text('صافي Sell-Out (ج.م)', maxLines: 2, softWrap: true, textAlign: TextAlign.center)), numeric: true),
+                            const DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('تاريخ الرفع')),
                           ],
                           rows: _archivedSellOutFiles.map((file) {
                             final periodText = file.targetMonth.isNotEmpty && file.targetMonth != 'auto'
@@ -3207,7 +3209,12 @@ onChanged: m3Legacy<int>((v) {
                                   ),
                                 ),
                                 DataCell(
-                                  Text(
+                                  // Date/time (and last import) wrap onto centred lines so the
+                                  // table fits 1030dp next to the pinned actions.
+                                  ConstrainedBox(
+                                    constraints: const BoxConstraints(maxWidth: 96.0),
+                                    child: Text(
+                                    textAlign: TextAlign.center,
                                     () {
                                       final uploaded = file.uploadedAt.length >= 16
                                           ? file.uploadedAt.substring(0, 16).replaceAll('T', ' ')
@@ -3225,6 +3232,7 @@ onChanged: m3Legacy<int>((v) {
                                     }(),
                                     style: M3TextVariants.cell.copyWith(color: colorScheme.onSurfaceVariant),
                                   ),
+                                  ),
                                 ),
                               ],
                             );
@@ -3238,7 +3246,7 @@ onChanged: m3Legacy<int>((v) {
   }
 
   static const double _archiveHeadingHeight = 48.0;
-  static const double _archiveRowHeight = 56.0;
+  static const double _archiveRowHeight = 72.0;
 
   Widget _buildArchiveActionsColumn(BuildContext context) {
     final theme = Theme.of(context);

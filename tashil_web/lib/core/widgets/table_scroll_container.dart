@@ -67,6 +67,31 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
   ScrollController get _effectiveController =>
       widget.controller ?? (_internalController ??= ScrollController());
 
+  /// The 'يمين / شمال' controls only show while the table really overflows
+  /// horizontally (maxScrollExtent > 0); re-checked after every layout and
+  /// whenever the scroll metrics change (resize, data change).
+  bool _overflows = false;
+
+  void _setOverflow(double maxScrollExtent) {
+    // Ignore sub-pixel rounding (< 2dp) from intrinsic column layout.
+    final next = maxScrollExtent > 2.0;
+    if (next == _overflows || !mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _overflows != next) setState(() => _overflows = next);
+    });
+  }
+
+  void _checkOverflowAfterLayout() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final c = _effectiveController;
+      if (!c.hasClients) return;
+      final positions = c.positions.where((p) => p.hasContentDimensions);
+      if (positions.isEmpty) return;
+      _setOverflow(positions.first.maxScrollExtent);
+    });
+  }
+
   @override
   void dispose() {
     _internalController?.dispose();
@@ -170,10 +195,12 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    _checkOverflowAfterLayout();
+    final showControls = widget.showControls && _overflows;
     final hasHeader = widget.title != null ||
         widget.subtitle != null ||
         widget.trailing != null ||
-        widget.showControls;
+        showControls;
 
     return Container(
       decoration: widget.decoration,
@@ -231,7 +258,7 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
                         widget.trailing!,
                         const SizedBox(width: 8.0),
                       ],
-                      if (widget.showControls)
+                      if (showControls)
                         Flexible(
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
@@ -310,13 +337,21 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
           interactive: true,
           thickness: 9.0,
           radius: const Radius.circular(8.0),
-          child: SingleChildScrollView(
-            controller: _effectiveController,
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
+          child: NotificationListener<ScrollMetricsNotification>(
+            onNotification: (n) {
+              if (n.metrics.axis == Axis.horizontal && n.depth == 0) {
+                _setOverflow(n.metrics.maxScrollExtent);
+              }
+              return false;
+            },
+            child: SingleChildScrollView(
+              controller: _effectiveController,
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              child: _buildExpandedChild(widget.child, availableWidth),
             ),
-            child: _buildExpandedChild(widget.child, availableWidth),
           ),
         );
       },
@@ -327,7 +362,8 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
   /// get their cells centred too (header and content share one axis).
   static List<DataRow> _centerCells(DataTable dt) {
     final centered = [
-      for (final c in dt.columns) c.headingRowAlignment == MainAxisAlignment.center,
+      for (final c in dt.columns)
+        c.headingRowAlignment == MainAxisAlignment.center,
     ];
     if (!centered.contains(true)) return dt.rows;
     return [
@@ -381,16 +417,14 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
       final minColWidth = rawMinColWidth.clamp(0.0, double.infinity);
 
       final flex = widget.columnFlex;
-      final useFlex = flex != null &&
-          flex.length == colCount &&
-          flex.every((f) => f > 0);
+      final useFlex =
+          flex != null && flex.length == colCount && flex.every((f) => f > 0);
       final flexSum = useFlex ? flex.fold<double>(0, (a, b) => a + b) : 0.0;
       var colIndex = 0;
       final expandedColumns = dt.columns.map((col) {
         final i = colIndex++;
-        final share = useFlex
-            ? minColWidth * colCount * flex[i] / flexSum
-            : minColWidth;
+        final share =
+            useFlex ? minColWidth * colCount * flex[i] / flexSum : minColWidth;
         // A sortable header adds the arrow (16 + 2); a centred one adds the
         // same spacer on the other side to keep the label centred.
         final sortAllowance = col.onSort == null
