@@ -281,7 +281,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                             size: 15.0,
                             color: colorScheme.onSurfaceVariant,
                           ),
-                          const SizedBox(width: 5.0),
+                          const SizedBox(width: 8.0),
                           Flexible(
                             child: Text(
                               'حصتنا السوقية ${widget.tenantMarketSharePct.toStringAsFixed(2)}% (المركز $adecoRank)',
@@ -298,7 +298,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                     ),
                     if (widget.totalMarketRevenue > 0) ...[
                       M3ChipSurface(
-                        color: colorScheme.surfaceContainerHighest,
+                        color: colorScheme.surfaceContainerLowest,
                         borderColor: colorScheme.outlineVariant,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -308,7 +308,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               size: 15.0,
                               color: colorScheme.onSurfaceVariant,
                             ),
-                            const SizedBox(width: 5.0),
+                            const SizedBox(width: 8.0),
                             Flexible(
                               child: Text(
                                 'إجمالي السوق: ${CurrencyFormatter.formatCompactEGP(widget.totalMarketRevenue)}',
@@ -324,7 +324,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                         ),
                       ),
                       M3ChipSurface(
-                        color: colorScheme.surfaceContainerHighest,
+                        color: colorScheme.surfaceContainerLowest,
                         borderColor: colorScheme.outlineVariant,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -334,10 +334,10 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               size: 15.0,
                               color: colorScheme.onSurfaceVariant,
                             ),
-                            const SizedBox(width: 5.0),
+                            const SizedBox(width: 8.0),
                             Flexible(
                               child: Text(
-                                '${widget.competitorsCount} منافس',
+                                countCompetitors(widget.competitorsCount),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.labelMedium?.copyWith(
@@ -403,12 +403,15 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                           final isWide = constraints.maxWidth >= 720;
 
                           final supplierIdentity = Wrap(
-                            spacing: 10.0,
+                            spacing: 8.0,
                             runSpacing: 8.0,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               // 1. Rank Chip
-                              M3ChipSurface(
+                              Semantics(
+                                label: 'المركز $rank',
+                                excludeSemantics: true,
+                                child: M3ChipSurface(
                                 color: isTenant
                                     ? colorScheme.primary
                                     : colorScheme.surfaceContainerHighest,
@@ -426,7 +429,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                              ),
+                              )),
                               // 2. Company Name (Arabic on Line 1, English on Line 2)
                               Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -460,7 +463,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               ),
                               // 3. Barcode Count Chip
                               M3ChipSurface(
-                                color: colorScheme.surfaceContainer,
+                                color: colorScheme.surfaceContainerLowest,
                                 borderColor: colorScheme.outlineVariant,
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -470,7 +473,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                       size: 14.0,
                                       color: colorScheme.onSurfaceVariant,
                                     ),
-                                    const SizedBox(width: 5.0),
+                                    const SizedBox(width: 8.0),
                                     Flexible(
                                       child: Text(
                                         countSku(sup.skuCount),
@@ -499,7 +502,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                         size: 15.0,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
-                                      const SizedBox(width: 5.0),
+                                      const SizedBox(width: 8.0),
                                       Flexible(
                                         child: Column(
                                           mainAxisSize: MainAxisSize.min,
@@ -537,7 +540,8 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               M3ChipSurface(
                                 color: isTenant
                                     ? colorScheme.primary
-                                    : colorScheme.surfaceContainerHighest,
+                                    : colorScheme.surfaceContainerLowest,
+                                borderColor: isTenant ? null : colorScheme.outlineVariant,
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -548,7 +552,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                           ? colorScheme.onPrimary
                                           : colorScheme.onSurfaceVariant,
                                     ),
-                                    const SizedBox(width: 5.0),
+                                    const SizedBox(width: 8.0),
                                     Flexible(
                                       child: Text(
                                         '${sup.marketSharePct.toStringAsFixed(2)}%',
@@ -570,7 +574,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               M3ChipSurface(
                                 color: isTenant
                                     ? colorScheme.secondaryContainer
-                                    : colorScheme.surfaceContainerHighest,
+                                    : colorScheme.surfaceContainerLowest,
                                 borderColor: isTenant
                                     ? null
                                     : colorScheme.outlineVariant,
@@ -584,7 +588,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                           ? colorScheme.primary
                                           : colorScheme.onSurfaceVariant,
                                     ),
-                                    const SizedBox(width: 5.0),
+                                    const SizedBox(width: 8.0),
                                     Flexible(
                                       child: Text(
                                         CurrencyFormatter.formatCompactEGP(
@@ -622,7 +626,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               supplierIdentity,
-                              const SizedBox(height: 10.0),
+                              const SizedBox(height: 8.0),
                               financialChips,
                             ],
                           );
@@ -665,12 +669,12 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                           final isWide = constraints.maxWidth >= 720;
 
                           final otherIdentity = Wrap(
-                            spacing: 10.0,
+                            spacing: 8.0,
                             runSpacing: 8.0,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               M3ChipSurface(
-                                color: colorScheme.surfaceContainerHighest,
+                                color: colorScheme.surfaceContainerLowest,
                                 borderColor: colorScheme.outlineVariant,
                                 child: Text(
                                   // "9 and beyond", isolated so '+' stays left
@@ -691,7 +695,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               M3ChipSurface(
-                                color: colorScheme.surfaceContainer,
+                                color: colorScheme.surfaceContainerLowest,
                                 borderColor: colorScheme.outlineVariant,
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -701,7 +705,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                       size: 14.0,
                                       color: colorScheme.onSurfaceVariant,
                                     ),
-                                    const SizedBox(width: 5.0),
+                                    const SizedBox(width: 8.0),
                                     Text(
                                       'باقي السوق',
                                       style:
@@ -740,7 +744,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                       size: 14.0,
                                       color: colorScheme.onSurfaceVariant,
                                     ),
-                                    const SizedBox(width: 5.0),
+                                    const SizedBox(width: 8.0),
                                     Text(
                                       '${remainingSharePct.toStringAsFixed(2)}%',
                                       style:
@@ -753,7 +757,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 ),
                               ),
                               M3ChipSurface(
-                                color: colorScheme.surfaceContainerHighest,
+                                color: colorScheme.surfaceContainerLowest,
                                 borderColor: colorScheme.outlineVariant,
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -763,7 +767,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                       size: 14.0,
                                       color: colorScheme.onSurfaceVariant,
                                     ),
-                                    const SizedBox(width: 5.0),
+                                    const SizedBox(width: 8.0),
                                     Text(
                                       CurrencyFormatter.formatCompactEGP(
                                           remainingRevenue),
@@ -795,7 +799,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               otherIdentity,
-                              const SizedBox(height: 10.0),
+                              const SizedBox(height: 8.0),
                               otherFinancialChips,
                             ],
                           );
@@ -995,7 +999,8 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 M3ChipSurface(
-                                  color: colorScheme.surfaceContainerHighest,
+                                  color: colorScheme.surfaceContainerLowest,
+                                  borderColor: colorScheme.outlineVariant,
                                   child: Text(
                                     countSku(cat.skuCount),
                                     style: theme.textTheme.labelSmall?.copyWith(
@@ -1125,7 +1130,8 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 M3ChipSurface(
-                                  color: colorScheme.surfaceContainerHighest,
+                                  color: colorScheme.surfaceContainerLowest,
+                                  borderColor: colorScheme.outlineVariant,
                                   child: Text(
                                     'فئات أخرى',
                                     style: theme.textTheme.labelSmall?.copyWith(

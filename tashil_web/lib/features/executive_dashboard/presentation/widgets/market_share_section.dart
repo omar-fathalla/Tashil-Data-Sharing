@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/utils/arabic_plural.dart';
@@ -58,24 +59,30 @@ class MarketShareSection extends StatelessWidget {
           loading: cpfrLoading && cpfr == null,
           error: cpfrError,
           fill: wide);
-      Widget row(Widget a, Widget b, Key key) => wide
-          ? _EqualHeightRow(
-              key: key,
-              spacing: M3Spacing.md,
-              textDirection: Directionality.of(context),
-              children: [a, b],
-            )
-          : Column(
-              key: key,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [a, M3Spacing.gapMD, b],
-            );
+      // F6: below 1600dp an even split leaves the 6-column stock table
+      // cramped (~380dp at 1431), so row A gives it 7/12 of the width.
+      final rowAFlex = c.maxWidth < 1600 ? const [5, 7] : const [1, 1];
+      Widget row(Widget a, Widget b, Key key,
+              {List<int> flex = const [1, 1]}) =>
+          wide
+              ? _EqualHeightRow(
+                  key: key,
+                  spacing: M3Spacing.md,
+                  textDirection: Directionality.of(context),
+                  flex: flex,
+                  children: [a, b],
+                )
+              : Column(
+                  key: key,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [a, M3Spacing.gapMD, b],
+                );
       return Column(
         key: const ValueKey('market_share_section'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Row A: share by SKU (start) + stock by SKU (end).
-          row(sku, stock, const ValueKey('exec_row_a')),
+          row(sku, stock, const ValueKey('exec_row_a'), flex: rowAFlex),
           if (months.isNotEmpty) ...[
             M3Spacing.gapMD,
             _SellInOutTiles(months: months, year: year),
@@ -615,7 +622,13 @@ class _StockCard extends StatelessWidget {
       color: cs.onSurface,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
-    Widget num(String v) => Text(v, style: cell, textAlign: TextAlign.end);
+    // F2: numeric cells and their headings share one alignment (centred,
+    // the owner's table rule) and the same 4dp horizontal padding, so each
+    // heading sits exactly over its numbers at any column width.
+    const numPad = EdgeInsets.symmetric(horizontal: M3Spacing.xxs);
+    Widget num(String v) => Padding(
+        padding: numPad,
+        child: Text(v, style: cell, textAlign: TextAlign.center));
     return Card.outlined(
       key: const ValueKey('stock_per_sku_table'),
       margin: EdgeInsets.zero,
@@ -657,20 +670,30 @@ class _StockCard extends StatelessWidget {
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
               children: [
                 TableRow(children: [
-                  for (final h in [
+                  for (final (i, h) in const [
                     'الصنف',
                     'Sell-In',
                     'Sell-Out',
                     'الفرق',
                     'نسبة التصريف',
                     'الحالة'
-                  ])
-                    // 8dp end gap so adjacent headings ("نسبة التصريف" |
-                    // "الحالة") never read as one phrase.
+                  ].indexed)
+                    // Item name stays start-aligned; every other heading is
+                    // centred with the same padding as its cells.
                     Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                            end: M3Spacing.xs, bottom: M3Spacing.xs),
-                        child: Text(h, style: label, maxLines: 2)),
+                        padding: i == 0
+                            ? const EdgeInsetsDirectional.only(
+                                end: M3Spacing.xs, bottom: M3Spacing.xs)
+                            : const EdgeInsets.only(
+                                left: M3Spacing.xxs,
+                                right: M3Spacing.xxs,
+                                bottom: M3Spacing.xs),
+                        child: Text(h,
+                            key: ValueKey('stock_head_$i'),
+                            style: label,
+                            maxLines: 2,
+                            textAlign:
+                                i == 0 ? TextAlign.start : TextAlign.center)),
                 ]),
                 for (final r in top)
                   TableRow(
@@ -707,10 +730,9 @@ class _StockCard extends StatelessWidget {
                       num(formatSignedUnits(r.sIn - r.sOut)),
                       num(_pct(r.sIn > 0 ? r.sOut / r.sIn * 100.0 : 0.0)),
                       Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                            start: M3Spacing.xs),
+                        padding: numPad,
                         child: Align(
-                            alignment: AlignmentDirectional.centerStart,
+                            alignment: Alignment.center,
                             child: _StatusChip(status: r.status)),
                       ),
                     ],
@@ -938,22 +960,28 @@ class _EqualHeightRow extends MultiChildRenderObjectWidget {
     super.key,
     required this.spacing,
     required this.textDirection,
+    this.flex = const [1, 1],
     required super.children,
   });
 
   final double spacing;
   final TextDirection textDirection;
 
+  /// Width share per child (missing entries count as 1).
+  final List<int> flex;
+
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderEqualHeightRow(spacing: spacing, textDirection: textDirection);
+      _RenderEqualHeightRow(
+          spacing: spacing, textDirection: textDirection, flex: flex);
 
   @override
   void updateRenderObject(
       BuildContext context, _RenderEqualHeightRow renderObject) {
     renderObject
       ..spacing = spacing
-      ..textDirection = textDirection;
+      ..textDirection = textDirection
+      ..flex = flex;
   }
 }
 
@@ -1097,9 +1125,20 @@ class _RenderEqualHeightRow extends RenderBox
         ContainerRenderObjectMixin<RenderBox, _OffsetParentData>,
         _OffsetChildren {
   _RenderEqualHeightRow(
-      {required double spacing, required TextDirection textDirection})
+      {required double spacing,
+      required TextDirection textDirection,
+      List<int> flex = const [1, 1]})
       : _spacing = spacing,
-        _textDirection = textDirection;
+        _textDirection = textDirection,
+        _flex = flex;
+
+  List<int> _flex;
+  List<int> get flex => _flex;
+  set flex(List<int> value) {
+    if (listEquals(value, _flex)) return;
+    _flex = value;
+    markNeedsLayout();
+  }
 
   double _spacing;
   double get spacing => _spacing;
@@ -1120,10 +1159,17 @@ class _RenderEqualHeightRow extends RenderBox
   @override
   void setupParentData(RenderBox child) => setupOffsetParentData(child);
 
-  double _childWidth(double width) {
+  int _flexAt(int i) => i < _flex.length && _flex[i] > 0 ? _flex[i] : 1;
+
+  /// Width of child [i] (logical order) for a row [width] wide.
+  double _childWidth(double width, int i) {
     final n = childCount;
     if (n == 0) return 0;
-    return math.max(0.0, (width - spacing * (n - 1)) / n);
+    var total = 0;
+    for (var k = 0; k < n; k++) {
+      total += _flexAt(k);
+    }
+    return math.max(0.0, (width - spacing * (n - 1)) * _flexAt(i) / total);
   }
 
   @override
@@ -1132,10 +1178,11 @@ class _RenderEqualHeightRow extends RenderBox
 
   @override
   double computeMaxIntrinsicHeight(double width) {
-    final childW = _childWidth(width);
     var maxH = 0.0;
+    var i = 0;
     for (final child in offsetChildren()) {
-      maxH = math.max(maxH, child.getMaxIntrinsicHeight(childW));
+      maxH =
+          math.max(maxH, child.getMaxIntrinsicHeight(_childWidth(width, i++)));
     }
     return maxH;
   }
@@ -1150,19 +1197,22 @@ class _RenderEqualHeightRow extends RenderBox
   void performLayout() {
     final width = constraints.maxWidth;
     final kids = offsetChildren();
-    final childW = _childWidth(width);
-    var maxH = 0.0;
-    for (final child in kids) {
-      maxH = math.max(maxH, child.getMaxIntrinsicHeight(childW));
-    }
     final n = kids.length;
+    final widths = [for (var i = 0; i < n; i++) _childWidth(width, i)];
+    var maxH = 0.0;
     for (var i = 0; i < n; i++) {
+      maxH = math.max(maxH, kids[i].getMaxIntrinsicHeight(widths[i]));
+    }
+    final rtl = textDirection == TextDirection.rtl;
+    var x = 0.0;
+    for (var v = 0; v < n; v++) {
+      // Visual slot v (left to right) holds logical child i.
+      final i = rtl ? n - 1 - v : v;
       final child = kids[i];
-      child.layout(BoxConstraints.tightFor(width: childW, height: maxH),
+      child.layout(BoxConstraints.tightFor(width: widths[i], height: maxH),
           parentUsesSize: true);
-      final slot = textDirection == TextDirection.rtl ? n - 1 - i : i;
-      (child.parentData! as _OffsetParentData).offset =
-          Offset(slot * (childW + spacing), 0);
+      (child.parentData! as _OffsetParentData).offset = Offset(x, 0);
+      x += widths[i] + spacing;
     }
     size = constraints.constrain(Size(width.isFinite ? width : 0, maxH));
   }

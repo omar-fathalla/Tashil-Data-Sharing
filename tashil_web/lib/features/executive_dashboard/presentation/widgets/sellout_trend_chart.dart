@@ -306,13 +306,14 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                     return M3ChipSurface(
                       // Neutral tonal pill; the series colour is shown by the
                       // dot (graphic ≥ 3:1); text stays onSurface.
-                      color: colorScheme.surfaceContainerHigh,
+                      color: colorScheme.surfaceContainerLowest,
+                      borderColor: colorScheme.outlineVariant,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           CircleAvatar(
                               radius: 4.5, backgroundColor: series.color),
-                          const SizedBox(width: 6.0),
+                          const SizedBox(width: 8.0),
                           Flexible(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,7 +393,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6.0),
+                  const SizedBox(width: 8.0),
                   // Canvas Chart
                   Expanded(
                     child: LayoutBuilder(
@@ -509,7 +510,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
   Widget _lineStyleKey(ThemeData theme, String label, {required bool dashed}) {
     final colorScheme = theme.colorScheme;
     return M3ChipSurface(
-      color: colorScheme.surfaceContainerHigh,
+      color: colorScheme.surfaceContainerLowest,
       borderColor: colorScheme.outlineVariant,
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -519,7 +520,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
             painter: _LineKeyPainter(
                 color: colorScheme.onSurfaceVariant, dashed: dashed),
           ),
-          const SizedBox(width: 6.0),
+          const SizedBox(width: 8.0),
           Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(

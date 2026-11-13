@@ -1,5 +1,6 @@
 import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/utils/arabic_plural.dart';
 import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/widgets/m3_status_tag.dart';
@@ -140,7 +141,7 @@ class ChainSharePie extends StatelessWidget {
                 const SizedBox(width: 8.0),
                 M3StatusTag(
                   label:
-                      '${chainShares.length} ${chainShares.length == 1 ? "سلسلة نشطة" : "سلاسل نشطة"}',
+                      countActiveChains(chainShares.length),
                   icon: AppIcons.filterList,
                 ),
                 const SizedBox(width: 6.0),
@@ -240,7 +241,8 @@ class ChainSharePie extends StatelessWidget {
                           ),
                         ),
                         M3ChipSurface(
-                          color: colorScheme.surfaceContainerHigh,
+                          color: colorScheme.surfaceContainerLowest,
+                          borderColor: colorScheme.outlineVariant,
                           child: Text(
                             '${item.marketShare.toStringAsFixed(1)}%',
                             style: theme.textTheme.labelSmall?.copyWith(
