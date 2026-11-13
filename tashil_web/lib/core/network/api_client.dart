@@ -4694,6 +4694,49 @@ class ApiClient {
   /// Last successful archive answer per (tenant, filters); served when a later request fails.
   final Map<String, UploadedFilesArchiveResponse> _lastArchiveByKey = {};
 
+  /// Backoff between attempts of the uploaded-files list on transient failures
+  /// (network/CORS errors, timeouts, 429/502/503/504 — e.g. Cloud Run's 429 while
+  /// the single instance is busy right after a deploy, which carries no CORS
+  /// headers). Tests shorten it.
+  static List<Duration> archiveRetryDelays = const [
+    Duration(seconds: 1),
+    Duration(seconds: 2),
+    Duration(seconds: 4),
+    Duration(seconds: 8),
+  ];
+
+  /// Per-attempt timeout of the uploaded-files list.
+  static Duration archiveAttemptTimeout = const Duration(seconds: 20);
+
+  static bool isTransientHttpStatus(int code) =>
+      code == 429 || code == 502 || code == 503 || code == 504;
+
+  /// GET with retry + backoff on transient failures; other responses are returned as-is.
+  static Future<http.Response> getWithTransientRetry(
+    Uri uri, {
+    required Map<String, String> headers,
+    List<Duration>? delays,
+    Duration? attemptTimeout,
+  }) async {
+    final waits = delays ?? archiveRetryDelays;
+    for (var attempt = 0;; attempt++) {
+      final last = attempt >= waits.length;
+      try {
+        final resp = await BackendHttp.get(uri, headers: headers)
+            .timeout(attemptTimeout ?? archiveAttemptTimeout);
+        if (!isTransientHttpStatus(resp.statusCode) || last) return resp;
+        debugPrint('[ApiClient] transient HTTP ${resp.statusCode} for ${uri.path}; retry ${attempt + 1}');
+      } on TimeoutException {
+        if (last) rethrow;
+        debugPrint('[ApiClient] timeout for ${uri.path}; retry ${attempt + 1}');
+      } on http.ClientException catch (e) {
+        if (last) rethrow;
+        debugPrint('[ApiClient] network error for ${uri.path} ($e); retry ${attempt + 1}');
+      }
+      await Future<void>.delayed(waits[attempt]);
+    }
+  }
+
   /// Retrieves archived Excel/CSV files for the tenant, optionally filtered by retail chain, year, search query, and fileType ('sell_out' | 'sell_in').
   Future<UploadedFilesArchiveResponse> getUploadedFilesArchive({
     String? chain,
@@ -4724,7 +4767,7 @@ class ApiClient {
       final uri = Uri.parse(ApiEndpoints.ingestArchive).replace(
         queryParameters: queryParams.isEmpty ? null : queryParams,
       );
-      final resp = await BackendHttp.get(
+      final resp = await getWithTransientRetry(
         uri,
         headers: {
           'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
@@ -4732,7 +4775,7 @@ class ApiClient {
           if (currentUser != null && currentUser!.role.isNotEmpty)
             'X-Simulated-Role': _asciiSafeHeader(currentUser!.role),
         },
-      ).timeout(const Duration(seconds: 10));
+      );
 
       if (resp.statusCode == 200) {
         final parsed = UploadedFilesArchiveResponse.fromJson(

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -165,8 +166,15 @@ func main() {
 	// Data loading runs after the HTTP server starts listening (see step 7). Until it finishes,
 	// data endpoints wait (up to dataReadyWait) instead of seeing a half-loaded dataset.
 	dataReady := make(chan struct{})
+	// archiveReady closes once the upload archive is restored (seconds after boot). The uploaded-files
+	// list only needs the archive index + BigQuery row counts, so it must not wait minutes for the
+	// durable sync / cache warm-up below (that held it past the web client's timeout after a deploy).
+	archiveReady := make(chan struct{})
+	var archiveReadyOnce sync.Once
+	markArchiveReady := func() { archiveReadyOnce.Do(func() { close(archiveReady) }) }
 	loadData := func() {
 		defer close(dataReady)
+		defer markArchiveReady()
 		bootStart := time.Now()
 		// Wipe all fake/synthetic seed data and restore ONLY real user-uploaded archived files
 		_ = ingestProcessor.ClearTenantData(context.Background(), "all")
@@ -176,6 +184,7 @@ func main() {
 		} else {
 			log.Printf("[Tashil Cloud Run] Data ready via %s in %s. Only user-uploaded files are active.", mode, time.Since(bootStart).Round(time.Millisecond))
 		}
+		markArchiveReady()
 		// Converge on the durable Sell-In / Sell-Out rows (BigQuery) before serving, then keep polling for changes.
 		// Failures are logged per dataset and keep the archive-replayed data.
 		durableTenants := []string{"tenant-adeco"}
@@ -396,7 +405,7 @@ func main() {
 
 	// 6. Wrap Middleware Chain: CORS -> Data-ready gate -> Auth -> Snapshot hook -> Router
 	protectedHandler := authMiddleware.Handler(middleware.ETag(newAsyncJobs(archDir).wrap(snapshotOnMutation(mux, ingestProcessor))))
-	corsHandler := middleware.CORS(waitForData(protectedHandler, dataReady))
+	corsHandler := middleware.CORS(waitForData(protectedHandler, dataReady, archiveReady))
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -436,7 +445,8 @@ const dataReadyWait = 170 * time.Second
 
 // waitForData holds data requests until the startup load has finished. Health, version,
 // auth and portal metadata do not depend on the replayed dataset and are served immediately.
-func waitForData(next http.Handler, ready <-chan struct{}) http.Handler {
+// The uploaded-files list (GET /api/v1/ingest/archive) waits only for archiveReady.
+func waitForData(next http.Handler, ready, archiveReady <-chan struct{}) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
 		if !strings.HasPrefix(p, "/api/v1/") || strings.HasPrefix(p, "/api/v1/auth/") ||
@@ -445,8 +455,12 @@ func waitForData(next http.Handler, ready <-chan struct{}) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		gate := ready
+		if r.Method == http.MethodGet && p == "/api/v1/ingest/archive" && archiveReady != nil {
+			gate = archiveReady
+		}
 		select {
-		case <-ready:
+		case <-gate:
 			next.ServeHTTP(w, r)
 		case <-r.Context().Done():
 			return
