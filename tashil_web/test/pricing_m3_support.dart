@@ -102,6 +102,8 @@ class PricingShotApiClient extends ApiClient {
       avgPromoUpliftPct: 13.9,
       availableCategories: const [
         kLongCategory,
+        'منظفات سجاد ومفروشات',
+        'مسحوق غسالات اطباق',
         'صابون سائل اطباق',
         'كلور ألوان',
         'منظف ارضيات',
