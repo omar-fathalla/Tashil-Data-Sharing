@@ -938,15 +938,25 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   // reading start; the rest scroll. Main columns (item, period, chain,
   // cases, net, gross) fit in a 1030dp viewport (1280 minus the sidebar).
   static const double _sellInItemColWidth = 248.0;
+  // Flex widths: the base widths below are stretched to fill the available
+  // width (no empty space on wide screens); recomputed on every layout.
+  List<double> _sellInWidths = _sellInColWidths;
+  double _sellInItemWidth = _sellInItemColWidth;
+
+  void _layoutSellInColumns(double available) {
+    final item = (available * 0.24).clamp(_sellInItemColWidth, 380.0);
+    final base = _sellInColWidths.fold<double>(0, (a, b) => a + b);
+    final rest = available - item - 1.0;
+    final scale = rest > base ? rest / base : 1.0;
+    _sellInItemWidth = item;
+    _sellInWidths = [for (final w in _sellInColWidths) (w * scale).floorToDouble()];
+  }
   static const double _sellInHeaderHeight = 56.0;
-  static const double _sellInRowHeight = 88.0;
+  static const double _sellInRowHeight = 132.0;
   // Scrolling columns (RTL order): period, chain/branch, cases/units, net,
   // gross, carton price, brand/category, sales rep, weight, file.
   static const List<double> _sellInColWidths = [
     96, 148, 128, 112, 112, 168, 160, 120, 84, 112,
-  ];
-  static const List<bool> _sellInColNumeric = [
-    false, false, true, true, true, true, false, false, true, false,
   ];
 
   bool _syncingRecordLists = false;
@@ -960,14 +970,14 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     _syncingRecordLists = false;
   }
 
+  // Every scrolling column is centred (header and content); only the pinned
+  // item column stays start-aligned for multi-line names.
   Widget _sellInCell(int i, Widget child) => SizedBox(
-        width: _sellInColWidths[i],
+        width: _sellInWidths[i],
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
           child: Align(
-            alignment: _sellInColNumeric[i]
-                ? AlignmentDirectional.centerEnd
-                : AlignmentDirectional.centerStart,
+            alignment: AlignmentDirectional.center,
             child: child,
           ),
         ),
@@ -977,18 +987,18 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   /// appended 25 at a time as the user nears the end of the list.
   Widget _buildVirtualSellInTable(BuildContext context, ColorScheme colorScheme) {
     final theme = Theme.of(context);
-    final totalWidth = _sellInColWidths.fold<double>(0, (a, b) => a + b);
+    final totalWidth = _sellInWidths.fold<double>(0, (a, b) => a + b);
     final headers = <Widget>[
-      const Text('الفترة'),
-      const Text('السلسلة / الفرع'),
-      const Text('كرتونة / وحدة'),
+      const Text('الفترة', textAlign: TextAlign.center),
+      const Text('السلسلة / الفرع', textAlign: TextAlign.center),
+      const Text('كرتونة / وحدة', textAlign: TextAlign.center),
       _twoLineHeader(context, 'صافي Sell-In', 'بدون الضريبة'),
       _twoLineHeader(context, 'الإجمالي', 'شامل الضريبة'),
       _twoLineHeader(context, 'سعر الكرتونة', 'الفعلي مقابل القائمة'),
-      const Text('العلامة التجارية / الفئة'),
-      const Text('مندوب المبيعات'),
-      const Text('الوزن (طن)'),
-      const Text('الملف'),
+      const Text('العلامة التجارية / الفئة', textAlign: TextAlign.center),
+      const Text('مندوب المبيعات', textAlign: TextAlign.center),
+      const Text('الوزن (طن)', textAlign: TextAlign.center),
+      const Text('الملف', textAlign: TextAlign.center),
     ];
     final records = _records;
     return SizedBox(
@@ -1050,7 +1060,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     final records = _records;
     return SizedBox(
       key: const ValueKey('sellin_records_pinned_item'),
-      width: _sellInItemColWidth,
+      width: _sellInItemWidth,
       height: 600.0,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -1112,7 +1122,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
             child: Text(
               r.itemName,
               key: const ValueKey('sellin_record_item_name'),
-              maxLines: 2,
+              maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
@@ -1148,24 +1158,33 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     }
   }
 
+  // Primary (14px) and secondary (12px, muted) cell text wrap to 2 lines;
+  // anything still clipped shows its full text in a tooltip.
   Widget _primary(BuildContext context, String text, {Color? color, FontWeight weight = FontWeight.w600, String? tooltip, Key? key}) {
-    final t = Text(
-      text,
-      key: key,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: weight, color: color),
+    return Tooltip(
+      message: tooltip ?? text,
+      child: Text(
+        text,
+        key: key,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: weight, color: color),
+      ),
     );
-    return tooltip == null ? t : Tooltip(message: tooltip, child: t);
   }
 
-  Widget _secondary(BuildContext context, String text, {Color? color}) => Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color ?? Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+  Widget _secondary(BuildContext context, String text, {Color? color}) => Tooltip(
+        message: text,
+        child: Text(
+          text,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: color ?? Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
       );
 
   List<Widget> _sellInRowCells(BuildContext context, ColorScheme colorScheme, SellInRecordItem r) {
@@ -1184,7 +1203,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     final wave = pricingWaveLabelAr(r.pricingWaveStatus);
     Widget col(List<Widget> c, {bool end = false}) => Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: end ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: c,
         );
@@ -1247,8 +1266,9 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
           message: '${r.brand} • ${r.subCategory}',
           child: Text(
             '${r.brand} • ${r.subCategory}',
-            maxLines: 2,
+            maxLines: 3,
             overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
@@ -1295,13 +1315,13 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     final theme = Theme.of(context);
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(title),
         Text(
           subtitle,
-          style: theme.textTheme.labelSmall?.copyWith(
-            fontWeight: FontWeight.w100,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w400,
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
@@ -1759,14 +1779,18 @@ onChanged: m3Legacy<int>((v) {
                         ),
                       ),
                     )
-                  : TableScrollContainer(
-                      controller: _recordsTableScrollController,
-                      showSwipeHint: true,
-                      padding: const EdgeInsets.all(16.0),
-                      // Item column stays on screen; the rest scroll.
-                      pinnedStart: _buildSellInPinnedItemColumn(context, colorScheme),
-                      child: _buildVirtualSellInTable(context, colorScheme),
-                    ),
+                  : LayoutBuilder(builder: (context, constraints) {
+                      // Fill the full width: 16dp padding on each side.
+                      _layoutSellInColumns(constraints.maxWidth - 32.0);
+                      return TableScrollContainer(
+                        controller: _recordsTableScrollController,
+                        showSwipeHint: true,
+                        padding: const EdgeInsets.all(16.0),
+                        // Item column stays on screen; the rest scroll.
+                        pinnedStart: _buildSellInPinnedItemColumn(context, colorScheme),
+                        child: _buildVirtualSellInTable(context, colorScheme),
+                      );
+                    }),
         ),
       ],
     );
@@ -2244,18 +2268,18 @@ onChanged: m3Legacy<String>((v) {
                     colorScheme.surfaceContainerHigh.withOpacity(0.5),
                   ),
                   columns: const [
-                    DataColumn(label: Text('الشهر / السنة')),
-                    DataColumn(label: Text('رصيد أول الشهر'), numeric: true),
-                    DataColumn(label: Text('+ Sell-In'), numeric: true),
-                    DataColumn(label: Text('− Sell-Out'), numeric: true),
-                    DataColumn(label: Text('هامش السلسلة'), numeric: true),
-                    DataColumn(label: Text('النمو السنوي'), numeric: true),
-                    DataColumn(
+                    DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الشهر / السنة')),
+                    DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('رصيد أول الشهر'), numeric: true),
+                    DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('+ Sell-In'), numeric: true),
+                    DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('− Sell-Out'), numeric: true),
+                    DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('هامش السلسلة'), numeric: true),
+                    DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('النمو السنوي'), numeric: true),
+                    DataColumn(headingRowAlignment: MainAxisAlignment.center, 
                       label: Text('رصيد آخر الشهر'),
                       numeric: true,
                     ),
-                    DataColumn(label: Text('نسبة التصريف'), numeric: true),
-                    DataColumn(label: Text('الحالة')),
+                    DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('نسبة التصريف'), numeric: true),
+                    DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الحالة')),
                   ],
                   rows: visibleMonthlyRows.map((m) {
                     final isPositiveClosing = m.closingStockValueEgp >= 0;
@@ -2264,7 +2288,7 @@ onChanged: m3Legacy<String>((v) {
                         DataCell(
                           Column(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Text(
                                 '${m.monthNum} - ${m.monthAr} ${m.year}',
@@ -2281,7 +2305,7 @@ onChanged: m3Legacy<String>((v) {
                         DataCell(
                           Column(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Text(CurrencyFormatter.formatCompactEGP(m.openingStockValueEgp)),
                               Text(
@@ -2294,7 +2318,7 @@ onChanged: m3Legacy<String>((v) {
                         DataCell(
                           Column(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Text(
                                 CurrencyFormatter.formatCompactEGP(m.sellInValueEgp),
@@ -2319,7 +2343,7 @@ onChanged: m3Legacy<String>((v) {
                           m.hasActualSellOut
                               ? Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Text(
                                       CurrencyFormatter.formatCompactEGP(m.sellOutValueEgp),
@@ -2348,7 +2372,7 @@ onChanged: m3Legacy<String>((v) {
                           m.hasActualSellOut && m.sellOutFactoryCostInclVatEgp > 0
                               ? Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Text(
                                       CurrencyFormatter.formatMarginEGP(m.chainGrossMarginEgp),
@@ -2371,7 +2395,7 @@ onChanged: m3Legacy<String>((v) {
                           m.hasActualSellOut && m.prevYearSellOutValueEgp > 0
                               ? Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Text(
                                       CurrencyFormatter.formatSignedPct(m.yoySellOutGrowthPct),
@@ -2394,7 +2418,7 @@ onChanged: m3Legacy<String>((v) {
                           Column(
                             key: const ValueKey('sellin_monthly_closing'),
                             mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Text(
                                 CurrencyFormatter.formatCompactEGP(m.closingStockValueEgp),
@@ -2789,7 +2813,7 @@ onChanged: m3Legacy<String>((val) {
                       key: const ValueKey('sellin_sku_table'),
                       sortColumnIndex: _skuSortColumnIndex > 0 ? _skuSortColumnIndex - 1 : null,
                       sortAscending: _skuSortAscending,
-                      columnSpacing: M3Spacing.sm,
+                      columnSpacing: M3Spacing.xs,
                       horizontalMargin: M3Spacing.sm,
                       headingRowHeight: _skuHeadingHeight,
                       dataRowMinHeight: _skuRowHeight,
@@ -2798,14 +2822,14 @@ onChanged: m3Legacy<String>((val) {
                         colorScheme.surfaceContainerHigh.withOpacity(0.5),
                       ),
                       columns: [
-                        DataColumn(
+                        DataColumn(headingRowAlignment: MainAxisAlignment.center, 
                           label: const Padding(
                               padding: EdgeInsets.symmetric(vertical: 4.0),
                               child: Text('العلامة التجارية'),
                             ),
                           onSort: (col, asc) => _onSortSku(1, asc),
                         ),
-                        DataColumn(
+                        DataColumn(headingRowAlignment: MainAxisAlignment.center, 
                           label: const Padding(
                               padding: EdgeInsets.symmetric(vertical: 4.0),
                               child: Text('Sell-In'),
@@ -2813,7 +2837,7 @@ onChanged: m3Legacy<String>((val) {
                           numeric: true,
                           onSort: (col, asc) => _onSortSku(2, asc),
                         ),
-                        DataColumn(
+                        DataColumn(headingRowAlignment: MainAxisAlignment.center, 
                           label: const Padding(
                               padding: EdgeInsets.symmetric(vertical: 4.0),
                               child: Text('Sell-Out'),
@@ -2821,7 +2845,7 @@ onChanged: m3Legacy<String>((val) {
                           numeric: true,
                           onSort: (col, asc) => _onSortSku(3, asc),
                         ),
-                        DataColumn(
+                        DataColumn(headingRowAlignment: MainAxisAlignment.center, 
                           // Header tap sorts via onSort; a nested Tooltip/InkWell broke the
                           // DataTable columnHeader semantics tree.
                           tooltip: 'اضغط للترتيب',
@@ -2839,7 +2863,7 @@ onChanged: m3Legacy<String>((val) {
                           numeric: true,
                           onSort: (col, asc) => _onSortSku(4, asc),
                         ),
-                        DataColumn(
+                        DataColumn(headingRowAlignment: MainAxisAlignment.center, 
                           // Header tap sorts via onSort; a nested Tooltip/InkWell broke the
                           // DataTable columnHeader semantics tree.
                           tooltip: 'اضغط للترتيب',
@@ -2857,14 +2881,14 @@ onChanged: m3Legacy<String>((val) {
                           numeric: true,
                           onSort: (col, asc) => _onSortSku(5, asc),
                         ),
-                        DataColumn(
+                        DataColumn(headingRowAlignment: MainAxisAlignment.center, 
                           label: const Padding(
                               padding: EdgeInsets.symmetric(vertical: 4.0),
                               child: Text('الحالة'),
                             ),
                           onSort: (col, asc) => _onSortSku(6, asc),
                         ),
-                        DataColumn(
+                        DataColumn(headingRowAlignment: MainAxisAlignment.center, 
                           label: const Padding(
                               padding: EdgeInsets.symmetric(vertical: 4.0),
                               child: Text('أمر الشراء المقترح'),
@@ -2901,7 +2925,7 @@ onChanged: m3Legacy<String>((val) {
                             DataCell(
                               Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   ConstrainedBox(
                                     constraints: const BoxConstraints(maxWidth: 140.0),
@@ -2909,7 +2933,7 @@ onChanged: m3Legacy<String>((val) {
                                       message: '${item.brand} • ${item.governorate}',
                                       child: Text(
                                         '${item.brand} • ${item.governorate}',
-                                        maxLines: 1,
+                                        maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(fontWeight: FontWeight.w600),
                                       ),
@@ -2926,7 +2950,7 @@ onChanged: m3Legacy<String>((val) {
                             DataCell(
                               Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   Text(
                                     '${CurrencyFormatter.formatNumber(item.sellInCases.round())} كرتونة',
@@ -2942,7 +2966,7 @@ onChanged: m3Legacy<String>((val) {
                             DataCell(
                               Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   Text(
                                     '${CurrencyFormatter.formatNumber(item.sellOutEstCases.round())} كرتونة',
@@ -2958,7 +2982,7 @@ onChanged: m3Legacy<String>((val) {
                             DataCell(
                               Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   Text(
                                     '${CurrencyFormatter.formatNumber(stockCases.round())} كرتونة',
@@ -2999,7 +3023,7 @@ onChanged: m3Legacy<String>((val) {
                               item.suggestedPoCases > 0
                                   ? Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
                                         Text(
                                           '${item.suggestedPoCases} كرتونة',
@@ -3369,14 +3393,14 @@ onChanged: m3Legacy<int>((v) {
                             colorScheme.surfaceContainerHigh.withOpacity(0.5),
                           ),
                           columns: const [
-                            DataColumn(label: Text('الملف')),
-                            DataColumn(label: Text('السلسلة')),
-                            DataColumn(label: Text('الفترة')),
-                            DataColumn(label: Text('المعاملات'), numeric: true),
-                            DataColumn(label: Text('الكراتين'), numeric: true),
-                            DataColumn(label: Text('صافي Sell-In (ج.م)'), numeric: true),
-                            DataColumn(label: Text('الوزن (طن)'), numeric: true),
-                            DataColumn(label: Text('تاريخ الرفع')),
+                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الملف')),
+                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('السلسلة')),
+                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الفترة')),
+                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('المعاملات'), numeric: true),
+                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الكراتين'), numeric: true),
+                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('صافي Sell-In (ج.م)'), numeric: true),
+                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الوزن (طن)'), numeric: true),
+                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('تاريخ الرفع')),
                           ],
                           rows: _archivedSellInFiles.map((file) {
                             final periodText = file.targetMonth.isNotEmpty &&
@@ -3520,8 +3544,8 @@ onChanged: m3Legacy<int>((v) {
   }
 
   static const double _skuHeadingHeight = 56.0;
-  static const double _skuRowHeight = 72.0;
-  static const double _skuItemColWidth = 232.0;
+  static const double _skuRowHeight = 120.0;
+  static const double _skuItemColWidth = 220.0;
 
   /// Pinned SKU column for the reorder table (same header/row heights).
   Widget _buildSkuPinnedColumn(BuildContext context, List<SKUBranchInventoryModel> items) {
@@ -3585,7 +3609,7 @@ onChanged: m3Legacy<int>((v) {
                         child: Text(
                           item.skuName,
                           key: const ValueKey('sellin_sku_name'),
-                          maxLines: 2,
+                          maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                         ),
@@ -3595,7 +3619,7 @@ onChanged: m3Legacy<int>((v) {
                             'كود: ${item.itemCode.isNotEmpty ? item.itemCode : "-"} • الباركود: ${item.barcode.isNotEmpty ? item.barcode : "-"} • ${item.unitsPerCarton > 0 ? item.unitsPerCarton : 12} وحدات/كرتونة',
                         child: Text(
                           'كود: ${item.itemCode.isNotEmpty ? item.itemCode : "-"} • الباركود: ${item.barcode.isNotEmpty ? item.barcode : "-"}',
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                         ),
@@ -3767,13 +3791,13 @@ onChanged: m3Legacy<int>((v) {
                 dataRowMinHeight: 40.0,
                 dataRowMaxHeight: 56.0,
                 columns: const [
-                  DataColumn(label: Text('الصنف')),
-                  DataColumn(label: Text('الكود / الباركود')),
-                  DataColumn(label: Text('السلاسل')),
-                  DataColumn(label: Text('الوحدات'), numeric: true),
-                  DataColumn(label: Text('المبيعات'), numeric: true),
-                  DataColumn(label: Text('التكلفة / الربح')),
-                  DataColumn(label: Text('السبب')),
+                  DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الصنف')),
+                  DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الكود / الباركود')),
+                  DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('السلاسل')),
+                  DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الوحدات'), numeric: true),
+                  DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('المبيعات'), numeric: true),
+                  DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('التكلفة / الربح')),
+                  DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('السبب')),
                 ],
                 rows: items
                     .take(50)
@@ -3979,11 +4003,14 @@ class _HoverCopyCodeState extends State<_HoverCopyCode> {
               Icon(widget.icon, size: 18.0, color: cs.onSurfaceVariant),
               const SizedBox(width: 4.0),
               Flexible(
-                child: Text(
-                  '${widget.label}: ${hasValue ? widget.value : "-"}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: style,
+                child: Tooltip(
+                  message: '${widget.label}: ${hasValue ? widget.value : "-"}',
+                  child: Text(
+                    '${widget.label}: ${hasValue ? widget.value : "-"}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: style,
+                  ),
                 ),
               ),
               if (hasValue && _hover) ...[

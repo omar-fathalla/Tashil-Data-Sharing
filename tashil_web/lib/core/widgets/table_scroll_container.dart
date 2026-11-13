@@ -316,6 +316,41 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
     );
   }
 
+  /// Columns that opt in with `headingRowAlignment: MainAxisAlignment.center`
+  /// get their cells centred too (header and content share one axis).
+  static List<DataRow> _centerCells(DataTable dt) {
+    final centered = [
+      for (final c in dt.columns) c.headingRowAlignment == MainAxisAlignment.center,
+    ];
+    if (!centered.contains(true)) return dt.rows;
+    return [
+      for (final r in dt.rows)
+        DataRow(
+          key: r.key,
+          selected: r.selected,
+          onSelectChanged: r.onSelectChanged,
+          onLongPress: r.onLongPress,
+          color: r.color,
+          mouseCursor: r.mouseCursor,
+          cells: [
+            for (var i = 0; i < r.cells.length; i++)
+              i < centered.length && centered[i]
+                  ? DataCell(
+                      Center(child: r.cells[i].child),
+                      placeholder: r.cells[i].placeholder,
+                      showEditIcon: r.cells[i].showEditIcon,
+                      onTap: r.cells[i].onTap,
+                      onLongPress: r.cells[i].onLongPress,
+                      onTapDown: r.cells[i].onTapDown,
+                      onDoubleTap: r.cells[i].onDoubleTap,
+                      onTapCancel: r.cells[i].onTapCancel,
+                    )
+                  : r.cells[i],
+          ],
+        ),
+    ];
+  }
+
   Widget _buildExpandedChild(Widget child, double availableWidth) {
     if (availableWidth <= 0) return child;
 
@@ -351,9 +386,11 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
           label: ConstrainedBox(
             constraints: BoxConstraints(minWidth: colMin),
             child: Align(
-              alignment: col.numeric
-                  ? AlignmentDirectional.centerEnd
-                  : AlignmentDirectional.centerStart,
+              alignment: col.headingRowAlignment == MainAxisAlignment.center
+                  ? AlignmentDirectional.center
+                  : col.numeric
+                      ? AlignmentDirectional.centerEnd
+                      : AlignmentDirectional.centerStart,
               widthFactor: 1.0,
               child: col.label,
             ),
@@ -382,7 +419,7 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
           showCheckboxColumn: dt.showCheckboxColumn,
           showBottomBorder: dt.showBottomBorder,
           dividerThickness: dt.dividerThickness,
-          rows: dt.rows,
+          rows: _centerCells(dt),
           checkboxHorizontalMargin: dt.checkboxHorizontalMargin,
           border: dt.border,
           clipBehavior: dt.clipBehavior,
