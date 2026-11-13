@@ -610,6 +610,10 @@ type ExecutiveKPIs struct {
 	UnitsGrowthPct        float64                `json:"units_growth_pct"`
 	UnitsYoYPct           float64                `json:"units_yoy_pct"`
 	UnitsMoMPct           float64                `json:"units_mom_pct"`
+	// YoYAvailable is false when no month of the selected period has
+	// last-year data; RevenueYoYPct/UnitsYoYPct are then 0 and must be shown
+	// as "—" (no comparable year), not as +0.0%.
+	YoYAvailable          bool                   `json:"yoy_available"`
 	ActiveStoresCount     int                    `json:"active_stores_count"`
 	OOSRatePct            float64                `json:"oos_rate_pct"`
 	OSARatePct            float64                `json:"osa_rate_pct"`

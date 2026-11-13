@@ -385,6 +385,9 @@ func (h *AnalyticsHandler) HandleStoreMatrix(w http.ResponseWriter, r *http.Requ
 		StartDate:     q.Get("start_date"),
 		EndDate:       q.Get("end_date"),
 	}
+	if sm, err := strconv.Atoi(q.Get("same_months_as")); err == nil && sm > 0 {
+		filter.SameMonthsAsYear = sm
+	}
 
 	if claims, ok := middleware.GetUserClaims(r.Context()); ok && claims != nil {
 		if claims.Role == domain.RoleChainKAM && strings.TrimSpace(claims.AssignedChain) != "" {

@@ -680,6 +680,10 @@ class CPFRDashboardModel {
   final List<MissingCostItemModel> missingCostItems;
   final double matchedYoyUnitsGrowthPct;
   final double matchedYoyValueGrowthPct;
+
+  /// False when no matched month has last-year Sell-Out (backend
+  /// `matched_yoy_available`); the YoY card then shows "—", not +0.0%.
+  final bool matchedYoyAvailable;
   final int pendingSellOutMonthsCount;
   final String pendingSellOutPeriodLabel;
   final double pendingSellOutCases;
@@ -748,6 +752,7 @@ class CPFRDashboardModel {
     this.missingCostItems = const [],
     this.matchedYoyUnitsGrowthPct = 0.0,
     this.matchedYoyValueGrowthPct = 0.0,
+    this.matchedYoyAvailable = true,
     this.pendingSellOutMonthsCount = 0,
     this.pendingSellOutPeriodLabel = '',
     this.pendingSellOutCases = 0.0,
@@ -876,6 +881,10 @@ class CPFRDashboardModel {
           (json['matched_yoy_units_growth_pct'] as num?)?.toDouble() ?? 0.0,
       matchedYoyValueGrowthPct:
           (json['matched_yoy_value_growth_pct'] as num?)?.toDouble() ?? 0.0,
+      // Older payloads without the flag: treat a non-zero % as available.
+      matchedYoyAvailable: json['matched_yoy_available'] as bool? ??
+          (((json['matched_yoy_value_growth_pct'] as num?) ?? 0) != 0 ||
+              ((json['matched_yoy_units_growth_pct'] as num?) ?? 0) != 0),
       pendingSellOutMonthsCount:
           (json['pending_sell_out_months_count'] as num?)?.toInt() ?? 0,
       pendingSellOutPeriodLabel:

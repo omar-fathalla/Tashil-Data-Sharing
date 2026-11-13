@@ -43,6 +43,9 @@ type MonthlyChainRoiSummary struct {
 	CurrentMonthSellInEGP     float64                   `json:"current_month_sell_in_egp"`
 	MoMGrowthPct              float64                   `json:"mom_growth_pct"`
 	YoYGrowthPct              float64                   `json:"yoy_growth_pct"`
+	// YoYAvailable is false when the same month last year has no Sell-Out;
+	// YoYGrowthPct is then 0 and the UI shows "—" instead of +0.0%.
+	YoYAvailable bool `json:"yoy_available"`
 	RomiMultiple              float64                   `json:"romi_multiple"`
 }
 
@@ -212,6 +215,7 @@ func (h *TradeMarketingHandler) HandleGetROI(w http.ResponseWriter, r *http.Requ
 		}
 		s.MoMGrowthPct = pct(s.CurrentMonthSalesEGP, s.PreviousMonthSalesEGP)
 		s.YoYGrowthPct = pct(s.CurrentMonthSalesEGP, s.LastYearSameMonthSalesEGP)
+		s.YoYAvailable = s.LastYearSameMonthSalesEGP > 0
 		s.RomiMultiple = romi(s.MarketingSpendEGP, s.CurrentMonthSalesEGP, s.PreviousMonthSalesEGP, s.LastYearSameMonthSalesEGP)
 		out = append(out, *s)
 	}

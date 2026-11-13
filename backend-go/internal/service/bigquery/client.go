@@ -108,6 +108,10 @@ type StoreMatrixFilter struct {
 	Month         int
 	StartDate     string
 	EndDate       string
+	// SameMonthsAsYear (with Month == 0) keeps only the calendar months that
+	// have data in that year, so a previous-year matrix compares the same
+	// months as a partial current year (e.g. Jan-Oct vs Jan-Oct).
+	SameMonthsAsYear int
 }
 
 // PricingComplianceFilter allows filtering pricing compliance items by chain, category, violation/promo status, search query, period, and pagination.
@@ -1864,6 +1868,9 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 	revYoY := 26.4
 	unitsMoM := 9.2
 	unitsYoY := 18.5
+	// Demo tenants keep their illustrative YoY; real data sets this from
+	// whether any selected month has a same-month value last year.
+	yoyAvailable := true
 	oosRate := 4.2
 	oosIncidents := 18
 	lostRev := 148500.0
@@ -1873,6 +1880,7 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 		revYoY = wbMeta.RevenueYoYPct
 		unitsMoM = wbMeta.UnitsMoMPct
 		unitsYoY = wbMeta.UnitsYoYPct
+		yoyAvailable = wbMeta.RevenueYoYPct != 0 || wbMeta.UnitsYoYPct != 0
 		oosRate = math.Round(wbMeta.OOSRatePct*10) / 10
 		oosIncidents = wbMeta.OOSIncidents
 		lostRev = wbMeta.EstimatedLostRevenue
@@ -1881,6 +1889,7 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 		revYoY = 0.0
 		unitsMoM = 0.0
 		unitsYoY = 0.0
+		yoyAvailable = false
 		oosRate = 0.0
 		oosIncidents = 0
 		lostRev = 0.0
@@ -1988,6 +1997,7 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 					prevYoyUnits += allOwnMonthUnits[prevYrMonth]
 				}
 			}
+			yoyAvailable = prevYoyRev > 0
 			if prevYoyRev > 0 {
 				revYoY = math.Round(((curYoyRev-prevYoyRev)/prevYoyRev)*1000) / 10
 				if prevYoyUnits > 0 {
@@ -2023,6 +2033,7 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 		UnitsGrowthPct:        unitsMoM,
 		UnitsYoYPct:           unitsYoY,
 		UnitsMoMPct:           unitsMoM,
+		YoYAvailable:          yoyAvailable,
 		ActiveStoresCount:     len(storeMap),
 		OOSRatePct:            oosRate,
 		OSARatePct:            osaRate,
@@ -2554,14 +2565,38 @@ func (c *Client) GetStoreBenchmarkMatrix(ctx context.Context, tenantID string, f
 
 	storeMap := make(map[string]*storeAgg)
 
+	chainOK := func(chain string) bool {
+		if filter.RetailerChain == "" || filter.RetailerChain == "all" || filter.RetailerChain == "الكل" {
+			return true
+		}
+		return strings.EqualFold(chain, filter.RetailerChain)
+	}
+
+	// Same-months comparison: collect the "-MM" months present in the
+	// reference year (same tenant/chain scope) once, before aggregating.
+	var sameMonths map[string]bool
+	if filter.SameMonthsAsYear > 0 && filter.Month == 0 {
+		sameMonths = make(map[string]bool)
+		refPrefix := fmt.Sprintf("%04d-", filter.SameMonthsAsYear)
+		for _, r := range c.records {
+			if !matchTenant(r.TenantID, tenantID) || !isOwnRecord(r) || !chainOK(r.RetailerChain) {
+				continue
+			}
+			if len(r.TransactionDate) >= 7 && strings.HasPrefix(r.TransactionDate, refPrefix) {
+				sameMonths[r.TransactionDate[4:7]] = true
+			}
+		}
+	}
+
 	for _, r := range c.records {
 		if !matchTenant(r.TenantID, tenantID) || !isOwnRecord(r) {
 			continue // Row-Level Security & Tenant's own SKUs
 		}
-		if filter.RetailerChain != "" && filter.RetailerChain != "all" && filter.RetailerChain != "الكل" {
-			if !strings.EqualFold(r.RetailerChain, filter.RetailerChain) {
-				continue
-			}
+		if !chainOK(r.RetailerChain) {
+			continue
+		}
+		if sameMonths != nil && (len(r.TransactionDate) < 7 || !sameMonths[r.TransactionDate[4:7]]) {
+			continue
 		}
 		// Period filtering (Year / Month / Date Range)
 		if filter.StartDate != "" && r.TransactionDate < filter.StartDate {

@@ -1014,6 +1014,11 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	var matchedSellOutValWithCost, matchedSellOutMissingCostVal float64
 	var matchedSellOutMissingCostUnits int
 	var matchedPrevYearVal float64
+	// Current-year totals restricted to months that have last-year data, so
+	// YoY compares the same months only (a partial previous year must not
+	// inflate growth).
+	var matchedYoYCurUnits int
+	var matchedYoYCurVal float64
 
 	var pendingMonthsCount int
 	var pendingFirstMonthAR, pendingLastMonthAR string
@@ -1131,6 +1136,12 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			matchedSellOutMissingCostUnits += sellOutMissingCostUnits
 			matchedPrevYearUnits += prevUnits
 			matchedPrevYearVal += prevVal
+			if prevUnits > 0 {
+				matchedYoYCurUnits += sellOutUnits
+			}
+			if prevVal > 0 {
+				matchedYoYCurVal += sellOutVal
+			}
 		} else if sellInCases > 0 || sellInVal > 0 {
 			pendingMonthsCount++
 			if pendingFirstMonthAR == "" {
@@ -1246,12 +1257,13 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	}
 	matchedYoYUnitsGrowth := 0.0
 	if matchedPrevYearUnits > 0 {
-		matchedYoYUnitsGrowth = round2(((float64(matchedSellOutUnits) - float64(matchedPrevYearUnits)) / float64(matchedPrevYearUnits)) * 100.0)
+		matchedYoYUnitsGrowth = round2(((float64(matchedYoYCurUnits) - float64(matchedPrevYearUnits)) / float64(matchedPrevYearUnits)) * 100.0)
 	}
 	matchedYoYValGrowth := 0.0
 	if matchedPrevYearVal > 0 {
-		matchedYoYValGrowth = round2(((matchedSellOutPOSVal - matchedPrevYearVal) / matchedPrevYearVal) * 100.0)
+		matchedYoYValGrowth = round2(((matchedYoYCurVal - matchedPrevYearVal) / matchedPrevYearVal) * 100.0)
 	}
+	matchedYoYAvailable := matchedPrevYearVal > 0
 
 	// Determine Spotlight KPI metrics (defaulting to Matched Window when available, else Full YTD)
 	spotlightSellInEGP := round2(ytdSellInEGP)
@@ -1768,6 +1780,7 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		MissingCostItems:                finalizeMissingCostItems(missingCostAcc),
 		MatchedYoYUnitsGrowthPct:        matchedYoYUnitsGrowth,
 		MatchedYoYValueGrowthPct:        matchedYoYValGrowth,
+		MatchedYoYAvailable:             matchedYoYAvailable,
 		PendingSellOutMonthsCount:       pendingMonthsCount,
 		PendingSellOutPeriodLabel:       pendingPeriodLabel,
 		PendingSellOutCases:             round2(pendingSellOutCases),
