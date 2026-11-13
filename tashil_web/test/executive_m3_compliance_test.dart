@@ -85,7 +85,7 @@ void main() {
       expect(tester.takeException(), isNull);
       for (final k in const [
         'executive_period_segmented',
-        'executive_year_segmented',
+        'executive_year_dropdown',
         'executive_chain_dropdown',
         'executive_month_dropdown',
       ]) {
@@ -126,9 +126,9 @@ void main() {
         isA<OutlinedButton>());
     await tester.tap(find.byKey(const ValueKey('executive_month_dropdown')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('February').last);
+    await tester.tap(find.text('فبراير').last);
     await tester.pumpAndSettle();
-    expect(find.text('Month: Feb'), findsOneWidget);
+    expect(find.text('الشهر: فبراير'), findsOneWidget);
     expect(
         tester.widget(find.byKey(const ValueKey('executive_month_dropdown'))),
         isA<FilledButton>());

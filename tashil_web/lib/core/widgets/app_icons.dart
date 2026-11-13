@@ -61,12 +61,15 @@ class AppIcons {
   static const IconData arrowForward = Icons.arrow_forward_rounded;
   static const IconData trendingUp = Icons.trending_up_rounded;
   static const IconData trendingDown = Icons.trending_down_rounded;
+  static const IconData trendingFlat = Icons.trending_flat_rounded;
+  static const IconData filterList = Icons.filter_list_rounded;
   static const IconData promo = Icons.redeem_rounded;
   static const IconData newItem = Icons.fiber_new_rounded;
 
   // Dates
   static const IconData calendar = Icons.calendar_month_rounded;
   static const IconData dateRange = Icons.date_range_rounded;
+  static const IconData event = Icons.event_rounded;
 
   // Status
   static const IconData success = Icons.check_circle_rounded;
