@@ -373,4 +373,20 @@ void main() {
     expect(chart.top, greaterThanOrEqualTo(table.bottom - 1));
     expect(find.text('Stock SKU 7'), findsOneWidget);
   });
+
+  test('Signed units keep the sign on the left in RTL (isolate + U+2212)', () {
+    expect(formatSignedUnits(-45080), '\u2066\u221245,080\u2069');
+    expect(formatSignedUnits(10000), '\u2066+10,000\u2069');
+    expect(formatSignedUnits(0), '\u20660\u2069');
+  });
+
+  testWidgets('Inventory difference column uses the isolated signed format',
+      (tester) async {
+    await _pumpAt(tester, 1280.0);
+    final table = find.byKey(const ValueKey('stock_per_sku_table'));
+    expect(
+        find.descendant(of: table, matching: find.text('\u2066+80\u2069')),
+        findsOneWidget);
+    expect(find.text('\u2066+2,400\u2069'), findsOneWidget); // net tile
+  });
 }

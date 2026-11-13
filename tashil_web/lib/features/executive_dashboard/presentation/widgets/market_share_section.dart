@@ -111,6 +111,15 @@ String _fmtInt(num v) {
   return '${v < 0 ? '-' : ''}$b';
 }
 
+/// Signed unit count for RTL text: '+' / U+2212 MINUS SIGN stay on the left
+/// of the digits ("−45,080", "+10,000") because the whole value sits in an
+/// LRI…PDI isolate; a bare '-' in Arabic text renders as "45,080-".
+@visibleForTesting
+String formatSignedUnits(num v) {
+  final sign = v > 0 ? '+' : (v < 0 ? '\u2212' : '');
+  return '\u2066$sign${_fmtInt(v.abs())}\u2069';
+}
+
 /// Arabic month names (index = month number); the dashboard is Arabic-only.
 const _monthsAr = [
   '',
@@ -483,7 +492,7 @@ class _SellInOutTiles extends StatelessWidget {
       _KpiTile(
           key: const ValueKey('kpi_net_accumulation'),
           label: 'تراكم المخزون (وحدة)',
-          value: '${net > 0 ? '+' : ''}${_fmtInt(net)}',
+          value: formatSignedUnits(net),
           color: acc.cautionStrong),
       _KpiTile(
           key: const ValueKey('kpi_sell_through'),
@@ -627,7 +636,8 @@ class _StockCard extends StatelessWidget {
           else
             Table(
               columnWidths: const {
-                0: FlexColumnWidth(3),
+                // SKU names get the most room (2 lines + tooltip).
+                0: FlexColumnWidth(4.2),
                 1: FlexColumnWidth(1.3),
                 2: FlexColumnWidth(1.3),
                 3: FlexColumnWidth(1.3),
@@ -665,7 +675,7 @@ class _StockCard extends StatelessWidget {
                             Tooltip(
                               message: r.name,
                               child: Text(r.name,
-                                  maxLines: 1,
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: theme.textTheme.titleSmall
                                       ?.copyWith(color: cs.onSurface)),
@@ -681,7 +691,7 @@ class _StockCard extends StatelessWidget {
                       ),
                       num(_fmtInt(r.sIn)),
                       num(_fmtInt(r.sOut)),
-                      num('${r.sIn - r.sOut > 0 ? '+' : ''}${_fmtInt(r.sIn - r.sOut)}'),
+                      num(formatSignedUnits(r.sIn - r.sOut)),
                       num(_pct(r.sIn > 0 ? r.sOut / r.sIn * 100.0 : 0.0)),
                       Padding(
                         padding: const EdgeInsetsDirectional.only(
