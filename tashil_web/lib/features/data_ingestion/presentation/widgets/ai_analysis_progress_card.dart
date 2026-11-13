@@ -3,6 +3,7 @@ import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
+import '../../../../core/utils/shared_display_prefix.dart';
 import '../../../../core/utils/currency_formatter.dart';
 
 /// AiAnalysisProgressCard displays real-time ingestion execution stages
@@ -556,8 +557,14 @@ class AiAnalysisProgressCard extends StatelessWidget {
                       Wrap(
                         spacing: 6.0,
                         runSpacing: 6.0,
-                        children: result!.discoveredBranches.take(18).map((b) {
-                          final name = (b['branch_name'] ?? b['id'] ?? '').toString();
+                        children: () {
+                          final rawNames = result!.discoveredBranches
+                              .map((b) => (b['branch_name'] ?? b['id'] ?? '').toString())
+                              .toList();
+                          final labels = displayNamesWithoutSharedPrefix(rawNames);
+                          return result!.discoveredBranches.take(18).map((b) {
+                          final name = labels[(b['branch_name'] ?? b['id'] ?? '').toString()] ??
+                              (b['branch_name'] ?? b['id'] ?? '').toString();
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                             decoration: BoxDecoration(
@@ -572,7 +579,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                               ),
                             ),
                           );
-                        }).toList(),
+                        }).toList(); }(),
                       ),
                       if (result!.discoveredCategories.isNotEmpty) ...[
                         M3Spacing.gapSM,

@@ -41,7 +41,11 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
 
   static const double minRowH = 44;
   static const double branchW = 168;
-  static const double minMonthW = 72;
+  static const double preferredMonthW = 72;
+
+  /// Floor used when shrinking months so a 10-month matrix still fits
+  /// the live 1280×800 shell (250dp sidebar + page/card padding).
+  static const double minMonthW = 56;
   static const double totalW = 108;
   static const double hPad = 8;
   static const double vPad = 6;
@@ -131,21 +135,26 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
         final available =
             constraints.maxWidth.isFinite ? constraints.maxWidth : 0.0;
 
-        var neededMonth = minMonthW;
+        var labelW = 0.0;
         for (final m in months) {
           final label =
               (m >= 1 && m < monthLabelsAr.length) ? monthLabelsAr[m] : '$m';
-          neededMonth = math.max(
-            neededMonth,
-            measureWidth(label, headerStyle) + hPad * 2,
-          );
+          labelW = math.max(labelW, measureWidth(label, headerStyle));
         }
+        final comfortableMonth = math.max(preferredMonthW, labelW + hPad * 2);
+        final tightMonth = math.max(minMonthW, labelW + 8);
 
         final leftover = available - branchW - totalW;
-        final monthW =
-            (months.isNotEmpty && leftover / months.length >= neededMonth)
-                ? leftover / months.length
-                : neededMonth;
+        final double monthW;
+        if (months.isEmpty) {
+          monthW = comfortableMonth;
+        } else if (leftover / months.length >= comfortableMonth) {
+          monthW = leftover / months.length;
+        } else if (leftover / months.length >= tightMonth) {
+          monthW = leftover / months.length;
+        } else {
+          monthW = comfortableMonth;
+        }
 
         final headerH = math.max(
           minRowH,

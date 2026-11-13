@@ -4,6 +4,7 @@ import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/shared_display_prefix.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_feedback.dart';
@@ -574,7 +575,17 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
         hint: 'كل الفروع (${availableStores.length})',
         options: [
           M3DropdownOption(null, 'كل الفروع (${availableStores.length})'),
-          ...availableStores.map((s) => M3DropdownOption<String?>(s['id'], s['name']!)),
+          ...() {
+            final labels = displayNamesWithoutSharedPrefix(
+              availableStores.map((s) => s['name'] ?? ''),
+            );
+            return availableStores.map(
+              (s) => M3DropdownOption<String?>(
+                s['id'],
+                labels[s['name']!] ?? s['name']!,
+              ),
+            );
+          }(),
         ],
         onChanged: onStoreChanged,
       );

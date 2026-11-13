@@ -12,6 +12,16 @@ const kReturnsFixtureBranches = [
   'سلسلة تجريبية XYZ - فرع النيل الجديد ذو الاسم الطويل للتحقق من اللف',
 ];
 
+/// Live-like spelling mix (ة/ه, en-dash, NBSP) plus one outlier. Fictional
+/// names only; the typo pattern matches the v140 Returns review.
+const kReturnsLiveVariantBranches = [
+  'سلسله تجريبيه XYZ - مخزن ألفا',
+  'سلسلة تجريبية XYZ – فرع بيتا',
+  'سلسلة تجريبية XYZ - المستودع المركزي',
+  'سلسلة تجريبية XYZ - فرع النيل الجديد ذو الاسم الطويل للتحقق من اللف',
+  'فرع منفصل بدون بادئة',
+];
+
 const kReturnsLongProductName =
     'صنف تجريبي طويل الاسم جداً للتحقق من لف الكلام لثلاثة سطور في جدول أعلى الأصناف المرتجعة';
 
@@ -33,9 +43,19 @@ SellInReturnsCell _cell({
 
 /// Made-up returns report used at 1280 and 1024. No customer rows.
 class ReturnsFakeRepo implements SellInReturnsRepository {
-  ReturnsFakeRepo({this.momChangePct = 8.5});
+  ReturnsFakeRepo({
+    this.momChangePct = 8.5,
+    this.branchNames = kReturnsFixtureBranches,
+    this.kpiValueEgp,
+    this.kpiQty,
+    this.kpiReturnPct,
+  });
 
   final double? momChangePct;
+  final List<String> branchNames;
+  final double? kpiValueEgp;
+  final double? kpiQty;
+  final double? kpiReturnPct;
 
   @override
   Future<Result<SellInReturnsReport>> load(
@@ -120,7 +140,24 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
       );
     }
 
-    final branches = [for (final n in kReturnsFixtureBranches) branch(n)];
+    final defaultNames = kReturnsFixtureBranches;
+    final valuesByIndex = [
+      values[defaultNames[0]]!,
+      values[defaultNames[1]]!,
+      values[defaultNames[2]]!,
+      values[defaultNames[3]]!,
+    ];
+    final qtysByIndex = [
+      qtys[defaultNames[0]]!,
+      qtys[defaultNames[1]]!,
+      qtys[defaultNames[2]]!,
+      qtys[defaultNames[3]]!,
+    ];
+    for (var i = 0; i < branchNames.length; i++) {
+      values.putIfAbsent(branchNames[i], () => valuesByIndex[i % 4]);
+      qtys.putIfAbsent(branchNames[i], () => qtysByIndex[i % 4]);
+    }
+    final branches = [for (final n in branchNames) branch(n)];
     final columnTotals = <int, SellInReturnsCell>{};
     for (final m in months) {
       var ret = 0.0, gross = 0.0, qty = 0.0;
@@ -144,11 +181,12 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
         year: 2026,
         months: months,
         kpis: SellInReturnsKpis(
-          returnsValueEgp: gRet,
-          returnsQty: gQty,
+          returnsValueEgp: kpiValueEgp ?? gRet,
+          returnsQty: kpiQty ?? gQty,
           grossValueEgp: gGross,
           netValueEgp: gGross - gRet,
-          returnPctOfGross: gGross == 0 ? 0 : (gRet / gGross) * 100,
+          returnPctOfGross:
+              kpiReturnPct ?? (gGross == 0 ? 0 : (gRet / gGross) * 100),
           momChangePct: momChangePct,
           momDirection: momChangePct == null
               ? 'n/a'
@@ -180,9 +218,9 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
         branches: branches,
         columnTotals: columnTotals,
         grandTotal: _cell(gross: gGross, returnsValue: gRet, qty: gQty),
-        filterOptions: const SellInReturnsFilterOptions(
+        filterOptions: SellInReturnsFilterOptions(
           years: [2026],
-          branches: kReturnsFixtureBranches,
+          branches: branchNames,
           products: [kReturnsLongProductName, 'صنف تجريبي قصير'],
           productGroups: ['مجموعة تجريبية'],
         ),

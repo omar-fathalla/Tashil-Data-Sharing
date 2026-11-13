@@ -437,9 +437,9 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
         titleKey: const ValueKey('returns_kpi_title_نسبة المرتجع من الإجمالي'),
         subtitleKey:
             const ValueKey('returns_kpi_subtitle_نسبة المرتجع من الإجمالي'),
-        title: 'نسبة المرتجع من الإجمالي',
+        title: 'نسبة المرتجع',
         value: '${k.returnPctOfGross.toStringAsFixed(1)}%',
-        subtitle: 'Returns ÷ Gross',
+        subtitle: 'من الإجمالي · Returns ÷ Gross',
         icon: Icons.percent_rounded,
         color: k.returnPctOfGross >= 10 ? cs.error : cs.secondary,
         titleMaxLines: null,

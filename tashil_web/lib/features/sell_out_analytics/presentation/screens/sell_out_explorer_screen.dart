@@ -2,6 +2,7 @@ import 'package:tashil_web/core/widgets/m3_search_field.dart';
 import 'package:tashil_web/core/widgets/m3_states.dart';
 import 'package:tashil_web/core/widgets/m3_menu_filter.dart';
 import 'package:tashil_web/core/utils/sheet_name_utils.dart';
+import 'package:tashil_web/core/utils/shared_display_prefix.dart';
 import 'dart:math' as math;
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import 'package:flutter/material.dart';
@@ -1374,16 +1375,19 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     }
   }
 
-  static String _shortenBranchName(String rawName) {
-    return rawName
-        .replaceFirst('فرع فتح الله - ', '')
-        .replaceFirst('فتح الله جملة ماركت - ', '')
-        .replaceFirst('فتح الله - ', '')
-        .replaceFirst('فرع بيت الجملة - ', '')
-        .replaceFirst('بيت الجملة - ', '')
-        .replaceFirst('فرع جملة ماركت - ', '')
-        .replaceFirst('جملة ماركت - ', '')
-        .trim();
+  /// Display-only map of store names with a shared leading prefix removed.
+  /// Values, exports, and API queries keep the original name.
+  Map<String, String> get _storeDisplay {
+    final names = <String>{
+      ...records.map((r) => r.storeName),
+      ..._branchChartItems.map((b) => b.storeName),
+    }..removeWhere((n) => n.trim().isEmpty);
+    return displayNamesWithoutSharedPrefix(names);
+  }
+
+  String _displayStore(String raw) {
+    if (raw.isEmpty || raw == '—') return raw;
+    return _storeDisplay[raw] ?? raw;
   }
 
   Widget _buildFullWidthBranchSalesChart(
@@ -1592,7 +1596,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     _buildBranchInsightBadge(
                       context,
                       label: 'الأعلى مبيعًا',
-                      branchName: _shortenBranchName(highestBranch.storeName),
+                      branchName: _displayStore(highestBranch.storeName),
                       valueText:
                           '${CurrencyFormatter.formatCompactEGP(highestBranch.totalRevenue)} (${totalChainRev > 0 ? ((highestBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
                       color: themePrimary1,
@@ -1603,7 +1607,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     _buildBranchInsightBadge(
                       context,
                       label: 'المركز الثاني',
-                      branchName: _shortenBranchName(secondBranch.storeName),
+                      branchName: _displayStore(secondBranch.storeName),
                       valueText:
                           '${CurrencyFormatter.formatCompactEGP(secondBranch.totalRevenue)} (${totalChainRev > 0 ? ((secondBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
                       color: themePrimary2,
@@ -1621,7 +1625,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     _buildBranchInsightBadge(
                       context,
                       label: 'الأقل مبيعًا',
-                      branchName: _shortenBranchName(lowestBranch.storeName),
+                      branchName: _displayStore(lowestBranch.storeName),
                       valueText:
                           '${CurrencyFormatter.formatCompactEGP(lowestBranch.totalRevenue)} (${totalChainRev > 0 ? ((lowestBranch.totalRevenue / totalChainRev) * 100).toStringAsFixed(1) : "0.0"}%)',
                       color: themeAccent4,
@@ -1756,7 +1760,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                           SizedBox(
                             width: 190.0,
                             child: Text(
-                              _shortenBranchName(b.storeName),
+                              _displayStore(b.storeName),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmall)),
@@ -2143,7 +2147,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               context,
               titleAr: 'الفرع الأعلى مبيعًا',
               titleEn: 'Top Store',
-              value: topBranch != null ? topBranch.storeName : '—',
+              value: topBranch != null ? _displayStore(topBranch.storeName) : '—',
               textValue: true,
               subtitle: topBranch != null
                   ? '${topBranch.chain.toUpperCase()} • ${CurrencyFormatter.formatCompactEGP(topBranch.revenue)} • $perfPeriodBadgeAr'
@@ -2451,7 +2455,7 @@ onChanged: m3Legacy<String>((v) {
                             ),
                           ),
                         ),
-                        DataCell(Text(b.storeName, style: const TextStyle(fontWeight: FontWeight.w700))),
+                        DataCell(Text(_displayStore(b.storeName), style: const TextStyle(fontWeight: FontWeight.w700))),
                         DataCell(
                           M3ChipSurface(
                               color: colorScheme.surfaceContainerHigh,
@@ -2626,7 +2630,7 @@ onChanged: m3Legacy<String>((v) {
                       _buildBranchInsightBadge(
                         context,
                         label: 'أسرع فرع نمواً',
-                        branchName: fastestGrowingBranch?.storeName ?? '—',
+                        branchName: fastestGrowingBranch != null ? _displayStore(fastestGrowingBranch.storeName) : '—',
                         valueText: fastestGrowingBranch != null
                             ? CurrencyFormatter.formatSignedPct(fastestGrowingBranch.yoyGrowthPct ?? 0)
                             : '—',
@@ -2754,7 +2758,7 @@ onChanged: m3Legacy<String>((v) {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                item.storeName,
+                                _displayStore(item.storeName),
                                 style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodyMedium)),
                               ),
                               Text(

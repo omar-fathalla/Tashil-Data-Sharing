@@ -88,5 +88,63 @@ void main() {
         'فرع بيتا',
       );
     });
+
+    test('normalises ة/ه, alef variants, dash variants and invisible marks',
+        () {
+      const rlm = '\u200F';
+      const zwj = '\u200D';
+      const nbsp = '\u00A0';
+      // Live-like typo mix: ه vs ة, en-dash, NBSP, RLM/ZWJ.
+      final names = [
+        'سلسله تجريبيه XYZ - مخزن ألفا',
+        'سلسلة تجريبية XYZ – فرع بيتا',
+        'سلسلة تجريبية XYZ -$nbspالمستودع المركزي',
+        '${rlm}سلسلة تجريبية XYZ - ${zwj}فرع النيل',
+      ];
+      expect(stripSharedLeadingPrefix(names), [
+        'مخزن ألفا',
+        'فرع بيتا',
+        'المستودع المركزي',
+        'فرع النيل',
+      ]);
+    });
+
+    test('strips a majority prefix even when an outlier has no prefix', () {
+      final names = [
+        'سلسلة تجريبية XYZ - مخزن ألفا',
+        'سلسلة تجريبية XYZ - فرع بيتا',
+        'سلسلة تجريبية XYZ - المستودع المركزي',
+        'فرع منفصل بدون بادئة',
+      ];
+      expect(stripSharedLeadingPrefix(names), [
+        'مخزن ألفا',
+        'فرع بيتا',
+        'المستودع المركزي',
+        'فرع منفصل بدون بادئة',
+      ]);
+    });
+
+    test('does not strip when fewer than 50% of names share a prefix', () {
+      final names = [
+        'سلسلة تجريبية XYZ - مخزن ألفا',
+        'فرع بيتا',
+        'المستودع المركزي',
+      ];
+      expect(stripSharedLeadingPrefix(names), names);
+    });
+
+    test('leaves a name that would become empty unchanged, strips the others',
+        () {
+      final names = [
+        'سلسلة تجريبية XYZ -',
+        'سلسلة تجريبية XYZ - فرع بيتا',
+        'سلسلة تجريبية XYZ - مخزن ألفا',
+      ];
+      expect(stripSharedLeadingPrefix(names), [
+        'سلسلة تجريبية XYZ -',
+        'فرع بيتا',
+        'مخزن ألفا',
+      ]);
+    });
   });
 }

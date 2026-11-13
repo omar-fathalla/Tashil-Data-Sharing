@@ -9,6 +9,7 @@ import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/arabic_plural.dart';
+import '../../../../core/utils/shared_display_prefix.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
@@ -56,6 +57,12 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
   PriceElasticitySummaryModel? _elasticitySummary;
   int? _selectedMonthIndex;
   List<PricingComplianceItem> _pageItems = [];
+
+  Map<String, String> get _storeDisplay =>
+      displayNamesWithoutSharedPrefix(_pageItems.map((i) => i.storeName));
+
+  String _displayStore(String raw) => _storeDisplay[raw] ?? raw;
+
   List<String> _availableCategories = const [];
 
   int _pageSize = 25;
@@ -837,7 +844,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                           width: 8.0),
                                                       Expanded(
                                                         child: Text(
-                                                          item.storeName,
+                                                          _displayStore(item.storeName),
                                                           maxLines: 3,
                                                           style: theme.textTheme
                                                               .bodySmall
@@ -1125,7 +1132,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                                 .center,
                                                         children: [
                                                           Text(
-                                                            item.storeName,
+                                                            _displayStore(item.storeName),
                                                             key: const ValueKey(
                                                                 'pricing_store_name'),
                                                             maxLines: 3,

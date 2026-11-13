@@ -7,6 +7,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/arabic_plural.dart';
+import '../../../../core/utils/shared_display_prefix.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/widgets/m3_button.dart';
@@ -134,6 +135,20 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
     }
     final sorted = set.toList()..sort();
     return ['الكل', ...sorted];
+  }
+
+  Map<String, String> get _branchDisplay {
+    final names = <String>{
+      for (final a in alerts)
+        if ((a.storeName.isNotEmpty ? a.storeName : a.storeId).trim().isNotEmpty)
+          (a.storeName.isNotEmpty ? a.storeName : a.storeId).trim(),
+    };
+    return displayNamesWithoutSharedPrefix(names);
+  }
+
+  String _displayBranch(String raw) {
+    if (raw.isEmpty || raw == 'الكل' || raw == '—') return raw;
+    return _branchDisplay[raw] ?? raw;
   }
 
   List<OOSAlertModel> get _filteredAlerts {
@@ -878,7 +893,7 @@ options: m3OptionsFromMenuItems<String>(_availableBranches.map((b) {
                 return DropdownMenuItem<String>(
                   value: b,
                   child: Text(
-                    b,
+                    _displayBranch(b),
                     style: const TextStyle(fontSize: M3FontSize.bodySmall),
                     maxLines: 1,
                   ),
@@ -1146,7 +1161,7 @@ onChanged: m3Legacy<String>((val) {
           maxLines: 3,
         );
         final storeLine = Text(
-          'المنفذ: ${alert.storeName} (${alert.retailerChain.toUpperCase()}) • ${alert.itemCode.isNotEmpty ? "كود: ${alert.itemCode} • " : ""}الباركود: ${alert.barcode}',
+          'المنفذ: ${_displayBranch(alert.storeName)} (${alert.retailerChain.toUpperCase()}) • ${alert.itemCode.isNotEmpty ? "كود: ${alert.itemCode} • " : ""}الباركود: ${alert.barcode}',
           key: const ValueKey('oos_store_name'),
           style: theme.textTheme.bodySmall?.copyWith(
             color: colorScheme.onSurfaceVariant,
@@ -1200,7 +1215,7 @@ onChanged: m3Legacy<String>((val) {
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('تم إنشاء طلب توريد سريع للصنف: ${alert.skuName} لفرع ${alert.storeName}'),
+                        content: Text('تم إنشاء طلب توريد سريع للصنف: ${alert.skuName} لفرع ${_displayBranch(alert.storeName)}'),
                         backgroundColor: colorScheme.primary,
                         behavior: SnackBarBehavior.floating,
                       ),
@@ -1337,7 +1352,7 @@ onChanged: m3Legacy<String>((val) {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            branchName,
+                            _displayBranch(branchName),
                             key: const ValueKey('oos_branch_name'),
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
@@ -1476,11 +1491,11 @@ onChanged: m3Legacy<String>((val) {
                   alignment: AlignmentDirectional.centerStart,
                   child: FilledButton.tonalIcon(
                     icon: const Icon(Icons.send_rounded, size: 20.0),
-                    label: Text('إصدار طلب توريد مجمع لـ $branchName', maxLines: 3),
+                    label: Text('إصدار طلب توريد مجمع لـ ${_displayBranch(branchName)}', maxLines: 3),
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('تم إنشاء طلب توريد مجمع لـ ${countSku(branchAlerts.length)} في $branchName'),
+                          content: Text('تم إنشاء طلب توريد مجمع لـ ${countSku(branchAlerts.length)} في ${_displayBranch(branchName)}'),
                           backgroundColor: colorScheme.primary,
                           behavior: SnackBarBehavior.floating,
                         ),
