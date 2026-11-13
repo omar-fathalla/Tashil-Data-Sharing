@@ -112,7 +112,7 @@ void main() {
     expect(find.text('المرتجعات'), findsWidgets);
     expect(find.textContaining('قيمة المرتجعات'), findsOneWidget);
     expect(find.textContaining('كمية المرتجعات'), findsOneWidget);
-    expect(find.text('نسبة المرتجع من الإجمالي'), findsOneWidget);
+    expect(find.text('نسبة المرتجع'), findsOneWidget);
     expect(find.textContaining('التغير الشهري'), findsOneWidget);
 
     // Phase-2: top returned products + Excel export; alert cards removed.

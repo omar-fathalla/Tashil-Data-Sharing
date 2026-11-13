@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/features/product_master/presentation/screens/product_master_screen.dart';
 
+import 'support/real_fonts.dart';
+
 class _FakeProductMasterApiClient extends ApiClient {
   _FakeProductMasterApiClient() : super();
 
@@ -243,6 +245,8 @@ class _FakeProductMasterApiClient extends ApiClient {
 }
 
 void main() {
+  setUpAll(loadRealCairoFont);
+
   group('ProductMasterItemModel & ProductMasterSummaryModel JSON normalization', () {
     test('normalizes backend decimal discount ratios (0.10 -> 10.0%), price diffs, and preserves >1 percentages', () {
       final summary = ProductMasterSummaryModel.fromJson({
@@ -403,7 +407,7 @@ void main() {
 
     // Verify header, 5th KPI card, and SKUs are rendered
     expect(find.textContaining('كارتة الأصناف والأسعار المعتمدة'), findsOneWidget);
-    expect(find.textContaining('التغطية والسحب بالسلاسل'), findsOneWidget);
+    expect(find.textContaining('التغطية بالسلاسل'), findsOneWidget);
     expect(find.text('FGCL-0550-0001'), findsWidgets);
     expect(find.text('PRCL-0102-0015'), findsWidgets);
 
