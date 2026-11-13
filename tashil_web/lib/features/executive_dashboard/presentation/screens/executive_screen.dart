@@ -65,7 +65,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
   late ExecutiveDashboardRepository _repo;
 
   static const List<
-      ({int number, String shortName, String fullName, String nameAr})> _months = [
+          ({int number, String shortName, String fullName, String nameAr})>
+      _months = [
     (number: 0, shortName: 'All', fullName: 'كل الشهور', nameAr: 'الكل'),
     (number: 1, shortName: 'Jan', fullName: 'January', nameAr: 'يناير'),
     (number: 2, shortName: 'Feb', fullName: 'February', nameAr: 'فبراير'),
@@ -357,7 +358,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
             key: const ValueKey('executive_quarter_segmented'),
             segments: [
               for (var q = 1; q <= 4; q++)
-                ButtonSegment(value: q, label: _segLabel('Q$q', minWidth: 32.0)),
+                ButtonSegment(
+                    value: q, label: _segLabel('Q$q', minWidth: 32.0)),
             ],
             selected: {_selectedQuarter},
             showSelectedIcon: false,
@@ -447,10 +449,9 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
   }
 
   /// Arabic tenant name for the header subtitle ("أديكو (Adeco)" → "أديكو").
-  String _tenantNameAr() =>
-      ChainSharePie.splitBilingualLabel(
-              ApiClient.getDisplayNameForTenant(widget.apiClient.tenantId))
-          .ar;
+  String _tenantNameAr() => ChainSharePie.splitBilingualLabel(
+          ApiClient.getDisplayNameForTenant(widget.apiClient.tenantId))
+      .ar;
 
   /// Menu item label: leading check (primary) on the selected value.
   Widget _menuItemText(BuildContext context, String text, bool selected) {
@@ -558,11 +559,26 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
         ),
       );
     }
+    // Wide: the three filters stay together as one group, so a narrow
+    // content area (e.g. ~745dp next to the full sidebar at 1019) breaks
+    // into two clean lines: period | filters, never a lone chain filter.
     return Wrap(
       spacing: M3Spacing.xs,
       runSpacing: M3Spacing.xs,
       crossAxisAlignment: WrapCrossAlignment.center,
-      children: children,
+      children: [
+        children[0],
+        children[1],
+        // A nested Wrap sizes to its content, so the group moves to the next
+        // line as a unit and only wraps inside if it is wider than the row.
+        Wrap(
+          key: const ValueKey('executive_filter_group'),
+          spacing: M3Spacing.xs,
+          runSpacing: M3Spacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: children.sublist(2),
+        ),
+      ],
     );
   }
 

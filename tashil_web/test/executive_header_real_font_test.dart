@@ -87,7 +87,8 @@ void main() {
       ];
       for (final w in widths) {
         expect(w, closeTo(widths.first, 0.5));
-        expect(w, greaterThanOrEqualTo(112.0), reason: 'segment widths $widths');
+        expect(w, greaterThanOrEqualTo(112.0),
+            reason: 'segment widths $widths');
       }
       for (final label in const ['شهري', 'ربع سنوي', 'سنوي']) {
         expect(tester.getSize(find.text(label)).height, lessThanOrEqualTo(24.0),
@@ -100,4 +101,22 @@ void main() {
           greaterThanOrEqualTo(40.0));
     });
   }
+
+  testWidgets('@1019 with the sidebar: the three filters stay on one line',
+      (tester) async {
+    await _pump(tester, const Size(1019, 900), sidebar: true);
+    expect(tester.takeException(), isNull);
+    final month =
+        tester.getRect(find.byKey(const ValueKey('executive_month_dropdown')));
+    final year =
+        tester.getRect(find.byKey(const ValueKey('executive_year_dropdown')));
+    final chain =
+        tester.getRect(find.byKey(const ValueKey('executive_chain_dropdown')));
+    expect(year.top, closeTo(month.top, 0.5));
+    expect(chain.top, closeTo(month.top, 0.5));
+    // At most two lines: period control (48dp target) + filter group.
+    final period = tester
+        .getRect(find.byKey(const ValueKey('executive_period_segmented')));
+    expect(month.top - period.top, lessThanOrEqualTo(48.0 + 8.0 + 0.5));
+  });
 }
