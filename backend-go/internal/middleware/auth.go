@@ -52,7 +52,7 @@ func (a *AuthMiddleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Health check and public routes bypass auth.
 		// /livez and /api/v1/health are the Cloud Run-safe probes (/healthz is reserved by Google).
-		if r.URL.Path == "/livez" || r.URL.Path == "/api/v1/health" ||
+		if r.URL.Path == "/livez" || r.URL.Path == "/readyz" || r.URL.Path == "/api/v1/health" ||
 			r.URL.Path == "/healthz" || r.URL.Path == "/" ||
 			r.URL.Path == "/api/v1/auth/login" ||
 			r.URL.Path == "/api/v1/version" ||

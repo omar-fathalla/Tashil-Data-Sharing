@@ -18,7 +18,7 @@ func TestAuthMiddlewarePublicHealthBypass(t *testing.T) {
 	})
 	handler := authMW.Handler(next)
 
-	for _, path := range []string{"/livez", "/api/v1/health", "/healthz"} {
+	for _, path := range []string{"/livez", "/readyz", "/api/v1/health", "/healthz"} {
 		t.Run("public_"+path, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, path, nil)
 			rec := httptest.NewRecorder()

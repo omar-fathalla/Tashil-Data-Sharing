@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -45,5 +46,32 @@ func TestHealthzWithAuthNotReady(t *testing.T) {
 	}
 	if body.Status != "not_ready" {
 		t.Fatalf("status=%q", body.Status)
+	}
+}
+
+func TestReadyz_LoadingUntilDataReady(t *testing.T) {
+	dataReady := make(chan struct{})
+	h := Readyz(stubAuthReady{}, dataReady)
+	get := func() *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		h(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+		return rec
+	}
+	if rec := get(); rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), `"loading"`) {
+		t.Fatalf("before load: want 503 loading, got %d %s", rec.Code, rec.Body.String())
+	}
+	close(dataReady)
+	if rec := get(); rec.Code != http.StatusOK {
+		t.Fatalf("after load: want 200, got %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestReadyz_FailsClosedWhenAuthNotReady(t *testing.T) {
+	dataReady := make(chan struct{})
+	close(dataReady)
+	rec := httptest.NewRecorder()
+	Readyz(stubAuthReady{err: errors.New("auth snapshot missing")}, dataReady)(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("want 503 when auth not ready, got %d", rec.Code)
 	}
 }
