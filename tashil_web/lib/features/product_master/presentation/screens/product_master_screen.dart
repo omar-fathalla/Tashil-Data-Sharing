@@ -14,6 +14,10 @@ import '../widgets/chain_discount_profiles_card.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
+import '../../../../core/theme/m3_spacing.dart';
+import '../../../../core/utils/arabic_plural.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
 
 /// Adeco Canonical Product Master & Official Price List Screen (`كارتة الأصناف والأسعار`).
 /// Provides:
@@ -89,13 +93,18 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
 
   // Calculator state
   ProductMasterItemModel? _calcSelectedSku;
-  final TextEditingController _calcCartonsCtrl = TextEditingController(text: '10');
-  final TextEditingController _calcInvoiceDiscCtrl = TextEditingController(text: '10.0');
-  final TextEditingController _calcExtraDiscCtrl = TextEditingController(text: '0.0');
-  final TextEditingController _calcRetailPriceCtrl = TextEditingController(text: '0.0');
+  final TextEditingController _calcCartonsCtrl =
+      TextEditingController(text: '10');
+  final TextEditingController _calcInvoiceDiscCtrl =
+      TextEditingController(text: '10.0');
+  final TextEditingController _calcExtraDiscCtrl =
+      TextEditingController(text: '0.0');
+  final TextEditingController _calcRetailPriceCtrl =
+      TextEditingController(text: '0.0');
 
   // Per-chain discount profiles (Firestore via backend). '' = no chain (defaults 10% / 0%).
-  late final ChainDiscountRepository _chainDiscRepo = ChainDiscountRepository(widget.apiClient);
+  late final ChainDiscountRepository _chainDiscRepo =
+      ChainDiscountRepository(widget.apiClient);
   List<ChainDiscountProfileModel> _chainProfiles = const [];
   bool _chainProfilesLoading = false;
   bool _chainProfilesSaving = false;
@@ -142,7 +151,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       setState(() {
         _chainProfiles = saved;
         if (_calcChain.isNotEmpty &&
-            !saved.any((p) => ChainDiscountProfileModel.key(p.chain) == ChainDiscountProfileModel.key(_calcChain))) {
+            !saved.any((p) =>
+                ChainDiscountProfileModel.key(p.chain) ==
+                ChainDiscountProfileModel.key(_calcChain))) {
           _calcChain = '';
         }
         _applyCalcChainDiscounts();
@@ -159,16 +170,21 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   void _applyCalcChainDiscounts() {
     if (_calcChain.isEmpty) {
       if (_calcSelectedSku == null) {
-        _calcInvoiceDiscCtrl.text = kDefaultInvoiceDiscountPct.toStringAsFixed(1);
-        _calcExtraDiscCtrl.text = kDefaultAdditionalDiscountPct.toStringAsFixed(1);
+        _calcInvoiceDiscCtrl.text =
+            kDefaultInvoiceDiscountPct.toStringAsFixed(1);
+        _calcExtraDiscCtrl.text =
+            kDefaultAdditionalDiscountPct.toStringAsFixed(1);
       } else {
-        _calcInvoiceDiscCtrl.text = _calcSelectedSku!.invoiceDiscountPct.toStringAsFixed(1);
-        _calcExtraDiscCtrl.text = _calcSelectedSku!.extraDiscountPct.toStringAsFixed(1);
+        _calcInvoiceDiscCtrl.text =
+            _calcSelectedSku!.invoiceDiscountPct.toStringAsFixed(1);
+        _calcExtraDiscCtrl.text =
+            _calcSelectedSku!.extraDiscountPct.toStringAsFixed(1);
       }
       return;
     }
     for (final p in _chainProfiles) {
-      if (ChainDiscountProfileModel.key(p.chain) == ChainDiscountProfileModel.key(_calcChain)) {
+      if (ChainDiscountProfileModel.key(p.chain) ==
+          ChainDiscountProfileModel.key(_calcChain)) {
         _calcInvoiceDiscCtrl.text = p.invoiceDiscountPct.toStringAsFixed(1);
         _calcExtraDiscCtrl.text = p.additionalDiscountPct.toStringAsFixed(1);
         return;
@@ -198,7 +214,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       final loadError = loaded.errorOrNull;
       if (loadError != null) throw loadError.cause ?? loadError;
       final summary = loaded.valueOrNull!;
-      final archiveFiles = (await _repo.loadArchive()).valueOrNull ?? const <ArchivedExcelFileModel>[];
+      final archiveFiles = (await _repo.loadArchive()).valueOrNull ??
+          const <ArchivedExcelFileModel>[];
       List<ArchivedExcelFileModel> pmArchives = archiveFiles
           .where((f) =>
               f.fileType == 'product_master' ||
@@ -255,9 +272,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     _calcInvoiceDiscCtrl.text = sku.invoiceDiscountPct.toStringAsFixed(1);
     _calcExtraDiscCtrl.text = sku.extraDiscountPct.toStringAsFixed(1);
     if (_calcChain.isNotEmpty) _applyCalcChainDiscounts();
-    final suggestedShelf = sku.unitPriceInclVat > 0
-        ? (sku.unitPriceInclVat * 1.12)
-        : 25.0;
+    final suggestedShelf =
+        sku.unitPriceInclVat > 0 ? (sku.unitPriceInclVat * 1.12) : 25.0;
     _calcRetailPriceCtrl.text = suggestedShelf.toStringAsFixed(2);
   }
 
@@ -362,7 +378,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     }
   }
 
-  Future<void> _handleDeleteProductMasterSheet(ArchivedExcelFileModel file) async {
+  Future<void> _handleDeleteProductMasterSheet(
+      ArchivedExcelFileModel file) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
@@ -400,7 +417,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     if (confirmed != true || !mounted) return;
 
     final hasOtherSameName = _archivedMasterFiles.any(
-      (f) => f.id != file.id && f.fileName.toLowerCase() == file.fileName.toLowerCase(),
+      (f) =>
+          f.id != file.id &&
+          f.fileName.toLowerCase() == file.fileName.toLowerCase(),
     );
     try {
       await widget.apiClient.deleteArchivedFile(
@@ -410,20 +429,20 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       );
     } catch (e) {
       if (!mounted) return;
-      final msg = e is ArchiveDeleteException
-          ? e.message
-          : 'تعذّر حذف ملف الماستر.';
+      final msg =
+          e is ArchiveDeleteException ? e.message : 'تعذّر حذف ملف الماستر.';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(backgroundColor: Theme.of(context).colorScheme.error, content: Text(msg)),
+        SnackBar(
+            backgroundColor: Theme.of(context).colorScheme.error,
+            content: Text(msg)),
       );
       await _loadData();
       return;
     }
     if (!mounted) return;
     setState(() {
-      _archivedMasterFiles = _archivedMasterFiles
-          .where((f) => f.id != file.id)
-          .toList();
+      _archivedMasterFiles =
+          _archivedMasterFiles.where((f) => f.id != file.id).toList();
     });
     _repo.invalidateAll();
     await _loadData();
@@ -450,8 +469,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             return Directionality(
               textDirection: TextDirection.rtl,
               child: AlertDialog(
-                titlePadding: const EdgeInsetsDirectional.fromSTEB(20, 18, 20, 8),
-                contentPadding: const EdgeInsetsDirectional.fromSTEB(20, 8, 20, 16),
+                titlePadding:
+                    const EdgeInsetsDirectional.fromSTEB(20, 18, 20, 8),
+                contentPadding:
+                    const EdgeInsetsDirectional.fromSTEB(20, 8, 20, 16),
                 title: Row(
                   children: [
                     Container(
@@ -528,13 +549,15 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                   ),
                                   decoration: BoxDecoration(
                                     color: isLatest
-                                        ? cs.primaryContainer.withValues(alpha: 0.45)
+                                        ? cs.primaryContainer
+                                            .withValues(alpha: 0.45)
                                         : cs.surfaceContainerLow,
                                     borderRadius: M3Shape.radiusLg,
                                     border: Border.all(
                                       color: isLatest
                                           ? cs.primary.withValues(alpha: 0.5)
-                                          : cs.outlineVariant.withValues(alpha: 0.6),
+                                          : cs.outlineVariant
+                                              .withValues(alpha: 0.6),
                                       width: isLatest ? 1.5 : 1.0,
                                     ),
                                   ),
@@ -570,7 +593,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                                     style: const TextStyle(
                                                       fontWeight:
                                                           FontWeight.w900,
-                                                      fontSize: M3FontSize.labelMediumPlus,
+                                                      fontSize: M3FontSize
+                                                          .labelMediumPlus,
                                                     ),
                                                   ),
                                                 ),
@@ -593,11 +617,11 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                                     child: const Text(
                                                       'مفعل حالياً',
                                                       style: TextStyle(
-                                                        fontSize: M3FontSize.tiny,
+                                                        fontSize:
+                                                            M3FontSize.tiny,
                                                         fontWeight:
                                                             FontWeight.w800,
-                                                        color:
-                                                            M3Palette.teal,
+                                                        color: M3Palette.teal,
                                                       ),
                                                     ),
                                                   ),
@@ -688,7 +712,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     final downCount = diff?.priceDecreasedCount ?? summary.priceDecreasedCount;
     final newCount = diff?.newSkusCount ?? summary.newSkusCount;
     final sameCount = diff?.priceUnchangedCount ?? summary.priceUnchangedCount;
-    final fileName = uploadedFilename ?? diff?.newFileName ?? summary.sourceFilename;
+    final fileName =
+        uploadedFilename ?? diff?.newFileName ?? summary.sourceFilename;
 
     await showDialog<void>(
       context: context,
@@ -1036,7 +1061,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   ),
                   FilledButton.tonalIcon(
                     key: const ValueKey('product_master_upload_btn'),
-                    onPressed: _isUploading ? null : _handleUploadMasterWorkbook,
+                    onPressed:
+                        _isUploading ? null : _handleUploadMasterWorkbook,
                     icon: _isUploading
                         ? const SizedBox(
                             width: 16,
@@ -1084,7 +1110,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(24.0, 20.0, 24.0, 12.0),
+              padding:
+                  const EdgeInsetsDirectional.fromSTEB(24.0, 20.0, 24.0, 12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -1109,7 +1136,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                       tabs: [
                         _buildBilingualTab(
                           icon: Icons.qr_code_2_rounded,
-                          titleAr: 'كارتة تعريف الأصناف والأسعار (${filtered.length})',
+                          titleAr:
+                              'كارتة تعريف الأصناف والأسعار (${filtered.length})',
                           titleEn: 'Official SKU Catalog & Price List',
                         ),
                         _buildBilingualTab(
@@ -1119,7 +1147,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                         ),
                         _buildBilingualTab(
                           icon: Icons.cloud_upload_rounded,
-                          titleAr: 'الشيتات المرفوعة وتحديث الكارتة (${_archivedMasterFiles.length})',
+                          titleAr:
+                              'الشيتات المرفوعة وتحديث الكارتة (${_archivedMasterFiles.length})',
                           titleEn: 'Uploaded Price Sheets & Sync',
                         ),
                       ],
@@ -1325,12 +1354,12 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 vertical: 4.5,
                               ),
                               decoration: BoxDecoration(
-                                color: M3Palette.warning
-                                    .withValues(alpha: 0.14),
+                                color:
+                                    M3Palette.warning.withValues(alpha: 0.14),
                                 borderRadius: M3Shape.radiusFull,
                                 border: Border.all(
-                                  color: M3Palette.warning
-                                      .withValues(alpha: 0.45),
+                                  color:
+                                      M3Palette.warning.withValues(alpha: 0.45),
                                 ),
                               ),
                               child: Row(
@@ -1473,194 +1502,84 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 1050;
-        final cards = [
-          _buildKpiCard(
-            theme: theme,
-            cs: cs,
-            titleAr: 'إجمالي الأصناف المسجلة بالكارتة',
-            titleEn: 'Total Registered Master SKUs',
-            value: '${_intFmt.format(summary.totalSkus)} صنف',
-            subtitle: 'المعروض بالفلتر الحالي: ${_intFmt.format(filteredCount)} صنف',
-            icon: Icons.qr_code_scanner_rounded,
-            accentColor: cs.primary,
-          ),
-          _buildKpiCard(
-            theme: theme,
-            cs: cs,
-            titleAr: 'أصناف البيع العادي',
-            titleEn: 'Regular • Standard Catalog SKUs',
-            value: '${_intFmt.format(summary.regularSkusCount)} صنف عادي',
-            subtitle:
-                'تمثل ${summary.totalSkus > 0 ? ((summary.regularSkusCount / summary.totalSkus) * 100).toStringAsFixed(1) : 0}% من إجمالي الكارتة',
-            icon: Icons.check_circle_outline_rounded,
-            accentColor: M3Palette.teal,
-          ),
-          _buildKpiCard(
-            theme: theme,
-            cs: cs,
-            titleAr: 'أصناف العروض الترويجية',
-            titleEn: 'Promos • Promotional & Bundle SKUs (PR)',
-            value: '${_intFmt.format(summary.promoSkusCount)} عرض ترويجي',
-            subtitle: 'أكواد العروض الخاصة والشرنك والباقات الترويجية',
-            icon: Icons.local_offer_rounded,
-            accentColor: M3Palette.warning,
-          ),
-          _buildKpiCard(
-            theme: theme,
-            cs: cs,
-            titleAr: 'الباركودات الفريدة وسعة الكرتونة',
-            titleEn: 'Unique Barcodes & Avg Pack Size',
-            value: '${_intFmt.format(summary.uniqueBarcodesCount)} باركود',
-            subtitle:
-                'متوسط سعة الكرتونة: ${summary.avgUnitsPerCarton.toStringAsFixed(1)} وحدة/كرتونة',
-            icon: Icons.view_in_ar_rounded,
-            accentColor: M3Palette.indigo,
-          ),
-          _buildKpiCard(
-            theme: theme,
-            cs: cs,
-            titleAr: 'التغطية والسحب بالسلاسل',
-            titleEn: 'Chain Assortment & Pull Coverage',
-            value: '${_intFmt.format(summary.activeInChainsCount)} نشط بالسلاسل',
-            subtitle:
-                'غير مسحوب (فرصة توزيع): ${_intFmt.format(summary.unpulledSkusCount)} صنف',
-            icon: Icons.storefront_rounded,
-            accentColor: M3Palette.info,
-          ),
-        ];
-
-        if (isWide) {
-          return IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: cards
-                  .map((c) => Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 5.0),
-                          child: c,
-                        ),
-                      ))
-                  .toList(),
+        final columns = constraints.maxWidth >= 1050
+            ? 5
+            : (constraints.maxWidth >= 700
+                ? 3
+                : (constraints.maxWidth >= 520 ? 2 : 1));
+        final regularShare = summary.totalSkus > 0
+            ? ((summary.regularSkusCount / summary.totalSkus) * 100)
+                .toStringAsFixed(1)
+            : '0';
+        return M3EqualHeightGrid(
+          key: const ValueKey('product_master_kpi_grid'),
+          columns: columns,
+          spacing: M3Spacing.sm,
+          runSpacing: M3Spacing.sm,
+          children: [
+            M3SummaryKpiCard(
+              key: const ValueKey('pm_kpi_card_Total Registered'),
+              title: 'إجمالي الأصناف المسجلة بالكارتة',
+              titleMaxLines: 2,
+              subtitleMaxLines: 2,
+              value: countSku(summary.totalSkus),
+              subtitle: 'المعروض بالفلتر الحالي: ${countSku(filteredCount)}',
+              icon: Icons.qr_code_scanner_rounded,
+              color: cs.primary,
+              valueKey: const ValueKey('pm_kpi_value_Total Registered'),
             ),
-          );
-        }
-        return Wrap(
-          spacing: 12.0,
-          runSpacing: 12.0,
-          children: cards
-              .map((c) => SizedBox(
-                    width: (constraints.maxWidth - 12.0) / 2,
-                    height: 132.0,
-                    child: c,
-                  ))
-              .toList(),
+            M3SummaryKpiCard(
+              key: const ValueKey('pm_kpi_card_Regular Catalog'),
+              title: 'أصناف البيع العادي',
+              titleMaxLines: 2,
+              subtitleMaxLines: 2,
+              value: countSku(summary.regularSkusCount),
+              subtitle: 'تمثل $regularShare% من إجمالي الكارتة',
+              icon: Icons.check_circle_outline_rounded,
+              color: M3Palette.teal,
+            ),
+            M3SummaryKpiCard(
+              key: const ValueKey('pm_kpi_card_Promos'),
+              title: 'أصناف العروض الترويجية',
+              titleMaxLines: 2,
+              subtitleMaxLines: 2,
+              value: '${_intFmt.format(summary.promoSkusCount)} عرض',
+              subtitle: 'أكواد العروض الخاصة والشرنك والباقات الترويجية',
+              icon: Icons.local_offer_rounded,
+              color: M3Palette.warning,
+            ),
+            M3SummaryKpiCard(
+              key: const ValueKey('pm_kpi_card_Unique Barcodes'),
+              title: 'الباركودات الفريدة وسعة الكرتونة',
+              titleMaxLines: 2,
+              subtitleMaxLines: 2,
+              value: '${_intFmt.format(summary.uniqueBarcodesCount)} باركود',
+              subtitle:
+                  'متوسط سعة الكرتونة: ${summary.avgUnitsPerCarton.toStringAsFixed(1)} وحدة/كرتونة',
+              icon: Icons.view_in_ar_rounded,
+              color: M3Palette.indigo,
+            ),
+            M3SummaryKpiCard(
+              key: const ValueKey('pm_kpi_card_Chain Coverage'),
+              title: 'التغطية والسحب بالسلاسل',
+              titleMaxLines: 2,
+              subtitleMaxLines: 2,
+              value: '${_intFmt.format(summary.activeInChainsCount)} نشط',
+              subtitle:
+                  'غير مسحوب (فرصة توزيع): ${countSku(summary.unpulledSkusCount)}',
+              icon: Icons.storefront_rounded,
+              color: M3Palette.info,
+            ),
+          ],
         );
       },
     );
   }
 
-  Widget _buildKpiCard({
-    required ThemeData theme,
-    required ColorScheme cs,
-    required String titleAr,
-    required String titleEn,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color accentColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: M3Shape.radiusLg,
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.12),
-                  borderRadius: M3Shape.radiusSm,
-                ),
-                child: Icon(icon, color: accentColor, size: 20.0),
-              ),
-              const SizedBox(width: 10.0),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      titleAr,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2.0),
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Text(
-                          titleEn,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            fontSize: M3FontSize.tinyPlus,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12.0),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: cs.onSurface,
-                ),
-              ),
-              const SizedBox(height: 4.0),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  fontSize: M3FontSize.labelSmallPlus,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   List<String> _buildEffectivePrefixChips(ProductMasterSummaryModel summary) {
     final raw = summary.availablePrefixes;
-    final hasSubPr = raw.any((p) => p.toUpperCase().startsWith('PR') && p.toUpperCase() != 'PR');
+    final hasSubPr = raw.any(
+        (p) => p.toUpperCase().startsWith('PR') && p.toUpperCase() != 'PR');
     final hasExactPr = raw.any((p) => p.toUpperCase() == 'PR');
     if (hasSubPr && !hasExactPr) {
       return [...raw, 'PR'];
@@ -1675,7 +1594,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     List<ProductMasterItemModel> filtered,
   ) {
     final totalPages = (filtered.length / _pageSize).ceil();
-    final safePage = totalPages == 0 ? 0 : _currentPage.clamp(0, totalPages - 1);
+    final safePage =
+        totalPages == 0 ? 0 : _currentPage.clamp(0, totalPages - 1);
     final startIdx = safePage * _pageSize;
     final endIdx = (startIdx + _pageSize) > filtered.length
         ? filtered.length
@@ -1693,7 +1613,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           decoration: BoxDecoration(
             color: cs.surfaceContainerLow,
             borderRadius: M3Shape.radiusLg,
-            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
+            border:
+                Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1752,7 +1673,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           _currentPage = 0;
                         });
                       },
-                      icon: const Icon(Icons.filter_alt_off_rounded, size: 18.0),
+                      icon:
+                          const Icon(Icons.filter_alt_off_rounded, size: 18.0),
                       label: const Text('إعادة ضبط الفلاتر'),
                     ),
                 ],
@@ -1785,7 +1707,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                     labelAr: 'العلامة التجارية (Brand)',
                     value: _selectedBrand,
                     items: {
-                      'all': 'كل العلامات التجارية (${summary.availableBrands.length})',
+                      'all':
+                          'كل العلامات التجارية (${summary.availableBrands.length})',
                       for (final b in summary.availableBrands) b: b,
                     },
                     onChanged: (v) => setState(() {
@@ -1826,8 +1749,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                     value: _selectedPullStatus,
                     items: {
                       'all': 'الكل (${summary.totalSkus})',
-                      'active': 'مسحوب ونشط بالسلاسل (${summary.activeInChainsCount})',
-                      'unpulled': 'غير مسحوب - فرصة توزيع (${summary.unpulledSkusCount})',
+                      'active':
+                          'مسحوب ونشط بالسلاسل (${summary.activeInChainsCount})',
+                      'unpulled':
+                          'غير مسحوب - فرصة توزيع (${summary.unpulledSkusCount})',
                     },
                     onChanged: (v) => setState(() {
                       _selectedPullStatus = v ?? 'all';
@@ -1846,7 +1771,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           decoration: BoxDecoration(
             color: cs.surfaceContainerLow,
             borderRadius: M3Shape.radiusLg,
-            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
+            border:
+                Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1893,14 +1819,16 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           icon: const Icon(Icons.chevron_right_rounded),
                           tooltip: 'الصفحة السابقة',
                           onPressed: safePage > 0
-                              ? () => setState(() => _currentPage = safePage - 1)
+                              ? () =>
+                                  setState(() => _currentPage = safePage - 1)
                               : null,
                         ),
                         IconButton(
                           icon: const Icon(Icons.chevron_left_rounded),
                           tooltip: 'الصفحة التالية',
                           onPressed: safePage < totalPages - 1
-                              ? () => setState(() => _currentPage = safePage + 1)
+                              ? () =>
+                                  setState(() => _currentPage = safePage + 1)
                               : null,
                         ),
                       ],
@@ -1989,7 +1917,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                         ),
                       ),
                       DataColumn(
-                        label: _buildColHeader('نوع الصنف والسحب', 'Type & Chain Pull'),
+                        label: _buildColHeader(
+                            'نوع الصنف والسحب', 'Type & Chain Pull'),
                       ),
                       DataColumn(
                         label: _buildColHeader('إجراءات', 'Actions'),
@@ -2373,7 +2302,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               const SizedBox(width: 6.0),
               const Text(
                 'فلتر سريع لتغيرات الأسعار:',
-                style: TextStyle(fontSize: M3FontSize.bodySmall, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                    fontSize: M3FontSize.bodySmall,
+                    fontWeight: FontWeight.w800),
               ),
             ],
           ),
@@ -2422,7 +2353,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               ),
               label: const Text(
                 'تقرير مقارنة الشيت الجديد',
-                style: TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                    fontSize: M3FontSize.labelSmallPlus,
+                    fontWeight: FontWeight.w800),
               ),
               onPressed: () => _showUploadDiffSummaryDialog(
                 summary,
@@ -2533,11 +2466,13 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       children: [
         Text(
           ar,
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmall),
+          style: const TextStyle(
+              fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmall),
         ),
         Text(
           en,
-          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: M3FontSize.tiny),
+          style: const TextStyle(
+              fontWeight: FontWeight.w500, fontSize: M3FontSize.tiny),
         ),
       ],
     );
@@ -2555,23 +2490,24 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       children: [
         Text(
           '$labelAr:',
-          style: const TextStyle(fontSize: M3FontSize.bodySmall, fontWeight: FontWeight.w700),
+          style: const TextStyle(
+              fontSize: M3FontSize.bodySmall, fontWeight: FontWeight.w700),
         ),
         const SizedBox(width: 6.0),
         DropdownButtonHideUnderline(
           child: M3Dropdown<String>(
-value: safeValue,
-options: m3OptionsFromMenuItems<String>(items.entries
-                  .map((e) => DropdownMenuItem<String>(
-                        value: e.key,
-                        child: Text(
-                          e.value,
-                          style: const TextStyle(fontSize: M3FontSize.bodySmall),
-                        ),
-                      ))
-                  .toList()),
-onChanged: m3Legacy<String>(onChanged),
-),
+            value: safeValue,
+            options: m3OptionsFromMenuItems<String>(items.entries
+                .map((e) => DropdownMenuItem<String>(
+                      value: e.key,
+                      child: Text(
+                        e.value,
+                        style: const TextStyle(fontSize: M3FontSize.bodySmall),
+                      ),
+                    ))
+                .toList()),
+            onChanged: m3Legacy<String>(onChanged),
+          ),
         ),
       ],
     );
@@ -2678,12 +2614,12 @@ onChanged: m3Legacy<String>(onChanged),
     }
 
     final cartons = double.tryParse(_calcCartonsCtrl.text.trim()) ?? 1.0;
-    final invDiscPct =
-        double.tryParse(_calcInvoiceDiscCtrl.text.trim()) ?? sku.invoiceDiscountPct;
+    final invDiscPct = double.tryParse(_calcInvoiceDiscCtrl.text.trim()) ??
+        sku.invoiceDiscountPct;
     final extraDiscPct =
         double.tryParse(_calcExtraDiscCtrl.text.trim()) ?? sku.extraDiscountPct;
-    final shelfUnitPrice =
-        double.tryParse(_calcRetailPriceCtrl.text.trim()) ?? sku.unitPriceInclVat;
+    final shelfUnitPrice = double.tryParse(_calcRetailPriceCtrl.text.trim()) ??
+        sku.unitPriceInclVat;
 
     final totalUnits = (cartons * sku.unitsPerCarton).round();
     final grossExclVat = cartons * sku.cartonPriceExclVat;
@@ -2717,7 +2653,8 @@ onChanged: m3Legacy<String>(onChanged),
           decoration: BoxDecoration(
             color: cs.surfaceContainerLow,
             borderRadius: M3Shape.radiusLg,
-            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
+            border:
+                Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2789,27 +2726,28 @@ onChanged: m3Legacy<String>(onChanged),
               ),
               const SizedBox(height: 16.0),
               M3Dropdown<ProductMasterItemModel>(
-value: summary.items.contains(sku) ? sku : summary.items.first,
-label: 'اختر الصنف من كارتة الأصناف (Select SKU)',
-expand: true,
-options: m3OptionsFromMenuItems<ProductMasterItemModel>(summary.items
-                    .take(200)
-                    .map(
-                      (item) => DropdownMenuItem<ProductMasterItemModel>(
-                        value: item,
-                        child: Text(
-                          '[${item.itemCode}] ${item.officialName} • باركود: ${item.barcode} (${item.unitsPerCarton} وحدة/كرتونة)',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    )
-                    .toList()),
-onChanged: m3Legacy<ProductMasterItemModel>((val) {
+                value: summary.items.contains(sku) ? sku : summary.items.first,
+                label: 'اختر الصنف من كارتة الأصناف (Select SKU)',
+                expand: true,
+                options:
+                    m3OptionsFromMenuItems<ProductMasterItemModel>(summary.items
+                        .take(200)
+                        .map(
+                          (item) => DropdownMenuItem<ProductMasterItemModel>(
+                            value: item,
+                            child: Text(
+                              '[${item.itemCode}] ${item.officialName} • باركود: ${item.barcode} (${item.unitsPerCarton} وحدة/كرتونة)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList()),
+                onChanged: m3Legacy<ProductMasterItemModel>((val) {
                   if (val != null) {
                     setState(() => _selectCalculatorSku(val));
                   }
                 }),
-),
+              ),
               const SizedBox(height: 16.0),
               Wrap(
                 spacing: 16.0,
@@ -2943,11 +2881,14 @@ onChanged: m3Legacy<ProductMasterItemModel>((val) {
         children: [
           Text(
             titleAr,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmallPlus),
+            style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: M3FontSize.bodySmallPlus),
           ),
           Text(
             titleEn,
-            style: TextStyle(fontSize: M3FontSize.tinyPlus, color: cs.onSurfaceVariant),
+            style: TextStyle(
+                fontSize: M3FontSize.tinyPlus, color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 8.0),
           Text(
@@ -3150,8 +3091,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
     if (code.isEmpty || name.isEmpty) return;
 
     final units = int.tryParse(_unitsPerCartonCtrl.text.trim()) ?? 12;
-    final unitIncl =
-        double.tryParse(_unitPriceInclVatCtrl.text.trim()) ?? 0.0;
+    final unitIncl = double.tryParse(_unitPriceInclVatCtrl.text.trim()) ?? 0.0;
     final discPct = double.tryParse(_discountPctCtrl.text.trim()) ?? 10.0;
     final vatRate = widget.item.vatRate > 0 ? widget.item.vatRate : 0.14;
     final unitExcl = unitIncl / (1.0 + vatRate);
@@ -3214,7 +3154,9 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                 children: [
                   const Text(
                     'بطاقة تعريف الصنف الرسمية (Product ID Card)',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: M3FontSize.bodyLarge),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: M3FontSize.bodyLarge),
                   ),
                   Text(
                     'كود الصنف: ${i.itemCode} • الباركود: ${i.barcode}',
@@ -3315,7 +3257,8 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                 TextField(
                   controller: _nameCtrl,
                   decoration: const InputDecoration(
-                    labelText: 'الاسم الرسمي للصنف في كارتة أدكو (Official Name)',
+                    labelText:
+                        'الاسم الرسمي للصنف في كارتة أدكو (Official Name)',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -3382,9 +3325,9 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                 ),
                 const SizedBox(height: 12.0),
                 M3Dropdown<String>(
-value: _itemType,
-label: 'نوع الصنف (Item Type)',
-options: m3OptionsFromMenuItems<String>([
+                  value: _itemType,
+                  label: 'نوع الصنف (Item Type)',
+                  options: m3OptionsFromMenuItems<String>([
                     const DropdownMenuItem(
                       value: 'عادي',
                       child: Text('عادي (Regular SKU)'),
@@ -3394,10 +3337,10 @@ options: m3OptionsFromMenuItems<String>([
                       child: Text('عرض ترويجي (Promotional Bundle)'),
                     ),
                   ]),
-onChanged: m3Legacy<String>((v) {
+                  onChanged: m3Legacy<String>((v) {
                     if (v != null) setState(() => _itemType = v);
                   }),
-),
+                ),
               ],
             ),
           ),

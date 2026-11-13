@@ -943,81 +943,128 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                         );
                                       }
 
-                                      final isMedium =
-                                          availableWidth >= 580.0 &&
-                                              availableWidth < 960.0;
-                                      final double dynamicColumnSpacing =
-                                          isMedium
-                                              ? 24.0
-                                              : ((availableWidth - 620.0) / 5.0)
-                                                  .clamp(24.0, 72.0);
-                                      const double horizontalMargin = 20.0;
+                                      // Tight 8dp gutters so 6 columns fit at
+                                      // 1280 (sidebar + padding ≈ 1000dp
+                                      // content) with no horizontal scroll.
+                                      const flex = <double>[
+                                        1.7,
+                                        1.25,
+                                        0.7,
+                                        0.85,
+                                        0.95,
+                                        1.2
+                                      ];
+                                      const spacing = M3Spacing.xs;
+                                      const margin = M3Spacing.xs;
+                                      final flexSum =
+                                          flex.fold<double>(0, (a, b) => a + b);
+                                      final inner = availableWidth -
+                                          (2 * margin) -
+                                          ((flex.length - 1) * spacing);
+                                      double colMax(int i) =>
+                                          (inner * flex[i] / flexSum)
+                                              .clamp(56.0, double.infinity);
+                                      Widget cellBox(int i, Widget child) =>
+                                          ConstrainedBox(
+                                            constraints: BoxConstraints(
+                                                maxWidth: colMax(i)),
+                                            child: child,
+                                          );
 
                                       return SizedBox(
                                         width: availableWidth,
                                         child: TableScrollContainer(
+                                          key: const ValueKey(
+                                              'pricing_table_scroll'),
                                           showSwipeHint: true,
-                                          child: ConstrainedBox(
-                                            constraints: BoxConstraints(
-                                                minWidth: availableWidth),
-                                            child: DataTable(
-                                              key: const ValueKey(
-                                                  'pricing_compliance_table'),
-                                              columnSpacing:
-                                                  dynamicColumnSpacing,
-                                              horizontalMargin:
-                                                  horizontalMargin,
-                                              dataRowMinHeight: 52.0,
-                                              dataRowMaxHeight: double.infinity,
-                                              headingRowHeight: 48.0,
-                                              headingRowColor:
-                                                  WidgetStateProperty.all(
-                                                colorScheme
-                                                    .surfaceContainerHighest
-                                                    .withOpacity(0.4),
-                                              ),
-                                              columns: const [
-                                                DataColumn(
-                                                    label: Text(
-                                                        'الصنف والباركود')),
-                                                DataColumn(
-                                                    headingRowAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    label:
-                                                        Text('السلسلة والفرع')),
-                                                DataColumn(
-                                                    headingRowAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    numeric: true,
-                                                    label:
-                                                        Text('السعر الفعلي')),
-                                                DataColumn(
-                                                    headingRowAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    numeric: true,
-                                                    label: Text(
-                                                        'السعر الموصى به (RRP)')),
-                                                DataColumn(
-                                                    headingRowAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    label: Text(
-                                                        'الفارق السعري (Delta)')),
-                                                DataColumn(
-                                                    headingRowAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    label: Text(
-                                                        'حالة العرض والأثر البيعي')),
-                                              ],
-                                              rows: displayedItems.map((item) {
-                                                return DataRow(
-                                                  cells: [
-                                                    // SKU Name, Item Code & Barcode
-                                                    DataCell(
+                                          columnFlex: flex,
+                                          child: DataTable(
+                                            key: const ValueKey(
+                                                'pricing_compliance_table'),
+                                            columnSpacing: spacing,
+                                            horizontalMargin: margin,
+                                            dataRowMinHeight: 52.0,
+                                            dataRowMaxHeight: double.infinity,
+                                            headingRowHeight: 48.0,
+                                            headingRowColor:
+                                                WidgetStateProperty.all(
+                                              colorScheme
+                                                  .surfaceContainerHighest
+                                                  .withOpacity(0.4),
+                                            ),
+                                            columns: [
+                                              DataColumn(
+                                                  label: cellBox(
+                                                      0,
+                                                      const Text(
+                                                        'الصنف والباركود',
+                                                        maxLines: 2,
+                                                      ))),
+                                              DataColumn(
+                                                  headingRowAlignment:
+                                                      MainAxisAlignment.center,
+                                                  label: cellBox(
+                                                      1,
+                                                      const Text(
+                                                        'السلسلة والفرع',
+                                                        maxLines: 2,
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                      ))),
+                                              DataColumn(
+                                                  headingRowAlignment:
+                                                      MainAxisAlignment.center,
+                                                  numeric: true,
+                                                  label: cellBox(
+                                                      2,
+                                                      const Text(
+                                                        'السعر الفعلي',
+                                                        maxLines: 2,
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                      ))),
+                                              DataColumn(
+                                                  headingRowAlignment:
+                                                      MainAxisAlignment.center,
+                                                  numeric: true,
+                                                  label: cellBox(
+                                                      3,
+                                                      const Text(
+                                                        'السعر الموصى به (RRP)',
+                                                        maxLines: 2,
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                      ))),
+                                              DataColumn(
+                                                  headingRowAlignment:
+                                                      MainAxisAlignment.center,
+                                                  label: cellBox(
+                                                      4,
+                                                      const Text(
+                                                        'الفارق السعري (Delta)',
+                                                        maxLines: 2,
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                      ))),
+                                              DataColumn(
+                                                  headingRowAlignment:
+                                                      MainAxisAlignment.center,
+                                                  label: cellBox(
+                                                      5,
+                                                      const Text(
+                                                        'حالة العرض والأثر البيعي',
+                                                        maxLines: 2,
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                      ))),
+                                            ],
+                                            rows: displayedItems.map((item) {
+                                              return DataRow(
+                                                cells: [
+                                                  // SKU Name, Item Code & Barcode
+                                                  DataCell(
+                                                    cellBox(
+                                                      0,
                                                       Column(
                                                         crossAxisAlignment:
                                                             CrossAxisAlignment
@@ -1058,9 +1105,12 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                         ],
                                                       ),
                                                     ),
+                                                  ),
 
-                                                    // Chain & Store
-                                                    DataCell(
+                                                  // Chain & Store
+                                                  DataCell(
+                                                    cellBox(
+                                                      1,
                                                       Column(
                                                         crossAxisAlignment:
                                                             CrossAxisAlignment
@@ -1097,9 +1147,12 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                         ],
                                                       ),
                                                     ),
+                                                  ),
 
-                                                    // Actual Price & Margin
-                                                    DataCell(
+                                                  // Actual Price & Margin
+                                                  DataCell(
+                                                    cellBox(
+                                                      2,
                                                       Column(
                                                         crossAxisAlignment:
                                                             CrossAxisAlignment
@@ -1147,9 +1200,12 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                         ],
                                                       ),
                                                     ),
+                                                  ),
 
-                                                    // Recommended Price (RRP) & Factory Cost
-                                                    DataCell(
+                                                  // Recommended Price (RRP) & Factory Cost
+                                                  DataCell(
+                                                    cellBox(
+                                                      3,
                                                       Column(
                                                         crossAxisAlignment:
                                                             CrossAxisAlignment
@@ -1195,20 +1251,22 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                         ],
                                                       ),
                                                     ),
+                                                  ),
 
-                                                    // Price Delta % Badge
-                                                    DataCell(
-                                                        _buildPriceDeltaBadge(
-                                                            context, item)),
+                                                  // Price Delta % Badge
+                                                  DataCell(cellBox(
+                                                      4,
+                                                      _buildPriceDeltaBadge(
+                                                          context, item))),
 
-                                                    // Promo Uplift Badge
-                                                    DataCell(
-                                                        _buildPromoUpliftBadge(
-                                                            context, item)),
-                                                  ],
-                                                );
-                                              }).toList(),
-                                            ),
+                                                  // Promo Uplift Badge
+                                                  DataCell(cellBox(
+                                                      5,
+                                                      _buildPromoUpliftBadge(
+                                                          context, item))),
+                                                ],
+                                              );
+                                            }).toList(),
                                           ),
                                         ),
                                       );
@@ -1855,36 +1913,44 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                     if (col > 0) const SizedBox(width: horizontalSpacing),
                     if (col < chunk.length) ...[
                       Expanded(
-                        child: FilterChip(
-                          label: Center(
-                            child: Text(
-                              chunk[col],
-                              maxLines: 3,
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                fontWeight: _selectedCategory == chunk[col]
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
+                        child: LayoutBuilder(
+                          builder: (context, chipConstraints) {
+                            final labelWidth = (chipConstraints.maxWidth - 24.0)
+                                .clamp(0.0, chipConstraints.maxWidth);
+                            return FilterChip(
+                              label: SizedBox(
+                                width: labelWidth,
+                                child: Text(
+                                  chunk[col],
+                                  maxLines: 3,
+                                  overflow: TextOverflow.clip,
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    fontWeight: _selectedCategory == chunk[col]
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          selected: _selectedCategory == chunk[col],
-                          showCheckmark: false,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 4.0, vertical: 2.0),
-                          labelPadding:
-                              const EdgeInsets.symmetric(horizontal: 4.0),
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: M3Shape.radiusSm,
-                          ),
-                          onSelected: (_) {
-                            setState(() {
-                              _selectedCategory = chunk[col];
-                              _currentPage = 0;
-                            });
-                            _loadPricingCompliance();
+                              selected: _selectedCategory == chunk[col],
+                              showCheckmark: false,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4.0, vertical: 2.0),
+                              labelPadding:
+                                  const EdgeInsets.symmetric(horizontal: 4.0),
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: M3Shape.radiusSm,
+                              ),
+                              onSelected: (_) {
+                                setState(() {
+                                  _selectedCategory = chunk[col];
+                                  _currentPage = 0;
+                                });
+                                _loadPricingCompliance();
+                              },
+                            );
                           },
                         ),
                       ),

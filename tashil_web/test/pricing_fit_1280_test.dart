@@ -1,0 +1,201 @@
+// v135 live-test follow-up: table fits at 1280, category chips wrap,
+// Product Master dialog KPI titles are not ellipsized.
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:tashil_web/core/data/app_cache.dart';
+import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/core/widgets/m3_section_title.dart';
+import 'package:tashil_web/features/pricing_compliance/presentation/screens/pricing_compliance_screen.dart';
+import 'package:tashil_web/features/product_master/presentation/screens/product_master_screen.dart';
+
+import 'pricing_m3_support.dart';
+
+class _FitApiClient extends PricingShotApiClient {
+  @override
+  Future<ProductMasterSummaryModel> getProductMaster({
+    String? search,
+    String? brand,
+    String? category,
+    String? prefix,
+    String? itemType,
+    String? packaging,
+    String? pullStatus,
+    String? priceChange,
+  }) async {
+    return const ProductMasterSummaryModel(
+      tenantId: 'tenant-adeco',
+      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+      sheetDateLabel: 'تحديث 01-08-2026',
+      sourceFilename: 'adeco_product_master_2026_08_01.xlsx',
+      totalSkus: 389,
+      regularSkusCount: 280,
+      promoSkusCount: 109,
+      uniqueBarcodesCount: 363,
+      avgUnitsPerCarton: 10.3,
+      activeInChainsCount: 327,
+      unpulledSkusCount: 62,
+      items: [],
+    );
+  }
+
+  @override
+  Future<UploadedFilesArchiveResponse> getUploadedFilesArchive({
+    String? chain,
+    String? year,
+    String? searchQuery,
+    String? targetTenant,
+    String? fileType,
+  }) async {
+    return const UploadedFilesArchiveResponse(
+      tenantId: 'tenant-adeco',
+      totalCount: 0,
+      chainCounts: {},
+      files: [],
+    );
+  }
+}
+
+double _hScrollExtent(WidgetTester tester, Finder scope) {
+  final scrollable =
+      find.descendant(of: scope, matching: find.byType(Scrollable));
+  expect(scrollable, findsWidgets);
+  for (final el in scrollable.evaluate()) {
+    final s = el.widget as Scrollable;
+    if (s.axisDirection == AxisDirection.right ||
+        s.axisDirection == AxisDirection.left) {
+      final state = tester.state<ScrollableState>(find.byWidget(s));
+      if (state.position.hasContentDimensions) {
+        return state.position.maxScrollExtent;
+      }
+    }
+  }
+  return 0;
+}
+
+bool _onScreen(WidgetTester tester, Finder f, {double width = 1280}) {
+  expect(f, findsWidgets);
+  final box = tester.getRect(f.first);
+  return box.left < width - 1 &&
+      box.right > 1 &&
+      box.top < 8000 &&
+      box.bottom > 0;
+}
+
+List<String> _ellipsizedBefore(WidgetTester tester, Finder scope, int lines) {
+  final out = <String>[];
+  for (final e
+      in find.descendant(of: scope, matching: find.byType(Text)).evaluate()) {
+    final t = e.widget as Text;
+    if (t.data == null || t.data!.isEmpty) continue;
+    final p = tester
+        .renderObject<RenderParagraph>(find.byElementPredicate((x) => x == e));
+    if (p.didExceedMaxLines && (t.maxLines ?? 99) < lines) {
+      out.add('"${t.data}" cut at maxLines ${t.maxLines}');
+    }
+  }
+  return out;
+}
+
+void main() {
+  ignoreGoogleFontLoadErrors();
+  setUpAll(loadPricingFonts);
+  setUp(AppCache.clear);
+
+  testWidgets(
+      'Pricing table fits 1280 with no horizontal scroll; name and status visible together',
+      (tester) async {
+    final api = _FitApiClient();
+    await pumpPricing(
+      tester,
+      PricingComplianceScreen(apiClient: api),
+      width: 1280,
+      height: 2400,
+    );
+
+    final table = find.byKey(const ValueKey('pricing_compliance_table'));
+    expect(table, findsOneWidget);
+    final scroller = find.byKey(const ValueKey('pricing_table_scroll'));
+    expect(scroller, findsOneWidget);
+    expect(_hScrollExtent(tester, scroller), lessThanOrEqualTo(2.0));
+
+    expect(find.byKey(const ValueKey('pricing_sku_name')), findsWidgets);
+    expect(_onScreen(tester, find.byKey(const ValueKey('pricing_sku_name'))),
+        isTrue);
+    // Status short labels from the fixture (under_cutting / no promo).
+    expect(find.text('حرق سعر'), findsWidgets);
+    expect(_onScreen(tester, find.text('حرق سعر')), isTrue);
+    expect(find.text('بدون عرض'), findsWidgets);
+    expect(_onScreen(tester, find.text('بدون عرض')), isTrue);
+  });
+
+  testWidgets('Long Active Promos category names wrap instead of ellipsizing',
+      (tester) async {
+    await pumpPricing(
+      tester,
+      PricingComplianceScreen(apiClient: _FitApiClient()),
+      width: 1280,
+      height: 2400,
+    );
+    await tester.tap(find.text('عروض نشطة'));
+    await tester.pumpAndSettle();
+
+    for (final name in [
+      'منظفات سجاد ومفروشات',
+      'مسحوق غسالات اطباق',
+      kLongCategory,
+    ]) {
+      final chip = find.widgetWithText(FilterChip, name);
+      expect(chip, findsOneWidget, reason: name);
+      expect(_onScreen(tester, chip), isTrue, reason: name);
+      final texts = find.descendant(of: chip, matching: find.byType(Text));
+      for (final t in tester.widgetList<Text>(texts)) {
+        expect(t.maxLines, greaterThanOrEqualTo(3), reason: name);
+        expect(t.overflow, isNot(TextOverflow.ellipsis), reason: name);
+        expect(t.overflow, isNot(TextOverflow.fade), reason: name);
+      }
+      expect(_ellipsizedBefore(tester, chip, 3), isEmpty, reason: name);
+    }
+  });
+
+  testWidgets(
+      'Product Master dialog KPI titles wrap up to 2 lines and are not ellipsized',
+      (tester) async {
+    final api = _FitApiClient();
+    await pumpPricing(
+      tester,
+      PricingComplianceScreen(apiClient: api),
+      width: 1280,
+      height: 2400,
+    );
+    final open = find.text('كارتة الأصناف والأسعار');
+    expect(open, findsOneWidget);
+    await tester.ensureVisible(open);
+    await tester.pumpAndSettle();
+    await tester.tap(open);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ProductMasterScreen), findsOneWidget);
+    final grid = find.byKey(const ValueKey('product_master_kpi_grid'));
+    expect(grid, findsOneWidget);
+
+    for (final title in [
+      'إجمالي الأصناف المسجلة بالكارتة',
+      'أصناف البيع العادي',
+      'أصناف العروض الترويجية',
+      'الباركودات الفريدة وسعة الكرتونة',
+      'التغطية والسحب بالسلاسل',
+    ]) {
+      expect(find.text(title), findsOneWidget, reason: title);
+      expect(_onScreen(tester, find.text(title)), isTrue, reason: title);
+    }
+
+    for (final e in find
+        .descendant(of: grid, matching: find.byType(M3SectionTitle))
+        .evaluate()) {
+      final title = e.widget as M3SectionTitle;
+      expect(title.maxLines, 2);
+    }
+    expect(_ellipsizedBefore(tester, grid, 2), isEmpty);
+  });
+}
