@@ -22,6 +22,12 @@ type ArchiveRows struct {
 	ArchiveID  string // empty for legacy rows
 	SourceFile string
 	Rows       int
+	// Units is SUM(quantity_sold) of the tenant's own rows (Sell-Out only): the same scope as the
+	// file's net Sell-Out (own brand, or rows without a supplier).
+	Units float64
+	// Cases / Tons are SUM(net_qty_cases) / SUM(weight_tons) of the file's rows (Sell-In only).
+	Cases float64
+	Tons  float64
 }
 
 // ArchiveReconciler is implemented by sinks that can compare stored rows with the upload archive.
@@ -36,6 +42,22 @@ func ArchiveRowCountsSQL(tableRef string) string {
 		" WHERE tenant_id = @tenant_id GROUP BY 1, 2"
 }
 
+// ArchiveFileTotalsSQL is ArchiveRowCountsSQL plus the per-file quantity totals shown in the upload
+// lists: own-brand units for Sell-Out, cases and tons for Sell-In (0 for other kinds). Raw stored
+// rows of each archive_id, the same rows COUNT(*) counts; analytics reads are unchanged.
+func ArchiveFileTotalsSQL(kind Kind, tableRef string) string {
+	totals := "CAST(0 AS FLOAT64) units, CAST(0 AS FLOAT64) cases, CAST(0 AS FLOAT64) tons"
+	switch kind {
+	case KindSellOut:
+		totals = "CAST(IFNULL(SUM(IF(IFNULL(is_own_brand, FALSE) OR IFNULL(supplier, '') = '', quantity_sold, 0)), 0) AS FLOAT64) units," +
+			" CAST(0 AS FLOAT64) cases, CAST(0 AS FLOAT64) tons"
+	case KindSellIn:
+		totals = "CAST(0 AS FLOAT64) units, IFNULL(SUM(net_qty_cases), 0) cases, IFNULL(SUM(weight_tons), 0) tons"
+	}
+	return "SELECT IFNULL(archive_id, '') archive_id, IFNULL(source_file, '') source_file, COUNT(*) n, " + totals +
+		" FROM " + tableRef + " WHERE tenant_id = @tenant_id GROUP BY 1, 2"
+}
+
 // DeleteOrphansSQL removes rows whose file is no longer in the archive (deleted or replaced uploads):
 // rows with an archive_id not in @live_ids, and legacy rows whose source file is not in @live_files.
 func DeleteOrphansSQL(tableRef string) string {
@@ -48,7 +70,7 @@ func DeleteOrphansSQL(tableRef string) string {
 func (s *BigQuerySink) ArchiveRowCounts(ctx context.Context, tenantID string) ([]ArchiveRows, error) {
 	var out []ArchiveRows
 	for _, kind := range []Kind{KindSellOut, KindSellIn, KindProductMaster} {
-		q := s.client.Query(ArchiveRowCountsSQL(s.ref(TableForKind(kind).Name)))
+		q := s.client.Query(ArchiveFileTotalsSQL(kind, s.ref(TableForKind(kind).Name)))
 		q.Parameters = []bigquery.QueryParameter{{Name: "tenant_id", Value: NormalizeTenant(tenantID)}}
 		it, err := q.Read(ctx)
 		if err != nil {
@@ -59,9 +81,12 @@ func (s *BigQuerySink) ArchiveRowCounts(ctx context.Context, tenantID string) ([
 		}
 		for {
 			var row struct {
-				ArchiveID  string `bigquery:"archive_id"`
-				SourceFile string `bigquery:"source_file"`
-				N          int64  `bigquery:"n"`
+				ArchiveID  string  `bigquery:"archive_id"`
+				SourceFile string  `bigquery:"source_file"`
+				N          int64   `bigquery:"n"`
+				Units      float64 `bigquery:"units"`
+				Cases      float64 `bigquery:"cases"`
+				Tons       float64 `bigquery:"tons"`
 			}
 			err := it.Next(&row)
 			if err == iterator.Done {
@@ -70,7 +95,8 @@ func (s *BigQuerySink) ArchiveRowCounts(ctx context.Context, tenantID string) ([
 			if err != nil {
 				return nil, fmt.Errorf("count %s rows: %w", kind, err)
 			}
-			out = append(out, ArchiveRows{Kind: kind, ArchiveID: row.ArchiveID, SourceFile: row.SourceFile, Rows: int(row.N)})
+			out = append(out, ArchiveRows{Kind: kind, ArchiveID: row.ArchiveID, SourceFile: row.SourceFile, Rows: int(row.N),
+				Units: row.Units, Cases: row.Cases, Tons: row.Tons})
 		}
 	}
 	return out, nil

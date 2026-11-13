@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -40,7 +41,10 @@ type ArchivedFile struct {
 	TotalRevenue    float64 `json:"total_revenue"`
 	TotalCases      float64 `json:"total_cases,omitempty"`
 	TotalWeightTons float64 `json:"total_weight_tons,omitempty"`
-	UploadedAt      string  `json:"uploaded_at"`
+	// TotalUnits is the units sold in a Sell-Out file (own brand, same scope as TotalRevenue).
+	// Overlaid from BigQuery stored rows on list; parse-time value otherwise.
+	TotalUnits float64 `json:"total_units"`
+	UploadedAt string  `json:"uploaded_at"`
 	// LastIngestedAt is always refreshed on save/re-upload. UploadedAt keeps the original
 	// first-upload time when the same bytes are replayed (reapply order depends on it).
 	LastIngestedAt string `json:"last_ingested_at,omitempty"`
@@ -604,6 +608,10 @@ func (p *Processor) SaveArchivedFile(
 	if len(extraMetrics) > 1 {
 		totalTons = extraMetrics[1]
 	}
+	var totalUnits float64
+	if len(extraMetrics) > 2 {
+		totalUnits = extraMetrics[2]
+	}
 
 	safeFile := sanitizeArchiveFilename(filename)
 	var existingID string
@@ -684,6 +692,7 @@ func (p *Processor) SaveArchivedFile(
 		TotalRevenue:    totalRevenue,
 		TotalCases:      totalCases,
 		TotalWeightTons: totalTons,
+		TotalUnits:      totalUnits,
 		UploadedAt:      uploadedAt,
 		LastIngestedAt:  nowStamp,
 		StoragePath:     storagePath,
@@ -838,9 +847,16 @@ func (p *Processor) enrichArchiveStoredRows(ctx context.Context, resp *ArchiveLi
 		return
 	}
 	byID := map[string]int{}
+	type qty struct{ units, cases, tons float64 }
+	qtyByID := map[string]qty{}
 	for _, s := range stored {
 		if s.ArchiveID != "" {
 			byID[s.ArchiveID] += s.Rows
+			q := qtyByID[s.ArchiveID]
+			q.units += s.Units
+			q.cases += s.Cases
+			q.tons += s.Tons
+			qtyByID[s.ArchiveID] = q
 		}
 	}
 	p.archiveMu.Lock()
@@ -851,6 +867,16 @@ func (p *Processor) enrichArchiveStoredRows(ctx context.Context, resp *ArchiveLi
 		// Successful query: missing id ⇒ 0 rows (not "unknown / keep stale").
 		n := byID[f.ID]
 		f.RowsIngested = n
+		// Quantity columns come from the same stored rows (response only; not persisted).
+		q := qtyByID[f.ID]
+		switch {
+		case isProductMasterArchiveEntry(f):
+		case isSellInArchiveEntry(f):
+			f.TotalCases = math.Round(q.cases*100) / 100
+			f.TotalWeightTons = math.Round(q.tons*100) / 100
+		default:
+			f.TotalUnits = q.units
+		}
 		if entry := p.archivedFiles[f.ID]; entry != nil && entry.RowsIngested != n {
 			entry.RowsIngested = n
 			p.writeArchiveSidecarLocked(entry)
@@ -1523,7 +1549,6 @@ func (p *Processor) replayFiles(ctx context.Context, files []*ArchivedFile, writ
 		debug.FreeOSMemory()
 	}
 }
-
 
 // archivedBytesLocked returns an archived file's bytes from the in-memory cache, or
 // reads them from disk when they are not cached. Caller holds archiveMu.

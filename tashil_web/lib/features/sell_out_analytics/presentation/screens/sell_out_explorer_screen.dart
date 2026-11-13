@@ -3166,12 +3166,17 @@ onChanged: m3Legacy<int>((v) {
                                 DataCell(
                                   Text(
                                     CurrencyFormatter.formatNumber(file.rowsIngested),
+                                    key: ValueKey('file_rows_${file.id}'),
                                     style: const TextStyle(fontWeight: FontWeight.w700),
                                   ),
                                 ),
                                 DataCell(
+                                  // Units sold (total_units), not the row count.
                                   Text(
-                                    CurrencyFormatter.formatNumber(file.rowsIngested),
+                                    file.totalUnits == null
+                                        ? '—'
+                                        : CurrencyFormatter.formatNumber(file.totalUnits!.round()),
+                                    key: ValueKey('file_units_${file.id}'),
                                     style: const TextStyle(fontWeight: FontWeight.w700),
                                   ),
                                 ),
