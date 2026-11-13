@@ -12,9 +12,11 @@ import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/features/oos_monitor/presentation/screens/oos_dashboard_screen.dart';
 import 'package:tashil_web/features/pricing_compliance/presentation/screens/pricing_compliance_screen.dart';
 
-import 'oos_m3_support.dart' hide ignoreGoogleFontLoadErrors, disableGoogleFontsFetch;
+import 'oos_m3_support.dart'
+    hide ignoreGoogleFontLoadErrors, disableGoogleFontsFetch;
 import 'pricing_m3_support.dart';
 import 'support/live_viewport.dart';
+import 'support/text_visibility.dart';
 
 const kLiveCarpetCategory = 'منظفات سجاد ومفروشات';
 const kLiveRrpHeader = 'السعر الموصى به (RRP)';
@@ -149,30 +151,10 @@ bool _inContent(WidgetTester tester, Finder f, {required double contentWidth}) {
       box.bottom > 0;
 }
 
-/// True when [expected] is fully laid out inside [scope] in at most 3 lines
-/// and the text's paint rect sits inside the scope's rect (no parent clip).
+/// Delegates to [labelFullyVisible]: glyphs must sit inside the column cell,
+/// not merely inside the table (the v151 RRP false pass).
 bool _labelFullyVisible(WidgetTester tester, Finder scope, String expected) {
-  final texts = find.descendant(of: scope, matching: find.text(expected));
-  if (texts.evaluate().isEmpty) return false;
-  final textEl = texts.evaluate().first;
-  final text = textEl.widget as Text;
-  if ((text.maxLines ?? 99) < 3) return false;
-  final para = tester.renderObject<RenderParagraph>(
-      find.byElementPredicate((x) => x == textEl));
-  final tp = TextPainter(
-    text: TextSpan(text: expected, style: text.style ?? para.text.style),
-    textDirection: Directionality.of(textEl),
-    textScaler: MediaQuery.textScalerOf(textEl),
-    maxLines: 3,
-  )..layout(maxWidth: para.size.width);
-  if (tp.didExceedMaxLines) return false;
-  final scopeBox = tester.getRect(scope);
-  final textBox = tester.getRect(texts.first);
-  const slop = 1.5;
-  return textBox.left >= scopeBox.left - slop &&
-      textBox.right <= scopeBox.right + slop &&
-      textBox.top >= scopeBox.top - slop &&
-      textBox.bottom <= scopeBox.bottom + slop;
+  return labelFullyVisible(tester, expected, scope: scope);
 }
 
 double _hScrollExtent(WidgetTester tester, Finder scope) {
@@ -232,7 +214,10 @@ void main() {
     final table = find.byKey(const ValueKey('pricing_compliance_table'));
     expect(table, findsOneWidget);
     expect(_labelFullyVisible(tester, table, kLiveRrpHeader), isTrue,
-        reason: 'RRP header must wrap inside its column');
+        reason:
+            'RRP header must wrap inside its column cell, not just the table');
+    expect(rrpText.softWrap, isTrue,
+        reason: 'DataTable headings default to softWrap: false; must override');
     expect(
         _hScrollExtent(
             tester, find.byKey(const ValueKey('pricing_table_scroll'))),
@@ -252,10 +237,12 @@ void main() {
     expect(chip, findsOneWidget);
     expect(_inContent(tester, chip, contentWidth: kLiveContentWidth), isTrue);
     expect(_labelFullyVisible(tester, chip, kLiveCarpetCategory), isTrue);
-    expect(_labelFullyVisible(
-        tester,
-        find.byKey(const ValueKey('pricing_compliance_table')),
-        kLiveRrpHeader), isTrue);
+    expect(
+        _labelFullyVisible(
+            tester,
+            find.byKey(const ValueKey('pricing_compliance_table')),
+            kLiveRrpHeader),
+        isTrue);
   });
 
   testWidgets(
@@ -286,11 +273,15 @@ void main() {
         reason: 'نيس table must not scroll horizontally at 1030');
 
     expect(find.text('الفاقد اليومي'), findsWidgets);
-    expect(_inContent(tester, find.text('الفاقد اليومي'),
-        contentWidth: kLiveContentWidth), isTrue);
+    expect(
+        _inContent(tester, find.text('الفاقد اليومي'),
+            contentWidth: kLiveContentWidth),
+        isTrue);
     expect(find.text(kLiveNisSku), findsWidgets);
-    expect(_inContent(tester, find.text(kLiveNisSku),
-        contentWidth: kLiveContentWidth), isTrue);
+    expect(
+        _inContent(tester, find.text(kLiveNisSku),
+            contentWidth: kLiveContentWidth),
+        isTrue);
     expect(_labelFullyVisible(tester, scroller, kLiveNisSku), isTrue,
         reason: 'long نيس item name must wrap inside the table');
 

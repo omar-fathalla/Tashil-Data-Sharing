@@ -14,6 +14,7 @@ import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell
 
 import 'errors_m3_support.dart';
 import 'support/live_viewport.dart';
+import 'support/text_visibility.dart';
 
 const _searchHint = 'بحث بالصنف أو الكود أو الباركود أو النوع...';
 
@@ -227,30 +228,10 @@ Future<void> _pumpPageWithSidebar(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-/// True when [expected] is fully laid out inside [scope] in at most 3 lines
-/// and the text's paint rect sits inside the scope's rect (no parent clip).
+/// Delegates to [labelFullyVisible]: glyphs must sit inside the column cell,
+/// not merely inside the table.
 bool _labelFullyVisible(WidgetTester tester, Finder scope, String expected) {
-  final texts = find.descendant(of: scope, matching: find.text(expected));
-  if (texts.evaluate().isEmpty) return false;
-  final textEl = texts.evaluate().first;
-  final text = textEl.widget as Text;
-  if ((text.maxLines ?? 99) < 3 && (text.maxLines ?? 99) < 2) return false;
-  final para = tester.renderObject<RenderParagraph>(
-      find.byElementPredicate((x) => x == textEl));
-  final tp = TextPainter(
-    text: TextSpan(text: expected, style: text.style ?? para.text.style),
-    textDirection: Directionality.of(textEl),
-    textScaler: MediaQuery.textScalerOf(textEl),
-    maxLines: text.maxLines ?? 3,
-  )..layout(maxWidth: para.size.width);
-  if (tp.didExceedMaxLines) return false;
-  final scopeBox = tester.getRect(scope);
-  final textBox = tester.getRect(texts.first);
-  const slop = 1.5;
-  return textBox.left >= scopeBox.left - slop &&
-      textBox.right <= scopeBox.right + slop &&
-      textBox.top >= scopeBox.top - slop &&
-      textBox.bottom <= scopeBox.bottom + slop;
+  return labelFullyVisible(tester, expected, scope: scope);
 }
 
 void _assertTableFitsLiveContent(WidgetTester tester,
@@ -290,6 +271,23 @@ void _assertTableFitsLiveContent(WidgetTester tester,
       reason: 'found value');
   expect(_labelFullyVisible(tester, table, kLongExpected), isTrue,
       reason: 'expected value');
+
+  expect(
+      codeBreaksOnlyAtHyphens(tester, kLiveMissingCode, scope: table), isTrue,
+      reason: 'QA-NOT-IN-MASTER-999 must stay intact and fully visible');
+  expect(codeBreaksOnlyAtHyphens(tester, kLiveFgccCode, scope: table), isTrue,
+      reason: 'FGCC-0700-0002 must not break mid-token');
+  for (final word in [
+    'الخطورة',
+    'مفتوحة',
+    'الحالة',
+    'تحذير',
+    'حرجة',
+    'متجاهلة'
+  ]) {
+    expect(shortWordUnsplit(tester, word, scope: table), isTrue,
+        reason: 'short word "$word" must not split mid-word');
+  }
 
   final chip = find.byKey(const ValueKey('dq_type_chip_missing_sku'));
   expect(chip, findsOneWidget);

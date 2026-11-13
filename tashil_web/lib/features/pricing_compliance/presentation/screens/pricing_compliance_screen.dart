@@ -1005,6 +1005,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                       const Text(
                                                         'الصنف والباركود',
                                                         maxLines: 3,
+                                                        softWrap: true,
                                                         overflow: TextOverflow.clip,
                                                       ))),
                                               DataColumn(
@@ -1015,6 +1016,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                       const Text(
                                                         'السلسلة والفرع',
                                                         maxLines: 3,
+                                                        softWrap: true,
                                                         overflow: TextOverflow.clip,
                                                         textAlign:
                                                             TextAlign.center,
@@ -1028,6 +1030,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                       const Text(
                                                         'السعر الفعلي',
                                                         maxLines: 3,
+                                                        softWrap: true,
                                                         overflow: TextOverflow.clip,
                                                         textAlign:
                                                             TextAlign.center,
@@ -1041,6 +1044,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                       const Text(
                                                         'السعر الموصى به (RRP)',
                                                         maxLines: 3,
+                                                        softWrap: true,
                                                         overflow: TextOverflow.clip,
                                                         textAlign:
                                                             TextAlign.center,
@@ -1053,6 +1057,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                       const Text(
                                                         'الفارق السعري (Delta)',
                                                         maxLines: 3,
+                                                        softWrap: true,
                                                         overflow: TextOverflow.clip,
                                                         textAlign:
                                                             TextAlign.center,
@@ -1065,6 +1070,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                       const Text(
                                                         'حالة العرض والأثر البيعي',
                                                         maxLines: 3,
+                                                        softWrap: true,
                                                         overflow: TextOverflow.clip,
                                                         textAlign:
                                                             TextAlign.center,

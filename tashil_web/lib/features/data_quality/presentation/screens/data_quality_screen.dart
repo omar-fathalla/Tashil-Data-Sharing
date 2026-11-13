@@ -8,6 +8,7 @@ import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/hyphenated_code_text.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
@@ -589,20 +590,25 @@ class _Filters extends StatelessWidget {
 
 class _IssuesTable extends StatelessWidget {
   // Headers and cells centred; only the item name stays start-aligned.
-  // Pixel budget measured with real Cairo at the 1024 content width
-  // (inner 928 after xxs gutter) so the longest live-like name, type,
-  // found and expected values wrap within 3 lines at 1024 and 1030.
+  // Pixel budget at the live 1030 shell (page padding 24, inner ~934
+  // after xxs gutters), measured with real Cairo:
+  //  - short words (الخطورة, مفتوحة, متجاهلة) never mid-word split
+  //  - hyphenated codes (QA-NOT-IN-MASTER-999) wrap at '-' only, ≤3 lines
+  //  - the live longest name (رابيدو / ووش اند واكس - 7 مج) wraps ≤3
+  //    with the tail visible.
+  // Type / found / expected shares follow live production lengths, not
+  // the earlier over-long fixtures that starved the code and name columns.
   static const _flex = [
-    44.0,
-    170.0,
+    64.0,
+    90.0,
     40.0,
+    96.0,
     48.0,
-    48.0,
-    219.0,
-    126.0,
-    97.0,
+    244.0,
+    94.0,
+    92.0,
     42.0,
-    52.0,
+    76.0,
     42.0
   ];
 
@@ -661,6 +667,7 @@ class _IssuesTable extends StatelessWidget {
                   Text(
                     label,
                     maxLines: 3,
+                    softWrap: true,
                     overflow: TextOverflow.clip,
                     textAlign: TextAlign.center,
                     style: theme.textTheme.labelLarge?.copyWith(color: onColor),
@@ -750,7 +757,13 @@ class _IssuesTable extends StatelessWidget {
                           ? '${i.row}${i.column.isNotEmpty ? ' · ${i.column}' : ''}'
                           : '',
                     )),
-                    DataCell(cellText(3, i.itemCode)),
+                    DataCell(cellBox(
+                      3,
+                      HyphenatedCodeText(
+                        i.itemCode,
+                        key: ValueKey('dq_item_code_${i.itemCode}'),
+                      ),
+                    )),
                     DataCell(cellText(4, i.barcode)),
                     DataCell(cellText(5, i.itemName,
                         key: const ValueKey('dq_item_name'),
@@ -790,6 +803,7 @@ class _IssuesTable extends StatelessWidget {
                               child: Text(
                                 i.status,
                                 maxLines: 3,
+                                softWrap: true,
                                 overflow: TextOverflow.clip,
                                 textAlign: TextAlign.center,
                                 style: theme.textTheme.labelLarge
