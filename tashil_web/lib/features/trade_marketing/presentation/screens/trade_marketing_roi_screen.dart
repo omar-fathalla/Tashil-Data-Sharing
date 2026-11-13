@@ -16,6 +16,12 @@ import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_responsive_tab_bar.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
+import '../../../../core/utils/arabic_plural.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_toolbar_button.dart';
+import '../../../../core/widgets/m3_wrap_text.dart';
 import '../../data/cached_trade_marketing_repository.dart';
 import '../../data/trade_marketing_repository.dart';
 import '../../domain/trade_marketing_models.dart';
@@ -38,10 +44,12 @@ class TradeMarketingRoiScreen extends StatefulWidget {
   });
 
   @override
-  State<TradeMarketingRoiScreen> createState() => _TradeMarketingRoiScreenState();
+  State<TradeMarketingRoiScreen> createState() =>
+      _TradeMarketingRoiScreenState();
 }
 
-class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with DataRefreshMixin<TradeMarketingRoiScreen> {
+class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
+    with DataRefreshMixin<TradeMarketingRoiScreen> {
   @override
   void onBackendDataChanged() {
     _reload();
@@ -68,9 +76,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
   final Map<String, TradeMarketingSalesBaseline> _baselines = {};
   bool _loading = false;
   String? _loadError;
-  late final TradeMarketingRepository _repo =
-      widget.repository ??
-          CachedTradeMarketingRepository(ApiTradeMarketingRepository(widget.apiClient), widget.apiClient);
+  late final TradeMarketingRepository _repo = widget.repository ??
+      CachedTradeMarketingRepository(
+          ApiTradeMarketingRepository(widget.apiClient), widget.apiClient);
 
   static const List<String> _availableChains = [
     'Fathalla',
@@ -91,7 +99,12 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
 
   /// Roles the backend allows to write trade marketing expenses.
   static const Set<String> _writeRoles = {
-    'super_admin', 'vendor_admin', 'admin', 'national_sales_manager', 'chain_kam', 'executive',
+    'super_admin',
+    'vendor_admin',
+    'admin',
+    'national_sales_manager',
+    'chain_kam',
+    'executive',
   };
 
   bool get _canWrite {
@@ -116,7 +129,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
     if (picked == null || !mounted) return;
     final lower = picked.name.toLowerCase();
     if (!(lower.endsWith('.xlsx') || lower.endsWith('.csv'))) {
-      M3Feedback.showError(context, 'نوع الملف غير مدعوم. يرجى اختيار ملف ‎.xlsx أو ‎.csv');
+      M3Feedback.showError(
+          context, 'نوع الملف غير مدعوم. يرجى اختيار ملف ‎.xlsx أو ‎.csv');
       return;
     }
     setState(() => _uploading = true);
@@ -143,7 +157,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
           child: AlertDialog(
             key: const ValueKey('dlg_expense_upload_result'),
             icon: Icon(
-              r.rejectedCount == 0 ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
+              r.rejectedCount == 0
+                  ? Icons.check_circle_rounded
+                  : Icons.warning_amber_rounded,
               color: r.rejectedCount == 0 ? cs.primary : cs.error,
             ),
             title: const Text('نتيجة رفع المصروفات'),
@@ -158,18 +174,21 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
                   Wrap(spacing: 8, runSpacing: 8, children: [
                     Chip(
                       key: const ValueKey('chip_upload_saved'),
-                      avatar: Icon(Icons.check_rounded, size: 18, color: cs.primary),
+                      avatar: Icon(Icons.check_rounded,
+                          size: 18, color: cs.primary),
                       label: Text('تم الحفظ: ${r.savedCount}'),
                     ),
                     Chip(
                       key: const ValueKey('chip_upload_rejected'),
-                      avatar: Icon(Icons.block_rounded, size: 18, color: cs.error),
+                      avatar:
+                          Icon(Icons.block_rounded, size: 18, color: cs.error),
                       label: Text('مرفوض: ${r.rejectedCount}'),
                     ),
                   ]),
                   if (r.rejectedReasons.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    const Text('الصفوف المرفوضة وأسبابها:', style: TextStyle(fontWeight: FontWeight.w700)),
+                    const Text('الصفوف المرفوضة وأسبابها:',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 6),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 260),
@@ -179,7 +198,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
                           for (final reason in r.rejectedReasons)
                             ListTile(
                               dense: true,
-                              leading: Icon(Icons.error_outline_rounded, size: 18, color: cs.error),
+                              leading: Icon(Icons.error_outline_rounded,
+                                  size: 18, color: cs.error),
                               title: Directionality(
                                 textDirection: TextDirection.ltr,
                                 child: Text(reason, textAlign: TextAlign.right),
@@ -215,10 +235,12 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
       final results = await Future.wait([_repo.listExpenses(), _repo.getRoi()]);
       if (!mounted) return;
       setState(() {
-        _expenses = List<MarketingExpenseItem>.from(results[0] as List<MarketingExpenseItem>);
+        _expenses = List<MarketingExpenseItem>.from(
+            results[0] as List<MarketingExpenseItem>);
         _baselines.clear();
         for (final b in results[1] as List<TradeMarketingSalesBaseline>) {
-          _baselines[tradeMarketingBaselineKey(b.year, b.month, b.chainName)] = b;
+          _baselines[tradeMarketingBaselineKey(b.year, b.month, b.chainName)] =
+              b;
         }
         _loading = false;
       });
@@ -238,14 +260,16 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
       setState(() {
         _baselines.clear();
         for (final b in list) {
-          _baselines[tradeMarketingBaselineKey(b.year, b.month, b.chainName)] = b;
+          _baselines[tradeMarketingBaselineKey(b.year, b.month, b.chainName)] =
+              b;
         }
       });
     } catch (_) {}
   }
 
   /// Ensures a server baseline exists for a chain/month (used by the what-if simulator).
-  Future<TradeMarketingSalesBaseline?> _ensureBaseline(String chain, int year, int month) async {
+  Future<TradeMarketingSalesBaseline?> _ensureBaseline(
+      String chain, int year, int month) async {
     final key = tradeMarketingBaselineKey(year, month, chain);
     if (_baselines.containsKey(key)) return _baselines[key];
     try {
@@ -259,7 +283,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
 
   /// Average historical ROMI from server data, used to project simulator lift.
   double get _historicalRomi {
-    final rows = _monthlyRoiSummariesFor(_expenses).where((s) => s.marketingSpendEgp > 0 && s.romiMultiple > 0);
+    final rows = _monthlyRoiSummariesFor(_expenses)
+        .where((s) => s.marketingSpendEgp > 0 && s.romiMultiple > 0);
     if (rows.isEmpty) return 3.45;
     return rows.fold<double>(0, (a, s) => a + s.romiMultiple) / rows.length;
   }
@@ -268,10 +293,12 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
   List<MarketingExpenseItem> get _filteredExpenses {
     final q = _searchQuery.trim().toLowerCase();
     final list = _expenses.where((item) {
-      if (_selectedChain != 'all' && item.chainName != _selectedChain) return false;
+      if (_selectedChain != 'all' && item.chainName != _selectedChain)
+        return false;
       if (_selectedYear != 0 && item.year != _selectedYear) return false;
       if (_selectedMonth != 0 && item.month != _selectedMonth) return false;
-      if (_selectedCategoryId != 'all' && item.category.id != _selectedCategoryId) return false;
+      if (_selectedCategoryId != 'all' &&
+          item.category.id != _selectedCategoryId) return false;
       if (q.isNotEmpty) {
         final match = item.campaignTitle.toLowerCase().contains(q) ||
             item.brandName.toLowerCase().contains(q) ||
@@ -308,9 +335,11 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
   }
 
   /// Aggregated Monthly + Chain ROI summaries
-  List<MonthlyChainRoiSummary> get _monthlyRoiSummaries => _monthlyRoiSummariesFor(_filteredExpenses);
+  List<MonthlyChainRoiSummary> get _monthlyRoiSummaries =>
+      _monthlyRoiSummariesFor(_filteredExpenses);
 
-  List<MonthlyChainRoiSummary> _monthlyRoiSummariesFor(List<MarketingExpenseItem> source) {
+  List<MonthlyChainRoiSummary> _monthlyRoiSummariesFor(
+      List<MarketingExpenseItem> source) {
     final grouped = <String, List<MarketingExpenseItem>>{};
     for (final item in source) {
       final key = '${item.year}_${item.month}_${item.chainName}';
@@ -323,7 +352,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
       final first = items.first;
       final totalSpend = items.fold<double>(0.0, (sum, e) => sum + e.amountEgp);
 
-      final baseline = _baselines[tradeMarketingBaselineKey(first.year, first.month, first.chainName)];
+      final baseline = _baselines[
+          tradeMarketingBaselineKey(first.year, first.month, first.chainName)];
 
       summaries.add(
         MonthlyChainRoiSummary(
@@ -397,10 +427,12 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    String chain = existing?.chainName ?? (_selectedChain != 'all' ? _selectedChain : 'Fathalla');
+    String chain = existing?.chainName ??
+        (_selectedChain != 'all' ? _selectedChain : 'Fathalla');
     int year = existing?.year ?? (_selectedYear != 0 ? _selectedYear : 2026);
     int month = existing?.month ?? (_selectedMonth != 0 ? _selectedMonth : 1);
-    MarketingExpenseCategory category = existing?.category ?? MarketingExpenseCategory.floorRental;
+    MarketingExpenseCategory category =
+        existing?.category ?? MarketingExpenseCategory.floorRental;
 
     final titleCtrl = TextEditingController(
       text: existing?.campaignTitle ?? '',
@@ -438,7 +470,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
                         borderRadius: M3Shape.radiusMd,
                       ),
                       child: Icon(
-                        existing == null ? Icons.add_chart_rounded : Icons.edit_note_rounded,
+                        existing == null
+                            ? Icons.add_chart_rounded
+                            : Icons.edit_note_rounded,
                         color: colorScheme.onPrimaryContainer,
                       ),
                     ),
@@ -479,25 +513,29 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen> with 
                             Expanded(
                               flex: 2,
                               child: M3Dropdown<String>(
-value: chain,
-label: 'السلسلة التجارية (Retail Chain)',
-expand: true,
-options: m3OptionsFromMenuItems<String>(_availableChains
-                                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                                    .toList()),
-onChanged: m3Legacy<String>((val) {
-                                  if (val != null) setDialogState(() => chain = val);
+                                value: chain,
+                                label: 'السلسلة التجارية (Retail Chain)',
+                                expand: true,
+                                options: m3OptionsFromMenuItems<String>(
+                                    _availableChains
+                                        .map((c) => DropdownMenuItem(
+                                            value: c, child: Text(c)))
+                                        .toList()),
+                                onChanged: m3Legacy<String>((val) {
+                                  if (val != null)
+                                    setDialogState(() => chain = val);
                                 }),
-),
+                              ),
                             ),
                             const SizedBox(width: 12.0),
                             Expanded(
                               flex: 2,
                               child: M3Dropdown<int>(
-value: month,
-label: 'الشهر (Campaign Month)',
-expand: true,
-options: m3OptionsFromMenuItems<int>(List.generate(12, (idx) {
+                                value: month,
+                                label: 'الشهر (Campaign Month)',
+                                expand: true,
+                                options: m3OptionsFromMenuItems<int>(
+                                    List.generate(12, (idx) {
                                   final m = idx + 1;
                                   return DropdownMenuItem(
                                     value: m,
@@ -506,26 +544,30 @@ options: m3OptionsFromMenuItems<int>(List.generate(12, (idx) {
                                     ),
                                   );
                                 })),
-onChanged: m3Legacy<int>((val) {
-                                  if (val != null) setDialogState(() => month = val);
+                                onChanged: m3Legacy<int>((val) {
+                                  if (val != null)
+                                    setDialogState(() => month = val);
                                 }),
-),
+                              ),
                             ),
                             const SizedBox(width: 12.0),
                             Expanded(
                               flex: 1,
                               child: M3Dropdown<int>(
-value: year,
-label: 'السنة (Year)',
-expand: true,
-options: m3OptionsFromMenuItems<int>([
-                                  const DropdownMenuItem(value: 2026, child: Text('2026')),
-                                  const DropdownMenuItem(value: 2025, child: Text('2025')),
+                                value: year,
+                                label: 'السنة (Year)',
+                                expand: true,
+                                options: m3OptionsFromMenuItems<int>([
+                                  const DropdownMenuItem(
+                                      value: 2026, child: Text('2026')),
+                                  const DropdownMenuItem(
+                                      value: 2025, child: Text('2025')),
                                 ]),
-onChanged: m3Legacy<int>((val) {
-                                  if (val != null) setDialogState(() => year = val);
+                                onChanged: m3Legacy<int>((val) {
+                                  if (val != null)
+                                    setDialogState(() => year = val);
                                 }),
-),
+                              ),
                             ),
                           ],
                         ),
@@ -533,10 +575,12 @@ onChanged: m3Legacy<int>((val) {
 
                         // Row 2: Expense Category
                         M3Dropdown<MarketingExpenseCategory>(
-value: category,
-label: 'نوع المصروف التسويقي (Expense Category)',
-expand: true,
-options: m3OptionsFromMenuItems<MarketingExpenseCategory>(MarketingExpenseCategory.values.map((cat) {
+                          value: category,
+                          label: 'نوع المصروف التسويقي (Expense Category)',
+                          expand: true,
+                          options:
+                              m3OptionsFromMenuItems<MarketingExpenseCategory>(
+                                  MarketingExpenseCategory.values.map((cat) {
                             return DropdownMenuItem(
                               value: cat,
                               child: Row(
@@ -553,10 +597,11 @@ options: m3OptionsFromMenuItems<MarketingExpenseCategory>(MarketingExpenseCatego
                               ),
                             );
                           }).toList()),
-onChanged: m3Legacy<MarketingExpenseCategory>((val) {
-                            if (val != null) setDialogState(() => category = val);
+                          onChanged: m3Legacy<MarketingExpenseCategory>((val) {
+                            if (val != null)
+                              setDialogState(() => category = val);
                           }),
-),
+                        ),
                         const SizedBox(height: 14.0),
 
                         // Row 3: Amount EGP + Brand
@@ -566,9 +611,12 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
                               flex: 3,
                               child: TextField(
                                 controller: amountCtrl,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 decoration: const InputDecoration(
-                                  labelText: 'قيمة المصروف بالجنيه (Amount in EGP) *',
+                                  labelText:
+                                      'قيمة المصروف بالجنيه (Amount in EGP) *',
                                   hintText: 'مثال: 100000',
                                   prefixIcon: Icon(Icons.payments_rounded),
                                   border: OutlineInputBorder(),
@@ -598,8 +646,10 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
                         TextField(
                           controller: titleCtrl,
                           decoration: const InputDecoration(
-                            labelText: 'وصف النشاط الترويجي أو الحملة (Campaign / Activity Title) *',
-                            hintText: 'مثال: تأجير فلورات عرض رئيسية + إيفنت تذوق وهدايا مجانية',
+                            labelText:
+                                'وصف النشاط الترويجي أو الحملة (Campaign / Activity Title) *',
+                            hintText:
+                                'مثال: تأجير فلورات عرض رئيسية + إيفنت تذوق وهدايا مجانية',
                             prefixIcon: Icon(Icons.campaign_rounded),
                             border: OutlineInputBorder(),
                             isDense: true,
@@ -611,8 +661,10 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
                         TextField(
                           controller: vendorCtrl,
                           decoration: const InputDecoration(
-                            labelText: 'شركة الدعاية أو جهة التعاقد (Agency / Retailer Contract)',
-                            hintText: 'مثال: إدارة التعاقدات بالسلسلة / شركة دعاية وإيفنتات',
+                            labelText:
+                                'شركة الدعاية أو جهة التعاقد (Agency / Retailer Contract)',
+                            hintText:
+                                'مثال: إدارة التعاقدات بالسلسلة / شركة دعاية وإيفنتات',
                             prefixIcon: Icon(Icons.business_rounded),
                             border: OutlineInputBorder(),
                             isDense: true,
@@ -625,8 +677,10 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
                           controller: notesCtrl,
                           maxLines: 2,
                           decoration: const InputDecoration(
-                            labelText: 'ملاحظات وتفاصيل الفروع المستهدفة (Notes & Target Branches)',
-                            hintText: 'مثال: فروع سموحة، سان ستيفانو، المنتزه...',
+                            labelText:
+                                'ملاحظات وتفاصيل الفروع المستهدفة (Notes & Target Branches)',
+                            hintText:
+                                'مثال: فروع سموحة، سان ستيفانو، المنتزه...',
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
@@ -642,9 +696,12 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
                   ),
                   FilledButton.icon(
                     onPressed: () async {
-                      final parsedAmount = double.tryParse(amountCtrl.text.replaceAll(',', '').trim()) ?? 0.0;
+                      final parsedAmount = double.tryParse(
+                              amountCtrl.text.replaceAll(',', '').trim()) ??
+                          0.0;
                       if (parsedAmount <= 0) {
-                        M3Feedback.showWarning(context, 'يرجى إدخال قيمة صحيحة للمصروف بالجنيه (أكبر من صفر)');
+                        M3Feedback.showWarning(context,
+                            'يرجى إدخال قيمة صحيحة للمصروف بالجنيه (أكبر من صفر)');
                         return;
                       }
                       final title = titleCtrl.text.trim().isEmpty
@@ -652,12 +709,15 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
                           : titleCtrl.text.trim();
 
                       final newItem = MarketingExpenseItem(
-                        id: existing?.id ?? 'EXP-${DateTime.now().millisecondsSinceEpoch}',
+                        id: existing?.id ??
+                            'EXP-${DateTime.now().millisecondsSinceEpoch}',
                         year: year,
                         month: month,
                         chainName: chain,
                         category: category,
-                        brandName: brandCtrl.text.trim().isEmpty ? 'General' : brandCtrl.text.trim(),
+                        brandName: brandCtrl.text.trim().isEmpty
+                            ? 'General'
+                            : brandCtrl.text.trim(),
                         campaignTitle: title,
                         vendorOrAgency: vendorCtrl.text.trim().isEmpty
                             ? 'تعاقد مباشر - $chain'
@@ -669,7 +729,8 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
 
                       final MarketingExpenseItem saved;
                       try {
-                        saved = await _repo.saveExpense(newItem, isNew: existing == null);
+                        saved = await _repo.saveExpense(newItem,
+                            isNew: existing == null);
                       } catch (e) {
                         if (!mounted) return;
                         M3Feedback.showWarning(context, 'تعذر حفظ المصروف: $e');
@@ -678,7 +739,8 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
                       if (!mounted) return;
                       setState(() {
                         if (existing != null) {
-                          final idx = _expenses.indexWhere((e) => e.id == existing.id);
+                          final idx =
+                              _expenses.indexWhere((e) => e.id == existing.id);
                           if (idx != -1) _expenses[idx] = saved;
                         } else {
                           _expenses.insert(0, saved);
@@ -695,8 +757,10 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
                             : 'تم تحديث المصروف التسويقي وإعادة احتساب الـ ROI بنجاح',
                       );
                     },
-                    icon: const Icon(Icons.check_circle_outline_rounded, size: 18.0),
-                    label: Text(existing == null ? 'Save Expense' : 'Update Expense'),
+                    icon: const Icon(Icons.check_circle_outline_rounded,
+                        size: 18.0),
+                    label: Text(
+                        existing == null ? 'Save Expense' : 'Update Expense'),
                   ),
                 ],
               ),
@@ -713,7 +777,8 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
 
     String simChain = _selectedChain != 'all' ? _selectedChain : 'Fathalla';
     int simMonth = _selectedMonth != 0 ? _selectedMonth : 1;
-    final int simYear = _selectedYear != 0 ? _selectedYear : DateTime.now().year;
+    final int simYear =
+        _selectedYear != 0 ? _selectedYear : DateTime.now().year;
     final requested = <String>{};
     final historicalRomi = _historicalRomi;
     double proposedBudget = 100000.0;
@@ -725,7 +790,8 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             // What-if projection seeded from server baselines (ingested sell-out data).
-            final simKey = tradeMarketingBaselineKey(simYear, simMonth, simChain);
+            final simKey =
+                tradeMarketingBaselineKey(simYear, simMonth, simChain);
             final baseline = _baselines[simKey];
             if (baseline == null && !requested.contains(simKey)) {
               requested.add(simKey);
@@ -739,13 +805,15 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
             final momLift = projectedSales - prevSales;
             final momPct = prevSales > 0 ? (momLift / prevSales) * 100.0 : 0.0;
             final yoyLift = projectedSales - lastYearSales;
-            final yoyPct = lastYearSales > 0 ? (yoyLift / lastYearSales) * 100.0 : 0.0;
+            final yoyPct =
+                lastYearSales > 0 ? (yoyLift / lastYearSales) * 100.0 : 0.0;
             final romi = proposedBudget > 0 ? momLift / proposedBudget : 0.0;
 
             return Directionality(
               textDirection: TextDirection.rtl,
               child: AlertDialog(
-                shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusXl),
+                shape: const RoundedRectangleBorder(
+                    borderRadius: M3Shape.radiusXl),
                 title: Row(
                   children: [
                     Container(
@@ -766,11 +834,13 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
                         children: [
                           Text(
                             'محاكي العائد التسويقي الذكي (Promo Budget ROI Simulator)',
-                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w800),
                           ),
                           Text(
                             'اختبر تأثير الميزانية التسويقية المقترحة على نمو المبيعات الشهري والسنوي',
-                            style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -787,34 +857,40 @@ onChanged: m3Legacy<MarketingExpenseCategory>((val) {
                         children: [
                           Expanded(
                             child: M3Dropdown<String>(
-value: simChain,
-label: 'السلسلة (Chain)',
-expand: true,
-options: m3OptionsFromMenuItems<String>(_availableChains
-                                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                                  .toList()),
-onChanged: m3Legacy<String>((v) {
-                                if (v != null) setDialogState(() => simChain = v);
+                              value: simChain,
+                              label: 'السلسلة (Chain)',
+                              expand: true,
+                              options: m3OptionsFromMenuItems<String>(
+                                  _availableChains
+                                      .map((c) => DropdownMenuItem(
+                                          value: c, child: Text(c)))
+                                      .toList()),
+                              onChanged: m3Legacy<String>((v) {
+                                if (v != null)
+                                  setDialogState(() => simChain = v);
                               }),
-),
+                            ),
                           ),
                           const SizedBox(width: 12.0),
                           Expanded(
                             child: M3Dropdown<int>(
-value: simMonth,
-label: 'الشهر (Month)',
-expand: true,
-options: m3OptionsFromMenuItems<int>(List.generate(12, (idx) {
+                              value: simMonth,
+                              label: 'الشهر (Month)',
+                              expand: true,
+                              options: m3OptionsFromMenuItems<int>(
+                                  List.generate(12, (idx) {
                                 final m = idx + 1;
                                 return DropdownMenuItem(
                                   value: m,
-                                  child: Text('${MarketingExpenseItem.monthNamesAr[m]} (${MarketingExpenseItem.monthNamesEn[m]})'),
+                                  child: Text(
+                                      '${MarketingExpenseItem.monthNamesAr[m]} (${MarketingExpenseItem.monthNamesEn[m]})'),
                                 );
                               })),
-onChanged: m3Legacy<int>((v) {
-                                if (v != null) setDialogState(() => simMonth = v);
+                              onChanged: m3Legacy<int>((v) {
+                                if (v != null)
+                                  setDialogState(() => simMonth = v);
                               }),
-),
+                            ),
                           ),
                         ],
                       ),
@@ -823,13 +899,16 @@ onChanged: m3Legacy<int>((v) {
                         controller: budgetCtrl,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
-                          labelText: 'الميزانية التسويقية المقترحة للشهر (Proposed Budget in EGP)',
-                          prefixIcon: Icon(Icons.account_balance_wallet_rounded),
+                          labelText:
+                              'الميزانية التسويقية المقترحة للشهر (Proposed Budget in EGP)',
+                          prefixIcon:
+                              Icon(Icons.account_balance_wallet_rounded),
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
                         onChanged: (val) {
-                          final parsed = double.tryParse(val.replaceAll(',', '').trim());
+                          final parsed =
+                              double.tryParse(val.replaceAll(',', '').trim());
                           if (parsed != null && parsed >= 0) {
                             setDialogState(() => proposedBudget = parsed);
                           }
@@ -839,7 +918,8 @@ onChanged: m3Legacy<int>((v) {
                       Container(
                         padding: const EdgeInsets.all(16.0),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withOpacity(0.45),
+                          color: colorScheme.surfaceContainerHighest
+                              .withOpacity(0.45),
                           borderRadius: M3Shape.radiusLg,
                           border: Border.all(color: colorScheme.outlineVariant),
                         ),
@@ -848,7 +928,8 @@ onChanged: m3Legacy<int>((v) {
                           children: [
                             Text(
                               'النتائج المتوقعة بناءً على حساسية المبيعات التاريخية لـ $simChain:',
-                              style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+                              style: theme.textTheme.labelLarge
+                                  ?.copyWith(fontWeight: FontWeight.w800),
                             ),
                             const SizedBox(height: 12.0),
                             _buildSimMetricRow(
@@ -912,15 +993,20 @@ onChanged: m3Legacy<int>((v) {
     );
   }
 
-  Widget _buildSimMetricRow(String label, String value, Color valueColor, {bool isBold = false}) {
+  Widget _buildSimMetricRow(String label, String value, Color valueColor,
+      {bool isBold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: M3FontSize.labelMediumPlus, fontWeight: FontWeight.w600)),
+        Text(label,
+            style: const TextStyle(
+                fontSize: M3FontSize.labelMediumPlus,
+                fontWeight: FontWeight.w600)),
         Text(
           value,
           style: TextStyle(
-            fontSize: isBold ? M3FontSize.bodyMedium : M3FontSize.labelMediumPlus,
+            fontSize:
+                isBold ? M3FontSize.bodyMedium : M3FontSize.labelMediumPlus,
             fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
             color: valueColor,
           ),
@@ -948,7 +1034,8 @@ onChanged: m3Legacy<int>((v) {
                     color: summary.verdictColor.withOpacity(0.15),
                     borderRadius: M3Shape.radiusMd,
                   ),
-                  child: Icon(Icons.insights_rounded, color: summary.verdictColor),
+                  child:
+                      Icon(Icons.insights_rounded, color: summary.verdictColor),
                 ),
                 const SizedBox(width: 12.0),
                 Expanded(
@@ -957,11 +1044,13 @@ onChanged: m3Legacy<int>((v) {
                     children: [
                       Text(
                         'تحليل أثر الحملة التسويقية: ${summary.chainName} - ${summary.monthNameAr} ${summary.year}',
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
                       ),
                       Text(
                         '${summary.chainName} | ${summary.monthNameEn} ${summary.year} Campaign ROI Breakdown',
-                        style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: colorScheme.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -976,41 +1065,55 @@ onChanged: m3Legacy<int>((v) {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Summary comparison boxes
-                    Wrap(
-                      spacing: 12.0,
-                      runSpacing: 12.0,
+                    M3EqualHeightGrid(
+                      key: const ValueKey('tm_drill_cards'),
+                      columns: 2,
+                      spacing: M3Spacing.s12,
+                      runSpacing: M3Spacing.s12,
                       children: [
                         _buildMiniDrillCard(
                           titleAr: 'إجمالي المصروفات بالشهر',
                           titleEn: 'Campaign Spend',
-                          value: CurrencyFormatter.formatEGP(summary.marketingSpendEgp),
-                          sub: '${summary.activitiesCount} أنشطة ترويجية',
+                          value: CurrencyFormatter.formatEGP(
+                              summary.marketingSpendEgp),
+                          sub: _itemsCount(summary.activitiesCount),
                           color: M3Palette.violet,
                         ),
                         _buildMiniDrillCard(
                           titleAr: 'مبيعات الشهر الحالي',
                           titleEn: 'Current Month Sales',
-                          value: CurrencyFormatter.formatEGP(summary.currentMonthSalesEgp),
-                          sub: 'نسبة الصرف: ${summary.spendToSalesRatioPct.toStringAsFixed(1)}% من المبيعات',
+                          value: CurrencyFormatter.formatEGP(
+                              summary.currentMonthSalesEgp),
+                          sub:
+                              'نسبة الصرف: ${summary.spendToSalesRatioPct.toStringAsFixed(1)}% من المبيعات',
                           color: colorScheme.primary,
                         ),
                         _buildMiniDrillCard(
                           titleAr: 'النمو عن الشهر السابق (MoM)',
-                          titleEn: 'vs. Previous Month (${CurrencyFormatter.formatEGP(summary.previousMonthSalesEgp)})',
-                          value: '${summary.momLiftEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(summary.momLiftEgp)}',
-                          sub: '${summary.momGrowthPct >= 0 ? '+' : ''}${summary.momGrowthPct.toStringAsFixed(1)}% MoM Growth',
-                          color: summary.momGrowthPct >= 0 ? M3Palette.success : M3Palette.danger,
+                          titleEn:
+                              'vs. Previous Month (${CurrencyFormatter.formatEGP(summary.previousMonthSalesEgp)})',
+                          value:
+                              '${summary.momLiftEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(summary.momLiftEgp)}',
+                          sub:
+                              '${summary.momGrowthPct >= 0 ? '+' : ''}${summary.momGrowthPct.toStringAsFixed(1)}% MoM Growth',
+                          color: summary.momGrowthPct >= 0
+                              ? M3Palette.success
+                              : M3Palette.danger,
                         ),
                         _buildMiniDrillCard(
                           titleAr: 'النمو عن نفس الشهر بالعام السابق (YoY)',
-                          titleEn: 'vs. Last Year (${CurrencyFormatter.formatEGP(summary.lastYearSameMonthSalesEgp)})',
+                          titleEn: summary.hasYoY
+                              ? 'vs. Last Year (${CurrencyFormatter.formatEGP(summary.lastYearSameMonthSalesEgp)})'
+                              : 'vs. Last Year (—)',
                           value: summary.hasYoY
                               ? '${summary.yoyLiftEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(summary.yoyLiftEgp)}'
                               : '—',
                           sub: summary.hasYoY
                               ? '${summary.yoyGrowthPct >= 0 ? '+' : ''}${summary.yoyGrowthPct.toStringAsFixed(1)}% YoY Growth'
                               : 'لا توجد بيانات للعام السابق',
-                          color: summary.yoyGrowthPct >= 0 ? M3Palette.info : M3Palette.danger,
+                          color: summary.yoyGrowthPct >= 0
+                              ? M3Palette.info
+                              : M3Palette.danger,
                         ),
                       ],
                     ),
@@ -1020,11 +1123,13 @@ onChanged: m3Legacy<int>((v) {
                       decoration: BoxDecoration(
                         color: summary.verdictColor.withOpacity(0.1),
                         borderRadius: M3Shape.radiusMd,
-                        border: Border.all(color: summary.verdictColor.withOpacity(0.4)),
+                        border: Border.all(
+                            color: summary.verdictColor.withOpacity(0.4)),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.verified_rounded, color: summary.verdictColor),
+                          Icon(Icons.verified_rounded,
+                              color: summary.verdictColor),
                           const SizedBox(width: 10.0),
                           Expanded(
                             child: Text(
@@ -1042,30 +1147,39 @@ onChanged: m3Legacy<int>((v) {
                     const SizedBox(height: 16.0),
                     Text(
                       'بنود المصروفات المسجلة في هذا الشهر (${summary.expenses.length}):',
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 8.0),
                     ...summary.expenses.map((exp) {
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8.0),
                         elevation: 0,
-                        color: colorScheme.surfaceContainerHighest.withOpacity(0.35),
+                        color: colorScheme.surfaceContainerHighest
+                            .withOpacity(0.35),
                         shape: RoundedRectangleBorder(
                           borderRadius: M3Shape.radiusMd,
-                          side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+                          side: BorderSide(
+                              color:
+                                  colorScheme.outlineVariant.withOpacity(0.5)),
                         ),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: exp.category.color.withOpacity(0.15),
-                            child: Icon(exp.category.icon, color: exp.category.color, size: 20.0),
+                            backgroundColor:
+                                exp.category.color.withOpacity(0.15),
+                            child: Icon(exp.category.icon,
+                                color: exp.category.color, size: 20.0),
                           ),
                           title: Text(
                             exp.campaignTitle,
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: M3FontSize.bodyCompact),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: M3FontSize.bodyCompact),
                           ),
                           subtitle: Text(
                             '${exp.category.labelAr} • البراند: ${exp.brandName} • الجهة: ${exp.vendorOrAgency}',
-                            style: const TextStyle(fontSize: M3FontSize.bodySmall),
+                            style:
+                                const TextStyle(fontSize: M3FontSize.bodySmall),
                           ),
                           trailing: Text(
                             CurrencyFormatter.formatEGP(exp.amountEgp),
@@ -1102,7 +1216,6 @@ onChanged: m3Legacy<int>((v) {
     required Color color,
   }) {
     return Container(
-      width: 310.0,
       padding: const EdgeInsets.all(14.0),
       decoration: BoxDecoration(
         color: color.withOpacity(0.06),
@@ -1112,15 +1225,27 @@ onChanged: m3Legacy<int>((v) {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(titleAr, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmallPlus)),
-          Text(titleEn, style: TextStyle(fontSize: M3FontSize.labelSmall, color: Colors.grey.shade700)),
+          Text(titleAr,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: M3FontSize.bodySmallPlus)),
+          Text(titleEn,
+              style: TextStyle(
+                  fontSize: M3FontSize.labelSmall,
+                  color: Colors.grey.shade700)),
           const SizedBox(height: 6.0),
           Text(
             value,
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: M3FontSize.titleMediumPlus, color: color),
+            style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: M3FontSize.titleMediumPlus,
+                color: color),
           ),
           const SizedBox(height: 2.0),
-          Text(sub, style: const TextStyle(fontSize: M3FontSize.labelSmallPlus, fontWeight: FontWeight.w600)),
+          Text(sub,
+              style: const TextStyle(
+                  fontSize: M3FontSize.labelSmallPlus,
+                  fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -1169,7 +1294,8 @@ onChanged: m3Legacy<int>((v) {
     }).toList();
 
     final csv = ExcelExportService.generateCsv(headers: headers, rows: rows);
-    ExcelExportService.downloadCsv('Trade_Marketing_ROI_Growth_Report.xlsx', csv);
+    ExcelExportService.downloadCsv(
+        'Trade_Marketing_ROI_Growth_Report.xlsx', csv);
     M3Feedback.showSuccess(
       context,
       'تم تصدير تقرير العائد التسويقي ونمو المبيعات (Trade_Marketing_ROI_Growth_Report.xlsx) بنجاح',
@@ -1178,8 +1304,10 @@ onChanged: m3Legacy<int>((v) {
 
   void _printPdfReport() {
     final summaries = _monthlyRoiSummaries;
-    final totalSpend = summaries.fold<double>(0.0, (s, e) => s + e.marketingSpendEgp);
-    final totalMomLift = summaries.fold<double>(0.0, (s, e) => s + e.momLiftEgp);
+    final totalSpend =
+        summaries.fold<double>(0.0, (s, e) => s + e.marketingSpendEgp);
+    final totalMomLift =
+        summaries.fold<double>(0.0, (s, e) => s + e.momLiftEgp);
 
     final headers = [
       'الشهر والسنة',
@@ -1201,23 +1329,29 @@ onChanged: m3Legacy<int>((v) {
         CurrencyFormatter.formatEGP(s.previousMonthSalesEgp),
         CurrencyFormatter.formatEGP(s.currentMonthSalesEgp),
         '${s.momGrowthPct >= 0 ? '+' : ''}${s.momGrowthPct.toStringAsFixed(1)}%',
-        s.hasYoY ? '${s.yoyGrowthPct >= 0 ? '+' : ''}${s.yoyGrowthPct.toStringAsFixed(1)}%' : '—',
+        s.hasYoY
+            ? '${s.yoyGrowthPct >= 0 ? '+' : ''}${s.yoyGrowthPct.toStringAsFixed(1)}%'
+            : '—',
         '${s.romiMultiple.toStringAsFixed(2)}x',
         s.verdictAr,
       ];
     }).toList();
 
     final htmlContent = ExcelExportService.generatePrintableReport(
-      title: 'تقرير العائد على المصروفات التسويقية والترويجية (Trade Marketing & Promo ROI)',
+      title:
+          'تقرير العائد على المصروفات التسويقية والترويجية (Trade Marketing & Promo ROI)',
       headers: headers,
       rows: rows,
       metadata: {
         'إجمالي الإنفاق التسويقي': CurrencyFormatter.formatEGP(totalSpend),
-        'إجمالي نمو المبيعات الشهري (MoM)': CurrencyFormatter.formatEGP(totalMomLift),
+        'إجمالي نمو المبيعات الشهري (MoM)':
+            CurrencyFormatter.formatEGP(totalMomLift),
       },
     );
-    ExcelExportService.downloadHtml('Trade_Marketing_ROI_Report.html', htmlContent);
-    M3Feedback.showInfo(context, 'تم تجهيز وتحميل تقرير الـ PDF القابل للطباعة');
+    ExcelExportService.downloadHtml(
+        'Trade_Marketing_ROI_Report.html', htmlContent);
+    M3Feedback.showInfo(
+        context, 'تم تجهيز وتحميل تقرير الـ PDF القابل للطباعة');
   }
 
   @override
@@ -1229,80 +1363,94 @@ onChanged: m3Legacy<int>((v) {
 
     // Aggregate top KPI metrics
     final totalSpend = expenses.fold<double>(0.0, (s, e) => s + e.amountEgp);
-    final totalCurrentSales = summaries.fold<double>(0.0, (s, e) => s + e.currentMonthSalesEgp);
-    final totalPrevSales = summaries.fold<double>(0.0, (s, e) => s + e.previousMonthSalesEgp);
-    final totalLastYearSales = summaries.fold<double>(0.0, (s, e) => s + e.lastYearSameMonthSalesEgp);
+    final totalCurrentSales =
+        summaries.fold<double>(0.0, (s, e) => s + e.currentMonthSalesEgp);
+    final totalPrevSales =
+        summaries.fold<double>(0.0, (s, e) => s + e.previousMonthSalesEgp);
+    final totalLastYearSales =
+        summaries.fold<double>(0.0, (s, e) => s + e.lastYearSameMonthSalesEgp);
 
     final totalMomLift = totalCurrentSales - totalPrevSales;
-    final totalMomPct = totalPrevSales > 0 ? (totalMomLift / totalPrevSales) * 100.0 : 0.0;
+    final totalMomPct =
+        totalPrevSales > 0 ? (totalMomLift / totalPrevSales) * 100.0 : 0.0;
 
     // YoY compares the same months only: current sales count only for
     // rows whose same month last year has Sell-Out.
-    final totalYoyCurrentSales =
-        summaries.where((e) => e.hasYoY).fold<double>(0.0, (s, e) => s + e.currentMonthSalesEgp);
+    final totalYoyCurrentSales = summaries
+        .where((e) => e.hasYoY)
+        .fold<double>(0.0, (s, e) => s + e.currentMonthSalesEgp);
     final totalYoyAvailable = totalLastYearSales > 0;
     final totalYoyLift = totalYoyCurrentSales - totalLastYearSales;
-    final totalYoyPct = totalYoyAvailable ? (totalYoyLift / totalLastYearSales) * 100.0 : 0.0;
+    final totalYoyPct =
+        totalYoyAvailable ? (totalYoyLift / totalLastYearSales) * 100.0 : 0.0;
 
     final overallRomi = totalSpend > 0 ? (totalMomLift / totalSpend) : 0.0;
-    final spendRatioPct = totalCurrentSales > 0 ? (totalSpend / totalCurrentSales) * 100.0 : 0.0;
+    final spendRatioPct =
+        totalCurrentSales > 0 ? (totalSpend / totalCurrentSales) * 100.0 : 0.0;
 
     final isCompact = MediaQuery.sizeOf(context).width < 600.0;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      body: SingleChildScrollView(
-        padding: isCompact ? M3Spacing.pSm : M3Spacing.pMd,
-        child: M3ContentBoundary(
-          maxWidth: double.infinity,
-          alignment: AlignmentDirectional.topStart,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // 1. Header & MD3 Large Responsive Tab Bar (Identical padding/margin to Sell-In & Sell-Out)
-              if (_loading || _uploading) const LinearProgressIndicator(),
-              if (_loadError != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: MaterialBanner(
-                    content: Text('تعذر تحميل بيانات التسويق من الخادم: $_loadError'),
-                    leading: Icon(Icons.cloud_off_rounded, color: colorScheme.error),
-                    actions: [
-                      TextButton(onPressed: _reload, child: const Text('Retry / إعادة المحاولة')),
-                    ],
+      body: M3ToolbarButtonTheme(
+        child: SingleChildScrollView(
+          padding: isCompact ? M3Spacing.pSm : M3Spacing.pMd,
+          child: M3ContentBoundary(
+            maxWidth: double.infinity,
+            alignment: AlignmentDirectional.topStart,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. Header & MD3 Large Responsive Tab Bar (Identical padding/margin to Sell-In & Sell-Out)
+                if (_loading || _uploading) const LinearProgressIndicator(),
+                if (_loadError != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: MaterialBanner(
+                      content: Text(
+                          'تعذر تحميل بيانات التسويق من الخادم: $_loadError'),
+                      leading: Icon(Icons.cloud_off_rounded,
+                          color: colorScheme.error),
+                      actions: [
+                        TextButton(
+                            onPressed: _reload,
+                            child: const Text('Retry / إعادة المحاولة')),
+                      ],
+                    ),
                   ),
+                _buildHeaderAndTabs(theme, colorScheme),
+                M3Spacing.gapMD,
+
+                // 2. Four Symmetrical Full-Width Executive KPI Cards (Arabic on top, English below)
+                _buildSymmetricalKpiRow(
+                  theme: theme,
+                  colorScheme: colorScheme,
+                  totalSpend: totalSpend,
+                  activitiesCount: expenses.length,
+                  totalMomLift: totalMomLift,
+                  totalMomPct: totalMomPct,
+                  totalYoyLift: totalYoyLift,
+                  totalYoyPct: totalYoyPct,
+                  totalYoyAvailable: totalYoyAvailable,
+                  overallRomi: overallRomi,
+                  spendRatioPct: spendRatioPct,
                 ),
-              _buildHeaderAndTabs(theme, colorScheme),
-              M3Spacing.gapMD,
+                M3Spacing.gapMD,
 
-              // 2. Four Symmetrical Full-Width Executive KPI Cards (Arabic on top, English below)
-              _buildSymmetricalKpiRow(
-                theme: theme,
-                colorScheme: colorScheme,
-                totalSpend: totalSpend,
-                activitiesCount: expenses.length,
-                totalMomLift: totalMomLift,
-                totalMomPct: totalMomPct,
-                totalYoyLift: totalYoyLift,
-                totalYoyPct: totalYoyPct,
-                totalYoyAvailable: totalYoyAvailable,
-                overallRomi: overallRomi,
-                spendRatioPct: spendRatioPct,
-              ),
-              M3Spacing.gapMD,
+                // 3. Symmetrical Filter & Action Toolbar (All English Action Buttons in MD3 Large)
+                _buildFilterAndActionToolbar(theme, colorScheme),
+                M3Spacing.gapMD,
 
-              // 3. Symmetrical Filter & Action Toolbar (All English Action Buttons in MD3 Large)
-              _buildFilterAndActionToolbar(theme, colorScheme),
-              M3Spacing.gapMD,
-
-              // 4. Active Tab Content
-              if (_activeTab == 0)
-                _buildRoiGrowthMatrixTab(theme, colorScheme, summaries)
-              else if (_activeTab == 1)
-                _buildExpenseLedgerTab(theme, colorScheme, expenses)
-              else
-                _buildCategoryAnalyticsTab(theme, colorScheme, expenses, summaries),
-            ],
+                // 4. Active Tab Content
+                if (_activeTab == 0)
+                  _buildRoiGrowthMatrixTab(theme, colorScheme, summaries)
+                else if (_activeTab == 1)
+                  _buildExpenseLedgerTab(theme, colorScheme, expenses)
+                else
+                  _buildCategoryAnalyticsTab(
+                      theme, colorScheme, expenses, summaries),
+              ],
+            ),
           ),
         ),
       ),
@@ -1364,211 +1512,71 @@ onChanged: m3Legacy<int>((v) {
     required double overallRomi,
     required double spendRatioPct,
   }) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 960;
-        final cards = [
-          _buildSymmetricalKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
-            titleAr: 'إجمالي المصروفات الترويجية',
-            titleEn: 'Total Trade Marketing Spend',
-            primaryValue: CurrencyFormatter.formatEGP(totalSpend),
-            badgeText: '$activitiesCount Campaigns / Activities',
-            subText: 'الفلورات، الدعاية، الهدايا، والإيفنتات',
-            icon: Icons.campaign_rounded,
-            accentColor: M3Palette.violet,
-          ),
-          _buildSymmetricalKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
-            titleAr: 'نمو المبيعات عن الشهر السابق',
-            titleEn: 'MoM Sales Growth Lift',
-            primaryValue: '${totalMomLift >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(totalMomLift)}',
-            badgeText: '${totalMomPct >= 0 ? '+' : ''}${totalMomPct.toStringAsFixed(1)}% MoM',
-            subText: 'مقارنة بمبيعات الشهر السابق مباشرةً',
-            icon: Icons.show_chart_rounded,
-            accentColor: totalMomLift >= 0 ? M3Palette.success : M3Palette.danger,
-          ),
-          _buildSymmetricalKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
-            titleAr: 'نمو المبيعات عن العام السابق',
-            titleEn: 'YoY Same-Month Sales Lift',
-            primaryValue: totalYoyAvailable
-                ? '${totalYoyLift >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(totalYoyLift)}'
-                : '—',
-            badgeText: totalYoyAvailable
-                ? '${totalYoyPct >= 0 ? '+' : ''}${totalYoyPct.toStringAsFixed(1)}% YoY'
-                : 'لا توجد بيانات للعام السابق',
-            subText: 'مقارنة بنفس الشهر من السنة السابقة',
-            icon: Icons.calendar_month_rounded,
-            accentColor: totalYoyLift >= 0 ? M3Palette.info : M3Palette.danger,
-          ),
-          _buildSymmetricalKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
-            titleAr: 'العائد على الإنفاق التسويقي',
-            titleEn: 'Return on Marketing Spend (ROMI)',
-            primaryValue: '${overallRomi.toStringAsFixed(2)}x ROI',
-            badgeText: 'Cost Ratio: ${spendRatioPct.toStringAsFixed(1)}%',
-            subText: 'كل 1 ج.م تسويق حقق ${overallRomi.toStringAsFixed(2)} ج.م نمو',
-            icon: Icons.workspace_premium_rounded,
-            accentColor: M3Palette.warning,
-          ),
-        ];
-
-        if (isWide) {
-          return IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (int i = 0; i < cards.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 14.0),
-                  Expanded(child: cards[i]),
-                ],
-              ],
-            ),
-          );
-        }
-
-        return Column(
-          children: [
-            Row(
-              children: [
-                Expanded(child: cards[0]),
-                const SizedBox(width: 12.0),
-                Expanded(child: cards[1]),
-              ],
-            ),
-            const SizedBox(height: 12.0),
-            Row(
-              children: [
-                Expanded(child: cards[2]),
-                const SizedBox(width: 12.0),
-                Expanded(child: cards[3]),
-              ],
-            ),
-          ],
-        );
-      },
-    );
+    String signed(double v) => v >= 0 ? '+' : '';
+    String pct(double v) => '${signed(v)}${v.toStringAsFixed(1)}%';
+    final momUp = totalMomLift >= 0;
+    final yoyUp = totalYoyLift >= 0;
+    // Shared Sell-Out KPI card + grid (same geometry, fonts and icon size).
+    // Values stay on one line; percentages and counts go on the detail line.
+    final cards = [
+      M3SummaryKpiCard(
+        key: const ValueKey('tm_kpi_spend'),
+        valueKey: const ValueKey('tm_kpi_spend_value'),
+        title: 'المصروفات الترويجية',
+        value: CurrencyFormatter.formatCompactEGP(totalSpend),
+        subtitle:
+            '${tmActivitiesCount(activitiesCount)} • ${spendRatioPct.toStringAsFixed(1)}% من المبيعات',
+        icon: Icons.campaign_rounded,
+        color: M3Palette.violet,
+      ),
+      M3SummaryKpiCard(
+        key: const ValueKey('tm_kpi_mom'),
+        valueKey: const ValueKey('tm_kpi_mom_value'),
+        title: 'النمو عن الشهر السابق',
+        value:
+            '${momUp ? '+' : ''}${CurrencyFormatter.formatCompactEGP(totalMomLift)}',
+        subtitle: '${pct(totalMomPct)} عن الشهر السابق',
+        icon: momUp ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+        color: momUp ? M3Palette.success : M3Palette.danger,
+      ),
+      M3SummaryKpiCard(
+        key: const ValueKey('tm_kpi_yoy'),
+        valueKey: const ValueKey('tm_kpi_yoy_value'),
+        subtitleKey: const ValueKey('tm_kpi_yoy_detail'),
+        title: 'النمو عن العام السابق',
+        value: totalYoyAvailable
+            ? '${yoyUp ? '+' : ''}${CurrencyFormatter.formatCompactEGP(totalYoyLift)}'
+            : '—',
+        subtitle: totalYoyAvailable
+            ? '${pct(totalYoyPct)} عن نفس الشهر'
+            : 'لا توجد بيانات للعام السابق',
+        icon: Icons.calendar_month_rounded,
+        color: !totalYoyAvailable || yoyUp ? M3Palette.info : M3Palette.danger,
+      ),
+      M3SummaryKpiCard(
+        key: const ValueKey('tm_kpi_romi'),
+        valueKey: const ValueKey('tm_kpi_romi_value'),
+        title: 'العائد على الإنفاق',
+        value: '${overallRomi.toStringAsFixed(2)}x',
+        subtitle: 'كل 1 ج.م حقق ${overallRomi.toStringAsFixed(2)} ج.م نمو',
+        icon: Icons.workspace_premium_rounded,
+        color: M3Palette.warning,
+      ),
+    ];
+    return LayoutBuilder(builder: (context, constraints) {
+      final w = constraints.maxWidth;
+      return M3EqualHeightGrid(
+        key: const ValueKey('tm_kpi_cards_row'),
+        columns: w >= 960 ? 4 : (w >= 580 ? 2 : 1),
+        spacing: M3Spacing.sm,
+        runSpacing: M3Spacing.sm,
+        children: cards,
+      );
+    });
   }
 
-  Widget _buildSymmetricalKpiCard({
-    required ThemeData theme,
-    required ColorScheme colorScheme,
-    required String titleAr,
-    required String titleEn,
-    required String primaryValue,
-    required String badgeText,
-    required String subText,
-    required IconData icon,
-    required Color accentColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(18.0),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: M3Shape.radiusLg,
-        border: Border.all(
-          color: accentColor.withOpacity(0.28),
-          width: 1.2,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10.0),
-                decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.12),
-                  borderRadius: M3Shape.radiusMd,
-                ),
-                child: Icon(icon, color: accentColor, size: 22.0),
-              ),
-              const SizedBox(width: 10.0),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      titleAr,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    Text(
-                      titleEn,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14.0),
-          Text(
-            primaryValue,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: accentColor,
-              letterSpacing: -0.4,
-            ),
-          ),
-          const SizedBox(height: 10.0),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  subText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: M3FontSize.labelSmallPlus,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6.0),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
-                decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.12),
-                  borderRadius: M3Shape.radiusFull,
-                ),
-                child: Text(
-                  badgeText,
-                  style: TextStyle(
-                    fontSize: M3FontSize.labelSmall,
-                    fontWeight: FontWeight.w800,
-                    color: accentColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterAndActionToolbar(ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildFilterAndActionToolbar(
+      ThemeData theme, ColorScheme colorScheme) {
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
@@ -1595,97 +1603,108 @@ onChanged: m3Legacy<int>((v) {
                     // Chain Filter
                     // Sized from its longest option (no clipping, v126).
                     M3Dropdown<String>(
-value: _selectedChain,
-label: 'Retail Chain',
-fitOptions: true,
-leadingIcon: Icons.storefront_rounded,
-options: m3OptionsFromMenuItems<String>([
-                          const DropdownMenuItem(value: 'all', child: Text('All Chains')),
-                          ..._availableChains.map(
-                            (c) => DropdownMenuItem(value: c, child: Text(c)),
-                          ),
-                        ]),
-onChanged: m3Legacy<String>((v) {
-                          if (v != null) setState(() => _selectedChain = v);
-                        }),
-),
+                      value: _selectedChain,
+                      label: 'Retail Chain',
+                      fitOptions: true,
+                      leadingIcon: Icons.storefront_rounded,
+                      options: m3OptionsFromMenuItems<String>([
+                        const DropdownMenuItem(
+                            value: 'all', child: Text('All Chains')),
+                        ..._availableChains.map(
+                          (c) => DropdownMenuItem(value: c, child: Text(c)),
+                        ),
+                      ]),
+                      onChanged: m3Legacy<String>((v) {
+                        if (v != null) setState(() => _selectedChain = v);
+                      }),
+                    ),
                     // Month Filter
                     // Sized from its longest option (no clipping, v126).
                     M3Dropdown<int>(
-value: _selectedMonth,
-label: 'Month',
-fitOptions: true,
-leadingIcon: Icons.event_note_rounded,
-options: m3OptionsFromMenuItems<int>([
-                          const DropdownMenuItem(value: 0, child: Text('All Months')),
-                          ...List.generate(12, (idx) {
-                            final m = idx + 1;
-                            return DropdownMenuItem(
-                              value: m,
-                              child: Text(MarketingExpenseItem.monthNamesEn[m]!),
-                            );
-                          }),
-                        ]),
-onChanged: m3Legacy<int>((v) {
-                          if (v != null) setState(() => _selectedMonth = v);
+                      value: _selectedMonth,
+                      label: 'Month',
+                      fitOptions: true,
+                      leadingIcon: Icons.event_note_rounded,
+                      options: m3OptionsFromMenuItems<int>([
+                        const DropdownMenuItem(
+                            value: 0, child: Text('All Months')),
+                        ...List.generate(12, (idx) {
+                          final m = idx + 1;
+                          return DropdownMenuItem(
+                            value: m,
+                            child: Text(MarketingExpenseItem.monthNamesEn[m]!),
+                          );
                         }),
-),
+                      ]),
+                      onChanged: m3Legacy<int>((v) {
+                        if (v != null) setState(() => _selectedMonth = v);
+                      }),
+                    ),
                     // Year Filter — same size as the shared year dropdown
                     // (Sell-Out 'سنة البيانات': 190dp with the calendar icon),
                     // so "2026" / "All Years" never clip.
                     SizedBox(
                       width: kYearDropdownWidth,
                       child: M3Dropdown<int>(
-value: _selectedYear,
-label: 'Year',
-leadingIcon: Icons.calendar_today_rounded,
-expand: true,
-options: m3OptionsFromMenuItems<int>([
-                          const DropdownMenuItem(value: 0, child: Text('All Years')),
-                          const DropdownMenuItem(value: 2026, child: Text('2026')),
-                          const DropdownMenuItem(value: 2025, child: Text('2025')),
+                        value: _selectedYear,
+                        label: 'Year',
+                        leadingIcon: Icons.calendar_today_rounded,
+                        expand: true,
+                        options: m3OptionsFromMenuItems<int>([
+                          const DropdownMenuItem(
+                              value: 0, child: Text('All Years')),
+                          const DropdownMenuItem(
+                              value: 2026, child: Text('2026')),
+                          const DropdownMenuItem(
+                              value: 2025, child: Text('2025')),
                         ]),
-onChanged: m3Legacy<int>((v) {
+                        onChanged: m3Legacy<int>((v) {
                           if (v != null) setState(() => _selectedYear = v);
                         }),
-),
+                      ),
                     ),
                     // Activity Category Filter
                     // Sized from its longest option (no clipping, v126).
                     M3Dropdown<String>(
-value: _selectedCategoryId,
-label: 'Activity Type',
-fitOptions: true,
-leadingIcon: Icons.category_rounded,
-options: m3OptionsFromMenuItems<String>([
-                          const DropdownMenuItem(value: 'all', child: Text('All Activity Types')),
-                          ...MarketingExpenseCategory.values.map(
-                            (c) => DropdownMenuItem(
-                              value: c.id,
-                              child: Text(c.labelEn, overflow: TextOverflow.ellipsis),
-                            ),
+                      value: _selectedCategoryId,
+                      label: 'Activity Type',
+                      fitOptions: true,
+                      leadingIcon: Icons.category_rounded,
+                      options: m3OptionsFromMenuItems<String>([
+                        const DropdownMenuItem(
+                            value: 'all', child: Text('All Activity Types')),
+                        ...MarketingExpenseCategory.values.map(
+                          (c) => DropdownMenuItem(
+                            value: c.id,
+                            child: Text(c.labelEn,
+                                overflow: TextOverflow.ellipsis),
                           ),
-                        ]),
-onChanged: m3Legacy<String>((v) {
-                          if (v != null) setState(() => _selectedCategoryId = v);
-                        }),
-),
+                        ),
+                      ]),
+                      onChanged: m3Legacy<String>((v) {
+                        if (v != null) setState(() => _selectedCategoryId = v);
+                      }),
+                    ),
                     // Search Box
                     M3FlexWrapFill(
                       // v127: fills the rest of the filter row, never
                       // narrower than its full placeholder.
                       child: M3SearchFieldWidth(
-                        hintText: 'Search campaign, brand...',
-                        child: TextField(
-                        onChanged: (val) => setState(() => _searchQuery = val),
-                        decoration: const InputDecoration(
                           hintText: 'Search campaign, brand...',
-                          prefixIcon: Icon(Icons.search_rounded, size: 18.0),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 11.0),
-                          border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
-                        ),
-                      )),
+                          child: TextField(
+                            onChanged: (val) =>
+                                setState(() => _searchQuery = val),
+                            decoration: const InputDecoration(
+                              hintText: 'Search campaign, brand...',
+                              prefixIcon:
+                                  Icon(Icons.search_rounded, size: 18.0),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12.0, vertical: 11.0),
+                              border: OutlineInputBorder(
+                                  borderRadius: M3Shape.radiusMd),
+                            ),
+                          )),
                     ),
                   ],
                 ),
@@ -1701,93 +1720,47 @@ onChanged: m3Legacy<String>((v) {
                   children: [
                     FilledButton.icon(
                       key: const ValueKey('btn_add_marketing_expense'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(0, 44.0),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18.0,
-                          vertical: 10.0,
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: M3FontSize.bodyCompact,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
                       onPressed: () => _openAddOrEditExpenseDialog(),
-                      icon: const Icon(Icons.add_circle_outline_rounded, size: 20.0),
+                      icon: const Icon(Icons.add_circle_outline_rounded),
                       label: const Text('Add Expense'),
                     ),
                     if (_canWrite)
                       FilledButton.tonalIcon(
                         key: const ValueKey('btn_upload_marketing_expenses'),
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(0, 44.0),
-                          padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 10.0),
-                          textStyle: const TextStyle(fontSize: M3FontSize.bodyCompact, fontWeight: FontWeight.w700),
-                        ),
                         onPressed: _uploading ? null : _pickAndUploadExpenses,
                         icon: _uploading
                             ? const SizedBox(
-                                width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.upload_file_rounded, size: 20.0),
-                        label: Text(_uploading ? 'Uploading…' : 'Upload Excel/CSV'),
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.upload_file_rounded),
+                        label: Text(
+                            _uploading ? 'Uploading…' : 'Upload Excel/CSV'),
                       ),
                     if (_canWrite)
                       TextButton.icon(
                         key: const ValueKey('btn_download_expense_template'),
-                        style: TextButton.styleFrom(minimumSize: const Size(0, 44.0)),
                         onPressed: _downloadTemplate,
-                        icon: const Icon(Icons.download_rounded, size: 20.0),
+                        icon: const Icon(Icons.download_rounded),
                         label: const Text('CSV Template'),
                       ),
                     FilledButton.tonalIcon(
                       key: const ValueKey('btn_roi_simulator'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(0, 44.0),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18.0,
-                          vertical: 10.0,
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: M3FontSize.bodyCompact,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
                       onPressed: _openRoiSimulatorDialog,
-                      icon: const Icon(Icons.auto_graph_rounded, size: 20.0),
+                      icon: const Icon(Icons.auto_graph_rounded),
                       label: const Text('ROI Simulator'),
                     ),
                     OutlinedButton.icon(
                       key: const ValueKey('btn_export_roi_excel'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 44.0),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18.0,
-                          vertical: 10.0,
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: M3FontSize.bodyCompact,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
                       onPressed: _exportExcelReport,
-                      icon: const Icon(Icons.table_view_rounded, size: 20.0),
+                      icon: const Icon(Icons.table_view_rounded),
                       label: const Text('Export Excel'),
                     ),
                     OutlinedButton.icon(
                       key: const ValueKey('btn_print_roi_pdf'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 44.0),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18.0,
-                          vertical: 10.0,
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: M3FontSize.bodyCompact,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
                       onPressed: _printPdfReport,
-                      icon: const Icon(Icons.picture_as_pdf_rounded, size: 20.0),
+                      icon: const Icon(Icons.picture_as_pdf_rounded),
                       label: const Text('Print PDF'),
                     ),
                   ],
@@ -1800,49 +1773,217 @@ onChanged: m3Legacy<String>((v) {
     );
   }
 
+  // ---- Shared table helpers (Sell-Out table rules) ----------------------
+  // Headers and cells centred except the name column; text wraps up to 3
+  // lines inside a bounded cell; full text in a tooltip only if clipped.
+  /// Cell width cap (text wraps inside it). Sortable headers get 36dp less:
+  /// DataTable adds the 18dp arrow and the table the same spacer opposite.
+  static const double _cellW = 80.0;
+
+  Widget _hdr(String label,
+      {TextAlign align = TextAlign.center,
+      double maxWidth = _cellW,
+      String? sortKey,
+      String? activeSort,
+      bool asc = true,
+      ValueChanged<String>? onSort}) {
+    final cs = Theme.of(context).colorScheme;
+    final selected = sortKey != null && sortKey == activeSort;
+    final text = M3WrapText(label,
+        textAlign: align,
+        style: TextStyle(
+            fontWeight: FontWeight.w800, color: selected ? cs.primary : null));
+    if (sortKey == null || onSort == null) {
+      return ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth), child: text);
+    }
+    // Inline 16dp sort icon (no DataTable arrow + mirrored spacer), so a
+    // sortable label keeps almost the full column width.
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: InkWell(
+        key: ValueKey('tm_sort_$sortKey'),
+        borderRadius: M3Shape.radiusSm,
+        onTap: () => onSort(sortKey),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: text),
+            const SizedBox(width: M3Spacing.s2),
+            Icon(
+              selected
+                  ? (asc
+                      ? Icons.arrow_upward_rounded
+                      : Icons.arrow_downward_rounded)
+                  : Icons.unfold_more_rounded,
+              size: 16.0,
+              color: selected ? cs.primary : cs.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _cell(Widget child, {double maxWidth = _cellW, bool start = false}) =>
+      ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: M3Spacing.xs),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment:
+                start ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+            children: [child],
+          ),
+        ),
+      );
+
+  Widget _lines(List<Widget> children, {bool start = false}) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment:
+            start ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        children: children,
+      );
+
+  Widget _txt(String text,
+          {TextStyle? style, bool start = false, int maxLines = 3}) =>
+      M3WrapText(text,
+          maxLines: maxLines,
+          textAlign: start ? TextAlign.start : TextAlign.center,
+          style: style);
+
+  /// Short 8dp status chip (M3ChipSurface geometry).
+  Widget _chip(String label, Color color, {Key? key, IconData? icon}) =>
+      M3ChipSurface(
+        key: key,
+        color: color.withOpacity(0.12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16.0, color: color),
+              const SizedBox(width: M3Spacing.xxs),
+            ],
+            Flexible(
+              child: M3WrapText(
+                label,
+                maxLines: 3,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: M3FontSize.labelSmallPlus,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  /// Short verdict label for the chip + its description under it (display
+  /// only; the verdict itself comes from the model unchanged).
+  static (String, String) verdictParts(String verdictAr) {
+    switch (verdictAr) {
+      case 'عائد ممتاز ونمو قياسي':
+        return ('ممتاز', 'عائد ممتاز ونمو قياسي');
+      case 'حملة ناجحة ونمو إيجابي':
+        return ('ناجحة', 'نمو إيجابي');
+      case 'نمو متوسط - يحتاج تحسين':
+        return ('متوسط', 'يحتاج تحسين');
+      case 'عائد ضعيف / مراجعة التكلفة':
+        return ('ضعيف', 'راجع التكلفة');
+      case 'بدون إنفاق ترويجي':
+        return ('بدون إنفاق', 'لا يوجد إنفاق ترويجي');
+    }
+    return (verdictAr, '');
+  }
+
+  static String _itemsCount(int n) => arabicCount(n,
+      one: 'بند ترويجي واحد',
+      two: 'بندان ترويجيان',
+      few: 'بنود ترويجية',
+      many: 'بندًا ترويجيًا',
+      hundred: 'بند ترويجي');
+
+  String _money(double v) => CurrencyFormatter.formatCompactEGP(v);
+
   /// TAB 0: Monthly & Chain ROI vs. MoM & YoY Sales Growth Matrix
   Widget _buildRoiGrowthMatrixTab(
     ThemeData theme,
     ColorScheme colorScheme,
     List<MonthlyChainRoiSummary> summaries,
   ) {
+    const sortKeys = [
+      'month',
+      '',
+      'spend',
+      '',
+      'sales',
+      'mom',
+      'yoy',
+      'roi',
+      '',
+      ''
+    ];
+    DataColumn col(int i, String label,
+            {bool start = false, double maxWidth = _cellW}) =>
+        DataColumn(
+          headingRowAlignment:
+              start ? MainAxisAlignment.start : MainAxisAlignment.center,
+          label: _hdr(label,
+              align: start ? TextAlign.start : TextAlign.center,
+              maxWidth: maxWidth,
+              sortKey: sortKeys[i].isEmpty ? null : sortKeys[i],
+              activeSort: _matrixSortColumn,
+              asc: _matrixSortAsc,
+              onSort: _toggleMatrixSort),
+        );
+    final small = TextStyle(
+        fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant);
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
       ),
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.all(M3Spacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'مصفوفة مقارنة المصروفات التسويقية بنمو المبيعات الشهري (MoM) والسنوي (YoY)',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                      'مصفوفة المصروفات التسويقية ونمو المبيعات',
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
                     ),
-                    const SizedBox(height: 2.0),
+                    const SizedBox(height: M3Spacing.s2),
                     Text(
-                      'اضغط على أي شهر أو سلسلة لعرض تفاصيل الفلورات والحملات الإعلانية وكيف أثرت على المبيعات مقارنة بالشهر السابق والعام السابق • Double-click على عناوين الأعمدة للترتيب',
-                      style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                      'اضغط على أي صف لعرض تفاصيل الحملات وأثرها على المبيعات مقارنة بالشهر السابق ونفس الشهر من العام السابق • اضغط على عنوان العمود للترتيب',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withOpacity(0.6),
-                  borderRadius: M3Shape.radiusFull,
-                ),
+              M3Spacing.hGapXS,
+              M3ChipSurface(
+                color: colorScheme.primaryContainer.withOpacity(0.6),
                 child: Text(
-                  '${summaries.length} حملات شهرية مجمعة',
+                  arabicCount(summaries.length,
+                      one: 'حملة شهرية واحدة',
+                      two: 'حملتان شهريتان',
+                      few: 'حملات شهرية',
+                      many: 'حملة شهرية',
+                      hundred: 'حملة شهرية'),
+                  key: const ValueKey('tm_matrix_count'),
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: M3FontSize.bodySmall,
@@ -1852,264 +1993,161 @@ onChanged: m3Legacy<String>((v) {
               ),
             ],
           ),
-          const SizedBox(height: 16.0),
+          M3Spacing.gapSM,
           if (summaries.isEmpty)
             const Padding(
               padding: EdgeInsets.all(32.0),
               child: Center(
-                child: Text('لا توجد مصروفات مطابقة للفلتر المحدد. اضغط Add Expense لإضافة مصروف تسويقي جديد.'),
+                child: Text(
+                    'لا توجد مصروفات مطابقة للفلتر المحدد. اضغط Add Expense لإضافة مصروف تسويقي جديد.'),
               ),
             )
           else
             TableScrollContainer(
               child: DataTable(
+                key: const ValueKey('tm_matrix_table'),
                 headingRowColor: WidgetStatePropertyAll(
                   colorScheme.surfaceContainerHighest.withOpacity(0.5),
                 ),
-                dataRowMinHeight: 62.0,
-                dataRowMaxHeight: 74.0,
-                columnSpacing: 22.0,
+                headingRowHeight: 64.0,
+                dataRowMinHeight: 64.0,
+                dataRowMaxHeight: double.infinity,
+                columnSpacing: M3Spacing.xs,
+                horizontalMargin: M3Spacing.xs,
                 columns: [
-                  DataColumn(
-                    label: _buildSortableHeader('الشهر والسنة\nMonth & Year', 'month', _matrixSortColumn, _matrixSortAsc, _toggleMatrixSort),
-                  ),
-                  const DataColumn(
-                    label: Text('السلسلة\nRetail Chain', style: TextStyle(fontWeight: FontWeight.w800)),
-                  ),
-                  DataColumn(
-                    numeric: true,
-                    label: _buildSortableHeader('المصروف التسويقي\nMarketing Spend', 'spend', _matrixSortColumn, _matrixSortAsc, _toggleMatrixSort),
-                  ),
-                  const DataColumn(
-                    numeric: true,
-                    label: Text('مبيعات الشهر السابق\nPrev Month Sales', style: TextStyle(fontWeight: FontWeight.w800)),
-                  ),
-                  DataColumn(
-                    numeric: true,
-                    label: _buildSortableHeader('مبيعات شهر الحملة\nCampaign Month Sales', 'sales', _matrixSortColumn, _matrixSortAsc, _toggleMatrixSort),
-                  ),
-                  DataColumn(
-                    numeric: true,
-                    label: _buildSortableHeader('النمو عن الشهر السابق\nMoM Growth Lift', 'mom', _matrixSortColumn, _matrixSortAsc, _toggleMatrixSort),
-                  ),
-                  DataColumn(
-                    numeric: true,
-                    label: _buildSortableHeader('النمو عن العام السابق\nYoY Same-Month Lift', 'yoy', _matrixSortColumn, _matrixSortAsc, _toggleMatrixSort),
-                  ),
-                  DataColumn(
-                    numeric: true,
-                    label: _buildSortableHeader('العائد (ROMI)\nROI Multiple', 'roi', _matrixSortColumn, _matrixSortAsc, _toggleMatrixSort),
-                  ),
-                  const DataColumn(
-                    label: Text('تقييم أثر الحملة\nCampaign Impact Verdict', style: TextStyle(fontWeight: FontWeight.w800)),
-                  ),
-                  const DataColumn(
-                    label: Text('التفاصيل\nDetails', style: TextStyle(fontWeight: FontWeight.w800)),
-                  ),
+                  col(0, 'الشهر'),
+                  col(1, 'السلسلة', start: true, maxWidth: 104.0),
+                  col(2, 'المصروف'),
+                  col(3, 'مبيعات الشهر السابق'),
+                  col(4, 'مبيعات شهر الحملة'),
+                  col(5, 'النمو عن الشهر السابق'),
+                  col(6, 'النمو عن العام السابق'),
+                  col(7, 'العائد (ROMI)'),
+                  col(8, 'تقييم الحملة'),
+                  col(9, 'عرض', maxWidth: 48.0),
                 ],
                 rows: summaries.map((s) {
                   final momPositive = s.momLiftEgp >= 0;
                   final yoyPositive = s.yoyLiftEgp >= 0;
+                  final momColor =
+                      momPositive ? M3Palette.success : M3Palette.danger;
+                  final yoyColor =
+                      yoyPositive ? M3Palette.info : M3Palette.danger;
+                  final (verdictShort, verdictDesc) = verdictParts(s.verdictAr);
+                  void open() => _openCampaignDrillDownModal(s);
                   return DataRow(
                     cells: [
                       DataCell(
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${s.monthNameAr} ${s.year}',
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodyCompact),
-                            ),
-                            Text(
-                              '${s.monthNameEn} ${s.year}',
-                              style: TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant),
-                            ),
-                          ],
-                        ),
-                        onTap: () => _openCampaignDrillDownModal(s),
-                      ),
-                      DataCell(
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.storefront_rounded, size: 17.0, color: colorScheme.primary),
-                            const SizedBox(width: 6.0),
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  s.chainName,
-                                  style: const TextStyle(fontWeight: FontWeight.w800),
-                                ),
-                                Text(
-                                  '${s.activitiesCount} بنود ترويجية',
-                                  style: TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        onTap: () => _openCampaignDrillDownModal(s),
-                      ),
-                      DataCell(
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              CurrencyFormatter.formatEGP(s.marketingSpendEgp),
+                        _cell(_lines([
+                          _txt('${s.monthNameAr} ${s.year}',
                               style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: M3FontSize.bodyCompact)),
+                          _txt('${s.monthNameEn} ${s.year}', style: small),
+                        ])),
+                        onTap: open,
+                      ),
+                      DataCell(
+                        _cell(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.storefront_rounded,
+                                  size: 18.0, color: colorScheme.primary),
+                              const SizedBox(width: M3Spacing.xxs),
+                              Flexible(
+                                child: _lines([
+                                  _txt(s.chainName,
+                                      start: true,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w800)),
+                                  _txt(_itemsCount(s.activitiesCount),
+                                      start: true, style: small),
+                                ], start: true),
+                              ),
+                            ],
+                          ),
+                          maxWidth: 104.0,
+                          start: true,
+                        ),
+                        onTap: open,
+                      ),
+                      DataCell(_cell(_lines([
+                        _txt(_money(s.marketingSpendEgp),
+                            style: const TextStyle(
                                 fontWeight: FontWeight.w900,
                                 color: M3Palette.violet,
-                                fontSize: M3FontSize.bodyCompact,
-                              ),
-                            ),
-                            Text(
-                              '${s.spendToSalesRatioPct.toStringAsFixed(1)}% من المبيعات',
-                              style: TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant),
-                            ),
-                          ],
-                        ),
-                      ),
-                      DataCell(
-                        Text(
-                          CurrencyFormatter.formatEGP(s.previousMonthSalesEgp),
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      DataCell(
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              CurrencyFormatter.formatEGP(s.currentMonthSalesEgp),
-                              style: TextStyle(
+                                fontSize: M3FontSize.bodyCompact)),
+                        _txt(
+                            '${s.spendToSalesRatioPct.toStringAsFixed(1)}% من المبيعات',
+                            style: small),
+                      ]))),
+                      DataCell(_cell(_txt(_money(s.previousMonthSalesEgp),
+                          style:
+                              const TextStyle(fontWeight: FontWeight.w600)))),
+                      DataCell(_cell(_lines([
+                        _txt(_money(s.currentMonthSalesEgp),
+                            style: TextStyle(
                                 fontWeight: FontWeight.w900,
                                 color: colorScheme.onSurface,
-                                fontSize: M3FontSize.bodyCompact,
-                              ),
-                            ),
-                            Text(
-                              'توريد Sell-In: ${CurrencyFormatter.formatEGP(s.currentMonthSellInEgp)}',
-                              style: TextStyle(fontSize: M3FontSize.tinyPlus, color: colorScheme.onSurfaceVariant),
-                            ),
-                          ],
-                        ),
-                      ),
-                      DataCell(
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
-                              decoration: BoxDecoration(
-                                color: (momPositive ? M3Palette.success : M3Palette.danger)
-                                    .withOpacity(0.12),
-                                borderRadius: M3Shape.radiusFull,
-                              ),
-                              child: Text(
-                                '${momPositive ? '+' : ''}${s.momGrowthPct.toStringAsFixed(1)}% MoM',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: M3FontSize.labelSmallPlus,
-                                  color: momPositive ? M3Palette.success : M3Palette.danger,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 2.0),
-                            Text(
-                              '${momPositive ? '+' : ''}${CurrencyFormatter.formatEGP(s.momLiftEgp)}',
-                              style: TextStyle(
+                                fontSize: M3FontSize.bodyCompact)),
+                        _txt(
+                            'توريد Sell-In: ${_money(s.currentMonthSellInEgp)}',
+                            style: small),
+                      ]))),
+                      DataCell(_cell(_lines([
+                        _chip(
+                            '${momPositive ? '+' : ''}${s.momGrowthPct.toStringAsFixed(1)}% MoM',
+                            momColor),
+                        const SizedBox(height: M3Spacing.s2),
+                        _txt('${momPositive ? '+' : ''}${_money(s.momLiftEgp)}',
+                            style: TextStyle(
                                 fontSize: M3FontSize.labelSmallPlus,
                                 fontWeight: FontWeight.w700,
-                                color: momPositive ? M3Palette.success : M3Palette.danger,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      DataCell(
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
-                              decoration: BoxDecoration(
-                                color: (yoyPositive ? M3Palette.info : M3Palette.danger)
-                                    .withOpacity(0.12),
-                                borderRadius: M3Shape.radiusFull,
-                              ),
-                              child: Text(
-                                s.hasYoY
-                                    ? '${yoyPositive ? '+' : ''}${s.yoyGrowthPct.toStringAsFixed(1)}% YoY'
-                                    : '— لا توجد بيانات للعام السابق',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: M3FontSize.labelSmallPlus,
-                                  color: yoyPositive ? M3Palette.info : M3Palette.danger,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 2.0),
-                            Text(
-                              s.hasYoY ? '${yoyPositive ? '+' : ''}${CurrencyFormatter.formatEGP(s.yoyLiftEgp)}' : '—',
-                              style: TextStyle(
-                                fontSize: M3FontSize.labelSmallPlus,
-                                fontWeight: FontWeight.w700,
-                                color: yoyPositive ? M3Palette.info : M3Palette.danger,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      DataCell(
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '${s.romiMultiple.toStringAsFixed(2)}x',
-                              style: TextStyle(
+                                color: momColor)),
+                      ]))),
+                      DataCell(_cell(s.hasYoY
+                          ? _lines([
+                              _chip(
+                                  '${yoyPositive ? '+' : ''}${s.yoyGrowthPct.toStringAsFixed(1)}% YoY',
+                                  yoyColor),
+                              const SizedBox(height: M3Spacing.s2),
+                              _txt(
+                                  '${yoyPositive ? '+' : ''}${_money(s.yoyLiftEgp)}',
+                                  style: TextStyle(
+                                      fontSize: M3FontSize.labelSmallPlus,
+                                      fontWeight: FontWeight.w700,
+                                      color: yoyColor)),
+                            ])
+                          : _lines([
+                              _txt('—',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w800)),
+                              _txt('لا توجد بيانات للعام السابق', style: small),
+                            ]))),
+                      DataCell(_cell(_lines([
+                        _txt('${s.romiMultiple.toStringAsFixed(2)}x',
+                            style: TextStyle(
                                 fontWeight: FontWeight.w900,
                                 fontSize: M3FontSize.bodyMediumPlus,
-                                color: s.verdictColor,
-                              ),
-                            ),
-                            Text(
-                              'ROI ${s.netRoiPct >= 0 ? '+' : ''}${s.netRoiPct.toStringAsFixed(0)}%',
-                              style: TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant),
-                            ),
-                          ],
-                        ),
-                      ),
-                      DataCell(
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
-                          decoration: BoxDecoration(
-                            color: s.verdictColor.withOpacity(0.12),
-                            borderRadius: M3Shape.radiusFull,
-                            border: Border.all(color: s.verdictColor.withOpacity(0.35)),
-                          ),
-                          child: Text(
-                            s.verdictAr,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: M3FontSize.labelSmallPlus,
-                              color: s.verdictColor,
-                            ),
-                          ),
-                        ),
-                      ),
+                                color: s.verdictColor)),
+                        _txt(
+                            'ROI ${s.netRoiPct >= 0 ? '+' : ''}${s.netRoiPct.toStringAsFixed(0)}%',
+                            style: small),
+                      ]))),
+                      DataCell(_cell(_lines([
+                        _chip(verdictShort, s.verdictColor),
+                        if (verdictDesc.isNotEmpty) ...[
+                          const SizedBox(height: M3Spacing.s2),
+                          _txt(verdictDesc, style: small),
+                        ],
+                      ]))),
                       DataCell(
                         IconButton(
                           tooltip: 'عرض تفاصيل الحملة والأثر البيعي',
-                          icon: Icon(Icons.visibility_rounded, color: colorScheme.primary),
-                          onPressed: () => _openCampaignDrillDownModal(s),
+                          icon: Icon(Icons.visibility_rounded,
+                              color: colorScheme.primary),
+                          onPressed: open,
                         ),
                       ),
                     ],
@@ -2128,192 +2166,148 @@ onChanged: m3Legacy<String>((v) {
     ColorScheme colorScheme,
     List<MarketingExpenseItem> expenses,
   ) {
+    const sortKeys = ['month', 'chain', 'category', '', '', '', 'amount', ''];
+    DataColumn col(int i, String label,
+            {bool start = false, double maxWidth = _cellW}) =>
+        DataColumn(
+          headingRowAlignment:
+              start ? MainAxisAlignment.start : MainAxisAlignment.center,
+          label: _hdr(label,
+              align: start ? TextAlign.start : TextAlign.center,
+              maxWidth: maxWidth,
+              sortKey: sortKeys[i].isEmpty ? null : sortKeys[i],
+              activeSort: _ledgerSortColumn,
+              asc: _ledgerSortAsc,
+              onSort: _toggleLedgerSort),
+        );
+    final small = TextStyle(
+        fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant);
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
       ),
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.all(M3Spacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'سجل المصروفات الترويجية والحملات التفصيلي (Campaigns & Expense Ledger)',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                      'سجل المصروفات الترويجية والحملات التفصيلي',
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
                     ),
-                    const SizedBox(height: 2.0),
+                    const SizedBox(height: M3Spacing.s2),
                     Text(
-                      'إدارة كافة بنود الصرف (تأجير فلورات، إعلانات، هدايا، شركات دعاية وإيفنتات) مع إمكانية التعديل أو الحذف الفوري',
-                      style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                      'كل بنود الصرف (تأجير فلورات، إعلانات، هدايا، شركات دعاية وإيفنتات) مع التعديل أو الحذف',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
+              M3Spacing.hGapXS,
               FilledButton.icon(
                 onPressed: () => _openAddOrEditExpenseDialog(),
-                icon: const Icon(Icons.add_rounded, size: 18.0),
+                icon: const Icon(Icons.add_rounded),
                 label: const Text('Add New Expense'),
               ),
             ],
           ),
-          const SizedBox(height: 16.0),
+          M3Spacing.gapSM,
           TableScrollContainer(
             child: DataTable(
+              key: const ValueKey('tm_ledger_table'),
               headingRowColor: WidgetStatePropertyAll(
                 colorScheme.surfaceContainerHighest.withOpacity(0.5),
               ),
+              headingRowHeight: 64.0,
               dataRowMinHeight: 58.0,
-              dataRowMaxHeight: 70.0,
-              columnSpacing: 20.0,
+              dataRowMaxHeight: double.infinity,
+              columnSpacing: M3Spacing.xs,
+              horizontalMargin: M3Spacing.xs,
               columns: [
-                DataColumn(
-                  label: _buildSortableHeader('الشهر\nMonth', 'month', _ledgerSortColumn, _ledgerSortAsc, _toggleLedgerSort),
-                ),
-                DataColumn(
-                  label: _buildSortableHeader('السلسلة\nChain', 'chain', _ledgerSortColumn, _ledgerSortAsc, _toggleLedgerSort),
-                ),
-                DataColumn(
-                  label: _buildSortableHeader('نوع النشاط الترويجي\nExpense Category', 'category', _ledgerSortColumn, _ledgerSortAsc, _toggleLedgerSort),
-                ),
-                const DataColumn(
-                  label: Text('البراند\nBrand', style: TextStyle(fontWeight: FontWeight.w800)),
-                ),
-                const DataColumn(
-                  label: Text('وصف الحملة / النشاط\nCampaign & Activity Description', style: TextStyle(fontWeight: FontWeight.w800)),
-                ),
-                const DataColumn(
-                  label: Text('شركة الدعاية / الجهة\nVendor / Agency', style: TextStyle(fontWeight: FontWeight.w800)),
-                ),
-                DataColumn(
-                  numeric: true,
-                  label: _buildSortableHeader('المبلغ المدفوع\nAmount (EGP)', 'amount', _ledgerSortColumn, _ledgerSortAsc, _toggleLedgerSort),
-                ),
-                const DataColumn(
-                  label: Text('إجراءات\nActions', style: TextStyle(fontWeight: FontWeight.w800)),
-                ),
+                col(0, 'الشهر', maxWidth: 80.0),
+                col(1, 'السلسلة', maxWidth: 100.0),
+                col(2, 'نوع النشاط', maxWidth: 116.0),
+                col(3, 'البراند', maxWidth: 100.0),
+                col(4, 'وصف الحملة / النشاط', start: true, maxWidth: 172.0),
+                col(5, 'شركة الدعاية / الجهة', maxWidth: 104.0),
+                col(6, 'المبلغ', maxWidth: 84.0),
+                col(7, 'إجراءات', maxWidth: 88.0),
               ],
               rows: expenses.map((item) {
                 return DataRow(
                   cells: [
-                    DataCell(
-                      Text(
-                        '${item.monthNameAr} ${item.year}',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        item.chainName,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                        decoration: BoxDecoration(
-                          color: item.category.color.withOpacity(0.12),
-                          borderRadius: M3Shape.radiusFull,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(item.category.icon, size: 15.0, color: item.category.color),
-                            const SizedBox(width: 6.0),
-                            Text(
-                              item.category.labelAr,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: M3FontSize.labelSmallPlus,
-                                color: item.category.color,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
-                        decoration: BoxDecoration(
-                          color: colorScheme.secondaryContainer,
-                          borderRadius: M3Shape.radiusSm,
-                        ),
-                        child: Text(
-                          item.brandName,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: M3FontSize.bodySmall,
-                            color: colorScheme.onSecondaryContainer,
-                          ),
-                        ),
-                      ),
-                    ),
-                    DataCell(
-                      SizedBox(
-                        width: 270.0,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.campaignTitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: M3FontSize.labelMediumPlus),
-                            ),
-                            if (item.notes.isNotEmpty)
-                              Text(
-                                item.notes,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        item.vendorOrAgency,
-                        style: const TextStyle(fontSize: M3FontSize.bodySmallPlus, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        CurrencyFormatter.formatEGP(item.amountEgp),
+                    DataCell(_cell(
+                        _txt('${item.monthNameAr} ${item.year}',
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w800)),
+                        maxWidth: 80.0)),
+                    DataCell(_cell(
+                        _txt(item.chainName,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w700)),
+                        maxWidth: 100.0)),
+                    DataCell(_cell(
+                        _chip(item.category.labelAr, item.category.color,
+                            icon: item.category.icon),
+                        maxWidth: 116.0)),
+                    DataCell(_cell(
+                        _chip(item.brandName, colorScheme.onSecondaryContainer),
+                        maxWidth: 100.0)),
+                    DataCell(_cell(
+                      _lines([
+                        _txt(item.campaignTitle,
+                            start: true,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: M3FontSize.labelMediumPlus)),
+                        if (item.notes.isNotEmpty)
+                          _txt(item.notes, start: true, style: small),
+                      ], start: true),
+                      maxWidth: 172.0,
+                      start: true,
+                    )),
+                    DataCell(_cell(
+                        _txt(item.vendorOrAgency,
+                            style: const TextStyle(
+                                fontSize: M3FontSize.bodySmallPlus,
+                                fontWeight: FontWeight.w600)),
+                        maxWidth: 104.0)),
+                    DataCell(_cell(_txt(_money(item.amountEgp),
                         style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: M3FontSize.bodyCompact,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                    ),
+                            fontWeight: FontWeight.w900,
+                            fontSize: M3FontSize.bodyCompact,
+                            color: colorScheme.primary)))),
                     DataCell(
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
                             tooltip: 'Edit / تعديل',
-                            icon: const Icon(Icons.edit_rounded, size: 19.0),
-                            onPressed: () => _openAddOrEditExpenseDialog(existing: item),
+                            icon: const Icon(Icons.edit_rounded, size: 20.0),
+                            onPressed: () =>
+                                _openAddOrEditExpenseDialog(existing: item),
                           ),
                           IconButton(
                             tooltip: 'Delete / حذف',
-                            icon: Icon(Icons.delete_outline_rounded, size: 19.0, color: colorScheme.error),
+                            icon: Icon(Icons.delete_outline_rounded,
+                                size: 20.0, color: colorScheme.error),
                             onPressed: () async {
                               try {
                                 await _repo.deleteExpense(item.id);
                               } catch (e) {
                                 if (!mounted) return;
-                                M3Feedback.showWarning(context, 'تعذر حذف المصروف: $e');
+                                M3Feedback.showWarning(
+                                    context, 'تعذر حذف المصروف: $e');
                                 return;
                               }
                               if (!mounted) return;
@@ -2348,160 +2342,121 @@ onChanged: m3Legacy<String>((v) {
     List<MonthlyChainRoiSummary> summaries,
   ) {
     final totalSpend = expenses.fold<double>(0.0, (s, e) => s + e.amountEgp);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20.0),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLow,
-            borderRadius: M3Shape.radiusLg,
-            border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'توزيع الميزانية التسويقية حسب نوع النشاط الترويجي (Spend Breakdown by Activity Type)',
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 4.0),
-              Text(
-                'مقارنة حجم الإنفاق على تأجير الفلورات، شركات الدعاية والإيفنتات، الهدايا المجانية، والإعلانات',
-                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 16.0),
-              Wrap(
-                spacing: 14.0,
-                runSpacing: 14.0,
-                children: MarketingExpenseCategory.values.map((cat) {
-                  final catItems = expenses.where((e) => e.category == cat).toList();
-                  final catSpend = catItems.fold<double>(0.0, (s, e) => s + e.amountEgp);
-                  final sharePct = totalSpend > 0 ? (catSpend / totalSpend) * 100.0 : 0.0;
-
-                  return Container(
-                    width: 340.0,
-                    padding: const EdgeInsets.all(16.0),
-                    decoration: BoxDecoration(
-                      color: cat.color.withOpacity(0.06),
-                      borderRadius: M3Shape.radiusLg,
-                      border: Border.all(color: cat.color.withOpacity(0.28)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8.0),
-                              decoration: BoxDecoration(
-                                color: cat.color.withOpacity(0.15),
-                                borderRadius: M3Shape.radiusSm,
-                              ),
-                              child: Icon(cat.icon, color: cat.color, size: 20.0),
-                            ),
-                            const SizedBox(width: 10.0),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    cat.labelAr,
-                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodyCompact),
-                                  ),
-                                  Text(
-                                    cat.labelEn,
-                                    style: TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12.0),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                CurrencyFormatter.formatEGP(catSpend),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: M3FontSize.bodyLarge,
-                                  color: cat.color,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8.0),
-                            Flexible(
-                              child: Text(
-                                '${sharePct.toStringAsFixed(1)}% (${catItems.length} أنشطة)',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: M3FontSize.labelSmallPlus),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8.0),
-                        ClipRRect(
-                          borderRadius: M3Shape.radiusFull,
-                          child: LinearProgressIndicator(
-                            value: (sharePct / 100.0).clamp(0.0, 1.0),
-                            minHeight: 7.0,
-                            backgroundColor: cat.color.withOpacity(0.15),
-                            valueColor: AlwaysStoppedAnimation<Color>(cat.color),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
+    final cards = MarketingExpenseCategory.values.map((cat) {
+      final catItems = expenses.where((e) => e.category == cat).toList();
+      final catSpend = catItems.fold<double>(0.0, (s, e) => s + e.amountEgp);
+      final sharePct = totalSpend > 0 ? (catSpend / totalSpend) * 100.0 : 0.0;
+      return Container(
+        key: ValueKey('tm_cat_${cat.id}'),
+        padding: M3SummaryKpiStyle.padding,
+        decoration: BoxDecoration(
+          color: cat.color.withOpacity(0.06),
+          borderRadius: M3Shape.radiusLg,
+          border: Border.all(color: cat.color.withOpacity(0.28)),
         ),
-      ],
-    );
-  }
-
-  Widget _buildSortableHeader(
-    String label,
-    String colKey,
-    String activeCol,
-    bool isAsc,
-    ValueChanged<String> onSort,
-  ) {
-    final isSelected = activeCol == colKey;
-    return GestureDetector(
-      onDoubleTap: () => onSort(colKey),
-      onTap: () => onSort(colKey),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: isSelected ? Theme.of(context).colorScheme.primary : null,
-              ),
+            Row(
+              children: [
+                Container(
+                  padding: M3SummaryKpiStyle.iconPadding,
+                  decoration: BoxDecoration(
+                    color: cat.color.withOpacity(0.12),
+                    borderRadius: M3SummaryKpiStyle.iconRadius,
+                  ),
+                  child: Icon(cat.icon,
+                      color: cat.color, size: M3SummaryKpiStyle.iconSize),
+                ),
+                const SizedBox(width: M3SummaryKpiStyle.iconGap),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _txt(cat.labelAr,
+                          start: true,
+                          maxLines: 2,
+                          style: M3SummaryKpiStyle.titleStyle(context)),
+                      _txt(cat.labelEn,
+                          start: true,
+                          maxLines: 2,
+                          style: TextStyle(
+                              fontSize: M3FontSize.labelSmall,
+                              color: colorScheme.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 4.0),
-            Icon(
-              isSelected
-                  ? (isAsc ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded)
-                  : Icons.unfold_more_rounded,
-              size: 15.0,
-              color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey,
+            M3Spacing.gapXS,
+            Text(
+              _money(catSpend),
+              key: ValueKey('tm_cat_value_${cat.id}'),
+              style: M3SummaryKpiStyle.valueStyle(context)
+                  ?.copyWith(color: cat.color),
+            ),
+            const SizedBox(height: M3SummaryKpiStyle.valueGap),
+            Text(
+              '${sharePct.toStringAsFixed(1)}% من الإنفاق • ${tmActivitiesCount(catItems.length)}',
+              style: M3SummaryKpiStyle.subtitleStyle(context),
+            ),
+            M3Spacing.gapXS,
+            ClipRRect(
+              borderRadius: M3Shape.radiusFull,
+              child: LinearProgressIndicator(
+                value: (sharePct / 100.0).clamp(0.0, 1.0),
+                minHeight: 8.0,
+                backgroundColor: cat.color.withOpacity(0.15),
+                valueColor: AlwaysStoppedAnimation<Color>(cat.color),
+              ),
             ),
           ],
         ),
+      );
+    }).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(M3Spacing.sm),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: M3Shape.radiusLg,
+        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'توزيع الميزانية التسويقية حسب نوع النشاط الترويجي',
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: M3Spacing.xxs),
+          Text(
+            'حجم الإنفاق على تأجير الفلورات، شركات الدعاية والإيفنتات، الهدايا المجانية، والإعلانات',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: colorScheme.onSurfaceVariant),
+          ),
+          M3Spacing.gapSM,
+          LayoutBuilder(builder: (context, c) {
+            final w = c.maxWidth;
+            return M3EqualHeightGrid(
+              key: const ValueKey('tm_category_grid'),
+              columns: w >= 900 ? 3 : (w >= 560 ? 2 : 1),
+              spacing: M3Spacing.sm,
+              runSpacing: M3Spacing.sm,
+              children: cards,
+            );
+          }),
+        ],
       ),
     );
   }
 }
+
+/// «نشاط واحد / نشاطان / 3 أنشطة / 11 نشاطًا / 100 نشاط».
+String tmActivitiesCount(int n) => arabicCount(n,
+    one: 'نشاط واحد',
+    two: 'نشاطان',
+    few: 'أنشطة',
+    many: 'نشاطًا',
+    hundred: 'نشاط');

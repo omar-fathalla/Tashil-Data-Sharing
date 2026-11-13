@@ -117,18 +117,19 @@ void main() {
 
         await tester.pumpAndSettle();
 
-        // Verify 4 symmetrical KPI cards (Arabic on top, English below)
-        expect(find.text('إجمالي المصروفات الترويجية'), findsOneWidget);
-        expect(find.text('Total Trade Marketing Spend'), findsOneWidget);
-
-        expect(find.text('نمو المبيعات عن الشهر السابق'), findsOneWidget);
-        expect(find.text('MoM Sales Growth Lift'), findsOneWidget);
-
-        expect(find.text('نمو المبيعات عن العام السابق'), findsOneWidget);
-        expect(find.text('YoY Same-Month Sales Lift'), findsOneWidget);
-
-        expect(find.text('العائد على الإنفاق التسويقي'), findsOneWidget);
-        expect(find.text('Return on Marketing Spend (ROMI)'), findsOneWidget);
+        // 4 shared Sell-Out KPI cards (Arabic titles; detail on the detail line)
+        expect(find.text('المصروفات الترويجية'), findsOneWidget);
+        expect(
+            find.descendant(
+                of: find.byKey(const ValueKey('tm_kpi_mom')),
+                matching: find.text('النمو عن الشهر السابق')),
+            findsOneWidget);
+        expect(
+            find.descendant(
+                of: find.byKey(const ValueKey('tm_kpi_yoy')),
+                matching: find.text('النمو عن العام السابق')),
+            findsOneWidget);
+        expect(find.text('العائد على الإنفاق'), findsOneWidget);
 
         // Verify 3 English SegmentedButton tabs
         expect(find.text('ROI & Growth Matrix'), findsOneWidget);
