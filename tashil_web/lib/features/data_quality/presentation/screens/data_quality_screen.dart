@@ -408,6 +408,8 @@ class _IssuesTable extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         child: DataTable(
           key: const ValueKey('dq_table'),
+          // Rows grow so item names wrap up to 3 lines.
+          dataRowMaxHeight: double.infinity,
           headingTextStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
           columns: const [
             DataColumn(label: Text('الخطورة')),
@@ -437,7 +439,10 @@ class _IssuesTable extends StatelessWidget {
               DataCell(Text(i.barcode)),
               DataCell(ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 260.0),
-                child: Text(i.itemName, overflow: TextOverflow.ellipsis),
+                child: Text(i.itemName,
+                    key: const ValueKey('dq_item_name'),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis),
               )),
               DataCell(Text(i.foundValue)),
               DataCell(Text(i.expectedValue)),

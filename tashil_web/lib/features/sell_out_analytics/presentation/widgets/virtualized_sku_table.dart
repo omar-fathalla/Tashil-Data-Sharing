@@ -847,6 +847,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   context: context,
                                   columnKey: 'barcode',
                                   label: 'الباركود',
+                                  textAlign: TextAlign.center,
                                   width: barcodeColWidth,
                                 ),
                                 const SizedBox(width: 8.0),
@@ -885,8 +886,9 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                   SizedBox(
                                     width: barcodeColWidth,
                                     child: Column(
+                                      key: const ValueKey('sku_table_barcode_cell'),
                                       mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
                                         if (r.itemCode.isNotEmpty)
                                           InkWell(
@@ -908,10 +910,11 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             ),
                                           ),
                                         Row(
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Icon(Icons.qr_code_2_rounded, size: 18.0, color: colorScheme.onSurfaceVariant),
                                             const SizedBox(width: 4.0),
-                                            Expanded(
+                                            Flexible(
                                               child: SelectableText(
                                                 r.barcode,
                                                 style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace', color: colorScheme.onSurfaceVariant),

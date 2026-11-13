@@ -2614,6 +2614,8 @@ onChanged: m3Legacy<String>((v) {
     return TableScrollContainer(
       showSwipeHint: true,
       child: DataTable(
+        // Rows grow so item names and details wrap up to 3 lines.
+        dataRowMaxHeight: double.infinity,
         headingRowColor: WidgetStatePropertyAll(
           colorScheme.surfaceContainerHigh.withOpacity(0.55),
         ),
@@ -2680,8 +2682,9 @@ onChanged: m3Legacy<String>((v) {
                               Flexible(
                                 child: Text(
                                   s.skuName,
+                                  key: const ValueKey('target_sku_name'),
                                   style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                                     fontWeight: FontWeight.w800,                                     fontSize: M3FontSize.bodySmall,                                   )),
-                                  maxLines: 1,
+                                  maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -2697,14 +2700,14 @@ onChanged: m3Legacy<String>((v) {
                             Text(
                               'كود: ${s.itemCode.isNotEmpty ? s.itemCode : "-"} • باركود: ${s.barcode.isNotEmpty ? s.barcode : "-"} • $packUnits وحدة/كرتونة',
                               style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontFamily: 'monospace',                                 fontSize: M3FontSize.labelSmall,                                 fontWeight: FontWeight.w700,                                 color: colorScheme.primary,                               )),
-                              maxLines: 1,
+                              maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                             )
                           else if (s.subCategory.isNotEmpty)
                             Text(
                               '${s.subCategory} • $packUnits وحدة/كرتونة',
                               style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                 fontSize: M3FontSize.labelSmall,                                 color: colorScheme.onSurfaceVariant,                               )),
-                              maxLines: 1,
+                              maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                             ),
                         ],
