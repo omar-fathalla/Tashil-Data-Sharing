@@ -63,6 +63,22 @@ class SellOutExplorerScreen extends StatefulWidget {
 }
 
 class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with DataRefreshMixin<SellOutExplorerScreen> {
+  // Headers and cells centred; the item name stays start-aligned.
+  static const List<DataColumn> _priceMatrixColumns = [
+                  DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('كود الصنف')),
+                  DataColumn(label: Text('الصنف الرسمي')),
+                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('وحدات/كرتونة')),
+                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('الوحدات')),
+                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('الكراتين')),
+                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('سعر القائمة (شامل الضريبة)')),
+                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('سعر البيع الفعلي')),
+                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('فرق السعر %')),
+                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('تكلفة المصنع للقطعة')),
+                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('صافي سعر الكرتونة (فاتورة)')),
+                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('صافي المبيعات')),
+                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('هامش السلسلة')),
+                ];
+
   @override
   void onBackendDataChanged() {
     _loadAllData();
@@ -1257,25 +1273,13 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   child: DataTable(
                 headingRowHeight: 48.0,
                 dataRowMinHeight: 52.0,
-                dataRowMaxHeight: 64.0,
+                // Room for a 3-line item name (owner table rule).
+                dataRowMaxHeight: 80.0,
                 columnSpacing: 24.0,
                 headingTextStyle: headStyle,
                 dataTextStyle: cellStyle,
-                columns: const [
-                  DataColumn(label: Text('كود الصنف')),
-                  DataColumn(label: Text('الصنف الرسمي')),
-                  DataColumn(numeric: true, label: Text('وحدات/كرتونة')),
-                  DataColumn(numeric: true, label: Text('الوحدات')),
-                  DataColumn(numeric: true, label: Text('الكراتين')),
-                  DataColumn(numeric: true, label: Text('سعر القائمة (شامل الضريبة)')),
-                  DataColumn(numeric: true, label: Text('سعر البيع الفعلي')),
-                  DataColumn(numeric: true, label: Text('فرق السعر %')),
-                  DataColumn(numeric: true, label: Text('تكلفة المصنع للقطعة')),
-                  DataColumn(numeric: true, label: Text('صافي سعر الكرتونة (فاتورة)')),
-                  DataColumn(numeric: true, label: Text('صافي المبيعات')),
-                  DataColumn(numeric: true, label: Text('هامش السلسلة')),
-                ],
-                rows: filteredItems.map((s) {
+                columns: _priceMatrixColumns,
+                rows: centerCellsUnderCenteredHeadings(_priceMatrixColumns, filteredItems.map((s) {
                   final isNegMargin = s.retailerMarginPct < 0;
                   final marginColor = isNegMargin ? colorScheme.error : colorScheme.secondary;
                   return DataRow(
@@ -1299,7 +1303,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                               child: Text(
                                 s.skuName,
                                 key: const ValueKey('price_matrix_sku_name'),
-                                maxLines: 2,
+                                maxLines: 3,
                                 overflow: TextOverflow.ellipsis,
                                 style: cellStrong,
                               ),
@@ -1334,7 +1338,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                       ),
                     ],
                   );
-                }).toList(),
+                }).toList()),
               ),
                 ),
               ),
@@ -1499,6 +1503,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   M3Dropdown<String>(
                     key: const ValueKey('branch_chart_chain_dropdown'),
                     width: 240.0,
+                    fitOptions: true,
                     value: const ['fathalla', 'gomla', 'beet-elgomla', 'carrefour', 'spinneys', 'all']
                             .contains(activeChainCode)
                         ? activeChainCode
@@ -2217,14 +2222,13 @@ onChanged: m3Legacy<int>((v) {
                   ),
 
                   // 2. Month Filter (Default: All Months / 0)
-                  SizedBox(
-                    width: 190.0,
-                    child: M3Dropdown<int>(
+                  M3Dropdown<int>(
+width: 190.0,
+fitOptions: true,
 key: const ValueKey('perf_month_dropdown'),
 value: _selectedMonth,
 label: 'الشهر',
 leadingIcon: Icons.date_range_rounded,
-expand: true,
 options: m3OptionsFromMenuItems<int>(monthLabelsAr.entries
                           .map(
                             (e) => DropdownMenuItem<int>(
@@ -2246,16 +2250,14 @@ onChanged: m3Legacy<int>((v) {
                         }
                       }),
 ),
-                  ),
 
                   // 3. Chain Filter
-                  SizedBox(
-                    width: 190.0,
-                    child: M3Dropdown<String>(
+                  M3Dropdown<String>(
+width: 190.0,
+fitOptions: true,
 value: _perfChain,
 label: 'السلسلة',
 leadingIcon: Icons.storefront_rounded,
-expand: true,
 options: m3OptionsFromMenuItems<String>([
                         const DropdownMenuItem(value: 'all', child: Text('كل السلاسل')),
                         const DropdownMenuItem(value: 'fathalla', child: Text('أسواق فتح الله')),
@@ -2274,14 +2276,12 @@ onChanged: m3Legacy<String>((v) {
                         }
                       }),
 ),
-                  ),
-                  SizedBox(
-                    width: 210.0,
-                    child: M3Dropdown<String>(
+                  M3Dropdown<String>(
+width: 210.0,
+fitOptions: true,
 value: availableBrands.contains(_perfBrand) ? _perfBrand : 'all',
 label: 'العلامة التجارية',
 leadingIcon: Icons.branding_watermark_rounded,
-expand: true,
 options: m3OptionsFromMenuItems<String>([
                         const DropdownMenuItem(value: 'all', child: Text('كل العلامات التجارية')),
                         ...availableBrands.map((b) => DropdownMenuItem(value: b, child: Text(b))),
@@ -2294,7 +2294,6 @@ onChanged: m3Legacy<String>((v) {
                         }
                       }),
 ),
-                  ),
                   M3SearchFieldWidth(
                     hintText: 'ابحث بالفرع أو المنطقة أو الصنف',
                     width: 220.0,

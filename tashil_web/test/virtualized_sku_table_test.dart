@@ -173,7 +173,8 @@ void main() {
     });
 
     testWidgets('supports pagination footer and page navigation', (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1280, 900);
+      // Tall enough for 10 rows of 3-line-capable cells plus the footer.
+      tester.view.physicalSize = const Size(1280, 1400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);

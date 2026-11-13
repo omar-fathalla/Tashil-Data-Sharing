@@ -301,6 +301,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
           children: [
             M3Dropdown<int>(
               width: 140,
+              fitOptions: true,
               label: 'السنة',
               value: _year,
               options: [for (final y in yearItems) M3DropdownOption(y, '$y')],
@@ -311,6 +312,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
             ),
             M3Dropdown<int>(
               width: 160,
+              fitOptions: true,
               label: 'الشهر',
               value: _month,
               options: [
@@ -323,6 +325,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
             ),
             M3Dropdown<String>(
               width: 220,
+              fitOptions: true,
               label: 'الفرع',
               value: branches.contains(_branch) ? _branch : 'all',
               options: [
@@ -336,6 +339,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
             ),
             M3Dropdown<String>(
               width: 220,
+              fitOptions: true,
               label: 'الصنف',
               value: products.contains(_product) ? _product : 'all',
               options: [
@@ -349,6 +353,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
             ),
             M3Dropdown<String>(
               width: 200,
+              fitOptions: true,
               label: 'مجموعة الصنف',
               value: groups.contains(_productGroup) ? _productGroup : 'all',
               options: [

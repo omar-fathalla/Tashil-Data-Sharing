@@ -656,7 +656,7 @@ class _StockCard extends StatelessWidget {
           else
             Table(
               columnWidths: const {
-                // SKU names get the most room (2 lines + tooltip).
+                // SKU names get the most room (up to 3 lines + tooltip).
                 0: FlexColumnWidth(4.0),
                 1: FlexColumnWidth(1.3),
                 2: FlexColumnWidth(1.3),
@@ -711,14 +711,15 @@ class _StockCard extends StatelessWidget {
                             Tooltip(
                               message: r.name,
                               child: Text(r.name,
-                                  maxLines: 2,
+                                  key: const ValueKey('stock_sku_name'),
+                                  maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
                                   style: theme.textTheme.titleSmall
                                       ?.copyWith(color: cs.onSurface)),
                             ),
                             if (r.category.isNotEmpty)
                               Text(r.category,
-                                  maxLines: 1,
+                                  maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
                                   style: theme.textTheme.bodySmall
                                       ?.copyWith(color: cs.onSurfaceVariant)),

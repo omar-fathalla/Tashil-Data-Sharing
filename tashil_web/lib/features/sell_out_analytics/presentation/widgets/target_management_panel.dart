@@ -1118,14 +1118,13 @@ onChanged: m3Legacy<int>((v) {
                 runSpacing: M3Spacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  SizedBox(
-                    width: 190.0,
-                    child: M3Dropdown<int>(
+                  M3Dropdown<int>(
+width: 190.0,
+fitOptions: true,
 value: [0, ..._targetPlanningYears].contains(_selectedYear)
                           ? _selectedYear
                           : 0,
 label: 'سنة البيانات',
-expand: true,
 options: m3OptionsFromMenuItems<int>([
                         const DropdownMenuItem(value: 0, child: Text('كل السنوات')),
                         ..._targetPlanningYears.map(
@@ -1142,15 +1141,13 @@ onChanged: m3Legacy<int>((v) {
                         }
                       }),
 ),
-                  ),
-                  SizedBox(
-                    width: 240.0,
-                    child: M3Dropdown<String>(
+                  M3Dropdown<String>(
+width: 240.0,
+fitOptions: true,
 value: _chainOptions.any((c) => c.code == _selectedChain)
                           ? _selectedChain
                           : 'all',
 label: 'السلسلة',
-expand: true,
 options: m3OptionsFromMenuItems<String>(_chainOptions
                           .map(
                             (c) => DropdownMenuItem<String>(
@@ -1169,7 +1166,6 @@ onChanged: m3Legacy<String>((v) {
                         }
                       }),
 ),
-                  ),
                 ],
               ),
 
@@ -1921,9 +1917,9 @@ onChanged: m3Legacy<String>((v) {
               runSpacing: 8.0,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                SizedBox(
-                  width: 175.0,
-                  child: M3Dropdown<String>(
+                M3Dropdown<String>(
+width: 175.0,
+fitOptions: true,
 value: _branchRegionFilter,
 label: 'الإقليم / المحافظة',
 options: m3OptionsFromMenuItems<String>([
@@ -1953,7 +1949,6 @@ onChanged: m3Legacy<String>((v) {
                       if (v != null) setState(() => _branchRegionFilter = v);
                     }),
 ),
-                ),
                 M3SearchFieldWidth(
                   hintText: 'ابحث باسم الفرع أو الكود أو المندوب...',
                   width: 240.0,
@@ -2263,12 +2258,11 @@ onChanged: m3Legacy<String>((v) {
                     label: const Text('العودة لكل الفروع'),
                   ),
                   const SizedBox(width: 12.0),
-                  SizedBox(
-                    width: 310.0,
-                    child: M3Dropdown<String>(
+                  M3Dropdown<String>(
+width: 310.0,
+fitOptions: true,
 value: branch.branchName,
 label: 'الفرع',
-expand: true,
 options: m3OptionsFromMenuItems<String>(target.branches
                           .map(
                             (b) => DropdownMenuItem<String>(
@@ -2289,7 +2283,6 @@ onChanged: m3Legacy<String>((v) {
                         }
                       }),
 ),
-                  ),
                 ],
               ),
               Wrap(
@@ -2448,12 +2441,11 @@ onChanged: m3Legacy<String>((v) {
           runSpacing: 8.0,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            SizedBox(
-              width: 170.0,
-              child: M3Dropdown<String>(
+            M3Dropdown<String>(
+width: 170.0,
+fitOptions: true,
 value: brands.contains(_skuBrandFilter) ? _skuBrandFilter : 'all',
 label: 'العلامة التجارية',
-expand: true,
 options: m3OptionsFromMenuItems<String>(brands
                     .map(
                       (b) => DropdownMenuItem<String>(
@@ -2474,10 +2466,9 @@ onChanged: m3Legacy<String>((v) {
                   }
                 }),
 ),
-            ),
-            SizedBox(
-              width: 165.0,
-              child: M3Dropdown<String>(
+            M3Dropdown<String>(
+width: 165.0,
+fitOptions: true,
 value: _skuSectorFilter,
 label: 'القطاع',
 options: m3OptionsFromMenuItems<String>([
@@ -2500,10 +2491,9 @@ onChanged: m3Legacy<String>((v) {
                   }
                 }),
 ),
-            ),
-            SizedBox(
-              width: 195.0,
-              child: M3Dropdown<String>(
+            M3Dropdown<String>(
+width: 195.0,
+fitOptions: true,
 value: _skuStockStatusFilter,
 label: 'حالة المخزون',
 options: m3OptionsFromMenuItems<String>([
@@ -2530,7 +2520,6 @@ onChanged: m3Legacy<String>((v) {
                   }
                 }),
 ),
-            ),
             SizedBox(
               width: 240.0,
               child: TextField(

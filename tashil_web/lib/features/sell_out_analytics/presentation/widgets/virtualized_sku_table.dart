@@ -30,7 +30,9 @@ class VirtualizedSkuTable extends StatefulWidget {
 }
 
 class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
-  static const double _rowHeight = 64.0;
+  // Tall enough for a value plus up to 3 wrapped detail lines (or a 3-line
+  // item / branch name) without ellipsis (owner table rule).
+  static const double _rowHeight = 84.0;
   static const double _headerHeight = 56.0;
 
   String? _sortColumn;
@@ -935,7 +937,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                           r.skuName,
                                           key: const ValueKey('sku_table_sku_name'),
                                           style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-                                          maxLines: 2,
+                                          maxLines: 3,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
@@ -975,12 +977,14 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     context: context,
                                     columnKey: 'retailerChain',
                                     label: 'السلسلة',
+                                    textAlign: TextAlign.center,
                                     width: colChainWidth,
                                   ),
                                   _buildSortableHeaderCell(
                                     context: context,
                                     columnKey: 'storeName',
                                     label: 'الفرع',
+                                    textAlign: TextAlign.center,
                                     width: colStoreWidth,
                                   ),
                                   _buildSortableHeaderCell(
@@ -988,21 +992,21 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     columnKey: 'quantitySold',
                                     label: 'الوحدات المباعة',
                                     width: colQtyWidth,
-                                    textAlign: TextAlign.end,
+                                    textAlign: TextAlign.center,
                                   ),
                                   _buildSortableHeaderCell(
                                     context: context,
                                     columnKey: 'unitPrice',
                                     label: 'سعر الوحدة',
                                     width: colUnitPriceWidth,
-                                    textAlign: TextAlign.end,
+                                    textAlign: TextAlign.center,
                                   ),
                                   _buildSortableHeaderCell(
                                     context: context,
                                     columnKey: 'netRevenue',
                                     label: 'صافي المبيعات (ج.م)',
                                     width: colNetRevenueWidth,
-                                    textAlign: TextAlign.end,
+                                    textAlign: TextAlign.center,
                                   ),
                                   _buildSortableHeaderCell(
                                     context: context,
@@ -1041,7 +1045,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     SizedBox(
                                       width: colChainWidth,
                                       child: Align(
-                                        alignment: AlignmentDirectional.centerStart,
+                                        alignment: Alignment.center,
                                         child: M3ChipSurface(
                                           key: const ValueKey('sku_table_chain_chip'),
                                           color: brandStyle.background,
@@ -1060,8 +1064,10 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       width: colStoreWidth,
                                       child: Text(
                                         r.storeName,
+                                        key: const ValueKey('sku_table_store_name'),
+                                        textAlign: TextAlign.center,
                                         style: theme.textTheme.bodyMedium,
-                                        maxLines: 1,
+                                        maxLines: 3,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
@@ -1069,21 +1075,22 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       width: colQtyWidth,
                                       child: Column(
                                         mainAxisAlignment: MainAxisAlignment.center,
-                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        crossAxisAlignment: CrossAxisAlignment.center,
                                         children: [
                                           Text(
                                             '${CurrencyFormatter.formatUnits(r.quantitySold)} وحدة',
-                                            textAlign: TextAlign.end,
+                                            key: const ValueKey('sku_table_units'),
+                                            textAlign: TextAlign.center,
                                             style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                                           ),
                                           if (r.cartonsSold > 0)
                                             Text(
                                               '${r.cartonsSold.toStringAsFixed(1)} كرتونة (${r.unitsPerCarton}/ك)',
-                                              textAlign: TextAlign.end,
+                                              textAlign: TextAlign.center,
                                               style: theme.textTheme.bodySmall?.copyWith(
                                                 color: colorScheme.onSurfaceVariant,
                                               ),
-                                              maxLines: 1,
+                                              maxLines: 3,
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                         ],
@@ -1097,21 +1104,21 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             : null,
                                         child: Column(
                                           mainAxisAlignment: MainAxisAlignment.center,
-                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          crossAxisAlignment: CrossAxisAlignment.center,
                                           children: [
                                             Text(
                                               '${r.unitPrice.toStringAsFixed(2)} ج.م',
-                                              textAlign: TextAlign.end,
+                                              textAlign: TextAlign.center,
                                               style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                                             ),
                                             if (r.recommendedPrice > 0 || r.factoryUnitCost > 0)
                                               Text(
                                                 'كارتة ${r.recommendedPrice.toStringAsFixed(2)} • مصنع ${r.factoryUnitCost.toStringAsFixed(2)}',
-                                                textAlign: TextAlign.end,
+                                                textAlign: TextAlign.center,
                                                 style: theme.textTheme.bodySmall?.copyWith(
                                                   color: colorScheme.onSurfaceVariant,
                                                 ),
-                                                maxLines: 1,
+                                                maxLines: 3,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
                                           ],
@@ -1126,11 +1133,11 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             : null,
                                         child: Column(
                                           mainAxisAlignment: MainAxisAlignment.center,
-                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          crossAxisAlignment: CrossAxisAlignment.center,
                                           children: [
                                             Text(
                                               '${CurrencyFormatter.formatUnits(r.netRevenue.round())} ج.م',
-                                              textAlign: TextAlign.end,
+                                              textAlign: TextAlign.center,
                                               style: theme.textTheme.bodyMedium?.copyWith(
                                                 fontWeight: FontWeight.w600,
                                                 color: colorScheme.primary,
@@ -1139,14 +1146,14 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                             if (r.retailerMarginPct != 0 || r.retailerGrossProfit != 0)
                                               Text(
                                                 CurrencyFormatter.formatMarginSummary(r.retailerGrossProfit, r.retailerMarginPct, compact: false),
-                                                textAlign: TextAlign.end,
+                                                textAlign: TextAlign.center,
                                                 style: theme.textTheme.bodySmall?.copyWith(
                                                   fontWeight: FontWeight.w600,
                                                   color: r.retailerMarginPct < 0
                                                       ? colorScheme.error
                                                       : colorScheme.secondary,
                                                 ),
-                                                maxLines: 1,
+                                                maxLines: 3,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
                                           ],
@@ -1214,6 +1221,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                         M3Dropdown<int>(
                           key: const ValueKey('rows_per_page_dropdown'),
                           width: 96.0,
+                          fitOptions: true,
                           value: _rowsPerPage,
                           options: const [
                             M3DropdownOption(10, '10'),

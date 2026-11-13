@@ -408,9 +408,9 @@ class CompetitorSuggestionsReviewState
                 ),
               ),
               if (widget.isOwner) ...[
-                SizedBox(
-                  width: 96,
-                  child: M3Dropdown<int>(
+                M3Dropdown<int>(
+width: 96,
+fitOptions: true,
                     value: _batchSize,
                     label: 'دفعة',
                     options: const [
@@ -421,7 +421,6 @@ class CompetitorSuggestionsReviewState
                         ? null
                         : (v) => setState(() => _batchSize = v),
                   ),
-                ),
                 M3Spacing.gapSM,
                 FilledButton.tonalIcon(
                   key: const ValueKey('run-suggestions-batch'),
