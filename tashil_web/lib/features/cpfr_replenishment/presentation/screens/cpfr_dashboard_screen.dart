@@ -1988,6 +1988,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                 TableScrollContainer(
                   showSwipeHint: true,
                   child: DataTable(
+                    // Rows grow so item names wrap up to 3 lines.
+                    dataRowMinHeight: 56.0,
+                    dataRowMaxHeight: double.infinity,
                     headingRowColor: WidgetStateProperty.all(
                       colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     ),
@@ -2036,8 +2039,10 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                               children: [
                                 Text(
                                   item.skuName,
+                                  key: const ValueKey('cpfr_po_sku_name'),
                                   style: const TextStyle(
                                       fontWeight: FontWeight.w700),
+                                  maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 if (item.itemCode.isNotEmpty ||
