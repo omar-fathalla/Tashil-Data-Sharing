@@ -36,6 +36,7 @@ import '../../../cpfr_replenishment/domain/cpfr_models.dart';
 import '../../../product_master/presentation/screens/product_master_screen.dart';
 import '../widgets/target_management_panel.dart';
 import '../widgets/sell_table_shared.dart';
+import '../utils/monthly_status_text.dart';
 import '../../data/sell_in_explorer_repository.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 import '../../../../core/data/available_years.dart';
@@ -3554,14 +3555,12 @@ onChanged: m3Legacy<int>((v) {
     final fg = urgent ? cs.onErrorContainer : over ? cs.onTertiaryContainer : cs.onSurfaceVariant;
     final style = Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: fg);
     if (wrapWidth != null) {
-      // Long backend labels ("… (detail)") wrap inside the chip (up to 3
-      // centred lines) instead of widening the column; the full label is in
-      // the tooltip.
-      final open = label.indexOf('(');
-      final head = (open > 0 ? label.substring(0, open) : label).trim();
-      final detail = open > 0
-          ? label.substring(open + 1).replaceAll(RegExp(r'\)\s*$'), '').trim()
-          : '';
+      // The chip is a short label (1-2 words); the description sits under it
+      // in smaller grey text (up to 3 centred lines). The full backend label
+      // is in the tooltip.
+      final t = MonthlyStatusText.resolve(status, label);
+      final head = t.short;
+      final detail = t.description;
       return Tooltip(
         message: label,
         child: ConstrainedBox(
