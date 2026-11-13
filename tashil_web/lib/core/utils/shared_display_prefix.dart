@@ -10,8 +10,9 @@
 /// whitespace (NBSP, thin space, RLM, ZWJ, …).
 ///
 /// A name is never left empty. If stripping would make two originally
-/// different names (after normalisation) share a display label, enough
-/// of the original is kept to disambiguate.
+/// different names share a display label after normalisation (including
+/// collapsing spaces next to digits, so "كفر 2" and "كفر2" collide),
+/// enough of the original is kept to disambiguate.
 ///
 /// This never changes stored data, upload parsing, dedup keys, or matching.
 /// Callers must apply it only when rendering a label.
@@ -112,8 +113,10 @@ String? _longestSharedSeparatorPrefix(String name, List<String> all) {
 /// When aggressive stripping would collapse two originally-different
 /// names onto one label, keep the remainder after their longest common
 /// prefix (trimmed of a leftover leading separator) so the labels stay
-/// unique. Names that already normalise to the same string may share a
-/// label. If there is no common prefix, the originals are kept.
+/// unique. Remainders are compared with [_collisionKey] so labels that
+/// differ only by spaces next to digits still collide. Names that already
+/// normalise to the same original string may share a label. If there is
+/// no common prefix, the originals are kept.
 List<String> _disambiguate(
   List<String> originals,
   List<String> normalized,
@@ -123,7 +126,7 @@ List<String> _disambiguate(
 
   final groups = <String, List<int>>{};
   for (var i = 0; i < out.length; i++) {
-    groups.putIfAbsent(out[i], () => []).add(i);
+    groups.putIfAbsent(_collisionKey(out[i]), () => []).add(i);
   }
 
   for (final indexes in groups.values) {
@@ -151,9 +154,10 @@ List<String> _disambiguate(
   final seen = <String, int>{};
   final collide = <int>{};
   for (var i = 0; i < out.length; i++) {
-    final prev = seen[out[i]];
+    final key = _collisionKey(out[i]);
+    final prev = seen[key];
     if (prev == null) {
-      seen[out[i]] = i;
+      seen[key] = i;
       continue;
     }
     if (normalized[prev] != normalized[i]) {
@@ -205,6 +209,33 @@ String _trimLeadingSeparator(String input) {
     consumed += String.fromCharCode(units[k]).length;
   }
   return input.substring(consumed).trim();
+}
+
+/// Comparison key for "are these display remainders the same?"
+/// Applies [_normalize] and then drops spaces that sit next to a digit,
+/// so "كفر 2" and "كفر2" are treated as a collision.
+String _collisionKey(String input) {
+  final n = _normalize(input);
+  if (n.isEmpty) return n;
+  final buf = StringBuffer();
+  for (var i = 0; i < n.length; i++) {
+    final ch = n[i];
+    if (ch == ' ') {
+      final prev = i > 0 ? n[i - 1] : '';
+      final next = i + 1 < n.length ? n[i + 1] : '';
+      if (_isDigit(prev) || _isDigit(next)) continue;
+    }
+    buf.write(ch);
+  }
+  return buf.toString();
+}
+
+bool _isDigit(String ch) {
+  if (ch.isEmpty) return false;
+  final c = ch.codeUnitAt(0);
+  return (c >= 0x0030 && c <= 0x0039) ||
+      (c >= 0x0660 && c <= 0x0669) ||
+      (c >= 0x06F0 && c <= 0x06F9);
 }
 
 /// Lowercase-style fold used only for comparison, never written back.
@@ -281,9 +312,8 @@ int? _originalIndexAfterNormalized(String original, String normPrefix) {
       if (ni >= normPrefix.length) break;
     }
     started = true;
-    final ch = _dashes.contains(rune)
-        ? '-'
-        : _foldLetter(String.fromCharCode(rune));
+    final ch =
+        _dashes.contains(rune) ? '-' : _foldLetter(String.fromCharCode(rune));
     if (!emit(ch)) return null;
     i++;
     if (ni >= normPrefix.length) break;
