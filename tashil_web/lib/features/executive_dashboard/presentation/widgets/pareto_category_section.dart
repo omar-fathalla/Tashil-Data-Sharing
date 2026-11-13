@@ -1,5 +1,6 @@
 import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/widgets/m3_fill_layout.dart';
 import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_equal_height_grid.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
@@ -927,8 +928,9 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
               ],
             ),
             M3Spacing.gapMD,
-            // Column Guide Header Bar to explicitly clarify both percentage metrics
+            // Column guide: one tag per metric (was icon + text + chip).
             Padding(
+              key: const ValueKey('category_metric_legend'),
               padding: const EdgeInsets.only(bottom: M3Spacing.s12),
               child: M3TonalSurface(
                 color: colorScheme.surfaceContainer,
@@ -936,84 +938,16 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                 borderRadius: M3Shape.radiusSm,
                 padding: const EdgeInsets.symmetric(
                     horizontal: M3Spacing.s12, vertical: M3Spacing.xs),
-                child: Wrap(
+                child: const Wrap(
                   spacing: 16.0,
                   runSpacing: 8.0,
                   alignment: WrapAlignment.spaceBetween,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Wrap(
-                      spacing: 6.0,
-                      runSpacing: 4.0,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        M3TonalSurface(
-                          color: colorScheme.surfaceContainerLowest,
-                          borderColor: colorScheme.outlineVariant,
-                          circle: true,
-                          padding: const EdgeInsets.all(M3Spacing.xxs),
-                          child: Icon(
-                            AppIcons.pieChart,
-                            size: 13.0,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        Text(
-                          'حصتنا السوقية %',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        M3ChipSurface(
-                          color: colorScheme.surfaceContainerLowest,
-                          borderColor: colorScheme.outlineVariant,
-                          child: Text(
-                            'حصتنا السوقية %',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Wrap(
-                      spacing: 6.0,
-                      runSpacing: 4.0,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        M3TonalSurface(
-                          color: colorScheme.surfaceContainerLowest,
-                          borderColor: colorScheme.outlineVariant,
-                          circle: true,
-                          padding: const EdgeInsets.all(M3Spacing.xxs),
-                          child: Icon(
-                            AppIcons.donutChart,
-                            size: 13.0,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        Text(
-                          '% من مبيعاتنا',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        M3ChipSurface(
-                          color: colorScheme.surfaceContainerLowest,
-                          borderColor: colorScheme.outlineVariant,
-                          child: Text(
-                            '% من مبيعاتنا',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    M3StatusTag(
+                        label: 'حصتنا السوقية %', icon: AppIcons.pieChart),
+                    M3StatusTag(
+                        label: '% من مبيعاتنا', icon: AppIcons.donutChart),
                   ],
                 ),
               ),
@@ -1341,15 +1275,18 @@ class _ParetoPowerSkusCard extends StatelessWidget {
         skusToDisplay = [];
       }
     } else {
-      skusToDisplay = paretoSkus.take(10).toList();
+      // Up to 30 candidates; 10 always shown, more only when the card is
+      // stretched to the category card's height (M3FillRows).
+      skusToDisplay = paretoSkus.take(30).toList();
     }
 
     return Card.outlined(
       key: const ValueKey('pareto_80_20_card'),
       child: Padding(
         padding: M3Spacing.pMd,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        // Last child (the SKU rows) gets any extra height from the equal-
+        // height row, so the card fills with rows instead of blank space.
+        child: M3FillColumn(
           children: [
             Row(
               children: [
@@ -1454,44 +1391,164 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                 ),
               )
             else
-              ...skusToDisplay.map((sku) {
-                final isClassA = sku.isTop80Contributor;
-                return LayoutBuilder(
-                  builder: (context, cardConstraints) {
-                    final isCompact = cardConstraints.maxWidth < 460;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: M3Spacing.xs),
-                      child: M3TonalSurface(
-                        // Calm outlined rows; class A shows via its info tag.
-                        color: colorScheme.surface,
-                        borderColor: colorScheme.outlineVariant,
-                        borderRadius: M3Shape.radiusSm,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: M3Spacing.sm,
-                          vertical: M3Spacing.xs,
-                        ),
-                        width: double.infinity,
-                        constraints:
-                            BoxConstraints(minHeight: isCompact ? 76.0 : 62.0),
-                        child: isCompact
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Row(
+              M3FillRows(
+                key: const ValueKey('pareto_sku_rows'),
+                minRows: isFiltered ? skusToDisplay.length : 10,
+                children: [
+                  ...skusToDisplay.map((sku) {
+                    final isClassA = sku.isTop80Contributor;
+                    return LayoutBuilder(
+                      builder: (context, cardConstraints) {
+                        final isCompact = cardConstraints.maxWidth < 460;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: M3Spacing.xs),
+                          child: M3TonalSurface(
+                            // Calm outlined rows; class A shows via its info tag.
+                            color: colorScheme.surface,
+                            borderColor: colorScheme.outlineVariant,
+                            borderRadius: M3Shape.radiusSm,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: M3Spacing.sm,
+                              vertical: M3Spacing.xs,
+                            ),
+                            width: double.infinity,
+                            constraints: BoxConstraints(
+                                minHeight: isCompact ? 76.0 : 62.0),
+                            child: isCompact
+                                ? Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Expanded(
-                                        child: Text(
-                                          sku.skuName,
-                                          style: theme.textTheme.bodyMedium
-                                              ?.copyWith(
-                                            fontWeight: FontWeight.w600,
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              sku.skuName,
+                                              style: theme.textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                          const SizedBox(width: 8.0),
+                                          M3ChipSurface(
+                                            color: isClassA
+                                                ? colorScheme.secondaryContainer
+                                                : colorScheme
+                                                    .surfaceContainerHighest,
+                                            child: Text(
+                                              isClassA
+                                                  ? 'تصنيف A'
+                                                  : 'تصنيف B/C',
+                                              style: theme.textTheme.labelSmall
+                                                  ?.copyWith(
+                                                color: isClassA
+                                                    ? colorScheme
+                                                        .onSecondaryContainer
+                                                    : colorScheme
+                                                        .onSurfaceVariant,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4.0),
+                                      Text(
+                                        '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود الصنف: ${sku.itemCode} • " : ""}الباركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
+                                        style:
+                                            theme.textTheme.bodySmall?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2.0),
+                                      Text(
+                                        'الحصة ${sku.revenueSharePct.toStringAsFixed(1)}% • التراكمي ${sku.cumulativeSharePct.toStringAsFixed(1)}%',
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: colorScheme.onSurface,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  )
+                                : Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      // 1. SKU Name & Category / Barcode / Revenue
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              sku.skuName,
+                                              style: theme.textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 3.0),
+                                            Text(
+                                              '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود الصنف: ${sku.itemCode} • " : ""}الباركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                color: colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      const SizedBox(width: 8.0),
+                                      const SizedBox(width: 12.0),
+                                      // 2. Share & Cumulative Share %
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                            minWidth: 95.0, maxWidth: 120.0),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              'الحصة ${sku.revenueSharePct.toStringAsFixed(1)}%',
+                                              style: theme.textTheme.labelMedium
+                                                  ?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                                color: colorScheme.onSurface,
+                                              ),
+                                              maxLines: 1,
+                                            ),
+                                            const SizedBox(height: 2.0),
+                                            Text(
+                                              'التراكمي ${sku.cumulativeSharePct.toStringAsFixed(1)}%',
+                                              style: theme.textTheme.labelSmall
+                                                  ?.copyWith(
+                                                color: colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                              maxLines: 1,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12.0),
+                                      // 3. Category Class Badge
                                       M3ChipSurface(
                                         color: isClassA
                                             ? colorScheme.secondaryContainer
@@ -1511,116 +1568,13 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 4.0),
-                                  Text(
-                                    '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود الصنف: ${sku.itemCode} • " : ""}الباركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 2.0),
-                                  Text(
-                                    'الحصة ${sku.revenueSharePct.toStringAsFixed(1)}% • التراكمي ${sku.cumulativeSharePct.toStringAsFixed(1)}%',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: colorScheme.onSurface,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              )
-                            : Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  // 1. SKU Name & Category / Barcode / Revenue
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          sku.skuName,
-                                          style: theme.textTheme.bodyMedium
-                                              ?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 3.0),
-                                        Text(
-                                          '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود الصنف: ${sku.itemCode} • " : ""}الباركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
-                                          style: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12.0),
-                                  // 2. Share & Cumulative Share %
-                                  ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                        minWidth: 95.0, maxWidth: 120.0),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          'الحصة ${sku.revenueSharePct.toStringAsFixed(1)}%',
-                                          style: theme.textTheme.labelMedium
-                                              ?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                            color: colorScheme.onSurface,
-                                          ),
-                                          maxLines: 1,
-                                        ),
-                                        const SizedBox(height: 2.0),
-                                        Text(
-                                          'التراكمي ${sku.cumulativeSharePct.toStringAsFixed(1)}%',
-                                          style: theme.textTheme.labelSmall
-                                              ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                          maxLines: 1,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12.0),
-                                  // 3. Category Class Badge
-                                  M3ChipSurface(
-                                    color: isClassA
-                                        ? colorScheme.secondaryContainer
-                                        : colorScheme.surfaceContainerHighest,
-                                    child: Text(
-                                      isClassA ? 'تصنيف A' : 'تصنيف B/C',
-                                      style:
-                                          theme.textTheme.labelSmall?.copyWith(
-                                        color: isClassA
-                                            ? colorScheme.onSecondaryContainer
-                                            : colorScheme.onSurfaceVariant,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
+                          ),
+                        );
+                      },
                     );
-                  },
-                );
-              }),
+                  }),
+                ],
+              ),
           ],
         ),
       ),
