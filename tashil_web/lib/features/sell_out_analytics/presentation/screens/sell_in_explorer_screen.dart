@@ -977,20 +977,21 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   // 1030dp; TableScrollContainer still stretches the table on wider screens.
   static const double _monthlyCellMaxWidth = 84.0;
   static const double _skuCellMaxWidth = 88.0;
+  static const double _monthlyStatusMaxWidth = 112.0;
 
   // Monthly cell text: at most 2 centred lines (row height stays bounded),
   // full text in a tooltip if still clipped.
   // Long stock-table headers wrap onto 2 centred lines so the columns fit 1030dp.
   static Widget _wrapHeader(String text) => ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 64.0),
+        constraints: const BoxConstraints(maxWidth: 56.0),
         child: Text(text, maxLines: 2, softWrap: true, textAlign: TextAlign.center),
       );
 
-  Widget _mText(String text, {TextStyle? style}) => Tooltip(
+  Widget _mText(String text, {TextStyle? style, int maxLines = 2}) => Tooltip(
         message: text,
         child: Text(
           text,
-          maxLines: 2,
+          maxLines: maxLines,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
           style: style,
@@ -2484,6 +2485,7 @@ onChanged: m3Legacy<String>((v) {
                             m.stockHealthLabelAr,
                             m.stockHealthStatus,
                             key: const ValueKey('sellin_monthly_status'),
+                            wrapWidth: _monthlyStatusMaxWidth,
                           ),
                         ),
                       ],
@@ -2849,7 +2851,7 @@ onChanged: m3Legacy<String>((val) {
                       sortColumnIndex: _skuSortColumnIndex > 0 ? _skuSortColumnIndex - 1 : null,
                       sortAscending: _skuSortAscending,
                       columnSpacing: M3Spacing.xs,
-                      horizontalMargin: M3Spacing.sm,
+                      horizontalMargin: M3Spacing.xs,
                       headingRowHeight: _skuHeadingHeight,
                       dataRowMinHeight: _skuRowHeight,
                       dataRowMaxHeight: _skuRowHeight,
@@ -2954,7 +2956,7 @@ onChanged: m3Legacy<String>((val) {
                                       message: '${item.brand} • ${item.governorate}',
                                       child: Text(
                                         '${item.brand} • ${item.governorate}',
-                                        maxLines: 2,
+                                        maxLines: 3,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(fontWeight: FontWeight.w600),
                                       ),
@@ -2963,8 +2965,7 @@ onChanged: m3Legacy<String>((val) {
                                   if (item.officialCartonExclVatEgp > 0)
                                     _mText(
                                       'سعر القائمة: ${CurrencyFormatter.formatEGP(item.officialCartonExclVatEgp)}',
-                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         color: colorScheme.onSurfaceVariant,                                       )),
-                                    ),
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         color: colorScheme.onSurfaceVariant,                                       )), maxLines: 3),
                                 ],
                               ),
                             ),
@@ -2975,12 +2976,10 @@ onChanged: m3Legacy<String>((val) {
                                 children: [
                                   _mText(
                                     '${CurrencyFormatter.formatNumber(item.sellInCases.round())} كرتونة',
-                                    style: const TextStyle(fontWeight: FontWeight.w700),
-                                  ),
+                                    style: const TextStyle(fontWeight: FontWeight.w700), maxLines: 3),
                                   _mText(
                                     '${CurrencyFormatter.formatNumber(sellInUnits)} وحدة • ${CurrencyFormatter.formatCompactEGP(item.sellInValueEgp)}',
-                                    style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.bodySmall,                                       color: colorScheme.primary,                                       fontWeight: FontWeight.w700,                                     )),
-                                  ),
+                                    style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.bodySmall,                                       color: colorScheme.primary,                                       fontWeight: FontWeight.w700,                                     )), maxLines: 3),
                                 ],
                               ),
                             ),
@@ -2991,12 +2990,10 @@ onChanged: m3Legacy<String>((val) {
                                 children: [
                                   _mText(
                                     '${CurrencyFormatter.formatNumber(item.sellOutEstCases.round())} كرتونة',
-                                    style: const TextStyle(fontWeight: FontWeight.w700),
-                                  ),
+                                    style: const TextStyle(fontWeight: FontWeight.w700), maxLines: 3),
                                   _mText(
                                     '${CurrencyFormatter.formatNumber(sellOutUnits)} وحدة • ${CurrencyFormatter.formatCompactEGP(item.sellOutValueEgp)}${item.retailerMarginPct != 0 ? " • هامش ${item.retailerMarginPct.toStringAsFixed(0)}%" : ""}',
-                                    style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.bodySmall,                                       color: M3StatusColors.of(context).accents.teal,                                       fontWeight: FontWeight.w700,                                     )),
-                                  ),
+                                    style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.bodySmall,                                       color: M3StatusColors.of(context).accents.teal,                                       fontWeight: FontWeight.w700,                                     )), maxLines: 3),
                                 ],
                               ),
                             ),
@@ -3010,12 +3007,10 @@ onChanged: m3Legacy<String>((val) {
                                     style: TextStyle(
                                       fontWeight: FontWeight.w900,
                                       color: colorScheme.primary,
-                                    ),
-                                  ),
+                                    ), maxLines: 3),
                                   _mText(
                                     '${CurrencyFormatter.formatNumber(stockUnits)} وحدة • ${CurrencyFormatter.formatCompactEGP(stockVal)}',
-                                    style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.bodySmall,                                       fontWeight: FontWeight.w700,                                       color: colorScheme.onSurfaceVariant,                                     )),
-                                  ),
+                                    style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.bodySmall,                                       fontWeight: FontWeight.w700,                                       color: colorScheme.onSurfaceVariant,                                     )), maxLines: 3),
                                 ],
                               ),
                             ),
@@ -3029,8 +3024,7 @@ onChanged: m3Legacy<String>((val) {
                                       : isOverstock
                                           ? M3StatusColors.of(context).accents.caution
                                           : M3StatusColors.of(context).accents.teal,
-                                ),
-                              ),
+                                ), maxLines: 3),
                             ),
                             DataCell(
                               _stockStatusChip(
@@ -3048,20 +3042,17 @@ onChanged: m3Legacy<String>((val) {
                                       children: [
                                         _mText(
                                           '${item.suggestedPoCases} كرتونة',
-                                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                             fontWeight: FontWeight.w900,                                             color: M3StatusColors.of(context).accents.alertStrong,                                             fontSize: M3FontSize.bodySmall,                                           )),
-                                        ),
+                                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                             fontWeight: FontWeight.w900,                                             color: M3StatusColors.of(context).accents.alertStrong,                                             fontSize: M3FontSize.bodySmall,                                           )), maxLines: 3),
                                         _mText(
                                           '${CurrencyFormatter.formatCompactEGP(item.suggestedPoValueEgp)} • شامل الضريبة ${CurrencyFormatter.formatCompactEGP(poGrossInclVat)}',
-                                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                             fontSize: M3FontSize.bodySmall,                                             fontWeight: FontWeight.w700,                                             color: M3StatusColors.of(context).accents.tealStrong,                                           )),
-                                        ),
+                                          style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                             fontSize: M3FontSize.bodySmall,                                             fontWeight: FontWeight.w700,                                             color: M3StatusColors.of(context).accents.tealStrong,                                           )), maxLines: 3),
                                       ],
                                     )
                                   : _mText(
                                       'لا يحتاج إعادة طلب',
                                       style: TextStyle(
                                         color: colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
+                                      ), maxLines: 3),
                             ),
                           ],
                         );
@@ -3399,6 +3390,8 @@ onChanged: m3Legacy<int>((v) {
                       )
                     : TableScrollContainer(
                         controller: _archiveSheetsScrollController,
+                        // File name and net revenue are the widest columns.
+                        columnFlex: const [1.05, 0.95, 0.9, 0.95, 0.95, 1.15, 0.95, 0.95],
                         showSwipeHint: true,
                         // Actions pinned at the row end (same as Sell-Out) so
                         // they stay on screen at 1280dp without scrolling.
@@ -3413,15 +3406,15 @@ onChanged: m3Legacy<int>((v) {
                           headingRowColor: WidgetStatePropertyAll(
                             colorScheme.surfaceContainerHigh.withOpacity(0.5),
                           ),
-                          columns: const [
-                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الملف')),
-                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('السلسلة')),
-                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الفترة')),
-                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('المعاملات'), numeric: true),
-                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الكراتين'), numeric: true),
-                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('صافي Sell-In (ج.م)'), numeric: true),
-                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الوزن (طن)'), numeric: true),
-                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('تاريخ الرفع')),
+                          columns: [
+                            const DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الملف')),
+                            const DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('السلسلة')),
+                            const DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الفترة')),
+                            const DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('المعاملات'), numeric: true),
+                            const DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الكراتين'), numeric: true),
+                            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 64.0), child: const Text('صافي Sell-In (ج.م)', maxLines: 2, softWrap: true, textAlign: TextAlign.center)), numeric: true),
+                            const DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الوزن (طن)'), numeric: true),
+                            const DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('تاريخ الرفع')),
                           ],
                           rows: _archivedSellInFiles.map((file) {
                             final periodText = file.targetMonth.isNotEmpty &&
@@ -3516,13 +3509,19 @@ onChanged: m3Legacy<int>((v) {
                                   ),
                                 ),
                                 DataCell(
-                                  Text(
+                                  // Date and time wrap onto 2 centred lines so the
+                                  // table fits 1030dp next to the pinned actions.
+                                  ConstrainedBox(
+                                    constraints: const BoxConstraints(maxWidth: 76.0),
+                                    child: Text(
+                                    textAlign: TextAlign.center,
                                     file.uploadedAt.length >= 16
                                         ? file.uploadedAt
                                             .substring(0, 16)
                                             .replaceAll('T', ' ')
                                         : file.uploadedAt,
                                     style: M3TextVariants.cell.copyWith(color: colorScheme.onSurfaceVariant),
+                                  ),
                                   ),
                                 ),
                               ],
@@ -3546,12 +3545,60 @@ onChanged: m3Legacy<int>((v) {
 
   /// Reorder/stock status as the shared 8dp chip. Colours stay semantic:
   /// urgent = M3 error container, overstock = tertiary container, else neutral.
-  Widget _stockStatusChip(BuildContext context, String label, String status, {Key? key}) {
+  Widget _stockStatusChip(BuildContext context, String label, String status,
+      {Key? key, double? wrapWidth}) {
     final cs = Theme.of(context).colorScheme;
     final urgent = status.contains('urgent') || status.contains('stockout') || status.contains('negative');
     final over = status == 'overstock';
     final bg = urgent ? cs.errorContainer : over ? cs.tertiaryContainer : cs.surfaceContainerHigh;
     final fg = urgent ? cs.onErrorContainer : over ? cs.onTertiaryContainer : cs.onSurfaceVariant;
+    final style = Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: fg);
+    if (wrapWidth != null) {
+      // Long backend labels ("… (detail)") wrap inside the chip (up to 3
+      // centred lines) instead of widening the column; the full label is in
+      // the tooltip.
+      final open = label.indexOf('(');
+      final head = (open > 0 ? label.substring(0, open) : label).trim();
+      final detail = open > 0
+          ? label.substring(open + 1).replaceAll(RegExp(r'\)\s*$'), '').trim()
+          : '';
+      return Tooltip(
+        message: label,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: wrapWidth),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              M3ChipSurface(
+                key: key,
+                color: bg,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: M3Spacing.xxs),
+                  child: Text(
+                    head,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: style,
+                  ),
+                ),
+              ),
+              if (detail.isNotEmpty) ...[
+                const SizedBox(height: M3Spacing.xxs),
+                Text(
+                  detail,
+                  key: const ValueKey('sellin_monthly_status_detail'),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
     return M3ChipSurface(
       key: key,
       color: bg,
@@ -3559,7 +3606,7 @@ onChanged: m3Legacy<int>((v) {
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: fg),
+        style: style,
       ),
     );
   }

@@ -100,11 +100,12 @@ void main() {
     final table =
         tester.getRect(find.byKey(const ValueKey('uploaded_files_table')));
     final n = groups.evaluate().length;
-    expect(table.height, closeTo(48.0 + 56.0 * n, 1.0));
+    // Rows are 72dp so the upload date/time (and last import) can wrap.
+    expect(table.height, closeTo(48.0 + 72.0 * n, 1.0));
     var i = 0;
     for (final e in groups.evaluate()) {
       final c = tester.getRect(find.byWidget(e.widget)).center.dy;
-      expect(c, closeTo(table.top + 48.0 + 56.0 * i + 28.0, 1.5));
+      expect(c, closeTo(table.top + 48.0 + 72.0 * i + 36.0, 1.5));
       i++;
     }
   });
