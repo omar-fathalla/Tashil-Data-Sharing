@@ -81,3 +81,11 @@ String countRegisteredChains(int n) => arabicCount(n,
     few: 'سلاسل مسجلة',
     many: 'سلسلة مسجلة',
     hundred: 'سلسلة مسجلة');
+
+/// "يوم واحد" / "يومان" / "5 أيام" / "12 يومًا" / "100 يوم".
+String countDay(int n) => arabicCount(n,
+    one: 'يوم واحد',
+    two: 'يومان',
+    few: 'أيام',
+    many: 'يومًا',
+    hundred: 'يوم');

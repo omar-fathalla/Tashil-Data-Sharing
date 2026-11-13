@@ -102,6 +102,8 @@ void main() {
       // Tap on SegmentedButton to switch to Branch Matrix
       final matrixSegment = find.text('مصفوفة الفروع والنواقص');
       expect(matrixSegment, findsOneWidget);
+      await tester.ensureVisible(matrixSegment);
+      await tester.pumpAndSettle();
       await tester.tap(matrixSegment);
       await tester.pumpAndSettle();
 
