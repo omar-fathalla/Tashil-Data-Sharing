@@ -101,3 +101,11 @@ String countMissingInBranch(int n) {
   if (r >= 11) return '$n صنفًا منعدمًا بالفرع';
   return '$n صنف منعدم بالفرع';
 }
+
+/// "صف واحد" / "صفان" / "5 صفوف" / "12 صفًا" / "100 صف".
+String countRows(int n) => arabicCount(n,
+    one: 'صف واحد', two: 'صفان', few: 'صفوف', many: 'صفًا', hundred: 'صف');
+
+/// "خطأ واحد" / "خطآن" / "5 أخطاء" / "12 خطأً" / "100 خطأ".
+String countError(int n) => arabicCount(n,
+    one: 'خطأ واحد', two: 'خطآن', few: 'أخطاء', many: 'خطأً', hundred: 'خطأ');

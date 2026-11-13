@@ -1,0 +1,482 @@
+// Errors (Data Quality): Sell-Out table, typography and card symmetry.
+// Real Cairo font, 1280, 1024, and the live 1030 content width
+// (1280 viewport minus the 250dp sidebar). Long live-like fixture values.
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/core/widgets/m3_section_title.dart';
+import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
+import 'package:tashil_web/features/data_quality/presentation/screens/data_quality_screen.dart';
+import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
+
+import 'errors_m3_support.dart';
+import 'support/live_viewport.dart';
+
+const _searchHint = 'بحث بالصنف أو الكود أو الباركود أو النوع...';
+
+List<String> _cutBeforeThreeLines(WidgetTester tester, Finder scope,
+    {bool Function(Text t)? only}) {
+  final out = <String>[];
+  for (final e
+      in find.descendant(of: scope, matching: find.byType(Text)).evaluate()) {
+    final t = e.widget as Text;
+    if (only != null && !only(t)) continue;
+    if (t.data == null || t.data!.isEmpty) continue;
+    final p = tester
+        .renderObject<RenderParagraph>(find.byElementPredicate((x) => x == e));
+    if (p.didExceedMaxLines && (t.maxLines ?? 99) < 3) {
+      out.add('"${t.data}" cut at maxLines ${t.maxLines}');
+    }
+  }
+  return out;
+}
+
+List<String> _clippedDropdowns(WidgetTester tester) {
+  final out = <String>[];
+  for (final e in find
+      .byType(DropdownMenu<int>)
+      .evaluate()
+      .followedBy(find.byType(DropdownMenu<String>).evaluate())) {
+    final editable = find.descendant(
+        of: find.byElementPredicate((x) => x == e),
+        matching: find.byType(EditableText));
+    if (editable.evaluate().isEmpty) continue;
+    final et = tester.widget<EditableText>(editable.first);
+    final text = et.controller.text;
+    if (text.isEmpty) continue;
+    final box = tester.renderObject<RenderBox>(editable.first);
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: et.style),
+      textDirection: Directionality.of(e),
+      textScaler: MediaQuery.textScalerOf(e),
+      maxLines: 1,
+    )..layout();
+    if (tp.width > box.size.width + 0.5) {
+      out.add('"$text" ${tp.width.toStringAsFixed(1)} > '
+          '${box.size.width.toStringAsFixed(1)}');
+    }
+  }
+  return out;
+}
+
+bool _valueIsOneLine(WidgetTester tester, Finder valueFinder) {
+  expect(valueFinder, findsOneWidget);
+  final el = valueFinder.evaluate().single;
+  final text = el.widget as Text;
+  final p = tester
+      .renderObject<RenderParagraph>(find.byElementPredicate((x) => x == el));
+  final tp = TextPainter(
+    text: TextSpan(text: text.data, style: text.style ?? p.text.style),
+    textDirection: Directionality.of(el),
+    textScaler: MediaQuery.textScalerOf(el),
+    maxLines: 1,
+  )..layout(maxWidth: p.size.width);
+  return (p.size.height - tp.height).abs() <= 1.5 && !p.didExceedMaxLines;
+}
+
+double _hScrollExtent(WidgetTester tester, Finder scope) {
+  final scrollable =
+      find.descendant(of: scope, matching: find.byType(Scrollable));
+  expect(scrollable, findsWidgets);
+  for (final el in scrollable.evaluate()) {
+    final s = el.widget as Scrollable;
+    if (s.axisDirection == AxisDirection.right ||
+        s.axisDirection == AxisDirection.left) {
+      final state = tester.state<ScrollableState>(find.byWidget(s));
+      if (state.position.hasContentDimensions) {
+        return state.position.maxScrollExtent;
+      }
+    }
+  }
+  return 0;
+}
+
+bool _onScreen(WidgetTester tester, Finder f, {double width = 1280}) {
+  expect(f, findsWidgets);
+  final box = tester.getRect(f.first);
+  return box.left < width - 1 &&
+      box.right > 1 &&
+      box.top < 8000 &&
+      box.bottom > 0;
+}
+
+_CardMetrics _metrics(WidgetTester tester, Finder card) {
+  expect(card, findsOneWidget);
+  final container = tester.widget<Container>(
+      find.descendant(of: card, matching: find.byType(Container)).first);
+  final padding = container.padding! as EdgeInsets;
+  final icon = tester.widget<Icon>(
+      find.descendant(of: card, matching: find.byType(Icon)).first);
+  final titleText = tester.widget<Text>(find.descendant(
+      of: find.descendant(of: card, matching: find.byType(M3SectionTitle)),
+      matching: find.byType(Text)));
+  final values = find.descendant(
+      of: card,
+      matching: find.byWidgetPredicate((w) =>
+          w is Text &&
+              w.key is ValueKey &&
+              (w.key as ValueKey).value.toString().startsWith('dq_') ||
+          (w is Text &&
+              w.key is ValueKey &&
+              (w.key as ValueKey).value.toString().startsWith('kpi_value_'))));
+  Text value;
+  if (values.evaluate().isNotEmpty) {
+    value = tester.widget<Text>(values.first);
+  } else {
+    final texts = tester
+        .widgetList<Text>(
+            find.descendant(of: card, matching: find.byType(Text)))
+        .toList();
+    value = texts.length > 1 ? texts[1] : texts.first;
+  }
+  return _CardMetrics(
+    padding: padding,
+    iconSize: icon.size ?? 0,
+    titleStyle: titleText.style,
+    valueStyle: value.style,
+    size: tester.getSize(card),
+  );
+}
+
+class _CardMetrics {
+  _CardMetrics({
+    required this.padding,
+    required this.iconSize,
+    required this.titleStyle,
+    required this.valueStyle,
+    required this.size,
+  });
+  final EdgeInsets padding;
+  final double iconSize;
+  final TextStyle? titleStyle;
+  final TextStyle? valueStyle;
+  final Size size;
+}
+
+Future<void> _pumpSellOut(WidgetTester tester, {required double width}) async {
+  tester.view.physicalSize = Size(width, 2400);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(MaterialApp(
+    theme: AppTheme.light(),
+    locale: const Locale('ar'),
+    supportedLocales: const [Locale('ar'), Locale('en')],
+    localizationsDelegates: const [
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    home: Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(body: SellOutExplorerScreen(apiClient: ApiClient())),
+    ),
+  ));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _pumpPage(WidgetTester tester, {required double width}) {
+  return pumpErrors(
+    tester,
+    DataQualityScreen(
+      dataSource: ErrorsShotSource(),
+      pollInterval: const Duration(hours: 1),
+    ),
+    width: width,
+    height: 3600,
+  );
+}
+
+Future<void> _pumpPageWithSidebar(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(kLiveViewportWidth, 3600);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(MaterialApp(
+    theme: AppTheme.light(),
+    locale: const Locale('ar'),
+    supportedLocales: const [Locale('ar'), Locale('en')],
+    localizationsDelegates: const [
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    home: Directionality(
+      textDirection: TextDirection.rtl,
+      child: Row(
+        children: [
+          const SizedBox(
+            width: kLiveSidebarWidth,
+            child: ColoredBox(color: Color(0xFFECEEE6)),
+          ),
+          Expanded(
+            child: Scaffold(
+              body: DataQualityScreen(
+                dataSource: ErrorsShotSource(),
+                pollInterval: const Duration(hours: 1),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  ));
+  await tester.pumpAndSettle();
+}
+
+/// True when [expected] is fully laid out inside [scope] in at most 3 lines
+/// and the text's paint rect sits inside the scope's rect (no parent clip).
+bool _labelFullyVisible(WidgetTester tester, Finder scope, String expected) {
+  final texts = find.descendant(of: scope, matching: find.text(expected));
+  if (texts.evaluate().isEmpty) return false;
+  final textEl = texts.evaluate().first;
+  final text = textEl.widget as Text;
+  if ((text.maxLines ?? 99) < 3 && (text.maxLines ?? 99) < 2) return false;
+  final para = tester.renderObject<RenderParagraph>(
+      find.byElementPredicate((x) => x == textEl));
+  final tp = TextPainter(
+    text: TextSpan(text: expected, style: text.style ?? para.text.style),
+    textDirection: Directionality.of(textEl),
+    textScaler: MediaQuery.textScalerOf(textEl),
+    maxLines: text.maxLines ?? 3,
+  )..layout(maxWidth: para.size.width);
+  if (tp.didExceedMaxLines) return false;
+  final scopeBox = tester.getRect(scope);
+  final textBox = tester.getRect(texts.first);
+  const slop = 1.5;
+  return textBox.left >= scopeBox.left - slop &&
+      textBox.right <= scopeBox.right + slop &&
+      textBox.top >= scopeBox.top - slop &&
+      textBox.bottom <= scopeBox.bottom + slop;
+}
+
+void _assertTableFitsLiveContent(WidgetTester tester,
+    {required double contentWidth}) {
+  final scroller = find.byKey(const ValueKey('dq_table_scroll'));
+  expect(scroller, findsOneWidget);
+  expect(_hScrollExtent(tester, scroller), lessThanOrEqualTo(2.0));
+  expect(
+      _onScreen(tester, find.byKey(const ValueKey('dq_item_name')),
+          width: contentWidth),
+      isTrue);
+  expect(_onScreen(tester, find.text('مفتوحة'), width: contentWidth), isTrue);
+  expect(
+      _onScreen(tester, find.byKey(const ValueKey('dq_status_e1')),
+          width: contentWidth),
+      isTrue);
+
+  final table = find.byKey(const ValueKey('dq_table'));
+  for (final header in [
+    'الخطورة',
+    'النوع',
+    'كود الصنف',
+    'الباركود',
+    'اسم الصنف',
+    'الموجود',
+    'المتوقع',
+    'التأثير',
+    'الحالة',
+  ]) {
+    expect(_labelFullyVisible(tester, table, header), isTrue, reason: header);
+  }
+  expect(_labelFullyVisible(tester, table, kLongSkuName), isTrue,
+      reason: 'item name');
+  expect(_labelFullyVisible(tester, table, kLongTypeMissing), isTrue,
+      reason: 'type');
+  expect(_labelFullyVisible(tester, table, kLongFound), isTrue,
+      reason: 'found value');
+  expect(_labelFullyVisible(tester, table, kLongExpected), isTrue,
+      reason: 'expected value');
+
+  final chip = find.byKey(const ValueKey('dq_type_chip_missing_sku'));
+  expect(chip, findsOneWidget);
+  final chipText = tester.widget<Text>(
+      find.descendant(of: chip, matching: find.byType(Text)).first);
+  expect(chipText.data, contains(kLongTypeMissing));
+  expect(_labelFullyVisible(tester, chip, chipText.data!), isTrue,
+      reason: 'type chip label must sit inside the chip at $contentWidth');
+}
+
+void main() {
+  ignoreGoogleFontLoadErrors();
+  setUpAll(loadErrorsFonts);
+
+  for (final width in [1280.0, 1024.0]) {
+    testWidgets(
+        'Errors table fits ${width.toInt()} with no horizontal scroll; name and status visible together',
+        (tester) async {
+      await _pumpPage(tester, width: width);
+
+      expect(find.byKey(const ValueKey('dq_table')), findsOneWidget);
+      final scroller = find.byKey(const ValueKey('dq_table_scroll'));
+      expect(scroller, findsOneWidget);
+      expect(_hScrollExtent(tester, scroller), lessThanOrEqualTo(2.0));
+
+      expect(find.byKey(const ValueKey('dq_item_name')), findsWidgets);
+      expect(
+          _onScreen(tester, find.byKey(const ValueKey('dq_item_name')),
+              width: width),
+          isTrue);
+      expect(find.text('مفتوحة'), findsWidgets);
+      expect(_onScreen(tester, find.text('مفتوحة'), width: width), isTrue);
+      expect(find.byKey(const ValueKey('dq_status_e1')), findsOneWidget);
+      expect(
+          _onScreen(tester, find.byKey(const ValueKey('dq_status_e1')),
+              width: width),
+          isTrue);
+
+      final dt =
+          tester.widget<DataTable>(find.byKey(const ValueKey('dq_table')));
+      for (final (i, c) in dt.columns.indexed) {
+        if (i == 5) {
+          expect(c.headingRowAlignment, isNot(MainAxisAlignment.center),
+              reason: 'item-name column');
+        } else {
+          expect(c.headingRowAlignment, MainAxisAlignment.center,
+              reason: 'column $i');
+        }
+      }
+      for (final t in tester
+          .widgetList<Text>(find.byKey(const ValueKey('dq_item_name')))) {
+        expect(t.maxLines, 3);
+        expect(t.textAlign, TextAlign.start);
+      }
+      expect(
+        _cutBeforeThreeLines(
+          tester,
+          find.byType(DataQualityScreen),
+          only: (text) => text.data != _searchHint,
+        ),
+        isEmpty,
+      );
+      expect(_clippedDropdowns(tester), isEmpty);
+    });
+
+    testWidgets(
+        'Errors KPI card height, padding, fonts and icon match Sell-Out at ${width.toInt()}',
+        (tester) async {
+      await _pumpSellOut(tester, width: width);
+      final soCard = find.byKey(const ValueKey('kpi_card_Net Sales (EGP)'));
+      expect(soCard, findsOneWidget);
+      final so = _metrics(tester, soCard);
+      expect(so.padding, M3SummaryKpiStyle.padding);
+      expect(so.iconSize, M3SummaryKpiStyle.iconSize);
+      final soH = so.size.height;
+
+      await _pumpPage(tester, width: width);
+      expect(find.byKey(const ValueKey('dq_kpi_grid')), findsOneWidget);
+      final dqCard = find.byKey(const ValueKey('dq_cleanliness_card'));
+      expect(dqCard, findsOneWidget);
+      final dq = _metrics(tester, dqCard);
+      expect(dq.padding, so.padding);
+      expect(dq.iconSize, so.iconSize);
+      expect(dq.titleStyle?.fontSize, so.titleStyle?.fontSize);
+      expect(dq.titleStyle?.fontWeight, so.titleStyle?.fontWeight);
+      expect(dq.titleStyle?.fontFamily, so.titleStyle?.fontFamily);
+      expect(dq.valueStyle?.fontSize, so.valueStyle?.fontSize);
+      expect(dq.valueStyle?.fontWeight, so.valueStyle?.fontWeight);
+      expect(dq.valueStyle?.fontFamily, so.valueStyle?.fontFamily);
+
+      for (final key in [
+        'dq_cleanliness_card',
+        'dq_open_card',
+        'dq_resolved_card',
+        'dq_ignored_card',
+      ]) {
+        final card = find.byKey(ValueKey(key));
+        expect(card, findsOneWidget, reason: key);
+        expect(tester.getSize(card).height, closeTo(soH, 1.0),
+            reason: '$key height at ${width.toInt()}');
+      }
+
+      for (final key in [
+        'dq_cleanliness',
+        'dq_value_open',
+        'dq_value_resolved',
+        'dq_value_ignored',
+      ]) {
+        expect(_valueIsOneLine(tester, find.byKey(ValueKey(key))), isTrue,
+            reason: '$key must stay on one line at ${width.toInt()}');
+      }
+
+      // Live-like 2004 ends 03–10 → plural "أخطاء".
+      expect(find.text('2004 أخطاء'), findsWidgets);
+      expect(find.text('90.2%'), findsOneWidget);
+    });
+  }
+
+  testWidgets(
+      'Status dialog wraps long type and item names; ignore needs a reason',
+      (tester) async {
+    await _pumpPage(tester, width: 1280);
+    final btn = find.byKey(const ValueKey('dq_status_e1'));
+    expect(btn, findsOneWidget);
+    await tester.ensureVisible(btn);
+    await tester.pumpAndSettle();
+    await tester.tap(btn);
+    await tester.pumpAndSettle();
+
+    expect(find.text('تغيير حالة الخطأ'), findsOneWidget);
+    expect(find.textContaining(kLongTypeMissing), findsWidgets);
+    expect(
+        find.descendant(
+            of: find.byType(AlertDialog), matching: find.text(kLongSkuName)),
+        findsOneWidget);
+    expect(_cutBeforeThreeLines(tester, find.byType(AlertDialog)), isEmpty);
+    expect(_clippedDropdowns(tester), isEmpty);
+
+    await tester.tap(find.byKey(const ValueKey('dq_status_save')));
+    await tester.pumpAndSettle();
+    expect(find.text('السبب مطلوب عند التجاهل'), findsOneWidget);
+  });
+
+  testWidgets('Long type chips wrap instead of ellipsizing at 1280',
+      (tester) async {
+    await _pumpPage(tester, width: 1280);
+    final chip = find.byKey(const ValueKey('dq_type_chip_missing_sku'));
+    expect(chip, findsOneWidget);
+    expect(_onScreen(tester, chip), isTrue);
+    final texts = find.descendant(of: chip, matching: find.byType(Text));
+    expect(texts, findsWidgets);
+    for (final t in tester.widgetList<Text>(texts)) {
+      expect(t.maxLines, greaterThanOrEqualTo(3));
+      expect(t.overflow, isNot(TextOverflow.ellipsis));
+      expect(t.overflow, isNot(TextOverflow.fade));
+    }
+    expect(_cutBeforeThreeLines(tester, chip), isEmpty);
+  });
+
+  testWidgets(
+      'Errors table, headers and type chips fit at the live 1030 content width',
+      (tester) async {
+    await _pumpPage(tester, width: kLiveContentWidth);
+    _assertTableFitsLiveContent(tester, contentWidth: kLiveContentWidth);
+    expect(_clippedDropdowns(tester), isEmpty);
+
+    for (final (key, title) in [
+      ('dq_cleanliness_card', 'نظافة البيانات'),
+      ('dq_open_card', 'مفتوحة'),
+      ('dq_resolved_card', 'اتصلّحت'),
+      ('dq_ignored_card', 'متجاهلة'),
+    ]) {
+      final card = find.byKey(ValueKey(key));
+      expect(card, findsOneWidget, reason: key);
+      final titleFinder = find.descendant(of: card, matching: find.text(title));
+      expect(titleFinder, findsOneWidget, reason: title);
+      final titleBox = tester.getRect(titleFinder);
+      final cardBox = tester.getRect(card);
+      expect(titleBox.left >= cardBox.left - 1.5, isTrue, reason: title);
+      expect(titleBox.right <= cardBox.right + 1.5, isTrue, reason: title);
+    }
+  });
+
+  testWidgets(
+      'Errors table fits a 1280 viewport with the 250dp sidebar (1030 content)',
+      (tester) async {
+    await _pumpPageWithSidebar(tester);
+    _assertTableFitsLiveContent(tester, contentWidth: kLiveContentWidth);
+  });
+}
