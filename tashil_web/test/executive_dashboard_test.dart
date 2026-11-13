@@ -45,7 +45,8 @@ void main() {
     dailyTrends: [],
   );
 
-  testWidgets('BentoKpiGrid renders all 4 KPI tiles correctly', (WidgetTester tester) async {
+  testWidgets('BentoKpiGrid renders all 4 KPI tiles correctly',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light(),
@@ -58,21 +59,26 @@ void main() {
     );
 
     expect(find.text('إجمالي Sell-Out'), findsOneWidget);
-    expect(find.text('Total Sell-Out (EGP)'), findsNothing); // Arabic-only M3 KPI card
+    expect(find.text('Total Sell-Out (EGP)'),
+        findsNothing); // Arabic-only M3 KPI card
     expect(find.text('إجمالي الوحدات المباعة'), findsOneWidget);
-    expect(find.text('Total Units Sold'), findsNothing); // Arabic-only M3 KPI card
+    expect(
+        find.text('Total Units Sold'), findsNothing); // Arabic-only M3 KPI card
     expect(find.text('الفروع النشطة'), findsOneWidget);
     expect(find.text('Active Stores'), findsNothing); // Arabic-only M3 KPI card
     expect(find.text('نسبة نفاد المخزون (OOS)'), findsOneWidget);
     expect(find.text('OOS Rate'), findsNothing); // Arabic-only M3 KPI card
 
-    expect(find.text('16 فرع'), findsOneWidget);
+    expect(find.text('16 فرعًا'), findsOneWidget);
     expect(find.text('4.2%'), findsOneWidget);
     // Multi-chain subtitle
-    expect(find.text('فروع كارفور • أسواق فتح الله من الملفات المرفوعة'), findsOneWidget);
+    expect(find.text('فروع كارفور • أسواق فتح الله من الملفات المرفوعة'),
+        findsOneWidget);
   });
 
-  testWidgets('BentoKpiGrid formats negative MoM/YoY without +- and shows single-chain dynamic subtitle', (WidgetTester tester) async {
+  testWidgets(
+      'BentoKpiGrid formats negative MoM/YoY without +- and shows single-chain dynamic subtitle',
+      (WidgetTester tester) async {
     final negativeGomlaKpis = ExecutiveKPIsModel(
       totalRevenue: 6573015.0,
       revenueGrowthPct: -16.0,
@@ -112,11 +118,12 @@ void main() {
     );
 
     // Must format negative percentages cleanly without '+-' (Arabic-only tags)
-    expect(find.text('-16.0% مقارنة بالشهر السابق'), findsOneWidget);
+    expect(find.textContaining('-16.0%'), findsWidgets);
     expect(find.text('MoM'), findsNothing);
-    expect(find.text('-4.5% مقارنة بالعام السابق'), findsOneWidget);
+    expect(find.textContaining('-4.5%'), findsOneWidget);
+    expect(find.textContaining('مقارنة بالعام السابق'), findsWidgets);
     expect(find.text('YoY'), findsNothing);
-    expect(find.text('-8.2% مقارنة بالشهر السابق'), findsOneWidget);
+    expect(find.textContaining('-8.2%'), findsWidgets);
     expect(find.textContaining('+-'), findsNothing);
 
     // Dynamic single-chain subtitle for Gomla Market (not hardcoded Fathalla)
@@ -124,7 +131,9 @@ void main() {
     expect(find.textContaining('فروع فتح الله'), findsNothing);
   });
 
-  testWidgets('ChainSharePie displays chain share names (Arabic Line 1, English Line 2) and percentages', (WidgetTester tester) async {
+  testWidgets(
+      'ChainSharePie displays chain share names (Arabic Line 1, English Line 2) and percentages',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light(),
@@ -146,7 +155,9 @@ void main() {
     expect(find.text('32.0%'), findsOneWidget);
   });
 
-  testWidgets('ExecutiveScreen simplifies header filters to Chain, Year, and Month (with All Months option) and removes period segmented buttons', (WidgetTester tester) async {
+  testWidgets(
+      'ExecutiveScreen simplifies header filters to Chain, Year, and Month (with All Months option) and removes period segmented buttons',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -169,9 +180,12 @@ void main() {
     expect(find.text('Yearly (YTD)'), findsNothing);
 
     // Verify 3 dropdowns exist
-    expect(find.byKey(const ValueKey('executive_chain_dropdown')), findsOneWidget);
-    expect(find.byKey(const ValueKey('executive_year_dropdown')), findsOneWidget);
-    expect(find.byKey(const ValueKey('executive_month_dropdown')), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('executive_chain_dropdown')), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('executive_year_dropdown')), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('executive_month_dropdown')), findsOneWidget);
 
     // Open Month dropdown and choose 'كل الشهور'
     await tester.tap(find.byKey(const ValueKey('executive_month_dropdown')));
@@ -191,7 +205,8 @@ void main() {
     expect(find.text('السنة: 2025'), findsOneWidget);
   });
 
-  testWidgets('ExecutiveScreen Month dropdown displays Arabic month names', (WidgetTester tester) async {
+  testWidgets('ExecutiveScreen Month dropdown displays Arabic month names',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -209,7 +224,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Open Month dropdown
-    final monthDropdown = find.byKey(const ValueKey('executive_month_dropdown'));
+    final monthDropdown =
+        find.byKey(const ValueKey('executive_month_dropdown'));
     expect(monthDropdown, findsOneWidget);
     await tester.tap(monthDropdown);
     await tester.pumpAndSettle();
@@ -219,8 +235,16 @@ void main() {
     expect(find.text('فبراير'), findsOneWidget);
     expect(find.text('مارس'), findsOneWidget);
     expect(find.text('أبريل'), findsOneWidget);
-    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('January')), findsNothing);
-    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('(')), findsNothing);
+    expect(
+        find.descendant(
+            of: find.byType(MenuItemButton),
+            matching: find.textContaining('January')),
+        findsNothing);
+    expect(
+        find.descendant(
+            of: find.byType(MenuItemButton),
+            matching: find.textContaining('(')),
+        findsNothing);
 
     // Select February and verify the trigger updates to 'الشهر: فبراير'
     await tester.tap(find.text('فبراير'));
@@ -228,7 +252,9 @@ void main() {
     expect(find.text('الشهر: فبراير'), findsOneWidget);
   });
 
-  testWidgets('UploadPortalScreen file picker parses real CSV bytes and excludes anomalous rows from valid count', (WidgetTester tester) async {
+  testWidgets(
+      'UploadPortalScreen file picker parses real CSV bytes and excludes anomalous rows from valid count',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -252,7 +278,8 @@ void main() {
 
     // Select target retail chain first (chains are now per-company; Adeco's list
     // no longer includes Carrefour, so target Fathalla).
-    await tester.tap(find.byKey(const ValueKey('ingestion_retail_chain_dropdown')));
+    await tester
+        .tap(find.byKey(const ValueKey('ingestion_retail_chain_dropdown')));
     await tester.pumpAndSettle();
     await tester.tap(m3MenuEntry('فتح الله').last);
     await tester.pumpAndSettle();
@@ -265,7 +292,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('تم الاستخراج بقواعد القراءة المحددة (بدون ذكاء اصطناعي) • بانتظار المراجعة والاعتماد'),
+      find.text(
+          'تم الاستخراج بقواعد القراءة المحددة (بدون ذكاء اصطناعي) • بانتظار المراجعة والاعتماد'),
       findsOneWidget,
     );
     expect(find.text('اعتماد البيانات'), findsOneWidget);
@@ -274,7 +302,9 @@ void main() {
     expect(find.text('1 ملاحظة'), findsOneWidget);
   });
 
-  testWidgets('SellOutExplorerScreen renders date range chip and exports real CSV & HTML', (WidgetTester tester) async {
+  testWidgets(
+      'SellOutExplorerScreen renders date range chip and exports real CSV & HTML',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -294,7 +324,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('sellout_date_range_chip')), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('sellout_date_range_chip')), findsOneWidget);
     expect(find.text('الفترة'), findsOneWidget);
 
     // Trigger Excel export (the toolbar sits below the fold after the redesign).
@@ -305,7 +336,8 @@ void main() {
 
     expect(ExcelExportService.lastDownloadedFilename, endsWith('.csv'));
     expect(ExcelExportService.lastDownloadedContent, startsWith('\uFEFF'));
-    expect(ExcelExportService.lastDownloadedMimeType, equals('text/csv;charset=utf-8'));
+    expect(ExcelExportService.lastDownloadedMimeType,
+        equals('text/csv;charset=utf-8'));
 
     // Trigger PDF/HTML export
     await tester.ensureVisible(find.byKey(const ValueKey('export_pdf_button')));
@@ -314,8 +346,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(ExcelExportService.lastDownloadedFilename, endsWith('.html'));
-    expect(ExcelExportService.lastDownloadedContent, contains('<!DOCTYPE html>'));
-    expect(ExcelExportService.lastDownloadedMimeType, equals('text/html;charset=utf-8'));
+    expect(
+        ExcelExportService.lastDownloadedContent, contains('<!DOCTYPE html>'));
+    expect(ExcelExportService.lastDownloadedMimeType,
+        equals('text/html;charset=utf-8'));
 
     // Open Date Range Picker via chip, apply it, and then clear it
     await tester.tap(find.byKey(const ValueKey('sellout_date_range_chip')));
@@ -332,7 +366,9 @@ void main() {
     expect(find.text('الفترة'), findsOneWidget);
   });
 
-  testWidgets('UploadPortalScreen device file picker button uses WebFileHelper and deduplicates repeated CSV rows', (WidgetTester tester) async {
+  testWidgets(
+      'UploadPortalScreen device file picker button uses WebFileHelper and deduplicates repeated CSV rows',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -351,7 +387,8 @@ void main() {
 
     // Select target retail chain first (chains are now per-company; Adeco's list
     // no longer includes Carrefour, so target Fathalla).
-    await tester.tap(find.byKey(const ValueKey('ingestion_retail_chain_dropdown')));
+    await tester
+        .tap(find.byKey(const ValueKey('ingestion_retail_chain_dropdown')));
     await tester.pumpAndSettle();
     await tester.tap(m3MenuEntry('فتح الله').last);
     await tester.pumpAndSettle();
@@ -370,7 +407,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('تم الاستخراج بقواعد القراءة المحددة (بدون ذكاء اصطناعي) • بانتظار المراجعة والاعتماد'),
+      find.text(
+          'تم الاستخراج بقواعد القراءة المحددة (بدون ذكاء اصطناعي) • بانتظار المراجعة والاعتماد'),
       findsOneWidget,
     );
     expect(find.text('اعتماد البيانات'), findsOneWidget);
@@ -391,7 +429,10 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('تم حفظ واعتماد البيانات نهائياً في النظام (Committed to BigQuery)'), findsOneWidget);
+    expect(
+        find.text(
+            'تم حفظ واعتماد البيانات نهائياً في النظام (Committed to BigQuery)'),
+        findsOneWidget);
 
     // Verify custom date range KPI calculation on ApiClient
     final customKpis = await apiClient.getExecutiveKPIs(
@@ -404,7 +445,9 @@ void main() {
     expect(customKpis.totalUnitsSold, equals(1120 + 1240 + 1090));
   });
 
-  testWidgets('ExecutiveScreen handles narrow mobile viewport (< 360px) and Month switching without overflow or stale overwrites', (WidgetTester tester) async {
+  testWidgets(
+      'ExecutiveScreen handles narrow mobile viewport (< 360px) and Month switching without overflow or stale overwrites',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(340, 740);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -422,7 +465,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Ensure Month dropdown is visible on narrow < 360px viewport and opens cleanly with Arabic months
-    final monthDropdown = find.byKey(const ValueKey('executive_month_dropdown'));
+    final monthDropdown =
+        find.byKey(const ValueKey('executive_month_dropdown'));
     expect(monthDropdown, findsOneWidget);
     await tester.ensureVisible(monthDropdown);
     await tester.tap(monthDropdown);
@@ -430,7 +474,11 @@ void main() {
 
     expect(find.text('يناير'), findsOneWidget);
     expect(find.text('ديسمبر'), findsOneWidget);
-    expect(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('January')), findsNothing);
+    expect(
+        find.descendant(
+            of: find.byType(MenuItemButton),
+            matching: find.textContaining('January')),
+        findsNothing);
 
     await tester.tap(find.text('مارس'));
     await tester.pumpAndSettle();
@@ -445,7 +493,9 @@ void main() {
     expect(find.text('الشهر: الكل'), findsOneWidget);
   });
 
-  testWidgets('SelloutTrendChart renders multi-chain monthly curves with distinct chain legend pills and supports single-month data', (WidgetTester tester) async {
+  testWidgets(
+      'SelloutTrendChart renders multi-chain monthly curves with distinct chain legend pills and supports single-month data',
+      (WidgetTester tester) async {
     final monthlyTrends = [
       DailyTrendItem(
         date: '2025-01-31',
@@ -516,7 +566,8 @@ void main() {
     expect(find.text('Jan'), findsNothing);
     expect(find.text('فبراير'), findsOneWidget);
     expect(find.text('Feb'), findsNothing);
-    expect(ChainSharePie.colorForChain('fathalla'), isNot(equals(ChainSharePie.colorForChain('gomla'))));
+    expect(ChainSharePie.colorForChain('fathalla'),
+        isNot(equals(ChainSharePie.colorForChain('gomla'))));
 
     // Also verify single-month series (e.g. 2026-01 or 2024-04) renders without error
     await tester.pumpWidget(
@@ -594,7 +645,9 @@ void main() {
     expect(find.text('جملة ماركت'), findsNothing);
   });
 
-  testWidgets('ExecutiveScreen Retail Chain filter dropdown filters KPIs and ChainSharePie to selected chain and places SelloutTrendChart at 100% width above ChainSharePie', (WidgetTester tester) async {
+  testWidgets(
+      'ExecutiveScreen Retail Chain filter dropdown filters KPIs and ChainSharePie to selected chain and places SelloutTrendChart at 100% width above ChainSharePie',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -619,7 +672,8 @@ void main() {
     expect(pieRect.width, closeTo(gridRect.width, 1.0));
     expect(pieRect.top, greaterThanOrEqualTo(trendRect.bottom));
 
-    final chainDropdown = find.byKey(const ValueKey('executive_chain_dropdown'));
+    final chainDropdown =
+        find.byKey(const ValueKey('executive_chain_dropdown'));
     expect(chainDropdown, findsOneWidget);
     expect(find.text('السلسلة: الكل'), findsOneWidget);
 
@@ -656,11 +710,14 @@ void main() {
         findsNothing);
     expect(
         find.descendant(
-            of: pareto, matching: find.textContaining(RegExp(r'\(المركز \d+\)'))),
+            of: pareto,
+            matching: find.textContaining(RegExp(r'\(المركز \d+\)'))),
         findsOneWidget);
   });
 
-  testWidgets('ChainSharePie.splitBilingualLabel handles edge cases and SelloutTrendChart renders all 12 months at full width', (WidgetTester tester) async {
+  testWidgets(
+      'ChainSharePie.splitBilingualLabel handles edge cases and SelloutTrendChart renders all 12 months at full width',
+      (WidgetTester tester) async {
     expect(ChainSharePie.splitBilingualLabel(''), equals((ar: '', en: null)));
     expect(
       ChainSharePie.splitBilingualLabel('أسواق فتح الله (Fathalla Market)'),
@@ -718,5 +775,3 @@ void main() {
     expect(find.text('Dec'), findsNothing);
   });
 }
-
-

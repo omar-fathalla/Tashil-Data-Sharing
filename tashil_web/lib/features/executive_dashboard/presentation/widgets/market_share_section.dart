@@ -47,67 +47,82 @@ class MarketShareSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, c) {
-      final wide = c.maxWidth >= 900;
-      final months = _matchedMonths(cpfr, year, periodMonths);
-      final sku = _SkuShareCard(kpis: kpis);
-      final stock = _StockCard(
-          cpfr: cpfr, loading: cpfrLoading, error: cpfrError, kpis: kpis);
-      final cat = _CategoryShareCard(kpis: kpis);
-      final bars = _MonthlyBarsCard(
+    return LayoutBuilder(
+      builder: (context, c) {
+        final wide = c.maxWidth >= 900;
+        final months = _matchedMonths(cpfr, year, periodMonths);
+        final sku = _SkuShareCard(kpis: kpis);
+        final stock = _StockCard(
+          cpfr: cpfr,
+          loading: cpfrLoading,
+          error: cpfrError,
+          kpis: kpis,
+        );
+        final cat = _CategoryShareCard(kpis: kpis);
+        final bars = _MonthlyBarsCard(
           months: months,
           loading: cpfrLoading && cpfr == null,
           error: cpfrError,
-          fill: wide);
-      // F6: below 1600dp an even split leaves the 6-column stock table
-      // cramped (~380dp at 1431), so row A gives it 7/12 of the width.
-      final rowAFlex = c.maxWidth < 1600 ? const [5, 7] : const [1, 1];
-      Widget row(Widget a, Widget b, Key key,
-              {List<int> flex = const [1, 1]}) =>
-          wide
-              ? _EqualHeightRow(
-                  key: key,
-                  spacing: M3Spacing.md,
-                  textDirection: Directionality.of(context),
-                  flex: flex,
-                  children: [a, b],
-                )
-              : Column(
-                  key: key,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [a, M3Spacing.gapMD, b],
-                );
-      return Column(
-        key: const ValueKey('market_share_section'),
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Row A: share by SKU (start) + stock by SKU (end).
-          row(sku, stock, const ValueKey('exec_row_a'), flex: rowAFlex),
-          if (months.isNotEmpty) ...[
+          fill: wide,
+        );
+        // F6: below 1600dp an even split leaves the 6-column stock table
+        // cramped (~380dp at 1431), so row A gives it 7/12 of the width.
+        final rowAFlex = c.maxWidth < 1600 ? const [5, 7] : const [1, 1];
+        Widget row(
+          Widget a,
+          Widget b,
+          Key key, {
+          List<int> flex = const [1, 1],
+        }) => wide
+            ? _EqualHeightRow(
+                key: key,
+                spacing: M3Spacing.md,
+                textDirection: Directionality.of(context),
+                flex: flex,
+                children: [a, b],
+              )
+            : Column(
+                key: key,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [a, M3Spacing.gapMD, b],
+              );
+        return Column(
+          key: const ValueKey('market_share_section'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Row A: share by SKU (start) + stock by SKU (end).
+            row(sku, stock, const ValueKey('exec_row_a'), flex: rowAFlex),
+            if (months.isNotEmpty) ...[
+              M3Spacing.gapMD,
+              _SellInOutTiles(months: months, year: year),
+            ],
             M3Spacing.gapMD,
-            _SellInOutTiles(months: months, year: year),
+            // Row B: share by category (start) + monthly Sell-In vs Sell-Out (end).
+            row(cat, bars, const ValueKey('exec_row_b')),
+            // Standard 24dp section gap before the trend chart (was 32).
+            M3Spacing.gapMD,
           ],
-          M3Spacing.gapMD,
-          // Row B: share by category (start) + monthly Sell-In vs Sell-Out (end).
-          row(cat, bars, const ValueKey('exec_row_b')),
-          // Standard 24dp section gap before the trend chart (was 32).
-          M3Spacing.gapMD,
-        ],
-      );
-    });
+        );
+      },
+    );
   }
 }
 
 /// Only months that have BOTH real Sell In and real Sell Out are compared.
 List<ReconciliationMonthModel> _matchedMonths(
-        CPFRDashboardModel? cpfr, int year, Set<int> periodMonths) =>
+  CPFRDashboardModel? cpfr,
+  int year,
+  Set<int> periodMonths,
+) =>
     (cpfr?.monthlyReconciliation ?? const <ReconciliationMonthModel>[])
-        .where((m) =>
-            m.year == year &&
-            periodMonths.contains(m.monthNum) &&
-            m.hasActualSellOut &&
-            m.sellInUnits > 0 &&
-            m.sellOutUnits > 0)
+        .where(
+          (m) =>
+              m.year == year &&
+              periodMonths.contains(m.monthNum) &&
+              m.hasActualSellOut &&
+              m.sellInUnits > 0 &&
+              m.sellOutUnits > 0,
+        )
         .toList()
       ..sort((a, b) => a.monthNum.compareTo(b.monthNum));
 
@@ -152,14 +167,15 @@ String _monthAr(int n) => n >= 1 && n <= 12 ? _monthsAr[n] : '$n';
 String _pct(double v) => '${v.toStringAsFixed(v >= 10 || v == 0 ? 0 : 1)}%';
 
 class _CardHeader extends StatelessWidget {
-  const _CardHeader(
-      {required this.icon,
-      required this.title,
-      required this.subtitle,
-      required this.count,
-      this.unit = '',
-      this.countLabel,
-      this.badgeKey});
+  const _CardHeader({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.count,
+    this.unit = '',
+    this.countLabel,
+    this.badgeKey,
+  });
   final IconData icon;
   final String title;
   final String subtitle;
@@ -180,26 +196,31 @@ class _CardHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          Icon(icon, size: 20.0, color: cs.onSurfaceVariant),
-          M3Spacing.gapXS,
-          Flexible(
-            child: M3SectionTitle(title, overflow: TextOverflow.ellipsis),
-          ),
-          M3Spacing.gapXS,
-          // Neutral count tag (not an error-red badge).
-          M3StatusTag(
-            key: badgeKey,
-            label: countLabel != null
-                ? countLabel!(count)
-                : (unit.isEmpty ? '$count' : '$count $unit'),
-            icon: AppIcons.filterList,
-          ),
-        ]),
+        Row(
+          children: [
+            Icon(icon, size: 20.0, color: cs.onSurfaceVariant),
+            M3Spacing.gapXS,
+            Flexible(
+              child: M3SectionTitle(title, overflow: TextOverflow.ellipsis),
+            ),
+            M3Spacing.gapXS,
+            // Neutral count tag (not an error-red badge).
+            M3StatusTag(
+              key: badgeKey,
+              label: countLabel != null
+                  ? countLabel!(count)
+                  : (unit.isEmpty ? '$count' : '$count $unit'),
+              icon: AppIcons.filterList,
+            ),
+          ],
+        ),
         M3Spacing.gapXXS,
-        Text(subtitle,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: cs.onSurfaceVariant)),
+        Text(
+          subtitle,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+        ),
       ],
     );
   }
@@ -215,15 +236,23 @@ class _EmptyNote extends StatelessWidget {
     return Padding(
       key: keyName == null ? null : ValueKey<String>(keyName!),
       padding: M3Spacing.pLg,
-      child: Column(children: [
-        Icon(AppIcons.empty,
-            size: 32.0, color: theme.colorScheme.onSurfaceVariant),
-        M3Spacing.gapSM,
-        Text(text,
+      child: Column(
+        children: [
+          Icon(
+            AppIcons.empty,
+            size: 32.0,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          M3Spacing.gapSM,
+          Text(
+            text,
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-      ]),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -234,20 +263,27 @@ class _Legend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Wrap(spacing: 12.0, runSpacing: 4.0, children: [
-      for (final (c, l) in items)
-        Row(mainAxisSize: MainAxisSize.min, children: [
-          M3TonalSurface(
-            color: c,
-            borderRadius: M3Shape.radiusXs,
-            width: 10.0,
-            height: 10.0,
-            child: const SizedBox.shrink(),
+    return Wrap(
+      spacing: 12.0,
+      runSpacing: 4.0,
+      children: [
+        for (final (c, l) in items)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              M3TonalSurface(
+                color: c,
+                borderRadius: M3Shape.radiusXs,
+                width: 10.0,
+                height: 10.0,
+                child: const SizedBox.shrink(),
+              ),
+              M3Spacing.gapXXS,
+              Text(l, style: theme.textTheme.labelSmall),
+            ],
           ),
-          M3Spacing.gapXXS,
-          Text(l, style: theme.textTheme.labelSmall),
-        ]),
-    ]);
+      ],
+    );
   }
 }
 
@@ -264,12 +300,10 @@ class _SkuShareCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final cats = {for (final c in kpis.categoryContributions) c.category: c};
-    final rows = <({
-      ParetoSkuItemModel sku,
-      double self,
-      double ownOther,
-      double comp
-    })>[];
+    final rows =
+        <
+          ({ParetoSkuItemModel sku, double self, double ownOther, double comp})
+        >[];
     final skus = [...kpis.paretoSkus]
       ..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
     for (final s in skus) {
@@ -303,8 +337,10 @@ class _SkuShareCard extends StatelessWidget {
             ]),
             M3Spacing.gapSM,
             if (rows.isEmpty)
-              const _EmptyNote('لا توجد بيانات حصة للأصناف في هذه الفترة',
-                  keyName: 'share_per_sku_empty')
+              const _EmptyNote(
+                'لا توجد بيانات حصة للأصناف في هذه الفترة',
+                keyName: 'share_per_sku_empty',
+              )
             else
               _GrowingColumn(
                 children: [
@@ -312,27 +348,48 @@ class _SkuShareCard extends StatelessWidget {
                     _SkuRow(
                       title: Tooltip(
                         message: rows[i].sku.skuName,
-                        child: Text(rows[i].sku.skuName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleSmall
-                                ?.copyWith(color: cs.onSurface)),
-                      ),
-                      category: Text(rows[i].sku.category,
+                        child: Text(
+                          rows[i].sku.skuName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: cs.onSurfaceVariant)),
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: cs.onSurface,
+                          ),
+                        ),
+                      ),
+                      category: Text(
+                        rows[i].sku.category,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
                       bar: ClipRRect(
                         key: ValueKey('sku_share_bar_$i'),
                         borderRadius: M3Shape.radiusSm,
-                        child: Row(children: [
-                          _seg(context, rows[i].self, cs.primary, cs.onPrimary),
-                          _seg(context, rows[i].ownOther, cs.tertiaryContainer,
-                              cs.onTertiaryContainer),
-                          _seg(context, rows[i].comp,
-                              cs.surfaceContainerHighest, cs.onSurfaceVariant),
-                        ]),
+                        child: Row(
+                          children: [
+                            _seg(
+                              context,
+                              rows[i].self,
+                              cs.primary,
+                              cs.onPrimary,
+                            ),
+                            _seg(
+                              context,
+                              rows[i].ownOther,
+                              cs.tertiaryContainer,
+                              cs.onTertiaryContainer,
+                            ),
+                            _seg(
+                              context,
+                              rows[i].comp,
+                              cs.surfaceContainerHighest,
+                              cs.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                 ],
@@ -352,10 +409,13 @@ class _SkuShareCard extends StatelessWidget {
         color: bg,
         alignment: Alignment.center,
         child: v >= 0.08
-            ? Text(_pct(v * 100),
+            ? Text(
+                _pct(v * 100),
                 maxLines: 1,
-                style:
-                    Theme.of(context).textTheme.labelSmall?.copyWith(color: fg))
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: fg),
+              )
             : null,
       ),
     );
@@ -371,10 +431,11 @@ class _CategoryShareCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cats = kpis.categoryContributions
-        .where((c) => c.marketTotalRevenue > 0)
-        .toList()
-      ..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
+    final cats =
+        kpis.categoryContributions
+            .where((c) => c.marketTotalRevenue > 0)
+            .toList()
+          ..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
     final top = cats.take(4).toList();
     return Card.outlined(
       key: const ValueKey('share_per_category_card'),
@@ -393,8 +454,10 @@ class _CategoryShareCard extends StatelessWidget {
             ),
             M3Spacing.gapSM,
             if (top.isEmpty)
-              const _EmptyNote('لا توجد بيانات للفئات في هذه الفترة',
-                  keyName: 'share_per_category_empty')
+              const _EmptyNote(
+                'لا توجد بيانات للفئات في هذه الفترة',
+                keyName: 'share_per_category_empty',
+              )
             else
               _GrowingGrid(
                 spacing: 12.0,
@@ -428,51 +491,67 @@ class _CategoryTile extends StatelessWidget {
           value: ours / 100.0,
           label: _pct(ours),
         ),
-        details:
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(cat.category,
+        details: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              cat.category,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelLarge
-                  ?.copyWith(fontWeight: FontWeight.w600)),
-          M3Spacing.gapXXS,
-          if (cat.tenantRank > 0)
-            Text(
-              'المرتبة ${cat.tenantRank}${cat.supplierCount > 0 ? ' من ${cat.supplierCount}' : ''}',
-              key: ValueKey('category_rank_${cat.category}'),
-              style: theme.textTheme.labelMedium?.copyWith(
-                // tealBase (#009688) fails WCAG on surface (~3.33:1); use deep teal for text.
-                color: cat.tenantRank == 1 ? acc.tealDeep : cs.onSurface,
+              style: theme.textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
-          M3Spacing.gapXXS,
-          _CompetitorBar(cat: cat, ours: ours),
-          M3Spacing.gapXXS,
-          if (cat.topCompetitors.isEmpty)
-            Text('المنافسون ${_pct(100.0 - ours)}',
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: cs.onSurfaceVariant))
-          else
-            for (final (i, c) in cat.topCompetitors.take(3).indexed)
-              Row(
+            M3Spacing.gapXXS,
+            if (cat.tenantRank > 0)
+              Text(
+                'المرتبة ${cat.tenantRank}${cat.supplierCount > 0 ? ' من ${cat.supplierCount}' : ''}',
+                key: ValueKey('category_rank_${cat.category}'),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  // tealBase (#009688) fails WCAG on surface (~3.33:1); use deep teal for text.
+                  color: cat.tenantRank == 1 ? acc.tealDeep : cs.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            M3Spacing.gapXXS,
+            _CompetitorBar(cat: cat, ours: ours),
+            M3Spacing.gapXXS,
+            if (cat.topCompetitors.isEmpty)
+              Text(
+                'المنافسون ${_pct(100.0 - ours)}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              )
+            else
+              for (final (i, c) in cat.topCompetitors.take(3).indexed)
+                Row(
                   key: ValueKey('category_competitor_${cat.category}_$i'),
                   children: [
                     CircleAvatar(
-                        radius: 4.0,
-                        backgroundColor: _competitorShade(
-                            acc, Theme.of(context).colorScheme, i)),
+                      radius: 4.0,
+                      backgroundColor: _competitorShade(
+                        acc,
+                        Theme.of(context).colorScheme,
+                        i,
+                      ),
+                    ),
                     const SizedBox(width: 4.0),
                     Expanded(
-                      child: Text(c.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall
-                              ?.copyWith(color: cs.onSurfaceVariant)),
+                      child: Text(
+                        c.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
                     ),
                     Text(_pct(c.sharePct), style: theme.textTheme.labelSmall),
-                  ]),
-        ]),
+                  ],
+                ),
+          ],
+        ),
       ),
     );
   }
@@ -499,21 +578,27 @@ class _SellInOutTiles extends StatelessWidget {
 
     final tiles = [
       _KpiTile(
-          label: 'Sell-In (وحدة)', value: _fmtInt(sellIn), color: cs.onSurface),
+        label: 'Sell-In (وحدة)',
+        value: _fmtInt(sellIn),
+        color: cs.onSurface,
+      ),
       _KpiTile(
-          label: 'Sell-Out (وحدة)',
-          value: _fmtInt(sellOut),
-          color: cs.onSurface),
+        label: 'Sell-Out (وحدة)',
+        value: _fmtInt(sellOut),
+        color: cs.onSurface,
+      ),
       _KpiTile(
-          key: const ValueKey('kpi_net_accumulation'),
-          label: 'تراكم المخزون (وحدة)',
-          value: formatSignedUnits(net),
-          color: acc.cautionStrong),
+        key: const ValueKey('kpi_net_accumulation'),
+        label: 'تراكم المخزون (وحدة)',
+        value: formatSignedUnits(net),
+        color: acc.cautionStrong,
+      ),
       _KpiTile(
-          key: const ValueKey('kpi_sell_through'),
-          label: 'نسبة التصريف',
-          value: _pct(through),
-          color: acc.tealBase),
+        key: const ValueKey('kpi_sell_through'),
+        label: 'نسبة التصريف',
+        value: _pct(through),
+        color: acc.tealBase,
+      ),
     ];
 
     return Column(
@@ -521,28 +606,36 @@ class _SellInOutTiles extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const M3SectionTitle('\u2068Sell-In\u2069 مقابل \u2068Sell-Out\u2069'),
-        Text('الأصناف والشهور المتطابقة: $monthLabel $year',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: cs.onSurfaceVariant)),
+        Text(
+          'الأصناف والشهور المتطابقة: $monthLabel $year',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+        ),
         M3Spacing.gapSM,
-        LayoutBuilder(builder: (context, c) {
-          final cols = c.maxWidth >= 700 ? 4 : 2;
-          final w = (c.maxWidth - (cols - 1) * 12.0) / cols;
-          return Wrap(spacing: 12.0, runSpacing: 12.0, children: [
-            for (final t in tiles) SizedBox(width: w, child: t),
-          ]);
-        }),
+        LayoutBuilder(
+          builder: (context, c) {
+            final cols = c.maxWidth >= 700 ? 4 : 2;
+            final w = (c.maxWidth - (cols - 1) * 12.0) / cols;
+            return Wrap(
+              spacing: 12.0,
+              runSpacing: 12.0,
+              children: [for (final t in tiles) SizedBox(width: w, child: t)],
+            );
+          },
+        ),
       ],
     );
   }
 }
 
 class _KpiTile extends StatelessWidget {
-  const _KpiTile(
-      {super.key,
-      required this.label,
-      required this.value,
-      required this.color});
+  const _KpiTile({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
   final String label;
   final String value;
   final Color color;
@@ -553,15 +646,25 @@ class _KpiTile extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: Padding(
         padding: M3Spacing.pMd,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
-              style: theme.textTheme.labelMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          M3Spacing.gapXS,
-          Text(value,
-              style: theme.textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w500, color: color)),
-        ]),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            M3Spacing.gapXS,
+            Text(
+              value,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -591,15 +694,18 @@ class _StockCard extends StatelessWidget {
       },
     };
     // Aggregate per SKU (the report can list a SKU per branch/region).
-    final bySku = <String,
-        ({
-      String name,
-      String category,
-      int sIn,
-      int sOut,
-      int stock,
-      String status
-    })>{};
+    final bySku =
+        <
+          String,
+          ({
+            String name,
+            String category,
+            int sIn,
+            int sOut,
+            int stock,
+            String status,
+          })
+        >{};
     for (final i
         in cpfr?.inventoryAndPoItems ?? const <SKUBranchInventoryModel>[]) {
       final k = i.barcode.isNotEmpty ? i.barcode : i.itemCode;
@@ -616,8 +722,10 @@ class _StockCard extends StatelessWidget {
     final rows = bySku.values.where((r) => r.sIn > 0).toList()
       ..sort((a, b) => b.sIn.compareTo(a.sIn));
     final top = rows.take(8).toList();
-    final label = theme.textTheme.labelSmall
-        ?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600);
+    final label = theme.textTheme.labelSmall?.copyWith(
+      color: cs.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+    );
     final cell = theme.textTheme.bodySmall?.copyWith(
       color: cs.onSurface,
       fontFeatures: const [FontFeature.tabularFigures()],
@@ -627,120 +735,152 @@ class _StockCard extends StatelessWidget {
     // heading sits exactly over its numbers at any column width.
     const numPad = EdgeInsets.symmetric(horizontal: M3Spacing.xxs);
     Widget num(String v) => Padding(
-        padding: numPad,
-        child: Text(v, style: cell, textAlign: TextAlign.center));
+      padding: numPad,
+      child: Text(
+        v,
+        style: cell,
+        textAlign: TextAlign.center,
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
     return Card.outlined(
       key: const ValueKey('stock_per_sku_table'),
       margin: EdgeInsets.zero,
       child: Padding(
         padding: M3Spacing.pMd,
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          _CardHeader(
-            icon: AppIcons.units,
-            title: 'المخزون حسب الصنف',
-            subtitle: 'منذ بداية العام (وحدة) · الحالة من تقرير CPFR',
-            count: top.length,
-            countLabel: countSku,
-            badgeKey: const ValueKey('stock_per_sku_badge'),
-          ),
-          M3Spacing.gapSM,
-          if (loading && cpfr == null)
-            const LinearProgressIndicator(year2023: false)
-          else if (cpfr == null && error != null)
-            const _EmptyNote('تعذّر تحميل بيانات المخزون',
-                keyName: 'stock_per_sku_empty')
-          else if (top.isEmpty)
-            const _EmptyNote('لا توجد بيانات مخزون لهذه الفترة',
-                keyName: 'stock_per_sku_empty')
-          else
-            Table(
-              columnWidths: const {
-                // SKU names get the most room (up to 3 lines + tooltip).
-                0: FlexColumnWidth(4.0),
-                1: FlexColumnWidth(1.3),
-                2: FlexColumnWidth(1.3),
-                3: FlexColumnWidth(1.3),
-                // "نسبة / التصريف" on two whole-word lines (was clipped at
-                // ~1431 with flex 1).
-                4: FlexColumnWidth(1.4),
-                // Status tags keep their natural width (never "مخزون زا…").
-                5: IntrinsicColumnWidth(),
-              },
-              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-              children: [
-                TableRow(children: [
-                  for (final (i, h) in const [
-                    'الصنف',
-                    'Sell-In',
-                    'Sell-Out',
-                    'الفرق',
-                    'نسبة التصريف',
-                    'الحالة'
-                  ].indexed)
-                    // Item name stays start-aligned; every other heading is
-                    // centred with the same padding as its cells.
-                    Padding(
-                        padding: i == 0
-                            ? const EdgeInsetsDirectional.only(
-                                end: M3Spacing.xs, bottom: M3Spacing.xs)
-                            : const EdgeInsets.only(
-                                left: M3Spacing.xxs,
-                                right: M3Spacing.xxs,
-                                bottom: M3Spacing.xs),
-                        child: Text(h,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _CardHeader(
+              icon: AppIcons.units,
+              title: 'المخزون حسب الصنف',
+              subtitle: 'منذ بداية العام (وحدة) · الحالة من تقرير CPFR',
+              count: top.length,
+              countLabel: countSku,
+              badgeKey: const ValueKey('stock_per_sku_badge'),
+            ),
+            M3Spacing.gapSM,
+            if (loading && cpfr == null)
+              const LinearProgressIndicator(year2023: false)
+            else if (cpfr == null && error != null)
+              const _EmptyNote(
+                'تعذّر تحميل بيانات المخزون',
+                keyName: 'stock_per_sku_empty',
+              )
+            else if (top.isEmpty)
+              const _EmptyNote(
+                'لا توجد بيانات مخزون لهذه الفترة',
+                keyName: 'stock_per_sku_empty',
+              )
+            else
+              Table(
+                columnWidths: const {
+                  // SKU names get the most room (up to 3 lines + tooltip).
+                  // Status uses flex, not IntrinsicColumnWidth, so the 6
+                  // columns fit the live 1280+sidebar table width (~500–900dp)
+                  // without a horizontal scroll.
+                  0: FlexColumnWidth(3.0),
+                  1: FlexColumnWidth(1.15),
+                  2: FlexColumnWidth(1.15),
+                  3: FlexColumnWidth(1.15),
+                  4: FlexColumnWidth(1.5),
+                  5: FlexColumnWidth(2.2),
+                },
+                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                children: [
+                  TableRow(
+                    children: [
+                      for (final (i, h) in const [
+                        'الصنف',
+                        'Sell-In',
+                        'Sell-Out',
+                        'الفرق',
+                        'نسبة التصريف',
+                        'الحالة',
+                      ].indexed)
+                        // Item name stays start-aligned; every other heading is
+                        // centred with the same padding as its cells.
+                        Padding(
+                          padding: i == 0
+                              ? const EdgeInsetsDirectional.only(
+                                  end: M3Spacing.xs,
+                                  bottom: M3Spacing.xs,
+                                )
+                              : const EdgeInsets.only(
+                                  left: M3Spacing.xxs,
+                                  right: M3Spacing.xxs,
+                                  bottom: M3Spacing.xs,
+                                ),
+                          child: Text(
+                            h,
                             key: ValueKey('stock_head_$i'),
                             style: label,
                             maxLines: 2,
-                            textAlign:
-                                i == 0 ? TextAlign.start : TextAlign.center)),
-                ]),
-                for (final r in top)
-                  TableRow(
-                    decoration: ShapeDecoration(
-                        shape:
-                            Border(top: BorderSide(color: cs.outlineVariant))),
-                    children: [
-                      Padding(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: M3Spacing.xs),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Tooltip(
-                              message: r.name,
-                              child: Text(r.name,
+                            textAlign: i == 0
+                                ? TextAlign.start
+                                : TextAlign.center,
+                          ),
+                        ),
+                    ],
+                  ),
+                  for (final r in top)
+                    TableRow(
+                      decoration: ShapeDecoration(
+                        shape: Border(
+                          top: BorderSide(color: cs.outlineVariant),
+                        ),
+                      ),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: M3Spacing.xs,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Tooltip(
+                                message: r.name,
+                                child: Text(
+                                  r.name,
                                   key: const ValueKey('stock_sku_name'),
                                   maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.titleSmall
-                                      ?.copyWith(color: cs.onSurface)),
-                            ),
-                            if (r.category.isNotEmpty)
-                              Text(r.category,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    color: cs.onSurface,
+                                  ),
+                                ),
+                              ),
+                              if (r.category.isNotEmpty)
+                                Text(
+                                  r.category,
                                   maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall
-                                      ?.copyWith(color: cs.onSurfaceVariant)),
-                          ],
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                      num(_fmtInt(r.sIn)),
-                      num(_fmtInt(r.sOut)),
-                      num(formatSignedUnits(r.sIn - r.sOut)),
-                      num(_pct(r.sIn > 0 ? r.sOut / r.sIn * 100.0 : 0.0)),
-                      Padding(
-                        padding: numPad,
-                        child: Align(
+                        num(_fmtInt(r.sIn)),
+                        num(_fmtInt(r.sOut)),
+                        num(formatSignedUnits(r.sIn - r.sOut)),
+                        num(_pct(r.sIn > 0 ? r.sOut / r.sIn * 100.0 : 0.0)),
+                        Padding(
+                          padding: numPad,
+                          child: Align(
                             alignment: Alignment.center,
-                            child: _StatusChip(status: r.status)),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-        ]),
+                            child: _StatusChip(status: r.status),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -748,7 +888,7 @@ class _StockCard extends StatelessWidget {
   static const _rank = {
     'overstock': 3,
     'urgent_replenishment': 2,
-    'optimal': 1
+    'optimal': 1,
   };
   static String _worse(String? a, String b) =>
       a == null ? b : ((_rank[a] ?? 0) >= (_rank[b] ?? 0) ? a : b);
@@ -766,10 +906,10 @@ class _StatusChip extends StatelessWidget {
       'overstock' => (M3StatusTone.error, AppIcons.warning, 'مخزون زائد'),
       'urgent_replenishment' => (M3StatusTone.warning, AppIcons.info, 'تموين'),
       _ => (
-          M3StatusTone.neutral,
-          AppIcons.info,
-          status.isEmpty ? 'غير معروف' : status
-        ),
+        M3StatusTone.neutral,
+        AppIcons.info,
+        status.isEmpty ? 'غير معروف' : status,
+      ),
     };
     return M3StatusTag(label: text, tone: tone, icon: icon);
   }
@@ -793,9 +933,10 @@ class _MonthlyBarsCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final maxV = months.fold<int>(
-        1,
-        (a, m) =>
-            [a, m.sellInUnits, m.sellOutUnits].reduce((x, y) => x > y ? x : y));
+      1,
+      (a, m) =>
+          [a, m.sellInUnits, m.sellOutUnits].reduce((x, y) => x > y ? x : y),
+    );
     const chartH = 180.0;
     final header = _CardHeader(
       icon: AppIcons.barChart,
@@ -810,59 +951,72 @@ class _MonthlyBarsCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: Padding(
         padding: M3Spacing.pMd,
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          header,
-          M3Spacing.gapSM,
-          if (loading)
-            const LinearProgressIndicator(year2023: false)
-          else if (months.isEmpty)
-            _EmptyNote(
-              error != null
-                  ? 'تعذّر تحميل بيانات Sell-In/Sell-Out'
-                  : 'لا توجد شهور بها بيانات Sell-In وSell-Out معًا',
-              keyName: 'sell_in_vs_out_empty',
-            )
-          else ...[
-            // Sell-Out is the hero series; Sell-In is the neutral reference.
-            _Legend([(cs.primary, 'Sell-Out'), (cs.outline, 'Sell-In')]),
-            M3Spacing.gapMD,
-            _plotArea(
-              Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                for (final m in months)
-                  Expanded(
-                    child: Tooltip(
-                      message:
-                          '${_monthAr(m.monthNum)}: \u2068Sell-In\u2069 ${_fmtInt(m.sellInUnits)} · \u2068Sell-Out\u2069 ${_fmtInt(m.sellOutUnits)}',
-                      child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            header,
+            M3Spacing.gapSM,
+            if (loading)
+              const LinearProgressIndicator(year2023: false)
+            else if (months.isEmpty)
+              _EmptyNote(
+                error != null
+                    ? 'تعذّر تحميل بيانات Sell-In/Sell-Out'
+                    : 'لا توجد شهور بها بيانات Sell-In وSell-Out معًا',
+                keyName: 'sell_in_vs_out_empty',
+              )
+            else ...[
+              // Sell-Out is the hero series; Sell-In is the neutral reference.
+              _Legend([(cs.primary, 'Sell-Out'), (cs.outline, 'Sell-In')]),
+              M3Spacing.gapMD,
+              _plotArea(
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    for (final m in months)
+                      Expanded(
+                        child: Tooltip(
+                          message:
+                              '${_monthAr(m.monthNum)}: \u2068Sell-In\u2069 ${_fmtInt(m.sellInUnits)} · \u2068Sell-Out\u2069 ${_fmtInt(m.sellOutUnits)}',
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  _bar(m.sellOutUnits / maxV * chartH,
-                                      cs.primary),
+                                  _bar(
+                                    m.sellOutUnits / maxV * chartH,
+                                    cs.primary,
+                                  ),
                                   const SizedBox(width: 3.0),
-                                  _bar(m.sellInUnits / maxV * chartH,
-                                      cs.outline),
-                                ]),
-                            M3Spacing.gapXXS,
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(_monthAr(m.monthNum),
+                                  _bar(
+                                    m.sellInUnits / maxV * chartH,
+                                    cs.outline,
+                                  ),
+                                ],
+                              ),
+                              M3Spacing.gapXXS,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  _monthAr(m.monthNum),
                                   maxLines: 1,
                                   softWrap: false,
-                                  style: theme.textTheme.labelSmall),
-                            ),
-                          ]),
-                    ),
-                  ),
-              ]),
-              chartH + 20.0,
-            ),
+                                  style: theme.textTheme.labelSmall,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                chartH + 20.0,
+              ),
+            ],
           ],
-        ]),
+        ),
       ),
     );
   }
@@ -870,16 +1024,19 @@ class _MonthlyBarsCard extends StatelessWidget {
   Widget _plotArea(Widget plot, double minH) => fill
       ? Expanded(
           child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: minH), child: plot))
+            constraints: BoxConstraints(minHeight: minH),
+            child: plot,
+          ),
+        )
       : SizedBox(height: minH, child: plot);
 
   Widget _bar(double h, Color c) => M3TonalSurface(
-        color: c,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(4.0)),
-        width: 16.0,
-        height: h.clamp(2.0, 180.0),
-        child: const SizedBox.shrink(),
-      );
+    color: c,
+    borderRadius: const BorderRadius.vertical(top: Radius.circular(4.0)),
+    width: 16.0,
+    height: h.clamp(2.0, 180.0),
+    child: const SizedBox.shrink(),
+  );
 }
 
 /// Grey shades for the named competitors (strongest first); MD3 theme roles only.
@@ -912,10 +1069,15 @@ class _CompetitorBar extends StatelessWidget {
       borderRadius: M3Shape.radiusSm,
       child: SizedBox(
         height: 6.0,
-        child: Row(children: [
-          for (final e in segs)
-            Expanded(flex: f(e.$1), child: ColoredBox(color: e.$2)),
-        ]),
+        child: Row(
+          children: [
+            for (final e in segs)
+              Expanded(
+                flex: f(e.$1),
+                child: ColoredBox(color: e.$2),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -932,26 +1094,31 @@ class _Donut extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final acc = M3StatusColors.of(context).accents;
-    return LayoutBuilder(builder: (context, c) {
-      final s = c.biggest.shortestSide;
-      final stroke = (s * 0.11).clamp(7.0, 14.0);
-      final style = s >= 112
-          ? theme.textTheme.titleLarge
-          : s >= 88
-              ? theme.textTheme.titleMedium
-              : theme.textTheme.labelLarge;
-      return Stack(alignment: Alignment.center, children: [
-        SizedBox.expand(
-          child: CircularProgressIndicator(
-            year2023: false,
-            value: value,
-            strokeWidth: stroke,
-            backgroundColor: acc.competitorSurface,
-          ),
-        ),
-        Text(label, style: style),
-      ]);
-    });
+    return LayoutBuilder(
+      builder: (context, c) {
+        final s = c.biggest.shortestSide;
+        final stroke = (s * 0.11).clamp(7.0, 14.0);
+        final style = s >= 112
+            ? theme.textTheme.titleLarge
+            : s >= 88
+            ? theme.textTheme.titleMedium
+            : theme.textTheme.labelLarge;
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox.expand(
+              child: CircularProgressIndicator(
+                year2023: false,
+                value: value,
+                strokeWidth: stroke,
+                backgroundColor: acc.competitorSurface,
+              ),
+            ),
+            Text(label, style: style),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -974,11 +1141,16 @@ class _EqualHeightRow extends MultiChildRenderObjectWidget {
   @override
   RenderObject createRenderObject(BuildContext context) =>
       _RenderEqualHeightRow(
-          spacing: spacing, textDirection: textDirection, flex: flex);
+        spacing: spacing,
+        textDirection: textDirection,
+        flex: flex,
+      );
 
   @override
   void updateRenderObject(
-      BuildContext context, _RenderEqualHeightRow renderObject) {
+    BuildContext context,
+    _RenderEqualHeightRow renderObject,
+  ) {
     renderObject
       ..spacing = spacing
       ..textDirection = textDirection
@@ -998,7 +1170,9 @@ class _FillColumn extends MultiChildRenderObjectWidget {
 
   @override
   void updateRenderObject(
-      BuildContext context, _RenderFillColumn renderObject) {
+    BuildContext context,
+    _RenderFillColumn renderObject,
+  ) {
     renderObject.textDirection = textDirection;
   }
 }
@@ -1027,14 +1201,16 @@ class _GrowingGrid extends MultiChildRenderObjectWidget {
 
   @override
   RenderObject createRenderObject(BuildContext context) => _RenderGrowingGrid(
-        spacing: spacing,
-        twoColumnMinWidth: twoColumnMinWidth,
-        textDirection: textDirection,
-      );
+    spacing: spacing,
+    twoColumnMinWidth: twoColumnMinWidth,
+    textDirection: textDirection,
+  );
 
   @override
   void updateRenderObject(
-      BuildContext context, _RenderGrowingGrid renderObject) {
+    BuildContext context,
+    _RenderGrowingGrid renderObject,
+  ) {
     renderObject
       ..spacing = spacing
       ..twoColumnMinWidth = twoColumnMinWidth
@@ -1044,9 +1220,11 @@ class _GrowingGrid extends MultiChildRenderObjectWidget {
 
 /// One SKU share row. Extra height thickens the bar, then the padding.
 class _SkuRow extends MultiChildRenderObjectWidget {
-  _SkuRow(
-      {required Widget title, required Widget category, required Widget bar})
-      : super(children: [title, category, bar]);
+  _SkuRow({
+    required Widget title,
+    required Widget category,
+    required Widget bar,
+  }) : super(children: [title, category, bar]);
 
   @override
   RenderObject createRenderObject(BuildContext context) => _RenderSkuRow();
@@ -1055,11 +1233,11 @@ class _SkuRow extends MultiChildRenderObjectWidget {
 /// Category tile: donut on the start side, copy beside it. Extra height
 /// enlarges the donut (capped) and centers both in the tile.
 class _ShareTile extends MultiChildRenderObjectWidget {
-  _ShareTile(
-      {required Widget donut,
-      required Widget details,
-      required this.textDirection})
-      : super(children: [donut, details]);
+  _ShareTile({
+    required Widget donut,
+    required Widget details,
+    required this.textDirection,
+  }) : super(children: [donut, details]);
 
   final TextDirection textDirection;
 
@@ -1125,13 +1303,13 @@ class _RenderEqualHeightRow extends RenderBox
     with
         ContainerRenderObjectMixin<RenderBox, _OffsetParentData>,
         _OffsetChildren {
-  _RenderEqualHeightRow(
-      {required double spacing,
-      required TextDirection textDirection,
-      List<int> flex = const [1, 1]})
-      : _spacing = spacing,
-        _textDirection = textDirection,
-        _flex = flex;
+  _RenderEqualHeightRow({
+    required double spacing,
+    required TextDirection textDirection,
+    List<int> flex = const [1, 1],
+  }) : _spacing = spacing,
+       _textDirection = textDirection,
+       _flex = flex;
 
   List<int> _flex;
   List<int> get flex => _flex;
@@ -1182,8 +1360,10 @@ class _RenderEqualHeightRow extends RenderBox
     var maxH = 0.0;
     var i = 0;
     for (final child in offsetChildren()) {
-      maxH =
-          math.max(maxH, child.getMaxIntrinsicHeight(_childWidth(width, i++)));
+      maxH = math.max(
+        maxH,
+        child.getMaxIntrinsicHeight(_childWidth(width, i++)),
+      );
     }
     return maxH;
   }
@@ -1210,8 +1390,10 @@ class _RenderEqualHeightRow extends RenderBox
       // Visual slot v (left to right) holds logical child i.
       final i = rtl ? n - 1 - v : v;
       final child = kids[i];
-      child.layout(BoxConstraints.tightFor(width: widths[i], height: maxH),
-          parentUsesSize: true);
+      child.layout(
+        BoxConstraints.tightFor(width: widths[i], height: maxH),
+        parentUsesSize: true,
+      );
       (child.parentData! as _OffsetParentData).offset = Offset(x, 0);
       x += widths[i] + spacing;
     }
@@ -1224,7 +1406,7 @@ class _RenderFillColumn extends RenderBox
         ContainerRenderObjectMixin<RenderBox, _OffsetParentData>,
         _OffsetChildren {
   _RenderFillColumn({required TextDirection textDirection})
-      : _textDirection = textDirection;
+    : _textDirection = textDirection;
 
   TextDirection _textDirection;
   TextDirection get textDirection => _textDirection;
@@ -1268,8 +1450,9 @@ class _RenderFillColumn extends RenderBox
     var y = 0.0;
     for (final child in kids.sublist(0, kids.length - 1)) {
       child.layout(BoxConstraints(maxWidth: width), parentUsesSize: true);
-      final x =
-          textDirection == TextDirection.rtl ? width - child.size.width : 0.0;
+      final x = textDirection == TextDirection.rtl
+          ? width - child.size.width
+          : 0.0;
       (child.parentData! as _OffsetParentData).offset = Offset(x, y);
       y += child.size.height;
     }
@@ -1277,8 +1460,10 @@ class _RenderFillColumn extends RenderBox
     final flexH = constraints.hasBoundedHeight
         ? math.max(flexNatural, constraints.maxHeight - y)
         : flexNatural;
-    flex.layout(BoxConstraints.tightFor(width: width, height: flexH),
-        parentUsesSize: true);
+    flex.layout(
+      BoxConstraints.tightFor(width: width, height: flexH),
+      parentUsesSize: true,
+    );
     (flex.parentData! as _OffsetParentData).offset = Offset(0, y);
     size = constraints.constrain(Size(width, y + flex.size.height));
   }
@@ -1315,7 +1500,7 @@ class _RenderGrowingColumn extends RenderBox
     final width = constraints.hasBoundedWidth ? constraints.maxWidth : 0.0;
     final kids = offsetChildren();
     final naturals = [
-      for (final child in kids) child.getMaxIntrinsicHeight(width)
+      for (final child in kids) child.getMaxIntrinsicHeight(width),
     ];
     final natural = naturals.fold<double>(0, (a, b) => a + b);
     final avail = constraints.hasBoundedHeight
@@ -1325,8 +1510,10 @@ class _RenderGrowingColumn extends RenderBox
     var y = 0.0;
     for (var i = 0; i < kids.length; i++) {
       final h = naturals[i] + extra;
-      kids[i].layout(BoxConstraints.tightFor(width: width, height: h),
-          parentUsesSize: true);
+      kids[i].layout(
+        BoxConstraints.tightFor(width: width, height: h),
+        parentUsesSize: true,
+      );
       (kids[i].parentData! as _OffsetParentData).offset = Offset(0, y);
       y += h;
     }
@@ -1342,9 +1529,9 @@ class _RenderGrowingGrid extends RenderBox
     required double spacing,
     required double twoColumnMinWidth,
     required TextDirection textDirection,
-  })  : _spacing = spacing,
-        _twoColumnMinWidth = twoColumnMinWidth,
-        _textDirection = textDirection;
+  }) : _spacing = spacing,
+       _twoColumnMinWidth = twoColumnMinWidth,
+       _textDirection = textDirection;
 
   double _spacing;
   double get spacing => _spacing;
@@ -1423,8 +1610,10 @@ class _RenderGrowingGrid extends RenderBox
     final rows = (kids.length + cols - 1) ~/ cols;
     final rowH = List<double>.filled(rows, 0);
     for (var i = 0; i < kids.length; i++) {
-      rowH[i ~/ cols] =
-          math.max(rowH[i ~/ cols], kids[i].getMaxIntrinsicHeight(cellW));
+      rowH[i ~/ cols] = math.max(
+        rowH[i ~/ cols],
+        kids[i].getMaxIntrinsicHeight(cellW),
+      );
     }
     final extra = (avail - natural) / rows;
     var y = 0.0;
@@ -1433,8 +1622,10 @@ class _RenderGrowingGrid extends RenderBox
       for (var c = 0; c < cols; c++) {
         final i = r * cols + c;
         if (i >= kids.length) break;
-        kids[i].layout(BoxConstraints.tightFor(width: cellW, height: h),
-            parentUsesSize: true);
+        kids[i].layout(
+          BoxConstraints.tightFor(width: cellW, height: h),
+          parentUsesSize: true,
+        );
         final x = textDirection == TextDirection.rtl
             ? width - (c + 1) * cellW - c * spacing
             : c * (cellW + spacing);
@@ -1506,8 +1697,10 @@ class _RenderSkuRow extends RenderBox
     final barExtra = math.min(_barExtraMax, extra);
     final vPad = _vPad + (extra - barExtra) / 2;
     final barH = _barH + barExtra;
-    kids[2].layout(BoxConstraints.tightFor(width: width, height: barH),
-        parentUsesSize: true);
+    kids[2].layout(
+      BoxConstraints.tightFor(width: width, height: barH),
+      parentUsesSize: true,
+    );
     var y = vPad;
     (kids[0].parentData! as _OffsetParentData).offset = Offset(0, y);
     y += kids[0].size.height;
@@ -1523,7 +1716,7 @@ class _RenderShareTile extends RenderBox
         ContainerRenderObjectMixin<RenderBox, _OffsetParentData>,
         _OffsetChildren {
   _RenderShareTile({required TextDirection textDirection})
-      : _textDirection = textDirection;
+    : _textDirection = textDirection;
 
   static const double _minDonut = 64.0;
   static const double _maxDonut = 148.0;
@@ -1558,8 +1751,9 @@ class _RenderShareTile extends RenderBox
   double computeMaxIntrinsicHeight(double width) {
     final kids = _parts();
     if (kids == null) return 0;
-    final textH =
-        kids[1].getMaxIntrinsicHeight(_textWidth(width, _minDonut, _pad));
+    final textH = kids[1].getMaxIntrinsicHeight(
+      _textWidth(width, _minDonut, _pad),
+    );
     return math.max(_minDonut, textH) + _pad * 2;
   }
 
@@ -1586,10 +1780,14 @@ class _RenderShareTile extends RenderBox
     final extra = math.max(0.0, used - natural);
     final donut = (_minDonut + extra).clamp(_minDonut, _maxDonut);
     final textW = _textWidth(width, donut, _pad);
-    kids[1].layout(BoxConstraints(minWidth: textW, maxWidth: textW),
-        parentUsesSize: true);
-    kids[0].layout(BoxConstraints.tightFor(width: donut, height: donut),
-        parentUsesSize: true);
+    kids[1].layout(
+      BoxConstraints(minWidth: textW, maxWidth: textW),
+      parentUsesSize: true,
+    );
+    kids[0].layout(
+      BoxConstraints.tightFor(width: donut, height: donut),
+      parentUsesSize: true,
+    );
     final contentH = math.max(0.0, used - _pad * 2);
     final donutY = _pad + math.max(0.0, (contentH - donut) / 2);
     final textY = _pad + math.max(0.0, (contentH - kids[1].size.height) / 2);

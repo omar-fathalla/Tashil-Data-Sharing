@@ -1,0 +1,330 @@
+// Live-harness Dashboard pass: Chrome 150% zoom fullscreen is a 1280×800
+// CSS viewport with the 250dp DesktopSidebar (content 1030dp). Tests use
+// that exact width (and 1024), real Cairo, the ▲▼ fallback font, and
+// live-scale (made-up) values. KPI cards must be 138px like Sell-Out;
+// the stock table must fit with no horizontal scroll; empty last-year
+// shows «—» + «لا توجد بيانات للعام السابق»; shared prefix is stripped.
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:tashil_web/core/data/app_cache.dart';
+import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
+import 'package:tashil_web/features/cpfr_replenishment/domain/cpfr_models.dart';
+import 'package:tashil_web/features/executive_dashboard/presentation/widgets/bento_kpi_grid.dart';
+import 'package:tashil_web/features/executive_dashboard/presentation/widgets/chain_share_pie.dart';
+import 'package:tashil_web/features/executive_dashboard/presentation/widgets/market_share_section.dart';
+import 'package:tashil_web/features/navigation/presentation/desktop_sidebar.dart';
+import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
+
+import 'support/real_fonts.dart';
+
+const kLiveViewportWidth = 1280.0;
+const kSellOutKpiHeight = 138.0;
+const kLongSku =
+    'منظف أرضيات تجريبي برائحة اللافندر عبوة اقتصادية كبيرة الحجم مع غطاء محكم';
+
+final _prefixedChains = [
+  ChainShareItem(
+    retailerChain: 'chain_nsr',
+    displayName: 'عائلة فتح الله ماركت - مدينة نصر',
+    totalRevenue: 128400000,
+    totalUnits: 214000,
+    marketShare: 48.0,
+  ),
+  ChainShareItem(
+    retailerChain: 'chain_alex',
+    displayName: 'عائله فتح الله ماركت - الإسكندرية',
+    totalRevenue: 71200000,
+    totalUnits: 118000,
+    marketShare: 27.0,
+  ),
+  ChainShareItem(
+    retailerChain: 'chain_moh',
+    displayName: 'عائلة فتح الله ماركت - المهندسين',
+    totalRevenue: 66100000,
+    totalUnits: 109000,
+    marketShare: 25.0,
+  ),
+];
+
+ExecutiveKPIsModel _liveKpis({bool yoyAvailable = false}) => ExecutiveKPIsModel(
+      totalRevenue: 128400000,
+      revenueGrowthPct: 8.4,
+      revenueMomPct: 8.4,
+      revenueYoyPct: 12.1,
+      yoyAvailable: yoyAvailable,
+      totalUnitsSold: 441000,
+      unitsGrowthPct: 5.2,
+      unitsMomPct: 5.2,
+      unitsYoyPct: 9.8,
+      activeStoresCount: 16,
+      oosRatePct: 3.2,
+      osaRatePct: 96.8,
+      totalOOSIncidents: 42,
+      estimatedLostRevenue: 1850000,
+      currency: 'EGP',
+      reportingPeriod: '2026',
+      chainShares: _prefixedChains,
+      dailyTrends: const [],
+    );
+
+final _liveCpfr = CPFRDashboardModel.fromJson({
+  'monthly_reconciliation': [
+    for (final m in [
+      [1, 'January', 1284000, 1217000],
+      [2, 'February', 1190000, 1105000],
+    ])
+      {
+        'year': 2026,
+        'month_num': m[0],
+        'month_en': m[1],
+        'has_actual_sell_out': true,
+        'sell_in_units': m[2],
+        'sell_out_units': m[3],
+      },
+  ],
+  'inventory_and_po_items': [
+    {
+      'barcode': '1',
+      'item_code': 'T-1',
+      'sku_name': kLongSku,
+      'sell_in_units': 1284000,
+      'sell_out_units': 1217000,
+      'estimated_stock_units': 67000,
+      'sell_through_pct': 94.8,
+      'stock_status': 'overstock',
+    },
+    {
+      'barcode': '2',
+      'item_code': 'T-2',
+      'sku_name': 'صنف تجريبي قصير',
+      'sell_in_units': 214000,
+      'sell_out_units': 198000,
+      'estimated_stock_units': 16000,
+      'sell_through_pct': 92.5,
+      'stock_status': 'urgent_replenishment',
+    },
+  ],
+});
+
+TextTheme _withFallback(TextTheme t, List<String> fb) {
+  TextStyle? f(TextStyle? s) =>
+      s?.copyWith(fontFamilyFallback: [...?s.fontFamilyFallback, ...fb]);
+  return TextTheme(
+    displayLarge: f(t.displayLarge),
+    displayMedium: f(t.displayMedium),
+    displaySmall: f(t.displaySmall),
+    headlineLarge: f(t.headlineLarge),
+    headlineMedium: f(t.headlineMedium),
+    headlineSmall: f(t.headlineSmall),
+    titleLarge: f(t.titleLarge),
+    titleMedium: f(t.titleMedium),
+    titleSmall: f(t.titleSmall),
+    bodyLarge: f(t.bodyLarge),
+    bodyMedium: f(t.bodyMedium),
+    bodySmall: f(t.bodySmall),
+    labelLarge: f(t.labelLarge),
+    labelMedium: f(t.labelMedium),
+    labelSmall: f(t.labelSmall),
+  );
+}
+
+ThemeData _liveTheme() {
+  final theme = AppTheme.light();
+  return theme.copyWith(
+    textTheme: _withFallback(theme.textTheme, const ['NotoSansSymbols2']),
+  );
+}
+
+Future<void> _pumpAt(
+  WidgetTester tester,
+  Widget page, {
+  double width = kLiveViewportWidth,
+  double height = 4000,
+  bool sidebar = true,
+}) async {
+  tester.view.physicalSize = Size(width, height);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(MaterialApp(
+    theme: _liveTheme(),
+    locale: const Locale('ar'),
+    supportedLocales: const [Locale('ar'), Locale('en')],
+    localizationsDelegates: const [
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    home: Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        body: sidebar && width >= 1280
+            ? Row(children: [
+                DesktopSidebar(
+                  selectedIndex: 0,
+                  onDestinationSelected: (_) {},
+                  activeTenant: 'adeco',
+                  onTenantChanged: (_) {},
+                ),
+                Expanded(child: page),
+              ])
+            : page,
+      ),
+    ),
+  ));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  for (var i = 0; i < 8; i++) {
+    await tester.pump();
+  }
+}
+
+Widget _dashboardBody({bool yoy = false}) => SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            BentoKpiGrid(kpis: _liveKpis(yoyAvailable: yoy)),
+            const SizedBox(height: 16),
+            MarketShareSection(
+              kpis: _liveKpis(yoyAvailable: yoy),
+              cpfr: _liveCpfr,
+              cpfrLoading: false,
+              periodMonths: const {1, 2},
+              year: 2026,
+            ),
+            const SizedBox(height: 16),
+            ChainSharePie(chainShares: _prefixedChains),
+          ],
+        ),
+      ),
+    );
+
+double _hScrollExtent(WidgetTester tester, Finder scope) {
+  final scrollable =
+      find.descendant(of: scope, matching: find.byType(Scrollable));
+  if (scrollable.evaluate().isEmpty) return 0;
+  for (final el in scrollable.evaluate()) {
+    final s = el.widget as Scrollable;
+    if (s.axisDirection == AxisDirection.right ||
+        s.axisDirection == AxisDirection.left) {
+      final state = tester.state<ScrollableState>(find.byWidget(s));
+      if (state.position.hasContentDimensions) {
+        return state.position.maxScrollExtent;
+      }
+    }
+  }
+  return 0;
+}
+
+void main() {
+  GoogleFonts.config.allowRuntimeFetching = false;
+  setUpAll(() async {
+    await loadRealCairoFont();
+    final bytes =
+        File('test/fonts/NotoSansSymbols2-Arrows.ttf').readAsBytesSync();
+    await (FontLoader('NotoSansSymbols2')
+          ..addFont(Future.value(ByteData.view(bytes.buffer))))
+        .load();
+  });
+  setUp(AppCache.clear);
+
+  testWidgets(
+      'at live 1280+sidebar and at 1024, Dashboard KPI cards are 138px like Sell-Out',
+      (tester) async {
+    await _pumpAt(
+      tester,
+      SellOutExplorerScreen(apiClient: ApiClient(tenantId: 'tenant-adeco')),
+    );
+    final sellOutCard = find.byKey(const ValueKey('kpi_card_Net Sales (EGP)'));
+    expect(sellOutCard, findsOneWidget);
+    final sellOutH = tester.getSize(sellOutCard).height;
+    expect(sellOutH, closeTo(kSellOutKpiHeight, 2.0),
+        reason: 'Sell-Out reference height is $sellOutH');
+
+    await _pumpAt(tester, _dashboardBody());
+    expect(tester.takeException(), isNull);
+    const keys = [
+      'kpi_card_exec_sellout',
+      'kpi_card_exec_units',
+      'kpi_card_exec_stores',
+      'kpi_card_exec_oos',
+    ];
+    for (final key in keys) {
+      final card = find.byKey(ValueKey(key));
+      expect(card, findsOneWidget, reason: key);
+      expect(tester.getSize(card).height, closeTo(kSellOutKpiHeight, 2.0),
+          reason: '$key height ${tester.getSize(card).height} vs $sellOutH');
+      final kpi = tester.widget<M3SummaryKpiCard>(card);
+      expect(kpi.titleMaxLines, 1, reason: key);
+      expect(kpi.subtitleMaxLines, 1, reason: key);
+    }
+    // Empty last year: «—» on the detail line, phrase uncut, no fake YoY %.
+    expect(
+        find.textContaining('لا توجد بيانات للعام السابق'), findsNWidgets(2));
+    expect(find.textContaining('—'), findsWidgets);
+    expect(find.textContaining('مقارنة بالعام السابق'), findsNothing);
+
+    await _pumpAt(tester, _dashboardBody(), width: 1024, sidebar: false);
+    expect(tester.takeException(), isNull);
+    for (final key in keys) {
+      expect(
+        tester.getSize(find.byKey(ValueKey(key))).height,
+        closeTo(kSellOutKpiHeight, 2.0),
+        reason: '$key at 1024',
+      );
+    }
+  });
+
+  testWidgets(
+      'at live 1280+sidebar, the stock table fits with no horizontal scroll',
+      (tester) async {
+    await _pumpAt(tester, _dashboardBody());
+    expect(tester.takeException(), isNull);
+    final stock = find.byKey(const ValueKey('stock_per_sku_table'));
+    expect(stock, findsOneWidget);
+    expect(_hScrollExtent(tester, stock), lessThanOrEqualTo(2.0),
+        reason: 'stock table still scrolls at live 1280');
+    final name = find.byKey(const ValueKey('stock_sku_name'));
+    expect(name, findsWidgets);
+    final r = tester.getRect(name.first);
+    expect(r.left, greaterThanOrEqualTo(-0.5));
+    expect(r.right, lessThanOrEqualTo(kLiveViewportWidth + 0.5));
+    // Status and item visible together.
+    expect(find.text('مخزون زائد'), findsOneWidget);
+    final status = tester.getRect(find.text('مخزون زائد'));
+    expect(status.right, lessThanOrEqualTo(kLiveViewportWidth + 0.5));
+    expect(status.overlaps(r) || status.left < r.left || r.left < status.left,
+        isTrue);
+
+    await _pumpAt(tester, _dashboardBody(), width: 1024, sidebar: false);
+    expect(
+        _hScrollExtent(
+            tester, find.byKey(const ValueKey('stock_per_sku_table'))),
+        lessThanOrEqualTo(2.0),
+        reason: 'stock table still scrolls at 1024');
+  });
+
+  testWidgets(
+      'shared branch prefix is display-stripped; last-year value is — when missing',
+      (tester) async {
+    await _pumpAt(tester, _dashboardBody());
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('عائلة فتح الله ماركت -'), findsNothing);
+    expect(find.textContaining('عائله فتح الله ماركت -'), findsNothing);
+    expect(find.textContaining('مدينة نصر'), findsWidgets);
+    expect(find.textContaining('الإسكندرية'), findsWidgets);
+    expect(find.textContaining('المهندسين'), findsWidgets);
+
+    await _pumpAt(tester, _dashboardBody(yoy: true));
+    expect(find.textContaining('لا توجد بيانات للعام السابق'), findsNothing);
+    expect(find.textContaining('مقارنة بالعام السابق'), findsNWidgets(2));
+  });
+}
