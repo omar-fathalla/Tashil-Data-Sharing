@@ -6,9 +6,15 @@ import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
+import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_search_field.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 
 /// OOSDashboardScreen provides real-time alerting for out-of-stock items across retail chains,
@@ -296,7 +302,8 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
     );
   }
 
-  /// Symmetrical Executive KPI Cards
+  /// Executive KPI cards — shared [M3SummaryKpiCard] (Sell-Out geometry).
+  /// Values stay on one line (compact EGP / arabic plural), like Sell-Out.
   Widget _buildExecutiveKPICards({
     required BuildContext context,
     required double totalLostCost,
@@ -305,198 +312,83 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
     required int totalFilteredSKUs,
     required bool isCompact,
   }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
+    final colorScheme = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final screenWidth = constraints.maxWidth;
-        final isWide = screenWidth >= 1100.0;
-        final isMedium = screenWidth >= 650.0 && screenWidth < 1100.0;
-
-        final cardList = [
-          // Card 1: OSA% (Maintains test key: osa_summary_card)
-          _buildKPICard(
-            key: const ValueKey('osa_summary_card'),
-            context: context,
-            titleAr: 'مؤشر التوافر على الرفوف OSA%',
-            titleEn: 'On-Shelf Availability',
-            value: '${osaRatePct.toStringAsFixed(1)}%',
-            subtitle: 'كفاءة التوافر الفعلي عبر الفروع النشطة',
-            icon: Icons.fact_check_rounded,
-            iconColor: colorScheme.primary,
-            iconBgColor: colorScheme.primaryContainer,
-            customWidget: Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: ClipRRect(
-                borderRadius: M3Shape.radiusXs,
-                child: LinearProgressIndicator(
-                  value: (osaRatePct / 100.0).clamp(0.0, 1.0),
-                  minHeight: 6.0,
-                  backgroundColor: colorScheme.errorContainer.withOpacity(0.5),
-                  valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
-                ),
-              ),
-            ),
-          ),
-
-          // Card 2: Total OOS SKUs
-          _buildKPICard(
-            context: context,
-            titleAr: 'إجمالي الأصناف المنعدمة',
-            titleEn: 'Total OOS SKUs',
-            value: '$totalFilteredSKUs صنف',
-            subtitle: '$criticalCount أصناف ذات خطورة حرجة جداً',
-            icon: Icons.inventory_2_rounded,
-            iconColor: colorScheme.error,
-            iconBgColor: colorScheme.errorContainer.withOpacity(0.6),
-          ),
-
-          // Card 3: Impacted Branches
-          _buildKPICard(
-            context: context,
-            titleAr: 'الفروع المتأثرة بالنواقص',
-            titleEn: 'Impacted Branches',
-            value: '$impactedBranchesCount فروع',
-            subtitle: 'فروع وهايبر ماركت بها عجز على الرف',
-            icon: Icons.store_rounded,
-            iconColor: colorScheme.tertiary,
-            iconBgColor: colorScheme.tertiaryContainer.withOpacity(0.6),
-          ),
-
-          // Card 4: Daily Lost Sales Revenue
-          _buildKPICard(
-            context: context,
-            titleAr: 'الخسارة اليومية المقدرة',
-            titleEn: 'Daily Lost Revenue',
-            value: CurrencyFormatter.formatEGP(totalLostCost),
-            subtitle: 'فاقد مبيعات يومي بسبب نفاد المخزون',
-            icon: Icons.trending_down_rounded,
-            iconColor: colorScheme.error,
-            iconBgColor: colorScheme.errorContainer.withOpacity(0.6),
-          ),
-
-          // Card 5: Monthly Loss Projection
-          _buildKPICard(
-            context: context,
-            titleAr: 'الخسارة الشهرية المتوقعة',
-            titleEn: 'Monthly Projected Loss',
-            value: CurrencyFormatter.formatEGP(totalLostCost * 30.0),
-            subtitle: 'تقدير الفاقد الشهري في حال تأخر التوريد',
-            icon: Icons.calendar_month_rounded,
-            iconColor: colorScheme.onSurfaceVariant,
-            iconBgColor: colorScheme.surfaceContainerHighest,
-          ),
-        ];
-
-        if (isWide) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: cardList.map((card) => Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: card))).toList(),
-          );
-        } else if (isMedium) {
-          return Wrap(
-            spacing: 8.0,
-            runSpacing: 8.0,
-            children: cardList.map((card) => SizedBox(width: (screenWidth - 8.0) / 2.0, child: card)).toList(),
-          );
-        } else {
-          return Column(
-            children: cardList.map((card) => Padding(padding: const EdgeInsets.only(bottom: 8.0), child: card)).toList(),
-          );
-        }
-      },
-    );
-  }
-
-  Widget _buildKPICard({
-    Key? key,
-    required BuildContext context,
-    required String titleAr,
-    required String titleEn,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color iconColor,
-    required Color iconBgColor,
-    Widget? customWidget,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Card(
-      key: key,
-      elevation: 0,
-      color: colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: M3Shape.radiusLg,
-        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        final columns = constraints.maxWidth >= 840.0
+            ? 3
+            : (constraints.maxWidth >= 580.0 ? 2 : 1);
+        return M3EqualHeightGrid(
+          key: const ValueKey('oos_kpi_grid'),
+          columns: columns,
+          spacing: M3Spacing.sm,
+          runSpacing: M3Spacing.sm,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8.0),
-                  decoration: BoxDecoration(
-                    color: iconBgColor,
-                    borderRadius: M3Shape.radiusSm,
-                  ),
-                  child: Icon(icon, color: iconColor, size: 20.0),
-                ),
-                const SizedBox(width: 6.0),
-                Flexible(
-                  child: Text(
-                    titleEn,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant.withOpacity(0.7),
-                      fontWeight: FontWeight.w600,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
-              ],
+            M3SummaryKpiCard(
+              key: const ValueKey('osa_summary_card'),
+              title: 'مؤشر التوافر على الرفوف OSA%',
+              titleMaxLines: 3,
+              subtitleMaxLines: 3,
+              value: '${osaRatePct.toStringAsFixed(1)}%',
+              subtitle: 'كفاءة التوافر الفعلي عبر الفروع النشطة',
+              icon: Icons.fact_check_rounded,
+              color: colorScheme.primary,
+              valueKey: const ValueKey('kpi_value_OSA'),
+              subtitleKey: const ValueKey('kpi_subtitle_OSA'),
             ),
-            const SizedBox(height: 10.0),
-            Text(
-              titleAr,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            M3SummaryKpiCard(
+              key: const ValueKey('kpi_card_Total OOS SKUs'),
+              title: 'إجمالي الأصناف المنعدمة',
+              titleMaxLines: 3,
+              subtitleMaxLines: 3,
+              value: countSku(totalFilteredSKUs),
+              subtitle: criticalCount == 0
+                  ? 'لا توجد أصناف حرجة'
+                  : '${countSku(criticalCount)} ذات خطورة حرجة',
+              icon: Icons.inventory_2_rounded,
+              color: colorScheme.error,
+              valueKey: const ValueKey('kpi_value_Total OOS SKUs'),
+              subtitleKey: const ValueKey('kpi_subtitle_Total OOS SKUs'),
             ),
-            const SizedBox(height: 4.0),
-            Text(
-              value,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: colorScheme.primary,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            M3SummaryKpiCard(
+              key: const ValueKey('kpi_card_Impacted Branches'),
+              title: 'الفروع المتأثرة بالنواقص',
+              titleMaxLines: 3,
+              subtitleMaxLines: 3,
+              value: countBranches(impactedBranchesCount),
+              subtitle: 'فروع وهايبر ماركت بها عجز على الرف',
+              icon: Icons.store_rounded,
+              color: colorScheme.tertiary,
+              valueKey: const ValueKey('kpi_value_Impacted Branches'),
+              subtitleKey: const ValueKey('kpi_subtitle_Impacted Branches'),
             ),
-            if (customWidget != null) customWidget,
-            const SizedBox(height: 6.0),
-            Text(
-              subtitle,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: M3FontSize.labelSmall,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            M3SummaryKpiCard(
+              key: const ValueKey('kpi_card_Daily Lost Revenue'),
+              title: 'الخسارة اليومية المقدرة',
+              titleMaxLines: 3,
+              subtitleMaxLines: 3,
+              value: CurrencyFormatter.formatCompactEGP(totalLostCost),
+              subtitle: 'فاقد مبيعات يومي بسبب نفاد المخزون',
+              icon: Icons.trending_down_rounded,
+              color: colorScheme.error,
+              valueKey: const ValueKey('kpi_value_Daily Lost Revenue'),
+              subtitleKey: const ValueKey('kpi_subtitle_Daily Lost Revenue'),
+            ),
+            M3SummaryKpiCard(
+              key: const ValueKey('kpi_card_Monthly Projected Loss'),
+              title: 'الخسارة الشهرية المتوقعة',
+              titleMaxLines: 3,
+              subtitleMaxLines: 3,
+              value: CurrencyFormatter.formatCompactEGP(totalLostCost * 30.0),
+              subtitle: 'تقدير الفاقد الشهري في حال تأخر التوريد',
+              icon: Icons.calendar_month_rounded,
+              color: colorScheme.onSurfaceVariant,
+              valueKey: const ValueKey('kpi_value_Monthly Projected Loss'),
+              subtitleKey: const ValueKey('kpi_subtitle_Monthly Projected Loss'),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -560,19 +452,22 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                     children: [
                       Row(
                         children: [
-                          Text(
-                            'مستشار الذكاء الاصطناعي (Gemini AI Root-Cause Advisor)',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
+                          Expanded(
+                            child: Text(
+                              'مستشار الذكاء الاصطناعي (Gemini AI Root-Cause Advisor)',
+                              maxLines: 3,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8.0),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+                            padding: M3ChipStyle.padding,
                             decoration: BoxDecoration(
                               color: colorScheme.tertiaryContainer,
-                              borderRadius: M3Shape.radiusSm,
+                              borderRadius: M3ChipStyle.radius,
                             ),
                             child: Text(
                               'Gemini 1.5 Pro',
@@ -876,14 +771,14 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
           ),
           const SizedBox(height: 8.0),
           Wrap(
-            spacing: 8.0,
-            runSpacing: 6.0,
+            spacing: M3Spacing.xs,
+            runSpacing: M3Spacing.xs,
             children: branches.map((bName) {
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
                 decoration: BoxDecoration(
                   color: colorScheme.surface,
-                  borderRadius: M3Shape.radiusSm,
+                  borderRadius: M3ChipStyle.radius,
                   border: Border.all(color: colorScheme.error.withOpacity(0.3)),
                 ),
                 child: Row(
@@ -893,6 +788,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                     const SizedBox(width: 4.0),
                     Text(
                       bName,
+                      maxLines: 3,
                       style: TextStyle(
                         fontSize: M3FontSize.bodySmall,
                         fontWeight: FontWeight.bold,
@@ -925,27 +821,31 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
         padding: const EdgeInsets.all(12.0),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final isNarrow = constraints.maxWidth < 840.0;
+            final isNarrow = constraints.maxWidth < 1100.0;
 
-            final searchField = TextField(
-              controller: _searchController,
-              onChanged: (val) => setState(() => _searchQuery = val),
-              decoration: InputDecoration(
-                hintText: 'بحث بالصنف أو الكرتونة أو الباركود أو اسم الفرع...',
-                hintStyle: TextStyle(fontSize: M3FontSize.labelMediumPlus, color: colorScheme.onSurfaceVariant.withOpacity(0.6)),
-                prefixIcon: const Icon(Icons.search_rounded, size: 20.0),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, size: 18.0),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-                border: const OutlineInputBorder(borderRadius: M3Shape.radiusSm),
+            const searchHint = 'بحث بالصنف أو الكرتونة أو الباركود أو اسم الفرع...';
+            final searchField = M3SearchFieldWidth(
+              hintText: searchHint,
+              child: TextField(
+                controller: _searchController,
+                onChanged: (val) => setState(() => _searchQuery = val),
+                decoration: InputDecoration(
+                  hintText: searchHint,
+                  hintStyle: TextStyle(fontSize: M3FontSize.labelMediumPlus, color: colorScheme.onSurfaceVariant.withOpacity(0.6)),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20.0),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18.0),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                  border: const OutlineInputBorder(borderRadius: M3Shape.radiusSm),
+                ),
               ),
             );
 
@@ -953,13 +853,14 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
 value: _availableBrands.contains(_selectedBrand) ? _selectedBrand : 'الكل',
 label: 'الماركة (Brand)',
 expand: true,
+fitOptions: true,
 options: m3OptionsFromMenuItems<String>(_availableBrands.map((b) {
                 return DropdownMenuItem<String>(
                   value: b,
                   child: Text(
                     b,
                     style: const TextStyle(fontSize: M3FontSize.bodySmall),
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 );
               }).toList()),
@@ -972,13 +873,14 @@ onChanged: m3Legacy<String>((val) {
 value: _availableBranches.contains(_selectedBranch) ? _selectedBranch : 'الكل',
 label: 'الفرع (Branch)',
 expand: true,
+fitOptions: true,
 options: m3OptionsFromMenuItems<String>(_availableBranches.map((b) {
                 return DropdownMenuItem<String>(
                   value: b,
                   child: Text(
                     b,
                     style: const TextStyle(fontSize: M3FontSize.bodySmall),
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 );
               }).toList()),
@@ -991,6 +893,7 @@ onChanged: m3Legacy<String>((val) {
 value: _selectedSeverity,
 label: 'مستوى الخطورة',
 expand: true,
+fitOptions: true,
 options: m3OptionsFromMenuItems<String>([
                 const DropdownMenuItem(value: 'الكل', child: Text('الكل', style: TextStyle(fontSize: M3FontSize.bodySmall))),
                 const DropdownMenuItem(value: 'حرج جداً', child: Text('حرج جداً', style: TextStyle(fontSize: M3FontSize.bodySmall, color: Colors.red))),
@@ -1064,7 +967,7 @@ onChanged: m3Legacy<String>((val) {
                   runSpacing: 8.0,
                   children: [
                     Text(
-                      'عدد النتائج المطابقة: ${_filteredAlerts.length} صنف منعدم',
+                      'عدد النتائج المطابقة: ${countSku(_filteredAlerts.length)} منعدم',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
@@ -1104,8 +1007,8 @@ onChanged: m3Legacy<String>((val) {
     final brands = _availableBrands;
 
     return Wrap(
-      spacing: 6.0,
-      runSpacing: 6.0,
+      spacing: M3Spacing.xs,
+      runSpacing: M3Spacing.xs,
       children: brands.map((b) {
         final isSelected = _selectedBrand == b;
         int count = 0;
@@ -1121,16 +1024,18 @@ onChanged: m3Legacy<String>((val) {
         return FilterChip(
           selected: isSelected,
           showCheckmark: false,
+          visualDensity: VisualDensity.standard,
+          shape: const RoundedRectangleBorder(borderRadius: M3ChipStyle.radius),
           label: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(b),
-              const SizedBox(width: 6.0),
+              Text(b, maxLines: 3),
+              const SizedBox(width: 8.0),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 1.5),
                 decoration: BoxDecoration(
                   color: isSelected ? colorScheme.onPrimary : colorScheme.surfaceContainerHighest,
-                  borderRadius: M3Shape.radiusSm,
+                  borderRadius: M3ChipStyle.radius,
                 ),
                 child: Text(
                   '$count',
@@ -1153,6 +1058,45 @@ onChanged: m3Legacy<String>((val) {
     );
   }
 
+  /// Short 8dp-radius chip with a grey description underneath.
+  Widget _buildShortStatus(
+      BuildContext context, String short, String description) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: M3ChipStyle.padding,
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest,
+            borderRadius: M3ChipStyle.radius,
+          ),
+          constraints: const BoxConstraints(minHeight: M3ChipStyle.minHeight),
+          alignment: Alignment.center,
+          child: Text(
+            short,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(height: 2.0),
+        Text(
+          description,
+          maxLines: 3,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
   /// View 1: Alert Cards List
   Widget _buildAlertCardsList(BuildContext context, List<OOSAlertModel> list, bool isCompact) {
     final theme = Theme.of(context);
@@ -1163,41 +1107,67 @@ onChanged: m3Legacy<String>((val) {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: list.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12.0),
+      separatorBuilder: (_, __) => const SizedBox(height: M3Spacing.xs),
       itemBuilder: (context, index) {
         final alert = list[index];
         final isCritical = alert.severity == 'critical';
-
-        final severityBadge = Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
-          decoration: BoxDecoration(
-            color: isCritical ? colorScheme.error : colorScheme.tertiary,
-            borderRadius: M3Shape.radiusSm,
-          ),
-          child: Text(
-            isCritical ? 'حرج جداً' : 'أولوية مرتفعة',
-            style: TextStyle(
-              color: isCritical ? colorScheme.onError : colorScheme.onTertiary,
-              fontSize: M3FontSize.tiny,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+        final severityChip = _buildShortStatus(
+          context,
+          isCritical ? 'حرج جداً' : 'أولوية مرتفعة',
+          isCritical
+              ? 'انعدام ممتد يؤثر على المبيعات اليومية'
+              : 'نواقص تحتاج إعادة توريد سريع',
         );
-
-        final brandBadge = Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
+        final brandChip = Container(
+          padding: M3ChipStyle.padding,
+          constraints: const BoxConstraints(minHeight: M3ChipStyle.minHeight),
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: colorScheme.primaryContainer,
-            borderRadius: M3Shape.radiusSm,
+            borderRadius: M3ChipStyle.radius,
           ),
           child: Text(
             alert.brand,
+            maxLines: 3,
             style: TextStyle(
               color: colorScheme.onPrimaryContainer,
               fontSize: M3FontSize.labelSmall,
               fontWeight: FontWeight.bold,
             ),
           ),
+        );
+
+        final skuTitle = Text(
+          alert.skuName,
+          key: const ValueKey('oos_sku_name'),
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+          maxLines: 3,
+        );
+        final storeLine = Text(
+          'المنفذ: ${alert.storeName} (${alert.retailerChain.toUpperCase()}) • ${alert.itemCode.isNotEmpty ? "كود: ${alert.itemCode} • " : ""}الباركود: ${alert.barcode}',
+          key: const ValueKey('oos_store_name'),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+          maxLines: 3,
+        );
+        final daysLine = Text(
+          '${countDay(alert.consecutiveDaysOOS)} بدون بيع',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+          maxLines: 3,
+        );
+        final lossLine = Text(
+          '${CurrencyFormatter.formatCompactEGP(alert.estimatedLostDailyCost)} يومياً',
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: colorScheme.error,
+            fontWeight: FontWeight.bold,
+          ),
+          maxLines: 1,
         );
 
         return Card(
@@ -1214,6 +1184,30 @@ onChanged: m3Legacy<String>((val) {
             child: LayoutBuilder(
               builder: (context, itemConstraints) {
                 final isMobileCard = itemConstraints.maxWidth < 620.0;
+                final iconWell = Container(
+                  padding: const EdgeInsets.all(8.0),
+                  decoration: BoxDecoration(
+                    color: isCritical ? colorScheme.errorContainer : colorScheme.tertiaryContainer,
+                    borderRadius: M3Shape.radiusMd,
+                  ),
+                  child: Icon(
+                    isCritical ? Icons.warning_rounded : Icons.info_outline_rounded,
+                    color: isCritical ? colorScheme.error : colorScheme.onTertiaryContainer,
+                    size: 20.0,
+                  ),
+                );
+                final poButton = OutlinedButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('تم إنشاء طلب توريد سريع للصنف: ${alert.skuName} لفرع ${alert.storeName}'),
+                        backgroundColor: colorScheme.primary,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  child: const Text('أمر توريد سريع'),
+                );
 
                 if (isMobileCard) {
                   return Column(
@@ -1222,36 +1216,18 @@ onChanged: m3Legacy<String>((val) {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(8.0),
-                            decoration: BoxDecoration(
-                              color: isCritical ? colorScheme.errorContainer : colorScheme.tertiaryContainer,
-                              borderRadius: M3Shape.radiusSm,
-                            ),
-                            child: Icon(
-                              isCritical ? Icons.warning_rounded : Icons.info_outline_rounded,
-                              color: isCritical ? colorScheme.error : colorScheme.onTertiaryContainer,
-                              size: 20.0,
-                            ),
-                          ),
+                          iconWell,
                           const SizedBox(width: 10.0),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  alert.skuName,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4.0),
+                                skuTitle,
+                                const SizedBox(height: 8.0),
                                 Wrap(
-                                  spacing: 6.0,
-                                  children: [
-                                    brandBadge,
-                                    severityBadge,
-                                  ],
+                                  spacing: M3Spacing.xs,
+                                  runSpacing: M3Spacing.xs,
+                                  children: [brandChip, severityChip],
                                 ),
                               ],
                             ),
@@ -1259,12 +1235,7 @@ onChanged: m3Legacy<String>((val) {
                         ],
                       ),
                       const SizedBox(height: 8.0),
-                      Text(
-                        'المنفذ: ${alert.storeName} (${alert.retailerChain.toUpperCase()}) • ${alert.itemCode.isNotEmpty ? "كود: ${alert.itemCode} • " : ""}الباركود: ${alert.barcode}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                      storeLine,
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 8.0),
                         child: Divider(height: 1.0),
@@ -1272,20 +1243,9 @@ onChanged: m3Legacy<String>((val) {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            '${alert.consecutiveDaysOOS} أيام بدون بيع',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            '- ${CurrencyFormatter.formatEGP(alert.estimatedLostDailyCost)} يومياً',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: colorScheme.error,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          Flexible(child: daysLine),
+                          const SizedBox(width: 8.0),
+                          Flexible(child: lossLine),
                         ],
                       ),
                     ],
@@ -1293,48 +1253,23 @@ onChanged: m3Legacy<String>((val) {
                 }
 
                 return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10.0),
-                      decoration: BoxDecoration(
-                        color: isCritical ? colorScheme.errorContainer : colorScheme.tertiaryContainer,
-                        borderRadius: M3Shape.radiusMd,
-                      ),
-                      child: Icon(
-                        isCritical ? Icons.warning_rounded : Icons.info_outline_rounded,
-                        color: isCritical ? colorScheme.error : colorScheme.onTertiaryContainer,
-                        size: 24.0,
-                      ),
-                    ),
-                    M3Spacing.hGapSM,
+                    iconWell,
+                    const SizedBox(width: 8.0),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  alert.skuName,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 8.0),
-                              brandBadge,
-                              const SizedBox(width: 6.0),
-                              severityBadge,
-                            ],
+                          skuTitle,
+                          const SizedBox(height: 8.0),
+                          Wrap(
+                            spacing: M3Spacing.xs,
+                            runSpacing: M3Spacing.xs,
+                            children: [brandChip, severityChip],
                           ),
-                          const SizedBox(height: 4.0),
-                          Text(
-                            'المنفذ: ${alert.storeName} (${alert.retailerChain.toUpperCase()}) • ${alert.itemCode.isNotEmpty ? "كود: ${alert.itemCode} • " : ""}الباركود: ${alert.barcode}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
+                          const SizedBox(height: 8.0),
+                          storeLine,
                         ],
                       ),
                     ),
@@ -1342,38 +1277,13 @@ onChanged: m3Legacy<String>((val) {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(
-                          '- ${CurrencyFormatter.formatEGP(alert.estimatedLostDailyCost)} يومياً',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: colorScheme.error,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '${alert.consecutiveDaysOOS} أيام بدون بيع',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontSize: M3FontSize.labelSmall,
-                          ),
-                        ),
+                        lossLine,
+                        const SizedBox(height: 4.0),
+                        daysLine,
                       ],
                     ),
                     const SizedBox(width: 12.0),
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                      ),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('تم إنشاء طلب توريد سريع للصنف: ${alert.skuName} لفرع ${alert.storeName}'),
-                            backgroundColor: colorScheme.primary,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
-                      child: const Text('أمر توريد سريع', style: TextStyle(fontSize: M3FontSize.bodySmall)),
-                    ),
+                    poButton,
                   ],
                 );
               },
@@ -1384,7 +1294,7 @@ onChanged: m3Legacy<String>((val) {
     );
   }
 
-  /// View 2: Branch Matrix List (Grouped by Branch)
+  /// View 2: Branch Matrix (grouped by branch, Sell-Out table rules).
   Widget _buildBranchMatrixList(BuildContext context, bool isCompact) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -1398,7 +1308,7 @@ onChanged: m3Legacy<String>((val) {
         final distinctBrands = branchAlerts.map((a) => a.brand).toSet().toList();
 
         return Card(
-          margin: const EdgeInsets.only(bottom: 14.0),
+          margin: const EdgeInsets.only(bottom: 16.0),
           elevation: 0,
           color: colorScheme.surfaceContainerLow,
           shape: RoundedRectangleBorder(
@@ -1410,56 +1320,59 @@ onChanged: m3Legacy<String>((val) {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Branch Header
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8.0),
-                          decoration: BoxDecoration(
-                            color: colorScheme.tertiaryContainer,
-                            borderRadius: M3Shape.radiusSm,
-                          ),
-                          child: Icon(Icons.storefront_rounded, color: colorScheme.onTertiaryContainer, size: 20.0),
-                        ),
-                        const SizedBox(width: 10.0),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              branchName,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 2.0),
-                            Text(
-                              'الماركات المتأثرة: ${distinctBrands.join(" • ")}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                    Container(
+                      padding: const EdgeInsets.all(8.0),
+                      decoration: BoxDecoration(
+                        color: colorScheme.tertiaryContainer,
+                        borderRadius: M3Shape.radiusMd,
+                      ),
+                      child: Icon(Icons.storefront_rounded, color: colorScheme.onTertiaryContainer, size: 20.0),
                     ),
+                    const SizedBox(width: 10.0),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            branchName,
+                            key: const ValueKey('oos_branch_name'),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 3,
+                          ),
+                          const SizedBox(height: 2.0),
+                          Text(
+                            'الماركات المتأثرة: ${distinctBrands.join(" • ")}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 3,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8.0),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          'إجمالي الفاقد: ${CurrencyFormatter.formatEGP(branchTotalCost)} يومياً',
+                          'إجمالي الفاقد: ${CurrencyFormatter.formatCompactEGP(branchTotalCost)} يومياً',
                           style: theme.textTheme.titleSmall?.copyWith(
                             color: colorScheme.error,
                             fontWeight: FontWeight.bold,
                           ),
+                          maxLines: 2,
                         ),
                         Text(
-                          '${branchAlerts.length} أصناف منعدمة بالفرع',
+                          '${countSku(branchAlerts.length)} منعدمة بالفرع',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
+                          maxLines: 2,
                         ),
                       ],
                     ),
@@ -1468,60 +1381,83 @@ onChanged: m3Legacy<String>((val) {
                 const SizedBox(height: 12.0),
                 const Divider(height: 1.0),
                 const SizedBox(height: 8.0),
-
-                // Missing Items Table in this branch
-                ...branchAlerts.map((item) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6.0),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest,
-                            borderRadius: M3Shape.radiusSm,
-                          ),
-                          child: Text(
-                            item.brand,
-                            style: const TextStyle(fontSize: M3FontSize.tinyPlus, fontWeight: FontWeight.bold),
-                          ),
+                TableScrollContainer(
+                  key: ValueKey('oos_matrix_table_$branchName'),
+                  child: DataTable(
+                    headingRowHeight: 48,
+                    dataRowMinHeight: 52,
+                    dataRowMaxHeight: double.infinity,
+                    columns: const [
+                      DataColumn(
+                        label: Text('الصنف'),
+                      ),
+                      DataColumn(
+                        label: Text('الماركة'),
+                        headingRowAlignment: MainAxisAlignment.center,
+                      ),
+                      DataColumn(
+                        label: Text('أيام الانعدام'),
+                        headingRowAlignment: MainAxisAlignment.center,
+                      ),
+                      DataColumn(
+                        label: Text('الفاقد اليومي'),
+                        headingRowAlignment: MainAxisAlignment.center,
+                      ),
+                    ],
+                    rows: [
+                      for (final item in branchAlerts)
+                        DataRow(
+                          cells: [
+                            DataCell(
+                              Text(
+                                item.skuName,
+                                key: const ValueKey('oos_sku_name'),
+                                maxLines: 3,
+                                textAlign: TextAlign.start,
+                              ),
+                            ),
+                            DataCell(
+                              Center(
+                                child: Text(
+                                  item.brand,
+                                  maxLines: 3,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                            DataCell(
+                              Center(
+                                child: Text(
+                                  countDay(item.consecutiveDaysOOS),
+                                  maxLines: 3,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                            DataCell(
+                              Center(
+                                child: Text(
+                                  CurrencyFormatter.formatCompactEGP(item.estimatedLostDailyCost),
+                                  maxLines: 3,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8.0),
-                        Expanded(
-                          child: Text(
-                            item.skuName,
-                            style: const TextStyle(fontSize: M3FontSize.labelMediumPlus, fontWeight: FontWeight.w600),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8.0),
-                        Text(
-                          '${item.consecutiveDaysOOS} أيام بدون بيع',
-                          style: TextStyle(fontSize: M3FontSize.bodySmall, color: colorScheme.onSurfaceVariant),
-                        ),
-                        const SizedBox(width: 12.0),
-                        Text(
-                          '- ${CurrencyFormatter.formatEGP(item.estimatedLostDailyCost)}',
-                          style: TextStyle(fontSize: M3FontSize.bodySmallPlus, fontWeight: FontWeight.bold, color: colorScheme.error),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 8.0),
                 Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: FilledButton.tonalIcon(
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
-                    ),
-                    icon: const Icon(Icons.send_rounded, size: 16.0),
-                    label: Text('إصدار طلب توريد مجمع لـ $branchName'),
+                    icon: const Icon(Icons.send_rounded, size: 20.0),
+                    label: Text('إصدار طلب توريد مجمع لـ $branchName', maxLines: 3),
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('تم إنشاء طلب توريد مجمع لـ ${branchAlerts.length} أصناف منعدمة في $branchName'),
+                          content: Text('تم إنشاء طلب توريد مجمع لـ ${countSku(branchAlerts.length)} منعدمة في $branchName'),
                           backgroundColor: colorScheme.primary,
                           behavior: SnackBarBehavior.floating,
                         ),

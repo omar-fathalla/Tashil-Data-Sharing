@@ -25,4 +25,13 @@ void main() {
     expect(countBranches(12), '12 فرعًا');
     expect(countBranches(100), '100 فرع');
   });
+
+  test('countDay uses the Arabic counted-noun rules', () {
+    expect(countDay(0), '0 أيام');
+    expect(countDay(1), 'يوم واحد');
+    expect(countDay(2), 'يومان');
+    expect(countDay(5), '5 أيام');
+    expect(countDay(12), '12 يومًا');
+    expect(countDay(100), '100 يوم');
+  });
 }
