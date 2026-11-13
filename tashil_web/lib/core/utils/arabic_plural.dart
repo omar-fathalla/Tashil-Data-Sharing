@@ -1,0 +1,25 @@
+/// Arabic counted nouns (تمييز العدد) for UI counts.
+///
+/// 1 → "صنف واحد", 2 → "صنفان", 3–10 → "n أصناف" (plural),
+/// 11–99 → "n صنفًا" (singular, accusative), 100, 101, 102, 200… →
+/// "n صنف" (singular, genitive), 0 → "0 أصناف".
+String arabicCount(
+  int n, {
+  required String one,
+  required String two,
+  required String few,
+  required String many,
+  required String hundred,
+}) {
+  if (n == 1) return one;
+  if (n == 2) return two;
+  if (n == 0) return '$n $few';
+  final r = n % 100;
+  if (r >= 3 && r <= 10) return '$n $few';
+  if (r >= 11) return '$n $many';
+  return '$n $hundred';
+}
+
+/// "صنف واحد" / "صنفان" / "5 أصناف" / "86 صنفًا" / "100 صنف".
+String countSku(int n) => arabicCount(n,
+    one: 'صنف واحد', two: 'صنفان', few: 'أصناف', many: 'صنفًا', hundred: 'صنف');

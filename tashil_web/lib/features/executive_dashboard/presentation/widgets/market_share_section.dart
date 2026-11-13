@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/utils/arabic_plural.dart';
 import 'package:tashil_web/core/widgets/m3_status_tag.dart';
 import 'package:tashil_web/core/widgets/m3_tonal_surface.dart';
 import 'package:flutter/rendering.dart';
@@ -148,6 +149,7 @@ class _CardHeader extends StatelessWidget {
       required this.subtitle,
       required this.count,
       this.unit = '',
+      this.countLabel,
       this.badgeKey});
   final IconData icon;
   final String title;
@@ -156,6 +158,10 @@ class _CardHeader extends StatelessWidget {
 
   /// Count unit shown in the neutral tag, e.g. "أصناف" → "6 أصناف".
   final String unit;
+
+  /// Optional count + Arabic counted noun (e.g. [countSku]: "6 أصناف",
+  /// "86 صنفًا"); takes precedence over [unit].
+  final String Function(int)? countLabel;
   final Key? badgeKey;
 
   @override
@@ -177,7 +183,9 @@ class _CardHeader extends StatelessWidget {
           // Neutral count tag (not an error-red badge).
           M3StatusTag(
             key: badgeKey,
-            label: unit.isEmpty ? '$count' : '$count $unit',
+            label: countLabel != null
+                ? countLabel!(count)
+                : (unit.isEmpty ? '$count' : '$count $unit'),
             icon: AppIcons.filterList,
           ),
         ]),
@@ -277,7 +285,7 @@ class _SkuShareCard extends StatelessWidget {
               title: 'الحصة حسب الصنف',
               subtitle: 'حصة أهم الأصناف من مبيعات الفئة',
               count: rows.length,
-              unit: 'أصناف',
+              countLabel: countSku,
               badgeKey: const ValueKey('share_per_sku_badge'),
             ),
             M3Spacing.gapSM,
@@ -621,7 +629,7 @@ class _StockCard extends StatelessWidget {
             title: 'المخزون حسب الصنف',
             subtitle: 'منذ بداية العام (وحدة) · الحالة من تقرير CPFR',
             count: top.length,
-            unit: 'أصناف',
+            countLabel: countSku,
             badgeKey: const ValueKey('stock_per_sku_badge'),
           ),
           M3Spacing.gapSM,
