@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 
 void main() {
-  testWidgets('TableScrollContainer renders navigation buttons and scrolls in RTL', (tester) async {
+  testWidgets(
+      'TableScrollContainer renders navigation buttons and scrolls in RTL',
+      (tester) async {
     final controller = ScrollController();
 
     await tester.pumpWidget(
@@ -14,7 +16,10 @@ void main() {
             body: Center(
               child: SizedBox(
                 width: 600,
-                height: 400,
+                // 400 was too short once the compact header (<640) stacked
+                // the title above the RTL nav and the 13dp scrollbar gutter
+                // was reserved under the last row.
+                height: 480,
                 child: TableScrollContainer(
                   controller: controller,
                   title: 'جدول تجريبي',
@@ -66,7 +71,9 @@ void main() {
     controller.dispose();
   });
 
-  testWidgets('TableScrollContainer handles narrow mobile width without overflow', (tester) async {
+  testWidgets(
+      'TableScrollContainer handles narrow mobile width without overflow',
+      (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Directionality(
