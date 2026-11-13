@@ -152,6 +152,28 @@ Future<void> pumpUpload(WidgetTester tester, {double width = 1280}) async {
   await tester.pumpAndSettle();
 }
 
+double horizontalScrollExtent(WidgetTester tester, Finder table) {
+  final scrollable = find.ancestor(
+      of: table,
+      matching: find.byWidgetPredicate((w) =>
+          w is Scrollable &&
+          w.axisDirection != AxisDirection.down &&
+          w.axisDirection != AxisDirection.up));
+  if (scrollable.evaluate().isEmpty) return 0.0;
+  return tester
+      .state<ScrollableState>(scrollable.first)
+      .position
+      .maxScrollExtent;
+}
+
+void expectInViewport(
+    WidgetTester tester, Finder f, double width, String what) {
+  expect(f, findsWidgets, reason: what);
+  final r = tester.getRect(f.first);
+  expect(r.left, greaterThanOrEqualTo(-0.5), reason: '$what $r');
+  expect(r.right, lessThanOrEqualTo(width + 0.5), reason: '$what $r');
+}
+
 void main() {
   GoogleFonts.config.allowRuntimeFetching = false;
   setUpAll(() async {
@@ -223,4 +245,47 @@ void main() {
     expect(find.byKey(const ValueKey('kpi_card_Records')), findsOneWidget);
     expect(find.byKey(const ValueKey('kpi_card_Revenue')), findsOneWidget);
   });
+
+  for (final width in [1280.0, 1024.0]) {
+    testWidgets(
+        'Upload archive table does not scroll horizontally at ${width.toInt()} with long filenames',
+        (tester) async {
+      await pumpUpload(tester, width: width);
+      expect(tester.takeException(), isNull);
+      final table = find.byKey(const ValueKey('upload_archive_files_table'));
+      expect(table, findsOneWidget);
+      expect(find.text('الحجم'), findsNothing);
+      expect(find.text('تاريخ الرفع'), findsOneWidget);
+      expect(find.textContaining('تقرير مبيعات أسواق فتح الله'), findsWidgets);
+      final name = tester.widget<Text>(find
+          .descendant(
+            of: find.byKey(const ValueKey('archive_file_card_u1')),
+            matching: find.byType(Text),
+          )
+          .first);
+      expect(name.maxLines, 3);
+      expect(
+        horizontalScrollExtent(tester, table),
+        lessThanOrEqualTo(2.0),
+        reason:
+            'archive table must fill the page with no leftover scroll at $width',
+      );
+      expectInViewport(tester, find.text('الملف'), width, 'header الملف');
+      expectInViewport(
+          tester, find.text('تاريخ الرفع'), width, 'header تاريخ الرفع');
+      expectInViewport(
+        tester,
+        find.byKey(const ValueKey('upload_archive_actions_column')),
+        width,
+        'pinned actions',
+      );
+      expectInViewport(
+        tester,
+        find.byKey(const ValueKey('archive_action_group_u1')),
+        width,
+        'row actions',
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 }
