@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../testing/test_semantics.dart';
-import '../theme/m3_shape.dart';
+import 'm3_chip_surface.dart';
 import 'app_icons.dart';
 
 /// Connected Material 3 button group for archived sheet rows:
-/// Edit (replace) | Download | Delete.
+/// تعديل (replace) | تحميل | حذف — 8dp corners like the shared toolbar style.
 class ArchiveActionsGroup extends StatelessWidget {
   const ArchiveActionsGroup({
     super.key,
@@ -51,10 +51,10 @@ class ArchiveActionsGroup extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: colorScheme.outlineVariant),
-        borderRadius: M3Shape.radiusFull,
+        borderRadius: M3ChipStyle.radius,
       ),
       child: ClipRRect(
-        borderRadius: M3Shape.radiusFull,
+        borderRadius: M3ChipStyle.radius,
         child: IntrinsicHeight(
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -62,7 +62,7 @@ class ArchiveActionsGroup extends StatelessWidget {
               if (showEdit) ...[
                 _segment(
                   context,
-                  label: 'Edit',
+                  label: 'تعديل',
                   icon: AppIcons.edit,
                   busy: isEditing,
                   onPressed: onEdit,
@@ -72,7 +72,7 @@ class ArchiveActionsGroup extends StatelessWidget {
               ],
               _segment(
                 context,
-                label: 'Download',
+                label: 'تحميل',
                 icon: AppIcons.download,
                 busy: false,
                 onPressed: onDownload,
@@ -81,7 +81,7 @@ class ArchiveActionsGroup extends StatelessWidget {
               divider,
               _segment(
                 context,
-                label: 'Delete',
+                label: 'حذف',
                 icon: AppIcons.delete,
                 busy: isDeleting,
                 onPressed: onDelete,
@@ -107,7 +107,10 @@ class ArchiveActionsGroup extends StatelessWidget {
     Widget button = TextButton.icon(
       style: TextButton.styleFrom(
         foregroundColor: color,
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+        // Compact segments: 40dp tall, 8dp side padding, so the actions
+        // column fits a 1280dp desktop without horizontal scrolling.
+        minimumSize: const Size(0.0, 40.0),
+        padding: const EdgeInsets.symmetric(horizontal: 8.0),
         shape: const RoundedRectangleBorder(),
         tapTargetSize: MaterialTapTargetSize.padded,
       ),
@@ -118,7 +121,7 @@ class ArchiveActionsGroup extends StatelessWidget {
               height: 18.0,
               child: CircularProgressIndicator(strokeWidth: 2.0),
             )
-          : Icon(icon, size: 20.0),
+          : Icon(icon, size: 18.0),
       label: Text(label),
     );
 

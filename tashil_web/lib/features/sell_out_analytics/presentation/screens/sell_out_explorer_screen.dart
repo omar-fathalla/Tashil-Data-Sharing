@@ -38,6 +38,7 @@ import '../../../../core/widgets/m3_toolbar_button.dart';
 import '../../../../core/widgets/m3_section_title.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_table_surface.dart';
 
 /// SellOutExplorerScreen provides comprehensive retailer Sell-Out analytics:
 /// - Tab 0: Sell-Out Data & Operations (Transactions Table, 4 KPI cards, Upload & Export Actions)
@@ -1176,7 +1177,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final cellMuted = cellStyle?.copyWith(color: colorScheme.onSurfaceVariant);
 
     return Card(
+      key: const ValueKey('price_matrix_section'),
       elevation: 0,
+      color: M3TableSurface.color(colorScheme),
       shape: RoundedRectangleBorder(
         borderRadius: M3Shape.radiusLg,
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.55)),
@@ -1819,18 +1822,17 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     bool isHighlighted = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
+    // Neutral strip roles (no tinted green / blue fills); the highlighted
+    // card is one step higher on the same surface scale.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 9.0),
+      key: ValueKey('insight_badge_$label'),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
       decoration: BoxDecoration(
         color: isHighlighted
-            ? colorScheme.primaryContainer.withOpacity(0.42)
-            : colorScheme.surfaceContainerLowest,
+            ? colorScheme.surfaceContainerHigh
+            : colorScheme.surfaceContainerLow,
         borderRadius: M3Shape.radiusMd,
-        border: Border.all(
-          color: isHighlighted
-              ? colorScheme.primary.withOpacity(0.45)
-              : color.withOpacity(0.28),
-        ),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -1854,12 +1856,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
           const SizedBox(width: 6.0),
           Flexible(
             child: M3ChipSurface(
-              color: color.withOpacity(0.10),
+              color: colorScheme.surfaceContainerHighest,
               child: Text(
                 valueText,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: color),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurface),
               ),
             ),
           ),
@@ -2107,6 +2109,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               titleAr: 'الصنف الأعلى مبيعًا',
               titleEn: 'Top SKU',
               value: topSku != null ? topSku.skuName : '—',
+              textValue: true,
               subtitle: topSku != null
                   ? '${CurrencyFormatter.formatCompactEGP(topSku.revenue)} (${CurrencyFormatter.formatNumber(topSku.units)} وحدة) • $perfPeriodBadgeAr'
                   : 'لا توجد مبيعات • $perfPeriodBadgeAr',
@@ -2127,6 +2130,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               titleAr: 'الفرع الأعلى مبيعًا',
               titleEn: 'Top Store',
               value: topBranch != null ? topBranch.storeName : '—',
+              textValue: true,
               subtitle: topBranch != null
                   ? '${topBranch.chain.toUpperCase()} • ${CurrencyFormatter.formatCompactEGP(topBranch.revenue)} • $perfPeriodBadgeAr'
                   : 'لا توجد فروع',
@@ -2157,7 +2161,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
 
         // 2. Filter Bar for Performance Analytics
         Container(
-          padding: const EdgeInsets.all(14.0),
+          key: const ValueKey('perf_filter_bar'),
+          padding: M3Spacing.pSm,
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
             borderRadius: M3Shape.radiusLg,
@@ -2166,19 +2171,19 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
             ),
           ),
           child: Wrap(
-            spacing: 12.0,
-            runSpacing: 10.0,
+            spacing: M3Spacing.sm,
+            runSpacing: M3Spacing.xs,
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Wrap(
-                spacing: 10.0,
-                runSpacing: 8.0,
+                spacing: M3Spacing.sm,
+                runSpacing: M3Spacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   // 1. Year Filter (Default: 2026)
                   SizedBox(
-                    width: 170.0,
+                    width: 190.0,
                     child: M3Dropdown<int>(
 key: const ValueKey('perf_year_dropdown'),
 value: [..._recentYears, 0].contains(_selectedYear)
@@ -2370,8 +2375,9 @@ onChanged: m3Legacy<String>((v) {
 
         // 3. Section A: Top Branches Sales Velocity Table
         Container(
+          key: const ValueKey('branch_velocity_section'),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLowest,
+            color: M3TableSurface.color(colorScheme),
             borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
@@ -2419,15 +2425,21 @@ onChanged: m3Legacy<String>((v) {
                     return DataRow(
                       cells: [
                         DataCell(
-                          CircleAvatar(
-                            radius: 12.0,
-                            backgroundColor: idx <= 3
-                                ? colorScheme.primary
-                                : colorScheme.surfaceContainerHighest,
-                            foregroundColor: idx <= 3
-                                ? colorScheme.onPrimary
-                                : colorScheme.onSurfaceVariant,
-                            child: Text('$idx', style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontSize: M3FontSize.labelSmall, fontWeight: FontWeight.bold))),
+                          ConstrainedBox(
+                            key: const ValueKey('branch_rank_badge'),
+                            constraints: const BoxConstraints(minWidth: M3ChipStyle.minHeight),
+                            child: M3ChipSurface(
+                              color: idx <= 3
+                                  ? colorScheme.primary
+                                  : colorScheme.surfaceContainerHighest,
+                              child: Text(
+                                '$idx',
+                                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: idx <= 3 ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            ),
                           ),
                         ),
                         DataCell(Text(b.storeName, style: const TextStyle(fontWeight: FontWeight.w700))),
@@ -2486,7 +2498,7 @@ onChanged: m3Legacy<String>((v) {
         Container(
           key: const ValueKey('branch_growth_matrix_section'),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLowest,
+            color: M3TableSurface.color(colorScheme),
             borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
@@ -2700,8 +2712,8 @@ onChanged: m3Legacy<String>((v) {
                     IconData statusIcon;
 
                     if (item.status == 'new_branch') {
-                      statusBg = colorScheme.tertiaryContainer.withOpacity(0.7);
-                      statusFg = colorScheme.onTertiaryContainer;
+                      statusBg = colorScheme.surfaceContainerHigh;
+                      statusFg = colorScheme.onSurfaceVariant;
                       statusLabel = 'فرع جديد';
                       statusIcon = AppIcons.newItem;
                     } else if (item.status == 'growing') {
@@ -2796,7 +2808,7 @@ onChanged: m3Legacy<String>((v) {
                                 )
                               : Text(
                                   'جديد ($currYearLabel)',
-                                  style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.tertiary),
+                                  style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant),
                                 ),
                         ),
                         DataCell(
@@ -3021,8 +3033,9 @@ onChanged: m3Legacy<int>((v) {
           label: 'الملفات المرفوعة (${_archivedSellOutFiles.length})',
           container: true,
           child: Container(
+            key: const ValueKey('uploaded_files_section'),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerLowest,
+              color: M3TableSurface.color(colorScheme),
               borderRadius: M3Shape.radiusLg,
               border: Border.all(
                 color: colorScheme.outlineVariant.withOpacity(0.5),
@@ -3066,7 +3079,18 @@ onChanged: m3Legacy<int>((v) {
                     : TableScrollContainer(
                         controller: _archiveSheetsScrollController,
                         showSwipeHint: true,
+                        // Actions pinned at the row end so they stay on
+                        // screen without horizontal scrolling.
+                        pinnedEnd: _buildArchiveActionsColumn(context),
                         child: DataTable(
+                          key: const ValueKey('uploaded_files_table'),
+                          // Compact spacing so the actions column is on
+                          // screen at 1280dp without horizontal scrolling.
+                          columnSpacing: M3Spacing.sm,
+                          horizontalMargin: M3Spacing.sm,
+                          headingRowHeight: _archiveHeadingHeight,
+                          dataRowMinHeight: _archiveRowHeight,
+                          dataRowMaxHeight: _archiveRowHeight,
                           headingRowColor: WidgetStatePropertyAll(
                             colorScheme.surfaceContainerHigh.withOpacity(0.5),
                           ),
@@ -3078,11 +3102,8 @@ onChanged: m3Legacy<int>((v) {
                             DataColumn(label: Text('الوحدات المباعة'), numeric: true),
                             DataColumn(label: Text('صافي Sell-Out (ج.م)'), numeric: true),
                             DataColumn(label: Text('تاريخ الرفع')),
-                            DataColumn(label: Text('الإجراءات')),
                           ],
                           rows: _archivedSellOutFiles.map((file) {
-                            final isDeleting = _deletingFileId == file.id;
-                            final isReplacing = _replacingFileId == file.id;
                             final periodText = file.targetMonth.isNotEmpty && file.targetMonth != 'auto'
                                 ? '${file.targetMonth} / ${file.targetYear}'
                                 : 'سنة ${file.targetYear}';
@@ -3183,8 +3204,50 @@ onChanged: m3Legacy<int>((v) {
                                     style: M3TextVariants.cell.copyWith(color: colorScheme.onSurfaceVariant),
                                   ),
                                 ),
-                                DataCell(
-                                  ArchiveActionsGroup(
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static const double _archiveHeadingHeight = 48.0;
+  static const double _archiveRowHeight = 56.0;
+
+  Widget _buildArchiveActionsColumn(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final divider = Divider.createBorderSide(context, width: 1.0);
+    return IntrinsicWidth(
+      key: const ValueKey('uploaded_files_actions_column'),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: BorderDirectional(start: BorderSide(color: colorScheme.outlineVariant)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: _archiveHeadingHeight,
+              alignment: AlignmentDirectional.centerStart,
+              padding: const EdgeInsets.symmetric(horizontal: M3Spacing.sm),
+              color: colorScheme.surfaceContainerHigh.withOpacity(0.5),
+              child: Text('الإجراءات', style: theme.dataTableTheme.headingTextStyle ?? theme.textTheme.titleSmall),
+            ),
+            for (final file in _archivedSellOutFiles)
+              Container(
+                height: _archiveRowHeight,
+                alignment: AlignmentDirectional.centerStart,
+                padding: const EdgeInsets.symmetric(horizontal: M3Spacing.sm),
+                decoration: BoxDecoration(border: Border(top: divider)),
+                child: Builder(builder: (context) {
+                  final isDeleting = _deletingFileId == file.id;
+                  final isReplacing = _replacingFileId == file.id;
+                  return ArchiveActionsGroup(
                                     archiveId: file.id,
                                     fileName: file.fileName,
                                     isEditing: isReplacing,
@@ -3199,16 +3262,12 @@ onChanged: m3Legacy<int>((v) {
                                     onDelete: (isDeleting || isReplacing || _isUploading)
                                         ? null
                                         : () => _confirmAndDeleteSellOutSheet(file),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }).toList(),
-                        ),
-                      ),
-          ),
+                                  );
+                }),
+              ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -3241,6 +3300,7 @@ onChanged: m3Legacy<int>((v) {
     required String subtitle,
     required IconData icon,
     required Color color,
+    bool textValue = false,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -3279,13 +3339,18 @@ onChanged: m3Legacy<int>((v) {
             ],
           ),
           M3Spacing.gapSM,
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: colorScheme.onSurface,
+          // Up to 2 lines; the full value is always in the tooltip.
+          Tooltip(
+            message: value,
+            child: Text(
+              value,
+              key: ValueKey('kpi_value_$titleEn'),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: (textValue ? theme.textTheme.titleLarge : theme.textTheme.headlineSmall)?.copyWith(
+                fontWeight: textValue ? FontWeight.w700 : FontWeight.w900,
+                color: colorScheme.onSurface,
+              ),
             ),
           ),
           const SizedBox(height: 4.0),
