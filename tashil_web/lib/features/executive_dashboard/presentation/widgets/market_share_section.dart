@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/utils/arabic_plural.dart';
 import 'package:tashil_web/core/widgets/m3_status_tag.dart';
 import 'package:tashil_web/core/widgets/m3_tonal_surface.dart';
@@ -82,7 +83,8 @@ class MarketShareSection extends StatelessWidget {
           M3Spacing.gapMD,
           // Row B: share by category (start) + monthly Sell-In vs Sell-Out (end).
           row(cat, bars, const ValueKey('exec_row_b')),
-          M3Spacing.gapLG,
+          // Standard 24dp section gap before the trend chart (was 32).
+          M3Spacing.gapMD,
         ],
       );
     });
@@ -175,9 +177,7 @@ class _CardHeader extends StatelessWidget {
           Icon(icon, size: 20.0, color: cs.onSurfaceVariant),
           M3Spacing.gapXS,
           Flexible(
-            child: Text(title,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium),
+            child: M3SectionTitle(title, overflow: TextOverflow.ellipsis),
           ),
           M3Spacing.gapXS,
           // Neutral count tag (not an error-red badge).
@@ -513,8 +513,7 @@ class _SellInOutTiles extends StatelessWidget {
       key: const ValueKey('sell_in_vs_out_section'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('\u2068Sell-In\u2069 مقابل \u2068Sell-Out\u2069',
-            style: theme.textTheme.titleMedium),
+        const M3SectionTitle('\u2068Sell-In\u2069 مقابل \u2068Sell-Out\u2069'),
         Text('الأصناف والشهور المتطابقة: $monthLabel $year',
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: cs.onSurfaceVariant)),

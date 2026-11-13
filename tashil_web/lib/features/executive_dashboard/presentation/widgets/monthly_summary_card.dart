@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/widgets/m3_card.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/m3_spacing.dart';
@@ -35,15 +36,10 @@ class MonthlySummaryCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(AppIcons.insights, size: 18, color: cs.onSurfaceVariant),
+                Icon(AppIcons.insights, size: 20, color: cs.onSurfaceVariant),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'الملخص الشهري التلقائي',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                const Expanded(
+                  child: M3SectionTitle('الملخص الشهري التلقائي'),
                 ),
                 Text(
                   '$sourceLabel · ${(summary.confidence * 100).toStringAsFixed(0)}%',

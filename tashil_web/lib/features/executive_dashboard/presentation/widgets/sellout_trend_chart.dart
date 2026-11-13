@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
+import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/widgets/m3_tonal_surface.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
@@ -278,9 +280,8 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const M3SectionTitle(
                       'الاتجاه الشهري (\u2068Sell-Out\u2069)',
-                      style: theme.textTheme.titleMedium,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -302,13 +303,10 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                   children: seriesList.map<Widget>((series) {
                     final parts =
                         ChainSharePie.splitBilingualLabel(series.displayName);
-                    return M3TonalSurface(
+                    return M3ChipSurface(
                       // Neutral tonal pill; the series colour is shown by the
-                      // dot (graphic ≥ 3:1), text stays onSurface.
+                      // dot (graphic ≥ 3:1); text stays onSurface.
                       color: colorScheme.surfaceContainerHigh,
-                      borderRadius: M3Shape.radiusLg,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10.0, vertical: 5.0),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -510,11 +508,9 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
   /// Legend key showing the line style used for Sell-Out (solid) or Sell-In (dashed).
   Widget _lineStyleKey(ThemeData theme, String label, {required bool dashed}) {
     final colorScheme = theme.colorScheme;
-    return M3TonalSurface(
+    return M3ChipSurface(
       color: colorScheme.surfaceContainerHigh,
       borderColor: colorScheme.outlineVariant,
-      borderRadius: M3Shape.radiusLg,
-      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
