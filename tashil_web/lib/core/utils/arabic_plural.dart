@@ -57,3 +57,27 @@ String countItem(int n) => arabicCount(n,
     few: 'عناصر',
     many: 'عنصرًا',
     hundred: 'عنصر');
+
+/// "ملف واحد" / "ملفان" / "5 ملفات" / "12 ملفًا" / "100 ملف".
+String countFiles(int n) => arabicCount(n,
+    one: 'ملف واحد', two: 'ملفان', few: 'ملفات', many: 'ملفًا', hundred: 'ملف');
+
+/// "شيت واحد" / "شيتان" / "5 شيتات" / "12 شيتًا" / "100 شيت".
+String countSheets(int n) => arabicCount(n,
+    one: 'شيت واحد', two: 'شيتان', few: 'شيتات', many: 'شيتًا', hundred: 'شيت');
+
+/// "فرع واحد" / "فرعان" / "5 فروع" / "12 فرعًا" / "100 فرع".
+String countBranches(int n) => arabicCount(n,
+    one: 'فرع واحد', two: 'فرعان', few: 'فروع', many: 'فرعًا', hundred: 'فرع');
+
+/// "سجل واحد" / "سجلان" / "5 سجلات" / "12 سجلًا" / "100 سجل".
+String countRecords(int n) => arabicCount(n,
+    one: 'سجل واحد', two: 'سجلان', few: 'سجلات', many: 'سجلًا', hundred: 'سجل');
+
+/// "سلسلة مسجلة واحدة" / "سلسلتان مسجلتان" / "5 سلاسل مسجلة" / "12 سلسلة مسجلة".
+String countRegisteredChains(int n) => arabicCount(n,
+    one: 'سلسلة مسجلة واحدة',
+    two: 'سلسلتان مسجلتان',
+    few: 'سلاسل مسجلة',
+    many: 'سلسلة مسجلة',
+    hundred: 'سلسلة مسجلة');
