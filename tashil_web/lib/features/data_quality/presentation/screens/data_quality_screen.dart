@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/table_scroll_container.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/excel_export_service.dart';
@@ -394,6 +395,21 @@ class _Filters extends StatelessWidget {
 }
 
 class _IssuesTable extends StatelessWidget {
+  // Headers and cells centred; only the item name stays start-aligned.
+  static const List<DataColumn> _dqColumns = [
+            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الخطورة')),
+            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('النوع')),
+            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الصف')),
+            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('كود الصنف')),
+            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الباركود')),
+            DataColumn(label: Text('اسم الصنف')),
+            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الموجود')),
+            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('المتوقع')),
+            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('التأثير'), numeric: true),
+            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الحالة')),
+            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('')),
+          ];
+
   final List<DataQualityIssue> issues;
   final ValueChanged<DataQualityIssue> onChangeStatus;
   const _IssuesTable({required this.issues, required this.onChangeStatus});
@@ -404,27 +420,19 @@ class _IssuesTable extends StatelessWidget {
     final cs = theme.colorScheme;
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: SingleChildScrollView(
+      // Fills the card width; scrolls horizontally only when it must.
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
         scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+        constraints: BoxConstraints(minWidth: constraints.maxWidth),
         child: DataTable(
           key: const ValueKey('dq_table'),
           // Rows grow so item names wrap up to 3 lines.
           dataRowMaxHeight: double.infinity,
           headingTextStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-          columns: const [
-            DataColumn(label: Text('الخطورة')),
-            DataColumn(label: Text('النوع')),
-            DataColumn(label: Text('الصف')),
-            DataColumn(label: Text('كود الصنف')),
-            DataColumn(label: Text('الباركود')),
-            DataColumn(label: Text('اسم الصنف')),
-            DataColumn(label: Text('الموجود')),
-            DataColumn(label: Text('المتوقع')),
-            DataColumn(label: Text('التأثير'), numeric: true),
-            DataColumn(label: Text('الحالة')),
-            DataColumn(label: Text('')),
-          ],
-          rows: issues.map((i) {
+          columns: _dqColumns,
+          rows: centerCellsUnderCenteredHeadings(_dqColumns, issues.map((i) {
             final critical = i.severity == kDqCritical;
             return DataRow(cells: [
               DataCell(Chip(
@@ -458,7 +466,9 @@ class _IssuesTable extends StatelessWidget {
                 onPressed: () => onChangeStatus(i),
               )),
             ]);
-          }).toList(),
+          }).toList()),
+        ),
+        ),
         ),
       ),
     );

@@ -2031,13 +2031,15 @@ onChanged: m3Legacy<int>((v) {
           builder: (context, constraints) {
             final card1 = _buildSummaryCard(
               context,
+              // Short title like its sibling cards; the matched period moves
+              // to the detail line so it is never cut at 1280.
               titleAr: useMatchedWindow
-                  ? 'Sell-In للفترة المطابقة ($matchedLabel)'
+                  ? 'Sell-In للفترة المطابقة'
                   : 'Sell-In منذ بداية العام',
               titleEn: useMatchedWindow ? 'Sell-In (matched period)' : 'Sell-In YTD',
               value: CurrencyFormatter.formatCompactEGP(displaySellInEgp),
               subtitle:
-                  '${CurrencyFormatter.formatNumber(displaySellInCases.round())} كرتونة • شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(displaySellInGrossEgp)}',
+                  '${useMatchedWindow ? '$matchedLabel • ' : ''}${CurrencyFormatter.formatNumber(displaySellInCases.round())} كرتونة • شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(displaySellInGrossEgp)}',
               icon: Icons.local_shipping_rounded,
               color: colorScheme.primary,
             );
@@ -3984,9 +3986,11 @@ onChanged: m3Legacy<int>((v) {
               ),
             ),
             const SizedBox(height: 4.0),
+            // Detail line wraps up to 3 lines (owner rule), never cut early.
             Text(
               subtitle,
-              maxLines: 2,
+              key: ValueKey('kpi_subtitle_$titleEn'),
+              maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
