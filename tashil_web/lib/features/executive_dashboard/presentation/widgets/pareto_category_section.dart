@@ -289,7 +289,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                           const SizedBox(width: 5.0),
                           Flexible(
                             child: Text(
-                              'حصتنا السوقية ${widget.tenantMarketSharePct.toStringAsFixed(2)}% (المركز #$adecoRank)',
+                              'حصتنا السوقية ${widget.tenantMarketSharePct.toStringAsFixed(2)}% (المركز $adecoRank)',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelMedium?.copyWith(
@@ -433,8 +433,10 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 borderRadius: M3Shape.radiusSm,
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
+                                // Bare rank number: the coloured chip already
+                                // reads as a rank (no '#', mockup is Arabic).
                                 child: Text(
-                                  '#$rank',
+                                  '$rank',
                                   style: theme.textTheme.labelMedium?.copyWith(
                                     color: isTenant
                                         ? colorScheme.onPrimary
@@ -704,7 +706,9 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
                                 child: Text(
-                                  '#9+',
+                                  // "9 and beyond", isolated so '+' stays left
+                                  // of the digit in RTL.
+                                  '\u2066+9\u2069',
                                   style: theme.textTheme.labelMedium?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                     fontWeight: FontWeight.w600,
