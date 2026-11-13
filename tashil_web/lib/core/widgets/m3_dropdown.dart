@@ -8,7 +8,8 @@ const double kYearDropdownWidth = 190.0;
 
 /// One option of an [M3Dropdown].
 class M3DropdownOption<T> {
-  const M3DropdownOption(this.value, this.label, {this.icon, this.enabled = true});
+  const M3DropdownOption(this.value, this.label,
+      {this.icon, this.enabled = true});
   final T value;
   final String label;
   final IconData? icon;
@@ -34,7 +35,13 @@ class M3Dropdown<T> extends StatelessWidget {
     this.enabled = true,
     this.menuHeight = 360.0,
     this.errorText,
+    this.fitOptions = false,
   });
+
+  /// Size the field from its longest option (measured with the field's text
+  /// style) so no option ever clips, e.g. "All Months" / "All Chains".
+  /// Ignored when [width] or [expand] is set.
+  final bool fitOptions;
 
   final List<M3DropdownOption<T>> options;
   final T value;
@@ -61,7 +68,9 @@ class M3Dropdown<T> extends StatelessWidget {
       key: ValueKey('m3dd-${selected ?? 'none'}'),
       initialSelection: selected,
       enabled: enabled && onChanged != null,
-      width: expand ? double.infinity : width,
+      width: expand
+          ? double.infinity
+          : (width ?? (fitOptions ? _fitWidth(context, theme) : null)),
       menuHeight: menuHeight,
       requestFocusOnTap: false,
       enableSearch: false,
@@ -96,11 +105,40 @@ class M3Dropdown<T> extends StatelessWidget {
     );
     return expand ? SizedBox(width: double.infinity, child: menu) : menu;
   }
+
+  /// Field chrome around the text (outlined, dense): 48dp trailing arrow,
+  /// 48dp leading icon or 12dp start padding, 12dp end padding, plus a 4dp
+  /// caret / rounding margin. Matches the 190dp year dropdown (78dp text).
+  static const double _chromeWithIcon = 48.0 + 48.0 + 16.0;
+  static const double _chromeNoIcon = 48.0 + 12.0 + 16.0;
+
+  double _fitWidth(BuildContext context, ThemeData theme) {
+    final base = theme.dropdownMenuTheme.textStyle ?? theme.textTheme.bodyLarge;
+    // The field renders with the M3 bodyLarge tracking (0.5) when the theme
+    // style leaves letterSpacing unset.
+    final style = base?.copyWith(letterSpacing: base.letterSpacing ?? 0.5);
+    final scaler = MediaQuery.textScalerOf(context);
+    final dir = Directionality.of(context);
+    var maxW = 0.0;
+    for (final o in options) {
+      final tp = TextPainter(
+        text: TextSpan(text: o.label, style: style),
+        textDirection: dir,
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      if (tp.width > maxW) maxW = tp.width;
+      tp.dispose();
+    }
+    final chrome = leadingIcon == null ? _chromeNoIcon : _chromeWithIcon;
+    return (maxW + chrome + 2.0).ceilToDouble();
+  }
 }
 
 /// Bridges legacy `DropdownMenuItem` lists to [M3DropdownOption]s, using the
 /// first [Text] found in each item's child as the label.
-List<M3DropdownOption<T>> m3OptionsFromMenuItems<T>(List<DropdownMenuItem<T>> items) {
+List<M3DropdownOption<T>> m3OptionsFromMenuItems<T>(
+    List<DropdownMenuItem<T>> items) {
   String? find(Widget w) {
     if (w is Text) return w.data;
     if (w is Flex) {

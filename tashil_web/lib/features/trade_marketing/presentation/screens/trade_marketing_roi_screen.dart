@@ -1593,13 +1593,12 @@ onChanged: m3Legacy<int>((v) {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     // Chain Filter
-                    SizedBox(
-                      width: 170.0,
-                      child: M3Dropdown<String>(
+                    // Sized from its longest option (no clipping, v126).
+                    M3Dropdown<String>(
 value: _selectedChain,
 label: 'Retail Chain',
+fitOptions: true,
 leadingIcon: Icons.storefront_rounded,
-expand: true,
 options: m3OptionsFromMenuItems<String>([
                           const DropdownMenuItem(value: 'all', child: Text('All Chains')),
                           ..._availableChains.map(
@@ -1610,15 +1609,13 @@ onChanged: m3Legacy<String>((v) {
                           if (v != null) setState(() => _selectedChain = v);
                         }),
 ),
-                    ),
                     // Month Filter
-                    SizedBox(
-                      width: 165.0,
-                      child: M3Dropdown<int>(
+                    // Sized from its longest option (no clipping, v126).
+                    M3Dropdown<int>(
 value: _selectedMonth,
 label: 'Month',
+fitOptions: true,
 leadingIcon: Icons.event_note_rounded,
-expand: true,
 options: m3OptionsFromMenuItems<int>([
                           const DropdownMenuItem(value: 0, child: Text('All Months')),
                           ...List.generate(12, (idx) {
@@ -1633,7 +1630,6 @@ onChanged: m3Legacy<int>((v) {
                           if (v != null) setState(() => _selectedMonth = v);
                         }),
 ),
-                    ),
                     // Year Filter — same size as the shared year dropdown
                     // (Sell-Out 'سنة البيانات': 190dp with the calendar icon),
                     // so "2026" / "All Years" never clip.
@@ -1655,13 +1651,12 @@ onChanged: m3Legacy<int>((v) {
 ),
                     ),
                     // Activity Category Filter
-                    SizedBox(
-                      width: 220.0,
-                      child: M3Dropdown<String>(
+                    // Sized from its longest option (no clipping, v126).
+                    M3Dropdown<String>(
 value: _selectedCategoryId,
 label: 'Activity Type',
+fitOptions: true,
 leadingIcon: Icons.category_rounded,
-expand: true,
 options: m3OptionsFromMenuItems<String>([
                           const DropdownMenuItem(value: 'all', child: Text('All Activity Types')),
                           ...MarketingExpenseCategory.values.map(
@@ -1675,7 +1670,6 @@ onChanged: m3Legacy<String>((v) {
                           if (v != null) setState(() => _selectedCategoryId = v);
                         }),
 ),
-                    ),
                     // Search Box
                     SizedBox(
                       width: 220.0,
