@@ -63,9 +63,10 @@ class BentoKpiGrid extends StatelessWidget {
         activeChains.map(_shortChainNameAr).toList(),
       );
       if (names.length == 1) {
-        return 'فروع ${names.first} من الملف المرفوع';
+        return names.first;
       }
-      return 'فروع ${names.join(' • ')} من الملفات المرفوعة';
+      // Short enough for the 4-up live 1280 card: just the unique names.
+      return names.join(' • ');
     }
     if (kpis.activeStoresCount == 0) {
       return 'لا توجد فروع نشطة في هذه الفترة';
@@ -133,7 +134,7 @@ class BentoKpiGrid extends StatelessWidget {
               key: const ValueKey('kpi_card_exec_oos'),
               valueKey: const ValueKey('kpi_value_exec_oos'),
               subtitleKey: const ValueKey('kpi_subtitle_exec_oos'),
-              title: 'نسبة نفاد المخزون (OOS)',
+              title: 'نسبة النفاد',
               value: '${kpis.oosRatePct.toStringAsFixed(1)}%',
               subtitle:
                   'OSA ${kpis.osaRatePct.toStringAsFixed(1)}% · نفاد المخزون ${kpis.oosRatePct.toStringAsFixed(1)}%',
