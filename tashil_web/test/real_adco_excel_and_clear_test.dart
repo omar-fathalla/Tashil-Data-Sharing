@@ -116,7 +116,7 @@ void main() {
 
       expect(find.byKey(const ValueKey('supplier_market_share_card')), findsOneWidget);
       expect(find.textContaining('حصتنا مقارنة بالمنافسين'), findsOneWidget);
-      expect(find.textContaining('حصتنا السوقية 18.44% (المركز #1)'), findsOneWidget);
+      expect(find.textContaining('حصتنا السوقية 18.44% (المركز 1)'), findsOneWidget);
     });
 
     test('uploadFile correctly extracts repeated branches from Column H under إسم الفرع and skips preamble', () async {

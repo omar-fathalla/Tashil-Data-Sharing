@@ -10,6 +10,7 @@ import 'package:tashil_web/features/data_ingestion/presentation/screens/upload_p
 import 'package:tashil_web/features/executive_dashboard/presentation/screens/executive_screen.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/widgets/bento_kpi_grid.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/widgets/chain_share_pie.dart';
+import 'package:tashil_web/features/executive_dashboard/presentation/widgets/pareto_category_section.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/widgets/sellout_trend_chart.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
 
@@ -648,6 +649,15 @@ void main() {
         find.textContaining(RegExp(
             r'Market Share vs|Market leader|Rank #|Category Contribution|Top SKUs')),
         findsNothing);
+    // Ranks are bare numbers in Arabic ("المركز 1", chip "1", "+9"): no '#'.
+    final pareto = find.byType(ParetoCategorySection);
+    expect(pareto, findsOneWidget);
+    expect(find.descendant(of: pareto, matching: find.textContaining('#')),
+        findsNothing);
+    expect(
+        find.descendant(
+            of: pareto, matching: find.textContaining(RegExp(r'\(المركز \d+\)'))),
+        findsOneWidget);
   });
 
   testWidgets('ChainSharePie.splitBilingualLabel handles edge cases and SelloutTrendChart renders all 12 months at full width', (WidgetTester tester) async {

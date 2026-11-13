@@ -1,5 +1,6 @@
 import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/utils/arabic_plural.dart';
 import 'package:tashil_web/core/widgets/m3_status_tag.dart';
 import 'package:tashil_web/core/widgets/m3_tonal_surface.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
@@ -289,7 +290,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                           const SizedBox(width: 5.0),
                           Flexible(
                             child: Text(
-                              'حصتنا السوقية ${widget.tenantMarketSharePct.toStringAsFixed(2)}% (المركز #$adecoRank)',
+                              'حصتنا السوقية ${widget.tenantMarketSharePct.toStringAsFixed(2)}% (المركز $adecoRank)',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelMedium?.copyWith(
@@ -433,8 +434,10 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 borderRadius: M3Shape.radiusSm,
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
+                                // Bare rank number: the coloured chip already
+                                // reads as a rank (no '#', mockup is Arabic).
                                 child: Text(
-                                  '#$rank',
+                                  '$rank',
                                   style: theme.textTheme.labelMedium?.copyWith(
                                     color: isTenant
                                         ? colorScheme.onPrimary
@@ -492,7 +495,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                     const SizedBox(width: 5.0),
                                     Flexible(
                                       child: Text(
-                                        '${sup.skuCount} صنف',
+                                        countSku(sup.skuCount),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: theme.textTheme.labelSmall
@@ -704,7 +707,9 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
                                 child: Text(
-                                  '#9+',
+                                  // "9 and beyond", isolated so '+' stays left
+                                  // of the digit in RTL.
+                                  '\u2066+9\u2069',
                                   style: theme.textTheme.labelMedium?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                     fontWeight: FontWeight.w600,
@@ -1117,7 +1122,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                     vertical: M3Spacing.s2,
                                   ),
                                   child: Text(
-                                    '${cat.skuCount} صنف',
+                                    countSku(cat.skuCount),
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
                                     ),
@@ -1436,7 +1441,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                           M3StatusTag(
                             key: const ValueKey('pareto_class_a_badge'),
                             label:
-                                '${paretoSkus.where((s) => s.isTop80Contributor).length} أصناف',
+                                countSku(paretoSkus.where((s) => s.isTop80Contributor).length),
                             tone: M3StatusTone.info,
                           ),
                         ],
@@ -1476,7 +1481,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                               size: 16.0, color: colorScheme.onSurfaceVariant),
                           const SizedBox(width: 6.0),
                           Text(
-                            '$selectedCategory · ${skusToDisplay.length} صنف',
+                            '$selectedCategory · ${countSku(skusToDisplay.length)}',
                             style: theme.textTheme.labelMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: colorScheme.onSurfaceVariant,
