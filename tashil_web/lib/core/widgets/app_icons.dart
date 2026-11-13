@@ -63,6 +63,7 @@ class AppIcons {
   static const IconData trendingDown = Icons.trending_down_rounded;
   static const IconData trendingFlat = Icons.trending_flat_rounded;
   static const IconData filterList = Icons.filter_list_rounded;
+  static const IconData barChart = Icons.bar_chart_rounded;
   static const IconData promo = Icons.redeem_rounded;
   static const IconData newItem = Icons.fiber_new_rounded;
 
