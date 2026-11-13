@@ -10,6 +10,7 @@ import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/features/data_quality/presentation/screens/data_quality_screen.dart';
+import 'package:tashil_web/features/navigation/presentation/desktop_sidebar.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
 
 import 'errors_m3_support.dart';
@@ -191,6 +192,28 @@ Future<void> _pumpPage(WidgetTester tester, {required double width}) {
   );
 }
 
+TextTheme _withSymbolFallback(TextTheme t) {
+  TextStyle? f(TextStyle? s) =>
+      s?.copyWith(fontFamilyFallback: const ['NotoSansSymbols2']);
+  return t.copyWith(
+    headlineSmall: f(t.headlineSmall),
+    titleLarge: f(t.titleLarge),
+    titleMedium: f(t.titleMedium),
+    titleSmall: f(t.titleSmall),
+    bodyLarge: f(t.bodyLarge),
+    bodyMedium: f(t.bodyMedium),
+    bodySmall: f(t.bodySmall),
+    labelLarge: f(t.labelLarge),
+    labelMedium: f(t.labelMedium),
+    labelSmall: f(t.labelSmall),
+  );
+}
+
+ThemeData _liveShellTheme() {
+  final theme = AppTheme.light();
+  return theme.copyWith(textTheme: _withSymbolFallback(theme.textTheme));
+}
+
 Future<void> _pumpPageWithSidebar(WidgetTester tester,
     {double width = kLiveViewportWidth}) async {
   tester.view.physicalSize = Size(width, 3600);
@@ -198,7 +221,7 @@ Future<void> _pumpPageWithSidebar(WidgetTester tester,
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(MaterialApp(
-    theme: AppTheme.light(),
+    theme: _liveShellTheme(),
     locale: const Locale('ar'),
     supportedLocales: const [Locale('ar'), Locale('en')],
     localizationsDelegates: const [
@@ -210,9 +233,11 @@ Future<void> _pumpPageWithSidebar(WidgetTester tester,
       textDirection: TextDirection.rtl,
       child: Row(
         children: [
-          const SizedBox(
-            width: kLiveSidebarWidth,
-            child: ColoredBox(color: Color(0xFFECEEE6)),
+          DesktopSidebar(
+            selectedIndex: 12,
+            onDestinationSelected: (_) {},
+            activeTenant: 'adeco',
+            onTenantChanged: (_) {},
           ),
           Expanded(
             child: Scaffold(
@@ -276,9 +301,16 @@ void _assertTableFitsLiveContent(WidgetTester tester,
   for (final code in [kLiveMissingCode, kLiveFgccCode, kLivePrccCode]) {
     expect(codeBreaksOnlyAtHyphens(tester, code, scope: table), isTrue,
         reason: '$code must stay intact and fully visible');
+    expect(codePaintedLineCount(tester, code, scope: table), 1,
+        reason: '$code must stay on one painted line at the live 1280 shell');
     expect(codeIsSingleLine(tester, code, scope: table), isTrue,
         reason: '$code must stay on one line at the live 1280 shell');
   }
+  expect(
+      codeColumnHasSlack(tester, kLiveMissingCode, slack: 16.0, scope: table),
+      isTrue,
+      reason: 'QA-NOT-IN-MASTER-999 column must keep ≥16dp slack over the '
+          'one-line Cairo advance (v157 wrapped when slack was ~4dp)');
   for (final word in [
     'الخطورة',
     'مفتوحة',
@@ -498,5 +530,22 @@ void main() {
         _onScreen(tester, find.byKey(const ValueKey('dq_item_name')),
             width: content),
         isTrue);
+  });
+
+  testWidgets(
+      'QA-NOT-IN-MASTER-999 paints on one line at 1280+DesktopSidebar',
+      (tester) async {
+    await _pumpPageWithSidebar(tester);
+    final table = find.byKey(const ValueKey('dq_table'));
+    expect(table, findsOneWidget);
+    expect(codePaintedLineCount(tester, kLiveMissingCode, scope: table), 1,
+        reason: 'longest live code must be one painted line');
+    expect(
+        codeColumnHasSlack(tester, kLiveMissingCode, slack: 16.0, scope: table),
+        isTrue,
+        reason: 'column must be ≥16dp wider than the one-line advance');
+    expect(
+        _hScrollExtent(tester, find.byKey(const ValueKey('dq_table_scroll'))),
+        lessThanOrEqualTo(2.0));
   });
 }

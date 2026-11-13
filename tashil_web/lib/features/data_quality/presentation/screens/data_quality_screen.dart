@@ -593,20 +593,23 @@ class _IssuesTable extends StatelessWidget {
   // Pixel budget at the live 1030 shell (page padding 24, inner ~934
   // after xxs gutters), measured with real Cairo bodyMedium:
   //  - short words (الخطورة, مفتوحة, متجاهلة) never mid-word split
-  //  - item codes stay on ONE line (QA-NOT-IN-MASTER-999 = 154.7dp);
-  //    the code share is taken from type/found/expected, leaving the
-  //    name column ≥ the 3-line minimum of the live longest name
+  //  - item codes stay on ONE line. Live v157 wrapped QA-NOT-IN-MASTER-999
+  //    at flex 158: real Cairo bodyMedium advance is 159.7dp, not the
+  //    earlier 154.7dp, so a 158.7dp column had no slack. Flex 178
+  //    (178/930×934 ≈ 178.7dp) leaves ≥16dp slack. Name keeps its 3-line
+  //    floor (232); the extra code share comes from found / expected /
+  //    barcode, which already wrap and have short headers.
   //  - at 1024+sidebar (inner ~678) one-line codes plus the name floor
   //    cannot both fit, so codes may wrap at '-' only
   static const _flex = [
     64.0,
     80.0,
     40.0,
-    158.0,
-    48.0,
+    178.0,
+    44.0,
     232.0,
-    74.0,
-    74.0,
+    60.0,
+    72.0,
     42.0,
     76.0,
     42.0
