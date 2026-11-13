@@ -1,7 +1,8 @@
 import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
+import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/widgets/m3_status_tag.dart';
-import 'package:tashil_web/core/widgets/m3_tonal_surface.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/network/api_client.dart';
@@ -128,14 +129,11 @@ class ChainSharePie extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
+                const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'حصة كل سلسلة من المبيعات',
-                        style: theme.textTheme.titleMedium,
-                      ),
+                      M3SectionTitle('حصة كل سلسلة من المبيعات'),
                     ],
                   ),
                 ),
@@ -241,11 +239,8 @@ class ChainSharePie extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        M3TonalSurface(
+                        M3ChipSurface(
                           color: colorScheme.surfaceContainerHigh,
-                          borderRadius: M3Shape.radiusSm,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6.0, vertical: 2.0),
                           child: Text(
                             '${item.marketShare.toStringAsFixed(1)}%',
                             style: theme.textTheme.labelSmall?.copyWith(

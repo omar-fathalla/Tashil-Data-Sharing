@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/kpi_card.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/utils/currency_formatter.dart';
 
@@ -69,9 +70,15 @@ class BentoKpiGrid extends StatelessWidget {
           crossAxisCount = 1;
         }
 
-        final double cardWidth = (constraints.maxWidth - ((crossAxisCount - 1) * M3Spacing.sm)) / crossAxisCount;
+        final double cardWidth =
+            (constraints.maxWidth - ((crossAxisCount - 1) * M3Spacing.sm)) /
+                crossAxisCount;
 
-        return Wrap(
+        // All KPI cards share the tallest card's height (OOS has two tag
+        // lines).
+        return M3EqualHeightGrid(
+          key: const ValueKey('exec_kpi_grid'),
+          columns: crossAxisCount,
           spacing: M3Spacing.sm,
           runSpacing: M3Spacing.sm,
           children: [
@@ -83,8 +90,10 @@ class BentoKpiGrid extends StatelessWidget {
                 subtitle: CurrencyFormatter.formatEGP(kpis.totalRevenue),
                 icon: AppIcons.money,
                 growthPct: kpis.revenueGrowthPct,
-                badgeLabel: '${_formatSignedPctValue(kpis.revenueMomPct)} مقارنة بالشهر السابق',
-                secondaryBadgeLabel: '${_formatSignedPctValue(kpis.revenueYoyPct)} مقارنة بالعام السابق',
+                badgeLabel:
+                    '${_formatSignedPctValue(kpis.revenueMomPct)} مقارنة بالشهر السابق',
+                secondaryBadgeLabel:
+                    '${_formatSignedPctValue(kpis.revenueYoyPct)} مقارنة بالعام السابق',
                 isPositive: kpis.revenueMomPct >= 0,
               ),
             ),
@@ -92,12 +101,16 @@ class BentoKpiGrid extends StatelessWidget {
               width: cardWidth,
               child: KpiCard(
                 title: 'إجمالي الوحدات المباعة',
-                value: CurrencyFormatter.formatCompactUnits(kpis.totalUnitsSold),
-                subtitle: '${CurrencyFormatter.formatUnits(kpis.totalUnitsSold)} وحدة',
+                value:
+                    CurrencyFormatter.formatCompactUnits(kpis.totalUnitsSold),
+                subtitle:
+                    '${CurrencyFormatter.formatUnits(kpis.totalUnitsSold)} وحدة',
                 icon: AppIcons.units,
                 growthPct: kpis.unitsGrowthPct,
-                badgeLabel: '${_formatSignedPctValue(kpis.unitsMomPct)} مقارنة بالشهر السابق',
-                secondaryBadgeLabel: '${_formatSignedPctValue(kpis.unitsYoyPct)} مقارنة بالعام السابق',
+                badgeLabel:
+                    '${_formatSignedPctValue(kpis.unitsMomPct)} مقارنة بالشهر السابق',
+                secondaryBadgeLabel:
+                    '${_formatSignedPctValue(kpis.unitsYoyPct)} مقارنة بالعام السابق',
                 isPositive: kpis.unitsMomPct >= 0,
               ),
             ),
@@ -105,11 +118,13 @@ class BentoKpiGrid extends StatelessWidget {
               width: cardWidth,
               child: KpiCard(
                 title: 'الفروع النشطة',
-                value: '${kpis.activeStoresCount} ${kpis.activeStoresCount >= 3 && kpis.activeStoresCount <= 10 ? 'فروع' : 'فرع'}',
+                value:
+                    '${kpis.activeStoresCount} ${kpis.activeStoresCount >= 3 && kpis.activeStoresCount <= 10 ? 'فروع' : 'فرع'}',
                 subtitle: _buildActiveBranchesSubtitle(),
                 icon: AppIcons.store,
                 growthPct: 0.0,
-                badgeLabel: kpis.activeStoresCount > 0 ? 'نشطة' : 'لا توجد فروع نشطة',
+                badgeLabel:
+                    kpis.activeStoresCount > 0 ? 'نشطة' : 'لا توجد فروع نشطة',
                 secondaryBadgeLabel: kpis.tenantMarketSharePct > 0
                     ? 'الحصة السوقية ${kpis.tenantMarketSharePct.toStringAsFixed(2)}% • ${kpis.totalSkusCount} صنف'
                     : null,
@@ -121,11 +136,14 @@ class BentoKpiGrid extends StatelessWidget {
               child: KpiCard(
                 title: 'نسبة نفاد المخزون (OOS)',
                 value: '${kpis.oosRatePct.toStringAsFixed(1)}%',
-                subtitle: 'المبيعات المفقودة (تقديري): ${CurrencyFormatter.formatCompactEGP(kpis.estimatedLostRevenue)}',
+                subtitle:
+                    'المبيعات المفقودة (تقديري): ${CurrencyFormatter.formatCompactEGP(kpis.estimatedLostRevenue)}',
                 icon: AppIcons.warning,
                 growthPct: -kpis.oosRatePct,
-                badgeLabel: 'التوفر على الرف (OSA) ${kpis.osaRatePct.toStringAsFixed(1)}%',
-                secondaryBadgeLabel: 'نفاد المخزون ${kpis.oosRatePct.toStringAsFixed(1)}% • ${kpis.totalOOSIncidents} حالة نفاد',
+                badgeLabel:
+                    'التوفر على الرف (OSA) ${kpis.osaRatePct.toStringAsFixed(1)}%',
+                secondaryBadgeLabel:
+                    'نفاد المخزون ${kpis.oosRatePct.toStringAsFixed(1)}% • ${kpis.totalOOSIncidents} حالة نفاد',
                 isPositive: false,
                 isAlert: true,
               ),

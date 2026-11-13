@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/m3_shape.dart';
+import 'm3_chip_surface.dart';
 import '../theme/m3_status_colors.dart';
 
 /// Compact status / category tag using theme roles (no raw hex in features).
@@ -58,14 +58,14 @@ class M3StatusTag extends StatelessWidget {
     return Material(
       color: color ?? bg,
       shape: RoundedRectangleBorder(
-        borderRadius: M3Shape.radiusSm,
+        borderRadius: M3ChipStyle.radius,
         side: useBorder ? BorderSide(color: border) : BorderSide.none,
       ),
-      // 32dp like the mockup chip; content centred vertically.
+      // Shared chip geometry (8dp radius, 32dp min height); centred content.
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 32.0),
+        constraints: const BoxConstraints(minHeight: M3ChipStyle.minHeight),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          padding: M3ChipStyle.padding,
           child: Center(
             widthFactor: 1.0,
             heightFactor: 1.0,
