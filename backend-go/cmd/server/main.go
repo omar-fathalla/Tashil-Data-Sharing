@@ -203,6 +203,7 @@ func main() {
 		// Fill kpiCache + sell-in-returns cache before serving so cold-start YTD
 		// and year-scoped المرتجعات do not rebuild on the request path.
 		bqRepo.WarmCommonTenantAnalytics(context.Background(), durableTenants)
+		log.Printf("[Tashil Cloud Run] Startup data load finished in %s; /readyz now passes.", time.Since(bootStart).Round(time.Millisecond))
 		go ingestProcessor.RunDurableSync(context.Background(), durableTenants, ingestion.DefaultDurableSyncInterval)
 	}
 
@@ -294,6 +295,8 @@ func main() {
 	health := handlers.HealthzWithAuth(fsRepo)
 	mux.HandleFunc("GET /livez", health)
 	mux.HandleFunc("GET /api/v1/health", health)
+	// Startup probe: passes only once the data load finished (see docs/DEPLOY.md).
+	mux.HandleFunc("GET /readyz", handlers.Readyz(fsRepo, dataReady))
 	mux.HandleFunc("GET /healthz", health) // local/legacy; not reachable via Cloud Run ingress
 	mux.HandleFunc("GET /api/v1/version", handlers.Version)
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {

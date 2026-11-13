@@ -39,6 +39,24 @@ func HealthzWithAuth(auth AuthReadiness) http.HandlerFunc {
 	}
 }
 
+// Readyz is the Cloud Run startup probe: 503 "loading" until the startup data load has
+// finished (dataReady closed), then the same auth readiness check as /livez. Cloud Run only
+// routes traffic to a new revision once this passes, so the old revision keeps serving while
+// the new one loads (~3 min). Mounted at GET /readyz; /livez stays the cheap liveness check.
+func Readyz(auth AuthReadiness, dataReady <-chan struct{}) http.HandlerFunc {
+	health := HealthzWithAuth(auth)
+	return func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-dataReady:
+		default:
+			w.Header().Set("Retry-After", "10")
+			writeHealth(w, http.StatusServiceUnavailable, "loading", "startup data load in progress")
+			return
+		}
+		health(w, r)
+	}
+}
+
 func writeHealth(w http.ResponseWriter, code int, status, detail string) {
 	resp := HealthResponse{
 		Status:    status,

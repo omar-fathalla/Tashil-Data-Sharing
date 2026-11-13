@@ -18,6 +18,28 @@ Pushing to `main` runs `.github/workflows/deploy.yml`:
 Docs-only changes (`**.md`, `docs/**`) do not deploy. Runs are serialized (`deploy-production`
 concurrency group, never cancelled mid-deploy). It can also be started by hand (workflow_dispatch).
 
+## Startup probe (zero-downtime rollouts)
+
+The backend loads its data for ~3 minutes after it starts listening. `GET /readyz` returns
+`503 {"status":"loading"}` until that load has finished (then the same auth check as `/livez`),
+and the Cloud Run **startup probe** points at it, so a new revision only receives traffic once it
+is warm; the previous revision keeps serving until then (max-instances is per revision).
+`/livez` stays the cheap liveness endpoint (always 200 once auth users are loaded).
+
+Service-level pin (Cloud Run keeps it on later `gcloud run deploy --source` runs, like the
+startup-cpu-boost / always-on settings):
+
+```
+--startup-probe=httpGet.path=/readyz,httpGet.port=8080,initialDelaySeconds=180,periodSeconds=10,timeoutSeconds=5,failureThreshold=24
+```
+
+Cloud Run caps `failureThreshold × periodSeconds` at 240s and `initialDelaySeconds` at 240s, so
+this allows 180s + 240s = 7 minutes (load ~3 min) and detects readiness within 10s after the
+first check. If a load ever takes longer, the new revision fails and traffic stays on the old one.
+The log line `Startup data load finished in …; /readyz now passes.` marks the moment. The flag is
+not in `deploy.yml` (workflow edits need separate approval); add it next to `--cpu/--memory`
+if the workflow is updated.
+
 ## Auth durability (single-instance stopgap)
 
 Login users are hydrated from Firestore `tenant_users` at startup (seed only when the collection
