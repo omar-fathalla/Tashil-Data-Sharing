@@ -12,6 +12,7 @@ import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import 'package:tashil_web/core/widgets/m3_feedback.dart';
 import 'package:tashil_web/core/widgets/kpi_card.dart';
+import 'package:tashil_web/core/widgets/m3_segment_label.dart';
 import 'package:tashil_web/core/widgets/m3_status_tag.dart';
 import 'package:tashil_web/core/widgets/m3_tonal_surface.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/screens/executive_screen.dart';
@@ -196,7 +197,7 @@ void main() {
             matching: find.byType(Table)),
         matching: find.byType(M3StatusTag));
     expect(tags, findsNWidgets(3));
-    for (final label in ['Healthy', 'Overstock', 'Replenish']) {
+    for (final label in ['سليم', 'مخزون زائد', 'تموين']) {
       expect(find.text(label), findsOneWidget);
     }
     // Pixel-sampling textContrastGuideline is unreliable with test fonts, so
@@ -247,6 +248,14 @@ void main() {
       for (final w in widths) {
         expect(w, closeTo(widths.first, 0.5));
         expect(w, greaterThanOrEqualTo(112.0));
+      }
+      // SegmentedButton ignores ButtonStyle.minimumSize; the width floor
+      // must come from the label (real-font check:
+      // executive_header_real_font_test.dart).
+      for (final l in tester.widgetList<M3SegmentLabel>(find.descendant(
+          of: find.byKey(const ValueKey('executive_period_segmented')),
+          matching: find.byType(M3SegmentLabel)))) {
+        expect(l.minWidth, greaterThanOrEqualTo(64.0));
       }
       if (size.width >= 600) {
         await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
@@ -325,7 +334,7 @@ void main() {
     expect(name.style?.fontSize, 14.0);
     expect(name.style?.fontWeight, FontWeight.w500);
     expect(name.style?.color, cs.onSurface);
-    expect(name.maxLines, 1);
+    expect(name.maxLines, 2); // long SKU names wrap (tooltip has the rest)
     expect(tester.takeException(), isNull);
   });
 

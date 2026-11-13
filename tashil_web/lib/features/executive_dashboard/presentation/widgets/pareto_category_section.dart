@@ -1,5 +1,6 @@
 import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/widgets/m3_status_tag.dart';
 import 'package:tashil_web/core/widgets/m3_tonal_surface.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import '../../../../core/theme/m3_shape.dart';
@@ -602,8 +603,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                             ?.copyWith(
                                           color: isTenant
                                               ? colorScheme.onPrimary
-                                              : colorScheme
-                                                  .onSecondaryContainer,
+                                              : colorScheme.onSurface,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -1470,13 +1470,11 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 6.0),
-                          Badge.count(
+                          M3StatusTag(
                             key: const ValueKey('pareto_class_a_badge'),
-                            count: paretoSkus
-                                .where((s) => s.isTop80Contributor)
-                                .length,
-                            backgroundColor: colorScheme.primary,
-                            textColor: colorScheme.onPrimary,
+                            label:
+                                '${paretoSkus.where((s) => s.isTop80Contributor).length}',
+                            tone: M3StatusTone.info,
                           ),
                         ],
                       ),

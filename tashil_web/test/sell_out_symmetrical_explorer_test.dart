@@ -94,9 +94,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(slots, findsNothing);
       expect(find.byIcon(AppIcons.expandMore), findsOneWidget);
-      expect(find.byKey(const ValueKey('branch_chart_year_segmented')), findsOneWidget);
-      expect(find.text('سنة 2026'), findsWidgets);
-      expect(find.text('سنة 2025'), findsWidgets);
+      final yearBtn = find.byKey(const ValueKey('branch_chart_year_dropdown'));
+      expect(yearBtn, findsOneWidget);
+      expect(find.text('السنة: 2026'), findsOneWidget);
+      // One line, 40dp (was a 3-segment control that wrapped and clipped).
+      expect(tester.getSize(yearBtn).height, greaterThanOrEqualTo(40.0));
+      expect(tester.getSize(find.text('السنة: 2026')).height, lessThanOrEqualTo(20.5));
+      expect(tester.getSize(find.byKey(const ValueKey('branch_chart_sort_toggle'))).height,
+          greaterThanOrEqualTo(40.0));
 
       // 4. Verify Action Buttons: Upload Sell-Out, Export Excel, Print PDF
       expect(find.byKey(const ValueKey('upload_sellout_button')), findsOneWidget);
@@ -136,15 +141,17 @@ void main() {
       expect(find.textContaining('سنة 2026'), findsWidgets);
       expect(find.textContaining('34 فرع'), findsWidgets);
 
-      // Switch to Year 2025 via SegmentedButton segment label
-      final year2025Btn = find.descendant(
-        of: find.byKey(const ValueKey('branch_chart_year_segmented')),
-        matching: find.text('سنة 2025'),
-      );
-      await tester.ensureVisible(year2025Btn);
-      await tester.tap(year2025Btn);
+      // Switch to Year 2025 via the year menu filter
+      final yearBtn = find.byKey(const ValueKey('branch_chart_year_dropdown'));
+      await tester.ensureVisible(yearBtn);
+      await tester.tap(yearBtn);
+      await tester.pumpAndSettle();
+      // Other menus on the page also list years: scope to this filter's anchor.
+      final yearMenu = find.ancestor(of: yearBtn, matching: find.byType(MenuAnchor)).first;
+      await tester.tap(find.descendant(of: yearMenu, matching: find.text('2025')));
       await tester.pumpAndSettle();
 
+      expect(find.text('السنة: 2025'), findsOneWidget);
       expect(find.textContaining('سنة 2025'), findsWidgets);
     });
 

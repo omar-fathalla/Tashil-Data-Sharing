@@ -185,7 +185,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('Rank #2 of 4'), findsOneWidget);
+    expect(find.text('المرتبة 2 من 4'), findsOneWidget);
     expect(find.text('P&G'), findsOneWidget);
     expect(find.text('Henkel'), findsOneWidget);
     expect(find.byKey(const ValueKey('category_competitor_Laundry_1')), findsOneWidget);
@@ -279,7 +279,7 @@ void main() {
       expect(bars.right, lessThanOrEqualTo(cat.left + 1));
       expect(find.text('Test SKU 0'), findsOneWidget);
       expect(find.text('Test SKU 5'), findsOneWidget);
-      expect(find.text('Rank #1 of 14'), findsOneWidget);
+      expect(find.text('المرتبة 1 من 14'), findsOneWidget);
       expect(find.text('Competitor Floor cleaner 0'), findsOneWidget);
       expect(find.text('هذا الصنف'), findsOneWidget);
       expect(find.text('أصنافنا الأخرى'), findsOneWidget);
@@ -299,7 +299,7 @@ void main() {
     expect(cat.height, closeTo(bars.height, 1));
     expect(tester.getSize(find.byKey(const ValueKey('sku_share_bar_0'))).height, greaterThan(12));
     expect(find.text('Test SKU 0'), findsOneWidget);
-    expect(find.text('Rank #2 of 8'), findsOneWidget);
+    expect(find.text('المرتبة 2 من 8'), findsOneWidget);
     expect(find.text('Competitor Bleach 2'), findsOneWidget);
   });
 
@@ -313,7 +313,7 @@ void main() {
     expect(find.text('الحصة حسب الصنف'), findsOneWidget);
     expect(find.text('الحصة حسب الفئة'), findsOneWidget);
     expect(find.text('Test SKU 5'), findsOneWidget);
-    expect(find.text('Rank #1 of 4'), findsOneWidget);
+    expect(find.text('المرتبة 1 من 4'), findsOneWidget);
     // Compact donut when the card is not stretched to a sibling.
     expect(tester.getSize(find.byKey(const ValueKey('category_donut_Floor cleaner'))).height, closeTo(64, 1));
   });
@@ -372,5 +372,21 @@ void main() {
     final chart = tester.getRect(find.byKey(const ValueKey('sell_in_vs_out_chart')));
     expect(chart.top, greaterThanOrEqualTo(table.bottom - 1));
     expect(find.text('Stock SKU 7'), findsOneWidget);
+  });
+
+  test('Signed units keep the sign on the left in RTL (isolate + U+2212)', () {
+    expect(formatSignedUnits(-45080), '\u2066\u221245,080\u2069');
+    expect(formatSignedUnits(10000), '\u2066+10,000\u2069');
+    expect(formatSignedUnits(0), '\u20660\u2069');
+  });
+
+  testWidgets('Inventory difference column uses the isolated signed format',
+      (tester) async {
+    await _pumpAt(tester, 1280.0);
+    final table = find.byKey(const ValueKey('stock_per_sku_table'));
+    expect(
+        find.descendant(of: table, matching: find.text('\u2066+80\u2069')),
+        findsOneWidget);
+    expect(find.text('\u2066+2,400\u2069'), findsOneWidget); // net tile
   });
 }

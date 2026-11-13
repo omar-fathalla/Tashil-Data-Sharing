@@ -1,4 +1,5 @@
 import 'package:tashil_web/core/widgets/m3_states.dart';
+import 'package:tashil_web/core/widgets/m3_menu_filter.dart';
 import 'package:tashil_web/core/utils/sheet_name_utils.dart';
 import 'dart:math' as math;
 import 'package:tashil_web/core/theme/m3_typography.dart';
@@ -1527,44 +1528,41 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     },
                   ),
 
-                  // Year switcher — SegmentedButton (M3 connected selection; no clipped chips)
-                  SegmentedButton<int>(
-                    key: const ValueKey('branch_chart_year_segmented'),
-                    segments: [
-                      ButtonSegment<int>(
-                        value: _currentYear,
-                        label: Text('سنة $_currentYear'),
-                        tooltip: 'سنة $_currentYear',
-                      ),
-                      ButtonSegment<int>(
-                        value: _currentYear - 1,
-                        label: Text('سنة ${_currentYear - 1}'),
-                        tooltip: 'سنة ${_currentYear - 1}',
-                      ),
-                      const ButtonSegment<int>(
-                        value: 0,
-                        label: Text('الكل'),
-                        tooltip: 'كل السنوات',
-                      ),
-                    ],
-                    selected: {_selectedYear},
-                    onSelectionChanged: (next) {
+                  // Year — M3 menu filter (dashboard header pattern): one
+                  // line, 40dp; outlined at the current year, tonal otherwise.
+                  M3MenuFilter<int>(
+                    buttonKey: const ValueKey('branch_chart_year_dropdown'),
+                    tooltip: 'اختر السنة',
+                    icon: AppIcons.event,
+                    label: _selectedYear == 0
+                        ? 'السنة: الكل'
+                        : 'السنة: $_selectedYear',
+                    active: _selectedYear != _currentYear,
+                    onSelected: (y) {
                       setState(() {
-                        _selectedYear = next.first;
+                        _selectedYear = y;
                         selectedDateRange = null;
                       });
                       _loadRecords();
                     },
-                    showSelectedIcon: false,
+                    items: [
+                      for (final y in [_currentYear, _currentYear - 1, 0])
+                        (
+                          y,
+                          M3MenuFilter.itemText(context,
+                              y == 0 ? 'كل السنوات' : '$y', y == _selectedYear),
+                        ),
+                    ],
                   ),
 
                   // Sort High-to-Low vs Low-to-High Button
                   OutlinedButton.icon(
                     key: const ValueKey('branch_chart_sort_toggle'),
                     style: OutlinedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      minimumSize: const Size(0, 36.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                      // 40dp, same family as the year filter beside it.
+                      minimumSize: const Size(0, 40.0),
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                          12.0, 0.0, 16.0, 0.0),
                     ),
                     onPressed: () {
                       setState(() => _chartSortAscending = !_chartSortAscending);

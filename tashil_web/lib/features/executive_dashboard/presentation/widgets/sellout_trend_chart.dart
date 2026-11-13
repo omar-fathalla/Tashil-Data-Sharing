@@ -69,21 +69,6 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
     'ديسمبر',
   ];
 
-  static const _englishMonthNames = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-
   String _formatAxisLabel(DailyTrendItem item) {
     if (item.monthKey.trim().isNotEmpty) {
       final parts = item.monthKey.trim().split('-');
@@ -99,22 +84,6 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
       if (parts.isNotEmpty) return parts[0];
     }
     return item.date.trim();
-  }
-
-  String? _formatAxisLabelEn(DailyTrendItem item) {
-    if (item.monthKey.trim().isNotEmpty) {
-      final parts = item.monthKey.trim().split('-');
-      if (parts.length >= 2) {
-        final m = int.tryParse(parts[1]);
-        if (m != null && m >= 1 && m <= 12) {
-          return _englishMonthNames[m - 1];
-        }
-      }
-    }
-    final arLabel = _formatAxisLabel(item);
-    final idx = _arabicMonthNames.indexOf(arLabel);
-    if (idx != -1) return _englishMonthNames[idx];
-    return null;
   }
 
   List<DailyTrendItem> _getEffectiveTrends() {
@@ -495,7 +464,6 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                       children: List.generate(effectiveTrends.length, (index) {
                         final item = effectiveTrends[index];
                         final label = _formatAxisLabel(item);
-                        final labelEn = _formatAxisLabelEn(item);
                         final isHovered = hoveredIndex == index;
 
                         return Expanded(
@@ -521,21 +489,6 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                                             isHovered ? FontWeight.w600 : null,
                                       ),
                                     ),
-                                    if (labelEn != null)
-                                      Text(
-                                        labelEn,
-                                        maxLines: 1,
-                                        softWrap: false,
-                                        style: theme.textTheme.labelSmall
-                                            ?.copyWith(
-                                          color: isHovered
-                                              ? colorScheme.primary
-                                              : colorScheme.onSurfaceVariant,
-                                          fontWeight: isHovered
-                                              ? FontWeight.w600
-                                              : null,
-                                        ),
-                                      ),
                                   ],
                                 ),
                               ),

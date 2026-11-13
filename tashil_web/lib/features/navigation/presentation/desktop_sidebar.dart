@@ -1,6 +1,5 @@
 import '../../../core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
-import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../core/theme/m3_shape.dart';
 import '../../../../core/config/app_version.dart';
 import '../../../../core/network/api_client.dart';
@@ -210,80 +209,67 @@ class DesktopSidebar extends StatelessWidget {
                   final dest = destinations[index];
                   final isSelected = selectedIndex == index;
 
-                  Widget item = InkWell(
-                    onTap: () => onDestinationSelected(index),
-                    borderRadius: M3Shape.radiusXl, // M3 pill shape
-                    child: AnimatedContainer(
-                      duration: M3Motion.short4,
-                      curve: M3Motion.standard,
-                      height: 52.0,
-                      padding: const EdgeInsetsDirectional.symmetric(
-                          horizontal: 16.0),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? colorScheme.secondaryContainer
-                            : Colors.transparent,
-                        borderRadius: M3Shape.radiusXl,
-                      ),
-                      child: Row(
-                        children: [
-                          AnimatedSwitcher(
-                            duration: M3Motion.short3,
-                            transitionBuilder: (child, anim) => ScaleTransition(
-                              scale: Tween<double>(begin: 0.85, end: 1.0)
-                                  .animate(anim),
-                              child:
-                                  FadeTransition(opacity: anim, child: child),
+                  // M3 nav indicator: a pill-shaped Material (no BoxDecoration).
+                  Widget item = Material(
+                    color: isSelected
+                        ? colorScheme.secondaryContainer
+                        : Colors.transparent,
+                    shape: const StadiumBorder(),
+                    clipBehavior: Clip.antiAlias,
+                    animationDuration: M3Motion.short4,
+                    child: InkWell(
+                      onTap: () => onDestinationSelected(index),
+                      customBorder: const StadiumBorder(),
+                      child: Container(
+                        height: 52.0,
+                        padding: const EdgeInsetsDirectional.symmetric(
+                            horizontal: 16.0),
+                        child: Row(
+                          children: [
+                            AnimatedSwitcher(
+                              duration: M3Motion.short3,
+                              transitionBuilder: (child, anim) =>
+                                  ScaleTransition(
+                                scale: Tween<double>(begin: 0.85, end: 1.0)
+                                    .animate(anim),
+                                child:
+                                    FadeTransition(opacity: anim, child: child),
+                              ),
+                              child: Icon(
+                                isSelected ? dest.selectedIcon : dest.icon,
+                                key: ValueKey('${index}_$isSelected'),
+                                size: 22.0,
+                                color: isSelected
+                                    ? colorScheme.onSecondaryContainer
+                                    : colorScheme.onSurfaceVariant,
+                              ),
                             ),
-                            child: Icon(
-                              isSelected ? dest.selectedIcon : dest.icon,
-                              key: ValueKey('${index}_$isSelected'),
-                              size: 22.0,
-                              color: isSelected
-                                  ? colorScheme.onSecondaryContainer
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          M3Spacing.gapSM,
-                          Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  dest.label,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    color: isSelected
-                                        ? colorScheme.onSecondaryContainer
-                                        : colorScheme.onSurface,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
+                            M3Spacing.gapSM,
+                            Expanded(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    dest.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelLarge?.copyWith(
+                                      color: isSelected
+                                          ? colorScheme.onSecondaryContainer
+                                          : colorScheme.onSurface,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (dest.badgeCount != null && dest.badgeCount! > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6.0, vertical: 2.0),
-                              decoration: BoxDecoration(
-                                color: colorScheme.error,
-                                borderRadius: M3Shape.radiusSm,
-                              ),
-                              child: Text(
-                                dest.badgeCount.toString(),
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: colorScheme.onError,
-                                  fontSize: M3FontSize.tiny,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                ],
                               ),
                             ),
-                        ],
+                            if (dest.badgeCount != null && dest.badgeCount! > 0)
+                              Badge.count(count: dest.badgeCount!),
+                          ],
+                        ),
                       ),
                     ),
                   );
@@ -323,8 +309,7 @@ class DesktopSidebar extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12.0, vertical: 10.0),
-                    side:
-                        BorderSide(color: colorScheme.outline),
+                    side: BorderSide(color: colorScheme.outline),
                     shape: const RoundedRectangleBorder(
                       borderRadius: M3Shape.radiusSm,
                     ),

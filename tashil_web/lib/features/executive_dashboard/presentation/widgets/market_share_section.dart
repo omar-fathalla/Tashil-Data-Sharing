@@ -111,6 +111,34 @@ String _fmtInt(num v) {
   return '${v < 0 ? '-' : ''}$b';
 }
 
+/// Signed unit count for RTL text: '+' / U+2212 MINUS SIGN stay on the left
+/// of the digits ("−45,080", "+10,000") because the whole value sits in an
+/// LRI…PDI isolate; a bare '-' in Arabic text renders as "45,080-".
+@visibleForTesting
+String formatSignedUnits(num v) {
+  final sign = v > 0 ? '+' : (v < 0 ? '\u2212' : '');
+  return '\u2066$sign${_fmtInt(v.abs())}\u2069';
+}
+
+/// Arabic month names (index = month number); the dashboard is Arabic-only.
+const _monthsAr = [
+  '',
+  'يناير',
+  'فبراير',
+  'مارس',
+  'أبريل',
+  'مايو',
+  'يونيو',
+  'يوليو',
+  'أغسطس',
+  'سبتمبر',
+  'أكتوبر',
+  'نوفمبر',
+  'ديسمبر',
+];
+
+String _monthAr(int n) => n >= 1 && n <= 12 ? _monthsAr[n] : '$n';
+
 String _pct(double v) => '${v.toStringAsFixed(v >= 10 || v == 0 ? 0 : 1)}%';
 
 class _CardHeader extends StatelessWidget {
@@ -287,8 +315,8 @@ class _SkuShareCard extends StatelessWidget {
                           _seg(context, rows[i].self, cs.primary, cs.onPrimary),
                           _seg(context, rows[i].ownOther, cs.tertiaryContainer,
                               cs.onTertiaryContainer),
-                          _seg(context, rows[i].comp, cs.surfaceContainerHighest,
-                              cs.onSurfaceVariant),
+                          _seg(context, rows[i].comp,
+                              cs.surfaceContainerHighest, cs.onSurfaceVariant),
                         ]),
                       ),
                     ),
@@ -311,10 +339,8 @@ class _SkuShareCard extends StatelessWidget {
         child: v >= 0.08
             ? Text(_pct(v * 100),
                 maxLines: 1,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelSmall
-                    ?.copyWith(color: fg))
+                style:
+                    Theme.of(context).textTheme.labelSmall?.copyWith(color: fg))
             : null,
       ),
     );
@@ -397,7 +423,7 @@ class _CategoryTile extends StatelessWidget {
           M3Spacing.gapXXS,
           if (cat.tenantRank > 0)
             Text(
-              'Rank #${cat.tenantRank}${cat.supplierCount > 0 ? ' of ${cat.supplierCount}' : ''}',
+              'المرتبة ${cat.tenantRank}${cat.supplierCount > 0 ? ' من ${cat.supplierCount}' : ''}',
               key: ValueKey('category_rank_${cat.category}'),
               style: theme.textTheme.labelMedium?.copyWith(
                 // tealBase (#009688) fails WCAG on surface (~3.33:1); use deep teal for text.
@@ -409,7 +435,7 @@ class _CategoryTile extends StatelessWidget {
           _CompetitorBar(cat: cat, ours: ours),
           M3Spacing.gapXXS,
           if (cat.topCompetitors.isEmpty)
-            Text('Competitors ${_pct(100.0 - ours)}',
+            Text('المنافسون ${_pct(100.0 - ours)}',
                 style: theme.textTheme.labelSmall
                     ?.copyWith(color: cs.onSurfaceVariant))
           else
@@ -454,10 +480,7 @@ class _SellInOutTiles extends StatelessWidget {
     final through = sellIn > 0 ? sellOut / sellIn * 100.0 : 0.0;
     final acc = M3StatusColors.of(context).accents;
     final cs = theme.colorScheme;
-    final monthLabel = months
-        .map(
-            (m) => m.monthEn.length > 3 ? m.monthEn.substring(0, 3) : m.monthEn)
-        .join(', ');
+    final monthLabel = months.map((m) => _monthAr(m.monthNum)).join('، ');
 
     final tiles = [
       _KpiTile(
@@ -469,7 +492,7 @@ class _SellInOutTiles extends StatelessWidget {
       _KpiTile(
           key: const ValueKey('kpi_net_accumulation'),
           label: 'تراكم المخزون (وحدة)',
-          value: '${net > 0 ? '+' : ''}${_fmtInt(net)}',
+          value: formatSignedUnits(net),
           color: acc.cautionStrong),
       _KpiTile(
           key: const ValueKey('kpi_sell_through'),
@@ -482,7 +505,8 @@ class _SellInOutTiles extends StatelessWidget {
       key: const ValueKey('sell_in_vs_out_section'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Sell-In vs Sell-Out', style: theme.textTheme.titleMedium),
+        Text('\u2068Sell-In\u2069 مقابل \u2068Sell-Out\u2069',
+            style: theme.textTheme.titleMedium),
         Text('الأصناف والشهور المتطابقة: $monthLabel $year',
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: cs.onSurfaceVariant)),
@@ -562,8 +586,8 @@ class _StockCard extends StatelessWidget {
       int stock,
       String status
     })>{};
-    for (final i in cpfr?.inventoryAndPoItems ??
-        const <SKUBranchInventoryModel>[]) {
+    for (final i
+        in cpfr?.inventoryAndPoItems ?? const <SKUBranchInventoryModel>[]) {
       final k = i.barcode.isNotEmpty ? i.barcode : i.itemCode;
       final p = bySku[k];
       bySku[k] = (
@@ -612,7 +636,8 @@ class _StockCard extends StatelessWidget {
           else
             Table(
               columnWidths: const {
-                0: FlexColumnWidth(3),
+                // SKU names get the most room (2 lines + tooltip).
+                0: FlexColumnWidth(4.2),
                 1: FlexColumnWidth(1.3),
                 2: FlexColumnWidth(1.3),
                 3: FlexColumnWidth(1.3),
@@ -650,7 +675,7 @@ class _StockCard extends StatelessWidget {
                             Tooltip(
                               message: r.name,
                               child: Text(r.name,
-                                  maxLines: 1,
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: theme.textTheme.titleSmall
                                       ?.copyWith(color: cs.onSurface)),
@@ -666,11 +691,11 @@ class _StockCard extends StatelessWidget {
                       ),
                       num(_fmtInt(r.sIn)),
                       num(_fmtInt(r.sOut)),
-                      num('${r.sIn - r.sOut > 0 ? '+' : ''}${_fmtInt(r.sIn - r.sOut)}'),
+                      num(formatSignedUnits(r.sIn - r.sOut)),
                       num(_pct(r.sIn > 0 ? r.sOut / r.sIn * 100.0 : 0.0)),
                       Padding(
-                        padding:
-                            const EdgeInsetsDirectional.only(start: M3Spacing.xs),
+                        padding: const EdgeInsetsDirectional.only(
+                            start: M3Spacing.xs),
                         child: Align(
                             alignment: AlignmentDirectional.centerStart,
                             child: _StatusChip(status: r.status)),
@@ -701,17 +726,13 @@ class _StatusChip extends StatelessWidget {
     // M3StatusTag tones: container/on-container pairs (≥ 4.5:1), plus an icon
     // so the state is not conveyed by colour alone.
     final (M3StatusTone tone, IconData icon, String text) = switch (status) {
-      'optimal' => (M3StatusTone.success, AppIcons.success, 'Healthy'),
-      'overstock' => (M3StatusTone.error, AppIcons.warning, 'Overstock'),
-      'urgent_replenishment' => (
-          M3StatusTone.warning,
-          AppIcons.info,
-          'Replenish'
-        ),
+      'optimal' => (M3StatusTone.success, AppIcons.success, 'سليم'),
+      'overstock' => (M3StatusTone.error, AppIcons.warning, 'مخزون زائد'),
+      'urgent_replenishment' => (M3StatusTone.warning, AppIcons.info, 'تموين'),
       _ => (
           M3StatusTone.neutral,
           AppIcons.info,
-          status.isEmpty ? 'Unknown' : status
+          status.isEmpty ? 'غير معروف' : status
         ),
     };
     return M3StatusTag(label: text, tone: tone, icon: icon);
@@ -753,59 +774,59 @@ class _MonthlyBarsCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: Padding(
         padding: M3Spacing.pMd,
-        child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              header,
-              M3Spacing.gapSM,
-              if (loading)
-                const LinearProgressIndicator(year2023: false)
-              else if (months.isEmpty)
-                _EmptyNote(
-                  error != null
-                      ? 'تعذّر تحميل بيانات Sell-In/Sell-Out'
-                      : 'لا توجد شهور بها بيانات Sell-In وSell-Out معًا',
-                  keyName: 'sell_in_vs_out_empty',
-                )
-              else ...[
-                // Sell-Out is the hero series; Sell-In is the neutral reference.
-                _Legend([(cs.primary, 'Sell-Out'), (cs.outline, 'Sell-In')]),
-                M3Spacing.gapMD,
-                _plotArea(
-                  Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    for (final m in months)
-                      Expanded(
-                        child: Tooltip(
-                          message:
-                              '${m.monthEn}: Sell-In ${_fmtInt(m.sellInUnits)} · Sell-Out ${_fmtInt(m.sellOutUnits)}',
-                          child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      _bar(m.sellOutUnits / maxV * chartH,
-                                          cs.primary),
-                                      const SizedBox(width: 3.0),
-                                      _bar(m.sellInUnits / maxV * chartH,
-                                          cs.outline),
-                                    ]),
-                                M3Spacing.gapXXS,
-                                Text(
-                                    m.monthEn.length > 3
-                                        ? m.monthEn.substring(0, 3)
-                                        : m.monthEn,
-                                    maxLines: 1,
-                                    style: theme.textTheme.labelSmall),
-                              ]),
-                        ),
-                      ),
-                  ]),
-                  chartH + 20.0,
-                ),
-              ],
-            ]),
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          header,
+          M3Spacing.gapSM,
+          if (loading)
+            const LinearProgressIndicator(year2023: false)
+          else if (months.isEmpty)
+            _EmptyNote(
+              error != null
+                  ? 'تعذّر تحميل بيانات Sell-In/Sell-Out'
+                  : 'لا توجد شهور بها بيانات Sell-In وSell-Out معًا',
+              keyName: 'sell_in_vs_out_empty',
+            )
+          else ...[
+            // Sell-Out is the hero series; Sell-In is the neutral reference.
+            _Legend([(cs.primary, 'Sell-Out'), (cs.outline, 'Sell-In')]),
+            M3Spacing.gapMD,
+            _plotArea(
+              Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                for (final m in months)
+                  Expanded(
+                    child: Tooltip(
+                      message:
+                          '${_monthAr(m.monthNum)}: \u2068Sell-In\u2069 ${_fmtInt(m.sellInUnits)} · \u2068Sell-Out\u2069 ${_fmtInt(m.sellOutUnits)}',
+                      child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  _bar(m.sellOutUnits / maxV * chartH,
+                                      cs.primary),
+                                  const SizedBox(width: 3.0),
+                                  _bar(m.sellInUnits / maxV * chartH,
+                                      cs.outline),
+                                ]),
+                            M3Spacing.gapXXS,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(_monthAr(m.monthNum),
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  style: theme.textTheme.labelSmall),
+                            ),
+                          ]),
+                    ),
+                  ),
+              ]),
+              chartH + 20.0,
+            ),
+          ],
+        ]),
       ),
     );
   }

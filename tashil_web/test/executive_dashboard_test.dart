@@ -136,7 +136,7 @@ void main() {
     );
 
     expect(find.text('حصة كل سلسلة من المبيعات'), findsOneWidget);
-    expect(find.text('Sales by Chain'), findsOneWidget);
+    expect(find.text('Sales by Chain'), findsNothing);
     expect(find.text('كارفور'), findsOneWidget);
     expect(find.text('Carrefour'), findsOneWidget);
     expect(find.text('فتح الله'), findsOneWidget);
@@ -512,9 +512,9 @@ void main() {
     expect(find.text('جملة ماركت'), findsOneWidget);
     expect(find.text('Gomla Market'), findsOneWidget);
     expect(find.text('يناير'), findsOneWidget);
-    expect(find.text('Jan'), findsOneWidget);
+    expect(find.text('Jan'), findsNothing);
     expect(find.text('فبراير'), findsOneWidget);
-    expect(find.text('Feb'), findsOneWidget);
+    expect(find.text('Feb'), findsNothing);
     expect(ChainSharePie.colorForChain('fathalla'), isNot(equals(ChainSharePie.colorForChain('gomla'))));
 
     // Also verify single-month series (e.g. 2026-01 or 2024-04) renders without error
@@ -530,7 +530,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('يناير'), findsOneWidget);
-    expect(find.text('Jan'), findsOneWidget);
+    expect(find.text('Jan'), findsNothing);
 
     // Verify when only 'beet-elgomla' exists (or after deleting Fathalla and Gomla),
     // neither Fathalla nor Gomla is rendered in legend or curves.
@@ -699,11 +699,11 @@ void main() {
 
     // All 12 months should have both Arabic (Line 1) and English (Line 2) labels rendered
     expect(find.text('يناير'), findsOneWidget);
-    expect(find.text('Jan'), findsOneWidget);
+    expect(find.text('Jan'), findsNothing);
     expect(find.text('يونيو'), findsOneWidget);
-    expect(find.text('Jun'), findsOneWidget);
+    expect(find.text('Jun'), findsNothing);
     expect(find.text('ديسمبر'), findsOneWidget);
-    expect(find.text('Dec'), findsOneWidget);
+    expect(find.text('Dec'), findsNothing);
   });
 }
 

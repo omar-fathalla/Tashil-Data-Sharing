@@ -6,7 +6,9 @@ import '../../data/executive_dashboard_repository.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/widgets/m3_segment_label.dart';
 import '../../../../core/widgets/m3_feedback.dart';
+import '../../../../core/widgets/m3_menu_filter.dart';
 import '../widgets/bento_kpi_grid.dart';
 import '../widgets/chain_share_pie.dart';
 import '../widgets/monthly_summary_card.dart';
@@ -64,7 +66,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
   late ExecutiveDashboardRepository _repo;
 
   static const List<
-      ({int number, String shortName, String fullName, String nameAr})> _months = [
+          ({int number, String shortName, String fullName, String nameAr})>
+      _months = [
     (number: 0, shortName: 'All', fullName: 'كل الشهور', nameAr: 'الكل'),
     (number: 1, shortName: 'Jan', fullName: 'January', nameAr: 'يناير'),
     (number: 2, shortName: 'Feb', fullName: 'February', nameAr: 'فبراير'),
@@ -318,12 +321,14 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
     return {selectedMonth};
   }
 
-  static Widget _segLabel(String s) =>
-      Text(s, maxLines: 1, softWrap: false, overflow: TextOverflow.visible);
+  /// Single-line segment label with a min width (SegmentedButton ignores
+  /// ButtonStyle.minimumSize), so each period segment is ≥ 112dp.
+  static Widget _segLabel(String s, {double minWidth = 64.0}) =>
+      M3SegmentLabel(s, minWidth: minWidth);
 
   Widget _buildPeriodControls(BuildContext context) {
-    // M3: segmented buttons inherit the theme (112x40 equal segments, 48dp
-    // tap target, secondaryContainer selection + check). No local overrides.
+    // M3: equal single-line segments ≥ 112dp (width from _segLabel), 40dp,
+    // 48dp tap target, secondaryContainer selection + check.
     return Wrap(
       spacing: M3Spacing.xs,
       runSpacing: M3Spacing.xs,
@@ -352,13 +357,10 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
         if (_periodMode == 'quarterly') ...[
           SegmentedButton<int>(
             key: const ValueKey('executive_quarter_segmented'),
-            style: const ButtonStyle(
-              // 4 short options: no 112dp floor.
-              minimumSize: WidgetStatePropertyAll(Size(56.0, 40.0)),
-            ),
             segments: [
               for (var q = 1; q <= 4; q++)
-                ButtonSegment(value: q, label: _segLabel('Q$q')),
+                ButtonSegment(
+                    value: q, label: _segLabel('Q$q', minWidth: 32.0)),
             ],
             selected: {_selectedQuarter},
             showSelectedIcon: false,
@@ -448,37 +450,13 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
   }
 
   /// Arabic tenant name for the header subtitle ("أديكو (Adeco)" → "أديكو").
-  String _tenantNameAr() =>
-      ChainSharePie.splitBilingualLabel(
-              ApiClient.getDisplayNameForTenant(widget.apiClient.tenantId))
-          .ar;
+  String _tenantNameAr() => ChainSharePie.splitBilingualLabel(
+          ApiClient.getDisplayNameForTenant(widget.apiClient.tenantId))
+      .ar;
 
   /// Menu item label: leading check (primary) on the selected value.
-  Widget _menuItemText(BuildContext context, String text, bool selected) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 18.0,
-          child: selected
-              ? Icon(AppIcons.check, size: 18.0, color: cs.primary)
-              : null,
-        ),
-        const SizedBox(width: M3Spacing.s12),
-        Text(
-          text,
-          maxLines: 1,
-          softWrap: false,
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: cs.onSurface,
-            fontWeight: selected ? FontWeight.w600 : null,
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _menuItemText(BuildContext context, String text, bool selected) =>
+      M3MenuFilter.itemText(context, text, selected);
 
   /// Year menu filter: outlined at the default year, tonal once changed
   /// (same rule as the other filters).
@@ -559,16 +537,30 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
         ),
       );
     }
+    // Wide: the three filters stay together as one group, so a narrow
+    // content area (e.g. ~745dp next to the full sidebar at 1019) breaks
+    // into two clean lines: period | filters, never a lone chain filter.
     return Wrap(
       spacing: M3Spacing.xs,
       runSpacing: M3Spacing.xs,
       crossAxisAlignment: WrapCrossAlignment.center,
-      children: children,
+      children: [
+        children[0],
+        children[1],
+        // A nested Wrap sizes to its content, so the group moves to the next
+        // line as a unit and only wraps inside if it is wider than the row.
+        Wrap(
+          key: const ValueKey('executive_filter_group'),
+          spacing: M3Spacing.xs,
+          runSpacing: M3Spacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: children.sublist(2),
+        ),
+      ],
     );
   }
 
-  /// M3 MenuAnchor filter trigger: a real button (40dp, 48dp target,
-  /// focus ring). Outlined at the default value, tonal when a filter is active.
+  /// Shared M3 menu filter (outlined at default, tonal when active).
   Widget _menuFilter<T>({
     required Key key,
     required String tooltip,
@@ -578,62 +570,17 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
     required List<(T, Widget)> items,
     required ValueChanged<T> onSelected,
     double? minWidth,
-  }) {
-    return MenuAnchor(
-      style: minWidth == null
-          ? null
-          : MenuStyle(minimumSize: WidgetStatePropertyAll(Size(minWidth, 0))),
-      menuChildren: [
-        for (final (value, child) in items)
-          MenuItemButton(onPressed: () => onSelected(value), child: child),
-      ],
-      builder: (context, controller, _) {
-        final cs = Theme.of(context).colorScheme;
-        void toggle() =>
-            controller.isOpen ? controller.close() : controller.open();
-        final content = Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label, maxLines: 1, softWrap: false),
-            const SizedBox(width: M3Spacing.xxs),
-            const Icon(AppIcons.dropDown, size: 18.0),
-          ],
-        );
-        // Icon-start M3 button + trailing caret; one 40dp stadium family.
-        const pad = EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 8.0, 0.0);
-        final outlined = OutlinedButton.styleFrom(
-          foregroundColor: cs.onSurfaceVariant,
-          iconColor: cs.onSurfaceVariant,
-          padding: pad,
-          iconSize: 18.0,
-          minimumSize: const Size(0.0, 40.0),
-        );
-        final tonal = FilledButton.styleFrom(
-          padding: pad,
-          iconSize: 18.0,
-          minimumSize: const Size(0.0, 40.0),
-        );
-        return Tooltip(
-          message: tooltip,
-          child: active
-              ? FilledButton.tonalIcon(
-                  key: key,
-                  style: tonal,
-                  onPressed: toggle,
-                  icon: Icon(icon),
-                  label: content,
-                )
-              : OutlinedButton.icon(
-                  key: key,
-                  style: outlined,
-                  onPressed: toggle,
-                  icon: Icon(icon),
-                  label: content,
-                ),
-        );
-      },
-    );
-  }
+  }) =>
+      M3MenuFilter<T>(
+        buttonKey: key,
+        tooltip: tooltip,
+        icon: icon,
+        label: label,
+        active: active,
+        items: items,
+        onSelected: onSelected,
+        minWidth: minWidth,
+      );
 
   @override
   Widget build(BuildContext context) {
