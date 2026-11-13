@@ -637,12 +637,15 @@ class _StockCard extends StatelessWidget {
             Table(
               columnWidths: const {
                 // SKU names get the most room (2 lines + tooltip).
-                0: FlexColumnWidth(4.2),
+                0: FlexColumnWidth(4.0),
                 1: FlexColumnWidth(1.3),
                 2: FlexColumnWidth(1.3),
                 3: FlexColumnWidth(1.3),
-                4: FlexColumnWidth(1),
-                5: FlexColumnWidth(2.2),
+                // "نسبة / التصريف" on two whole-word lines (was clipped at
+                // ~1431 with flex 1).
+                4: FlexColumnWidth(1.4),
+                // Status tags keep their natural width (never "مخزون زا…").
+                5: IntrinsicColumnWidth(),
               },
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
               children: [

@@ -15,12 +15,27 @@ import 'package:tashil_web/features/navigation/presentation/desktop_sidebar.dart
 
 import 'support/real_fonts.dart';
 
-MockClient _client() => MockClient((req) async {
+/// Test-only CPFR rows (no real data) so the inventory table renders.
+final _inventoryRows = [
+  for (var i = 0; i < 3; i++)
+    {
+      'barcode': 'b$i',
+      'item_code': 'T$i',
+      'sku_name': 'صنف تجريبي رقم $i بعبوة كبيرة',
+      'sell_in_units': 1000 + i,
+      'sell_out_units': 900 + i,
+      'estimated_stock_units': 100,
+      'sell_through_pct': 90.0,
+      'stock_status': ['optimal', 'overstock', 'urgent_replenishment'][i],
+    },
+];
+
+MockClient _client({bool inventory = false}) => MockClient((req) async {
       if (req.url.path.endsWith('/api/v1/analytics/cpfr')) {
         return http.Response(
             jsonEncode({
               'monthly_reconciliation': <Object>[],
-              'inventory_and_po_items': <Object>[],
+              'inventory_and_po_items': inventory ? _inventoryRows : <Object>[],
             }),
             200,
             headers: {'content-type': 'application/json; charset=utf-8'});
@@ -30,7 +45,8 @@ MockClient _client() => MockClient((req) async {
 
 /// RTL dashboard; with [sidebar] the full desktop sidebar sits beside it, as
 /// in the shell on desktop widths.
-Future<void> _pump(WidgetTester tester, Size size, {bool sidebar = false}) =>
+Future<void> _pump(WidgetTester tester, Size size,
+        {bool sidebar = false, bool inventory = false}) =>
     http.runWithClient(() async {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1.0;
@@ -57,7 +73,7 @@ Future<void> _pump(WidgetTester tester, Size size, {bool sidebar = false}) =>
         ),
       ));
       await tester.pumpAndSettle();
-    }, _client);
+    }, () => _client(inventory: inventory));
 
 void main() {
   GoogleFonts.config.allowRuntimeFetching = false;
@@ -167,5 +183,26 @@ void main() {
         tester.getRect(find.byKey(const ValueKey('executive_month_dropdown')));
     expect(month.top, greaterThan(period.bottom - 0.5));
     expect(dividerWidth(tester), 0.0);
+  });
+
+  testWidgets(
+      '@1440 with the sidebar: "نسبة التصريف" heading wraps on whole words',
+      (tester) async {
+    await _pump(tester, const Size(1440, 1400), sidebar: true, inventory: true);
+    expect(tester.takeException(), isNull);
+    final table = find.byKey(const ValueKey('stock_per_sku_table'));
+    expect(table, findsOneWidget);
+    final rp = tester.renderObject<RenderParagraph>(
+        find.descendant(of: table, matching: find.text('نسبة التصريف')));
+    expect(rp.didExceedMaxLines, isFalse);
+    // Longest word ("التصريف") must fit the column, or it breaks mid-word.
+    expect(rp.getMinIntrinsicWidth(double.infinity),
+        lessThanOrEqualTo(rp.size.width + 0.5));
+    // Status tags are not truncated by the narrower columns.
+    for (final label in const ['سليم', 'مخزون زائد', 'تموين']) {
+      final tag = tester.renderObject<RenderParagraph>(
+          find.descendant(of: table, matching: find.text(label)));
+      expect(tag.didExceedMaxLines, isFalse, reason: label);
+    }
   });
 }
