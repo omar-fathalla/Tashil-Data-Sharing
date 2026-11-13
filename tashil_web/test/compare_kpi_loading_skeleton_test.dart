@@ -129,7 +129,7 @@ void main() {
 
       // Loading: skeletons in each KPI card; computed zero placeholders must not flash.
       expect(find.byKey(const ValueKey('compare_kpi_skeleton')), findsNWidgets(4));
-      expect(find.textContaining('0 صنف'), findsNothing);
+      expect(find.textContaining('0 أصناف'), findsNothing);
       expect(find.textContaining('0 من 0'), findsNothing);
       expect(find.textContaining('100.0%'), findsNothing);
 
@@ -138,7 +138,8 @@ void main() {
 
       // After an empty competitive-monthly response, real zeros are allowed.
       expect(find.byKey(const ValueKey('compare_kpi_skeleton')), findsNothing);
-      expect(find.textContaining('0 صنف'), findsOneWidget);
+      // KPI value «0 أصناف» (+ detail «… في 0 أصناف»).
+      expect(find.text('0 أصناف'), findsOneWidget);
       expect(find.textContaining('0 من 0'), findsOneWidget);
       expect(find.textContaining('100.0%'), findsOneWidget);
     },
@@ -172,15 +173,15 @@ void main() {
       );
       await tester.pump();
       expect(find.byKey(const ValueKey('compare_kpi_skeleton')), findsNWidgets(4));
-      expect(find.text('1 صنف'), findsNothing);
+      expect(find.text('صنف واحد'), findsNothing);
       expect(find.text('106.7%'), findsNothing);
 
       gate.complete();
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('compare_kpi_skeleton')), findsNothing);
-      // KPI value + filtered-groups count chip both read "1 صنف".
-      expect(find.text('1 صنف'), findsNWidgets(2));
+      // KPI value + filtered-groups count chip both read "صنف واحد".
+      expect(find.text('صنف واحد'), findsNWidgets(2));
       expect(find.text('106.7%'), findsOneWidget);
     },
   );

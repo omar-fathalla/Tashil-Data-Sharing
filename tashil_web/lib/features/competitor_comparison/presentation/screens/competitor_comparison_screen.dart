@@ -18,8 +18,13 @@ import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
-import '../../../../core/widgets/m3_states.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
+import '../../../../core/utils/arabic_plural.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
+import '../../../../core/widgets/m3_search_field.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_toolbar_button.dart';
 
 /// CompetitorComparisonScreen (Compare)
 /// Material Design 3 1-vs-1 Focused Competitive Intelligence Experience:
@@ -458,7 +463,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),
-                            maxLines: 1,
+                            maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
@@ -731,74 +736,57 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             // 2. Top 4 Competitive & Temporal Summary KPI Cards
             LayoutBuilder(
               builder: (context, constraints) {
-                final isDesktop = constraints.maxWidth >= 900.0;
                 final cards = [
                   _buildKpiCard(
                     context: context,
-                    title: 'الفترة الزمنية النشطة ($_selectedYear)',
-                    value: '$totalOwnSkus صنف',
+                    title: 'الأصناف النشطة $_selectedYear',
+                    value: countSku(totalOwnSkus),
                     subtitle:
-                        'منها $mappedOwnSkus بمنافسين محددين · $totalCompetitorSkus منافس · $_activePeriodLabelAr',
+                        '$mappedOwnSkus بمنافسين محددين · ${countCompetitors(totalCompetitorSkus)}',
                     icon: Icons.calendar_month_rounded,
-                    containerColor: colorScheme.primaryContainer,
-                    onContainerColor: colorScheme.onPrimaryContainer,
+                    color: colorScheme.primary,
                     isLoading: _isLoading,
                   ),
                   _buildKpiCard(
                     context: context,
-                    title: 'ميزة سعرية تنافسية (نحن الأرخص 🟢)',
-                    value: '$advantageSkusCount من $totalOwnSkus أصناف',
-                    subtitle: 'سعر بيعنا أقل من متوسط المنافسين المباشرين',
+                    title: 'الميزة السعرية',
+                    value: '$advantageSkusCount من ${countSku(totalOwnSkus)}',
+                    subtitle: 'سعرنا أقل من متوسط المنافسين',
                     icon: Icons.trending_down_rounded,
-                    containerColor: M3Palette.successSurface,
-                    onContainerColor: M3Palette.onSuccessSurface,
+                    color: M3Palette.success,
                     isLoading: _isLoading,
                   ),
                   _buildKpiCard(
                     context: context,
-                    title: 'حركة الأسعار عبر شهور $_selectedYear',
+                    title: 'حركة الأسعار $_selectedYear',
                     value:
                         '▲ $priceIncreasedSkusCount زاد | ▼ $priceDecreasedSkusCount نزل',
-                    subtitle: 'تتبع شهري لارتفاع وانخفاض الأسعار ($_monthRangeLabel)',
+                    subtitle: 'الفترة: $_monthRangeLabel',
                     icon: Icons.show_chart_rounded,
-                    containerColor: M3Palette.warningSurface,
-                    onContainerColor: M3Palette.onWarningSurface,
+                    color: M3Palette.warning,
                     isLoading: _isLoading,
                   ),
                   _buildKpiCard(
                     context: context,
-                    title: 'مؤشر السعر التنافسي (Price Index)',
+                    title: 'مؤشر السعر التنافسي',
                     value: '${avgPriceIndex.toStringAsFixed(1)}%',
                     subtitle:
-                        'تهديد سعري مباشر في $undercutRiskSkusCount أصناف',
+                        'تهديد سعري مباشر في ${countSku(undercutRiskSkusCount)}',
                     icon: Icons.speed_rounded,
-                    containerColor: colorScheme.secondaryContainer,
-                    onContainerColor: colorScheme.onSecondaryContainer,
+                    color: colorScheme.secondary,
                     isLoading: _isLoading,
                   ),
                 ];
 
-                if (isDesktop) {
-                  return IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (int i = 0; i < cards.length; i++) ...[
-                          Expanded(child: cards[i]),
-                          if (i < cards.length - 1) M3Spacing.gapSM,
-                        ],
-                      ],
-                    ),
-                  );
-                }
-
-                return Column(
-                  children: [
-                    for (int i = 0; i < cards.length; i++) ...[
-                      cards[i],
-                      if (i < cards.length - 1) M3Spacing.gapSM,
-                    ],
-                  ],
+                // Same equal-height grid, breakpoints and 16dp gutters as the
+                // Sell-Out KPI row.
+                final maxWidth = constraints.maxWidth;
+                return M3EqualHeightGrid(
+                  key: const ValueKey('compare_kpi_cards_row'),
+                  columns: maxWidth >= 960 ? 4 : (maxWidth >= 580 ? 2 : 1),
+                  spacing: M3Spacing.sm,
+                  runSpacing: M3Spacing.sm,
+                  children: cards,
                 );
               },
             ),
@@ -1075,10 +1063,12 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             crossAxisAlignment: WrapCrossAlignment.center,
             alignment: WrapAlignment.spaceBetween,
             children: [
-              SizedBox(
+              M3SearchFieldWidth(
+                hintText: 'ابحث باسم الصنف، الباركود، أو المنافس...',
+                hintStyle: theme.textTheme.bodyMedium,
                 width: 340.0,
-                height: 42.0,
                 child: TextField(
+                  key: const ValueKey('compare_search_field'),
                   controller: _searchController,
                   onChanged: (val) {
                     setState(() {
@@ -1102,18 +1092,22 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                             },
                           )
                         : null,
+                    isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14.0,
+                      horizontal: 12.0,
                       vertical: 8.0,
+                    ),
+                    constraints: const BoxConstraints(
+                      maxHeight: M3ToolbarButton.height,
                     ),
                     filled: true,
                     fillColor: colorScheme.surface,
                     border: OutlineInputBorder(
-                      borderRadius: M3Shape.radiusFull,
+                      borderRadius: M3Shape.radiusMd,
                       borderSide: BorderSide(color: colorScheme.outlineVariant),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: M3Shape.radiusFull,
+                      borderRadius: M3Shape.radiusMd,
                       borderSide: BorderSide(color: colorScheme.outlineVariant),
                     ),
                   ),
@@ -1282,10 +1276,10 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                   ),
                   decoration: BoxDecoration(
                     color: colorScheme.surface,
-                    borderRadius: M3Shape.radiusFull,
+                    borderRadius: M3ChipStyle.radius,
                   ),
                   child: Text(
-                    '$totalCount صنف',
+                    countSku(totalCount),
                     style: theme.textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: colorScheme.primary,
@@ -1592,7 +1586,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     ),
                     decoration: BoxDecoration(
                       color: badgeBg,
-                      borderRadius: M3Shape.radiusFull,
+                      borderRadius: M3ChipStyle.radius,
                     ),
                     child: Text(
                       badgeText,
@@ -1609,7 +1603,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                       Text(
                         group.competitors.isEmpty
                             ? 'لم يتم تحديد المنافسين بعد'
-                            : '${group.competitors.length} منافسين',
+                            : countCompetitors(group.competitors.length),
                         style: theme.textTheme.labelSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: isSelected
@@ -2047,7 +2041,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                                       ? activeAccent
                                       : colorScheme.onSurface,
                                 ),
-                                maxLines: 1,
+                                maxLines: 3,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -2064,7 +2058,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                           color: isSelected
                               ? activeAccent
                               : colorScheme.surfaceContainerHighest,
-                          borderRadius: M3Shape.radiusFull,
+                          borderRadius: M3ChipStyle.radius,
                         ),
                         child: Text(
                           competitor.packSizeLabel,
@@ -2093,7 +2087,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                       fontWeight: FontWeight.w600,
                       height: 1.4,
                     ),
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -2179,7 +2173,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                               fontWeight: FontWeight.w900,
                               color: statusFg,
                             ),
-                            maxLines: 1,
+                            maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -2257,7 +2251,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     ),
                     decoration: const BoxDecoration(
                       color: M3Palette.successSurface,
-                      borderRadius: M3Shape.radiusFull,
+                      borderRadius: M3ChipStyle.radius,
                       border:
                           Border.fromBorderSide(BorderSide(color: _ownBrandGreen, width: 1.5)),
                     ),
@@ -2297,7 +2291,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     ),
                     decoration: BoxDecoration(
                       color: compColor.withValues(alpha: 0.10),
-                      borderRadius: M3Shape.radiusFull,
+                      borderRadius: M3ChipStyle.radius,
                       border: Border.all(color: compColor, width: 1.5),
                     ),
                     child: Row(
@@ -2434,7 +2428,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     fontWeight: FontWeight.w900,
                     color: colorScheme.onSurface,
                   ),
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -2626,7 +2620,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                         fontWeight: FontWeight.w900,
                         color: colorScheme.onSurface,
                       ),
-                      maxLines: 1,
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -2662,7 +2656,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                                     ? M3Palette.onDangerSurface
                                     : colorScheme.onSurfaceVariant,
                           ),
-                          maxLines: 1,
+                          maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -2695,7 +2689,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                               fontWeight: FontWeight.w800,
                               color: M3Palette.onSuccessSurface,
                             ),
-                            maxLines: 1,
+                            maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -2720,7 +2714,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                               fontWeight: FontWeight.w900,
                               color: _ownBrandGreen,
                             ),
-                            maxLines: 1,
+                            maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -2759,7 +2753,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                                 fontWeight: FontWeight.w800,
                                 color: compColor,
                               ),
-                              maxLines: 1,
+                              maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -2784,7 +2778,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                                 fontWeight: FontWeight.w900,
                                 color: colorScheme.onSurface,
                               ),
-                              maxLines: 1,
+                              maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -2819,6 +2813,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     final colorScheme = theme.colorScheme;
 
     String monthlyMovementSummary = 'استقرار سعري خلال شهور $_selectedYear';
+    String movementChip = 'سعر مستقر';
     Color movementBg = colorScheme.secondaryContainer;
     Color movementFg = colorScheme.onSecondaryContainer;
     IconData movementIcon = Icons.timeline_rounded;
@@ -2846,7 +2841,9 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
         parts.add('انخفض في: ${downMonths.join('، ')}');
       }
       monthlyMovementSummary = parts.join(' | ');
+      movementChip = 'تغيّر السعر';
       if (group.periodPriceChangePct > 0.5) {
+        movementChip = 'ارتفاع السعر';
         movementBg = M3Palette.warningSurface;
         movementFg = M3Palette.onWarningSurface;
         movementIcon = Icons.trending_up_rounded;
@@ -2854,6 +2851,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
         movementBg = M3Palette.infoSurface;
         movementFg = M3Palette.onInfoSurface;
         movementIcon = Icons.trending_down_rounded;
+        movementChip = 'انخفاض السعر';
       }
     }
 
@@ -2900,7 +2898,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                           ),
                           decoration: const BoxDecoration(
                             color: _ownBrandGreen,
-                            borderRadius: M3Shape.radiusFull,
+                            borderRadius: M3ChipStyle.radius,
                           ),
                           child: Text(
                             'صنفنا الافتراضي ($_activePeriodLabelAr)',
@@ -2917,7 +2915,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                           ),
                           decoration: BoxDecoration(
                             color: colorScheme.surface,
-                            borderRadius: M3Shape.radiusFull,
+                            borderRadius: M3ChipStyle.radius,
                           ),
                           child: Text(
                             'الفئة: ${group.category}',
@@ -2933,7 +2931,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                           ),
                           decoration: BoxDecoration(
                             color: colorScheme.surface,
-                            borderRadius: M3Shape.radiusFull,
+                            borderRadius: M3ChipStyle.radius,
                           ),
                           child: Text(
                             'العبوة: ${group.packSizeLabel}',
@@ -2956,8 +2954,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                 ),
               ),
               Wrap(
-                spacing: 10.0,
-                runSpacing: 10.0,
+                spacing: 8.0,
+                runSpacing: 8.0,
                 children: [
                   _buildSpotlightMetricBox(
                     context,
@@ -3010,7 +3008,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
           const Divider(height: 1.0),
           const SizedBox(height: 12.0),
           Wrap(
-            spacing: 10.0,
+            spacing: 8.0,
             runSpacing: 8.0,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
@@ -3021,31 +3019,44 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                 ),
               ),
               _buildStatusCountPill(
-                label: '$higherCount منافس سعره أعلى منك (أنت أرخص)',
+                label: 'أنت أرخص من ${countCompetitors(higherCount)}',
                 bgColor: M3Palette.successSurface,
                 fgColor: M3Palette.onSuccessSurface,
                 icon: Icons.arrow_upward_rounded,
               ),
               _buildStatusCountPill(
-                label: '$lowerCount منافس سعره أقل منك (أنت أغلى)',
+                label: 'أنت أغلى من ${countCompetitors(lowerCount)}',
                 bgColor: M3Palette.dangerSurface,
                 fgColor: M3Palette.onDangerSurface,
                 icon: Icons.arrow_downward_rounded,
               ),
               if (equalCount > 0)
                 _buildStatusCountPill(
-                  label: '$equalCount منافس مساوي لسعرك',
+                  label: 'سعرك مساوٍ لـ ${countCompetitors(equalCount)}',
                   bgColor: colorScheme.secondaryContainer,
                   fgColor: colorScheme.onSecondaryContainer,
                   icon: Icons.drag_handle_rounded,
                 ),
               _buildStatusCountPill(
-                label: monthlyMovementSummary,
+                key: const ValueKey('compare_movement_chip'),
+                label: movementChip,
                 bgColor: movementBg,
                 fgColor: movementFg,
                 icon: movementIcon,
               ),
             ],
+          ),
+          M3Spacing.gapXS,
+          // Short status chip above, full month-by-month detail underneath.
+          Text(
+            monthlyMovementSummary,
+            key: const ValueKey('compare_movement_detail'),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -3111,28 +3122,30 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
   }
 
   Widget _buildStatusCountPill({
+    Key? key,
     required String label,
     required Color bgColor,
     required Color fgColor,
     required IconData icon,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: M3Shape.radiusFull,
-      ),
+    return M3ChipSurface(
+      key: key,
+      color: bgColor,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15.0, color: fgColor),
-          const SizedBox(width: 6.0),
-          Text(
-            label,
-            style: TextStyle(
-              color: fgColor,
-              fontWeight: FontWeight.w800,
-              fontSize: M3FontSize.bodySmall,
+          Icon(icon, size: 16.0, color: fgColor),
+          M3Spacing.hGapXS,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: fgColor,
+                fontWeight: FontWeight.w800,
+                fontSize: M3FontSize.bodySmall,
+              ),
             ),
           ),
         ],
@@ -3301,76 +3314,24 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     required String value,
     required String subtitle,
     required IconData icon,
-    required Color containerColor,
-    required Color onContainerColor,
+    required Color color,
     bool isLoading = false,
   }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: M3Shape.radiusLg,
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12.0),
-            decoration: BoxDecoration(
-              color: containerColor,
-              borderRadius: M3Shape.radiusMd,
-            ),
-            child: Icon(icon, color: onContainerColor, size: 24.0),
-          ),
-          const SizedBox(width: 14.0),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4.0),
-                // Never flash computed zeros (or stale KPIs) while competitive-monthly loads.
-                if (isLoading) ...[
-                  const M3SkeletonBox(
-                    key: ValueKey('compare_kpi_skeleton'),
-                    width: 120.0,
-                    height: 28.0,
-                  ),
-                  const SizedBox(height: 6.0),
-                  const M3SkeletonBox(width: 180.0, height: 12.0),
-                ] else ...[
-                  Text(
-                    value,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 2.0),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
+    // Same shared card as the Sell-Out KPIs (geometry, fonts, icon).
+    // Never flash computed zeros (or stale KPIs) while competitive-monthly loads.
+    return M3SummaryKpiCard(
+      key: ValueKey('compare_kpi_card_$title'),
+      titleKey: ValueKey('compare_kpi_title_$title'),
+      subtitleKey: ValueKey('compare_kpi_subtitle_$title'),
+      loadingKey: const ValueKey('compare_kpi_skeleton'),
+      title: title,
+      value: value,
+      subtitle: subtitle,
+      icon: icon,
+      color: color,
+      titleMaxLines: null,
+      subtitleMaxLines: 3,
+      isLoading: isLoading,
     );
   }
 }
@@ -3485,21 +3446,32 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
           ..strokeWidth = isHighlightedMonth ? 2.0 : 1.0,
       );
 
-      final label =
-          n > 4 ? '${pt.monthNameAr} ${pt.year % 100}' : pt.monthNameAr;
-      final tp = TextPainter(
-        text: TextSpan(
-          text: label,
-          style: TextStyle(
-            color: isHighlightedMonth ? ownColor : textColor,
-            fontSize: M3FontSize.bodySmall,
-            fontWeight:
-                isHighlightedMonth ? FontWeight.w900 : FontWeight.w800,
-          ),
-        ),
-        textDirection: TextDirection.rtl,
-      )..layout();
-      tp.paint(canvas, Offset(x - tp.width / 2, topPad + chartH + 9.0));
+      // Month labels never overlap: drop the year, then every other label,
+      // when the slot between grid lines is narrower than the text.
+      final slot = n > 1 ? chartW / (n - 1) - 6.0 : chartW;
+      TextPainter monthLabel(String text) => TextPainter(
+            text: TextSpan(
+              text: text,
+              style: TextStyle(
+                color: isHighlightedMonth ? ownColor : textColor,
+                fontSize: M3FontSize.bodySmall,
+                fontWeight:
+                    isHighlightedMonth ? FontWeight.w900 : FontWeight.w800,
+              ),
+            ),
+            textDirection: TextDirection.rtl,
+          )..layout();
+      var tp = monthLabel(
+          n > 4 ? '${pt.monthNameAr} ${pt.year % 100}' : pt.monthNameAr);
+      if (tp.width > slot) {
+        tp.dispose();
+        tp = monthLabel(pt.monthNameAr);
+      }
+      final skip = tp.width > slot && i.isOdd && !isHighlightedMonth;
+      if (!skip) {
+        tp.paint(canvas, Offset(x - tp.width / 2, topPad + chartH + 9.0));
+      }
+      tp.dispose();
     }
 
     // 3. Draw Selected Competitor Line + Callouts
