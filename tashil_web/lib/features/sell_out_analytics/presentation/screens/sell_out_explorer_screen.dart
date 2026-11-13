@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/m3_search_field.dart';
 import 'package:tashil_web/core/widgets/m3_states.dart';
 import 'package:tashil_web/core/widgets/m3_menu_filter.dart';
 import 'package:tashil_web/core/utils/sheet_name_utils.dart';
@@ -2294,7 +2295,8 @@ onChanged: m3Legacy<String>((v) {
                       }),
 ),
                   ),
-                  SizedBox(
+                  M3SearchFieldWidth(
+                    hintText: 'ابحث بالفرع أو المنطقة أو الصنف',
                     width: 220.0,
                     child: TextField(
                       key: const ValueKey('perf_search_field'),

@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_toolbar_button.dart';
 import '../../../../core/widgets/m3_section_title.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
@@ -1746,7 +1747,9 @@ onChanged: m3Legacy<int>((v) {
                       }),
 ),
                   ),
-                  SizedBox(
+                  M3SearchFieldWidth(
+                    hintText: 'ابحث بالصنف أو الكود أو الباركود',
+                    hintStyle: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w300),
                     width: 220.0,
                     child: TextField(
                       decoration: InputDecoration(

@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/m3_search_field.dart';
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_text_variants.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
@@ -1953,7 +1954,8 @@ onChanged: m3Legacy<String>((v) {
                     }),
 ),
                 ),
-                SizedBox(
+                M3SearchFieldWidth(
+                  hintText: 'ابحث باسم الفرع أو الكود أو المندوب...',
                   width: 240.0,
                   child: TextField(
                     onChanged: (v) => setState(() => _branchSearchQuery = v),
