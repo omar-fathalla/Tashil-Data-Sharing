@@ -30,6 +30,14 @@ abstract final class M3SummaryKpiStyle {
     );
   }
 
+  /// Fixed line box for a text role. Glyphs the page font lacks (▲ ▼ on
+  /// Compare) are drawn by a fallback font with another ascent / descent
+  /// split, which made mixed lines taller (Compare 141px vs Sell-Out 138px
+  /// live, v137). Forcing the strut keeps every line at the role's height.
+  static StrutStyle? strut(TextStyle? style) => style == null
+      ? null
+      : StrutStyle.fromTextStyle(style, forceStrutHeight: true);
+
   /// Detail line: bodySmall onSurfaceVariant.
   static TextStyle? subtitleStyle(BuildContext context) =>
       Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -75,6 +83,9 @@ class M3SummaryKpiCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final valueStyle =
+        M3SummaryKpiStyle.valueStyle(context, textValue: textValue);
+    final subtitleStyle = M3SummaryKpiStyle.subtitleStyle(context);
     return Container(
       padding: M3SummaryKpiStyle.padding,
       decoration: BoxDecoration(
@@ -124,8 +135,8 @@ class M3SummaryKpiCard extends StatelessWidget {
                 key: valueKey,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: M3SummaryKpiStyle.valueStyle(context,
-                    textValue: textValue),
+                style: valueStyle,
+                strutStyle: M3SummaryKpiStyle.strut(valueStyle),
               ),
             ),
             const SizedBox(height: M3SummaryKpiStyle.valueGap),
@@ -134,7 +145,8 @@ class M3SummaryKpiCard extends StatelessWidget {
               key: subtitleKey,
               maxLines: subtitleMaxLines,
               overflow: TextOverflow.ellipsis,
-              style: M3SummaryKpiStyle.subtitleStyle(context),
+              style: subtitleStyle,
+              strutStyle: M3SummaryKpiStyle.strut(subtitleStyle),
             ),
           ],
         ],
