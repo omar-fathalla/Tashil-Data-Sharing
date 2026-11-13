@@ -209,6 +209,22 @@ bool codeBreaksOnlyAtHyphens(WidgetTester tester, String code,
   return true;
 }
 
+/// Painted line count of a fully-visible table label (glyph box tops).
+int labelPaintedLineCount(WidgetTester tester, String expected,
+    {Finder? scope}) {
+  final texts = findTextLoose(expected, scope: scope);
+  if (texts.evaluate().isEmpty) return 0;
+  final textEl = texts.evaluate().first;
+  final para = _paragraphForText(tester, textEl);
+  if (para == null) return 0;
+  if (para.didExceedMaxLines) return (para.maxLines ?? 0) + 1;
+  final data = (textEl.widget as Text).data ?? '';
+  final boxes = para.getBoxesForSelection(
+      TextSelection(baseOffset: 0, extentOffset: data.length));
+  if (boxes.isEmpty) return 0;
+  return {for (final b in boxes) b.toRect().top.round()}.length;
+}
+
 /// True when [code] is painted on a single line (the live 1280 requirement).
 bool codeIsSingleLine(WidgetTester tester, String code, {Finder? scope}) {
   final key = find.byKey(ValueKey('dq_item_code_$code'));

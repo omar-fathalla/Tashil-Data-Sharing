@@ -597,21 +597,27 @@ class _IssuesTable extends StatelessWidget {
   //    at flex 158: real Cairo bodyMedium advance is 159.7dp, not the
   //    earlier 154.7dp, so a 158.7dp column had no slack. Flex 178
   //    (178/930×934 ≈ 178.7dp) leaves ≥16dp slack. Name keeps its 3-line
-  //    floor (232); the extra code share comes from found / expected /
-  //    barcode, which already wrap and have short headers.
-  //  - at 1024+sidebar (inner ~678) one-line codes plus the name floor
-  //    cannot both fit, so codes may wrap at '-' only
+  //    floor (232).
+  //  - expected must fit the live phrase «الصنف يتضاف لكارتة الأصناف»
+  //    in ≤3 lines. The wrapping bottleneck is «يتضاف لكارتة» (74.2dp);
+  //    v158's flex 72 (72.3dp) clipped «الأصناف». Flex 88 (88.4dp) leaves
+  //    ~14dp slack. The share comes from severity / found / status, which
+  //    have slack beyond «الخطورة» / «الموجود» / the «متجاهلة» chip.
+  //  - Arabic space-separated "codes" wrap at words, ≤3 lines (see
+  //    HyphenatedCodeText); they must not clip mid-word.
+  //  - at 1024+sidebar (inner ~678) one-line SKUs plus the name floor
+  //    cannot both fit, so hyphenated codes may wrap at '-' only
   static const _flex = [
-    64.0,
+    58.0,
     80.0,
     40.0,
     178.0,
     44.0,
     232.0,
-    60.0,
-    72.0,
+    54.0,
+    88.0,
     42.0,
-    76.0,
+    72.0,
     42.0
   ];
 

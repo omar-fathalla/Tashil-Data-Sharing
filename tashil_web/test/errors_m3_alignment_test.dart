@@ -296,7 +296,16 @@ void _assertTableFitsLiveContent(WidgetTester tester,
   expect(_labelFullyVisible(tester, table, kLongFound), isTrue,
       reason: 'found value');
   expect(_labelFullyVisible(tester, table, kLongExpected), isTrue,
-      reason: 'expected value');
+      reason: 'live expected «الصنف يتضاف لكارتة الأصناف» must show fully, '
+          'including الأصناف, in ≤3 lines');
+  expect(labelPaintedLineCount(tester, kLongExpected, scope: table),
+      lessThanOrEqualTo(3),
+      reason: 'live expected phrase');
+  expect(_labelFullyVisible(tester, table, kLiveArabicCode), isTrue,
+      reason: 'ماكسيل ماجيك متخصص عادي عادي must not clip at the cell edge');
+  expect(codePaintedLineCount(tester, kLiveArabicCode, scope: table),
+      inInclusiveRange(1, 3),
+      reason: 'Arabic item code wraps at words, ≤3 lines');
 
   for (final code in [kLiveMissingCode, kLiveFgccCode, kLivePrccCode]) {
     expect(codeBreaksOnlyAtHyphens(tester, code, scope: table), isTrue,
@@ -544,6 +553,36 @@ void main() {
         codeColumnHasSlack(tester, kLiveMissingCode, slack: 16.0, scope: table),
         isTrue,
         reason: 'column must be ≥16dp wider than the one-line advance');
+    expect(
+        _hScrollExtent(tester, find.byKey(const ValueKey('dq_table_scroll'))),
+        lessThanOrEqualTo(2.0));
+  });
+
+  testWidgets(
+      'live expected and Arabic item-code cells are fully visible at 1280+DesktopSidebar',
+      (tester) async {
+    await _pumpPageWithSidebar(tester);
+    final table = find.byKey(const ValueKey('dq_table'));
+    expect(table, findsOneWidget);
+    for (final text in [
+      kLongExpected,
+      kLiveArabicCode,
+      kLongTypeMissing,
+      kLongSkuName,
+      kLongFound,
+      'الخطورة',
+      'مفتوحة',
+      'المتوقع',
+      'الموجود',
+    ]) {
+      expect(_labelFullyVisible(tester, table, text), isTrue, reason: text);
+      expect(labelPaintedLineCount(tester, text, scope: table),
+          lessThanOrEqualTo(3),
+          reason: text);
+    }
+    expect(codePaintedLineCount(tester, kLiveMissingCode, scope: table), 1);
+    expect(codePaintedLineCount(tester, kLiveArabicCode, scope: table),
+        lessThanOrEqualTo(3));
     expect(
         _hScrollExtent(tester, find.byKey(const ValueKey('dq_table_scroll'))),
         lessThanOrEqualTo(2.0));
