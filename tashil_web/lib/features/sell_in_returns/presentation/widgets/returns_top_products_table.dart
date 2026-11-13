@@ -14,7 +14,8 @@ class ReturnsTopProductsTable extends StatelessWidget {
 
   /// Stable keys for widget tests (filter dropdown also labels «الصنف»).
   static const Key productHeaderKey = Key('returns-top-products-col-product');
-  static const Key returnsValueHeaderKey = Key('returns-top-products-col-returns-value');
+  static const Key returnsValueHeaderKey =
+      Key('returns-top-products-col-returns-value');
 
   final List<SellInReturnsTopProduct> products;
 
@@ -42,9 +43,11 @@ class ReturnsTopProductsTable extends StatelessWidget {
       fontWeight: FontWeight.w800,
       color: cs.onSurfaceVariant,
     );
-    final bodyStyle = theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
+    final bodyStyle =
+        theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
 
-    Widget head(String text, {TextAlign align = TextAlign.start, Key? key}) => SizedBox(
+    Widget head(String text, {TextAlign align = TextAlign.start, Key? key}) =>
+        SizedBox(
           height: _rowH,
           child: Align(
             alignment: align == TextAlign.end
@@ -52,12 +55,19 @@ class ReturnsTopProductsTable extends StatelessWidget {
                 : align == TextAlign.center
                     ? Alignment.center
                     : AlignmentDirectional.centerStart,
-            child: Text(key: key, text, style: headerStyle, textAlign: align, maxLines: 2),
+            child: Text(
+                key: key,
+                text,
+                style: headerStyle,
+                textAlign: align,
+                maxLines: 2),
           ),
         );
 
     // Rows grow so long names wrap to 3 lines without ellipsis.
-    Widget cell(String text, {TextAlign align = TextAlign.start, TextStyle? style}) => ConstrainedBox(
+    Widget cell(String text,
+            {TextAlign align = TextAlign.start, TextStyle? style}) =>
+        ConstrainedBox(
           constraints: const BoxConstraints(minHeight: _rowH),
           child: Align(
             alignment: align == TextAlign.end
@@ -76,20 +86,24 @@ class ReturnsTopProductsTable extends StatelessWidget {
         );
 
     return TableScrollContainer(
-      showSwipeHint: true,
+      showControls: false,
+      showSwipeHint: false,
       child: Table(
         columnWidths: columnWidths,
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
         border: TableBorder(
-          horizontalInside: BorderSide(color: cs.outlineVariant.withOpacity(0.45)),
+          horizontalInside:
+              BorderSide(color: cs.outlineVariant.withOpacity(0.45)),
         ),
         children: [
           TableRow(
-            decoration: BoxDecoration(color: cs.surfaceContainerHighest.withOpacity(0.45)),
+            decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withOpacity(0.45)),
             children: [
               head('#', align: TextAlign.center),
               head('الصنف', key: productHeaderKey),
-              head('قيمة المرتجع', align: TextAlign.center, key: returnsValueHeaderKey),
+              head('قيمة المرتجع',
+                  align: TextAlign.center, key: returnsValueHeaderKey),
               head('الكمية', align: TextAlign.center),
               head('نسبة من الإجمالي', align: TextAlign.center),
               head('حصة المرتجعات', align: TextAlign.center),
@@ -105,11 +119,16 @@ class ReturnsTopProductsTable extends StatelessWidget {
                       ? p.productName
                       : '${p.productName} (${p.productCode})',
                 ),
-                cell(CurrencyFormatter.formatCompactEGP(p.returnsValueEgp), align: TextAlign.center),
-                cell(CurrencyFormatter.formatNumber(p.returnsQty.round()), align: TextAlign.center),
-                cell('${p.returnPctOfGross.toStringAsFixed(1)}%', align: TextAlign.center),
-                cell('${p.shareOfReturns.toStringAsFixed(1)}%', align: TextAlign.center),
-                cell(CurrencyFormatter.formatCompactEGP(p.netValueEgp), align: TextAlign.center),
+                cell(CurrencyFormatter.formatCompactEGP(p.returnsValueEgp),
+                    align: TextAlign.center),
+                cell(CurrencyFormatter.formatNumber(p.returnsQty.round()),
+                    align: TextAlign.center),
+                cell('${p.returnPctOfGross.toStringAsFixed(1)}%',
+                    align: TextAlign.center),
+                cell('${p.shareOfReturns.toStringAsFixed(1)}%',
+                    align: TextAlign.center),
+                cell(CurrencyFormatter.formatCompactEGP(p.netValueEgp),
+                    align: TextAlign.center),
               ],
             ),
         ],
