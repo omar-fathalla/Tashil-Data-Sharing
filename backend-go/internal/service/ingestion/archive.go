@@ -828,6 +828,9 @@ func (p *Processor) setArchiveStoredRows(archiveID string, rows int, batchID str
 	p.writeArchiveSidecarLocked(entry)
 }
 
+// archiveCountsTimeout bounds the per-file BigQuery totals query on the archive list.
+var archiveCountsTimeout = 8 * time.Second
+
 // enrichArchiveStoredRows overlays BigQuery row counts (by archive_id) onto the list response so
 // rows_ingested reflects stored analytics rows, not a stale parse-time count.
 //
@@ -841,7 +844,11 @@ func (p *Processor) enrichArchiveStoredRows(ctx context.Context, resp *ArchiveLi
 	if !ok {
 		return
 	}
-	stored, err := rec.ArchiveRowCounts(ctx, resp.TenantID)
+	// Bounded: a slow BigQuery must not hold the uploaded-files list; on timeout the
+	// listed values are kept (same as a failed query).
+	cctx, cancel := context.WithTimeout(ctx, archiveCountsTimeout)
+	defer cancel()
+	stored, err := rec.ArchiveRowCounts(cctx, resp.TenantID)
 	if err != nil {
 		log.Printf("WARN [archive] ArchiveRowCounts failed for tenant=%s; keeping listed rows_ingested: %v", resp.TenantID, err)
 		return

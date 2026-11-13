@@ -115,6 +115,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   // Tab 3: Uploaded Sell-Out Excel Sheets Archive State
   bool _isLoadingArchive = false;
   List<ArchivedExcelFileModel> _archivedSellOutFiles = const [];
+  /// The last list load failed (after transient retries): show an error with
+  /// retry, never a misleading "no files" empty state.
+  bool _archiveLoadFailed = false;
   String _archiveUploadChain = 'fathalla';
   int _archiveUploadYear = 0; // 0 = Auto-detect from sheet
   int _archiveUploadMonth = 0; // 0 = Auto-detect from sheet
@@ -336,12 +339,16 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       if (mounted) {
         setState(() {
           _archivedSellOutFiles = res.files;
+          _archiveLoadFailed = false;
           _isLoadingArchive = false;
         });
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _isLoadingArchive = false);
+        setState(() {
+          _archiveLoadFailed = true;
+          _isLoadingArchive = false;
+        });
       }
     }
   }
@@ -3046,6 +3053,16 @@ onChanged: m3Legacy<int>((v) {
                     padding: EdgeInsets.all(48.0),
                     child: Center(child: CircularProgressIndicator()),
                   )
+                : _archiveLoadFailed && _archivedSellOutFiles.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: M3ErrorState(
+                          key: const ValueKey('sell_out_archive_load_error'),
+                          title: 'تعذّر تحميل الملفات المرفوعة',
+                          message: 'الخادم مشغول أو الاتصال انقطع. حاول مرة أخرى بعد لحظات.',
+                          onRetry: _loadSellOutArchive,
+                        ),
+                      )
                 : _archivedSellOutFiles.isEmpty
                     ? Padding(
                         padding: const EdgeInsets.all(48.0),
