@@ -115,10 +115,7 @@ void main() {
         ),
       ));
       await tester.pumpAndSettle();
-      await tester.tap(find
-          .textContaining(
-              RegExp(sellIn ? '^Uploaded Files' : '^الملفات المرفوعة'))
-          .first);
+      await tester.tap(find.textContaining(RegExp('^الملفات المرفوعة')).first);
       await tester.pumpAndSettle();
       final kind = sellIn ? 'sell_in' : 'sell_out';
       expect(

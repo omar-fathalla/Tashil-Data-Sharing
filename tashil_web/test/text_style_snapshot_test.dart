@@ -105,11 +105,11 @@ void main() {
   testWidgets('Sell-In explorer text styles are unchanged', (tester) async {
     await _pump(tester, SellInExplorerScreen(apiClient: ApiClient()));
     await _check(tester, 'sell_in_tab0');
-    await _tab(tester, 'Stock & Reorder');
+    await _tab(tester, RegExp('^المخزون وإعادة الطلب\$'));
     await _check(tester, 'sell_in_stock');
-    await _tab(tester, 'Targets');
+    await _tab(tester, RegExp('^المستهدفات\$'));
     await _check(tester, 'sell_in_targets');
-    await _tab(tester, 'Uploaded Files');
+    await _tab(tester, RegExp('^الملفات المرفوعة'));
     await _check(tester, 'sell_in_sheets');
   });
 
