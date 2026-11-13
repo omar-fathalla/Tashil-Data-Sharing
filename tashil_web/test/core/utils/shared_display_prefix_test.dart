@@ -199,6 +199,32 @@ void main() {
       ]);
     });
 
+    test(
+      'treats remainders that differ only by spaces next to digits as a collision',
+      () {
+        // Mirrors the live v153 Returns case: main-chain "… - كفر 2"
+        // vs personal-care "… مواد عناية - كفر2" (no space before 2).
+        // Fictional names only.
+        const nbsp = '\u00A0';
+        final names = [
+          'عائله سلسله تجريبيه - كفر التجريبي',
+          'عائله سلسله تجريبيه - كفر التجريبي 2',
+          'عائلة سلسلة تجريبية - كفر التجريبي$nbsp 2',
+          'عائله سلسله تجريبيه مواد عناية - كفر التجريبي',
+          'عائله سلسله تجريبيه مواد عناية - كفر التجريبي2',
+          'عائله سلسله تجريبيه مواد عناية - فرع المطروح',
+        ];
+        expect(stripSharedLeadingPrefix(names), [
+          'كفر التجريبي',
+          'كفر التجريبي 2',
+          'كفر التجريبي$nbsp 2',
+          'مواد عناية - كفر التجريبي',
+          'مواد عناية - كفر التجريبي2',
+          'فرع المطروح',
+        ]);
+      },
+    );
+
     test('strips a live-like Store Matrix فرع prefix, leaving the outlier', () {
       final names = [
         'فرع سلسلة تجريبية - سيدي جابر ميني',
