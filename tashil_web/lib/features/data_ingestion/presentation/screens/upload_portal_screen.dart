@@ -19,7 +19,6 @@ import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_section_title.dart';
-import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../../../../core/widgets/m3_states.dart';
 import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/m3_toolbar_button.dart';
@@ -94,13 +93,13 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
   // with the pinned actions column.
   static const double _archiveRowHeight = 104.0;
   static const List<double> _archiveColumnFlex = [
-    2.2, // الملف (flexes and wraps)
-    1.0, // السلسلة
+    1.9, // الملف (flexes and wraps)
+    0.95, // السلسلة
     0.7, // الفترة
-    0.55, // الفروع
-    0.7, // السجلات
-    0.8, // المبيعات
-    0.95, // تاريخ الرفع
+    0.5, // الفروع
+    0.65, // السجلات
+    0.75, // المبيعات
+    1.35, // تاريخ الرفع (full uploaded + last-import date)
   ];
   static const double _archiveActionsWidthEstimate = 168.0;
 
@@ -1372,9 +1371,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
               final chainDropdown = M3Dropdown<String?>(
                 key: const ValueKey('ingestion_retail_chain_dropdown'),
                 value: hasSelectedChain ? _selectedChain : null,
-                label: compact
-                    ? 'السلسلة *'
-                    : 'سلسلة التجزئة المستهدفة (Target Retail Chain) *',
+                label: 'السلسلة *',
                 leadingIcon: Icons.store_mall_directory_rounded,
                 fitOptions: true,
                 expand: compact || constraints.maxWidth >= 1000,
@@ -1401,7 +1398,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
               final yearDropdown = M3Dropdown<String>(
                 key: const ValueKey('ingestion_year_dropdown'),
                 value: _selectedYear,
-                label: compact ? 'السنة' : 'سنة البيانات (Target Year)',
+                label: 'السنة',
                 leadingIcon: Icons.calendar_today_rounded,
                 fitOptions: true,
                 expand: compact || constraints.maxWidth >= 1000,
@@ -1417,7 +1414,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
               final monthDropdown = M3Dropdown<String>(
                 key: const ValueKey('ingestion_month_dropdown'),
                 value: _selectedMonth,
-                label: compact ? 'الشهر' : 'الشهر المستهدف (Target Month)',
+                label: 'الشهر',
                 leadingIcon: Icons.date_range_rounded,
                 fitOptions: true,
                 expand: compact || constraints.maxWidth >= 1000,
@@ -2249,33 +2246,36 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
             },
           ),
           M3Spacing.gapSM,
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: M3SegmentedButtonGroup<String>(
-              segments: [
-                M3SegmentItem(
-                  value: 'all',
-                  label: 'الكل ($totalAllChains)',
-                  icon: Icons.apps_rounded,
-                ),
-                ...chainKeys.map((code) {
-                  final count = _archiveChainCounts[code.toLowerCase()] ?? 0;
-                  final arName = _getShortChainTabLabel(code);
-                  return M3SegmentItem(
-                    value: code,
-                    label: '$arName ($count)',
-                    icon: Icons.storefront_rounded,
-                  );
-                }),
-              ],
-              selectedValue: chainKeys.contains(_archiveChainFilter)
-                  ? _archiveChainFilter
-                  : 'all',
-              onSelectionChanged: (val) {
-                setState(() => _archiveChainFilter = val);
-                _loadArchive();
-              },
-            ),
+          LayoutBuilder(
+            builder: (context, tabConstraints) {
+              final tabMax = tabConstraints.maxWidth.isFinite
+                  ? tabConstraints.maxWidth
+                  : MediaQuery.sizeOf(context).width;
+              return Wrap(
+                key: const ValueKey('archive_chain_tabs'),
+                spacing: M3Spacing.xs,
+                runSpacing: M3Spacing.xs,
+                children: [
+                  _archiveChainTab(
+                    value: 'all',
+                    label: 'الكل ($totalAllChains)',
+                    icon: Icons.apps_rounded,
+                    selected: _archiveChainFilter == 'all' ||
+                        !chainKeys.contains(_archiveChainFilter),
+                    maxWidth: tabMax,
+                  ),
+                  for (final code in chainKeys)
+                    _archiveChainTab(
+                      value: code,
+                      label:
+                          '${_getShortChainTabLabel(code)} (${_archiveChainCounts[code.toLowerCase()] ?? 0})',
+                      icon: Icons.storefront_rounded,
+                      selected: _archiveChainFilter == code,
+                      maxWidth: tabMax,
+                    ),
+                ],
+              );
+            },
           ),
           M3Spacing.gapXS,
           M3FlexWrap(
@@ -2510,11 +2510,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
     final periodText = file.targetMonth.isNotEmpty && file.targetMonth != 'auto'
         ? '${file.targetMonth} / ${file.targetYear}'
         : 'سنة ${file.targetYear}';
-    final uploaded = _formatArchiveDateTime(file.uploadedAt);
-    final dateText = (file.lastIngestedAt.isNotEmpty &&
-            file.lastIngestedAt != file.uploadedAt)
-        ? '$uploaded\nآخر استيراد: ${_formatArchiveDateTime(file.lastIngestedAt)}'
-        : uploaded;
+    final dateLines = _archiveDateLines(file);
 
     return DataRow(
       cells: [
@@ -2603,16 +2599,26 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
           color: colorScheme.primary,
         )),
         DataCell(
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 96.0),
-            child: Text(
-              dateText,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+          KeyedSubtree(
+            key: ValueKey('archive_date_${file.id}'),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (final line in dateLines)
+                  Text(
+                    line,
+                    maxLines: 1,
+                    overflow: TextOverflow.visible,
+                    softWrap: false,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: line == 'آخر استيراد'
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -2698,11 +2704,64 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
     );
   }
 
+  Widget _archiveChainTab({
+    required String value,
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required double maxWidth,
+  }) {
+    void onPressed() {
+      setState(() => _archiveChainFilter = value);
+      _loadArchive();
+    }
+
+    final child = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: M3ToolbarButton.iconSize),
+        const SizedBox(width: 8.0),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+    final button = selected
+        ? FilledButton.tonal(onPressed: onPressed, child: child)
+        : OutlinedButton(onPressed: onPressed, child: child);
+    return KeyedSubtree(
+      key: ValueKey('archive_chain_tab_$value'),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: button,
+      ),
+    );
+  }
+
+  /// Uploaded timestamp, plus last-import date on its own lines so neither
+  /// is ellipsised. At most 3 lines.
+  static List<String> _archiveDateLines(ArchivedExcelFileModel file) {
+    final uploaded = _formatArchiveDateTime(file.uploadedAt);
+    if (file.lastIngestedAt.isNotEmpty &&
+        file.lastIngestedAt != file.uploadedAt) {
+      return [
+        uploaded,
+        'آخر استيراد',
+        _formatArchiveDateTime(file.lastIngestedAt),
+      ];
+    }
+    return [uploaded];
+  }
+
   /// Width reserved for the file-name cell so a long name wraps (up to 3
   /// lines) instead of pushing the table into a horizontal scroll.
   static double _archiveFileNameMaxWidth(double tableAreaWidth) {
-    const otherFlexSum = 1.0 + 0.7 + 0.55 + 0.7 + 0.8 + 0.95;
-    const nameFlex = 2.2;
+    const otherFlexSum = 0.95 + 0.7 + 0.5 + 0.65 + 0.75 + 1.35;
+    const nameFlex = 1.9;
     const spacing = M3Spacing.xs;
     const columns = 7;
     final tableWidth = (tableAreaWidth - _archiveActionsWidthEstimate)

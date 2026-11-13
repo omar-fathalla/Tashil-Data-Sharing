@@ -5,6 +5,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,7 @@ import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/core/widgets/m3_search_field.dart';
 import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 import 'package:tashil_web/features/data_ingestion/presentation/screens/upload_portal_screen.dart';
+import 'package:tashil_web/features/navigation/presentation/desktop_sidebar.dart';
 
 import 'support/real_fonts.dart';
 
@@ -98,6 +100,66 @@ class UploadFixtureApi extends ApiClient {
   }
 }
 
+/// Live-like Adeco chains at 1280×800 (sidebar + six archive tabs, including الوكالة).
+class UploadLiveFixtureApi extends UploadFixtureApi {
+  @override
+  Future<List<RetailChainModel>> getRetailChains({String? targetTenant}) async {
+    return [
+      ...await super.getRetailChains(targetTenant: targetTenant),
+      RetailChainModel(
+        chainId: 'beet-elgomla',
+        tenantId: 'adeco',
+        displayName: 'بيت الجملة (Beet El Gomla)',
+        code: 'beet-elgomla',
+        storeCount: 9,
+      ),
+      RetailChainModel(
+        chainId: 'qa-test',
+        tenantId: 'adeco',
+        displayName: 'QA Test',
+        code: 'qa-test',
+        storeCount: 0,
+      ),
+      RetailChainModel(
+        chainId: 'chain-1080314',
+        tenantId: 'adeco',
+        displayName: 'الوكالة (El Wakala)',
+        code: 'chain-1080314',
+        storeCount: 4,
+      ),
+    ];
+  }
+
+  @override
+  Future<UploadedFilesArchiveResponse> getUploadedFilesArchive({
+    String? chain,
+    String? year,
+    String? searchQuery,
+    String? targetTenant,
+    String? fileType,
+  }) async {
+    final base = await super.getUploadedFilesArchive(
+      chain: chain,
+      year: year,
+      searchQuery: searchQuery,
+      targetTenant: targetTenant,
+      fileType: fileType,
+    );
+    return UploadedFilesArchiveResponse(
+      tenantId: base.tenantId,
+      totalCount: base.totalCount,
+      chainCounts: const {
+        'fathalla': 1,
+        'gomla': 1,
+        'beet-elgomla': 0,
+        'qa-test': 0,
+        'chain-1080314': 3,
+      },
+      files: base.files,
+    );
+  }
+}
+
 List<String> clippedDropdowns(WidgetTester tester) {
   final out = <String>[];
   for (final e in find
@@ -130,11 +192,18 @@ List<String> clippedDropdowns(WidgetTester tester) {
   return out;
 }
 
-Future<void> pumpUpload(WidgetTester tester, {double width = 1280}) async {
-  tester.view.physicalSize = Size(width, 3000);
+Future<void> pumpUpload(
+  WidgetTester tester, {
+  double width = 1280,
+  double height = 3000,
+  bool sidebar = false,
+  ApiClient? api,
+}) async {
+  tester.view.physicalSize = Size(width, height);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+  final page = UploadPortalScreen(apiClient: api ?? UploadFixtureApi());
   await tester.pumpWidget(MaterialApp(
     theme: AppTheme.light(),
     locale: const Locale('ar'),
@@ -146,10 +215,49 @@ Future<void> pumpUpload(WidgetTester tester, {double width = 1280}) async {
     ],
     home: Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(body: UploadPortalScreen(apiClient: UploadFixtureApi())),
+      child: Scaffold(
+        body: sidebar
+            ? Row(children: [
+                DesktopSidebar(
+                  selectedIndex: 10,
+                  onDestinationSelected: (_) {},
+                  activeTenant: 'adeco',
+                  onTenantChanged: (_) {},
+                ),
+                Expanded(child: page),
+              ])
+            : page,
+      ),
     ),
   ));
   await tester.pumpAndSettle();
+}
+
+void expectTextFullyVisible(WidgetTester tester, Finder f, String what) {
+  expect(f, findsWidgets, reason: what);
+  final e = f.evaluate().first;
+  final widget = e.widget;
+  if (widget is Text && widget.data != null) {
+    final box = tester.getRect(f.first);
+    final style = widget.style;
+    final tp = TextPainter(
+      text: TextSpan(text: widget.data, style: style),
+      textDirection: Directionality.of(e),
+      textScaler: MediaQuery.textScalerOf(e),
+      maxLines: widget.maxLines,
+    )..layout();
+    final cut = (widget.overflow == TextOverflow.ellipsis &&
+            widget.maxLines != null &&
+            tp.didExceedMaxLines) ||
+        (widget.maxLines == 1 && tp.width > box.width + 0.5);
+    tp.dispose();
+    expect(cut, isFalse,
+        reason: '$what is truncated ($box, overflow=${widget.overflow})');
+  }
+  try {
+    final p = tester.renderObject<RenderParagraph>(f.first);
+    expect(p.didExceedMaxLines, isFalse, reason: '$what exceeded maxLines');
+  } catch (_) {}
 }
 
 double horizontalScrollExtent(WidgetTester tester, Finder table) {
@@ -288,4 +396,65 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets(
+      'Upload last-import date is fully visible at 1280 with sidebar (live layout)',
+      (tester) async {
+    await pumpUpload(tester,
+        width: 1280, sidebar: true, api: UploadLiveFixtureApi());
+    expect(tester.takeException(), isNull);
+    const width = 1280.0;
+    expectInViewport(
+        tester, find.text('آخر استيراد'), width, 'آخر استيراد label');
+    expectInViewport(
+        tester, find.text('2026-11-02 10:15'), width, 'uploaded timestamp');
+    expectInViewport(
+        tester, find.text('2026-11-12 18:40'), width, 'last-import timestamp');
+    expectTextFullyVisible(tester, find.text('آخر استيراد'), 'آخر استيراد');
+    expectTextFullyVisible(
+        tester, find.text('2026-11-02 10:15'), 'uploaded timestamp');
+    expectTextFullyVisible(
+        tester, find.text('2026-11-12 18:40'), 'last-import timestamp');
+    expect(find.textContaining('آخر استيراد:'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'Upload ingestion dropdown labels are short and uncut at 1280 with sidebar',
+      (tester) async {
+    await pumpUpload(tester,
+        width: 1280, sidebar: true, api: UploadLiveFixtureApi());
+    expect(find.text('السلسلة *'), findsWidgets);
+    expect(find.text('السنة'), findsWidgets);
+    expect(find.text('الشهر'), findsWidgets);
+    expect(find.text('سلسلة التجزئة المستهدفة (Target Retail Chain) *'),
+        findsNothing);
+    expect(find.text('سنة البيانات (Target Year)'), findsNothing);
+    expect(find.text('الشهر المستهدف (Target Month)'), findsNothing);
+    expectTextFullyVisible(tester, find.text('السلسلة *'), 'سلسلة label');
+    expectTextFullyVisible(tester, find.text('السنة').first, 'سنة label');
+    expectTextFullyVisible(tester, find.text('الشهر').first, 'شهر label');
+    expect(find.textContaining('تلقائي من الشيت'), findsWidgets);
+    expect(clippedDropdowns(tester), isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'Upload الوكالة archive tab is fully visible at 1280 with sidebar',
+      (tester) async {
+    await pumpUpload(tester,
+        width: 1280, sidebar: true, api: UploadLiveFixtureApi());
+    const width = 1280.0;
+    expect(find.byKey(const ValueKey('archive_chain_tab_chain-1080314')),
+        findsOneWidget);
+    expect(find.text('الوكالة (3)'), findsWidgets);
+    expectInViewport(tester, find.text('الوكالة (3)'), width, 'الوكالة tab');
+    expectInViewport(tester, find.text('الكل (5)'), width, 'الكل tab');
+    expectInViewport(
+        tester, find.text('أسواق فتح الله (1)'), width, 'Fathalla tab');
+    expectInViewport(tester, find.text('QA Test (0)'), width, 'QA Test tab');
+    expectTextFullyVisible(
+        tester, find.text('الوكالة (3)'), 'الوكالة tab label');
+    expect(tester.takeException(), isNull);
+  });
 }
