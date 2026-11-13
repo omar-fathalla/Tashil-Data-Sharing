@@ -248,8 +248,7 @@ class CompetitorSuggestionsReviewState
 
         final processed = (result['processed_own'] as num?)?.toInt() ?? 0;
         final created = (result['created_count'] as num?)?.toInt() ?? 0;
-        final remaining =
-            (result['remaining_uncovered'] as num?)?.toInt() ?? 0;
+        final remaining = (result['remaining_uncovered'] as num?)?.toInt() ?? 0;
         final summary =
             (result['summary_ar'] ?? result['error'])?.toString().trim() ?? '';
         final rankFailures = (result['rank_failures'] as num?)?.toInt() ?? 0;
@@ -410,18 +409,17 @@ class CompetitorSuggestionsReviewState
               ),
               if (widget.isOwner) ...[
                 M3Dropdown<int>(
-width: 96,
-fitOptions: true,
-                    value: _batchSize,
-                    label: 'دفعة',
-                    options: const [
-                      M3DropdownOption(5, '5'),
-                      M3DropdownOption(10, '10'),
-                    ],
-                    onChanged: _busyBatch
-                        ? null
-                        : (v) => setState(() => _batchSize = v),
-                  ),
+                  width: 96,
+                  fitOptions: true,
+                  value: _batchSize,
+                  label: 'دفعة',
+                  options: const [
+                    M3DropdownOption(5, '5'),
+                    M3DropdownOption(10, '10'),
+                  ],
+                  onChanged:
+                      _busyBatch ? null : (v) => setState(() => _batchSize = v),
+                ),
                 M3Spacing.gapSM,
                 FilledButton.tonalIcon(
                   key: const ValueKey('run-suggestions-batch'),
@@ -441,7 +439,8 @@ fitOptions: true,
                 if (_generatingAll)
                   OutlinedButton.icon(
                     key: const ValueKey('stop-generate-all-suggestions'),
-                    onPressed: _stopGenerateAll ? null : _requestStopGenerateAll,
+                    onPressed:
+                        _stopGenerateAll ? null : _requestStopGenerateAll,
                     icon: const Icon(Icons.stop_circle_rounded, size: 18),
                     label: Text(_stopGenerateAll ? 'جارٍ الإيقاف…' : 'إيقاف'),
                   )
@@ -449,7 +448,8 @@ fitOptions: true,
                   FilledButton.tonalIcon(
                     key: const ValueKey('generate-all-suggestions'),
                     onPressed: _busyBatch ? null : _generateAll,
-                    icon: const Icon(Icons.playlist_add_check_rounded, size: 18),
+                    icon:
+                        const Icon(Icons.playlist_add_check_rounded, size: 18),
                     label: const Text('توليد للكل'),
                   ),
               ],
@@ -490,7 +490,8 @@ fitOptions: true,
             'تشغيل دفعة (حتى 10 أصناف) أو «توليد للكل» أو اختيار صنف في تبويب الأسعار يولّد اقتراحات جديدة (تبقى معلّقة). '
             'حجم الدفعة يخص التشغيل اليدوي فقط ولا يقيّد قائمة الانتظار. '
             'الاقتراحات المعلّقة لا تظهر في المقارنة أو مؤشرات الأداء حتى الموافقة.',
-            style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            style:
+                theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
           if (!_loading && groups.isNotEmpty) ...[
             M3Spacing.gapXS,
@@ -533,7 +534,8 @@ fitOptions: true,
             for (final g in pageGroups) _buildGroupCard(g),
             if (pageCount > 1) ...[
               M3Spacing.gapSM,
-              _buildPager(theme, cs, groups.length, pageCount, pageStart, pageEnd),
+              _buildPager(
+                  theme, cs, groups.length, pageCount, pageStart, pageEnd),
             ],
           ],
         ],
@@ -556,16 +558,15 @@ fitOptions: true,
       children: [
         IconButton(
           tooltip: 'الصفحة السابقة',
-          onPressed: _pageIndex > 0
-              ? () => setState(() => _pageIndex--)
-              : null,
+          onPressed: _pageIndex > 0 ? () => setState(() => _pageIndex--) : null,
           icon: const Icon(AppIcons.chevronStart),
         ),
         Expanded(
           child: Text(
             'صفحة ${_pageIndex + 1} من $pageCount · $rangeLabel',
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            style:
+                theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
         ),
         IconButton(
@@ -588,12 +589,13 @@ fitOptions: true,
 
     return Card(
       key: ValueKey('suggestion-group-${group.ownBarcode}'),
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: M3Spacing.s12),
       elevation: 0,
-      color: cs.surface,
+      // Same outlined surface as the Compare / Sell-Out cards.
+      color: cs.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: M3Shape.radiusLg,
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.7)),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -654,10 +656,10 @@ fitOptions: true,
                   ),
               ],
             ),
-            M3Spacing.gapMD,
-            for (final s in group.suggestions) ...[
-              _buildCompetitorRow(s, groupBusy: groupBusy),
-              M3Spacing.gapSM,
+            const SizedBox(height: M3Spacing.s12),
+            for (var i = 0; i < group.suggestions.length; i++) ...[
+              _buildCompetitorRow(group.suggestions[i], groupBusy: groupBusy),
+              if (i < group.suggestions.length - 1) M3Spacing.gapXS,
             ],
           ],
         ),
@@ -672,17 +674,16 @@ fitOptions: true,
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final busy = groupBusy || _busyId == s.id;
-    final name = s.competitorSkuName.isEmpty
-        ? s.competitorBarcode
-        : s.competitorSkuName;
+    final name =
+        s.competitorSkuName.isEmpty ? s.competitorBarcode : s.competitorSkuName;
 
     return Container(
       key: ValueKey('suggestion-${s.id}'),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerLowest,
+        color: cs.surface,
         borderRadius: M3Shape.radiusMd,
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.55)),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -747,43 +748,35 @@ fitOptions: true,
             ),
           ),
           if (widget.isOwner) ...[
-            M3Spacing.gapSM,
+            M3Spacing.gapXS,
             // M3 connected action group: tonal approve + outlined reject on light surface.
             // Adeco green is accent only (selected/tonal), never a solid dark fill.
             Align(
+              key: ValueKey('suggestion-actions-${s.id}'),
               alignment: AlignmentDirectional.centerStart,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: cs.surface,
-                  borderRadius: M3Shape.radiusXl,
-                  border: Border.all(
-                    color: cs.outlineVariant.withValues(alpha: 0.7),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      FilledButton.tonal(
-                        onPressed: busy ? null : () => _approve(s),
-                        style: FilledButton.styleFrom(
-                          foregroundColor: M3Palette.success,
-                          backgroundColor: M3Palette.successSurface,
-                        ),
-                        child: const Text('موافقة'),
+              child: Padding(
+                padding: EdgeInsets.zero,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FilledButton.tonal(
+                      onPressed: busy ? null : () => _approve(s),
+                      style: FilledButton.styleFrom(
+                        foregroundColor: M3Palette.success,
+                        backgroundColor: M3Palette.successSurface,
                       ),
-                      M3Spacing.gapXS,
-                      OutlinedButton(
-                        onPressed: busy ? null : () => _reject(s),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: cs.onSurfaceVariant,
-                          side: BorderSide(color: cs.outlineVariant),
-                        ),
-                        child: const Text('رفض'),
+                      child: const Text('موافقة'),
+                    ),
+                    M3Spacing.gapXS,
+                    OutlinedButton(
+                      onPressed: busy ? null : () => _reject(s),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: cs.onSurfaceVariant,
+                        side: BorderSide(color: cs.outlineVariant),
                       ),
-                    ],
-                  ),
+                      child: const Text('رفض'),
+                    ),
+                  ],
                 ),
               ),
             ),
