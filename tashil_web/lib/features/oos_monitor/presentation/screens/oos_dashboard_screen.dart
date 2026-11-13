@@ -1368,7 +1368,7 @@ onChanged: m3Legacy<String>((val) {
                           maxLines: 2,
                         ),
                         Text(
-                          '${countSku(branchAlerts.length)} منعدمة بالفرع',
+                          countMissingInBranch(branchAlerts.length),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -1381,72 +1381,95 @@ onChanged: m3Legacy<String>((val) {
                 const SizedBox(height: 12.0),
                 const Divider(height: 1.0),
                 const SizedBox(height: 8.0),
-                TableScrollContainer(
-                  key: ValueKey('oos_matrix_table_$branchName'),
-                  child: DataTable(
-                    headingRowHeight: 48,
-                    dataRowMinHeight: 52,
-                    dataRowMaxHeight: double.infinity,
-                    columns: const [
-                      DataColumn(
-                        label: Text('الصنف'),
-                      ),
-                      DataColumn(
-                        label: Text('الماركة'),
-                        headingRowAlignment: MainAxisAlignment.center,
-                      ),
-                      DataColumn(
-                        label: Text('أيام الانعدام'),
-                        headingRowAlignment: MainAxisAlignment.center,
-                      ),
-                      DataColumn(
-                        label: Text('الفاقد اليومي'),
-                        headingRowAlignment: MainAxisAlignment.center,
-                      ),
-                    ],
-                    rows: [
-                      for (final item in branchAlerts)
-                        DataRow(
-                          cells: [
-                            DataCell(
-                              Text(
-                                item.skuName,
-                                key: const ValueKey('oos_sku_name'),
-                                maxLines: 3,
-                                textAlign: TextAlign.start,
-                              ),
-                            ),
-                            DataCell(
-                              Center(
-                                child: Text(
-                                  item.brand,
-                                  maxLines: 3,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                            DataCell(
-                              Center(
-                                child: Text(
-                                  countDay(item.consecutiveDaysOOS),
-                                  maxLines: 3,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                            DataCell(
-                              Center(
-                                child: Text(
-                                  CurrencyFormatter.formatCompactEGP(item.estimatedLostDailyCost),
-                                  maxLines: 3,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                          ],
+                LayoutBuilder(
+                  builder: (context, tableConstraints) {
+                    const flex = <double>[2.2, 0.9, 0.8, 0.9];
+                    const spacing = M3Spacing.xs;
+                    const margin = M3Spacing.xs;
+                    final availableWidth = tableConstraints.maxWidth.isFinite
+                        ? tableConstraints.maxWidth
+                        : MediaQuery.sizeOf(context).width;
+                    final flexSum = flex.fold<double>(0, (a, b) => a + b);
+                    final inner = availableWidth -
+                        (2 * margin) -
+                        ((flex.length - 1) * spacing);
+                    double colMax(int i) =>
+                        (inner * flex[i] / flexSum).clamp(56.0, double.infinity);
+                    Widget cellBox(int i, Widget child) => SizedBox(
+                          width: colMax(i),
+                          child: child,
+                        );
+                    Widget cellText(int i, String text,
+                        {Key? key, TextAlign align = TextAlign.center}) {
+                      return cellBox(
+                        i,
+                        Text(
+                          text,
+                          key: key,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: align,
+                          softWrap: true,
                         ),
-                    ],
-                  ),
+                      );
+                    }
+
+                    final columns = [
+                      DataColumn(
+                        label: cellText(0, 'الصنف', align: TextAlign.start),
+                      ),
+                      DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: cellText(1, 'الماركة'),
+                      ),
+                      DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: cellText(2, 'أيام الانعدام'),
+                      ),
+                      DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: cellText(3, 'الفاقد اليومي'),
+                      ),
+                    ];
+
+                    return SizedBox(
+                      width: availableWidth,
+                      child: TableScrollContainer(
+                        key: ValueKey('oos_matrix_table_$branchName'),
+                        showSwipeHint: true,
+                        columnFlex: flex,
+                        child: DataTable(
+                          headingRowHeight: 56,
+                          dataRowMinHeight: 52,
+                          dataRowMaxHeight: double.infinity,
+                          columnSpacing: spacing,
+                          horizontalMargin: margin,
+                          columns: columns,
+                          rows: centerCellsUnderCenteredHeadings(
+                            columns,
+                            [
+                              for (final item in branchAlerts)
+                                DataRow(
+                                  cells: [
+                                    DataCell(cellText(0, item.skuName,
+                                        key: const ValueKey('oos_sku_name'),
+                                        align: TextAlign.start)),
+                                    DataCell(cellText(1, item.brand)),
+                                    DataCell(cellText(
+                                        2, countDay(item.consecutiveDaysOOS))),
+                                    DataCell(cellText(
+                                      3,
+                                      CurrencyFormatter.formatCompactEGP(
+                                          item.estimatedLostDailyCost),
+                                    )),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 8.0),
                 Align(
@@ -1457,7 +1480,7 @@ onChanged: m3Legacy<String>((val) {
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('تم إنشاء طلب توريد مجمع لـ ${countSku(branchAlerts.length)} منعدمة في $branchName'),
+                          content: Text('تم إنشاء طلب توريد مجمع لـ ${countSku(branchAlerts.length)} في $branchName'),
                           backgroundColor: colorScheme.primary,
                           behavior: SnackBarBehavior.floating,
                         ),

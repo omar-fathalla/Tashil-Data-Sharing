@@ -34,4 +34,14 @@ void main() {
     expect(countDay(12), '12 يومًا');
     expect(countDay(100), '100 يوم');
   });
+
+  test('countMissingInBranch agrees the adjective with the counted noun', () {
+    expect(countMissingInBranch(0), '0 أصناف منعدمة بالفرع');
+    expect(countMissingInBranch(1), 'صنف واحد منعدم بالفرع');
+    expect(countMissingInBranch(2), 'صنفان منعدمان بالفرع');
+    expect(countMissingInBranch(3), '3 أصناف منعدمة بالفرع');
+    expect(countMissingInBranch(18), '18 صنفًا منعدمًا بالفرع');
+    expect(countMissingInBranch(100), '100 صنف منعدم بالفرع');
+  });
+
 }

@@ -965,9 +965,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                           (inner * flex[i] / flexSum)
                                               .clamp(56.0, double.infinity);
                                       Widget cellBox(int i, Widget child) =>
-                                          ConstrainedBox(
-                                            constraints: BoxConstraints(
-                                                maxWidth: colMax(i)),
+                                          SizedBox(
+                                            width: colMax(i),
                                             child: child,
                                           );
 
@@ -985,7 +984,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                             horizontalMargin: margin,
                                             dataRowMinHeight: 52.0,
                                             dataRowMaxHeight: double.infinity,
-                                            headingRowHeight: 48.0,
+                                            headingRowHeight: 72.0,
                                             headingRowColor:
                                                 WidgetStateProperty.all(
                                               colorScheme
@@ -998,7 +997,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                       0,
                                                       const Text(
                                                         'الصنف والباركود',
-                                                        maxLines: 2,
+                                                        maxLines: 3,
+                                                        overflow: TextOverflow.clip,
                                                       ))),
                                               DataColumn(
                                                   headingRowAlignment:
@@ -1007,7 +1007,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                       1,
                                                       const Text(
                                                         'السلسلة والفرع',
-                                                        maxLines: 2,
+                                                        maxLines: 3,
+                                                        overflow: TextOverflow.clip,
                                                         textAlign:
                                                             TextAlign.center,
                                                       ))),
@@ -1019,7 +1020,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                       2,
                                                       const Text(
                                                         'السعر الفعلي',
-                                                        maxLines: 2,
+                                                        maxLines: 3,
+                                                        overflow: TextOverflow.clip,
                                                         textAlign:
                                                             TextAlign.center,
                                                       ))),
@@ -1031,7 +1033,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                       3,
                                                       const Text(
                                                         'السعر الموصى به (RRP)',
-                                                        maxLines: 2,
+                                                        maxLines: 3,
+                                                        overflow: TextOverflow.clip,
                                                         textAlign:
                                                             TextAlign.center,
                                                       ))),
@@ -1042,7 +1045,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                       4,
                                                       const Text(
                                                         'الفارق السعري (Delta)',
-                                                        maxLines: 2,
+                                                        maxLines: 3,
+                                                        overflow: TextOverflow.clip,
                                                         textAlign:
                                                             TextAlign.center,
                                                       ))),
@@ -1053,7 +1057,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                       5,
                                                       const Text(
                                                         'حالة العرض والأثر البيعي',
-                                                        maxLines: 2,
+                                                        maxLines: 3,
+                                                        overflow: TextOverflow.clip,
                                                         textAlign:
                                                             TextAlign.center,
                                                       ))),
@@ -1915,15 +1920,24 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                       Expanded(
                         child: LayoutBuilder(
                           builder: (context, chipConstraints) {
-                            final labelWidth = (chipConstraints.maxWidth - 24.0)
-                                .clamp(0.0, chipConstraints.maxWidth);
-                            return FilterChip(
+                            // FilterChip adds padding, labelPadding, and a
+                            // border around the label. 24dp was not enough at
+                            // the live 1030dp content width (1280 minus the
+                            // 250dp sidebar): the chip overflowed the slot and
+                            // clipped the start of long names. Reserve 48dp.
+                            const chrome = 48.0;
+                            final labelWidth = (chipConstraints.maxWidth - chrome)
+                                .clamp(8.0, chipConstraints.maxWidth);
+                            return SizedBox(
+                              width: chipConstraints.maxWidth,
+                              child: FilterChip(
                               label: SizedBox(
                                 width: labelWidth,
                                 child: Text(
                                   chunk[col],
                                   maxLines: 3,
                                   overflow: TextOverflow.clip,
+                                  softWrap: true,
                                   textAlign: TextAlign.center,
                                   style: theme.textTheme.labelLarge?.copyWith(
                                     fontWeight: _selectedCategory == chunk[col]
@@ -1950,6 +1964,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                 });
                                 _loadPricingCompliance();
                               },
+                            ),
                             );
                           },
                         ),
