@@ -78,87 +78,67 @@ class BentoKpiGrid extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final int crossAxisCount;
-        if (constraints.maxWidth >= 1000) {
-          crossAxisCount = 4;
-        } else if (constraints.maxWidth >= 600) {
-          crossAxisCount = 2;
-        } else {
-          crossAxisCount = 1;
-        }
-
-        final double cardWidth =
-            (constraints.maxWidth - ((crossAxisCount - 1) * M3Spacing.sm)) /
-            crossAxisCount;
-
+        // Same breakpoints as Sell-Out `_buildFourCardResponsiveLayout`
+        // (960 / 580). At the live 1280+sidebar shell the content after
+        // 24dp page padding is ~982dp, which is 4 columns there and 2
+        // columns at a 1024+sidebar shell (~726dp).
+        final columns = constraints.maxWidth >= 960
+            ? 4
+            : (constraints.maxWidth >= 580 ? 2 : 1);
         return M3EqualHeightGrid(
           key: const ValueKey('exec_kpi_grid'),
-          columns: crossAxisCount,
+          columns: columns,
           spacing: M3Spacing.sm,
           runSpacing: M3Spacing.sm,
           children: [
-            SizedBox(
-              width: cardWidth,
-              child: M3SummaryKpiCard(
-                key: const ValueKey('kpi_card_exec_sellout'),
-                valueKey: const ValueKey('kpi_value_exec_sellout'),
-                subtitleKey: const ValueKey('kpi_subtitle_exec_sellout'),
-                title: 'إجمالي Sell-Out',
-                value: CurrencyFormatter.formatCompactEGP(kpis.totalRevenue),
-                subtitle: _yearDetail(
-                  yoyAvailable: kpis.yoyAvailable,
-                  momPct: kpis.revenueMomPct,
-                  yoyPct: kpis.revenueYoyPct,
-                ),
-                icon: AppIcons.money,
-                color: colorScheme.primary,
+            M3SummaryKpiCard(
+              key: const ValueKey('kpi_card_exec_sellout'),
+              valueKey: const ValueKey('kpi_value_exec_sellout'),
+              subtitleKey: const ValueKey('kpi_subtitle_exec_sellout'),
+              title: 'إجمالي Sell-Out',
+              value: CurrencyFormatter.formatCompactEGP(kpis.totalRevenue),
+              subtitle: _yearDetail(
+                yoyAvailable: kpis.yoyAvailable,
+                momPct: kpis.revenueMomPct,
+                yoyPct: kpis.revenueYoyPct,
               ),
+              icon: AppIcons.money,
+              color: colorScheme.primary,
             ),
-            SizedBox(
-              width: cardWidth,
-              child: M3SummaryKpiCard(
-                key: const ValueKey('kpi_card_exec_units'),
-                valueKey: const ValueKey('kpi_value_exec_units'),
-                subtitleKey: const ValueKey('kpi_subtitle_exec_units'),
-                title: 'إجمالي الوحدات المباعة',
-                value: CurrencyFormatter.formatCompactUnits(
-                  kpis.totalUnitsSold,
-                ),
-                subtitle: _yearDetail(
-                  yoyAvailable: kpis.yoyAvailable,
-                  momPct: kpis.unitsMomPct,
-                  yoyPct: kpis.unitsYoyPct,
-                ),
-                icon: AppIcons.units,
-                color: colorScheme.tertiary,
+            M3SummaryKpiCard(
+              key: const ValueKey('kpi_card_exec_units'),
+              valueKey: const ValueKey('kpi_value_exec_units'),
+              subtitleKey: const ValueKey('kpi_subtitle_exec_units'),
+              title: 'إجمالي الوحدات المباعة',
+              value: CurrencyFormatter.formatCompactUnits(kpis.totalUnitsSold),
+              subtitle: _yearDetail(
+                yoyAvailable: kpis.yoyAvailable,
+                momPct: kpis.unitsMomPct,
+                yoyPct: kpis.unitsYoyPct,
               ),
+              icon: AppIcons.units,
+              color: colorScheme.tertiary,
             ),
-            SizedBox(
-              width: cardWidth,
-              child: M3SummaryKpiCard(
-                key: const ValueKey('kpi_card_exec_stores'),
-                valueKey: const ValueKey('kpi_value_exec_stores'),
-                subtitleKey: const ValueKey('kpi_subtitle_exec_stores'),
-                title: 'الفروع النشطة',
-                value: countBranches(kpis.activeStoresCount),
-                subtitle: _buildActiveBranchesSubtitle(),
-                icon: AppIcons.store,
-                color: colorScheme.secondary,
-              ),
+            M3SummaryKpiCard(
+              key: const ValueKey('kpi_card_exec_stores'),
+              valueKey: const ValueKey('kpi_value_exec_stores'),
+              subtitleKey: const ValueKey('kpi_subtitle_exec_stores'),
+              title: 'الفروع النشطة',
+              value: countBranches(kpis.activeStoresCount),
+              subtitle: _buildActiveBranchesSubtitle(),
+              icon: AppIcons.store,
+              color: colorScheme.secondary,
             ),
-            SizedBox(
-              width: cardWidth,
-              child: M3SummaryKpiCard(
-                key: const ValueKey('kpi_card_exec_oos'),
-                valueKey: const ValueKey('kpi_value_exec_oos'),
-                subtitleKey: const ValueKey('kpi_subtitle_exec_oos'),
-                title: 'نسبة نفاد المخزون (OOS)',
-                value: '${kpis.oosRatePct.toStringAsFixed(1)}%',
-                subtitle:
-                    'OSA ${kpis.osaRatePct.toStringAsFixed(1)}% · نفاد المخزون ${kpis.oosRatePct.toStringAsFixed(1)}%',
-                icon: AppIcons.warning,
-                color: colorScheme.error,
-              ),
+            M3SummaryKpiCard(
+              key: const ValueKey('kpi_card_exec_oos'),
+              valueKey: const ValueKey('kpi_value_exec_oos'),
+              subtitleKey: const ValueKey('kpi_subtitle_exec_oos'),
+              title: 'نسبة نفاد المخزون (OOS)',
+              value: '${kpis.oosRatePct.toStringAsFixed(1)}%',
+              subtitle:
+                  'OSA ${kpis.osaRatePct.toStringAsFixed(1)}% · نفاد المخزون ${kpis.oosRatePct.toStringAsFixed(1)}%',
+              icon: AppIcons.warning,
+              color: colorScheme.error,
             ),
           ],
         );

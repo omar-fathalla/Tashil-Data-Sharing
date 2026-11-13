@@ -1,7 +1,9 @@
 // Live-harness Dashboard pass: Chrome 150% zoom fullscreen is a 1280×800
 // CSS viewport with the 250dp DesktopSidebar (content 1030dp). Tests use
-// that exact width (and 1024), real Cairo, the ▲▼ fallback font, and
-// live-scale (made-up) values. KPI cards must be 138px like Sell-Out;
+// that exact width and 1024 (both with the sidebar, which the live
+// shell shows at >= 840dp), real Cairo, the ▲▼ fallback font, and
+// live-scale (made-up) values. The Dashboard KPI row must use the
+// same column count, card width, and 138px height as Sell-Out;
 // the stock table must fit with no horizontal scroll; empty last-year
 // shows «—» + «لا توجد بيانات للعام السابق»; shared prefix is stripped.
 import 'dart:io';
@@ -165,7 +167,7 @@ Future<void> _pumpAt(
     home: Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: sidebar && width >= 1280
+        body: sidebar && width >= 840
             ? Row(children: [
                 DesktopSidebar(
                   selectedIndex: 0,
@@ -224,6 +226,28 @@ double _hScrollExtent(WidgetTester tester, Finder scope) {
   return 0;
 }
 
+const _dashboardKpiKeys = [
+  'kpi_card_exec_sellout',
+  'kpi_card_exec_units',
+  'kpi_card_exec_stores',
+  'kpi_card_exec_oos',
+];
+
+const _sellOutKpiKeys = [
+  'kpi_card_Net Sales (EGP)',
+  'kpi_card_Total Units Sold',
+  'kpi_card_Active SKUs',
+  'kpi_card_Active Stores',
+];
+
+int _kpiColumnCount(WidgetTester tester, List<String> keys) {
+  final tops = [
+    for (final key in keys) tester.getRect(find.byKey(ValueKey(key))).top,
+  ];
+  final first = tops.first;
+  return tops.where((top) => (top - first).abs() < 1.0).length;
+}
+
 void main() {
   GoogleFonts.config.allowRuntimeFetching = false;
   setUpAll(() async {
@@ -237,50 +261,82 @@ void main() {
   setUp(AppCache.clear);
 
   testWidgets(
-      'at live 1280+sidebar and at 1024, Dashboard KPI cards are 138px like Sell-Out',
+      'Dashboard KPI row matches Sell-Out column count, width and height at live 1280+sidebar and 1024+sidebar',
       (tester) async {
-    await _pumpAt(
-      tester,
-      SellOutExplorerScreen(apiClient: ApiClient(tenantId: 'tenant-adeco')),
-    );
-    final sellOutCard = find.byKey(const ValueKey('kpi_card_Net Sales (EGP)'));
-    expect(sellOutCard, findsOneWidget);
-    final sellOutH = tester.getSize(sellOutCard).height;
-    expect(sellOutH, closeTo(kSellOutKpiHeight, 2.0),
-        reason: 'Sell-Out reference height is $sellOutH');
-
-    await _pumpAt(tester, _dashboardBody());
-    expect(tester.takeException(), isNull);
-    const keys = [
-      'kpi_card_exec_sellout',
-      'kpi_card_exec_units',
-      'kpi_card_exec_stores',
-      'kpi_card_exec_oos',
-    ];
-    for (final key in keys) {
-      final card = find.byKey(ValueKey(key));
-      expect(card, findsOneWidget, reason: key);
-      expect(tester.getSize(card).height, closeTo(kSellOutKpiHeight, 2.0),
-          reason: '$key height ${tester.getSize(card).height} vs $sellOutH');
-      final kpi = tester.widget<M3SummaryKpiCard>(card);
-      expect(kpi.titleMaxLines, 1, reason: key);
-      expect(kpi.subtitleMaxLines, 1, reason: key);
+    Future<({int columns, double width, double height})> measureSellOut(
+      double width,
+    ) async {
+      await _pumpAt(
+        tester,
+        SellOutExplorerScreen(apiClient: ApiClient(tenantId: 'tenant-adeco')),
+        width: width,
+      );
+      for (final key in _sellOutKpiKeys) {
+        expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+      }
+      final size = tester.getSize(
+        find.byKey(ValueKey(_sellOutKpiKeys.first)),
+      );
+      return (
+        columns: _kpiColumnCount(tester, _sellOutKpiKeys),
+        width: size.width,
+        height: size.height,
+      );
     }
+
+    Future<void> expectDashboardMatches(
+      ({int columns, double width, double height}) sellOut, {
+      required double width,
+      required String label,
+    }) async {
+      await _pumpAt(tester, _dashboardBody(), width: width);
+      expect(tester.takeException(), isNull);
+      expect(
+        _kpiColumnCount(tester, _dashboardKpiKeys),
+        sellOut.columns,
+        reason: 'Dashboard columns vs Sell-Out at $label',
+      );
+      for (final key in _dashboardKpiKeys) {
+        final card = find.byKey(ValueKey(key));
+        expect(card, findsOneWidget, reason: key);
+        final size = tester.getSize(card);
+        expect(size.height, closeTo(sellOut.height, 2.0),
+            reason:
+                '$key height ${size.height} vs Sell-Out ${sellOut.height} at $label');
+        expect(size.width, closeTo(sellOut.width, 2.0),
+            reason:
+                '$key width ${size.width} vs Sell-Out ${sellOut.width} at $label');
+        expect(size.height, closeTo(kSellOutKpiHeight, 2.0),
+            reason: '$key height ${size.height} at $label');
+        final kpi = tester.widget<M3SummaryKpiCard>(card);
+        expect(kpi.titleMaxLines, 1, reason: key);
+        expect(kpi.subtitleMaxLines, 1, reason: key);
+      }
+    }
+
+    final at1280 = await measureSellOut(kLiveViewportWidth);
+    expect(at1280.height, closeTo(kSellOutKpiHeight, 2.0),
+        reason: 'Sell-Out reference height is ${at1280.height}');
+    expect(at1280.columns, 4,
+        reason: 'Sell-Out at live 1280+sidebar should be 4-up '
+            '(content after padding is ~982dp, breakpoint 960)');
+    await expectDashboardMatches(at1280,
+        width: kLiveViewportWidth, label: 'live 1280+sidebar');
+
     // Empty last year: «—» on the detail line, phrase uncut, no fake YoY %.
     expect(
         find.textContaining('لا توجد بيانات للعام السابق'), findsNWidgets(2));
     expect(find.textContaining('—'), findsWidgets);
     expect(find.textContaining('مقارنة بالعام السابق'), findsNothing);
 
-    await _pumpAt(tester, _dashboardBody(), width: 1024, sidebar: false);
-    expect(tester.takeException(), isNull);
-    for (final key in keys) {
-      expect(
-        tester.getSize(find.byKey(ValueKey(key))).height,
-        closeTo(kSellOutKpiHeight, 2.0),
-        reason: '$key at 1024',
-      );
-    }
+    final at1024 = await measureSellOut(1024);
+    expect(at1024.height, closeTo(kSellOutKpiHeight, 2.0),
+        reason: 'Sell-Out height at 1024+sidebar is ${at1024.height}');
+    expect(at1024.columns, 2,
+        reason: 'Sell-Out at live 1024+sidebar should be 2-up '
+            '(content after padding is ~726dp, below 960)');
+    await expectDashboardMatches(at1024,
+        width: 1024, label: 'live 1024+sidebar');
   });
 
   testWidgets(
@@ -304,12 +360,12 @@ void main() {
     expect(status.overlaps(r) || status.left < r.left || r.left < status.left,
         isTrue);
 
-    await _pumpAt(tester, _dashboardBody(), width: 1024, sidebar: false);
+    await _pumpAt(tester, _dashboardBody(), width: 1024);
     expect(
         _hScrollExtent(
             tester, find.byKey(const ValueKey('stock_per_sku_table'))),
         lessThanOrEqualTo(2.0),
-        reason: 'stock table still scrolls at 1024');
+        reason: 'stock table still scrolls at live 1024+sidebar');
   });
 
   testWidgets(
