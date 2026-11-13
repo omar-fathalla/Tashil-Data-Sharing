@@ -8,6 +8,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/shared_display_prefix.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
 
 /// VirtualizedSkuTable renders sell-out transactions with pinned columns
@@ -30,6 +31,11 @@ class VirtualizedSkuTable extends StatefulWidget {
 }
 
 class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
+  Map<String, String> get _storeDisplay =>
+      displayNamesWithoutSharedPrefix(widget.records.map((r) => r.storeName));
+
+  String _displayStore(String raw) => _storeDisplay[raw] ?? raw;
+
   // Tall enough for a value plus up to 3 wrapped detail lines (or a 3-line
   // item / branch name) without ellipsis (owner table rule).
   static const double _rowHeight = 84.0;
@@ -507,7 +513,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                       ),
                                       const SizedBox(width: 4.0),
                                       Text(
-                                        r.storeName,
+                                        _displayStore(r.storeName),
                                         style: theme.textTheme.labelSmall?.copyWith(
                                           color: colorScheme.onSurfaceVariant,
                                           fontSize: M3FontSize.labelSmall,
@@ -1066,7 +1072,7 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                                     SizedBox(
                                       width: colStoreWidth,
                                       child: Text(
-                                        r.storeName,
+                                        _displayStore(r.storeName),
                                         key: const ValueKey('sku_table_store_name'),
                                         textAlign: TextAlign.center,
                                         style: theme.textTheme.bodyMedium,

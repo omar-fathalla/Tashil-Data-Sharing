@@ -25,6 +25,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/testing/test_semantics.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/shared_display_prefix.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/widgets/app_icons.dart';
@@ -77,6 +78,17 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   int _selectedMonth = 0; // 0 = All Months
   static const int _pageSize = 25;
   List<SellInRecordItem> _records = const []; // accumulated rows (infinite scroll)
+
+  Map<String, String> get _locationDisplay {
+    final names = <String>{
+      ..._records.map((r) => r.governorate),
+      ...?_stockDashboard?.inventoryAndPoItems.map((i) => i.governorate),
+    }..removeWhere((n) => n.trim().isEmpty);
+    return displayNamesWithoutSharedPrefix(names);
+  }
+
+  String _displayLocation(String raw) => _locationDisplay[raw] ?? raw;
+
   bool _isLoadingMore = false;
   String _searchQuery = '';
   bool _isLoading = true;
@@ -1256,7 +1268,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                 ),
           ),
         ),
-        if (r.governorate.isNotEmpty) _secondary(context, r.governorate),
+        if (r.governorate.isNotEmpty) _secondary(context, _displayLocation(r.governorate)),
       ]),
       col([
         _primary(context, '${CurrencyFormatter.formatNumber(r.netQtyCases.round())} كرتونة'),
@@ -2962,9 +2974,9 @@ onChanged: m3Legacy<String>((val) {
                                   ConstrainedBox(
                                     constraints: const BoxConstraints(maxWidth: 140.0),
                                     child: Tooltip(
-                                      message: '${item.brand} • ${item.governorate}',
+                                      message: '${item.brand} • ${_displayLocation(item.governorate)}',
                                       child: Text(
-                                        '${item.brand} • ${item.governorate}',
+                                        '${item.brand} • ${_displayLocation(item.governorate)}',
                                         maxLines: 3,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(fontWeight: FontWeight.w600),

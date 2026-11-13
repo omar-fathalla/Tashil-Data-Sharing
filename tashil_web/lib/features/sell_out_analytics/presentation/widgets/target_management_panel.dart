@@ -11,6 +11,7 @@ import '../../../../core/network/api_client.dart';
 import '../../data/target_repository.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/shared_display_prefix.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/widgets/m3_feedback.dart';
@@ -55,6 +56,30 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
   String _selectedChain = 'all';
   int _selectedYear = 0; // 0 = All Years
   TargetsSummaryModel? _summary;
+
+  Map<String, String> get _branchDisplay {
+    final names = <String>{};
+    final items = _summary?.items;
+    if (items != null) {
+      for (final item in items) {
+        if (item.branchName.trim().isNotEmpty && item.branchName != 'كل الفروع') {
+          names.add(item.branchName);
+        }
+        for (final b in item.branches) {
+          if (b.branchName.trim().isNotEmpty && b.branchName != 'كل الفروع') {
+            names.add(b.branchName);
+          }
+        }
+      }
+    }
+    return displayNamesWithoutSharedPrefix(names);
+  }
+
+  String _displayBranch(String raw) {
+    if (raw.isEmpty || raw == 'كل الفروع' || raw == '—') return raw;
+    return _branchDisplay[raw] ?? raw;
+  }
+
   List<RetailChainModel> _companyChains = const [];
 
   // Selected Target for Comprehensive 3-Level Drill-Down
@@ -1380,7 +1405,7 @@ onChanged: m3Legacy<String>((v) {
                                             ),
                                           )
                                         : Text(
-                                            '${item.branchName} • ${item.category}',
+                                            '${_displayBranch(item.branchName)} • ${item.category}',
                                           ),
                                   ),
                                   DataCell(
@@ -2030,7 +2055,7 @@ onChanged: m3Legacy<String>((v) {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          b.branchName,
+                          _displayBranch(b.branchName),
                           style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(                             fontWeight: FontWeight.w800,                             fontSize: M3FontSize.bodyMedium,                           )),
                         ),
                         Text(
@@ -2268,7 +2293,7 @@ options: m3OptionsFromMenuItems<String>(target.branches
                             (b) => DropdownMenuItem<String>(
                               value: b.branchName,
                               child: Text(
-                                '${b.branchName} (${CurrencyFormatter.formatNumber(b.targetUnits.round())} كرتونة)',
+                                '${_displayBranch(b.branchName)} (${CurrencyFormatter.formatNumber(b.targetUnits.round())} كرتونة)',
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -2334,7 +2359,7 @@ onChanged: m3Legacy<String>((v) {
           theme,
           colorScheme,
           pageSkus,
-          scopeLabel: branch.branchName,
+          scopeLabel: _displayBranch(branch.branchName),
         ),
 
         const SizedBox(height: 10.0),
