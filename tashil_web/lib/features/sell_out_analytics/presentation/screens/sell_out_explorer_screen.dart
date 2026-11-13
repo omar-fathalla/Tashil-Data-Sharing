@@ -457,7 +457,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   actions: [
                     TestSemantics.button(
                       identifier: TestIds.uploadCommitCancel,
-                      label: 'Cancel upload commit',
+                      label: 'إلغاء الرفع',
                       onPressed: () => Navigator.of(ctx).pop(false),
                       child: TextButton(
                         onPressed: () => Navigator.of(ctx).pop(false),
@@ -466,7 +466,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     ),
                     TestSemantics.button(
                       identifier: TestIds.uploadCommitConfirm,
-                      label: 'Confirm upload commit',
+                      label: 'تأكيد الرفع',
                       onPressed: () => Navigator.of(ctx).pop(true),
                       child: FilledButton(
                         style: FilledButton.styleFrom(
@@ -610,7 +610,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
           actions: [
             TestSemantics.button(
               identifier: TestIds.deleteCancel,
-              label: 'Cancel delete',
+              label: 'إلغاء الحذف',
               onPressed: () => Navigator.of(ctx).pop(false),
               child: TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
@@ -619,7 +619,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
             ),
             TestSemantics.button(
               identifier: TestIds.deleteConfirm,
-              label: 'Confirm delete',
+              label: 'تأكيد الحذف',
               onPressed: () => Navigator.of(ctx).pop(true),
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
@@ -2989,7 +2989,7 @@ onChanged: m3Legacy<int>((v) {
                     children: [
                       TestSemantics.button(
                         identifier: TestIds.selloutUploadButton,
-                        label: 'Upload Sell-Out file',
+                        label: 'رفع ملف Sell-Out',
                         onPressed: _isUploading
                             ? null
                             : () => _pickAndUploadSellOutFile(

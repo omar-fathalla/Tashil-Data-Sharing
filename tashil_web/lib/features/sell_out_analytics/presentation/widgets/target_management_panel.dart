@@ -2477,7 +2477,7 @@ onChanged: m3Legacy<String>((v) {
               width: 165.0,
               child: M3Dropdown<String>(
 value: _skuSectorFilter,
-label: 'القطاع (Sector)',
+label: 'القطاع',
 options: m3OptionsFromMenuItems<String>([
                   const DropdownMenuItem(value: 'all', child: Text('كل القطاعات')),
                   const DropdownMenuItem(

@@ -28,6 +28,11 @@ class TableScrollContainer extends StatefulWidget {
   /// screen. Its rows must use the same heights as the table's rows.
   final Widget? pinnedEnd;
 
+  /// Optional key column pinned at the inline start (right in RTL), outside
+  /// the horizontal scroll view, e.g. the item name, so it stays on screen
+  /// while the other columns scroll. Its rows must use the table's heights.
+  final Widget? pinnedStart;
+
   const TableScrollContainer({
     super.key,
     required this.child,
@@ -42,6 +47,7 @@ class TableScrollContainer extends StatefulWidget {
     this.padding,
     this.decoration,
     this.pinnedEnd,
+    this.pinnedStart,
   });
 
   @override
@@ -269,12 +275,13 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
           ],
 
           // Scrollable Table Area with Always-Visible Scrollbar & Full-Width Column Expansion
-          if (widget.pinnedEnd != null)
+          if (widget.pinnedEnd != null || widget.pinnedStart != null)
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (widget.pinnedStart != null) widget.pinnedStart!,
                 Expanded(child: _buildScrollArea()),
-                widget.pinnedEnd!,
+                if (widget.pinnedEnd != null) widget.pinnedEnd!,
               ],
             )
           else
