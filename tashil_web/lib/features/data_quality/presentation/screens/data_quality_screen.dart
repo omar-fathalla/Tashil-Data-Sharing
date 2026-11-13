@@ -1,22 +1,27 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/table_scroll_container.dart';
 
+import '../../../../core/data/data_refresh_mixin.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/theme/m3_spacing.dart';
+import '../../../../core/theme/m3_status_colors.dart';
+import '../../../../core/utils/arabic_plural.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/widgets/app_icons.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
-import '../../data/data_quality_repository.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_search_field.dart';
+import '../../../../core/widgets/m3_states.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_toolbar_button.dart';
+import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../customer_registry/presentation/pending_customers_screen.dart';
-import '../../../sellin_assist/presentation/sellin_assist_screen.dart';
 import '../../../product_match/presentation/screens/product_match_review_screen.dart';
-import '../../../../core/data/data_refresh_mixin.dart';
-
-String _egp(double v) {
-  final s = v.abs().round().toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
-  return '${v < 0 ? '-' : ''}$s ج.م';
-}
+import '../../../sellin_assist/presentation/sellin_assist_screen.dart';
+import '../../data/data_quality_repository.dart';
 
 String _d(DateTime? t) => t == null
     ? ''
@@ -39,13 +44,15 @@ class DataQualityScreen extends StatefulWidget {
   State<DataQualityScreen> createState() => _DataQualityScreenState();
 }
 
-class _DataQualityScreenState extends State<DataQualityScreen> with DataRefreshMixin<DataQualityScreen> {
+class _DataQualityScreenState extends State<DataQualityScreen>
+    with DataRefreshMixin<DataQualityScreen> {
   @override
   void onBackendDataChanged() {
     _load();
   }
 
-  late final DataQualityDataSource _repo = widget.dataSource ?? DataQualityRepository(widget.apiClient!);
+  late final DataQualityDataSource _repo =
+      widget.dataSource ?? DataQualityRepository(widget.apiClient!);
   DataQualitySummary _summary = const DataQualitySummary();
   List<DataQualityIssue> _issues = const [];
   DataQualityFilter _filter = const DataQualityFilter();
@@ -53,6 +60,8 @@ class _DataQualityScreenState extends State<DataQualityScreen> with DataRefreshM
   String? _error;
   DateTime? _version;
   Timer? _poll;
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -64,6 +73,7 @@ class _DataQualityScreenState extends State<DataQualityScreen> with DataRefreshM
   @override
   void dispose() {
     _poll?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -110,6 +120,22 @@ class _DataQualityScreenState extends State<DataQualityScreen> with DataRefreshM
     _load();
   }
 
+  List<DataQualityIssue> get _visibleIssues {
+    final q = _searchQuery.trim().toLowerCase();
+    if (q.isEmpty) return _issues;
+    bool hit(DataQualityIssue i) => [
+          i.itemName,
+          i.itemCode,
+          i.barcode,
+          i.typeLabel,
+          i.foundValue,
+          i.expectedValue,
+          i.sheet,
+          dqSourceLabel(i.source),
+        ].any((s) => s.toLowerCase().contains(q));
+    return _issues.where(hit).toList();
+  }
+
   Future<void> _changeStatus(DataQualityIssue issue) async {
     final result = await showDialog<(String, String)>(
       context: context,
@@ -121,21 +147,49 @@ class _DataQualityScreenState extends State<DataQualityScreen> with DataRefreshM
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
   void _export() {
     final csv = ExcelExportService.generateCsv(
       headers: const [
-        'المصدر', 'النوع', 'الخطورة', 'الشيت', 'الصف', 'العمود', 'كود الصنف', 'الباركود', 'اسم الصنف',
-        'القيمة الموجودة', 'القيمة المتوقعة', 'التأثير (ج.م)', 'الحالة', 'السبب', 'أول ظهور', 'تاريخ الحل',
+        'المصدر',
+        'النوع',
+        'الخطورة',
+        'الشيت',
+        'الصف',
+        'العمود',
+        'كود الصنف',
+        'الباركود',
+        'اسم الصنف',
+        'القيمة الموجودة',
+        'القيمة المتوقعة',
+        'التأثير (ج.م)',
+        'الحالة',
+        'السبب',
+        'أول ظهور',
+        'تاريخ الحل',
       ],
-      rows: _issues
+      rows: _visibleIssues
           .map((i) => [
-                dqSourceLabel(i.source), i.typeLabel, i.severity, i.sheet, i.row, i.column,
-                i.itemCode, i.barcode, i.itemName, i.foundValue, i.expectedValue,
-                i.impactEgp?.toStringAsFixed(2) ?? '', i.status, i.statusReason, _d(i.firstSeen), _d(i.resolvedAt),
+                dqSourceLabel(i.source),
+                i.typeLabel,
+                i.severity,
+                i.sheet,
+                i.row,
+                i.column,
+                i.itemCode,
+                i.barcode,
+                i.itemName,
+                i.foundValue,
+                i.expectedValue,
+                i.impactEgp?.toStringAsFixed(2) ?? '',
+                i.status,
+                i.statusReason,
+                _d(i.firstSeen),
+                _d(i.resolvedAt),
               ])
           .toList(),
     );
@@ -145,92 +199,130 @@ class _DataQualityScreenState extends State<DataQualityScreen> with DataRefreshM
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final visible = _visibleIssues;
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: RefreshIndicator(
-        onRefresh: _load,
-        child: ListView(
-          padding: const EdgeInsets.all(24.0),
-          children: [
-            Row(
-              children: [
-                Icon(AppIcons.dataQuality, color: cs.primary),
-                const SizedBox(width: 8.0),
-                Expanded(
-                  child: Text('الأخطاء وجودة البيانات',
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-                ),
-                IconButton(
-                  key: const ValueKey('dq_refresh'),
-                  tooltip: 'تحديث',
-                  onPressed: _load,
-                  icon: const Icon(AppIcons.refresh),
-                ),
-                if (widget.apiClient != null)
-                  IconButton(
-                    key: const ValueKey('dq_pending_customers'),
-                    tooltip: 'عملاء محتاجين تأكيد',
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                      builder: (_) => PendingCustomersScreen(apiClient: widget.apiClient),
-                    )),
-                    icon: const Icon(AppIcons.pendingCustomers),
-                  ),
-                if (widget.apiClient != null)
-                  IconButton(
-                    key: const ValueKey('dq_sellin_assist'),
-                    tooltip: 'مساعدة Gemini للتوريد',
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                      builder: (_) => SellInAssistScreen(apiClient: widget.apiClient),
-                    )),
-                    icon: const Icon(AppIcons.sellInAssist),
-                  ),
-                if (widget.apiClient != null)
-                  IconButton(
-                    key: const ValueKey('dq_product_match_review'),
-                    tooltip: 'مراجعة مطابقة الأصناف',
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                      builder: (_) => ProductMatchReviewScreen(apiClient: widget.apiClient),
-                    )),
-                    icon: const Icon(AppIcons.productMatchReview),
-                  ),
-                const SizedBox(width: 4.0),
-                FilledButton.tonalIcon(
-                  key: const ValueKey('dq_export'),
-                  onPressed: _issues.isEmpty ? null : _export,
-                  icon: const Icon(AppIcons.download),
-                  label: const Text('تصدير Excel/CSV'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16.0),
-            if (_error != null)
-              Card(
-                color: cs.errorContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(_error!, style: theme.textTheme.bodyMedium?.copyWith(color: cs.onErrorContainer)),
-                ),
+      child: M3ToolbarButtonTheme(
+        child: RefreshIndicator(
+          onRefresh: _load,
+          child: ListView(
+            padding: M3Spacing.pMd,
+            children: [
+              _Header(
+                apiClient: widget.apiClient,
+                canExport: visible.isNotEmpty,
+                onRefresh: _load,
+                onExport: _export,
               ),
-            _SummaryRow(summary: _summary),
-            const SizedBox(height: 16.0),
-            _Filters(summary: _summary, filter: _filter, onChanged: _setFilter),
-            const SizedBox(height: 12.0),
-            if (_loading)
-              const Padding(padding: EdgeInsets.all(32.0), child: Center(child: CircularProgressIndicator()))
-            else if (_issues.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Center(
-                  child: Text('لا توجد أخطاء مطابقة للفلاتر',
-                      key: const ValueKey('dq_empty'), style: theme.textTheme.titleMedium),
+              M3Spacing.gapSM,
+              if (_error != null)
+                M3ErrorState(
+                  title: 'تعذر تحميل الأخطاء',
+                  message: _error,
+                  onRetry: _load,
                 ),
-              )
-            else
-              _IssuesTable(issues: _issues, onChangeStatus: _changeStatus),
-          ],
+              _SummaryRow(summary: _summary),
+              M3Spacing.gapSM,
+              _Filters(
+                summary: _summary,
+                filter: _filter,
+                searchController: _searchController,
+                searchQuery: _searchQuery,
+                onSearch: (v) => setState(() => _searchQuery = v),
+                onChanged: _setFilter,
+              ),
+              const SizedBox(height: M3Spacing.s12),
+              if (_loading)
+                const Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: Center(child: CircularProgressIndicator()))
+              else if (visible.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Center(
+                    child: Text(
+                      'لا توجد أخطاء مطابقة للفلاتر',
+                      key: const ValueKey('dq_empty'),
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ),
+                )
+              else
+                _IssuesTable(issues: visible, onChangeStatus: _changeStatus),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  final ApiClient? apiClient;
+  final bool canExport;
+  final VoidCallback onRefresh;
+  final VoidCallback onExport;
+  const _Header({
+    required this.apiClient,
+    required this.canExport,
+    required this.onRefresh,
+    required this.onExport,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Wrap(
+      spacing: M3Spacing.xs,
+      runSpacing: M3Spacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Icon(AppIcons.dataQuality, color: theme.colorScheme.primary),
+        Text(
+          'الأخطاء وجودة البيانات',
+          style: theme.textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        IconButton(
+          key: const ValueKey('dq_refresh'),
+          tooltip: 'تحديث',
+          onPressed: onRefresh,
+          icon: const Icon(AppIcons.refresh),
+        ),
+        if (apiClient != null)
+          IconButton(
+            key: const ValueKey('dq_pending_customers'),
+            tooltip: 'عملاء محتاجين تأكيد',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => PendingCustomersScreen(apiClient: apiClient),
+            )),
+            icon: const Icon(AppIcons.pendingCustomers),
+          ),
+        if (apiClient != null)
+          IconButton(
+            key: const ValueKey('dq_sellin_assist'),
+            tooltip: 'مساعدة Gemini للتوريد',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => SellInAssistScreen(apiClient: apiClient),
+            )),
+            icon: const Icon(AppIcons.sellInAssist),
+          ),
+        if (apiClient != null)
+          IconButton(
+            key: const ValueKey('dq_product_match_review'),
+            tooltip: 'مراجعة مطابقة الأصناف',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => ProductMatchReviewScreen(apiClient: apiClient),
+            )),
+            icon: const Icon(AppIcons.productMatchReview),
+          ),
+        FilledButton.tonalIcon(
+          key: const ValueKey('dq_export'),
+          onPressed: canExport ? onExport : null,
+          icon: const Icon(AppIcons.download),
+          label: const Text('تصدير Excel/CSV'),
+        ),
+      ],
     );
   }
 }
@@ -241,104 +333,181 @@ class _SummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
     // Defensive empty-state UI. Backend row totals when Runs are missing are
     // fixed in PR #86 / TDS-76 — keep this guard so 0 rows never show 100%.
     final hasRows = summary.totalRows > 0;
-    final pct = hasRows ? summary.cleanlinessPct.clamp(0, 100) / 100 : 0.0;
-    final gauge = Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            SizedBox(
-              width: 96.0,
-              height: 96.0,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  SizedBox.expand(
-                    child: CircularProgressIndicator(
-                      value: hasRows ? pct.toDouble() : null,
-                      strokeWidth: 10.0,
-                      backgroundColor: cs.surfaceContainerHighest,
-                      color: !hasRows
-                          ? cs.outlineVariant
-                          : (pct >= 0.95
-                              ? cs.primary
-                              : (pct >= 0.85 ? cs.tertiary : cs.error)),
-                    ),
-                  ),
-                  Text(
-                    hasRows
-                        ? '${summary.cleanlinessPct.toStringAsFixed(1)}%'
-                        : '—',
-                    key: const ValueKey('dq_cleanliness'),
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: hasRows ? null : cs.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+    final cleanRows = hasRows ? summary.totalRows - summary.criticalRows : 0;
+    final cleanlinessValue =
+        hasRows ? '${summary.cleanlinessPct.toStringAsFixed(1)}%' : '—';
+    final cleanlinessSubtitle = hasRows
+        ? '$cleanRows من ${countRows(summary.totalRows)}'
+        : 'مفيش صفوف اتفحصت';
+    final openSubtitle = countError(summary.open);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 960.0
+                ? 4
+                : (constraints.maxWidth >= 580.0 ? 2 : 1);
+            return M3EqualHeightGrid(
+              key: const ValueKey('dq_kpi_grid'),
+              columns: columns,
+              spacing: M3Spacing.sm,
+              runSpacing: M3Spacing.sm,
+              children: [
+                M3SummaryKpiCard(
+                  key: const ValueKey('dq_cleanliness_card'),
+                  valueKey: const ValueKey('dq_cleanliness'),
+                  subtitleKey: const ValueKey('dq_cleanliness_subtitle'),
+                  title: 'نظافة البيانات',
+                  titleMaxLines: 2,
+                  subtitleMaxLines: 1,
+                  value: cleanlinessValue,
+                  subtitle: cleanlinessSubtitle,
+                  icon: AppIcons.verified,
+                  color: !hasRows
+                      ? cs.outline
+                      : (summary.cleanlinessPct >= 95
+                          ? cs.primary
+                          : (summary.cleanlinessPct >= 85
+                              ? cs.tertiary
+                              : cs.error)),
+                ),
+                M3SummaryKpiCard(
+                  key: const ValueKey('dq_open_card'),
+                  valueKey: const ValueKey('dq_value_open'),
+                  titleKey: const ValueKey('dq_title_open'),
+                  title: 'مفتوحة',
+                  titleMaxLines: 2,
+                  subtitleMaxLines: 1,
+                  value: CurrencyFormatter.formatNumber(summary.open),
+                  subtitle: openSubtitle,
+                  icon: AppIcons.error,
+                  color: cs.error,
+                ),
+                M3SummaryKpiCard(
+                  key: const ValueKey('dq_resolved_card'),
+                  valueKey: const ValueKey('dq_value_resolved'),
+                  title: 'اتصلّحت',
+                  titleMaxLines: 2,
+                  subtitleMaxLines: 1,
+                  value: CurrencyFormatter.formatNumber(summary.resolved),
+                  subtitle: countError(summary.resolved),
+                  icon: AppIcons.verified,
+                  color: cs.primary,
+                ),
+                M3SummaryKpiCard(
+                  key: const ValueKey('dq_ignored_card'),
+                  valueKey: const ValueKey('dq_value_ignored'),
+                  title: 'متجاهلة',
+                  titleMaxLines: 2,
+                  subtitleMaxLines: 1,
+                  value: CurrencyFormatter.formatNumber(summary.ignored),
+                  subtitle: countError(summary.ignored),
+                  icon: AppIcons.block,
+                  color: cs.outline,
+                ),
+              ],
+            );
+          },
+        ),
+        if (summary.types.where((t) => t.total > 0).isNotEmpty) ...[
+          M3Spacing.gapSM,
+          _TypeChips(types: summary.types.where((t) => t.total > 0).toList()),
+        ],
+      ],
+    );
+  }
+}
+
+class _TypeChips extends StatelessWidget {
+  final List<DataQualityTypeSummary> types;
+  const _TypeChips({required this.types});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Wrap(
+      spacing: M3Spacing.xs,
+      runSpacing: M3Spacing.xs,
+      children: [
+        for (final t in types)
+          M3ChipSurface(
+            key: ValueKey('dq_type_chip_${t.type}'),
+            color: t.severity == kDqCritical
+                ? cs.errorContainer
+                : cs.tertiaryContainer,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 280.0),
+              child: Text(
+                t.impactEgp > 0
+                    ? '${t.typeLabel} · ${countError(t.open)} · ${CurrencyFormatter.formatCompactEGP(t.impactEgp)}'
+                    : '${t.typeLabel} · ${countError(t.open)}',
+                maxLines: 3,
+                overflow: TextOverflow.clip,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: t.severity == kDqCritical
+                      ? cs.onErrorContainer
+                      : cs.onTertiaryContainer,
+                ),
               ),
             ),
-            const SizedBox(height: 8.0),
-            Text('نظافة البيانات', style: theme.textTheme.labelLarge),
-            Text(
-              hasRows
-                  ? '${summary.totalRows - summary.criticalRows} من ${summary.totalRows} صف بدون أخطاء حرجة'
-                  : 'مفيش صفوف اتفحصت',
-              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-            const SizedBox(height: 4.0),
-            Text('مفتوحة ${summary.open} · اتصلّحت ${summary.resolved} · متجاهلة ${summary.ignored}',
-                key: const ValueKey('dq_counts'), style: theme.textTheme.bodySmall),
-          ],
-        ),
-      ),
-    );
-    final cards = summary.types.where((t) => t.total > 0).map((t) {
-      final critical = t.severity == kDqCritical;
-      return SizedBox(
-        width: 220.0,
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Icon(critical ? AppIcons.error : AppIcons.warning,
-                      size: 18.0, color: critical ? cs.error : cs.tertiary),
-                  const SizedBox(width: 6.0),
-                  Expanded(child: Text(t.typeLabel, style: theme.textTheme.labelLarge, maxLines: 2)),
-                ]),
-                const SizedBox(height: 8.0),
-                Text('${t.open}', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-                Text(t.impactEgp > 0 ? 'التأثير ${_egp(t.impactEgp)}' : 'التأثير غير محسوب',
-                    style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-              ],
-            ),
           ),
-        ),
-      );
-    }).toList();
-    return Wrap(spacing: 12.0, runSpacing: 12.0, children: [gauge, ...cards]);
+      ],
+    );
   }
 }
 
 class _Filters extends StatelessWidget {
   final DataQualitySummary summary;
   final DataQualityFilter filter;
+  final TextEditingController searchController;
+  final String searchQuery;
+  final ValueChanged<String> onSearch;
   final ValueChanged<DataQualityFilter> onChanged;
-  const _Filters({required this.summary, required this.filter, required this.onChanged});
+  const _Filters({
+    required this.summary,
+    required this.filter,
+    required this.searchController,
+    required this.searchQuery,
+    required this.onSearch,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final types = <String, String>{for (final t in summary.types) t.type: t.typeLabel};
+    final types = <String, String>{
+      for (final t in summary.types) t.type: t.typeLabel
+    };
     final sources = <String>{for (final t in summary.types) t.source};
-    return Wrap(spacing: 12.0, runSpacing: 12.0, children: [
+    const searchHint = 'بحث بالصنف أو الكود أو الباركود أو النوع...';
+    final searchField = M3SearchFieldWidth(
+      hintText: searchHint,
+      child: TextField(
+        key: const ValueKey('dq_search'),
+        controller: searchController,
+        onChanged: onSearch,
+        decoration: InputDecoration(
+          hintText: searchHint,
+          prefixIcon: const Icon(Icons.search_rounded, size: 20.0),
+          suffixIcon: searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 18.0),
+                  onPressed: () {
+                    searchController.clear();
+                    onSearch('');
+                  },
+                )
+              : null,
+        ),
+      ),
+    );
+    final dropdowns = [
       M3Dropdown<String>(
         key: const ValueKey('dq_filter_status'),
         label: 'الحالة',
@@ -390,25 +559,52 @@ class _Filters extends StatelessWidget {
         ],
         onChanged: (v) => onChanged(filter.copyWith(type: v)),
       ),
-    ]);
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 1100.0;
+        if (narrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              searchField,
+              const SizedBox(height: M3Spacing.xs),
+              Wrap(
+                  spacing: M3Spacing.xs,
+                  runSpacing: M3Spacing.xs,
+                  children: dropdowns),
+            ],
+          );
+        }
+        return Wrap(
+          spacing: M3Spacing.xs,
+          runSpacing: M3Spacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [searchField, ...dropdowns],
+        );
+      },
+    );
   }
 }
 
 class _IssuesTable extends StatelessWidget {
   // Headers and cells centred; only the item name stays start-aligned.
-  static const List<DataColumn> _dqColumns = [
-            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الخطورة')),
-            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('النوع')),
-            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الصف')),
-            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('كود الصنف')),
-            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الباركود')),
-            DataColumn(label: Text('اسم الصنف')),
-            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الموجود')),
-            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('المتوقع')),
-            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('التأثير'), numeric: true),
-            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('الحالة')),
-            DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('')),
-          ];
+  // Pixel budget measured with real Cairo at the 1024 content width
+  // (inner 928 after xxs gutter) so the longest live-like name, type,
+  // found and expected values wrap within 3 lines at 1024 and 1030.
+  static const _flex = [
+    44.0,
+    170.0,
+    40.0,
+    48.0,
+    48.0,
+    219.0,
+    126.0,
+    97.0,
+    42.0,
+    52.0,
+    42.0
+  ];
 
   final List<DataQualityIssue> issues;
   final ValueChanged<DataQualityIssue> onChangeStatus;
@@ -418,59 +614,223 @@ class _IssuesTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      // Fills the card width; scrolls horizontally only when it must.
-      child: LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ConstrainedBox(
-        constraints: BoxConstraints(minWidth: constraints.maxWidth),
-        child: DataTable(
-          key: const ValueKey('dq_table'),
-          // Rows grow so item names wrap up to 3 lines.
-          dataRowMaxHeight: double.infinity,
-          headingTextStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-          columns: _dqColumns,
-          rows: centerCellsUnderCenteredHeadings(_dqColumns, issues.map((i) {
-            final critical = i.severity == kDqCritical;
-            return DataRow(cells: [
-              DataCell(Chip(
-                avatar: Icon(critical ? AppIcons.error : AppIcons.warning,
-                    size: 16.0, color: critical ? cs.error : cs.tertiary),
-                label: Text(i.severity),
-                visualDensity: VisualDensity.compact,
-              )),
-              DataCell(Text(i.typeLabel)),
-              DataCell(Text(i.row > 0 ? '${i.row}${i.column.isNotEmpty ? ' · ${i.column}' : ''}' : '')),
-              DataCell(Text(i.itemCode)),
-              DataCell(Text(i.barcode)),
-              DataCell(ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 260.0),
-                child: Text(i.itemName,
-                    key: const ValueKey('dq_item_name'),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = M3Spacing.xxs;
+        const margin = M3Spacing.xxs;
+        final availableWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final flexSum = _flex.fold<double>(0, (a, b) => a + b);
+        final inner =
+            availableWidth - (2 * margin) - ((_flex.length - 1) * spacing);
+        // No per-column min clamp: 11 columns at the live 1030 content
+        // width (minus page padding) cannot all be ≥56 without overflowing.
+        double colMax(int i) => inner * _flex[i] / flexSum;
+        // Tight width (not ConstrainedBox-as-max): DataTable otherwise
+        // sizes from the one-line intrinsic width and horizontally scrolls.
+        Widget cellBox(int i, Widget child) => SizedBox(
+              width: colMax(i),
+              child: child,
+            );
+        Widget cellText(int i, String text,
+            {Key? key, TextAlign align = TextAlign.center}) {
+          return cellBox(
+            i,
+            Text(
+              text,
+              key: key,
+              maxLines: 3,
+              overflow: TextOverflow.clip,
+              textAlign: align,
+              softWrap: true,
+            ),
+          );
+        }
+
+        Widget wrapTag(int i, String label,
+            {required Color color, required Color onColor, IconData? icon}) {
+          return cellBox(
+            i,
+            M3ChipSurface(
+              color: color,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) Icon(icon, size: 16.0, color: onColor),
+                  Text(
+                    label,
                     maxLines: 3,
-                    overflow: TextOverflow.ellipsis),
-              )),
-              DataCell(Text(i.foundValue)),
-              DataCell(Text(i.expectedValue)),
-              DataCell(Text(i.impactEgp == null ? '—' : _egp(i.impactEgp!))),
-              DataCell(Tooltip(
-                message: i.statusReason,
-                child: Text(i.status + (i.autoClosed ? ' (تلقائي)' : '')),
-              )),
-              DataCell(IconButton(
-                key: ValueKey('dq_status_${i.id}'),
-                tooltip: 'تغيير الحالة',
-                icon: const Icon(AppIcons.edit),
-                onPressed: () => onChangeStatus(i),
-              )),
-            ]);
-          }).toList()),
-        ),
-        ),
-        ),
-      ),
+                    overflow: TextOverflow.clip,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelLarge?.copyWith(color: onColor),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final columns = [
+          DataColumn(
+              headingRowAlignment: MainAxisAlignment.center,
+              label: cellText(0, 'الخطورة')),
+          DataColumn(
+              headingRowAlignment: MainAxisAlignment.center,
+              label: cellText(1, 'النوع')),
+          DataColumn(
+              headingRowAlignment: MainAxisAlignment.center,
+              label: cellText(2, 'الصف')),
+          DataColumn(
+              headingRowAlignment: MainAxisAlignment.center,
+              label: cellText(3, 'كود الصنف')),
+          DataColumn(
+              headingRowAlignment: MainAxisAlignment.center,
+              label: cellText(4, 'الباركود')),
+          DataColumn(
+              headingRowAlignment: MainAxisAlignment.start,
+              label: cellText(5, 'اسم الصنف', align: TextAlign.start)),
+          DataColumn(
+              headingRowAlignment: MainAxisAlignment.center,
+              label: cellText(6, 'الموجود')),
+          DataColumn(
+              headingRowAlignment: MainAxisAlignment.center,
+              label: cellText(7, 'المتوقع')),
+          DataColumn(
+              headingRowAlignment: MainAxisAlignment.center,
+              numeric: true,
+              label: cellText(8, 'التأثير')),
+          DataColumn(
+              headingRowAlignment: MainAxisAlignment.center,
+              label: cellText(9, 'الحالة')),
+          DataColumn(
+              headingRowAlignment: MainAxisAlignment.center,
+              label: cellBox(10, const SizedBox.shrink())),
+        ];
+
+        return SizedBox(
+          width: availableWidth,
+          child: TableScrollContainer(
+            key: const ValueKey('dq_table_scroll'),
+            showSwipeHint: true,
+            columnFlex: _flex,
+            child: DataTable(
+              key: const ValueKey('dq_table'),
+              columnSpacing: spacing,
+              horizontalMargin: margin,
+              dataRowMinHeight: 52.0,
+              dataRowMaxHeight: double.infinity,
+              headingRowHeight: 72.0,
+              headingTextStyle: theme.textTheme.labelLarge
+                  ?.copyWith(fontWeight: FontWeight.w700),
+              columns: columns,
+              rows: centerCellsUnderCenteredHeadings(
+                columns,
+                issues.map((i) {
+                  final critical = i.severity == kDqCritical;
+                  final statusDesc = [
+                    if (i.autoClosed) 'تلقائي',
+                    if (i.statusReason.isNotEmpty) i.statusReason,
+                  ].join(' · ');
+                  return DataRow(cells: [
+                    DataCell(wrapTag(
+                      0,
+                      i.severity,
+                      color:
+                          critical ? cs.errorContainer : cs.tertiaryContainer,
+                      onColor: critical
+                          ? cs.onErrorContainer
+                          : cs.onTertiaryContainer,
+                      icon: critical ? AppIcons.error : AppIcons.warning,
+                    )),
+                    DataCell(cellText(1, i.typeLabel)),
+                    DataCell(cellText(
+                      2,
+                      i.row > 0
+                          ? '${i.row}${i.column.isNotEmpty ? ' · ${i.column}' : ''}'
+                          : '',
+                    )),
+                    DataCell(cellText(3, i.itemCode)),
+                    DataCell(cellText(4, i.barcode)),
+                    DataCell(cellText(5, i.itemName,
+                        key: const ValueKey('dq_item_name'),
+                        align: TextAlign.start)),
+                    DataCell(cellText(6, i.foundValue)),
+                    DataCell(cellText(7, i.expectedValue)),
+                    DataCell(cellText(
+                      8,
+                      i.impactEgp == null
+                          ? '—'
+                          : CurrencyFormatter.formatCompactEGP(i.impactEgp!),
+                    )),
+                    DataCell(cellBox(
+                      9,
+                      Builder(builder: (context) {
+                        final status = M3StatusColors.of(context);
+                        final (Color bg, Color fg) = i.status == kDqOpen
+                            ? (cs.errorContainer, cs.onErrorContainer)
+                            : (i.status == kDqResolved
+                                ? (
+                                    status.successContainer,
+                                    status.onSuccessContainer
+                                  )
+                                : (
+                                    cs.surfaceContainerLowest,
+                                    cs.onSurfaceVariant
+                                  ));
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            M3ChipSurface(
+                              color: bg,
+                              borderColor: i.status == kDqIgnored
+                                  ? cs.outlineVariant
+                                  : null,
+                              child: Text(
+                                i.status,
+                                maxLines: 3,
+                                overflow: TextOverflow.clip,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.labelLarge
+                                    ?.copyWith(color: fg),
+                              ),
+                            ),
+                            if (statusDesc.isNotEmpty)
+                              Text(
+                                statusDesc,
+                                maxLines: 3,
+                                overflow: TextOverflow.clip,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
+                        );
+                      }),
+                    )),
+                    DataCell(cellBox(
+                      10,
+                      IconButton(
+                        key: ValueKey('dq_status_${i.id}'),
+                        tooltip: 'تغيير الحالة',
+                        visualDensity: VisualDensity.compact,
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(40, 40),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        icon: const Icon(AppIcons.edit, size: 18.0),
+                        onPressed: () => onChangeStatus(i),
+                      ),
+                    )),
+                  ]);
+                }).toList(),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -497,48 +857,71 @@ class _StatusDialogState extends State<_StatusDialog> {
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: AlertDialog(
-        title: const Text('تغيير حالة الخطأ'),
-        content: SizedBox(
-          width: 380.0,
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('${widget.issue.typeLabel} — ${widget.issue.itemCode}'),
-            const SizedBox(height: 16.0),
-            M3Dropdown<String>(
-              key: const ValueKey('dq_status_select'),
-              label: 'الحالة الجديدة',
-              expand: true,
-              value: _status,
-              options: const [
-                M3DropdownOption(kDqOpen, kDqOpen),
-                M3DropdownOption(kDqResolved, kDqResolved),
-                M3DropdownOption(kDqIgnored, kDqIgnored),
+      child: M3ToolbarButtonTheme(
+        child: AlertDialog(
+          title: const Text('تغيير حالة الخطأ'),
+          content: SizedBox(
+            width: 380.0,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '${widget.issue.typeLabel} — ${widget.issue.itemCode}',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (widget.issue.itemName.isNotEmpty) ...[
+                  const SizedBox(height: M3Spacing.xs),
+                  Text(
+                    widget.issue.itemName,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                M3Spacing.gapSM,
+                M3Dropdown<String>(
+                  key: const ValueKey('dq_status_select'),
+                  label: 'الحالة الجديدة',
+                  expand: true,
+                  fitOptions: true,
+                  value: _status,
+                  options: const [
+                    M3DropdownOption(kDqOpen, kDqOpen),
+                    M3DropdownOption(kDqResolved, kDqResolved),
+                    M3DropdownOption(kDqIgnored, kDqIgnored),
+                  ],
+                  onChanged: (v) => setState(() => _status = v),
+                ),
+                const SizedBox(height: M3Spacing.s12),
+                TextField(
+                  key: const ValueKey('dq_status_reason'),
+                  controller: _reason,
+                  maxLines: 3,
+                  decoration:
+                      InputDecoration(labelText: 'السبب', errorText: _err),
+                ),
               ],
-              onChanged: (v) => setState(() => _status = v),
             ),
-            const SizedBox(height: 12.0),
-            TextField(
-              key: const ValueKey('dq_status_reason'),
-              controller: _reason,
-              decoration: InputDecoration(labelText: 'السبب', errorText: _err),
-            ),
-          ]),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
-          FilledButton(
-            key: const ValueKey('dq_status_save'),
-            onPressed: () {
-              final r = _reason.text.trim();
-              if (_status == kDqIgnored && r.isEmpty) {
-                setState(() => _err = 'السبب مطلوب عند التجاهل');
-                return;
-              }
-              Navigator.pop(context, (_status, r));
-            },
-            child: const Text('حفظ'),
           ),
-        ],
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إلغاء')),
+            FilledButton(
+              key: const ValueKey('dq_status_save'),
+              onPressed: () {
+                final r = _reason.text.trim();
+                if (_status == kDqIgnored && r.isEmpty) {
+                  setState(() => _err = 'السبب مطلوب عند التجاهل');
+                  return;
+                }
+                Navigator.pop(context, (_status, r));
+              },
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
       ),
     );
   }

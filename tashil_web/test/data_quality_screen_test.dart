@@ -79,8 +79,9 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text('90.2%'), findsOneWidget);
-    expect(find.textContaining('من 389 صف بدون أخطاء حرجة'), findsOneWidget);
-    expect(find.textContaining('مفتوحة 79'), findsOneWidget);
+    expect(find.textContaining('من 389 صفًا'), findsOneWidget);
+    expect(find.byKey(const ValueKey('dq_value_open')), findsOneWidget);
+    expect(find.text('79'), findsOneWidget);
     expect(find.text('0 من 0 صف بدون أخطاء حرجة'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
@@ -99,7 +100,11 @@ void main() {
     expect(find.text('FGHC-0700-0214'), findsOneWidget);
     expect(src.calls.first, 'issues:'); // default = open only
 
-    await tester.tap(find.byKey(const ValueKey('dq_status_a1')));
+    final statusBtn = find.byKey(const ValueKey('dq_status_a1'));
+    expect(statusBtn, findsOneWidget);
+    await tester.ensureVisible(statusBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(statusBtn);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('dq_status_save')));
     await tester.pumpAndSettle();
@@ -134,7 +139,7 @@ void main() {
     final src = _FakeSource(empty, const []);
     await tester.pumpWidget(MaterialApp(
       theme: AppTheme.light(),
-      home: Scaffold(body: DataQualityScreen(dataSource: src)),
+      home: Scaffold(body: DataQualityScreen(dataSource: src, pollInterval: const Duration(hours: 1))),
     ));
     await tester.pumpAndSettle();
     expect(find.text('—'), findsOneWidget);

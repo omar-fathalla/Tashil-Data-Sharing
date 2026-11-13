@@ -44,4 +44,23 @@ void main() {
     expect(countMissingInBranch(100), '100 صنف منعدم بالفرع');
   });
 
+  test('countRows uses the Arabic counted-noun rules', () {
+    expect(countRows(0), '0 صفوف');
+    expect(countRows(1), 'صف واحد');
+    expect(countRows(2), 'صفان');
+    expect(countRows(5), '5 صفوف');
+    expect(countRows(12), '12 صفًا');
+    expect(countRows(100), '100 صف');
+    expect(countRows(389), '389 صفًا');
+  });
+
+  test('countError uses the Arabic counted-noun rules', () {
+    expect(countError(0), '0 أخطاء');
+    expect(countError(1), 'خطأ واحد');
+    expect(countError(2), 'خطآن');
+    expect(countError(5), '5 أخطاء');
+    expect(countError(12), '12 خطأً');
+    expect(countError(100), '100 خطأ');
+    expect(countError(2004), '2004 أخطاء');
+  });
 }

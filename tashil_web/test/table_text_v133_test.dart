@@ -119,11 +119,14 @@ void main() {
     final table = find.byKey(const ValueKey('dq_table'));
     expect(table, findsOneWidget);
     final dt = tester.widget<DataTable>(table);
-    for (final c in dt.columns) {
-      final label = (c.label as Text).data;
-      expect(c.headingRowAlignment,
-          label == 'اسم الصنف' ? isNot(MainAxisAlignment.center) : MainAxisAlignment.center,
-          reason: label);
+    for (final (i, c) in dt.columns.indexed) {
+      if (i == 5) {
+        expect(c.headingRowAlignment, isNot(MainAxisAlignment.center),
+            reason: 'item-name column');
+      } else {
+        expect(c.headingRowAlignment, MainAxisAlignment.center,
+            reason: 'column $i');
+      }
     }
     for (final (head, cell) in [
       ('كود الصنف', 'TEST-0001'),
@@ -135,10 +138,11 @@ void main() {
       expect(_glyphCenterX(tester, c), closeTo(_glyphCenterX(tester, h), 2.0),
           reason: head);
     }
-    // Fills its card (no empty band beside a narrow table).
-    final card = find.ancestor(of: table, matching: find.byType(Card)).first;
+    // Fills the scroll surface (no empty band beside a narrow table).
+    final scroller = find.byKey(const ValueKey('dq_table_scroll'));
+    expect(scroller, findsOneWidget);
     expect(tester.getSize(table).width,
-        greaterThanOrEqualTo(tester.getSize(card).width - 1));
+        greaterThanOrEqualTo(tester.getSize(scroller).width - 1));
   });
 
   // 1024 ≈ the content width at a 1280 window beside the navigation rail (4 KPI cards per row, the narrowest case).
