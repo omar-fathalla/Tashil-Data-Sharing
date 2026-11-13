@@ -591,22 +591,22 @@ class _Filters extends StatelessWidget {
 class _IssuesTable extends StatelessWidget {
   // Headers and cells centred; only the item name stays start-aligned.
   // Pixel budget at the live 1030 shell (page padding 24, inner ~934
-  // after xxs gutters), measured with real Cairo:
+  // after xxs gutters), measured with real Cairo bodyMedium:
   //  - short words (الخطورة, مفتوحة, متجاهلة) never mid-word split
-  //  - hyphenated codes (QA-NOT-IN-MASTER-999) wrap at '-' only, ≤3 lines
-  //  - the live longest name (رابيدو / ووش اند واكس - 7 مج) wraps ≤3
-  //    with the tail visible.
-  // Type / found / expected shares follow live production lengths, not
-  // the earlier over-long fixtures that starved the code and name columns.
+  //  - item codes stay on ONE line (QA-NOT-IN-MASTER-999 = 154.7dp);
+  //    the code share is taken from type/found/expected, leaving the
+  //    name column ≥ the 3-line minimum of the live longest name
+  //  - at 1024+sidebar (inner ~678) one-line codes plus the name floor
+  //    cannot both fit, so codes may wrap at '-' only
   static const _flex = [
     64.0,
-    90.0,
+    80.0,
     40.0,
-    96.0,
+    158.0,
     48.0,
-    244.0,
-    94.0,
-    92.0,
+    232.0,
+    74.0,
+    74.0,
     42.0,
     76.0,
     42.0
