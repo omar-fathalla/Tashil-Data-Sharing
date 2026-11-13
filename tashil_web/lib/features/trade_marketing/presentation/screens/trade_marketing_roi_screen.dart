@@ -1634,9 +1634,11 @@ onChanged: m3Legacy<int>((v) {
                         }),
 ),
                     ),
-                    // Year Filter
+                    // Year Filter — same size as the shared year dropdown
+                    // (Sell-Out 'سنة البيانات': 190dp with the calendar icon),
+                    // so "2026" / "All Years" never clip.
                     SizedBox(
-                      width: 135.0,
+                      width: kYearDropdownWidth,
                       child: M3Dropdown<int>(
 value: _selectedYear,
 label: 'Year',

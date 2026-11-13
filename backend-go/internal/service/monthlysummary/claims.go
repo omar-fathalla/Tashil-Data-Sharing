@@ -286,7 +286,13 @@ func NarrateFromClaims(claims []Claim, agg domain.MonthlySummaryAggregates) stri
 		b.WriteString(fmt.Sprintf(" التغير الشهري للوحدات %+.1f%%.", c.Number))
 	}
 
-	if c, ok := byKey[ClaimRevenueYoYPct]; ok {
+	if !agg.YoYAvailable {
+		// No comparable last-year data: never ship a YoY claim (it would read
+		// as a real 0% change).
+		if _, ok := byKey[ClaimTotalRevenue]; ok {
+			b.WriteString(NoLastYearSentenceAR)
+		}
+	} else if c, ok := byKey[ClaimRevenueYoYPct]; ok {
 		b.WriteString(fmt.Sprintf(" التغير السنوي للإيراد %+.1f%%.", c.Number))
 	}
 	if c, ok := byKey[ClaimMarketSharePct]; ok {

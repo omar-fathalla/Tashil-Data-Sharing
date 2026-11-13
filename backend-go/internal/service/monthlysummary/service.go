@@ -89,6 +89,7 @@ func buildGeminiPrompt(agg domain.MonthlySummaryAggregates) string {
 2) المفاتيح المسموحة فقط: total_revenue, total_units, revenue_mom_pct, units_mom_pct, revenue_yoy_pct, market_share_pct, active_stores, top_chain, top_product, top_category, prior_month_key, current_month_key, prior_month_revenue.
 3) narrative_ar للتحقق فقط ويجب ألا يحتوي أي رقم غير موجود في الحقائق؛ النص النهائي يُبنى من claims فقط على الخادم.
 4) أي ادعاء غير موجود في الحقائق مرفوض.
+5) إذا كانت yoy_available = false فلا توجد بيانات للعام السابق: لا تذكر revenue_yoy_pct ولا أي تغير سنوي.
 
 JSON الحقائق المحسوبة مسبقاً:
 %s`, string(facts))
