@@ -126,7 +126,9 @@ class MockCPFRApiClient extends Fake implements ApiClient {
 }
 
 void main() {
-  testWidgets('CPFR Dashboard renders English tabs, refined KPI cards and template buttons', (tester) async {
+  testWidgets(
+      'CPFR Dashboard renders English tabs, refined KPI cards and template buttons',
+      (tester) async {
     final mockClient = MockCPFRApiClient();
 
     tester.view.physicalSize = const Size(1400, 1000);
@@ -149,18 +151,23 @@ void main() {
     expect(find.text('3. Demand Forecasting & Promos (EXP)'), findsOneWidget);
     expect(find.text('4. أداء فريق المبيعات وهيكل الحسابات'), findsOneWidget);
 
-    // 2. Verify 4 KPI cards titles and English subtitles on second line
+    // 2. Verify 4 KPI cards (Arabic-only titles, same as Sell-Out / Sell-In)
     expect(find.text('إجمالي التوريد للسلاسل'), findsOneWidget);
-    expect(find.text('Sell-In'), findsOneWidget);
+    expect(find.byKey(const ValueKey('kpi_card_Sell-In')), findsOneWidget);
 
     expect(find.text('مبيعات الكاشير الفعلية'), findsOneWidget);
-    expect(find.text('Sell-Out'), findsOneWidget);
+    expect(find.byKey(const ValueKey('kpi_card_Sell-Out')), findsOneWidget);
 
     expect(find.text('معدل دوران المخزون'), findsOneWidget);
-    expect(find.text('Sell-Through Rate'), findsOneWidget);
+    expect(find.byKey(const ValueKey('kpi_card_Sell-Through Rate')),
+        findsOneWidget);
 
-    expect(find.text('الفجوة المخزنية والرصيد المرحّل'), findsOneWidget);
-    expect(find.text('Inventory Gap'), findsOneWidget);
+    expect(find.text('الفجوة المخزنية'), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('kpi_card_Inventory Gap')), findsOneWidget);
+    // English labels are keys only — they must not appear as a second title line.
+    expect(find.text('Sell-Through Rate'), findsNothing);
+    expect(find.text('Inventory Gap'), findsNothing);
 
     // 3. Verify concise Sell-In upload card header and English Demo buttons
     expect(find.text('بوابة رفع بيانات التوريد Sell-In'), findsOneWidget);
@@ -169,15 +176,19 @@ void main() {
     expect(find.text('رفع ملف Sell-In هنا'), findsOneWidget);
 
     // 4. Verify no 'تحديد السلسلة تلقائياً من الملف' in the screen
-    expect(find.text('تحديد السلسلة تلقائياً من الملف (Multi-Chain)'), findsNothing);
+    expect(find.text('تحديد السلسلة تلقائياً من الملف (Multi-Chain)'),
+        findsNothing);
 
-    // 5. Verify horizontal scroll controller and arrows for monthly reconciliation table
-    expect(find.byTooltip('تمرير الجدول للبداية'), findsOneWidget);
-    expect(find.byTooltip('تمرير الجدول للنهاية'), findsOneWidget);
-    expect(find.byType(Scrollbar), findsWidgets);
+    // 5. Monthly reconciliation uses the shared table container (no custom 1450 min-width).
+    expect(find.byKey(const ValueKey('cpfr_reconciliation_table')),
+        findsOneWidget);
+    expect(find.byTooltip('تمرير الجدول للبداية'), findsNothing);
+    expect(find.byTooltip('تمرير الجدول للنهاية'), findsNothing);
   });
 
-  test('ApiClient.fetchCPFRDashboard sanitizes non-ASCII headers and falls back cleanly without throwing', () async {
+  test(
+      'ApiClient.fetchCPFRDashboard sanitizes non-ASCII headers and falls back cleanly without throwing',
+      () async {
     final client = ApiClient();
     client.currentUser = TenantUserModel(
       userId: 'u_test',
@@ -193,7 +204,8 @@ void main() {
     // Verify headers are strictly ASCII-safe (< 128) so BrowserClient window.fetch never throws TypeError
     for (final entry in client.requestHeaders.entries) {
       for (final unit in entry.value.codeUnits) {
-        expect(unit <= 127, isTrue, reason: 'Header ${entry.key} contains non-ASCII codeUnit $unit');
+        expect(unit <= 127, isTrue,
+            reason: 'Header ${entry.key} contains non-ASCII codeUnit $unit');
       }
     }
 

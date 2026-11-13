@@ -66,8 +66,8 @@ List<String> _cutBeforeThreeLines(WidgetTester tester, Finder scope,
       in find.descendant(of: scope, matching: find.byType(Text)).evaluate()) {
     final t = e.widget as Text;
     if (only != null && !only(t)) continue;
-    final p = tester.renderObject<RenderParagraph>(find.byElementPredicate(
-        (x) => x == e));
+    final p = tester
+        .renderObject<RenderParagraph>(find.byElementPredicate((x) => x == e));
     if (p.didExceedMaxLines && (t.maxLines ?? 99) < 3) {
       out.add('"${t.data}" cut at maxLines ${t.maxLines}');
     }
@@ -123,8 +123,27 @@ final _cpfrFixture = {
       },
   ],
   'inventory_and_po_items': [
-    {'barcode': '1', 'item_code': 'A1', 'sku_name': _longName, 'department_ar': 'زيوت الطعام والسمن النباتي والحيواني ومشتقاتها', 'sell_in_units': 900, 'sell_out_units': 820, 'estimated_stock_units': 80, 'sell_through_pct': 91.1, 'stock_status': 'optimal'},
-    {'barcode': '2', 'item_code': 'A2', 'sku_name': 'سمن تجريبي 1 كجم', 'sell_in_units': 700, 'sell_out_units': 300, 'estimated_stock_units': 400, 'sell_through_pct': 42.9, 'stock_status': 'overstock'},
+    {
+      'barcode': '1',
+      'item_code': 'A1',
+      'sku_name': _longName,
+      'department_ar': 'زيوت الطعام والسمن النباتي والحيواني ومشتقاتها',
+      'sell_in_units': 900,
+      'sell_out_units': 820,
+      'estimated_stock_units': 80,
+      'sell_through_pct': 91.1,
+      'stock_status': 'optimal'
+    },
+    {
+      'barcode': '2',
+      'item_code': 'A2',
+      'sku_name': 'سمن تجريبي 1 كجم',
+      'sell_in_units': 700,
+      'sell_out_units': 300,
+      'estimated_stock_units': 400,
+      'sell_through_pct': 42.9,
+      'stock_status': 'overstock'
+    },
   ],
 };
 
@@ -200,13 +219,14 @@ void main() {
           expect(t.maxLines, 3, reason: k);
         }
       }
-      for (final t in tester
-          .widgetList<Text>(find.byKey(const ValueKey('sku_table_store_name')))) {
+      for (final t in tester.widgetList<Text>(
+          find.byKey(const ValueKey('sku_table_store_name')))) {
         expect(t.textAlign, TextAlign.center);
       }
       expect(_cutBeforeThreeLines(tester, table), isEmpty);
       // Metric column: heading glyphs centred over the first row's value.
-      final head = find.descendant(of: table, matching: find.text('الوحدات المباعة'));
+      final head =
+          find.descendant(of: table, matching: find.text('الوحدات المباعة'));
       final units = find.byKey(const ValueKey('sku_table_units'));
       expect(units, findsWidgets);
       expect(_glyphCenterX(tester, units.first),
@@ -232,8 +252,11 @@ void main() {
           find.descendant(of: table, matching: find.byType(DataTable)));
       for (final (i, c) in dt.columns.indexed) {
         final label = (c.label as Text).data;
-        expect(c.headingRowAlignment,
-            label == 'الصنف الرسمي' ? isNot(MainAxisAlignment.center) : MainAxisAlignment.center,
+        expect(
+            c.headingRowAlignment,
+            label == 'الصنف الرسمي'
+                ? isNot(MainAxisAlignment.center)
+                : MainAxisAlignment.center,
             reason: label);
         if (label == 'وحدات/كرتونة') {
           final head = find.descendant(of: table, matching: find.text(label!));
@@ -260,8 +283,8 @@ void main() {
     expect(tester.widget<Text>(name).maxLines, 3);
     final p = tester.renderObject<RenderParagraph>(name);
     // The fixture name needs 3 lines at 1280: all 3 are shown, not 2 + "…".
-    expect(p.size.height,
-        greaterThan(2.5 * (p.text.style?.fontSize ?? 14) * 1.2));
+    expect(
+        p.size.height, greaterThan(2.5 * (p.text.style?.fontSize ?? 14) * 1.2));
     expect(_cutBeforeThreeLines(tester, table), isEmpty);
   });
 
@@ -273,10 +296,26 @@ void main() {
     expect(head, findsWidgets);
     final dt = tester.widget<DataTable>(
         find.ancestor(of: head.first, matching: find.byType(DataTable)));
-    final i = dt.columns.indexWhere((c) => (c.label as Text).data == 'الأصناف النشطة');
+    String? colLabel(DataColumn c) {
+      Widget w = c.label;
+      while (true) {
+        if (w is Text) return w.data;
+        if (w is ConstrainedBox && w.child != null) {
+          w = w.child!;
+          continue;
+        }
+        if (w is Align && w.child != null) {
+          w = w.child!;
+          continue;
+        }
+        return null;
+      }
+    }
+
+    final i = dt.columns.indexWhere((c) => colLabel(c) == 'الأصناف النشطة');
     for (final c in dt.columns) {
       expect(c.headingRowAlignment, MainAxisAlignment.center,
-          reason: (c.label as Text).data);
+          reason: colLabel(c));
     }
     expect(dt.rows, isNotEmpty);
     final cell = find.descendant(
@@ -288,16 +327,17 @@ void main() {
 
   // 1000 ≈ the content width at a 1280 window beside the navigation rail.
   for (final width in [1280.0, 1000.0]) {
-  testWidgets('F4 Sell-In stock: brand dropdown shows its whole value at '
-      '${width.toInt()}', (tester) async {
-    await _pump(tester,
-        SellInExplorerScreen(apiClient: ApiClient(tenantId: 'tenant-adeco')),
-        width: width);
-    await tester.tap(find.textContaining('المخزون وإعادة الطلب').first);
-    await tester.pumpAndSettle();
-    expect(_clippedDropdowns(tester), isEmpty);
-    expect(find.byKey(const ValueKey('sellin_stock_brand_dropdown')),
-        findsOneWidget);
-  });
+    testWidgets(
+        'F4 Sell-In stock: brand dropdown shows its whole value at '
+        '${width.toInt()}', (tester) async {
+      await _pump(tester,
+          SellInExplorerScreen(apiClient: ApiClient(tenantId: 'tenant-adeco')),
+          width: width);
+      await tester.tap(find.textContaining('المخزون وإعادة الطلب').first);
+      await tester.pumpAndSettle();
+      expect(_clippedDropdowns(tester), isEmpty);
+      expect(find.byKey(const ValueKey('sellin_stock_brand_dropdown')),
+          findsOneWidget);
+    });
   }
 }
