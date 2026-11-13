@@ -3215,10 +3215,9 @@ onChanged: m3Legacy<String>((val) {
                     runSpacing: M3Spacing.xs,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      SizedBox(
-                        width: 200.0,
-                        child: M3Dropdown<String>(
+                      M3Dropdown<String>(
 value: _archiveUploadChain,
+fitOptions: true,
 label: 'السلسلة',
 hint: 'اختار السلسلة',
 options: chainOptions(_chains),
@@ -3228,11 +3227,9 @@ onChanged: m3Legacy<String>((v) {
                             }
                           }),
 ),
-                      ),
-                      SizedBox(
-                        width: 155.0,
-                        child: M3Dropdown<int>(
+                      M3Dropdown<int>(
 value: _archiveUploadYear,
+fitOptions: true,
 label: 'السنة (اختياري)',
 options: m3OptionsFromMenuItems<int>([
                             const DropdownMenuItem(
@@ -3248,11 +3245,9 @@ onChanged: m3Legacy<int>((v) {
                             }
                           }),
 ),
-                      ),
-                      SizedBox(
-                        width: 175.0,
-                        child: M3Dropdown<int>(
+                      M3Dropdown<int>(
 value: _archiveUploadMonth,
+fitOptions: true,
 label: 'الشهر (اختياري)',
 options: m3OptionsFromMenuItems<int>([
                             const DropdownMenuItem(
@@ -3278,7 +3273,6 @@ onChanged: m3Legacy<int>((v) {
                             }
                           }),
 ),
-                      ),
                     ],
                   ),
                   Wrap(

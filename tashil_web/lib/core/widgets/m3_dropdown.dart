@@ -38,8 +38,9 @@ class M3Dropdown<T> extends StatelessWidget {
     this.fitOptions = false,
   });
 
-  /// Size the field from its longest option (measured with the field's text
-  /// style) so no option ever clips, e.g. "All Months" / "All Chains".
+  /// Size the field from its longest option or hint (measured with the
+  /// field's text style) so nothing ever clips, e.g. "All Months" /
+  /// "من الملف تلقائيًا".
   /// Ignored when [width] or [expand] is set.
   final bool fitOptions;
 
@@ -120,9 +121,9 @@ class M3Dropdown<T> extends StatelessWidget {
     final scaler = MediaQuery.textScalerOf(context);
     final dir = Directionality.of(context);
     var maxW = 0.0;
-    for (final o in options) {
+    for (final text in [for (final o in options) o.label, if (hint != null) hint!]) {
       final tp = TextPainter(
-        text: TextSpan(text: o.label, style: style),
+        text: TextSpan(text: text, style: style),
         textDirection: dir,
         textScaler: scaler,
         maxLines: 1,
