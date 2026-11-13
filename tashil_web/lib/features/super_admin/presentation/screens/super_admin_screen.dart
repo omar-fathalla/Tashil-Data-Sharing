@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/m3_search_field.dart';
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_states.dart';
@@ -514,7 +515,8 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                 runSpacing: 10,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  SizedBox(
+                  M3SearchFieldWidth(
+                    hintText: 'بحث عن شركة أو بريد أو كود...',
                     width: 250,
                     child: TextField(
                       controller: _tenantSearchCtrl,

@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/m3_search_field.dart';
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/app_icons.dart';
@@ -278,7 +279,8 @@ class _AuditLogsPanelState extends State<AuditLogsPanel> {
                     )
                     .toList(),
               ),
-              SizedBox(
+              M3SearchFieldWidth(
+                hintText: 'بحث في السجل (مستخدم، شركة، IP)...',
                 width: 280,
                 child: TextField(
                   controller: _searchCtrl,

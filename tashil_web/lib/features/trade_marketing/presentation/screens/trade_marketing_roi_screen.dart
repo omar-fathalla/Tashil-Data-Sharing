@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/m3_search_field.dart';
 import 'dart:convert';
 import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
@@ -1587,10 +1588,9 @@ onChanged: m3Legacy<int>((v) {
               // Filters (English labels for symmetry)
               Directionality(
                 textDirection: TextDirection.ltr,
-                child: Wrap(
+                child: M3FlexWrap(
                   spacing: 10.0,
                   runSpacing: 10.0,
-                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     // Chain Filter
                     // Sized from its longest option (no clipping, v126).
@@ -1671,9 +1671,12 @@ onChanged: m3Legacy<String>((v) {
                         }),
 ),
                     // Search Box
-                    SizedBox(
-                      width: 220.0,
-                      child: TextField(
+                    M3FlexWrapFill(
+                      // v127: fills the rest of the filter row, never
+                      // narrower than its full placeholder.
+                      child: M3SearchFieldWidth(
+                        hintText: 'Search campaign, brand...',
+                        child: TextField(
                         onChanged: (val) => setState(() => _searchQuery = val),
                         decoration: const InputDecoration(
                           hintText: 'Search campaign, brand...',
@@ -1682,7 +1685,7 @@ onChanged: m3Legacy<String>((v) {
                           contentPadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 11.0),
                           border: OutlineInputBorder(borderRadius: M3Shape.radiusMd),
                         ),
-                      ),
+                      )),
                     ),
                   ],
                 ),

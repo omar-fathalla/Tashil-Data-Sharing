@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/m3_search_field.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
@@ -450,9 +451,17 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
       border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
     );
 
+    const searchHint = 'ابحث بالصنف أو الباركود';
+    final searchHintStyle = theme.textTheme.bodyMedium?.copyWith(
+      fontFamily: 'Cairo',
+      color: colorScheme.onSurfaceVariant.withOpacity(0.65),
+      fontWeight: FontWeight.normal,
+    );
+
     Widget buildSearchField({required double? width}) {
-      return Container(
-        width: width,
+      final fixed = width != null && width.isFinite;
+      final box = Container(
+        width: fixed ? null : width,
         height: M3ToolbarButton.height,
         decoration: controlDecoration,
         alignment: Alignment.center,
@@ -471,12 +480,8 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
               onSearchChanged(val);
             },
             decoration: InputDecoration(
-              hintText: 'ابحث بالصنف أو الباركود',
-              hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                fontFamily: 'Cairo',
-                color: colorScheme.onSurfaceVariant.withOpacity(0.65),
-                fontWeight: FontWeight.normal,
-              ),
+              hintText: searchHint,
+              hintStyle: searchHintStyle,
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
@@ -525,6 +530,17 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
           ),
         ),
       );
+      // v127: never narrower than the full placeholder (38dp search icon,
+      // 38dp barcode button, 10dp padding each side).
+      return fixed
+          ? M3SearchFieldWidth(
+              hintText: searchHint,
+              hintStyle: searchHintStyle,
+              width: width,
+              chrome: 38.0 + 38.0 + 20.0,
+              child: box,
+            )
+          : box;
     }
 
     Widget buildChainDropdown({required bool expand}) {
