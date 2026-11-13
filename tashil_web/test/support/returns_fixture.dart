@@ -22,6 +22,28 @@ const kReturnsLiveVariantBranches = [
   'فرع منفصل بدون بادئة',
 ];
 
+/// Live-like two-cluster typo mix mirroring the v151 Returns review: a
+/// majority "… - remainder" group and a minority "… مواد عناية - remainder"
+/// group, plus one outlier. Fictional names only.
+const kReturnsLiveClusterBranches = [
+  'عائله سلسله تجريبيه - مخزن ألفا',
+  'عائلة سلسلة تجريبية - فرع بيتا',
+  'عائله سلسله تجريبيه - المستودع المركزي',
+  'عائله سلسله تجريبيه - عصمي التجريبي',
+  'عائله سلسله تجريبيه مواد عناية - عصمي التجريبي',
+  'عائله سلسله تجريبيه مواد عناية - فرع المطروح',
+  'عائله سلسله تجريبيه مواد عناية - أبو يوسف التجريبي',
+  'فرع منفصل بدون بادئة',
+];
+
+/// Live-scale month values in EGP (v151 matrix used 993.0K / 575.2K / 208.8K).
+const kReturnsLiveScaleMonthValues = <List<double>>[
+  [11700, 1700, 0, 4300, 0, 993000, 575200, 3600, 67000, 9000],
+  [26600, 15400, 5100, 7400, 8700, 23300, 101300, 29000, 65900, 12500],
+  [5800, 14500, 6500, 6800, 9500, 12400, 18400, 13700, 20100, 19500],
+  [8100, 7500, 6200, 1400, 3100, 6900, 4200, 16800, 10100, 45300],
+];
+
 const kReturnsLongProductName =
     'صنف تجريبي طويل الاسم جداً للتحقق من لف الكلام لثلاثة سطور في جدول أعلى الأصناف المرتجعة';
 
@@ -49,6 +71,7 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
     this.kpiValueEgp,
     this.kpiQty,
     this.kpiReturnPct,
+    this.monthValuesEgp,
   });
 
   final double? momChangePct;
@@ -56,6 +79,9 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
   final double? kpiValueEgp;
   final double? kpiQty;
   final double? kpiReturnPct;
+
+  /// When set, month returns are used as EGP amounts (no ×1000).
+  final List<List<double>>? monthValuesEgp;
 
   @override
   Future<Result<SellInReturnsReport>> load(
@@ -74,7 +100,7 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
         57.5,
         3.6,
         67,
-        9.0
+        9.0,
       ],
       kReturnsFixtureBranches[1]: [
         26.1,
@@ -86,7 +112,7 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
         101.3,
         29,
         65.9,
-        12.5
+        12.5,
       ],
       kReturnsFixtureBranches[2]: [
         5.8,
@@ -98,7 +124,7 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
         18.4,
         13.7,
         20.1,
-        19.5
+        19.5,
       ],
       kReturnsFixtureBranches[3]: [
         8.1,
@@ -110,7 +136,7 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
         4.2,
         16.8,
         10.1,
-        45.3
+        45.3,
       ],
     };
     final qtys = <String, List<double>>{
@@ -120,11 +146,14 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
       kReturnsFixtureBranches[3]: [1, 1, 1, 1, 1, 1, 1, 2, 2, 5],
     };
 
-    SellInReturnsBranchRow branch(String name) {
+    SellInReturnsBranchRow branch(String name, {required int index}) {
       final byMonth = <int, SellInReturnsCell>{};
       var totRet = 0.0, totGross = 0.0, totQty = 0.0;
+      final override = monthValuesEgp;
       for (var i = 0; i < months.length; i++) {
-        final ret = values[name]![i] * 1000;
+        final ret = override != null
+            ? override[index % override.length][i]
+            : values[name]![i] * 1000;
         final qty = qtys[name]![i];
         final gross = ret * 5;
         byMonth[months[i]] = _cell(gross: gross, returnsValue: ret, qty: qty);
@@ -157,7 +186,10 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
       values.putIfAbsent(branchNames[i], () => valuesByIndex[i % 4]);
       qtys.putIfAbsent(branchNames[i], () => qtysByIndex[i % 4]);
     }
-    final branches = [for (final n in branchNames) branch(n)];
+    final branches = [
+      for (var i = 0; i < branchNames.length; i++)
+        branch(branchNames[i], index: i),
+    ];
     final columnTotals = <int, SellInReturnsCell>{};
     for (final m in months) {
       var ret = 0.0, gross = 0.0, qty = 0.0;

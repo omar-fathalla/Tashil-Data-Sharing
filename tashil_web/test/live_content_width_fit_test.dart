@@ -273,8 +273,10 @@ void main() {
     await tester.tap(matrix);
     await tester.pumpAndSettle();
 
-    expect(find.text(kLiveNisBranch), findsOneWidget);
-    await tester.ensureVisible(find.text(kLiveNisBranch));
+    const nisLabel = 'نيس';
+    expect(find.text(nisLabel), findsOneWidget);
+    expect(find.text(kLiveNisBranch), findsNothing);
+    await tester.ensureVisible(find.text(nisLabel));
     await tester.pumpAndSettle();
 
     final scroller =

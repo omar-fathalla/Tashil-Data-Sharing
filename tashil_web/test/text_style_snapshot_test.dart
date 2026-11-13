@@ -94,10 +94,9 @@ Future<void> _tab(WidgetTester tester, Pattern label) async {
 void main() {
   GoogleFonts.config.allowRuntimeFetching = false;
 
-  // sell_out_tab0 / sell_out_tab1 were re-recorded after #141: display-only
-  // stripSharedLeadingPrefix removes the repeated branch prefix, so labels
-  // such as «فرع فتح الله - نيس2» now read «نيس2». Typography (size, weight,
-  // color, letterSpacing, height) of the pre-existing strings is unchanged.
+  // sell_out_tab0 was re-recorded after the multi-cluster prefix helper:
+  // minority groups such as «سبينيس - مول العرب» / «فرع فتح الله - مدينة
+  // الرحاب» now show the remainder. Typography of unchanged strings is the same.
   testWidgets('Sell-Out explorer text styles are unchanged', (tester) async {
     await _pump(tester, SellOutExplorerScreen(apiClient: ApiClient()));
     await _check(tester, 'sell_out_tab0');

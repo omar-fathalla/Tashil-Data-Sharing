@@ -60,7 +60,9 @@ void main() {
       // Check Store Items
       expect(find.text('كارفور المعادي سيتي سنتر'), findsOneWidget);
       expect(find.text('فتح الله جملة ماركت - سموحة'), findsOneWidget);
-      expect(find.text('فتح الله - المنشية'), findsOneWidget);
+      // Shared "فتح الله -" cluster (≥2 names) is stripped for display.
+      expect(find.text('المنشية'), findsOneWidget);
+      expect(find.text('فتح الله - المنشية'), findsNothing);
 
       // Check Ranks and Tier Badges
       expect(find.text('#1'), findsOneWidget);
@@ -120,11 +122,11 @@ void main() {
 
       // In East Alex: Smouha and Stanley exist
       expect(find.text('فتح الله جملة ماركت - سموحة'), findsOneWidget);
-      expect(find.text('فتح الله - ستانلي'), findsOneWidget);
+      expect(find.text('ستانلي'), findsOneWidget);
 
       // Cairo and West Alex stores should NOT be present in table
       expect(find.text('كارفور المعادي سيتي سنتر'), findsNothing);
-      expect(find.text('فتح الله - المنشية'), findsNothing);
+      expect(find.text('المنشية'), findsNothing);
     });
 
     testWidgets('filtering by Tier segment updates the store list',
@@ -152,7 +154,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Only Tier C store (Mansheya) should be in table
-      expect(find.text('فتح الله - المنشية'), findsOneWidget);
+      expect(find.text('المنشية'), findsOneWidget);
       expect(find.text('كارفور المعادي سيتي سنتر'), findsNothing);
     });
 

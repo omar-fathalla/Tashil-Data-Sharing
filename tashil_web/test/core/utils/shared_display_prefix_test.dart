@@ -3,35 +3,41 @@ import 'package:tashil_web/core/utils/shared_display_prefix.dart';
 
 void main() {
   group('stripSharedLeadingPrefix', () {
-    test('strips a shared Arabic prefix cut at a hyphen, keeping the remainder',
-        () {
-      final names = [
-        'سلسلة تجريبية XYZ - مخزن ألفا',
-        'سلسلة تجريبية XYZ - فرع بيتا',
-        'سلسلة تجريبية XYZ - المستودع المركزي',
-      ];
-      expect(stripSharedLeadingPrefix(names), [
-        'مخزن ألفا',
-        'فرع بيتا',
-        'المستودع المركزي',
-      ]);
-    });
+    test(
+      'strips a shared Arabic prefix cut at a hyphen, keeping the remainder',
+      () {
+        final names = [
+          'سلسلة تجريبية XYZ - مخزن ألفا',
+          'سلسلة تجريبية XYZ - فرع بيتا',
+          'سلسلة تجريبية XYZ - المستودع المركزي',
+        ];
+        expect(stripSharedLeadingPrefix(names), [
+          'مخزن ألفا',
+          'فرع بيتا',
+          'المستودع المركزي',
+        ]);
+      },
+    );
 
     test('supports en-dash, em-dash and colon separators', () {
       expect(
-        stripSharedLeadingPrefix(
-            ['Acme Markets – Downtown', 'Acme Markets – Harbour']),
+        stripSharedLeadingPrefix([
+          'Acme Markets – Downtown',
+          'Acme Markets – Harbour',
+        ]),
         ['Downtown', 'Harbour'],
       );
       expect(
-        stripSharedLeadingPrefix(
-            ['Acme Markets — Downtown', 'Acme Markets — Harbour']),
+        stripSharedLeadingPrefix([
+          'Acme Markets — Downtown',
+          'Acme Markets — Harbour',
+        ]),
         ['Downtown', 'Harbour'],
       );
-      expect(
-        stripSharedLeadingPrefix(['Region: North', 'Region: South']),
-        ['North', 'South'],
-      );
+      expect(stripSharedLeadingPrefix(['Region: North', 'Region: South']), [
+        'North',
+        'South',
+      ]);
     });
 
     test('trims Arabic and Unicode whitespace around the separator', () {
@@ -52,14 +58,15 @@ void main() {
     test('leaves names unchanged when the common prefix has no separator', () {
       final names = [
         'سلسلة النور التجارية الشمالية',
-        'سلسلة النور التجارية الجنوبية'
+        'سلسلة النور التجارية الجنوبية',
       ];
       expect(stripSharedLeadingPrefix(names), names);
     });
 
     test('leaves a single name unchanged', () {
-      expect(stripSharedLeadingPrefix(['سلسلة تجريبية XYZ - مخزن ألفا']),
-          ['سلسلة تجريبية XYZ - مخزن ألفا']);
+      expect(stripSharedLeadingPrefix(['سلسلة تجريبية XYZ - مخزن ألفا']), [
+        'سلسلة تجريبية XYZ - مخزن ألفا',
+      ]);
     });
 
     test('leaves an empty list unchanged', () {
@@ -67,14 +74,15 @@ void main() {
     });
 
     test(
-        'never produces an empty name: skips stripping if any remainder is empty',
-        () {
-      final names = [
-        'سلسلة تجريبية XYZ -',
-        'سلسلة تجريبية XYZ - فرع بيتا',
-      ];
-      expect(stripSharedLeadingPrefix(names), names);
-    });
+      'never produces an empty name: leaves only the empty remainder unchanged',
+      () {
+        final names = ['سلسلة تجريبية XYZ -', 'سلسلة تجريبية XYZ - فرع بيتا'];
+        expect(stripSharedLeadingPrefix(names), [
+          'سلسلة تجريبية XYZ -',
+          'فرع بيتا',
+        ]);
+      },
+    );
 
     test('display map keeps the original name as the key', () {
       final names = [
@@ -89,25 +97,27 @@ void main() {
       );
     });
 
-    test('normalises ة/ه, alef variants, dash variants and invisible marks',
-        () {
-      const rlm = '\u200F';
-      const zwj = '\u200D';
-      const nbsp = '\u00A0';
-      // Live-like typo mix: ه vs ة, en-dash, NBSP, RLM/ZWJ.
-      final names = [
-        'سلسله تجريبيه XYZ - مخزن ألفا',
-        'سلسلة تجريبية XYZ – فرع بيتا',
-        'سلسلة تجريبية XYZ -$nbspالمستودع المركزي',
-        '${rlm}سلسلة تجريبية XYZ - ${zwj}فرع النيل',
-      ];
-      expect(stripSharedLeadingPrefix(names), [
-        'مخزن ألفا',
-        'فرع بيتا',
-        'المستودع المركزي',
-        'فرع النيل',
-      ]);
-    });
+    test(
+      'normalises ة/ه, alef variants, dash variants and invisible marks',
+      () {
+        const rlm = '\u200F';
+        const zwj = '\u200D';
+        const nbsp = '\u00A0';
+        // Live-like typo mix: ه vs ة, en-dash, NBSP, RLM/ZWJ.
+        final names = [
+          'سلسله تجريبيه XYZ - مخزن ألفا',
+          'سلسلة تجريبية XYZ – فرع بيتا',
+          'سلسلة تجريبية XYZ -$nbspالمستودع المركزي',
+          '${rlm}سلسلة تجريبية XYZ - ${zwj}فرع النيل',
+        ];
+        expect(stripSharedLeadingPrefix(names), [
+          'مخزن ألفا',
+          'فرع بيتا',
+          'المستودع المركزي',
+          'فرع النيل',
+        ]);
+      },
+    );
 
     test('strips a majority prefix even when an outlier has no prefix', () {
       final names = [
@@ -124,7 +134,7 @@ void main() {
       ]);
     });
 
-    test('does not strip when fewer than 50% of names share a prefix', () {
+    test('does not strip a prefix that appears on only one name', () {
       final names = [
         'سلسلة تجريبية XYZ - مخزن ألفا',
         'فرع بيتا',
@@ -133,18 +143,91 @@ void main() {
       expect(stripSharedLeadingPrefix(names), names);
     });
 
-    test('leaves a name that would become empty unchanged, strips the others',
-        () {
+    test('strips a cluster shared by two names even when it is under 50%', () {
       final names = [
-        'سلسلة تجريبية XYZ -',
-        'سلسلة تجريبية XYZ - فرع بيتا',
         'سلسلة تجريبية XYZ - مخزن ألفا',
+        'سلسلة تجريبية XYZ - فرع بيتا',
+        'المستودع المركزي',
+        'فرع النيل',
+        'فرع المعادي',
       ];
       expect(stripSharedLeadingPrefix(names), [
-        'سلسلة تجريبية XYZ -',
-        'فرع بيتا',
         'مخزن ألفا',
+        'فرع بيتا',
+        'المستودع المركزي',
+        'فرع النيل',
+        'فرع المعادي',
       ]);
     });
+
+    test('strips multiple prefix clusters independently', () {
+      // Mirrors the live v151 Returns pattern: a majority "ماركت -" group
+      // and a minority "ماركت مواد عناية -" group, plus typo ة/ه variants.
+      // Names are fictional; only the cluster structure is live-like.
+      final names = [
+        'عائله سلسله تجريبيه - مخزن ألفا',
+        'عائلة سلسلة تجريبية - فرع بيتا',
+        'عائله سلسله تجريبيه - عصمي التجريبي',
+        'عائله سلسله تجريبيه مواد عناية - عصمي التجريبي',
+        'عائله سلسله تجريبيه مواد عناية - فرع المطروح',
+        'عائله سلسله تجريبيه مواد عناية - أبو يوسف التجريبي',
+        'فرع منفصل بدون بادئة',
+      ];
+      expect(stripSharedLeadingPrefix(names), [
+        'مخزن ألفا',
+        'فرع بيتا',
+        'عصمي التجريبي',
+        'مواد عناية - عصمي التجريبي',
+        'فرع المطروح',
+        'أبو يوسف التجريبي',
+        'فرع منفصل بدون بادئة',
+      ]);
+    });
+
+    test('keeps enough of the prefix when stripping would collide', () {
+      final names = [
+        'سلسلة شمال - فرع الوسط',
+        'سلسلة جنوب - فرع الوسط',
+        'سلسلة شمال - فرع الشرق',
+        'سلسلة جنوب - فرع الغرب',
+      ];
+      expect(stripSharedLeadingPrefix(names), [
+        'شمال - فرع الوسط',
+        'جنوب - فرع الوسط',
+        'فرع الشرق',
+        'فرع الغرب',
+      ]);
+    });
+
+    test('strips a live-like Store Matrix فرع prefix, leaving the outlier', () {
+      final names = [
+        'فرع سلسلة تجريبية - سيدي جابر ميني',
+        'فرع سلسلة تجريبية - نيس2',
+        'فرع سلسلة تجريبية - الدخيلة ميني',
+        'غير موزع علي فرع',
+      ];
+      expect(stripSharedLeadingPrefix(names), [
+        'سيدي جابر ميني',
+        'نيس2',
+        'الدخيلة ميني',
+        'غير موزع علي فرع',
+      ]);
+    });
+
+    test(
+      'leaves a name that would become empty unchanged, strips the others',
+      () {
+        final names = [
+          'سلسلة تجريبية XYZ -',
+          'سلسلة تجريبية XYZ - فرع بيتا',
+          'سلسلة تجريبية XYZ - مخزن ألفا',
+        ];
+        expect(stripSharedLeadingPrefix(names), [
+          'سلسلة تجريبية XYZ -',
+          'فرع بيتا',
+          'مخزن ألفا',
+        ]);
+      },
+    );
   });
 }
