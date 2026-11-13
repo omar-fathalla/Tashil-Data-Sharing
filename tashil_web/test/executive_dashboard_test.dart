@@ -57,13 +57,13 @@ void main() {
     );
 
     expect(find.text('إجمالي Sell-Out'), findsOneWidget);
-    expect(find.text('Total Sell-Out (EGP)'), findsOneWidget);
+    expect(find.text('Total Sell-Out (EGP)'), findsNothing); // Arabic-only M3 KPI card
     expect(find.text('إجمالي الوحدات المباعة'), findsOneWidget);
-    expect(find.text('Total Units Sold'), findsOneWidget);
+    expect(find.text('Total Units Sold'), findsNothing); // Arabic-only M3 KPI card
     expect(find.text('الفروع النشطة'), findsOneWidget);
-    expect(find.text('Active Stores'), findsOneWidget);
+    expect(find.text('Active Stores'), findsNothing); // Arabic-only M3 KPI card
     expect(find.text('نسبة نفاد المخزون (OOS)'), findsOneWidget);
-    expect(find.text('OOS Rate'), findsOneWidget);
+    expect(find.text('OOS Rate'), findsNothing); // Arabic-only M3 KPI card
 
     expect(find.text('16 فرع'), findsOneWidget);
     expect(find.text('4.2%'), findsOneWidget);
@@ -110,11 +110,11 @@ void main() {
       ),
     );
 
-    // Must format negative percentages cleanly without '+-' with Arabic on Line 1 and English on Line 2
+    // Must format negative percentages cleanly without '+-' (Arabic-only tags)
     expect(find.text('-16.0% مقارنة بالشهر السابق'), findsOneWidget);
-    expect(find.text('MoM'), findsWidgets);
+    expect(find.text('MoM'), findsNothing);
     expect(find.text('-4.5% مقارنة بالعام السابق'), findsOneWidget);
-    expect(find.text('YoY'), findsWidgets);
+    expect(find.text('YoY'), findsNothing);
     expect(find.text('-8.2% مقارنة بالشهر السابق'), findsOneWidget);
     expect(find.textContaining('+-'), findsNothing);
 

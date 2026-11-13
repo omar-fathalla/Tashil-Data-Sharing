@@ -116,10 +116,10 @@ void main() {
       final categoryTop = tester.getTopLeft(find.text('Category Contribution').first).dy;
       expect(kpiTop, lessThan(shareTop));
       expect(shareTop, lessThan(categoryTop));
-      expect(find.text('Total Sell-Out (EGP)'), findsOneWidget);
-      expect(find.text('Total Units Sold'), findsOneWidget);
-      expect(find.text('Active Stores'), findsOneWidget);
-      expect(find.text('OOS Rate'), findsOneWidget);
+      expect(find.text('إجمالي Sell-Out'), findsOneWidget);
+      expect(find.text('إجمالي الوحدات المباعة'), findsOneWidget);
+      expect(find.text('الفروع النشطة'), findsOneWidget);
+      expect(find.text('نسبة نفاد المخزون (OOS)'), findsOneWidget);
     });
   }
 
