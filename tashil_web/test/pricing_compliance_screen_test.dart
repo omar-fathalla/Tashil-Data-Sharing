@@ -12,7 +12,9 @@ void main() {
       apiClient = ApiClient();
     });
 
-    testWidgets('renders KPI cards, SegmentedButton filter, and price delta badges', (WidgetTester tester) async {
+    testWidgets(
+        'renders KPI cards, SegmentedButton filter, and price delta badges',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1440, 1024);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -33,9 +35,9 @@ void main() {
       expect(find.textContaining('Pricing & Promo Compliance'), findsOneWidget);
 
       // Check Summary KPI Cards
-      expect(find.textContaining('معدل الالتزام السعري (Compliance Rate)'), findsOneWidget);
-      expect(find.textContaining('إجمالي المخالفات السعرية (Price Violations)'), findsOneWidget);
-      expect(find.textContaining('متوسط الأثر الترويجي (Avg Promo Uplift)'), findsOneWidget);
+      expect(find.textContaining('معدل الالتزام السعري'), findsOneWidget);
+      expect(find.textContaining('إجمالي المخالفات السعرية'), findsOneWidget);
+      expect(find.textContaining('متوسط الأثر الترويجي'), findsOneWidget);
 
       // Check SegmentedButton options
       expect(find.text('الكل'), findsWidgets);
@@ -60,7 +62,9 @@ void main() {
       expect(find.textContaining('بدون عرض'), findsWidgets);
     });
 
-    testWidgets('filtering by SegmentedButton (مخالفات سعرية فقط) filters compliant items', (WidgetTester tester) async {
+    testWidgets(
+        'filtering by SegmentedButton (مخالفات سعرية فقط) filters compliant items',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1440, 1024);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -84,22 +88,29 @@ void main() {
 
       // In violation only mode, compliant badges in the DataTable must be 0
       expect(
-        find.descendant(of: find.byType(DataTable), matching: find.textContaining('مطابق')),
+        find.descendant(
+            of: find.byType(DataTable), matching: find.textContaining('مطابق')),
         findsNothing,
       );
 
       // Violations should still appear in the DataTable
       expect(
-        find.descendant(of: find.byType(DataTable), matching: find.textContaining('حرق سعر')),
+        find.descendant(
+            of: find.byType(DataTable),
+            matching: find.textContaining('حرق سعر')),
         findsWidgets,
       );
       expect(
-        find.descendant(of: find.byType(DataTable), matching: find.textContaining('زيادة سعر')),
+        find.descendant(
+            of: find.byType(DataTable),
+            matching: find.textContaining('زيادة سعر')),
         findsWidgets,
       );
     });
 
-    testWidgets('filtering by SegmentedButton (عروض نشطة فقط) displays promo items with uplift', (WidgetTester tester) async {
+    testWidgets(
+        'filtering by SegmentedButton (عروض نشطة فقط) displays promo items with uplift',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1440, 1024);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -123,18 +134,23 @@ void main() {
 
       // Non-promo items ('بدون عرض') must be 0 in table
       expect(
-        find.descendant(of: find.byType(DataTable), matching: find.textContaining('بدون عرض')),
+        find.descendant(
+            of: find.byType(DataTable),
+            matching: find.textContaining('بدون عرض')),
         findsNothing,
       );
 
       // Uplift badges should be visible
       expect(
-        find.descendant(of: find.byType(DataTable), matching: find.textContaining('أثر ترويجي')),
+        find.descendant(
+            of: find.byType(DataTable),
+            matching: find.textContaining('أثر ترويجي')),
         findsWidgets,
       );
     });
 
-    testWidgets('filtering by Category chip updates the SKU compliance list', (WidgetTester tester) async {
+    testWidgets('filtering by Category chip updates the SKU compliance list',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1440, 1024);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -159,7 +175,9 @@ void main() {
       expect(find.byType(DataTable), findsOneWidget);
     });
 
-    testWidgets('renders cleanly on compact mobile viewport without RenderFlex overflow', (WidgetTester tester) async {
+    testWidgets(
+        'renders cleanly on compact mobile viewport without RenderFlex overflow',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(360, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -179,7 +197,9 @@ void main() {
       expect(find.textContaining('السعر الفعلي'), findsWidgets);
     });
 
-    testWidgets('paginates 25 items by default, switches to 50 items, and deduplicates approved categories without hardcoded food categories', (WidgetTester tester) async {
+    testWidgets(
+        'paginates 25 items by default, switches to 50 items, and deduplicates approved categories without hardcoded food categories',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1440, 1024);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -200,15 +220,19 @@ void main() {
       // 1. Verify default request used limit=25, offset=0
       expect(fakeClient.lastRequestedLimit, equals(25));
       expect(fakeClient.lastRequestedOffset, equals(0));
-      expect(find.byKey(const ValueKey('header_pricing_range_label')), findsOneWidget);
+      expect(find.byKey(const ValueKey('header_pricing_range_label')),
+          findsOneWidget);
       expect(find.text('عرض 1-25 من 60'), findsWidgets);
 
-      final DataTable tablePage1 = tester.widget<DataTable>(find.byType(DataTable));
+      final DataTable tablePage1 =
+          tester.widget<DataTable>(find.byType(DataTable));
       expect(tablePage1.rows.length, equals(25));
 
       // 2. Verify category chips only show deduplicated canonical categories (no unapproved food categories)
-      expect(find.widgetWithText(FilterChip, 'صابون سائل اطباق'), findsOneWidget);
-      expect(find.widgetWithText(FilterChip, 'صابون سائل للاطباق'), findsNothing);
+      expect(
+          find.widgetWithText(FilterChip, 'صابون سائل اطباق'), findsOneWidget);
+      expect(
+          find.widgetWithText(FilterChip, 'صابون سائل للاطباق'), findsNothing);
       expect(find.widgetWithText(FilterChip, 'كلور ألوان'), findsOneWidget);
       expect(find.widgetWithText(FilterChip, 'كلور الوان'), findsNothing);
       expect(find.widgetWithText(FilterChip, 'منظف ارضيات'), findsOneWidget);
@@ -233,7 +257,8 @@ void main() {
       expect(fakeClient.lastRequestedOffset, equals(0));
       expect(find.text('عرض 1-50 من 60'), findsWidgets);
 
-      final DataTable tablePage50 = tester.widget<DataTable>(find.byType(DataTable));
+      final DataTable tablePage50 =
+          tester.widget<DataTable>(find.byType(DataTable));
       expect(tablePage50.rows.length, equals(50));
 
       // 5. Navigate to Page 2 (offset=50) and then switch to a category with fewer than 25 items (20 items)
@@ -267,7 +292,8 @@ class _FakePaginatedComplianceApiClient extends ApiClient {
     return PricingComplianceItem(
       skuName: 'أدكو منظف رقم ${i + 1}',
       barcode: '622300139${(1000 + i)}',
-      category: ApiClient.normalizeCategoryName(rawCategories[i % rawCategories.length]),
+      category: ApiClient.normalizeCategoryName(
+          rawCategories[i % rawCategories.length]),
       retailerChain: i.isEven ? 'fathalla' : 'gomla',
       storeName: i.isEven ? 'فتح الله سموحة' : 'جملة ماركت',
       actualPrice: isViolation ? 90.0 : 100.0,
@@ -296,9 +322,12 @@ class _FakePaginatedComplianceApiClient extends ApiClient {
 
     final cats = _all60Items.map((e) => e.category).toSet().toList()..sort();
     var filtered = _all60Items.where((item) {
-      if (chain != null && chain.isNotEmpty && item.retailerChain != chain) return false;
-      if (category != null && category.isNotEmpty && item.category != category) return false;
-      if (violationOnly == true && item.violationType == 'compliant') return false;
+      if (chain != null && chain.isNotEmpty && item.retailerChain != chain)
+        return false;
+      if (category != null && category.isNotEmpty && item.category != category)
+        return false;
+      if (violationOnly == true && item.violationType == 'compliant')
+        return false;
       if (promoOnly == true && !item.isPromoActive) return false;
       if (search != null && search.trim().isNotEmpty) {
         if (!ApiClient.matchesProductSearch(
@@ -316,7 +345,9 @@ class _FakePaginatedComplianceApiClient extends ApiClient {
 
     final totalCount = filtered.length;
     final start = (offset ?? 0).clamp(0, totalCount);
-    final end = limit != null && limit > 0 ? (start + limit).clamp(0, totalCount) : totalCount;
+    final end = limit != null && limit > 0
+        ? (start + limit).clamp(0, totalCount)
+        : totalCount;
     final pageItems = filtered.sublist(start, end);
 
     lastPricingComplianceMeta = PricingCompliancePageResult(
@@ -334,4 +365,3 @@ class _FakePaginatedComplianceApiClient extends ApiClient {
     return pageItems;
   }
 }
-

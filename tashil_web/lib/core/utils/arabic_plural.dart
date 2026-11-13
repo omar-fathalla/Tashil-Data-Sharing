@@ -41,3 +41,19 @@ String countActiveChains(int n) => arabicCount(n,
     few: 'سلاسل نشطة',
     many: 'سلسلة نشطة',
     hundred: 'سلسلة نشطة');
+
+/// "مخالفة واحدة" / "مخالفتان" / "5 مخالفات" / "12 مخالفةً" / "100 مخالفة".
+String countViolation(int n) => arabicCount(n,
+    one: 'مخالفة واحدة',
+    two: 'مخالفتان',
+    few: 'مخالفات',
+    many: 'مخالفةً',
+    hundred: 'مخالفة');
+
+/// "عنصر واحد" / "عنصران" / "5 عناصر" / "12 عنصرًا" / "100 عنصر".
+String countItem(int n) => arabicCount(n,
+    one: 'عنصر واحد',
+    two: 'عنصران',
+    few: 'عناصر',
+    many: 'عنصرًا',
+    hundred: 'عنصر');

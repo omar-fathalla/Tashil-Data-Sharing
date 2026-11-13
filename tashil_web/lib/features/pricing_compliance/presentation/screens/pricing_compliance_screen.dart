@@ -8,8 +8,15 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_search_field.dart';
+import '../../../../core/widgets/m3_section_title.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_toolbar_button.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../product_master/presentation/screens/product_master_screen.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
@@ -26,10 +33,12 @@ class PricingComplianceScreen extends StatefulWidget {
   });
 
   @override
-  State<PricingComplianceScreen> createState() => _PricingComplianceScreenState();
+  State<PricingComplianceScreen> createState() =>
+      _PricingComplianceScreenState();
 }
 
-class _PricingComplianceScreenState extends State<PricingComplianceScreen> with DataRefreshMixin<PricingComplianceScreen> {
+class _PricingComplianceScreenState extends State<PricingComplianceScreen>
+    with DataRefreshMixin<PricingComplianceScreen> {
   @override
   void onBackendDataChanged() {
     _loadPricingCompliance();
@@ -62,8 +71,14 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
 
   final List<M3SegmentItem<String>> _filterSegments = const [
     M3SegmentItem(value: 'الكل', label: 'الكل', icon: Icons.view_list_rounded),
-    M3SegmentItem(value: 'عروض نشطة فقط', label: 'عروض نشطة', icon: Icons.local_offer_rounded),
-    M3SegmentItem(value: 'مخالفات سعرية فقط', label: 'مخالفات سعرية', icon: Icons.warning_amber_rounded),
+    M3SegmentItem(
+        value: 'عروض نشطة فقط',
+        label: 'عروض نشطة',
+        icon: Icons.local_offer_rounded),
+    M3SegmentItem(
+        value: 'مخالفات سعرية فقط',
+        label: 'مخالفات سعرية',
+        icon: Icons.warning_amber_rounded),
   ];
 
   late String _lastTenantId;
@@ -138,7 +153,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
           _elasticityPoints = meta.monthlyElasticity;
           _elasticitySummary = meta.elasticitySummary;
           if (_selectedMonthIndex != null &&
-              (_selectedMonthIndex! < 0 || _selectedMonthIndex! >= _elasticityPoints.length)) {
+              (_selectedMonthIndex! < 0 ||
+                  _selectedMonthIndex! >= _elasticityPoints.length)) {
             _selectedMonthIndex = null;
           }
           if (meta.availableCategories.isNotEmpty || isUnfilteredCategory) {
@@ -155,14 +171,20 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
         } else {
           _totalMatchingCount = results.length;
           _summaryTotalCount = results.length;
-          _compliantCount = results.where((i) => i.violationType == 'compliant').length;
-          _violationCount = results.where((i) => i.violationType != 'compliant').length;
+          _compliantCount =
+              results.where((i) => i.violationType == 'compliant').length;
+          _violationCount =
+              results.where((i) => i.violationType != 'compliant').length;
           _complianceRate = _summaryTotalCount > 0
               ? (_compliantCount / _summaryTotalCount) * 100.0
               : 100.0;
-          final activePromos = results.where((i) => i.isPromoActive && i.promoUpliftPct > 0).toList();
+          final activePromos = results
+              .where((i) => i.isPromoActive && i.promoUpliftPct > 0)
+              .toList();
           _avgPromoUplift = activePromos.isNotEmpty
-              ? activePromos.fold<double>(0.0, (sum, i) => sum + i.promoUpliftPct) / activePromos.length
+              ? activePromos.fold<double>(
+                      0.0, (sum, i) => sum + i.promoUpliftPct) /
+                  activePromos.length
               : 0.0;
           _elasticityPoints = [];
           _elasticitySummary = null;
@@ -205,7 +227,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
           textDirection: TextDirection.rtl,
           child: Scaffold(
             appBar: AppBar(
-              title: const Text('كارتة الأصناف والأسعار المعتمدة (Product Master)'),
+              title: const Text(
+                  'كارتة الأصناف والأسعار المعتمدة (Product Master)'),
               leading: IconButton(
                 icon: const Icon(Icons.close_rounded),
                 onPressed: () => Navigator.of(ctx).pop(),
@@ -234,744 +257,981 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
 
     final displayedItems = _pageItems;
     final totalMatching = _totalMatchingCount;
-    final totalPages = totalMatching > 0 ? ((totalMatching - 1) ~/ _pageSize) + 1 : 1;
+    final totalPages =
+        totalMatching > 0 ? ((totalMatching - 1) ~/ _pageSize) + 1 : 1;
     final startItem = totalMatching == 0 ? 0 : (_currentPage * _pageSize) + 1;
     final endItem = totalMatching == 0
         ? 0
-        : ((_currentPage * _pageSize) + displayedItems.length).clamp(startItem, totalMatching);
+        : ((_currentPage * _pageSize) + displayedItems.length)
+            .clamp(startItem, totalMatching);
 
     final isCompactScreen = MediaQuery.sizeOf(context).width < 600.0;
 
-    return SingleChildScrollView(
-      padding: isCompactScreen ? M3Spacing.pSm : M3Spacing.pMd,
-      child: M3ContentBoundary(
-        maxWidth: 1440.0,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Unified M3 Page Header (English Left, Arabic Right)
-            M3PageHeader(
-              titleEn: 'Pricing & Promo Compliance',
-              subtitleAr:
-                  'كشف الفروق السعرية عن السعر الاسترشادي (RRP) وكارتة أسعار المصنع وتتبع الأثر البيعي للعروض',
-              actions: M3ActionButtonGroup(
-                actions: [
-                  M3ActionItem(
-                    label: _showPriceImpact ? 'إخفاء المؤشر' : 'أثر الأسعار',
-                    icon: _showPriceImpact
-                        ? Icons.visibility_off_rounded
-                        : Icons.insights_rounded,
-                    isPrimary: _showPriceImpact,
-                    onPressed: () {
-                      setState(() => _showPriceImpact = !_showPriceImpact);
-                    },
-                  ),
-                  M3ActionItem(
-                    label: 'تحديث',
-                    icon: Icons.refresh_rounded,
-                    onPressed: _isLoading ? null : _loadPricingCompliance,
-                  ),
-                ],
-              ),
-            ),
-
-            M3Spacing.gapMD,
-
-            // Summary KPI Cards (Responsive Reflow >= 840dp)
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isDesktop = constraints.maxWidth >= 840.0;
-                final cards = [
-                  _buildKpiCard(
-                    context: context,
-                    title: 'معدل الالتزام السعري (Compliance Rate)',
-                    value: '${complianceRate.toStringAsFixed(1)}%',
-                    subtitle: '$compliantCount من أصل $totalCount صنف مطابق',
-                    icon: Icons.verified_rounded,
-                    containerColor: colorScheme.primaryContainer,
-                    onContainerColor: colorScheme.onPrimaryContainer,
-                  ),
-                  _buildKpiCard(
-                    context: context,
-                    title: 'إجمالي المخالفات السعرية (Price Violations)',
-                    value: '$violationCount مخالفة',
-                    subtitle: 'حالات حرق أسعار وزيادة غير معتمدة',
-                    icon: Icons.error_outline_rounded,
-                    containerColor: colorScheme.errorContainer,
-                    onContainerColor: colorScheme.onErrorContainer,
-                  ),
-                  _buildKpiCard(
-                    context: context,
-                    title: 'متوسط الأثر الترويجي (Avg Promo Uplift)',
-                    value: '+${avgPromoUplift.toStringAsFixed(1)}%',
-                    subtitle: 'زيادة في حجم المبيعات خلال فترات العروض',
-                    icon: Icons.rocket_launch_rounded,
-                    containerColor: colorScheme.tertiaryContainer,
-                    onContainerColor: colorScheme.onTertiaryContainer,
-                  ),
-                ];
-
-                if (isDesktop) {
-                  return IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(child: cards[0]),
-                        M3Spacing.hGapMD,
-                        Expanded(child: cards[1]),
-                        M3Spacing.hGapMD,
-                        Expanded(child: cards[2]),
-                      ],
-                    ),
-                  );
-                }
-
-                return Column(
-                  children: [
-                    cards[0],
-                    M3Spacing.gapSM,
-                    cards[1],
-                    M3Spacing.gapSM,
-                    cards[2],
-                  ],
-                );
-              },
-            ),
-
-            M3Spacing.gapMD,
-
-            // Filter Toolbar with Temporal (Year/Month), Chain, Status & Category Selectors
-            Card(
-              elevation: 0,
-              color: colorScheme.surfaceContainerLow,
-              shape: RoundedRectangleBorder(
-                borderRadius: M3Shape.radiusLg,
-                side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(M3Spacing.sm),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Row 1: Time & Chain Dimensions (Year, Month, Chain)
-                    Wrap(
-                      spacing: M3Spacing.md,
-                      runSpacing: M3Spacing.sm,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        // Year Selector
-                        _buildFilterDropdown<int>(
-                          context: context,
-                          label: 'السنة المالية:',
-                          icon: Icons.calendar_today_rounded,
-                          value: _selectedYear,
-                          items: [
-                            const DropdownMenuItem(value: 0, child: Text('كافة السنوات (إجمالي)')),
-                            for (final y in AvailableYears.current.including(_selectedYear))
-                              DropdownMenuItem(value: y, child: Text('عام $y')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null && val != _selectedYear) {
-                              setState(() {
-                                _selectedYear = val;
-                                _currentPage = 0;
-                              });
-                              _loadPricingCompliance();
-                            }
-                          },
-                        ),
-
-                        // Month Selector
-                        _buildFilterDropdown<int>(
-                          context: context,
-                          label: 'الشهر:',
-                          icon: Icons.event_note_rounded,
-                          value: _selectedMonth,
-                          items: const [
-                            DropdownMenuItem(value: 0, child: Text('كافة الشهور (إجمالي السنة)')),
-                            DropdownMenuItem(value: 1, child: Text('01 - يناير')),
-                            DropdownMenuItem(value: 2, child: Text('02 - فبراير')),
-                            DropdownMenuItem(value: 3, child: Text('03 - مارس')),
-                            DropdownMenuItem(value: 4, child: Text('04 - أبريل')),
-                            DropdownMenuItem(value: 5, child: Text('05 - مايو')),
-                            DropdownMenuItem(value: 6, child: Text('06 - يونيو')),
-                            DropdownMenuItem(value: 7, child: Text('07 - يوليو')),
-                            DropdownMenuItem(value: 8, child: Text('08 - أغسطس')),
-                            DropdownMenuItem(value: 9, child: Text('09 - سبتمبر')),
-                            DropdownMenuItem(value: 10, child: Text('10 - أكتوبر')),
-                            DropdownMenuItem(value: 11, child: Text('11 - نوفمبر')),
-                            DropdownMenuItem(value: 12, child: Text('12 - ديسمبر')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null && val != _selectedMonth) {
-                              setState(() {
-                                _selectedMonth = val;
-                                _currentPage = 0;
-                              });
-                              _loadPricingCompliance();
-                            }
-                          },
-                        ),
-
-                        // Chain Selector
-                        _buildFilterDropdown<String>(
-                          context: context,
-                          label: 'سلسلة التجزئة:',
-                          icon: Icons.storefront_rounded,
-                          value: _selectedChain,
-                          items: [
-                            const DropdownMenuItem(value: 'all', child: Text('كافة السلاسل')),
-                            _buildChainDropdownItem('fathalla', 'أسواق فتح الله'),
-                            _buildChainDropdownItem('gomla', 'جملة ماركت'),
-                            _buildChainDropdownItem('beet-elgomla', 'بيت الجملة'),
-                            _buildChainDropdownItem('carrefour', 'كارفور'),
-                            _buildChainDropdownItem('spinneys', 'سبينيس'),
-                          ],
-                          onChanged: (val) {
-                            if (val != null && val != _selectedChain) {
-                              setState(() {
-                                _selectedChain = val;
-                                _currentPage = 0;
-                              });
-                              _loadPricingCompliance();
-                            }
-                          },
-                        ),
-                        OutlinedButton.icon(
-                          key: const ValueKey('open_product_master_from_pricing_btn'),
-                          onPressed: _openProductMasterDialog,
-                          icon: const Icon(Icons.qr_code_2_rounded, size: 18.0),
-                          label: const Text('كارتة الأصناف والأسعار'),
-                        ),
-                      ],
-                    ),
-
-                    const Divider(height: 20.0),
-
-                    // Search Bar by Item Code (كود الصنف), Barcode (الباركود), SKU Name, or Branch
-                    TextField(
-                      key: const ValueKey('pricing_compliance_search_input'),
-                      controller: _searchController,
-                      onSubmitted: (_) {
-                        setState(() => _currentPage = 0);
-                        _loadPricingCompliance();
+    return M3ToolbarButtonTheme(
+      child: SingleChildScrollView(
+        padding: isCompactScreen ? M3Spacing.pSm : M3Spacing.pMd,
+        child: M3ContentBoundary(
+          maxWidth: 1440.0,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Unified M3 Page Header (English Left, Arabic Right)
+              M3PageHeader(
+                titleEn: 'Pricing & Promo Compliance',
+                subtitleAr:
+                    'كشف الفروق السعرية عن السعر الاسترشادي (RRP) وكارتة أسعار المصنع وتتبع الأثر البيعي للعروض',
+                actions: M3ActionButtonGroup(
+                  actions: [
+                    M3ActionItem(
+                      label: _showPriceImpact ? 'إخفاء المؤشر' : 'أثر الأسعار',
+                      icon: _showPriceImpact
+                          ? Icons.visibility_off_rounded
+                          : Icons.insights_rounded,
+                      isPrimary: _showPriceImpact,
+                      onPressed: () {
+                        setState(() => _showPriceImpact = !_showPriceImpact);
                       },
-                      onChanged: (val) {
-                        if (val.isEmpty) {
-                          setState(() => _currentPage = 0);
-                          _loadPricingCompliance();
-                        } else {
-                          setState(() {});
-                        }
-                      },
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.search_rounded, size: 20.0),
-                        suffixIcon: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_searchController.text.isNotEmpty)
-                              IconButton(
-                                icon: const Icon(Icons.clear_rounded, size: 18.0),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() => _currentPage = 0);
-                                  _loadPricingCompliance();
-                                },
-                              ),
-                            IconButton(
-                              icon: const Icon(Icons.arrow_back_rounded, size: 18.0),
-                              tooltip: 'بحث',
-                              onPressed: () {
-                                setState(() => _currentPage = 0);
-                                _loadPricingCompliance();
-                              },
-                            ),
-                          ],
-                        ),
-                        hintText:
-                            'ابحث بكود الصنف (FGCL-0550-0001 / FGSL) أو الباركود (6221133...) أو اسم الصنف أو الفرع...',
-                        isDense: true,
-                        filled: true,
-                        fillColor: colorScheme.surface,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14.0,
-                          vertical: 10.0,
-                        ),
-                        border: const OutlineInputBorder(
-                          borderRadius: M3Shape.radiusMd,
-                        ),
-                      ),
                     ),
-                    const SizedBox(height: M3Spacing.sm),
-
-                    // Row 2: Status & Category Selectors
-                    Text(
-                      'تصفية الأصناف والعروض:',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    M3ActionItem(
+                      label: 'تحديث',
+                      icon: Icons.refresh_rounded,
+                      onPressed: _isLoading ? null : _loadPricingCompliance,
                     ),
-                    const SizedBox(height: M3Spacing.xs),
-                    M3SegmentedButtonGroup<String>(
-                      segments: _filterSegments,
-                      selectedValue: _selectedFilter,
-                      onSelectionChanged: (val) {
-                        setState(() {
-                          _selectedFilter = val;
-                          _currentPage = 0;
-                        });
-                        _loadPricingCompliance();
-                      },
-                      showSelectedCheckmark: false,
-                    ),
-                    const SizedBox(height: M3Spacing.sm),
-                    // Category Filter Chips Header
-                    Text(
-                      'التصنيف:',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: M3Spacing.xs),
-                    _buildCategoryGrid(context),
                   ],
                 ),
               ),
-            ),
 
-            if (_showPriceImpact) ...[
               M3Spacing.gapMD,
-              _buildElasticitySection(context),
-            ],
 
-            M3Spacing.gapMD,
-
-            // Tabular View Card
-            Card(
-              elevation: 0,
-              color: colorScheme.surfaceContainerLow,
-              shape: RoundedRectangleBorder(
-                borderRadius: M3Shape.radiusLg,
-                side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+              // Summary KPI cards — shared M3SummaryCard (Sell-Out geometry).
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 840.0
+                      ? 3
+                      : (constraints.maxWidth >= 580.0 ? 2 : 1);
+                  return M3EqualHeightGrid(
+                    key: const ValueKey('pricing_kpi_grid'),
+                    columns: columns,
+                    spacing: M3Spacing.sm,
+                    runSpacing: M3Spacing.sm,
+                    children: [
+                      M3SummaryKpiCard(
+                        key: const ValueKey('kpi_card_Compliance Rate'),
+                        title: 'معدل الالتزام السعري',
+                        titleMaxLines: 3,
+                        subtitleMaxLines: 3,
+                        value: '${complianceRate.toStringAsFixed(1)}%',
+                        subtitle:
+                            '$compliantCount من أصل ${countSku(totalCount)} مطابق',
+                        icon: Icons.verified_rounded,
+                        color: colorScheme.primary,
+                        valueKey: const ValueKey('kpi_value_Compliance Rate'),
+                        subtitleKey:
+                            const ValueKey('kpi_subtitle_Compliance Rate'),
+                      ),
+                      M3SummaryKpiCard(
+                        key: const ValueKey('kpi_card_Price Violations'),
+                        title: 'إجمالي المخالفات السعرية',
+                        titleMaxLines: 3,
+                        subtitleMaxLines: 3,
+                        value: countViolation(violationCount),
+                        subtitle: 'حالات حرق أسعار وزيادة غير معتمدة',
+                        icon: Icons.error_outline_rounded,
+                        color: colorScheme.error,
+                        valueKey: const ValueKey('kpi_value_Price Violations'),
+                        subtitleKey:
+                            const ValueKey('kpi_subtitle_Price Violations'),
+                      ),
+                      M3SummaryKpiCard(
+                        key: const ValueKey('kpi_card_Avg Promo Uplift'),
+                        title: 'متوسط الأثر الترويجي',
+                        titleMaxLines: 3,
+                        subtitleMaxLines: 3,
+                        value: '+${avgPromoUplift.toStringAsFixed(1)}%',
+                        subtitle: 'زيادة في حجم المبيعات خلال فترات العروض',
+                        icon: Icons.rocket_launch_rounded,
+                        color: colorScheme.tertiary,
+                        valueKey: const ValueKey('kpi_value_Avg Promo Uplift'),
+                        subtitleKey:
+                            const ValueKey('kpi_subtitle_Avg Promo Uplift'),
+                      ),
+                    ],
+                  );
+                },
               ),
-              child: Padding(
-                padding: EdgeInsets.all(isCompactScreen ? 12.0 : 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isDesktop = constraints.maxWidth >= 720.0;
-                        final titleRow = Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.price_check_rounded, color: colorScheme.primary, size: 22.0),
-                            const SizedBox(width: M3Spacing.xs),
-                            Flexible(
-                              child: Text(
-                                'جدول مراقبة الامتثال السعري والعروض ($totalMatching عنصر)',
-                                style: (isCompactScreen
-                                        ? theme.textTheme.titleSmall
-                                        : theme.textTheme.titleMedium)
-                                    ?.copyWith(
-                                  fontWeight: FontWeight.bold,
+
+              M3Spacing.gapMD,
+
+              // Filter Toolbar with Temporal (Year/Month), Chain, Status & Category Selectors
+              Card(
+                elevation: 0,
+                color: colorScheme.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: M3Shape.radiusLg,
+                  side: BorderSide(
+                      color: colorScheme.outlineVariant.withOpacity(0.5)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(M3Spacing.sm),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Row 1: Time & Chain Dimensions (Year, Month, Chain)
+                      Wrap(
+                        spacing: M3Spacing.md,
+                        runSpacing: M3Spacing.sm,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          // Year Selector
+                          _buildFilterDropdown<int>(
+                            context: context,
+                            label: 'السنة المالية',
+                            icon: Icons.calendar_today_rounded,
+                            value: _selectedYear,
+                            fitOptions: true,
+                            width: kYearDropdownWidth,
+                            items: [
+                              const DropdownMenuItem(
+                                  value: 0,
+                                  child: Text('كافة السنوات (إجمالي)')),
+                              for (final y in AvailableYears.current
+                                  .including(_selectedYear))
+                                DropdownMenuItem(
+                                    value: y, child: Text('عام $y')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null && val != _selectedYear) {
+                                setState(() {
+                                  _selectedYear = val;
+                                  _currentPage = 0;
+                                });
+                                _loadPricingCompliance();
+                              }
+                            },
+                          ),
+
+                          // Month Selector
+                          _buildFilterDropdown<int>(
+                            context: context,
+                            label: 'الشهر',
+                            icon: Icons.event_note_rounded,
+                            value: _selectedMonth,
+                            fitOptions: true,
+                            items: const [
+                              DropdownMenuItem(
+                                  value: 0,
+                                  child: Text('كافة الشهور (إجمالي السنة)')),
+                              DropdownMenuItem(
+                                  value: 1, child: Text('01 - يناير')),
+                              DropdownMenuItem(
+                                  value: 2, child: Text('02 - فبراير')),
+                              DropdownMenuItem(
+                                  value: 3, child: Text('03 - مارس')),
+                              DropdownMenuItem(
+                                  value: 4, child: Text('04 - أبريل')),
+                              DropdownMenuItem(
+                                  value: 5, child: Text('05 - مايو')),
+                              DropdownMenuItem(
+                                  value: 6, child: Text('06 - يونيو')),
+                              DropdownMenuItem(
+                                  value: 7, child: Text('07 - يوليو')),
+                              DropdownMenuItem(
+                                  value: 8, child: Text('08 - أغسطس')),
+                              DropdownMenuItem(
+                                  value: 9, child: Text('09 - سبتمبر')),
+                              DropdownMenuItem(
+                                  value: 10, child: Text('10 - أكتوبر')),
+                              DropdownMenuItem(
+                                  value: 11, child: Text('11 - نوفمبر')),
+                              DropdownMenuItem(
+                                  value: 12, child: Text('12 - ديسمبر')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null && val != _selectedMonth) {
+                                setState(() {
+                                  _selectedMonth = val;
+                                  _currentPage = 0;
+                                });
+                                _loadPricingCompliance();
+                              }
+                            },
+                          ),
+
+                          // Chain Selector
+                          _buildFilterDropdown<String>(
+                            context: context,
+                            label: 'سلسلة التجزئة',
+                            icon: Icons.storefront_rounded,
+                            value: _selectedChain,
+                            fitOptions: true,
+                            items: [
+                              const DropdownMenuItem(
+                                  value: 'all', child: Text('كافة السلاسل')),
+                              _buildChainDropdownItem(
+                                  'fathalla', 'أسواق فتح الله'),
+                              _buildChainDropdownItem('gomla', 'جملة ماركت'),
+                              _buildChainDropdownItem(
+                                  'beet-elgomla', 'بيت الجملة'),
+                              _buildChainDropdownItem('carrefour', 'كارفور'),
+                              _buildChainDropdownItem('spinneys', 'سبينيس'),
+                            ],
+                            onChanged: (val) {
+                              if (val != null && val != _selectedChain) {
+                                setState(() {
+                                  _selectedChain = val;
+                                  _currentPage = 0;
+                                });
+                                _loadPricingCompliance();
+                              }
+                            },
+                          ),
+                          OutlinedButton.icon(
+                            key: const ValueKey(
+                                'open_product_master_from_pricing_btn'),
+                            onPressed: _openProductMasterDialog,
+                            icon:
+                                const Icon(Icons.qr_code_2_rounded, size: 18.0),
+                            label: const Text('كارتة الأصناف والأسعار'),
+                          ),
+                        ],
+                      ),
+
+                      const Divider(height: 20.0),
+
+                      // Search Bar by Item Code (كود الصنف), Barcode (الباركود), SKU Name, or Branch
+                      M3SearchFieldWidth(
+                        hintText:
+                            'ابحث بكود الصنف (FGCL-0550-0001 / FGSL) أو الباركود (6221133...) أو اسم الصنف أو الفرع...',
+                        child: TextField(
+                          key:
+                              const ValueKey('pricing_compliance_search_input'),
+                          controller: _searchController,
+                          onSubmitted: (_) {
+                            setState(() => _currentPage = 0);
+                            _loadPricingCompliance();
+                          },
+                          onChanged: (val) {
+                            if (val.isEmpty) {
+                              setState(() => _currentPage = 0);
+                              _loadPricingCompliance();
+                            } else {
+                              setState(() {});
+                            }
+                          },
+                          decoration: InputDecoration(
+                            prefixIcon:
+                                const Icon(Icons.search_rounded, size: 20.0),
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_searchController.text.isNotEmpty)
+                                  IconButton(
+                                    icon: const Icon(Icons.clear_rounded,
+                                        size: 18.0),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() => _currentPage = 0);
+                                      _loadPricingCompliance();
+                                    },
+                                  ),
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_back_rounded,
+                                      size: 18.0),
+                                  tooltip: 'بحث',
+                                  onPressed: () {
+                                    setState(() => _currentPage = 0);
+                                    _loadPricingCompliance();
+                                  },
                                 ),
-                                overflow: TextOverflow.ellipsis,
+                              ],
+                            ),
+                            hintText:
+                                'ابحث بكود الصنف (FGCL-0550-0001 / FGSL) أو الباركود (6221133...) أو اسم الصنف أو الفرع...',
+                            isDense: true,
+                            filled: true,
+                            fillColor: colorScheme.surface,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14.0,
+                              vertical: 10.0,
+                            ),
+                            border: const OutlineInputBorder(
+                              borderRadius: M3Shape.radiusMd,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: M3Spacing.sm),
+
+                      // Row 2: Status & Category Selectors
+                      Text(
+                        'تصفية الأصناف والعروض:',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: M3Spacing.xs),
+                      M3SegmentedButtonGroup<String>(
+                        segments: _filterSegments,
+                        selectedValue: _selectedFilter,
+                        onSelectionChanged: (val) {
+                          setState(() {
+                            _selectedFilter = val;
+                            _currentPage = 0;
+                          });
+                          _loadPricingCompliance();
+                        },
+                        showSelectedCheckmark: false,
+                      ),
+                      const SizedBox(height: M3Spacing.sm),
+                      // Category Filter Chips Header
+                      Text(
+                        'التصنيف:',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: M3Spacing.xs),
+                      _buildCategoryGrid(context),
+                    ],
+                  ),
+                ),
+              ),
+
+              if (_showPriceImpact) ...[
+                M3Spacing.gapMD,
+                _buildElasticitySection(context),
+              ],
+
+              M3Spacing.gapMD,
+
+              // Tabular View Card
+              Card(
+                elevation: 0,
+                color: colorScheme.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: M3Shape.radiusLg,
+                  side: BorderSide(
+                      color: colorScheme.outlineVariant.withOpacity(0.5)),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(isCompactScreen ? 12.0 : 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isDesktop = constraints.maxWidth >= 720.0;
+                          final titleRow = Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.price_check_rounded,
+                                  color: colorScheme.primary, size: 20.0),
+                              const SizedBox(width: M3Spacing.xs),
+                              Flexible(
+                                child: M3SectionTitle(
+                                  'جدول مراقبة الامتثال السعري والعروض (${countItem(totalMatching)})',
+                                  maxLines: 3,
+                                ),
+                              ),
+                            ],
+                          );
+
+                          final toleranceBadge = Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10.0, vertical: M3Spacing.xxs),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest,
+                              borderRadius: M3Shape.radiusMd,
+                            ),
+                            child: Text(
+                              'هامش السماح المعتمد: ±2.0%',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
-                          ],
-                        );
+                          );
 
-                        final toleranceBadge = Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: M3Spacing.xxs),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest,
-                            borderRadius: M3Shape.radiusMd,
-                          ),
-                          child: Text(
-                            'هامش السماح المعتمد: ±2.0%',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        );
+                          if (isDesktop) {
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(child: titleRow),
+                                const SizedBox(width: M3Spacing.sm),
+                                toleranceBadge,
+                              ],
+                            );
+                          }
 
-                        if (isDesktop) {
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(child: titleRow),
-                              const SizedBox(width: M3Spacing.sm),
+                              titleRow,
+                              const SizedBox(height: M3Spacing.xs),
                               toleranceBadge,
                             ],
                           );
-                        }
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            titleRow,
-                            const SizedBox(height: M3Spacing.xs),
-                            toleranceBadge,
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: M3Spacing.xs),
-                    _buildPaginationToolbar(
-                      context: context,
-                      totalItems: totalMatching,
-                      startItem: startItem,
-                      endItem: endItem,
-                      totalPages: totalPages,
-                    ),
-                    const Divider(height: 24.0),
-                    M3FadeThroughSwitcher(
-                      child: _isLoading
-                          ? const Padding(
-                              key: ValueKey('pricing_loading'),
-                              padding: EdgeInsets.all(40.0),
-                              child: Center(child: CircularProgressIndicator()),
-                            )
-                          : displayedItems.isEmpty
-                              ? Padding(
-                                  key: const ValueKey('pricing_empty'),
-                                  padding: const EdgeInsets.all(40.0),
-                                  child: Center(
-                                    child: Column(
-                                      children: [
-                                        Icon(Icons.check_circle_outline_rounded, size: 48.0, color: colorScheme.primary),
-                                        const SizedBox(height: M3Spacing.xs),
-                                        Text(
-                                          'لا توجد عناصر مطابقة لمعايير البحث والفلترة المحددة',
-                                          style: theme.textTheme.titleMedium?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              : LayoutBuilder(
-                                  key: ValueKey('pricing_table_${_selectedFilter}_${_selectedCategory}_${_currentPage}_${_pageSize}_${displayedItems.length}'),
-                                  builder: (context, tableConstraints) {
-                                    final availableWidth = tableConstraints.maxWidth.isFinite
-                                        ? tableConstraints.maxWidth
-                                        : MediaQuery.sizeOf(context).width;
-                                    final isCompact = availableWidth < 580.0;
-                                    if (isCompact) {
-                                      return Column(
-                                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                                        children: displayedItems.map((item) {
-                                          return Container(
-                                            margin: const EdgeInsets.only(bottom: 10.0),
-                                            padding: const EdgeInsets.all(14.0),
-                                            decoration: BoxDecoration(
-                                              color: colorScheme.surface,
-                                              borderRadius: M3Shape.radiusMd,
-                                              border: Border.all(
-                                                color: colorScheme.outlineVariant.withOpacity(0.55),
-                                              ),
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                                              children: [
-                                                Row(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          Text(
-                                                            item.skuName,
-                                                            style: theme.textTheme.bodyMedium?.copyWith(
-                                                              fontWeight: FontWeight.w800,
-                                                            ),
-                                                          ),
-                                                          const SizedBox(height: 2.0),
-                                                          Text(
-                                                            '${item.itemCode.isNotEmpty ? '[${item.itemCode}] • ' : ''}GTIN: ${item.barcode} | ${item.category}',
-                                                            style: theme.textTheme.bodySmall?.copyWith(
-                                                              color: colorScheme.onSurfaceVariant,
-                                                              fontSize: M3FontSize.labelSmall,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8.0),
-                                                    _buildPriceDeltaBadge(context, item),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 6.0),
-                                                Row(
-                                                  children: [
-                                                    Container(
-                                                      width: 8.0,
-                                                      height: 8.0,
-                                                      decoration: BoxDecoration(
-                                                        color: _getChainColor(item.retailerChain),
-                                                        shape: BoxShape.circle,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 6.0),
-                                                    Flexible(
-                                                      child: Text(
-                                                        _getChainDisplayName(item.retailerChain),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: theme.textTheme.bodySmall?.copyWith(
-                                                          color: colorScheme.onSurfaceVariant,
-                                                          fontWeight: FontWeight.w700,
-                                                          fontSize: M3FontSize.labelSmallPlus,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8.0),
-                                                    Text('•', style: TextStyle(color: colorScheme.outline)),
-                                                    const SizedBox(width: 8.0),
-                                                    Expanded(
-                                                      child: Text(
-                                                        item.storeName,
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: theme.textTheme.bodySmall?.copyWith(
-                                                          color: colorScheme.onSurfaceVariant,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const Padding(
-                                                  padding: EdgeInsets.symmetric(vertical: 8.0),
-                                                  child: Divider(height: 1.0),
-                                                ),
-                                                Wrap(
-                                                  alignment: WrapAlignment.spaceBetween,
-                                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                                  spacing: 16.0,
-                                                  runSpacing: 8.0,
-                                                  children: [
-                                                    Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Text(
-                                                          'السعر الفعلي',
-                                                          style: theme.textTheme.labelSmall?.copyWith(
-                                                            color: colorScheme.onSurfaceVariant,
-                                                          ),
-                                                        ),
-                                                        Text(
-                                                          CurrencyFormatter.formatEGP(
-                                                            item.actualPrice,
-                                                            showDecimals: true,
-                                                          ),
-                                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                                            fontWeight: FontWeight.w800,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Text(
-                                                          'السعر الاسترشادي RRP',
-                                                          style: theme.textTheme.labelSmall?.copyWith(
-                                                            color: colorScheme.onSurfaceVariant,
-                                                          ),
-                                                        ),
-                                                        Text(
-                                                          CurrencyFormatter.formatEGP(
-                                                            item.recommendedPrice,
-                                                            showDecimals: true,
-                                                          ),
-                                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                                            color: colorScheme.onSurfaceVariant,
-                                                            fontWeight: FontWeight.w600,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    _buildPromoUpliftBadge(context, item),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        }).toList(),
-                                      );
-                                    }
-
-                                    final isMedium = availableWidth >= 580.0 && availableWidth < 960.0;
-                                    final double dynamicColumnSpacing = isMedium
-                                        ? 24.0
-                                        : ((availableWidth - 620.0) / 5.0).clamp(24.0, 72.0);
-                                    const double horizontalMargin = 20.0;
-
-                                    return SizedBox(
-                                      width: availableWidth,
-                                      child: TableScrollContainer(
-                                        showSwipeHint: true,
-                                        child: ConstrainedBox(
-                                          constraints: BoxConstraints(minWidth: availableWidth),
-                                          child: DataTable(
-                                            columnSpacing: dynamicColumnSpacing,
-                                            horizontalMargin: horizontalMargin,
-                                            dataRowMinHeight: 56.0,
-                                            dataRowMaxHeight: 68.0,
-                                            headingRowHeight: 52.0,
-                                            headingRowColor: WidgetStateProperty.all(
-                                              colorScheme.surfaceContainerHighest.withOpacity(0.4),
-                                            ),
-                                            columns: const [
-                                              DataColumn(label: Text('الصنف والباركود')),
-                                              DataColumn(label: Text('السلسلة والفرع')),
-                                              DataColumn(label: Text('السعر الفعلي')),
-                                              DataColumn(label: Text('السعر الموصى به (RRP)')),
-                                              DataColumn(label: Text('الفارق السعري (Delta)')),
-                                              DataColumn(label: Text('حالة العرض والأثر البيعي')),
-                                            ],
-                                            rows: displayedItems.map((item) {
-                                              return DataRow(
-                                                cells: [
-                                                  // SKU Name, Item Code & Barcode
-                                                  DataCell(
-                                                    Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                      children: [
-                                                        Text(
-                                                          item.skuName,
-                                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                                            fontWeight: FontWeight.w600,
-                                                          ),
-                                                        ),
-                                                        Text(
-                                                          '${item.itemCode.isNotEmpty ? 'كود: ${item.itemCode} | ' : ''}GTIN: ${item.barcode} | ${item.category}${item.unitsPerCarton > 0 ? ' (${item.unitsPerCarton} ش)' : ''}',
-                                                          style: theme.textTheme.bodySmall?.copyWith(
-                                                            color: colorScheme.onSurfaceVariant,
-                                                            fontSize: M3FontSize.labelSmall,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-
-                                                  // Chain & Store
-                                                  DataCell(
-                                                    Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                      children: [
-                                                        Text(item.storeName, style: theme.textTheme.bodyMedium),
-                                                        Row(
-                                                          mainAxisSize: MainAxisSize.min,
-                                                          children: [
-                                                            Container(
-                                                              width: 8.0,
-                                                              height: 8.0,
-                                                              decoration: BoxDecoration(
-                                                                color: _getChainColor(item.retailerChain),
-                                                                shape: BoxShape.circle,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(width: 6.0),
-                                                            Text(
-                                                              _getChainDisplayName(item.retailerChain),
-                                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                                color: colorScheme.onSurfaceVariant,
-                                                                fontSize: M3FontSize.labelSmall,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-
-                                                  // Actual Price & Margin
-                                                  DataCell(
-                                                    Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                      children: [
-                                                        Text(
-                                                          CurrencyFormatter.formatEGP(item.actualPrice, showDecimals: true),
-                                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                                            fontWeight: FontWeight.bold,
-                                                          ),
-                                                        ),
-                                                        if (item.retailerMarginPct != 0)
-                                                          Text(
-                                                            'هامش السلسلة: ${item.retailerMarginPct.toStringAsFixed(1)}%',
-                                                            style: theme.textTheme.labelSmall?.copyWith(
-                                                              fontSize: M3FontSize.tiny,
-                                                              color: colorScheme.primary,
-                                                            ),
-                                                          ),
-                                                      ],
-                                                    ),
-                                                  ),
-
-                                                  // Recommended Price (RRP) & Factory Cost
-                                                  DataCell(
-                                                    Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                      children: [
-                                                        Text(
-                                                          CurrencyFormatter.formatEGP(item.recommendedPrice, showDecimals: true),
-                                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                                            color: colorScheme.onSurfaceVariant,
-                                                          ),
-                                                        ),
-                                                        if (item.factoryUnitCost > 0)
-                                                          Text(
-                                                            'صافي المصنع: ${item.factoryUnitCost.toStringAsFixed(2)} ج.م',
-                                                            style: theme.textTheme.labelSmall?.copyWith(
-                                                              fontSize: M3FontSize.tiny,
-                                                              color: colorScheme.onSurfaceVariant,
-                                                            ),
-                                                          ),
-                                                      ],
-                                                    ),
-                                                  ),
-
-                                                  // Price Delta % Badge
-                                                  DataCell(_buildPriceDeltaBadge(context, item)),
-
-                                                  // Promo Uplift Badge
-                                                  DataCell(_buildPromoUpliftBadge(context, item)),
-                                                ],
-                                              );
-                                            }).toList(),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                    ),
-                    if (!_isLoading && displayedItems.isNotEmpty) ...[
-                      const Divider(height: 24.0),
+                        },
+                      ),
+                      const SizedBox(height: M3Spacing.xs),
                       _buildPaginationToolbar(
                         context: context,
                         totalItems: totalMatching,
                         startItem: startItem,
                         endItem: endItem,
                         totalPages: totalPages,
-                        isFooter: true,
                       ),
+                      const Divider(height: 24.0),
+                      M3FadeThroughSwitcher(
+                        child: _isLoading
+                            ? const Padding(
+                                key: ValueKey('pricing_loading'),
+                                padding: EdgeInsets.all(40.0),
+                                child:
+                                    Center(child: CircularProgressIndicator()),
+                              )
+                            : displayedItems.isEmpty
+                                ? Padding(
+                                    key: const ValueKey('pricing_empty'),
+                                    padding: const EdgeInsets.all(40.0),
+                                    child: Center(
+                                      child: Column(
+                                        children: [
+                                          Icon(
+                                              Icons
+                                                  .check_circle_outline_rounded,
+                                              size: 48.0,
+                                              color: colorScheme.primary),
+                                          const SizedBox(height: M3Spacing.xs),
+                                          Text(
+                                            'لا توجد عناصر مطابقة لمعايير البحث والفلترة المحددة',
+                                            style: theme.textTheme.titleMedium
+                                                ?.copyWith(
+                                              color:
+                                                  colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                : LayoutBuilder(
+                                    key: ValueKey(
+                                        'pricing_table_${_selectedFilter}_${_selectedCategory}_${_currentPage}_${_pageSize}_${displayedItems.length}'),
+                                    builder: (context, tableConstraints) {
+                                      final availableWidth = tableConstraints
+                                              .maxWidth.isFinite
+                                          ? tableConstraints.maxWidth
+                                          : MediaQuery.sizeOf(context).width;
+                                      final isCompact = availableWidth < 580.0;
+                                      if (isCompact) {
+                                        return Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: displayedItems.map((item) {
+                                            return Container(
+                                              margin: const EdgeInsets.only(
+                                                  bottom: 10.0),
+                                              padding:
+                                                  const EdgeInsets.all(14.0),
+                                              decoration: BoxDecoration(
+                                                color: colorScheme.surface,
+                                                borderRadius: M3Shape.radiusMd,
+                                                border: Border.all(
+                                                  color: colorScheme
+                                                      .outlineVariant
+                                                      .withOpacity(0.55),
+                                                ),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.stretch,
+                                                children: [
+                                                  Row(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            Text(
+                                                              item.skuName,
+                                                              maxLines: 3,
+                                                              style: theme
+                                                                  .textTheme
+                                                                  .bodyMedium
+                                                                  ?.copyWith(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w800,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                                height: 2.0),
+                                                            Text(
+                                                              '${item.itemCode.isNotEmpty ? '[${item.itemCode}] • ' : ''}GTIN: ${item.barcode} | ${item.category}',
+                                                              maxLines: 3,
+                                                              style: theme
+                                                                  .textTheme
+                                                                  .bodySmall
+                                                                  ?.copyWith(
+                                                                color: colorScheme
+                                                                    .onSurfaceVariant,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                          width: 8.0),
+                                                      Flexible(
+                                                        child:
+                                                            _buildPriceDeltaBadge(
+                                                                context, item),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 6.0),
+                                                  Row(
+                                                    children: [
+                                                      Container(
+                                                        width: 8.0,
+                                                        height: 8.0,
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: _getChainColor(
+                                                              item.retailerChain),
+                                                          shape:
+                                                              BoxShape.circle,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                          width: 6.0),
+                                                      Flexible(
+                                                        child: Text(
+                                                          _getChainDisplayName(
+                                                              item.retailerChain),
+                                                          maxLines: 3,
+                                                          style: theme.textTheme
+                                                              .bodySmall
+                                                              ?.copyWith(
+                                                            color: colorScheme
+                                                                .onSurfaceVariant,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                          width: 8.0),
+                                                      Text('•',
+                                                          style: TextStyle(
+                                                              color: colorScheme
+                                                                  .outline)),
+                                                      const SizedBox(
+                                                          width: 8.0),
+                                                      Expanded(
+                                                        child: Text(
+                                                          item.storeName,
+                                                          maxLines: 3,
+                                                          style: theme.textTheme
+                                                              .bodySmall
+                                                              ?.copyWith(
+                                                            color: colorScheme
+                                                                .onSurfaceVariant,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const Padding(
+                                                    padding:
+                                                        EdgeInsets.symmetric(
+                                                            vertical: 8.0),
+                                                    child: Divider(height: 1.0),
+                                                  ),
+                                                  Wrap(
+                                                    alignment: WrapAlignment
+                                                        .spaceBetween,
+                                                    crossAxisAlignment:
+                                                        WrapCrossAlignment
+                                                            .center,
+                                                    spacing: 16.0,
+                                                    runSpacing: 8.0,
+                                                    children: [
+                                                      Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            'السعر الفعلي',
+                                                            style: theme
+                                                                .textTheme
+                                                                .labelSmall
+                                                                ?.copyWith(
+                                                              color: colorScheme
+                                                                  .onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            CurrencyFormatter
+                                                                .formatEGP(
+                                                              item.actualPrice,
+                                                              showDecimals:
+                                                                  true,
+                                                            ),
+                                                            style: theme
+                                                                .textTheme
+                                                                .bodyMedium
+                                                                ?.copyWith(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w800,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            'السعر الاسترشادي RRP',
+                                                            style: theme
+                                                                .textTheme
+                                                                .labelSmall
+                                                                ?.copyWith(
+                                                              color: colorScheme
+                                                                  .onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            CurrencyFormatter
+                                                                .formatEGP(
+                                                              item.recommendedPrice,
+                                                              showDecimals:
+                                                                  true,
+                                                            ),
+                                                            style: theme
+                                                                .textTheme
+                                                                .bodyMedium
+                                                                ?.copyWith(
+                                                              color: colorScheme
+                                                                  .onSurfaceVariant,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      _buildPromoUpliftBadge(
+                                                          context, item),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          }).toList(),
+                                        );
+                                      }
+
+                                      final isMedium =
+                                          availableWidth >= 580.0 &&
+                                              availableWidth < 960.0;
+                                      final double dynamicColumnSpacing =
+                                          isMedium
+                                              ? 24.0
+                                              : ((availableWidth - 620.0) / 5.0)
+                                                  .clamp(24.0, 72.0);
+                                      const double horizontalMargin = 20.0;
+
+                                      return SizedBox(
+                                        width: availableWidth,
+                                        child: TableScrollContainer(
+                                          showSwipeHint: true,
+                                          child: ConstrainedBox(
+                                            constraints: BoxConstraints(
+                                                minWidth: availableWidth),
+                                            child: DataTable(
+                                              key: const ValueKey(
+                                                  'pricing_compliance_table'),
+                                              columnSpacing:
+                                                  dynamicColumnSpacing,
+                                              horizontalMargin:
+                                                  horizontalMargin,
+                                              dataRowMinHeight: 52.0,
+                                              dataRowMaxHeight: double.infinity,
+                                              headingRowHeight: 48.0,
+                                              headingRowColor:
+                                                  WidgetStateProperty.all(
+                                                colorScheme
+                                                    .surfaceContainerHighest
+                                                    .withOpacity(0.4),
+                                              ),
+                                              columns: const [
+                                                DataColumn(
+                                                    label: Text(
+                                                        'الصنف والباركود')),
+                                                DataColumn(
+                                                    headingRowAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    label:
+                                                        Text('السلسلة والفرع')),
+                                                DataColumn(
+                                                    headingRowAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    numeric: true,
+                                                    label:
+                                                        Text('السعر الفعلي')),
+                                                DataColumn(
+                                                    headingRowAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    numeric: true,
+                                                    label: Text(
+                                                        'السعر الموصى به (RRP)')),
+                                                DataColumn(
+                                                    headingRowAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    label: Text(
+                                                        'الفارق السعري (Delta)')),
+                                                DataColumn(
+                                                    headingRowAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    label: Text(
+                                                        'حالة العرض والأثر البيعي')),
+                                              ],
+                                              rows: displayedItems.map((item) {
+                                                return DataRow(
+                                                  cells: [
+                                                    // SKU Name, Item Code & Barcode
+                                                    DataCell(
+                                                      Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Text(
+                                                            item.skuName,
+                                                            key: const ValueKey(
+                                                                'pricing_sku_name'),
+                                                            maxLines: 3,
+                                                            textAlign:
+                                                                TextAlign.start,
+                                                            style: theme
+                                                                .textTheme
+                                                                .bodyMedium
+                                                                ?.copyWith(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            '${item.itemCode.isNotEmpty ? 'كود: ${item.itemCode} | ' : ''}GTIN: ${item.barcode} | ${item.category}${item.unitsPerCarton > 0 ? ' (${item.unitsPerCarton} ش)' : ''}',
+                                                            maxLines: 3,
+                                                            textAlign:
+                                                                TextAlign.start,
+                                                            style: theme
+                                                                .textTheme
+                                                                .bodySmall
+                                                                ?.copyWith(
+                                                              color: colorScheme
+                                                                  .onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+
+                                                    // Chain & Store
+                                                    DataCell(
+                                                      Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .center,
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Text(
+                                                            item.storeName,
+                                                            key: const ValueKey(
+                                                                'pricing_store_name'),
+                                                            maxLines: 3,
+                                                            textAlign: TextAlign
+                                                                .center,
+                                                            style: theme
+                                                                .textTheme
+                                                                .bodyMedium,
+                                                          ),
+                                                          Text(
+                                                            _getChainDisplayName(
+                                                                item.retailerChain),
+                                                            maxLines: 3,
+                                                            textAlign: TextAlign
+                                                                .center,
+                                                            style: theme
+                                                                .textTheme
+                                                                .bodySmall
+                                                                ?.copyWith(
+                                                              color: colorScheme
+                                                                  .onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+
+                                                    // Actual Price & Margin
+                                                    DataCell(
+                                                      Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .center,
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Text(
+                                                            CurrencyFormatter
+                                                                .formatEGP(
+                                                                    item
+                                                                        .actualPrice,
+                                                                    showDecimals:
+                                                                        true),
+                                                            maxLines: 3,
+                                                            textAlign: TextAlign
+                                                                .center,
+                                                            style: theme
+                                                                .textTheme
+                                                                .bodyMedium
+                                                                ?.copyWith(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                          if (item.retailerMarginPct !=
+                                                              0)
+                                                            Text(
+                                                              'هامش السلسلة: ${item.retailerMarginPct.toStringAsFixed(1)}%',
+                                                              maxLines: 3,
+                                                              textAlign:
+                                                                  TextAlign
+                                                                      .center,
+                                                              style: theme
+                                                                  .textTheme
+                                                                  .labelSmall
+                                                                  ?.copyWith(
+                                                                color:
+                                                                    colorScheme
+                                                                        .primary,
+                                                              ),
+                                                            ),
+                                                        ],
+                                                      ),
+                                                    ),
+
+                                                    // Recommended Price (RRP) & Factory Cost
+                                                    DataCell(
+                                                      Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .center,
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Text(
+                                                            CurrencyFormatter
+                                                                .formatEGP(
+                                                                    item
+                                                                        .recommendedPrice,
+                                                                    showDecimals:
+                                                                        true),
+                                                            maxLines: 3,
+                                                            textAlign: TextAlign
+                                                                .center,
+                                                            style: theme
+                                                                .textTheme
+                                                                .bodyMedium
+                                                                ?.copyWith(
+                                                              color: colorScheme
+                                                                  .onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                          if (item.factoryUnitCost >
+                                                              0)
+                                                            Text(
+                                                              'صافي المصنع: ${item.factoryUnitCost.toStringAsFixed(2)} ج.م',
+                                                              maxLines: 3,
+                                                              textAlign:
+                                                                  TextAlign
+                                                                      .center,
+                                                              style: theme
+                                                                  .textTheme
+                                                                  .labelSmall
+                                                                  ?.copyWith(
+                                                                color: colorScheme
+                                                                    .onSurfaceVariant,
+                                                              ),
+                                                            ),
+                                                        ],
+                                                      ),
+                                                    ),
+
+                                                    // Price Delta % Badge
+                                                    DataCell(
+                                                        _buildPriceDeltaBadge(
+                                                            context, item)),
+
+                                                    // Promo Uplift Badge
+                                                    DataCell(
+                                                        _buildPromoUpliftBadge(
+                                                            context, item)),
+                                                  ],
+                                                );
+                                              }).toList(),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                      ),
+                      if (!_isLoading && displayedItems.isNotEmpty) ...[
+                        const Divider(height: 24.0),
+                        _buildPaginationToolbar(
+                          context: context,
+                          totalItems: totalMatching,
+                          startItem: startItem,
+                          endItem: endItem,
+                          totalPages: totalPages,
+                          isFooter: true,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1040,7 +1300,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest.withOpacity(0.6),
                 borderRadius: M3Shape.radiusSm,
@@ -1098,182 +1359,80 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
     );
   }
 
-  Widget _buildKpiCard({
-    required BuildContext context,
-    required String title,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color containerColor,
-    required Color onContainerColor,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Card(
-      elevation: 0,
-      color: colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: M3Shape.radiusLg,
-        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(M3Spacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8.0),
-                  decoration: BoxDecoration(
-                    color: containerColor,
-                    borderRadius: M3Shape.radiusSm,
-                  ),
-                  child: Icon(icon, color: onContainerColor, size: 20.0),
-                ),
-                const SizedBox(width: 10.0),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12.0),
-            Text(
-              value,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 4.0),
-            Text(
-              subtitle,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPriceDeltaBadge(BuildContext context, PricingComplianceItem item) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    Color bg;
-    Color fg;
-    String label;
-    IconData icon;
-
+  Widget _buildPriceDeltaBadge(
+      BuildContext context, PricingComplianceItem item) {
     final delta = item.priceDeltaPct;
-    final deltaPrefix = delta > 0 ? '+$delta%' : '$delta%';
+    final deltaText = '${delta > 0 ? '+' : ''}${delta.toStringAsFixed(1)}%';
 
+    late final String short;
+    late final String description;
     switch (item.violationType) {
       case 'under_cutting':
-        bg = colorScheme.errorContainer;
-        fg = colorScheme.onErrorContainer;
-        label = '$deltaPrefix حرق سعر';
-        icon = Icons.arrow_downward_rounded;
+        short = 'حرق سعر';
+        description = '$deltaText عن السعر الموصى به';
         break;
       case 'price_gouging':
-        bg = colorScheme.tertiaryContainer;
-        fg = colorScheme.onTertiaryContainer;
-        label = '$deltaPrefix زيادة سعر';
-        icon = Icons.arrow_upward_rounded;
+        short = 'زيادة سعر';
+        description = '$deltaText عن السعر الموصى به';
         break;
       case 'compliant':
       default:
-        bg = colorScheme.primaryContainer;
-        fg = colorScheme.onPrimaryContainer;
-        label = '$deltaPrefix مطابق';
-        icon = Icons.check_circle_rounded;
+        short = 'مطابق';
+        description = '$deltaText ضمن هامش السماح';
         break;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: M3Shape.radiusMd,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14.0, color: fg),
-          const SizedBox(width: M3Spacing.xxs),
-          Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: fg,
-                fontWeight: FontWeight.bold,
-                fontSize: M3FontSize.bodySmall,
-              ),
-            ),
-          ),
-        ],
-      ),
+    return _buildShortStatus(context, short, description);
+  }
+
+  Widget _buildPromoUpliftBadge(
+      BuildContext context, PricingComplianceItem item) {
+    if (!item.isPromoActive) {
+      return _buildShortStatus(context, 'بدون عرض', 'لا يوجد عرض ترويجي نشط');
+    }
+    return _buildShortStatus(
+      context,
+      'أثر ترويجي',
+      '+${item.promoUpliftPct.toStringAsFixed(1)}% في حجم المبيعات',
     );
   }
 
-  Widget _buildPromoUpliftBadge(BuildContext context, PricingComplianceItem item) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    if (!item.isPromoActive) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs, vertical: 3.0),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-          borderRadius: M3Shape.radiusSm,
-        ),
-        child: Text(
-          'بدون عرض',
-          style: TextStyle(
-            color: colorScheme.onSurfaceVariant,
-            fontSize: M3FontSize.labelSmall,
+  /// Short 8dp-radius chip with a grey description underneath (Sell-Out /
+  /// Sell-In monthly-status pattern). Neutral fill, no early ellipsis.
+  Widget _buildShortStatus(
+      BuildContext context, String short, String description) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          padding: M3ChipStyle.padding,
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest,
+            borderRadius: M3ChipStyle.radius,
           ),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
-        borderRadius: M3Shape.radiusMd,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.bolt_rounded, size: 14.0, color: colorScheme.onPrimaryContainer),
-          const SizedBox(width: M3Spacing.xxs),
-          Flexible(
-            child: Text(
-              '+${item.promoUpliftPct.toStringAsFixed(1)}% أثر ترويجي',
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colorScheme.onPrimaryContainer,
-                fontWeight: FontWeight.bold,
-                fontSize: M3FontSize.labelSmall,
-              ),
+          child: Text(
+            short,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 2.0),
+        Text(
+          description,
+          maxLines: 3,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 
@@ -1295,7 +1454,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.6)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(M3Spacing.sm),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1305,29 +1464,27 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                 Container(
                   padding: const EdgeInsets.all(8.0),
                   decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
-                    borderRadius: M3Shape.radiusSm,
+                    color: colorScheme.primary.withOpacity(0.12),
+                    borderRadius: M3Shape.radiusMd,
                   ),
-                  child: Icon(Icons.insights_rounded, color: colorScheme.onPrimaryContainer, size: 22.0),
+                  child: Icon(Icons.insights_rounded,
+                      color: colorScheme.primary, size: 20.0),
                 ),
-                const SizedBox(width: 12.0),
+                const SizedBox(width: 8.0),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const M3SectionTitle(
                         'مؤشر أثر حركة الأسعار على المبيعات الشهرية',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: M3FontSize.bodyLarge,
-                        ),
+                        maxLines: 3,
                       ),
                       const SizedBox(height: 2.0),
                       Text(
                         'مقارنة مباشرة بين حركة متوسط الأسعار ونمو الإيرادات الفعلية عبر الشهور',
+                        maxLines: 3,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
-                          fontSize: M3FontSize.bodySmall,
                         ),
                       ),
                     ],
@@ -1336,7 +1493,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                 if (_selectedChain != 'all' || _selectedYear > 0)
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 8.0),
-                    padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10.0, vertical: 4.0),
                     decoration: BoxDecoration(
                       color: colorScheme.secondaryContainer.withOpacity(0.6),
                       borderRadius: M3Shape.radiusMd,
@@ -1368,7 +1526,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer.withOpacity(0.25),
                   borderRadius: M3Shape.radiusMd,
-                  border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
+                  border:
+                      Border.all(color: colorScheme.primary.withOpacity(0.2)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1376,7 +1535,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Icon(Icons.lightbulb_outline_rounded, size: 22.0, color: colorScheme.primary),
+                        Icon(Icons.lightbulb_outline_rounded,
+                            size: 20.0, color: colorScheme.primary),
                         const SizedBox(width: 8.0),
                         Expanded(
                           child: Text(
@@ -1398,22 +1558,31 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                         _buildMiniStatChip(
                           context,
                           'متوسط السعر الحالي',
-                          CurrencyFormatter.formatEGP(summary.avgPriceCurrent, showDecimals: true),
+                          CurrencyFormatter.formatEGP(summary.avgPriceCurrent,
+                              showDecimals: true),
                           Icons.sell_rounded,
                         ),
                         _buildMiniStatChip(
                           context,
                           'صافي تغير السعر',
                           '${summary.netPriceChangePct >= 0 ? '+' : ''}${summary.netPriceChangePct.toStringAsFixed(1)}%',
-                          summary.netPriceChangePct >= 0 ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                          color: summary.netPriceChangePct >= 0 ? colorScheme.tertiary : colorScheme.error,
+                          summary.netPriceChangePct >= 0
+                              ? Icons.arrow_upward_rounded
+                              : Icons.arrow_downward_rounded,
+                          color: summary.netPriceChangePct >= 0
+                              ? colorScheme.tertiary
+                              : colorScheme.error,
                         ),
                         _buildMiniStatChip(
                           context,
                           'نمو الإيرادات الإجمالي',
                           '${summary.netRevenueGrowthPct >= 0 ? '+' : ''}${summary.netRevenueGrowthPct.toStringAsFixed(1)}%',
-                          summary.netRevenueGrowthPct >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded,
-                          color: summary.netRevenueGrowthPct >= 0 ? colorScheme.primary : colorScheme.error,
+                          summary.netRevenueGrowthPct >= 0
+                              ? Icons.trending_up_rounded
+                              : Icons.trending_down_rounded,
+                          color: summary.netRevenueGrowthPct >= 0
+                              ? colorScheme.primary
+                              : colorScheme.error,
                         ),
                       ],
                     ),
@@ -1437,14 +1606,16 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
 
                     // Responsive card width so they fill space naturally
                     final double cardWidth = constraints.maxWidth >= 900
-                        ? ((constraints.maxWidth - (12.0 * 3) - 1.0) / 4.0).clamp(200.0, 340.0)
+                        ? ((constraints.maxWidth - (12.0 * 3) - 1.0) / 4.0)
+                            .clamp(200.0, 340.0)
                         : (constraints.maxWidth >= 600
-                            ? ((constraints.maxWidth - 12.0 - 1.0) / 2.0).clamp(200.0, 400.0)
+                            ? ((constraints.maxWidth - 12.0 - 1.0) / 2.0)
+                                .clamp(200.0, 400.0)
                             : constraints.maxWidth);
 
                     return Container(
                       width: cardWidth,
-                      padding: const EdgeInsets.all(14.0),
+                      padding: const EdgeInsets.all(M3Spacing.sm),
                       decoration: BoxDecoration(
                         color: colorScheme.surface,
                         borderRadius: M3Shape.radiusMd,
@@ -1462,7 +1633,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.calendar_today_rounded, size: 14.0, color: colorScheme.primary),
+                                  Icon(Icons.calendar_today_rounded,
+                                      size: 14.0, color: colorScheme.primary),
                                   const SizedBox(width: 6.0),
                                   Text(
                                     point.monthLabel,
@@ -1474,11 +1646,15 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                                 ],
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8.0, vertical: 3.0),
                                 decoration: BoxDecoration(
                                   color: isRevUp
                                       ? colorScheme.primaryContainer
-                                      : (isRevDown ? colorScheme.errorContainer : colorScheme.surfaceContainerHighest),
+                                      : (isRevDown
+                                          ? colorScheme.errorContainer
+                                          : colorScheme
+                                              .surfaceContainerHighest),
                                   borderRadius: M3Shape.radiusSm,
                                 ),
                                 child: Text(
@@ -1490,7 +1666,9 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                                     fontWeight: FontWeight.bold,
                                     color: isRevUp
                                         ? colorScheme.onPrimaryContainer
-                                        : (isRevDown ? colorScheme.onErrorContainer : colorScheme.onSurfaceVariant),
+                                        : (isRevDown
+                                            ? colorScheme.onErrorContainer
+                                            : colorScheme.onSurfaceVariant),
                                   ),
                                 ),
                               ),
@@ -1514,7 +1692,9 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    CurrencyFormatter.formatEGP(point.averagePrice, showDecimals: true),
+                                    CurrencyFormatter.formatEGP(
+                                        point.averagePrice,
+                                        showDecimals: true),
                                     style: theme.textTheme.bodyMedium?.copyWith(
                                       fontWeight: FontWeight.bold,
                                       fontSize: M3FontSize.labelMediumPlus,
@@ -1527,7 +1707,9 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                                       style: TextStyle(
                                         fontSize: M3FontSize.labelSmall,
                                         fontWeight: FontWeight.w600,
-                                        color: isPriceUp ? colorScheme.tertiary : colorScheme.error,
+                                        color: isPriceUp
+                                            ? colorScheme.tertiary
+                                            : colorScheme.error,
                                       ),
                                     ),
                                   ],
@@ -1565,9 +1747,11 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                           // Verdict Footer
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8.0, vertical: 4.0),
                             decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                              color: colorScheme.surfaceContainerHighest
+                                  .withOpacity(0.5),
                               borderRadius: M3Shape.radiusSm,
                             ),
                             child: Text(
@@ -1635,6 +1819,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
   Widget _buildCategoryGrid(BuildContext context) {
     final allCategories = ['الكل', ..._availableCategories];
 
+    final theme = Theme.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         final availableWidth = constraints.maxWidth;
@@ -1643,9 +1828,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
             ? 3
             : (availableWidth < 900.0 ? 4 : (availableWidth < 1200.0 ? 6 : 8));
 
-        final isCompact = availableWidth < 600.0;
-        const double horizontalSpacing = 6.0;
-        const double verticalSpacing = 6.0;
+        const double horizontalSpacing = M3Spacing.xs;
+        const double verticalSpacing = M3Spacing.xs;
 
         // Chunk categories into groups of crossAxisCount
         final chunks = <List<String>>[];
@@ -1671,39 +1855,37 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
                     if (col > 0) const SizedBox(width: horizontalSpacing),
                     if (col < chunk.length) ...[
                       Expanded(
-                        child: SizedBox(
-                          height: 38.0,
-                          child: FilterChip(
-                            label: Center(
-                              child: Text(
-                                chunk[col],
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: isCompact ? M3FontSize.labelSmall : M3FontSize.bodySmall,
-                                  fontWeight: _selectedCategory == chunk[col]
-                                      ? FontWeight.w800
-                                      : FontWeight.w600,
-                                ),
+                        child: FilterChip(
+                          label: Center(
+                            child: Text(
+                              chunk[col],
+                              maxLines: 3,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                fontWeight: _selectedCategory == chunk[col]
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
                               ),
                             ),
-                            selected: _selectedCategory == chunk[col],
-                            showCheckmark: false,
-                            padding: EdgeInsets.zero,
-                            labelPadding: const EdgeInsets.symmetric(horizontal: 4.0),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: M3Shape.radiusSm,
-                            ),
-                            onSelected: (_) {
-                              setState(() {
-                                _selectedCategory = chunk[col];
-                                _currentPage = 0;
-                              });
-                              _loadPricingCompliance();
-                            },
                           ),
+                          selected: _selectedCategory == chunk[col],
+                          showCheckmark: false,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4.0, vertical: 2.0),
+                          labelPadding:
+                              const EdgeInsets.symmetric(horizontal: 4.0),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: M3Shape.radiusSm,
+                          ),
+                          onSelected: (_) {
+                            setState(() {
+                              _selectedCategory = chunk[col];
+                              _currentPage = 0;
+                            });
+                            _loadPricingCompliance();
+                          },
                         ),
                       ),
                     ] else ...[
@@ -1727,39 +1909,19 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
     required T value,
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?> onChanged,
+    bool fitOptions = false,
+    double? width,
   }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final isCompact = MediaQuery.sizeOf(context).width < 600.0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14.0, color: colorScheme.primary),
-            const SizedBox(width: 4.0),
-            Flexible(
-              child: Text(
-                label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: M3Spacing.xs),
-        M3Dropdown<T>(
-          expand: isCompact,
-          value: value,
-          options: m3OptionsFromMenuItems(items),
-          onChanged: onChanged,
-        ),
-      ],
+    return M3Dropdown<T>(
+      label: label,
+      leadingIcon: icon,
+      expand: isCompact,
+      fitOptions: fitOptions,
+      width: width,
+      value: value,
+      options: m3OptionsFromMenuItems(items),
+      onChanged: onChanged,
     );
   }
 
@@ -1779,10 +1941,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
           ),
           const SizedBox(width: 8.0),
           Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: Text(label),
           ),
         ],
       ),
@@ -1791,7 +1950,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen> with 
 
   Color _getChainColor(String chain) {
     final c = chain.toLowerCase().trim();
-    if (c.contains('fathalla') || c.contains('فتح الله')) return M3Palette.emerald;
+    if (c.contains('fathalla') || c.contains('فتح الله'))
+      return M3Palette.emerald;
     if (c.contains('beet') || c.contains('بيت الجملة')) return M3Palette.violet;
     if (c.contains('gomla') || c.contains('جملة')) return M3Palette.amber;
     if (c.contains('carrefour') || c.contains('كارفور')) return M3Palette.blue;
