@@ -90,7 +90,19 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
   final ScrollController _archiveSheetsScrollController = ScrollController();
 
   static const double _archiveHeadingHeight = 48.0;
-  static const double _archiveRowHeight = 72.0;
+  // 3 filename lines + the size line under the name, kept aligned
+  // with the pinned actions column.
+  static const double _archiveRowHeight = 104.0;
+  static const List<double> _archiveColumnFlex = [
+    2.2, // الملف (flexes and wraps)
+    1.0, // السلسلة
+    0.7, // الفترة
+    0.55, // الفروع
+    0.7, // السجلات
+    0.8, // المبيعات
+    0.95, // تاريخ الرفع
+  ];
+  static const double _archiveActionsWidthEstimate = 168.0;
 
   static const Map<String, String> _monthNamesAr = {
     '1': '1 - يناير (Jan)',
@@ -2337,54 +2349,63 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
                   color: colorScheme.outlineVariant.withOpacity(0.5),
                 ),
               ),
-              child: TableScrollContainer(
-                controller: _archiveSheetsScrollController,
-                showSwipeHint: true,
-                columnFlex: const [1.4, 0.9, 0.8, 0.7, 0.8, 0.95, 1.1],
-                pinnedEnd: _buildArchiveActionsColumn(context),
-                child: DataTable(
-                  key: const ValueKey('upload_archive_files_table'),
-                  columnSpacing: M3Spacing.sm,
-                  horizontalMargin: M3Spacing.sm,
-                  headingRowHeight: _archiveHeadingHeight,
-                  dataRowMinHeight: _archiveRowHeight,
-                  dataRowMaxHeight: _archiveRowHeight,
-                  headingRowColor: WidgetStatePropertyAll(
-                    colorScheme.surfaceContainerHigh.withOpacity(0.5),
-                  ),
-                  columns: const [
-                    DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: Text('الملف')),
-                    DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: Text('السلسلة')),
-                    DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: Text('الفترة')),
-                    DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: Text('الفروع'),
-                        numeric: true),
-                    DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: Text('السجلات'),
-                        numeric: true),
-                    DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: Text('المبيعات')),
-                    DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: Text('الحجم')),
-                    DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: Text('تاريخ الرفع')),
-                  ],
-                  rows: [
-                    for (final file in _archivedFiles)
-                      _buildArchiveDataRow(file, colorScheme, theme),
-                  ],
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final nameMaxWidth = _archiveFileNameMaxWidth(
+                    constraints.maxWidth,
+                  );
+                  return TableScrollContainer(
+                    controller: _archiveSheetsScrollController,
+                    showSwipeHint: true,
+                    columnFlex: _archiveColumnFlex,
+                    pinnedEnd: _buildArchiveActionsColumn(context),
+                    child: DataTable(
+                      key: const ValueKey('upload_archive_files_table'),
+                      columnSpacing: M3Spacing.xs,
+                      horizontalMargin: M3Spacing.xs,
+                      headingRowHeight: _archiveHeadingHeight,
+                      dataRowMinHeight: _archiveRowHeight,
+                      dataRowMaxHeight: _archiveRowHeight,
+                      headingRowColor: WidgetStatePropertyAll(
+                        colorScheme.surfaceContainerHigh.withOpacity(0.5),
+                      ),
+                      columns: const [
+                        DataColumn(
+                            headingRowAlignment: MainAxisAlignment.center,
+                            label: Text('الملف')),
+                        DataColumn(
+                            headingRowAlignment: MainAxisAlignment.center,
+                            label: Text('السلسلة')),
+                        DataColumn(
+                            headingRowAlignment: MainAxisAlignment.center,
+                            label: Text('الفترة')),
+                        DataColumn(
+                            headingRowAlignment: MainAxisAlignment.center,
+                            label: Text('الفروع'),
+                            numeric: true),
+                        DataColumn(
+                            headingRowAlignment: MainAxisAlignment.center,
+                            label: Text('السجلات'),
+                            numeric: true),
+                        DataColumn(
+                            headingRowAlignment: MainAxisAlignment.center,
+                            label: Text('المبيعات')),
+                        DataColumn(
+                            headingRowAlignment: MainAxisAlignment.center,
+                            label: Text('تاريخ الرفع')),
+                      ],
+                      rows: [
+                        for (final file in _archivedFiles)
+                          _buildArchiveDataRow(
+                            file,
+                            colorScheme,
+                            theme,
+                            nameMaxWidth: nameMaxWidth,
+                          ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
         ],
@@ -2483,8 +2504,9 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
   DataRow _buildArchiveDataRow(
     ArchivedExcelFileModel file,
     ColorScheme colorScheme,
-    ThemeData theme,
-  ) {
+    ThemeData theme, {
+    required double nameMaxWidth,
+  }) {
     final periodText = file.targetMonth.isNotEmpty && file.targetMonth != 'auto'
         ? '${file.targetMonth} / ${file.targetYear}'
         : 'سنة ${file.targetYear}';
@@ -2499,57 +2521,64 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
         DataCell(
           KeyedSubtree(
             key: ValueKey('archive_file_card_${file.id}'),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.description_rounded,
-                  color: colorScheme.primary,
-                  size: 20.0,
-                ),
-                const SizedBox(width: M3Spacing.xs),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Tooltip(
-                        message: file.fileName,
-                        child: Text(
-                          file.fileName,
-                          maxLines: 3,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: nameMaxWidth),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.description_rounded,
+                    color: colorScheme.primary,
+                    size: 20.0,
+                  ),
+                  const SizedBox(width: M3Spacing.xs),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Tooltip(
+                          message: file.fileName,
+                          child: Text(
+                            file.fileName,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.start,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        Text(
+                          _formatFileSize(file.fileSizeBytes),
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.start,
-                          style: const TextStyle(fontWeight: FontWeight.w800),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                      Text(
-                        _formatFileSize(file.fileSizeBytes),
-                        maxLines: 3,
-                        textAlign: TextAlign.start,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
         DataCell(
-          M3ChipSurface(
-            color: colorScheme.surfaceContainerHigh,
-            child: Text(
-              file.chainNameAr.isNotEmpty
-                  ? file.chainNameAr
-                  : file.retailChain.toUpperCase(),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurfaceVariant,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 120.0),
+            child: M3ChipSurface(
+              color: colorScheme.surfaceContainerHigh,
+              child: Text(
+                file.chainNameAr.isNotEmpty
+                    ? file.chainNameAr
+                    : file.retailChain.toUpperCase(),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ),
@@ -2573,8 +2602,6 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
           weight: FontWeight.w800,
           color: colorScheme.primary,
         )),
-        DataCell(
-            _archiveCenteredText(_formatFileSize(file.fileSizeBytes), theme)),
         DataCell(
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 96.0),
@@ -2630,7 +2657,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
             Container(
               height: _archiveHeadingHeight,
               alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: M3Spacing.sm),
+              padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs),
               color: colorScheme.surfaceContainerHigh.withOpacity(0.5),
               child: Text(
                 'الإجراءات',
@@ -2642,7 +2669,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
               Container(
                 height: _archiveRowHeight,
                 alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(horizontal: M3Spacing.sm),
+                padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs),
                 decoration: BoxDecoration(border: Border(top: divider)),
                 child: _archiveActions(file),
               ),
@@ -2669,6 +2696,21 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
               ? null
               : () => _handleDeleteArchivedFile(file),
     );
+  }
+
+  /// Width reserved for the file-name cell so a long name wraps (up to 3
+  /// lines) instead of pushing the table into a horizontal scroll.
+  static double _archiveFileNameMaxWidth(double tableAreaWidth) {
+    const otherFlexSum = 1.0 + 0.7 + 0.55 + 0.7 + 0.8 + 0.95;
+    const nameFlex = 2.2;
+    const spacing = M3Spacing.xs;
+    const columns = 7;
+    final tableWidth = (tableAreaWidth - _archiveActionsWidthEstimate)
+        .clamp(0.0, double.infinity);
+    final inner = tableWidth - (2 * spacing) - ((columns - 1) * spacing);
+    final share = inner * nameFlex / (nameFlex + otherFlexSum);
+    // Keep enough room for the 20dp icon + 8dp gap + a few glyphs.
+    return share.clamp(120.0, 480.0);
   }
 
   static String _formatFileSize(int bytes) {
