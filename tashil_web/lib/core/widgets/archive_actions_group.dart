@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../testing/test_semantics.dart';
-import 'm3_chip_surface.dart';
+import 'm3_toolbar_button.dart';
 import 'app_icons.dart';
 
 /// Connected Material 3 button group for archived sheet rows:
-/// تعديل (replace) | تحميل | حذف — 8dp corners like the shared toolbar style.
+/// تعديل (replace) | تحميل | حذف — full-round like the shared 40dp controls.
 class ArchiveActionsGroup extends StatelessWidget {
   const ArchiveActionsGroup({
     super.key,
@@ -51,10 +51,10 @@ class ArchiveActionsGroup extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: colorScheme.outlineVariant),
-        borderRadius: M3ChipStyle.radius,
+        borderRadius: M3ToolbarButton.radius,
       ),
       child: ClipRRect(
-        borderRadius: M3ChipStyle.radius,
+        borderRadius: M3ToolbarButton.radius,
         child: IntrinsicHeight(
           child: Row(
             mainAxisSize: MainAxisSize.min,

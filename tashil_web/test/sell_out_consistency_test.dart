@@ -97,7 +97,7 @@ List<String> _violations(WidgetTester tester) {
 
     visit(ro.text, null);
   }
-  // Buttons (not icon buttons): 40dp tall, 8dp corners.
+  // Buttons (not icon buttons): 40dp tall, full-round (F1).
   for (final e in find
       .byWidgetPredicate((w) =>
           w is FilledButton || w is OutlinedButton || w is ElevatedButton)
@@ -113,8 +113,8 @@ List<String> _violations(WidgetTester tester) {
     final material = matEl.widget as Material;
     final h = (matEl.renderObject! as RenderBox).size.height;
     final shape = material.shape;
-    final ok8 = shape is RoundedRectangleBorder &&
-        shape.borderRadius == M3ChipStyle.radius;
+    // F1: 40dp buttons are full-round (chips keep 8dp).
+    final ok8 = shape is StadiumBorder;
     final label = find
         .descendant(of: find.byWidget(e.widget), matching: find.byType(Text))
         .evaluate()
@@ -193,7 +193,7 @@ void main() {
     });
 
     testWidgets(
-        '1+6. Export / Print / Upload and the toolbar: 40dp, 8dp corners',
+        '1+6. Export / Print / Upload and the toolbar: 40dp, full-round (F1)',
         (tester) async {
       await _pump(tester);
       for (final k in const [
@@ -207,10 +207,7 @@ void main() {
         final mat =
             find.descendant(of: btn, matching: find.byType(Material)).first;
         final shape = tester.widget<Material>(mat).shape;
-        expect(shape, isA<RoundedRectangleBorder>(), reason: k);
-        expect(
-            (shape! as RoundedRectangleBorder).borderRadius, M3ChipStyle.radius,
-            reason: k);
+        expect(shape, isA<StadiumBorder>(), reason: k);
         expect(tester.getSize(mat).height, 40.0, reason: k);
       }
       expect(

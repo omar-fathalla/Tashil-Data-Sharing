@@ -1760,7 +1760,6 @@ onChanged: m3Legacy<String>((val) {
       ),
       style: FilledButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 12.0),
-        shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusMd),
       ),
     );
 

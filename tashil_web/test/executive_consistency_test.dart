@@ -158,7 +158,7 @@ void main() {
           reason:
               'ad-hoc chip: ${find.descendant(of: f, matching: find.byType(Text)).evaluate().map((t) => (t.widget as Text).data).join(' | ')}');
     }
-    // Header filters use the same 8dp chip corners (40dp touch-friendly).
+    // Header filters are 40dp full-round controls (F1), not 8dp chips.
     var checked = 0;
     for (final k in [
       'executive_month_dropdown',
@@ -173,10 +173,7 @@ void main() {
           matchRoot: true);
       final style = tester.widget<ButtonStyleButton>(btn.first).style!;
       final shape = style.shape!.resolve(<WidgetState>{});
-      expect(shape, isA<RoundedRectangleBorder>(), reason: k);
-      expect(
-          (shape! as RoundedRectangleBorder).borderRadius, M3ChipStyle.radius,
-          reason: k);
+      expect(shape, isA<StadiumBorder>(), reason: k);
       checked++;
     }
     expect(checked, greaterThanOrEqualTo(2));

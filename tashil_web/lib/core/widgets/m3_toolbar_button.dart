@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 
-import 'm3_chip_surface.dart';
+import '../theme/m3_shape.dart';
 
-/// One geometry for toolbar / page-action buttons (filter bars, Export,
-/// Print, Upload, sort toggles): 40dp tall, 8dp corners — the same
-/// [M3ChipStyle.radius] the dashboard's [M3MenuFilter] buttons use — and
-/// 18dp icons. Colour roles (filled / tonal / outlined) stay per button.
+/// One geometry for every 40dp control (filter buttons, toolbar / page-action
+/// buttons such as Export, Print, Upload, sort toggles, segmented buttons):
+/// 40dp tall, full-round [StadiumBorder] corners (F1, owner decision: one
+/// shape on every page, matching the app theme's button family) and 18dp
+/// icons. Chips keep their 8dp [M3ChipStyle.radius]. Colour roles
+/// (filled / tonal / outlined) stay per button.
 abstract final class M3ToolbarButton {
   static const double height = 40.0;
   static const double iconSize = 18.0;
-  static const OutlinedBorder shape =
-      RoundedRectangleBorder(borderRadius: M3ChipStyle.radius);
+  static const OutlinedBorder shape = StadiumBorder();
+
+  /// Corner radius for hand-built 40dp controls (InkWell + decoration) so
+  /// they match [shape].
+  static const BorderRadius radius = M3Shape.radiusFull;
 
   static const ButtonStyle style = ButtonStyle(
     shape: WidgetStatePropertyAll(shape),

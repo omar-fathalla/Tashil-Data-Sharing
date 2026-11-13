@@ -277,9 +277,6 @@ class _VirtualizedSkuTableState extends State<VirtualizedSkuTable> {
                       }
                     },
                     style: SegmentedButton.styleFrom(
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: M3Shape.radiusXl,
-                      ),
                       visualDensity: VisualDensity.compact,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       padding: const EdgeInsets.symmetric(horizontal: 2.0),

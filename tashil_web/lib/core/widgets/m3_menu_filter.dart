@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'm3_chip_surface.dart';
+import 'm3_toolbar_button.dart';
 
 import '../theme/m3_spacing.dart';
 import 'app_icons.dart';
@@ -90,9 +90,9 @@ class M3MenuFilter<T> extends StatelessWidget {
             const Icon(AppIcons.dropDown, size: 18.0),
           ],
         );
-        // Icon-start M3 button + trailing caret, 40dp tall; filter-chip
-        // shape (8dp corners, [M3ChipStyle.radius]) like every other chip.
-        const shape = RoundedRectangleBorder(borderRadius: M3ChipStyle.radius);
+        // Icon-start M3 button + trailing caret, 40dp tall, with the shared
+        // full-round 40dp control shape ([M3ToolbarButton.shape]).
+        const shape = M3ToolbarButton.shape;
         const pad = EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 8.0, 0.0);
         final outlined = OutlinedButton.styleFrom(
           foregroundColor: cs.onSurfaceVariant,

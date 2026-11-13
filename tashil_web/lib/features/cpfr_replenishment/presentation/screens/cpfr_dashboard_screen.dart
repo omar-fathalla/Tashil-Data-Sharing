@@ -900,9 +900,6 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                     vertical: 12.0,
                     horizontal: 22.0,
                   ),
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: M3Shape.radiusSm,
-                  ),
                 ),
                 icon: _isUploadingSellIn
                     ? const SizedBox(

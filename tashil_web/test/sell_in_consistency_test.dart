@@ -138,7 +138,7 @@ List<String> _violations(WidgetTester tester) {
 
     visit(ro.text, null);
   }
-  // Buttons (not icon buttons): 40dp tall, 8dp corners.
+  // Buttons (not icon buttons): 40dp tall, full-round (F1).
   for (final e in find
       .byWidgetPredicate((w) =>
           w is FilledButton || w is OutlinedButton || w is ElevatedButton)
@@ -154,8 +154,8 @@ List<String> _violations(WidgetTester tester) {
     final material = matEl.widget as Material;
     final h = (matEl.renderObject! as RenderBox).size.height;
     final shape = material.shape;
-    final ok8 = shape is RoundedRectangleBorder &&
-        shape.borderRadius == M3ChipStyle.radius;
+    // F1: 40dp buttons are full-round (chips keep 8dp).
+    final ok8 = shape is StadiumBorder;
     final label = find
         .descendant(of: find.byWidget(e.widget), matching: find.byType(Text))
         .evaluate()
