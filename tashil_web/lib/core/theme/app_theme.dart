@@ -13,12 +13,13 @@ class AppTheme {
   AppTheme._();
 
   /// Builds light ThemeData derived programmatically from a single seed color.
-  /// Uses [DynamicSchemeVariant.fidelity] so primary stays close to brand green.
+  /// M3 default tonal-spot variant: calm neutrals; primary reserved for the
+  /// main action, the selected destination and focus. Brand #35A211 stays the seed.
   static ThemeData light({Color seedColor = TenantBrandSeeds.brandGreen}) {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: Brightness.light,
-      dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+      dynamicSchemeVariant: DynamicSchemeVariant.tonalSpot,
     );
     return _buildTheme(colorScheme);
   }
@@ -28,7 +29,7 @@ class AppTheme {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: Brightness.dark,
-      dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+      dynamicSchemeVariant: DynamicSchemeVariant.tonalSpot,
     );
     return _buildTheme(colorScheme);
   }
@@ -85,6 +86,20 @@ class AppTheme {
         height: 16 / 11,
       ),
     );
+
+    // Visible 3dp focus ring (secondary ≈ 6:1 on surface) shared by the button
+    // family, segmented buttons and tappable surfaces.
+    WidgetStateProperty<BorderSide?> sideWithFocus(BorderSide? normal) =>
+        WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.focused)) {
+            return BorderSide(color: colorScheme.secondary, width: 3.0);
+          }
+          if (states.contains(WidgetState.disabled) && normal != null) {
+            return BorderSide(
+                color: colorScheme.onSurface.withValues(alpha: 0.12));
+          }
+          return normal;
+        });
 
     final menuShape = RoundedRectangleBorder(
       borderRadius: M3Shape.radiusMd,
@@ -182,6 +197,7 @@ class AppTheme {
           ),
           iconSize: WidgetStateProperty.all(20.0),
           textStyle: WidgetStateProperty.all(textTheme.labelLarge),
+          side: sideWithFocus(null),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -192,11 +208,7 @@ class AppTheme {
           padding: WidgetStateProperty.all(
             const EdgeInsets.symmetric(horizontal: M3Spacing.sm, vertical: 10.0),
           ),
-          side: WidgetStateProperty.resolveWith((states) => BorderSide(
-            color: states.contains(WidgetState.disabled)
-                ? colorScheme.onSurface.withValues(alpha: 0.12)
-                : colorScheme.outlineVariant,
-          )),
+          side: sideWithFocus(BorderSide(color: colorScheme.outline)),
           iconSize: WidgetStateProperty.all(20.0),
           textStyle: WidgetStateProperty.all(textTheme.labelLarge),
         ),
@@ -211,6 +223,7 @@ class AppTheme {
           ),
           iconSize: WidgetStateProperty.all(20.0),
           textStyle: WidgetStateProperty.all(textTheme.labelLarge),
+          side: sideWithFocus(null),
         ),
       ),
 
@@ -279,9 +292,12 @@ class AppTheme {
           textStyle: WidgetStateProperty.all(
             textTheme.labelLarge,
           ),
-          side: WidgetStateProperty.all(
-            BorderSide(color: colorScheme.outline),
-          ),
+          side: sideWithFocus(BorderSide(color: colorScheme.outline)),
+          // Equal, single-line segments: 112 x 40 (mockup .seg button).
+          minimumSize: const WidgetStatePropertyAll(Size(112.0, 40.0)),
+          padding: const WidgetStatePropertyAll(
+              EdgeInsets.symmetric(horizontal: M3Spacing.s12)),
+          iconSize: const WidgetStatePropertyAll(18.0),
           elevation: WidgetStateProperty.all(0),
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
@@ -293,7 +309,7 @@ class AppTheme {
             if (states.contains(WidgetState.selected)) {
               return colorScheme.onSecondaryContainer;
             }
-            return colorScheme.onSurfaceVariant;
+            return colorScheme.onSurface;
           }),
         ),
       ),

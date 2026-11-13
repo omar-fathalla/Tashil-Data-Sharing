@@ -26,8 +26,11 @@ void main() {
       expect(TenantBrandSeeds.brandGreen, const Color(0xFF35A211));
       expect(TenantBrandSeeds.adecoSeed, TenantBrandSeeds.brandGreen);
       expect(TenantBrandSeeds.adminSeed, TenantBrandSeeds.brandGreen);
-      // Fidelity keeps primary close to the seed (not forced blue).
+      // tonalSpot from #35A211: calm neutrals, primary #426834 (not forced blue).
       expect(theme.colorScheme.primary.toARGB32() & 0x00FFFFFF, isNot(0x001565C0));
+      expect(theme.colorScheme.primary, const Color(0xFF426834));
+      expect(theme.colorScheme.secondaryContainer, const Color(0xFFD8E7CC));
+      expect(theme.colorScheme.surface, const Color(0xFFF8FAF0));
       expect(theme.colorScheme.surfaceContainerLow, isNotNull);
       expect(theme.colorScheme.surfaceContainer, isNotNull);
       expect(theme.colorScheme.surfaceContainerHigh, isNotNull);
