@@ -409,27 +409,28 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                             children: [
                               // 1. Rank Chip
                               Semantics(
-                                label: 'المركز $rank',
-                                excludeSemantics: true,
-                                child: M3ChipSurface(
-                                color: isTenant
-                                    ? colorScheme.primary
-                                    : colorScheme.surfaceContainerHighest,
-                                borderColor: isTenant
-                                    ? null
-                                    : colorScheme.outlineVariant,
-                                // Bare rank number: the coloured chip already
-                                // reads as a rank (no '#', mockup is Arabic).
-                                child: Text(
-                                  '$rank',
-                                  style: theme.textTheme.labelMedium?.copyWith(
+                                  label: 'المركز $rank',
+                                  excludeSemantics: true,
+                                  child: M3ChipSurface(
                                     color: isTenant
-                                        ? colorScheme.onPrimary
-                                        : colorScheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              )),
+                                        ? colorScheme.primary
+                                        : colorScheme.surfaceContainerHighest,
+                                    borderColor: isTenant
+                                        ? null
+                                        : colorScheme.outlineVariant,
+                                    // Bare rank number: the coloured chip already
+                                    // reads as a rank (no '#', mockup is Arabic).
+                                    child: Text(
+                                      '$rank',
+                                      style:
+                                          theme.textTheme.labelMedium?.copyWith(
+                                        color: isTenant
+                                            ? colorScheme.onPrimary
+                                            : colorScheme.onSurfaceVariant,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  )),
                               // 2. Company Name (Arabic on Line 1, English on Line 2)
                               Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -541,7 +542,9 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                 color: isTenant
                                     ? colorScheme.primary
                                     : colorScheme.surfaceContainerLowest,
-                                borderColor: isTenant ? null : colorScheme.outlineVariant,
+                                borderColor: isTenant
+                                    ? null
+                                    : colorScheme.outlineVariant,
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -990,13 +993,16 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                               children: [
                                 Text(
                                   cat.category,
+                                  key: ValueKey(
+                                      'pareto_category_name_${cat.category}'),
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: isSelected
                                         ? colorScheme.primary
                                         : colorScheme.onSurface,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.clip,
                                 ),
                                 M3ChipSurface(
                                   color: colorScheme.surfaceContainerLowest,
@@ -1078,7 +1084,8 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
                               ),
-                              overflow: TextOverflow.ellipsis,
+                              maxLines: 3,
+                              overflow: TextOverflow.clip,
                             ),
                           ),
                           const SizedBox(width: 8.0),
@@ -1431,12 +1438,14 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                           Expanded(
                                             child: Text(
                                               sku.skuName,
+                                              key: const ValueKey(
+                                                  'pareto_sku_name'),
                                               style: theme.textTheme.bodyMedium
                                                   ?.copyWith(
                                                 fontWeight: FontWeight.w600,
                                               ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 3,
+                                              overflow: TextOverflow.clip,
                                             ),
                                           ),
                                           const SizedBox(width: 8.0),
@@ -1465,12 +1474,13 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                       const SizedBox(height: 4.0),
                                       Text(
                                         '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود الصنف: ${sku.itemCode} • " : ""}الباركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
+                                        key: const ValueKey('pareto_sku_meta'),
                                         style:
                                             theme.textTheme.bodySmall?.copyWith(
                                           color: colorScheme.onSurfaceVariant,
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.clip,
                                       ),
                                       const SizedBox(height: 2.0),
                                       Text(
@@ -1480,8 +1490,8 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                           fontWeight: FontWeight.w600,
                                           color: colorScheme.onSurface,
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.clip,
                                       ),
                                     ],
                                   )
@@ -1499,23 +1509,27 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                                           children: [
                                             Text(
                                               sku.skuName,
+                                              key: const ValueKey(
+                                                  'pareto_sku_name'),
                                               style: theme.textTheme.bodyMedium
                                                   ?.copyWith(
                                                 fontWeight: FontWeight.w600,
                                               ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 3,
+                                              overflow: TextOverflow.clip,
                                             ),
                                             const SizedBox(height: 3.0),
                                             Text(
                                               '${sku.category} • ${sku.itemCode.isNotEmpty ? "كود الصنف: ${sku.itemCode} • " : ""}الباركود: ${sku.barcode} • ${CurrencyFormatter.formatCompactEGP(sku.totalRevenue)}',
+                                              key: const ValueKey(
+                                                  'pareto_sku_meta'),
                                               style: theme.textTheme.bodySmall
                                                   ?.copyWith(
                                                 color: colorScheme
                                                     .onSurfaceVariant,
                                               ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 3,
+                                              overflow: TextOverflow.clip,
                                             ),
                                           ],
                                         ),

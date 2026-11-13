@@ -13,6 +13,8 @@ import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/widgets/app_icons.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../cpfr_replenishment/domain/cpfr_models.dart';
 
 /// Market Share + Sell In vs Sell Out overview, shown above the existing
@@ -73,19 +75,20 @@ class MarketShareSection extends StatelessWidget {
           Widget b,
           Key key, {
           List<int> flex = const [1, 1],
-        }) => wide
-            ? _EqualHeightRow(
-                key: key,
-                spacing: M3Spacing.md,
-                textDirection: Directionality.of(context),
-                flex: flex,
-                children: [a, b],
-              )
-            : Column(
-                key: key,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [a, M3Spacing.gapMD, b],
-              );
+        }) =>
+            wide
+                ? _EqualHeightRow(
+                    key: key,
+                    spacing: M3Spacing.md,
+                    textDirection: Directionality.of(context),
+                    flex: flex,
+                    children: [a, b],
+                  )
+                : Column(
+                    key: key,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [a, M3Spacing.gapMD, b],
+                  );
         return Column(
           key: const ValueKey('market_share_section'),
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -300,10 +303,12 @@ class _SkuShareCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final cats = {for (final c in kpis.categoryContributions) c.category: c};
-    final rows =
-        <
-          ({ParetoSkuItemModel sku, double self, double ownOther, double comp})
-        >[];
+    final rows = <({
+      ParetoSkuItemModel sku,
+      double self,
+      double ownOther,
+      double comp
+    })>[];
     final skus = [...kpis.paretoSkus]
       ..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
     for (final s in skus) {
@@ -350,8 +355,8 @@ class _SkuShareCard extends StatelessWidget {
                         message: rows[i].sku.skuName,
                         child: Text(
                           rows[i].sku.skuName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          maxLines: 3,
+                          overflow: TextOverflow.clip,
                           style: theme.textTheme.titleSmall?.copyWith(
                             color: cs.onSurface,
                           ),
@@ -359,8 +364,8 @@ class _SkuShareCard extends StatelessWidget {
                       ),
                       category: Text(
                         rows[i].sku.category,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        maxLines: 3,
+                        overflow: TextOverflow.clip,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: cs.onSurfaceVariant,
                         ),
@@ -431,11 +436,10 @@ class _CategoryShareCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cats =
-        kpis.categoryContributions
-            .where((c) => c.marketTotalRevenue > 0)
-            .toList()
-          ..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
+    final cats = kpis.categoryContributions
+        .where((c) => c.marketTotalRevenue > 0)
+        .toList()
+      ..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
     final top = cats.take(4).toList();
     return Card.outlined(
       key: const ValueKey('share_per_category_card'),
@@ -482,74 +486,100 @@ class _CategoryTile extends StatelessWidget {
     final cs = theme.colorScheme;
     final acc = M3StatusColors.of(context).accents;
     final ours = cat.tenantCategorySharePct.clamp(0.0, 100.0);
+    final competitors = <Widget>[
+      if (cat.topCompetitors.isEmpty)
+        Text(
+          'المنافسون ${_pct(100.0 - ours)}',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+        )
+      else
+        for (final (i, c) in cat.topCompetitors.take(3).indexed)
+          Row(
+            key: ValueKey('category_competitor_${cat.category}_$i'),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 5.0),
+                child: CircleAvatar(
+                  radius: 4.0,
+                  backgroundColor: _competitorShade(
+                    acc,
+                    Theme.of(context).colorScheme,
+                    i,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4.0),
+              Expanded(
+                child: Text(
+                  c.name,
+                  maxLines: 3,
+                  overflow: TextOverflow.clip,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              Text(_pct(c.sharePct), style: theme.textTheme.labelSmall),
+            ],
+          ),
+    ];
     return Card.filled(
       margin: EdgeInsets.zero,
-      child: _ShareTile(
-        textDirection: Directionality.of(context),
-        donut: _Donut(
-          key: ValueKey('category_donut_${cat.category}'),
-          value: ours / 100.0,
-          label: _pct(ours),
-        ),
-        details: Column(
+      child: Padding(
+        padding: M3Spacing.pMd,
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               cat.category,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              key: ValueKey('category_tile_name_${cat.category}'),
+              maxLines: 3,
+              overflow: TextOverflow.clip,
               style: theme.textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
             M3Spacing.gapXXS,
-            if (cat.tenantRank > 0)
-              Text(
-                'المرتبة ${cat.tenantRank}${cat.supplierCount > 0 ? ' من ${cat.supplierCount}' : ''}',
-                key: ValueKey('category_rank_${cat.category}'),
-                style: theme.textTheme.labelMedium?.copyWith(
-                  // tealBase (#009688) fails WCAG on surface (~3.33:1); use deep teal for text.
-                  color: cat.tenantRank == 1 ? acc.tealDeep : cs.onSurface,
-                  fontWeight: FontWeight.w600,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: _Donut(
+                    key: ValueKey('category_donut_${cat.category}'),
+                    value: ours / 100.0,
+                    label: _pct(ours),
+                  ),
                 ),
-              ),
-            M3Spacing.gapXXS,
-            _CompetitorBar(cat: cat, ours: ours),
-            M3Spacing.gapXXS,
-            if (cat.topCompetitors.isEmpty)
-              Text(
-                'المنافسون ${_pct(100.0 - ours)}',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-              )
-            else
-              for (final (i, c) in cat.topCompetitors.take(3).indexed)
-                Row(
-                  key: ValueKey('category_competitor_${cat.category}_$i'),
-                  children: [
-                    CircleAvatar(
-                      radius: 4.0,
-                      backgroundColor: _competitorShade(
-                        acc,
-                        Theme.of(context).colorScheme,
-                        i,
-                      ),
-                    ),
-                    const SizedBox(width: 4.0),
-                    Expanded(
-                      child: Text(
-                        c.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: cs.onSurfaceVariant,
+                const SizedBox(width: 16.0),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (cat.tenantRank > 0)
+                        Text(
+                          'المرتبة ${cat.tenantRank}${cat.supplierCount > 0 ? ' من ${cat.supplierCount}' : ''}',
+                          key: ValueKey('category_rank_${cat.category}'),
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: cat.tenantRank == 1
+                                ? acc.tealDeep
+                                : cs.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                    ),
-                    Text(_pct(c.sharePct), style: theme.textTheme.labelSmall),
-                  ],
+                      M3Spacing.gapXXS,
+                      _CompetitorBar(cat: cat, ours: ours),
+                    ],
+                  ),
                 ),
+              ],
+            ),
+            M3Spacing.gapXXS,
+            ...competitors,
           ],
         ),
       ),
@@ -577,26 +607,36 @@ class _SellInOutTiles extends StatelessWidget {
     final monthLabel = months.map((m) => _monthAr(m.monthNum)).join('، ');
 
     final tiles = [
-      _KpiTile(
-        label: 'Sell-In (وحدة)',
+      M3SummaryKpiCard(
+        key: const ValueKey('kpi_card_exec_sellin'),
+        title: 'Sell-In',
         value: _fmtInt(sellIn),
-        color: cs.onSurface,
+        subtitle: 'وحدة',
+        icon: AppIcons.sellIn,
+        color: cs.primary,
       ),
-      _KpiTile(
-        label: 'Sell-Out (وحدة)',
+      M3SummaryKpiCard(
+        key: const ValueKey('kpi_card_exec_cpfr_sellout'),
+        title: 'Sell-Out',
         value: _fmtInt(sellOut),
-        color: cs.onSurface,
+        subtitle: 'وحدة',
+        icon: AppIcons.units,
+        color: cs.tertiary,
       ),
-      _KpiTile(
+      M3SummaryKpiCard(
         key: const ValueKey('kpi_net_accumulation'),
-        label: 'تراكم المخزون (وحدة)',
+        title: 'تراكم المخزون',
         value: formatSignedUnits(net),
+        subtitle: 'وحدة',
+        icon: AppIcons.cpfr,
         color: acc.cautionStrong,
       ),
-      _KpiTile(
+      M3SummaryKpiCard(
         key: const ValueKey('kpi_sell_through'),
-        label: 'نسبة التصريف',
+        title: 'نسبة التصريف',
         value: _pct(through),
+        subtitle: 'Sell-Out من Sell-In',
+        icon: AppIcons.discount,
         color: acc.tealBase,
       ),
     ];
@@ -615,57 +655,18 @@ class _SellInOutTiles extends StatelessWidget {
         M3Spacing.gapSM,
         LayoutBuilder(
           builder: (context, c) {
-            final cols = c.maxWidth >= 700 ? 4 : 2;
-            final w = (c.maxWidth - (cols - 1) * 12.0) / cols;
-            return Wrap(
-              spacing: 12.0,
-              runSpacing: 12.0,
-              children: [for (final t in tiles) SizedBox(width: w, child: t)],
+            // Same 960/580 breakpoints as Sell-Out / the Dashboard KPI row.
+            final columns = c.maxWidth >= 960 ? 4 : (c.maxWidth >= 580 ? 2 : 1);
+            return M3EqualHeightGrid(
+              key: const ValueKey('exec_sellinout_kpi_grid'),
+              columns: columns,
+              spacing: M3Spacing.sm,
+              runSpacing: M3Spacing.sm,
+              children: tiles,
             );
           },
         ),
       ],
-    );
-  }
-}
-
-class _KpiTile extends StatelessWidget {
-  const _KpiTile({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-  final String label;
-  final String value;
-  final Color color;
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card.filled(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: M3Spacing.pMd,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            M3Spacing.gapXS,
-            Text(
-              value,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w500,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -694,18 +695,15 @@ class _StockCard extends StatelessWidget {
       },
     };
     // Aggregate per SKU (the report can list a SKU per branch/region).
-    final bySku =
-        <
-          String,
-          ({
-            String name,
-            String category,
-            int sIn,
-            int sOut,
-            int stock,
-            String status,
-          })
-        >{};
+    final bySku = <String,
+        ({
+      String name,
+      String category,
+      int sIn,
+      int sOut,
+      int stock,
+      String status,
+    })>{};
     for (final i
         in cpfr?.inventoryAndPoItems ?? const <SKUBranchInventoryModel>[]) {
       final k = i.barcode.isNotEmpty ? i.barcode : i.itemCode;
@@ -735,15 +733,15 @@ class _StockCard extends StatelessWidget {
     // heading sits exactly over its numbers at any column width.
     const numPad = EdgeInsets.symmetric(horizontal: M3Spacing.xxs);
     Widget num(String v) => Padding(
-      padding: numPad,
-      child: Text(
-        v,
-        style: cell,
-        textAlign: TextAlign.center,
-        maxLines: 3,
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
+          padding: numPad,
+          child: Text(
+            v,
+            style: cell,
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.clip,
+          ),
+        );
     return Card.outlined(
       key: const ValueKey('stock_per_sku_table'),
       margin: EdgeInsets.zero,
@@ -780,12 +778,12 @@ class _StockCard extends StatelessWidget {
                   // Status uses flex, not IntrinsicColumnWidth, so the 6
                   // columns fit the live 1280+sidebar table width (~500–900dp)
                   // without a horizontal scroll.
-                  0: FlexColumnWidth(3.0),
-                  1: FlexColumnWidth(1.15),
-                  2: FlexColumnWidth(1.15),
-                  3: FlexColumnWidth(1.15),
-                  4: FlexColumnWidth(1.5),
-                  5: FlexColumnWidth(2.2),
+                  0: FlexColumnWidth(3.6),
+                  1: FlexColumnWidth(1.1),
+                  2: FlexColumnWidth(1.1),
+                  3: FlexColumnWidth(1.1),
+                  4: FlexColumnWidth(1.4),
+                  5: FlexColumnWidth(2.0),
                 },
                 defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                 children: [
@@ -817,9 +815,8 @@ class _StockCard extends StatelessWidget {
                             key: ValueKey('stock_head_$i'),
                             style: label,
                             maxLines: 2,
-                            textAlign: i == 0
-                                ? TextAlign.start
-                                : TextAlign.center,
+                            textAlign:
+                                i == 0 ? TextAlign.start : TextAlign.center,
                           ),
                         ),
                     ],
@@ -846,7 +843,7 @@ class _StockCard extends StatelessWidget {
                                   r.name,
                                   key: const ValueKey('stock_sku_name'),
                                   maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
+                                  overflow: TextOverflow.clip,
                                   style: theme.textTheme.titleSmall?.copyWith(
                                     color: cs.onSurface,
                                   ),
@@ -856,7 +853,7 @@ class _StockCard extends StatelessWidget {
                                 Text(
                                   r.category,
                                   maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
+                                  overflow: TextOverflow.clip,
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: cs.onSurfaceVariant,
                                   ),
@@ -906,10 +903,10 @@ class _StatusChip extends StatelessWidget {
       'overstock' => (M3StatusTone.error, AppIcons.warning, 'مخزون زائد'),
       'urgent_replenishment' => (M3StatusTone.warning, AppIcons.info, 'تموين'),
       _ => (
-        M3StatusTone.neutral,
-        AppIcons.info,
-        status.isEmpty ? 'غير معروف' : status,
-      ),
+          M3StatusTone.neutral,
+          AppIcons.info,
+          status.isEmpty ? 'غير معروف' : status,
+        ),
     };
     return M3StatusTag(label: text, tone: tone, icon: icon);
   }
@@ -1031,12 +1028,12 @@ class _MonthlyBarsCard extends StatelessWidget {
       : SizedBox(height: minH, child: plot);
 
   Widget _bar(double h, Color c) => M3TonalSurface(
-    color: c,
-    borderRadius: const BorderRadius.vertical(top: Radius.circular(4.0)),
-    width: 16.0,
-    height: h.clamp(2.0, 180.0),
-    child: const SizedBox.shrink(),
-  );
+        color: c,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(4.0)),
+        width: 16.0,
+        height: h.clamp(2.0, 180.0),
+        child: const SizedBox.shrink(),
+      );
 }
 
 /// Grey shades for the named competitors (strongest first); MD3 theme roles only.
@@ -1101,8 +1098,8 @@ class _Donut extends StatelessWidget {
         final style = s >= 112
             ? theme.textTheme.titleLarge
             : s >= 88
-            ? theme.textTheme.titleMedium
-            : theme.textTheme.labelLarge;
+                ? theme.textTheme.titleMedium
+                : theme.textTheme.labelLarge;
         return Stack(
           alignment: Alignment.center,
           children: [
@@ -1201,10 +1198,10 @@ class _GrowingGrid extends MultiChildRenderObjectWidget {
 
   @override
   RenderObject createRenderObject(BuildContext context) => _RenderGrowingGrid(
-    spacing: spacing,
-    twoColumnMinWidth: twoColumnMinWidth,
-    textDirection: textDirection,
-  );
+        spacing: spacing,
+        twoColumnMinWidth: twoColumnMinWidth,
+        textDirection: textDirection,
+      );
 
   @override
   void updateRenderObject(
@@ -1232,6 +1229,7 @@ class _SkuRow extends MultiChildRenderObjectWidget {
 
 /// Category tile: donut on the start side, copy beside it. Extra height
 /// enlarges the donut (capped) and centers both in the tile.
+// ignore: unused_element
 class _ShareTile extends MultiChildRenderObjectWidget {
   _ShareTile({
     required Widget donut,
@@ -1307,9 +1305,9 @@ class _RenderEqualHeightRow extends RenderBox
     required double spacing,
     required TextDirection textDirection,
     List<int> flex = const [1, 1],
-  }) : _spacing = spacing,
-       _textDirection = textDirection,
-       _flex = flex;
+  })  : _spacing = spacing,
+        _textDirection = textDirection,
+        _flex = flex;
 
   List<int> _flex;
   List<int> get flex => _flex;
@@ -1406,7 +1404,7 @@ class _RenderFillColumn extends RenderBox
         ContainerRenderObjectMixin<RenderBox, _OffsetParentData>,
         _OffsetChildren {
   _RenderFillColumn({required TextDirection textDirection})
-    : _textDirection = textDirection;
+      : _textDirection = textDirection;
 
   TextDirection _textDirection;
   TextDirection get textDirection => _textDirection;
@@ -1450,9 +1448,8 @@ class _RenderFillColumn extends RenderBox
     var y = 0.0;
     for (final child in kids.sublist(0, kids.length - 1)) {
       child.layout(BoxConstraints(maxWidth: width), parentUsesSize: true);
-      final x = textDirection == TextDirection.rtl
-          ? width - child.size.width
-          : 0.0;
+      final x =
+          textDirection == TextDirection.rtl ? width - child.size.width : 0.0;
       (child.parentData! as _OffsetParentData).offset = Offset(x, y);
       y += child.size.height;
     }
@@ -1529,9 +1526,9 @@ class _RenderGrowingGrid extends RenderBox
     required double spacing,
     required double twoColumnMinWidth,
     required TextDirection textDirection,
-  }) : _spacing = spacing,
-       _twoColumnMinWidth = twoColumnMinWidth,
-       _textDirection = textDirection;
+  })  : _spacing = spacing,
+        _twoColumnMinWidth = twoColumnMinWidth,
+        _textDirection = textDirection;
 
   double _spacing;
   double get spacing => _spacing;
@@ -1716,7 +1713,7 @@ class _RenderShareTile extends RenderBox
         ContainerRenderObjectMixin<RenderBox, _OffsetParentData>,
         _OffsetChildren {
   _RenderShareTile({required TextDirection textDirection})
-    : _textDirection = textDirection;
+      : _textDirection = textDirection;
 
   static const double _minDonut = 64.0;
   static const double _maxDonut = 148.0;

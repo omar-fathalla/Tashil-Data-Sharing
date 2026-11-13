@@ -9,6 +9,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,6 +22,7 @@ import 'package:tashil_web/features/cpfr_replenishment/domain/cpfr_models.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/widgets/bento_kpi_grid.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/widgets/chain_share_pie.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/widgets/market_share_section.dart';
+import 'package:tashil_web/features/executive_dashboard/presentation/widgets/pareto_category_section.dart';
 import 'package:tashil_web/features/navigation/presentation/desktop_sidebar.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
 
@@ -29,7 +31,9 @@ import 'support/real_fonts.dart';
 const kLiveViewportWidth = 1280.0;
 const kSellOutKpiHeight = 138.0;
 const kLongSku =
-    'منظف أرضيات تجريبي برائحة اللافندر عبوة اقتصادية كبيرة الحجم مع غطاء محكم';
+    'عرض شنطة تجريبية (3 عبوة 1050 جم مبيض & 1 عبوة 1 ك *2 )- 3 مجموعة';
+const kLongCategory = 'صابون سائل أطباق برائحة الليمون المركز';
+const kLongCompetitor = 'إيما التجارية للمنظفات والعناية المنزلية';
 
 final _prefixedChains = [
   ChainShareItem(
@@ -74,6 +78,55 @@ ExecutiveKPIsModel _liveKpis({bool yoyAvailable = false}) => ExecutiveKPIsModel(
       reportingPeriod: '2026',
       chainShares: _prefixedChains,
       dailyTrends: const [],
+      categoryContributions: [
+        CategoryContributionModel(
+          category: kLongCategory,
+          totalRevenue: 34200000,
+          totalUnits: 89000,
+          sharePct: 27.1,
+          skuCount: 32,
+          marketTotalRevenue: 102220000,
+          tenantCategorySharePct: 33.7,
+          tenantRank: 1,
+          supplierCount: 13,
+          topCompetitors: const [
+            CategoryCompetitorModel(
+              name: kLongCompetitor,
+              revenue: 29600000,
+              sharePct: 29.0,
+            ),
+            CategoryCompetitorModel(
+              name: 'هندل بريسل للمنتجات المنزلية',
+              revenue: 26600000,
+              sharePct: 26.0,
+            ),
+          ],
+        ),
+        CategoryContributionModel(
+          category: 'كلور عادى',
+          totalRevenue: 15720000,
+          totalUnits: 41000,
+          sharePct: 12.4,
+          skuCount: 41,
+          marketTotalRevenue: 26620000,
+          tenantCategorySharePct: 59.0,
+          tenantRank: 1,
+          supplierCount: 5,
+        ),
+      ],
+      paretoSkus: [
+        ParetoSkuItemModel(
+          itemCode: 'PRHC-0003-0009',
+          barcode: '6224000000009',
+          skuName: kLongSku,
+          category: kLongCategory,
+          totalRevenue: 12840000,
+          totalUnits: 21400,
+          revenueSharePct: 16.5,
+          cumulativeSharePct: 16.5,
+          isTop80Contributor: true,
+        ),
+      ],
     );
 
 final _liveCpfr = CPFRDashboardModel.fromJson({
@@ -204,6 +257,14 @@ Widget _dashboardBody({bool yoy = false}) => SingleChildScrollView(
             ),
             const SizedBox(height: 16),
             ChainSharePie(chainShares: _prefixedChains),
+            const SizedBox(height: 16),
+            ParetoCategorySection(
+              categories: _liveKpis(yoyAvailable: yoy).categoryContributions,
+              paretoSkus: _liveKpis(yoyAvailable: yoy).paretoSkus,
+              totalMarketRevenue: 265700000,
+              tenantMarketSharePct: 48.0,
+              competitorsCount: 6,
+            ),
           ],
         ),
       ),
@@ -246,6 +307,20 @@ int _kpiColumnCount(WidgetTester tester, List<String> keys) {
   ];
   final first = tops.first;
   return tops.where((top) => (top - first).abs() < 1.0).length;
+}
+
+bool _paragraphExceeded(WidgetTester tester, Finder finder) {
+  for (final el in finder.evaluate()) {
+    final ro = el.renderObject;
+    if (ro is RenderParagraph && ro.didExceedMaxLines) return true;
+  }
+  return false;
+}
+
+void _expectUncut(WidgetTester tester, Finder finder,
+    {required String reason}) {
+  expect(finder, findsWidgets, reason: reason);
+  expect(_paragraphExceeded(tester, finder), isFalse, reason: reason);
 }
 
 void main() {
@@ -382,5 +457,68 @@ void main() {
     await _pumpAt(tester, _dashboardBody(yoy: true));
     expect(find.textContaining('لا توجد بيانات للعام السابق'), findsNothing);
     expect(find.textContaining('مقارنة بالعام السابق'), findsNWidgets(2));
+  });
+
+  testWidgets(
+      'at the live shell, secondary cards are 138px and long names wrap without ellipsis',
+      (tester) async {
+    Future<void> assertAt(double width, String label) async {
+      await _pumpAt(tester, _dashboardBody(), width: width);
+      expect(tester.takeException(), isNull);
+
+      const secondary = [
+        'kpi_card_exec_sellin',
+        'kpi_card_exec_cpfr_sellout',
+        'kpi_net_accumulation',
+        'kpi_sell_through',
+      ];
+      for (final key in secondary) {
+        final card = find.byKey(ValueKey(key));
+        expect(card, findsOneWidget, reason: '$key at $label');
+        expect(
+          tester.getSize(card).height,
+          closeTo(kSellOutKpiHeight, 2.0),
+          reason: '$key height ${tester.getSize(card).height} at $label',
+        );
+      }
+
+      // Main 4-up OOS title and store names stay uncut.
+      _expectUncut(tester, find.text('نسبة النفاد'),
+          reason: 'OOS title cut at $label');
+      _expectUncut(
+        tester,
+        find.textContaining('مدينة نصر'),
+        reason: 'store subtitle cut at $label',
+      );
+
+      // Stock item name: 3 lines, no ellipsis, full live-length name.
+      final stockName = find.byKey(const ValueKey('stock_sku_name'));
+      expect(stockName, findsWidgets, reason: 'stock name at $label');
+      final nameText = tester.widget<Text>(stockName.first);
+      expect(nameText.maxLines, 3);
+      expect(nameText.overflow, isNot(TextOverflow.ellipsis));
+      expect(nameText.data, kLongSku);
+      expect(_paragraphExceeded(tester, stockName.first), isFalse,
+          reason: 'stock name ellipsized or overflowed 3 lines at $label');
+      expect(find.text(kLongSku), findsWidgets);
+
+      _expectUncut(tester, find.text(kLongCategory),
+          reason: 'category label cut at $label');
+      _expectUncut(tester, find.text(kLongCompetitor),
+          reason: 'competitor label cut at $label');
+      _expectUncut(
+        tester,
+        find.byKey(const ValueKey('pareto_sku_name')),
+        reason: 'Pareto SKU name cut at $label',
+      );
+      _expectUncut(
+        tester,
+        find.byKey(const ValueKey('pareto_sku_meta')),
+        reason: 'Pareto metadata cut at $label',
+      );
+    }
+
+    await assertAt(kLiveViewportWidth, 'live 1280+sidebar');
+    await assertAt(1024, 'live 1024+sidebar');
   });
 }

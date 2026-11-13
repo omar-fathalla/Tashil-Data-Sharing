@@ -66,14 +66,13 @@ void main() {
         find.text('Total Units Sold'), findsNothing); // Arabic-only M3 KPI card
     expect(find.text('الفروع النشطة'), findsOneWidget);
     expect(find.text('Active Stores'), findsNothing); // Arabic-only M3 KPI card
-    expect(find.text('نسبة نفاد المخزون (OOS)'), findsOneWidget);
+    expect(find.text('نسبة النفاد'), findsOneWidget);
     expect(find.text('OOS Rate'), findsNothing); // Arabic-only M3 KPI card
 
     expect(find.text('16 فرعًا'), findsOneWidget);
     expect(find.text('4.2%'), findsOneWidget);
     // Multi-chain subtitle
-    expect(find.text('فروع كارفور • أسواق فتح الله من الملفات المرفوعة'),
-        findsOneWidget);
+    expect(find.text('كارفور • أسواق فتح الله'), findsOneWidget);
   });
 
   testWidgets(
@@ -127,7 +126,7 @@ void main() {
     expect(find.textContaining('+-'), findsNothing);
 
     // Dynamic single-chain subtitle for Gomla Market (not hardcoded Fathalla)
-    expect(find.text('فروع جملة ماركت من الملف المرفوع'), findsOneWidget);
+    expect(find.text('جملة ماركت'), findsOneWidget);
     expect(find.textContaining('فروع فتح الله'), findsNothing);
   });
 
