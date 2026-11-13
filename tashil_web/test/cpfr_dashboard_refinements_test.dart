@@ -127,90 +127,107 @@ class MockCPFRApiClient extends Fake implements ApiClient {
 
 void main() {
   testWidgets(
-      'CPFR Dashboard renders English tabs, refined KPI cards and template buttons',
-      (tester) async {
-    final mockClient = MockCPFRApiClient();
+    'CPFR Dashboard renders English tabs, refined KPI cards and template buttons',
+    (tester) async {
+      final mockClient = MockCPFRApiClient();
 
-    tester.view.physicalSize = const Size(1400, 1000);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(() => tester.view.resetPhysicalSize());
+      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: CPFRDashboardScreen(apiClient: mockClient),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: CPFRDashboardScreen(apiClient: mockClient)),
         ),
-      ),
-    );
+      );
 
-    await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
 
-    // 1. Verify English tab titles and 4th Arabic tab
-    expect(find.text('1. Sell-In vs Sell-Out'), findsOneWidget);
-    expect(find.text('2. Suggested PO & Replenishment'), findsOneWidget);
-    expect(find.text('3. Demand Forecasting & Promos (EXP)'), findsOneWidget);
-    expect(find.text('4. أداء فريق المبيعات وهيكل الحسابات'), findsOneWidget);
+      // 1. Verify English tab titles and 4th Arabic tab
+      expect(find.text('Sell-In vs Sell-Out'), findsOneWidget);
+      expect(find.text('Suggested PO & Replenishment'), findsOneWidget);
+      expect(find.text('Demand Forecasting & Promos (EXP)'), findsOneWidget);
+      expect(find.text('أداء فريق المبيعات وهيكل الحسابات'), findsOneWidget);
+      for (var i = 1; i <= 4; i++) {
+        expect(find.byKey(ValueKey('cpfr_tab_badge_$i')), findsOneWidget);
+      }
+      // Number is not glued into the label string.
+      expect(find.text('1. Sell-In vs Sell-Out'), findsNothing);
+      expect(find.text('3. Demand Forecasting & Promos (EXP)'), findsNothing);
 
-    // 2. Verify 4 KPI cards (Arabic-only titles, same as Sell-Out / Sell-In)
-    expect(find.text('إجمالي التوريد للسلاسل'), findsOneWidget);
-    expect(find.byKey(const ValueKey('kpi_card_Sell-In')), findsOneWidget);
+      // 2. Verify 4 KPI cards (Arabic-only titles, same as Sell-Out / Sell-In)
+      expect(find.text('إجمالي التوريد للسلاسل'), findsOneWidget);
+      expect(find.byKey(const ValueKey('kpi_card_Sell-In')), findsOneWidget);
 
-    expect(find.text('مبيعات الكاشير الفعلية'), findsOneWidget);
-    expect(find.byKey(const ValueKey('kpi_card_Sell-Out')), findsOneWidget);
+      expect(find.text('مبيعات الكاشير الفعلية'), findsOneWidget);
+      expect(find.byKey(const ValueKey('kpi_card_Sell-Out')), findsOneWidget);
 
-    expect(find.text('معدل دوران المخزون'), findsOneWidget);
-    expect(find.byKey(const ValueKey('kpi_card_Sell-Through Rate')),
-        findsOneWidget);
+      expect(find.text('معدل دوران المخزون'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('kpi_card_Sell-Through Rate')),
+        findsOneWidget,
+      );
 
-    expect(find.text('الفجوة المخزنية'), findsOneWidget);
-    expect(
-        find.byKey(const ValueKey('kpi_card_Inventory Gap')), findsOneWidget);
-    // English labels are keys only — they must not appear as a second title line.
-    expect(find.text('Sell-Through Rate'), findsNothing);
-    expect(find.text('Inventory Gap'), findsNothing);
+      expect(find.text('الفجوة المخزنية'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('kpi_card_Inventory Gap')),
+        findsOneWidget,
+      );
+      // English labels are keys only — they must not appear as a second title line.
+      expect(find.text('Sell-Through Rate'), findsNothing);
+      expect(find.text('Inventory Gap'), findsNothing);
 
-    // 3. Verify concise Sell-In upload card header and English Demo buttons
-    expect(find.text('بوابة رفع بيانات التوريد Sell-In'), findsOneWidget);
-    expect(find.text('Demo Sell-In'), findsOneWidget);
-    expect(find.text('Demo Sell-Out'), findsOneWidget);
-    expect(find.text('رفع ملف Sell-In هنا'), findsOneWidget);
+      // 3. Verify concise Sell-In upload card header and English Demo buttons
+      expect(find.text('بوابة رفع بيانات التوريد Sell-In'), findsOneWidget);
+      expect(find.text('Demo Sell-In'), findsOneWidget);
+      expect(find.text('Demo Sell-Out'), findsOneWidget);
+      expect(find.text('رفع ملف Sell-In هنا'), findsOneWidget);
 
-    // 4. Verify no 'تحديد السلسلة تلقائياً من الملف' in the screen
-    expect(find.text('تحديد السلسلة تلقائياً من الملف (Multi-Chain)'),
-        findsNothing);
+      // 4. Verify no 'تحديد السلسلة تلقائياً من الملف' in the screen
+      expect(
+        find.text('تحديد السلسلة تلقائياً من الملف (Multi-Chain)'),
+        findsNothing,
+      );
 
-    // 5. Monthly reconciliation uses the shared table container (no custom 1450 min-width).
-    expect(find.byKey(const ValueKey('cpfr_reconciliation_table')),
-        findsOneWidget);
-    expect(find.byTooltip('تمرير الجدول للبداية'), findsNothing);
-    expect(find.byTooltip('تمرير الجدول للنهاية'), findsNothing);
-  });
+      // 5. Monthly reconciliation uses the shared table container (no custom 1450 min-width).
+      expect(
+        find.byKey(const ValueKey('cpfr_reconciliation_table')),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('تمرير الجدول للبداية'), findsNothing);
+      expect(find.byTooltip('تمرير الجدول للنهاية'), findsNothing);
+    },
+  );
 
   test(
-      'ApiClient.fetchCPFRDashboard sanitizes non-ASCII headers and falls back cleanly without throwing',
-      () async {
-    final client = ApiClient();
-    client.currentUser = TenantUserModel(
-      userId: 'u_test',
-      email: 'test@adeco.com',
-      fullName: 'أحمد فتح الله',
-      role: 'regional_supervisor',
-      tenantId: 'tenant-adeco',
-      active: true,
-      assignedRegion: 'شرق الإسكندرية',
-      assignedChain: 'أسواق فتح الله',
-    );
+    'ApiClient.fetchCPFRDashboard sanitizes non-ASCII headers and falls back cleanly without throwing',
+    () async {
+      final client = ApiClient();
+      client.currentUser = TenantUserModel(
+        userId: 'u_test',
+        email: 'test@adeco.com',
+        fullName: 'أحمد فتح الله',
+        role: 'regional_supervisor',
+        tenantId: 'tenant-adeco',
+        active: true,
+        assignedRegion: 'شرق الإسكندرية',
+        assignedChain: 'أسواق فتح الله',
+      );
 
-    // Verify headers are strictly ASCII-safe (< 128) so BrowserClient window.fetch never throws TypeError
-    for (final entry in client.requestHeaders.entries) {
-      for (final unit in entry.value.codeUnits) {
-        expect(unit <= 127, isTrue,
-            reason: 'Header ${entry.key} contains non-ASCII codeUnit $unit');
+      // Verify headers are strictly ASCII-safe (< 128) so BrowserClient window.fetch never throws TypeError
+      for (final entry in client.requestHeaders.entries) {
+        for (final unit in entry.value.codeUnits) {
+          expect(
+            unit <= 127,
+            isTrue,
+            reason: 'Header ${entry.key} contains non-ASCII codeUnit $unit',
+          );
+        }
       }
-    }
 
-    final dashboard = await client.fetchCPFRDashboard(chain: 'all');
-    expect(dashboard.monthlyReconciliation, isNotEmpty);
-    expect(dashboard.jan2026SellInEgp, greaterThan(0));
-  });
+      final dashboard = await client.fetchCPFRDashboard(chain: 'all');
+      expect(dashboard.monthlyReconciliation, isNotEmpty);
+      expect(dashboard.jan2026SellInEgp, greaterThan(0));
+    },
+  );
 }
