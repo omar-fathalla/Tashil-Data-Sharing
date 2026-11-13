@@ -191,8 +191,9 @@ Future<void> _pumpPage(WidgetTester tester, {required double width}) {
   );
 }
 
-Future<void> _pumpPageWithSidebar(WidgetTester tester) async {
-  tester.view.physicalSize = const Size(kLiveViewportWidth, 3600);
+Future<void> _pumpPageWithSidebar(WidgetTester tester,
+    {double width = kLiveViewportWidth}) async {
+  tester.view.physicalSize = Size(width, 3600);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -272,11 +273,12 @@ void _assertTableFitsLiveContent(WidgetTester tester,
   expect(_labelFullyVisible(tester, table, kLongExpected), isTrue,
       reason: 'expected value');
 
-  expect(
-      codeBreaksOnlyAtHyphens(tester, kLiveMissingCode, scope: table), isTrue,
-      reason: 'QA-NOT-IN-MASTER-999 must stay intact and fully visible');
-  expect(codeBreaksOnlyAtHyphens(tester, kLiveFgccCode, scope: table), isTrue,
-      reason: 'FGCC-0700-0002 must not break mid-token');
+  for (final code in [kLiveMissingCode, kLiveFgccCode, kLivePrccCode]) {
+    expect(codeBreaksOnlyAtHyphens(tester, code, scope: table), isTrue,
+        reason: '$code must stay intact and fully visible');
+    expect(codeIsSingleLine(tester, code, scope: table), isTrue,
+        reason: '$code must stay on one line at the live 1280 shell');
+  }
   for (final word in [
     'الخطورة',
     'مفتوحة',
@@ -476,5 +478,25 @@ void main() {
       (tester) async {
     await _pumpPageWithSidebar(tester);
     _assertTableFitsLiveContent(tester, contentWidth: kLiveContentWidth);
+  });
+
+  testWidgets(
+      'at 1024+sidebar, codes may wrap at dashes only; no horizontal scroll',
+      (tester) async {
+    await _pumpPageWithSidebar(tester, width: 1024);
+    const content = 1024.0 - kLiveSidebarWidth;
+    final table = find.byKey(const ValueKey('dq_table'));
+    expect(table, findsOneWidget);
+    expect(
+        _hScrollExtent(tester, find.byKey(const ValueKey('dq_table_scroll'))),
+        lessThanOrEqualTo(2.0));
+    for (final code in [kLiveMissingCode, kLiveFgccCode, kLivePrccCode]) {
+      expect(codeBreaksOnlyAtHyphens(tester, code, scope: table), isTrue,
+          reason: '$code');
+    }
+    expect(
+        _onScreen(tester, find.byKey(const ValueKey('dq_item_name')),
+            width: content),
+        isTrue);
   });
 }

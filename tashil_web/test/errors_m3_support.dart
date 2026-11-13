@@ -20,6 +20,7 @@ const kLongSkuName =
 const kLongSkuName2 = 'رابيدو 700 مل منظف وملمع الاطارات والجنوط';
 const kLiveMissingCode = 'QA-NOT-IN-MASTER-999';
 const kLiveFgccCode = 'FGCC-0700-0002';
+const kLivePrccCode = 'PRCC-0700-0005';
 const kLongTypeMissing = 'صنف مش موجود في كارتة الأصناف';
 const kLongTypeDuplicate = 'باركود مكرر على أكثر من صنف';
 const kLongTypeMismatch = 'سعر البيع أقل من التكلفة';
@@ -138,7 +139,7 @@ const kErrorsLiveIssues = [
     sheet: 'توريد أكتوبر',
     row: 88,
     column: 'السعر',
-    itemCode: 'FGNV-0800-0003',
+    itemCode: kLivePrccCode,
     barcode: '6221133011905',
     itemName:
         'نيفيا كريم ترطيب عميق للبشرة الجافة 250 مل عبوة التوفير العائلية',
