@@ -10,7 +10,6 @@ import '../../../../core/widgets/m3_feedback.dart';
 import 'barcode_scanner_dialog.dart';
 import 'sell_table_shared.dart';
 import '../../../../core/widgets/m3_toolbar_button.dart';
-import '../../../../core/widgets/m3_chip_surface.dart';
 
 /// CascadingFilterToolbar provides multi-dimensional cascading filter controls
 /// where selecting a chain filters the available stores, and category filters SKUs.
@@ -619,7 +618,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
     Widget buildDateRangeButton({bool expand = false}) {
       final child = InkWell(
         key: const ValueKey('sellout_date_range_chip'),
-        borderRadius: M3ChipStyle.radius,
+        borderRadius: M3ToolbarButton.radius,
         onTap: () => _showCompactDateRangeBubble(context),
         child: AnimatedContainer(
           duration: M3Motion.short4,
@@ -630,7 +629,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
             color: hasDateRange
                 ? colorScheme.primaryContainer.withOpacity(0.55)
                 : colorScheme.surfaceContainerHighest.withOpacity(0.45),
-            borderRadius: M3ChipStyle.radius,
+            borderRadius: M3ToolbarButton.radius,
             border: Border.all(
               color: hasDateRange
                   ? colorScheme.primary.withOpacity(0.6)

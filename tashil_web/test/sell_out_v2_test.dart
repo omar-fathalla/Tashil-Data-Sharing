@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tashil_web/core/widgets/m3_toolbar_button.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/widgets/archive_actions_group.dart';
@@ -61,7 +62,7 @@ void main() {
     await loadRealCairoFont();
   });
 
-  testWidgets('1. archive actions: Arabic, 8dp corners, 18dp icons',
+  testWidgets('1. archive actions: Arabic, full-round (F1), 18dp icons',
       (tester) async {
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -76,7 +77,7 @@ void main() {
     final clip = tester.widget<ClipRRect>(find.descendant(
         of: find.byType(ArchiveActionsGroup),
         matching: find.byType(ClipRRect)));
-    expect(clip.borderRadius, M3ChipStyle.radius);
+    expect(clip.borderRadius, M3ToolbarButton.radius);
     for (final i in tester.widgetList<Icon>(find.descendant(
         of: find.byType(ArchiveActionsGroup), matching: find.byType(Icon)))) {
       expect(i.size, 18.0);

@@ -1,6 +1,5 @@
 import '../../../core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
-import '../../../core/theme/m3_shape.dart';
 import '../../../../core/config/app_version.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/testing/test_semantics.dart';
@@ -310,9 +309,6 @@ class DesktopSidebar extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12.0, vertical: 10.0),
                     side: BorderSide(color: colorScheme.outline),
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: M3Shape.radiusSm,
-                    ),
                   ),
                 ),
               ),

@@ -23,3 +23,21 @@ String arabicCount(
 /// "صنف واحد" / "صنفان" / "5 أصناف" / "86 صنفًا" / "100 صنف".
 String countSku(int n) => arabicCount(n,
     one: 'صنف واحد', two: 'صنفان', few: 'أصناف', many: 'صنفًا', hundred: 'صنف');
+
+/// "منافس واحد" / "منافسان" / "5 منافسين" / "86 منافسًا" / "105 منافسين".
+///
+/// 101–110 take the plural like 3–10 (handled by [arabicCount]).
+String countCompetitors(int n) => arabicCount(n,
+    one: 'منافس واحد',
+    two: 'منافسان',
+    few: 'منافسين',
+    many: 'منافسًا',
+    hundred: 'منافس');
+
+/// "سلسلة نشطة واحدة" / "سلسلتان نشطتان" / "5 سلاسل نشطة" / "12 سلسلة نشطة".
+String countActiveChains(int n) => arabicCount(n,
+    one: 'سلسلة نشطة واحدة',
+    two: 'سلسلتان نشطتان',
+    few: 'سلاسل نشطة',
+    many: 'سلسلة نشطة',
+    hundred: 'سلسلة نشطة');
