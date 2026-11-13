@@ -24,8 +24,9 @@ const kLivePrccCode = 'PRCC-0700-0005';
 const kLongTypeMissing = 'صنف مش موجود في كارتة الأصناف';
 const kLongTypeDuplicate = 'باركود مكرر على أكثر من صنف';
 const kLongTypeMismatch = 'سعر البيع أقل من التكلفة';
-const kLongFound = '1 صف';
-const kLongExpected = 'الصنف يضاف لكارتة الأصناف';
+const kLongFound = '86 صف';
+const kLongExpected = 'الصنف يتضاف لكارتة الأصناف';
+const kLiveArabicCode = 'ماكسيل ماجيك متخصص عادي عادي';
 const kLongReason = 'نفس الباركود مستخدم لصنفين في شيت نوفمبر بعد الدمج اليدوي';
 
 class ErrorsShotSource implements DataQualityDataSource {
@@ -124,7 +125,7 @@ const kErrorsLiveIssues = [
     itemCode: kLiveFgccCode,
     barcode: '6223000233436',
     itemName: kLongSkuName2,
-    foundValue: '6223000233436 على صنفين مختلفين',
+    foundValue: '2 صف',
     expectedValue: 'باركود فريد لكل صنف',
     impactEgp: 601200,
     status: kDqOpen,
@@ -157,7 +158,7 @@ const kErrorsLiveIssues = [
     typeLabel: kLongTypeMissing,
     severity: kDqWarning,
     row: 42,
-    itemCode: 'FGMX-0400-0004',
+    itemCode: kLiveArabicCode,
     barcode: '6221133011906',
     itemName: 'ماكسيل ماجيك منظف أفران وشوايات مركّز 500 مل',
     foundValue: 'صنف غير مربوط',
