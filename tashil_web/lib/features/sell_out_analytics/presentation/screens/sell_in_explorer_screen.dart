@@ -972,6 +972,38 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
 
   // Every scrolling column is centred (header and content); only the pinned
   // item column stays start-aligned for multi-line names.
+  // Monthly / stock DataTables: cap each column's width so long compact
+  // numbers wrap onto 2 lines (centred) instead of widening the table past
+  // 1030dp; TableScrollContainer still stretches the table on wider screens.
+  static const double _monthlyCellMaxWidth = 84.0;
+  static const double _skuCellMaxWidth = 88.0;
+
+  // Monthly cell text: at most 2 centred lines (row height stays bounded),
+  // full text in a tooltip if still clipped.
+  // Long stock-table headers wrap onto 2 centred lines so the columns fit 1030dp.
+  static Widget _wrapHeader(String text) => ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 64.0),
+        child: Text(text, maxLines: 2, softWrap: true, textAlign: TextAlign.center),
+      );
+
+  Widget _mText(String text, {TextStyle? style}) => Tooltip(
+        message: text,
+        child: Text(
+          text,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: style,
+        ),
+      );
+
+  DataCell _fitCell(double maxWidth, Widget child) => DataCell(
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: DefaultTextStyle.merge(textAlign: TextAlign.center, child: child),
+        ),
+      );
+
   Widget _sellInCell(int i, Widget child) => SizedBox(
         width: _sellInWidths[i],
         child: Padding(
@@ -2256,14 +2288,16 @@ onChanged: m3Legacy<String>((v) {
               const SizedBox(height: 14.0),
               TableScrollContainer(
                 controller: _monthlyLedgerScrollController,
+                // Extra width follows each column's content (status chip widest).
+                columnFlex: const [0.8, 0.9, 0.85, 0.85, 0.95, 0.85, 0.85, 0.8, 1.1],
                 showSwipeHint: true,
                 child: DataTable(
                   key: const ValueKey('sellin_monthly_table'),
                   // Compact spacing + compact money so all columns fit 1030dp.
-                  columnSpacing: M3Spacing.sm,
-                  horizontalMargin: M3Spacing.sm,
+                  columnSpacing: M3Spacing.xs,
+                  horizontalMargin: M3Spacing.xs,
                   dataRowMinHeight: 64.0,
-                  dataRowMaxHeight: 76.0,
+                  dataRowMaxHeight: 128.0,
                   headingRowColor: WidgetStatePropertyAll(
                     colorScheme.surfaceContainerHigh.withOpacity(0.5),
                   ),
@@ -2285,96 +2319,96 @@ onChanged: m3Legacy<String>((v) {
                     final isPositiveClosing = m.closingStockValueEgp >= 0;
                     return DataRow(
                       cells: [
-                        DataCell(
+                        _fitCell(_monthlyCellMaxWidth, 
                           Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Text(
+                              _mText(
                                 '${m.monthNum} - ${m.monthAr} ${m.year}',
                                 style: const TextStyle(fontWeight: FontWeight.w800),
                               ),
                               if (!m.hasActualSellOut)
-                                Text(
+                                _mText(
                                   'بانتظار ملف Sell-Out',
                                   style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.bodySmall,                                     fontWeight: FontWeight.w700,                                     color: M3StatusColors.of(context).accents.highlight,                                   )),
                                 ),
                             ],
                           ),
                         ),
-                        DataCell(
+                        _fitCell(_monthlyCellMaxWidth, 
                           Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Text(CurrencyFormatter.formatCompactEGP(m.openingStockValueEgp)),
-                              Text(
+                              _mText(CurrencyFormatter.formatCompactEGP(m.openingStockValueEgp)),
+                              _mText(
                                 '${CurrencyFormatter.formatNumber(m.openingStockCases.round())} كرتونة',
                                 style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                   fontSize: M3FontSize.bodySmall,                                   color: colorScheme.onSurfaceVariant,                                 )),
                               ),
                             ],
                           ),
                         ),
-                        DataCell(
+                        _fitCell(_monthlyCellMaxWidth, 
                           Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Text(
+                              _mText(
                                 CurrencyFormatter.formatCompactEGP(m.sellInValueEgp),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   color: colorScheme.primary,
                                 ),
                               ),
-                              Text(
+                              _mText(
                                 '${_signedCount(m.sellInCases.round(), positive: true)} كرتونة',
                                 style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                   fontSize: M3FontSize.bodySmall,                                   fontWeight: FontWeight.w700,                                   color: colorScheme.onSurfaceVariant,                                 )),
                               ),
                               if (m.sellInGrossInclVatEgp > 0)
-                                Text(
+                                _mText(
                                   'شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(m.sellInGrossInclVatEgp)}',
                                   style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.bodySmall,                                     color: M3StatusColors.of(context).accents.tealStrong,                                   )),
                                 ),
                             ],
                           ),
                         ),
-                        DataCell(
+                        _fitCell(_monthlyCellMaxWidth, 
                           m.hasActualSellOut
                               ? Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    Text(
+                                    _mText(
                                       CurrencyFormatter.formatCompactEGP(m.sellOutValueEgp),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w800,
                                         color: M3StatusColors.of(context).accents.teal,
                                       ),
                                     ),
-                                    Text(
+                                    _mText(
                                       '${_signedCount(m.sellOutEstCases.round(), positive: false)} كرتونة',
                                       style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         fontWeight: FontWeight.w700,                                         color: colorScheme.onSurfaceVariant,                                       )),
                                     ),
                                     if (m.sellOutFactoryCostExclVatEgp > 0)
-                                      Text(
+                                      _mText(
                                         'تكلفة المصنع: ${CurrencyFormatter.formatCompactEGP(m.sellOutFactoryCostExclVatEgp)}',
                                         style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                           fontSize: M3FontSize.bodySmall,                                           color: colorScheme.onSurfaceVariant,                                         )),
                                       ),
                                   ],
                                 )
-                              : Text(
+                              : _mText(
                                   'بانتظار ملف Sell-Out',
                                   style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                     fontSize: M3FontSize.bodySmall,                                     fontWeight: FontWeight.w700,                                     color: M3StatusColors.of(context).accents.highlight,                                   )),
                                 ),
                         ),
-                        DataCell(
+                        _fitCell(_monthlyCellMaxWidth, 
                           m.hasActualSellOut && m.sellOutFactoryCostInclVatEgp > 0
                               ? Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    Text(
+                                    _mText(
                                       CurrencyFormatter.formatMarginEGP(m.chainGrossMarginEgp),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w800,
@@ -2383,21 +2417,21 @@ onChanged: m3Legacy<String>((v) {
                                             : M3StatusColors.of(context).accents.positiveStrong,
                                       ),
                                     ),
-                                    Text(
-                                      'هامش السلسلة: ${CurrencyFormatter.formatMarginPct(m.chainGrossMarginPct)}',
+                                    _mText(
+                                      CurrencyFormatter.formatMarginPct(m.chainGrossMarginPct),
                                       style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         fontWeight: FontWeight.w700,                                         color: M3StatusColors.of(context).accents.positive,                                       )),
                                     ),
                                   ],
                                 )
                               : const Text('-'),
                         ),
-                        DataCell(
+                        _fitCell(_monthlyCellMaxWidth, 
                           m.hasActualSellOut && m.prevYearSellOutValueEgp > 0
                               ? Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    Text(
+                                    _mText(
                                       CurrencyFormatter.formatSignedPct(m.yoySellOutGrowthPct),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w900,
@@ -2406,7 +2440,7 @@ onChanged: m3Legacy<String>((v) {
                                             : colorScheme.error,
                                       ),
                                     ),
-                                    Text(
+                                    _mText(
                                       'العام السابق: ${CurrencyFormatter.formatCompactEGP(m.prevYearSellOutValueEgp)}',
                                       style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         color: colorScheme.onSurfaceVariant,                                       )),
                                     ),
@@ -2414,20 +2448,20 @@ onChanged: m3Legacy<String>((v) {
                                 )
                               : const Text('-'),
                         ),
-                        DataCell(
+                        _fitCell(_monthlyCellMaxWidth, 
                           Column(
                             key: const ValueKey('sellin_monthly_closing'),
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Text(
+                              _mText(
                                 CurrencyFormatter.formatCompactEGP(m.closingStockValueEgp),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   color: isPositiveClosing ? colorScheme.onSurface : colorScheme.error,
                                 ),
                               ),
-                              Text(
+                              _mText(
                                 '${CurrencyFormatter.formatNumber(m.closingStockCases.round())} كرتونة',
                                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
@@ -2436,8 +2470,8 @@ onChanged: m3Legacy<String>((v) {
                             ],
                           ),
                         ),
-                        DataCell(
-                          Text(
+                        _fitCell(_monthlyCellMaxWidth, 
+                          _mText(
                             m.hasActualSellOut
                                 ? '${m.sellThroughRatePct.toStringAsFixed(1)}%'
                                 : 'بانتظار ملف Sell-Out',
@@ -2807,6 +2841,7 @@ onChanged: m3Legacy<String>((val) {
                   TableScrollContainer(
                     controller: _skuStockScrollController,
                     showSwipeHint: true,
+                    columnFlex: const [1.0, 1.0, 1.0, 1.0, 0.95, 1.1, 1.0],
                     // SKU column pinned; compact columns so the main ones fit 1030dp.
                     pinnedStart: _buildSkuPinnedColumn(context, currentSkuPageItems),
                     child: DataTable(
@@ -2823,9 +2858,9 @@ onChanged: m3Legacy<String>((val) {
                       ),
                       columns: [
                         DataColumn(headingRowAlignment: MainAxisAlignment.center, 
-                          label: const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 4.0),
-                              child: Text('العلامة التجارية'),
+                          label: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4.0),
+                              child: _wrapHeader('العلامة التجارية'),
                             ),
                           onSort: (col, asc) => _onSortSku(1, asc),
                         ),
@@ -2851,14 +2886,7 @@ onChanged: m3Legacy<String>((val) {
                           tooltip: 'اضغط للترتيب',
                           label: const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 4.0),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text('المخزون'),
-                                    SizedBox(width: 4.0),
-                                    Icon(Icons.swap_vert_rounded, size: 18.0),
-                                  ],
-                                ),
+                                child: Text('المخزون'),
                           ),
                           numeric: true,
                           onSort: (col, asc) => _onSortSku(4, asc),
@@ -2867,16 +2895,9 @@ onChanged: m3Legacy<String>((val) {
                           // Header tap sorts via onSort; a nested Tooltip/InkWell broke the
                           // DataTable columnHeader semantics tree.
                           tooltip: 'اضغط للترتيب',
-                          label: const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 4.0),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text('أيام التغطية'),
-                                    SizedBox(width: 4.0),
-                                    Icon(Icons.swap_vert_rounded, size: 18.0),
-                                  ],
-                                ),
+                          label: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                child: _wrapHeader('أيام التغطية'),
                           ),
                           numeric: true,
                           onSort: (col, asc) => _onSortSku(5, asc),
@@ -2889,9 +2910,9 @@ onChanged: m3Legacy<String>((val) {
                           onSort: (col, asc) => _onSortSku(6, asc),
                         ),
                         DataColumn(headingRowAlignment: MainAxisAlignment.center, 
-                          label: const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 4.0),
-                              child: Text('أمر الشراء المقترح'),
+                          label: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4.0),
+                              child: _wrapHeader('أمر الشراء المقترح'),
                             ),
                           numeric: true,
                           onSort: (col, asc) => _onSortSku(7, asc),
@@ -2922,7 +2943,7 @@ onChanged: m3Legacy<String>((val) {
 
                         return DataRow(
                           cells: [
-                            DataCell(
+                            _fitCell(_skuCellMaxWidth, 
                               Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -2940,66 +2961,66 @@ onChanged: m3Legacy<String>((val) {
                                     ),
                                   ),
                                   if (item.officialCartonExclVatEgp > 0)
-                                    Text(
+                                    _mText(
                                       'سعر القائمة: ${CurrencyFormatter.formatEGP(item.officialCartonExclVatEgp)}',
                                       style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                         fontSize: M3FontSize.bodySmall,                                         color: colorScheme.onSurfaceVariant,                                       )),
                                     ),
                                 ],
                               ),
                             ),
-                            DataCell(
+                            _fitCell(_skuCellMaxWidth, 
                               Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  Text(
+                                  _mText(
                                     '${CurrencyFormatter.formatNumber(item.sellInCases.round())} كرتونة',
                                     style: const TextStyle(fontWeight: FontWeight.w700),
                                   ),
-                                  Text(
+                                  _mText(
                                     '${CurrencyFormatter.formatNumber(sellInUnits)} وحدة • ${CurrencyFormatter.formatCompactEGP(item.sellInValueEgp)}',
                                     style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.bodySmall,                                       color: colorScheme.primary,                                       fontWeight: FontWeight.w700,                                     )),
                                   ),
                                 ],
                               ),
                             ),
-                            DataCell(
+                            _fitCell(_skuCellMaxWidth, 
                               Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  Text(
+                                  _mText(
                                     '${CurrencyFormatter.formatNumber(item.sellOutEstCases.round())} كرتونة',
                                     style: const TextStyle(fontWeight: FontWeight.w700),
                                   ),
-                                  Text(
+                                  _mText(
                                     '${CurrencyFormatter.formatNumber(sellOutUnits)} وحدة • ${CurrencyFormatter.formatCompactEGP(item.sellOutValueEgp)}${item.retailerMarginPct != 0 ? " • هامش ${item.retailerMarginPct.toStringAsFixed(0)}%" : ""}',
                                     style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.bodySmall,                                       color: M3StatusColors.of(context).accents.teal,                                       fontWeight: FontWeight.w700,                                     )),
                                   ),
                                 ],
                               ),
                             ),
-                            DataCell(
+                            _fitCell(_skuCellMaxWidth, 
                               Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  Text(
+                                  _mText(
                                     '${CurrencyFormatter.formatNumber(stockCases.round())} كرتونة',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w900,
                                       color: colorScheme.primary,
                                     ),
                                   ),
-                                  Text(
+                                  _mText(
                                     '${CurrencyFormatter.formatNumber(stockUnits)} وحدة • ${CurrencyFormatter.formatCompactEGP(stockVal)}',
                                     style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                       fontSize: M3FontSize.bodySmall,                                       fontWeight: FontWeight.w700,                                       color: colorScheme.onSurfaceVariant,                                     )),
                                   ),
                                 ],
                               ),
                             ),
-                            DataCell(
-                              Text(
+                            _fitCell(_skuCellMaxWidth, 
+                              _mText(
                                 '${item.daysOfInventory.toStringAsFixed(1)} يوم',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
@@ -3019,23 +3040,23 @@ onChanged: m3Legacy<String>((val) {
                                 key: const ValueKey('sellin_sku_status'),
                               ),
                             ),
-                            DataCell(
+                            _fitCell(_skuCellMaxWidth, 
                               item.suggestedPoCases > 0
                                   ? Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
-                                        Text(
+                                        _mText(
                                           '${item.suggestedPoCases} كرتونة',
                                           style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                             fontWeight: FontWeight.w900,                                             color: M3StatusColors.of(context).accents.alertStrong,                                             fontSize: M3FontSize.bodySmall,                                           )),
                                         ),
-                                        Text(
+                                        _mText(
                                           '${CurrencyFormatter.formatCompactEGP(item.suggestedPoValueEgp)} • شامل الضريبة ${CurrencyFormatter.formatCompactEGP(poGrossInclVat)}',
                                           style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                             fontSize: M3FontSize.bodySmall,                                             fontWeight: FontWeight.w700,                                             color: M3StatusColors.of(context).accents.tealStrong,                                           )),
                                         ),
                                       ],
                                     )
-                                  : Text(
+                                  : _mText(
                                       'لا يحتاج إعادة طلب',
                                       style: TextStyle(
                                         color: colorScheme.onSurfaceVariant,
@@ -3545,7 +3566,7 @@ onChanged: m3Legacy<int>((v) {
 
   static const double _skuHeadingHeight = 56.0;
   static const double _skuRowHeight = 120.0;
-  static const double _skuItemColWidth = 220.0;
+  static const double _skuItemColWidth = 204.0;
 
   /// Pinned SKU column for the reorder table (same header/row heights).
   Widget _buildSkuPinnedColumn(BuildContext context, List<SKUBranchInventoryModel> items) {
@@ -3652,7 +3673,7 @@ onChanged: m3Legacy<int>((v) {
           children: [
             Container(
               height: _archiveHeadingHeight,
-              alignment: AlignmentDirectional.centerStart,
+              alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(horizontal: M3Spacing.sm),
               color: colorScheme.surfaceContainerHigh.withOpacity(0.5),
               child: Text('الإجراءات', style: theme.dataTableTheme.headingTextStyle ?? theme.textTheme.titleSmall),
@@ -3660,7 +3681,7 @@ onChanged: m3Legacy<int>((v) {
             for (final file in _archivedSellInFiles)
               Container(
                 height: _archiveRowHeight,
-                alignment: AlignmentDirectional.centerStart,
+                alignment: Alignment.center,
                 padding: const EdgeInsets.symmetric(horizontal: M3Spacing.sm),
                 decoration: BoxDecoration(border: Border(top: divider)),
                 child: Builder(builder: (context) {
