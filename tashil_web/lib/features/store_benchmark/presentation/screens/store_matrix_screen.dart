@@ -8,9 +8,17 @@ import '../../../../core/network/api_client.dart';
 import '../../data/store_benchmark_repository.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
+import '../../../../core/utils/arabic_plural.dart';
+import '../../../../core/utils/shared_display_prefix.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_search_field.dart';
+import '../../../../core/widgets/m3_section_title.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_toolbar_button.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 
@@ -32,7 +40,8 @@ class StoreMatrixScreen extends StatefulWidget {
   State<StoreMatrixScreen> createState() => _StoreMatrixScreenState();
 }
 
-class _StoreMatrixScreenState extends State<StoreMatrixScreen> with DataRefreshMixin<StoreMatrixScreen> {
+class _StoreMatrixScreenState extends State<StoreMatrixScreen>
+    with DataRefreshMixin<StoreMatrixScreen> {
   @override
   void onBackendDataChanged() {
     _loadStoreMatrix();
@@ -44,15 +53,65 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> with DataRefreshM
   String _selectedTier = 'الكل';
   int _selectedYear = 2026;
   int _selectedMonth = 0; // 0 = All months
-  String _selectedChain = 'all'; // 'all', 'fathalla', 'gomla', 'beet-elgomla', etc.
+  String _selectedChain =
+      'all'; // 'all', 'fathalla', 'gomla', 'beet-elgomla', etc.
   List<StoreBenchmarkItem> _stores = [];
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  static const List<double> _tableColumnFlex = [
+    0.45, // الترتيب
+    2.2, // اسم الفرع
+    1.0, // المنطقة
+    0.9, // الفئة
+    1.0, // المبيعات
+    0.9, // الوحدات
+    1.0, // السرعة
+  ];
+  static const double _tableHeadingHeight = 48.0;
+  static const double _tableRowHeight = 120.0;
+
+  List<StoreBenchmarkItem> get _visibleStores {
+    final q = _searchQuery.trim();
+    if (q.isEmpty) return _stores;
+    bool matches(StoreBenchmarkItem s) {
+      return s.storeName.contains(q) ||
+          _displayStoreName(s).contains(q) ||
+          s.region.contains(q) ||
+          s.tier.contains(q) ||
+          _getChainDisplayName(s.retailerChain).contains(q);
+    }
+
+    return _stores.where(matches).toList();
+  }
+
+  /// Display-only map: strips a leading prefix shared by every loaded store
+  /// name (t438u). Never changes stored or uploaded data.
+  Map<String, String> get _storeDisplayNames =>
+      displayNamesWithoutSharedPrefix(_stores.map((s) => s.storeName));
+
+  String _displayStoreName(StoreBenchmarkItem store) =>
+      _storeDisplayNames[store.storeName] ?? store.storeName;
 
   final List<M3SegmentItem<String>> _regionSegments = const [
-    M3SegmentItem(value: 'الكل', label: 'كافة المناطق', icon: Icons.public_rounded),
-    M3SegmentItem(value: 'شرق الإسكندرية', label: 'شرق الإسكندرية', icon: Icons.location_city_rounded),
-    M3SegmentItem(value: 'غرب الإسكندرية', label: 'غرب الإسكندرية', icon: Icons.location_on_rounded),
-    M3SegmentItem(value: 'الدلتا والبحيرة', label: 'الدلتا والبحيرة', icon: Icons.map_rounded),
-    M3SegmentItem(value: 'القاهرة الكبرى', label: 'القاهرة الكبرى', icon: Icons.apartment_rounded),
+    M3SegmentItem(
+        value: 'الكل', label: 'كافة المناطق', icon: Icons.public_rounded),
+    M3SegmentItem(
+        value: 'شرق الإسكندرية',
+        label: 'شرق الإسكندرية',
+        icon: Icons.location_city_rounded),
+    M3SegmentItem(
+        value: 'غرب الإسكندرية',
+        label: 'غرب الإسكندرية',
+        icon: Icons.location_on_rounded),
+    M3SegmentItem(
+        value: 'الدلتا والبحيرة',
+        label: 'الدلتا والبحيرة',
+        icon: Icons.map_rounded),
+    M3SegmentItem(
+        value: 'القاهرة الكبرى',
+        label: 'القاهرة الكبرى',
+        icon: Icons.apartment_rounded),
   ];
 
   @override
@@ -64,6 +123,12 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> with DataRefreshM
   }
 
   late String _lastTenantId;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant StoreMatrixScreen oldWidget) {
@@ -152,322 +217,504 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> with DataRefreshM
     final colorScheme = theme.colorScheme;
 
     // Aggregate Tier KPI stats from current stores (or national base)
-    final tierAStores = _stores.where((s) => s.tier == 'Tier A').toList();
-    final tierBStores = _stores.where((s) => s.tier == 'Tier B').toList();
-    final tierCStores = _stores.where((s) => s.tier == 'Tier C').toList();
+    final visible = _visibleStores;
+    final tierAStores = visible.where((s) => s.tier == 'Tier A').toList();
+    final tierBStores = visible.where((s) => s.tier == 'Tier B').toList();
+    final tierCStores = visible.where((s) => s.tier == 'Tier C').toList();
 
-    final tierARevenue = tierAStores.fold<double>(0.0, (sum, s) => sum + s.totalRevenue);
-    final tierBRevenue = tierBStores.fold<double>(0.0, (sum, s) => sum + s.totalRevenue);
-    final tierCRevenue = tierCStores.fold<double>(0.0, (sum, s) => sum + s.totalRevenue);
+    final tierARevenue =
+        tierAStores.fold<double>(0.0, (sum, s) => sum + s.totalRevenue);
+    final tierBRevenue =
+        tierBStores.fold<double>(0.0, (sum, s) => sum + s.totalRevenue);
+    final tierCRevenue =
+        tierCStores.fold<double>(0.0, (sum, s) => sum + s.totalRevenue);
 
     final isCompactScreen = MediaQuery.sizeOf(context).width < 600.0;
 
-    return SingleChildScrollView(
-      padding: isCompactScreen ? M3Spacing.pSm : M3Spacing.pMd,
-      child: M3ContentBoundary(
-        maxWidth: 1440.0,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header Section (Unified M3 Left English Title + Right Arabic Subtitle)
-            M3PageHeader(
-              titleEn: 'Store Matrix Benchmarking',
-              subtitleAr: 'مقارنة الأداء المعياري وتصنيف الفروع إلى فئات (Tier A / B / C) ومعدلات سرعة البيع اليومية',
-              actions: M3Button.tonal(
-                label: 'تحديث',
-                icon: Icons.refresh_rounded,
-                onPressed: _isLoading ? null : () => _loadStoreMatrix(forceRefresh: true),
-              ),
-            ),
-
-            M3Spacing.gapMD,
-
-            // Filter Toolbar (Temporal, Chain, Regional & Tier Selectors)
-            Card(
-              elevation: 0,
-              color: colorScheme.surfaceContainerLow,
-              shape: RoundedRectangleBorder(
-                borderRadius: M3Shape.radiusLg,
-                side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(isCompactScreen ? M3Spacing.sm : M3Spacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Row 1: Time & Chain Dimensions (Year, Month, Chain)
-                    Wrap(
-                      spacing: M3Spacing.md,
-                      runSpacing: M3Spacing.sm,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        // Year Selector
-                        _buildFilterDropdown<int>(
-                          context: context,
-                          label: 'السنة المالية:',
-                          icon: Icons.calendar_today_rounded,
-                          value: _selectedYear,
-                          items: const [
-                            DropdownMenuItem(value: 0, child: Text('كافة السنوات (إجمالي)')),
-                            DropdownMenuItem(value: 2026, child: Text('عام 2026')),
-                            DropdownMenuItem(value: 2025, child: Text('عام 2025')),
-                            DropdownMenuItem(value: 2024, child: Text('عام 2024')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null && val != _selectedYear) {
-                              setState(() => _selectedYear = val);
-                              _loadStoreMatrix();
-                            }
-                          },
-                        ),
-
-                        // Month Selector
-                        _buildFilterDropdown<int>(
-                          context: context,
-                          label: 'الشهر:',
-                          icon: Icons.event_note_rounded,
-                          value: _selectedMonth,
-                          items: const [
-                            DropdownMenuItem(value: 0, child: Text('كافة الشهور (إجمالي السنة)')),
-                            DropdownMenuItem(value: 1, child: Text('01 - يناير')),
-                            DropdownMenuItem(value: 2, child: Text('02 - فبراير')),
-                            DropdownMenuItem(value: 3, child: Text('03 - مارس')),
-                            DropdownMenuItem(value: 4, child: Text('04 - أبريل')),
-                            DropdownMenuItem(value: 5, child: Text('05 - مايو')),
-                            DropdownMenuItem(value: 6, child: Text('06 - يونيو')),
-                            DropdownMenuItem(value: 7, child: Text('07 - يوليو')),
-                            DropdownMenuItem(value: 8, child: Text('08 - أغسطس')),
-                            DropdownMenuItem(value: 9, child: Text('09 - سبتمبر')),
-                            DropdownMenuItem(value: 10, child: Text('10 - أكتوبر')),
-                            DropdownMenuItem(value: 11, child: Text('11 - نوفمبر')),
-                            DropdownMenuItem(value: 12, child: Text('12 - ديسمبر')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null && val != _selectedMonth) {
-                              setState(() => _selectedMonth = val);
-                              _loadStoreMatrix();
-                            }
-                          },
-                        ),
-
-                        // Chain Selector
-                        _buildFilterDropdown<String>(
-                          context: context,
-                          label: 'سلسلة التجزئة:',
-                          icon: Icons.storefront_rounded,
-                          value: _selectedChain,
-                          items: const [
-                            DropdownMenuItem(value: 'all', child: Text('كافة السلاسل')),
-                            DropdownMenuItem(value: 'fathalla', child: Text('أسواق فتح الله')),
-                            DropdownMenuItem(value: 'gomla', child: Text('جملة ماركت')),
-                            DropdownMenuItem(value: 'beet-elgomla', child: Text('بيت الجملة')),
-                            DropdownMenuItem(value: 'carrefour', child: Text('كارفور')),
-                            DropdownMenuItem(value: 'spinneys', child: Text('سبينيس')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null && val != _selectedChain) {
-                              setState(() => _selectedChain = val);
-                              _loadStoreMatrix();
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-
-                    const Divider(height: 20.0),
-
-                    // Row 2: Regional & Tier Selectors (Both M3 Connected Segmented Button Groups)
-                    Wrap(
-                      spacing: M3Spacing.sm,
-                      runSpacing: M3Spacing.sm,
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        // Regional Segmented Button
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'تصفية حسب المنطقة الجغرافية:',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: M3Spacing.xs),
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: M3SegmentedButtonGroup<String>(
-                                segments: _regionSegments,
-                                selectedValue: _selectedRegion,
-                                onSelectionChanged: _onRegionChanged,
-                                showSelectedCheckmark: false,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        // Tier Segmented Button Group
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'فئة الفرع:',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: M3Spacing.xs),
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: M3SegmentedButtonGroup<String>(
-                                segments: const [
-                                  M3SegmentItem(value: 'الكل', label: 'الكل', icon: Icons.apps_rounded),
-                                  M3SegmentItem(value: 'Tier A', label: 'Tier A', icon: Icons.star_rounded),
-                                  M3SegmentItem(value: 'Tier B', label: 'Tier B', icon: Icons.storefront_rounded),
-                                  M3SegmentItem(value: 'Tier C', label: 'Tier C', icon: Icons.store_mall_directory_rounded),
-                                ],
-                                selectedValue: _selectedTier,
-                                onSelectionChanged: _onTierFilterChanged,
-                                showSelectedCheckmark: false,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
+    return M3ToolbarButtonTheme(
+      child: SingleChildScrollView(
+        padding: isCompactScreen ? M3Spacing.pSm : M3Spacing.pMd,
+        child: M3ContentBoundary(
+          maxWidth: 1440.0,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header Section (Unified M3 Left English Title + Right Arabic Subtitle)
+              M3PageHeader(
+                titleEn: 'Store Matrix Benchmarking',
+                subtitleAr:
+                    'مقارنة الأداء المعياري وتصنيف الفروع إلى فئات (Tier A / B / C) ومعدلات سرعة البيع اليومية',
+                actions: M3Button.tonal(
+                  label: 'تحديث',
+                  icon: Icons.refresh_rounded,
+                  onPressed: _isLoading
+                      ? null
+                      : () => _loadStoreMatrix(forceRefresh: true),
                 ),
               ),
-            ),
 
-            M3Spacing.gapMD,
+              M3Spacing.gapMD,
 
-            // Tier Summary KPI Cards (Responsive Reflow >= 840dp)
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isDesktop = constraints.maxWidth >= 840.0;
-                final cards = [
-                  _buildTierKpiCard(
-                    context: context,
-                    tierName: 'Tier A (الفئة الأولى - الرائدة)',
-                    storeCount: tierAStores.length,
-                    totalRevenue: tierARevenue,
-                    containerColor: colorScheme.primaryContainer,
-                    onContainerColor: colorScheme.onPrimaryContainer,
-                    icon: Icons.star_rounded,
-                    badgeColor: colorScheme.primary,
-                  ),
-                  _buildTierKpiCard(
-                    context: context,
-                    tierName: 'Tier B (الفئة المتوسطة)',
-                    storeCount: tierBStores.length,
-                    totalRevenue: tierBRevenue,
-                    containerColor: colorScheme.secondaryContainer,
-                    onContainerColor: colorScheme.onSecondaryContainer,
-                    icon: Icons.storefront_rounded,
-                    badgeColor: colorScheme.secondary,
-                  ),
-                  _buildTierKpiCard(
-                    context: context,
-                    tierName: 'Tier C (الفئة القياسية / الناشئة)',
-                    storeCount: tierCStores.length,
-                    totalRevenue: tierCRevenue,
-                    containerColor: colorScheme.tertiaryContainer,
-                    onContainerColor: colorScheme.onTertiaryContainer,
-                    icon: Icons.store_mall_directory_rounded,
-                    badgeColor: colorScheme.tertiary,
-                  ),
-                ];
+              // Filter Toolbar (Temporal, Chain, Regional & Tier Selectors)
+              Card(
+                elevation: 0,
+                color: colorScheme.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: M3Shape.radiusLg,
+                  side: BorderSide(
+                      color: colorScheme.outlineVariant.withOpacity(0.5)),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(
+                      isCompactScreen ? M3Spacing.sm : M3Spacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Row 1: Time & Chain Dimensions (Year, Month, Chain)
+                      Wrap(
+                        spacing: M3Spacing.md,
+                        runSpacing: M3Spacing.sm,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          // Year Selector
+                          _buildFilterDropdown<int>(
+                            context: context,
+                            label: 'السنة',
+                            icon: Icons.calendar_today_rounded,
+                            value: _selectedYear,
+                            items: const [
+                              DropdownMenuItem(
+                                  value: 0,
+                                  child: Text('كافة السنوات (إجمالي)')),
+                              DropdownMenuItem(
+                                  value: 2026, child: Text('عام 2026')),
+                              DropdownMenuItem(
+                                  value: 2025, child: Text('عام 2025')),
+                              DropdownMenuItem(
+                                  value: 2024, child: Text('عام 2024')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null && val != _selectedYear) {
+                                setState(() => _selectedYear = val);
+                                _loadStoreMatrix();
+                              }
+                            },
+                          ),
 
-                if (isDesktop) {
-                  return IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(child: cards[0]),
-                        M3Spacing.hGapMD,
-                        Expanded(child: cards[1]),
-                        M3Spacing.hGapMD,
-                        Expanded(child: cards[2]),
-                      ],
-                    ),
-                  );
-                }
+                          // Month Selector
+                          _buildFilterDropdown<int>(
+                            context: context,
+                            label: 'الشهر',
+                            icon: Icons.event_note_rounded,
+                            value: _selectedMonth,
+                            items: const [
+                              DropdownMenuItem(
+                                  value: 0,
+                                  child: Text('كافة الشهور (إجمالي السنة)')),
+                              DropdownMenuItem(
+                                  value: 1, child: Text('01 - يناير')),
+                              DropdownMenuItem(
+                                  value: 2, child: Text('02 - فبراير')),
+                              DropdownMenuItem(
+                                  value: 3, child: Text('03 - مارس')),
+                              DropdownMenuItem(
+                                  value: 4, child: Text('04 - أبريل')),
+                              DropdownMenuItem(
+                                  value: 5, child: Text('05 - مايو')),
+                              DropdownMenuItem(
+                                  value: 6, child: Text('06 - يونيو')),
+                              DropdownMenuItem(
+                                  value: 7, child: Text('07 - يوليو')),
+                              DropdownMenuItem(
+                                  value: 8, child: Text('08 - أغسطس')),
+                              DropdownMenuItem(
+                                  value: 9, child: Text('09 - سبتمبر')),
+                              DropdownMenuItem(
+                                  value: 10, child: Text('10 - أكتوبر')),
+                              DropdownMenuItem(
+                                  value: 11, child: Text('11 - نوفمبر')),
+                              DropdownMenuItem(
+                                  value: 12, child: Text('12 - ديسمبر')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null && val != _selectedMonth) {
+                                setState(() => _selectedMonth = val);
+                                _loadStoreMatrix();
+                              }
+                            },
+                          ),
 
-                return Column(
-                  children: [
-                    cards[0],
-                    M3Spacing.gapSM,
-                    cards[1],
-                    M3Spacing.gapSM,
-                    cards[2],
-                  ],
-                );
-              },
-            ),
+                          // Chain Selector
+                          _buildFilterDropdown<String>(
+                            context: context,
+                            label: 'السلسلة',
+                            icon: Icons.storefront_rounded,
+                            value: _selectedChain,
+                            items: const [
+                              DropdownMenuItem(
+                                  value: 'all', child: Text('كافة السلاسل')),
+                              DropdownMenuItem(
+                                  value: 'fathalla',
+                                  child: Text('أسواق فتح الله')),
+                              DropdownMenuItem(
+                                  value: 'gomla', child: Text('جملة ماركت')),
+                              DropdownMenuItem(
+                                  value: 'beet-elgomla',
+                                  child: Text('بيت الجملة')),
+                              DropdownMenuItem(
+                                  value: 'carrefour', child: Text('كارفور')),
+                              DropdownMenuItem(
+                                  value: 'spinneys', child: Text('سبينيس')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null && val != _selectedChain) {
+                                setState(() => _selectedChain = val);
+                                _loadStoreMatrix();
+                              }
+                            },
+                          ),
+                        ],
+                      ),
 
-            M3Spacing.gapMD,
+                      M3Spacing.gapSM,
+                      M3SearchFieldWidth(
+                        hintText: 'ابحث باسم الفرع أو السلسلة أو المنطقة...',
+                        child: TextField(
+                          key: const ValueKey('store_matrix_search'),
+                          controller: _searchController,
+                          textInputAction: TextInputAction.search,
+                          decoration: InputDecoration(
+                            hintText:
+                                'ابحث باسم الفرع أو السلسلة أو المنطقة...',
+                            prefixIcon:
+                                const Icon(Icons.search_rounded, size: 18.0),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear_rounded,
+                                        size: 18.0),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() => _searchQuery = '');
+                                    },
+                                  )
+                                : null,
+                            isDense: true,
+                            filled: true,
+                            fillColor: colorScheme.surface,
+                            border: const OutlineInputBorder(
+                              borderRadius: M3Shape.radiusMd,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12.0, vertical: 8.0),
+                            constraints: const BoxConstraints(
+                                maxHeight: M3ToolbarButton.height),
+                          ),
+                          onChanged: (v) => setState(() => _searchQuery = v),
+                        ),
+                      ),
+                      const Divider(height: 20.0),
 
-            // Comparative Store Ranking Table Card
-            Card(
-              elevation: 0,
-              color: colorScheme.surfaceContainerLow,
-              shape: RoundedRectangleBorder(
-                borderRadius: M3Shape.radiusLg,
-                side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(isCompactScreen ? 12.0 : 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isDesktop = constraints.maxWidth >= 600.0;
-                        if (isDesktop) {
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      // Row 2: Regional & Tier Selectors (Both M3 Connected Segmented Button Groups)
+                      Wrap(
+                        spacing: M3Spacing.sm,
+                        runSpacing: M3Spacing.sm,
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          // Regional Segmented Button
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.leaderboard_rounded, color: colorScheme.primary, size: 24.0),
-                                    const SizedBox(width: M3Spacing.xs),
-                                    Expanded(
-                                      child: Text(
-                                        'جدول المقارنة المعيارية وترتيب الفروع (${_stores.length} فرع)',
-                                        style: theme.textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.bold,
+                              Text(
+                                'تصفية حسب المنطقة الجغرافية:',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: M3Spacing.xs),
+                              LayoutBuilder(
+                                builder: (context, tabConstraints) {
+                                  final maxW =
+                                      tabConstraints.maxWidth.isFinite &&
+                                              tabConstraints.maxWidth > 0
+                                          ? tabConstraints.maxWidth
+                                          : 280.0;
+                                  return Wrap(
+                                    spacing: M3Spacing.xs,
+                                    runSpacing: M3Spacing.xs,
+                                    children: [
+                                      for (final s in _regionSegments)
+                                        _filterTab(
+                                          value: s.value,
+                                          label: s.label,
+                                          icon: s.icon ?? Icons.public_rounded,
+                                          selected: _selectedRegion == s.value,
+                                          onSelected: _onRegionChanged,
+                                          maxWidth: maxW,
                                         ),
-                                        overflow: TextOverflow.ellipsis,
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+
+                          // Tier Segmented Button Group
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'فئة الفرع:',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: M3Spacing.xs),
+                              LayoutBuilder(
+                                builder: (context, tabConstraints) {
+                                  final maxW =
+                                      tabConstraints.maxWidth.isFinite &&
+                                              tabConstraints.maxWidth > 0
+                                          ? tabConstraints.maxWidth
+                                          : 280.0;
+                                  const tiers = <M3SegmentItem<String>>[
+                                    M3SegmentItem(
+                                        value: 'الكل',
+                                        label: 'الكل',
+                                        icon: Icons.apps_rounded),
+                                    M3SegmentItem(
+                                        value: 'Tier A',
+                                        label: 'Tier A',
+                                        icon: Icons.star_rounded),
+                                    M3SegmentItem(
+                                        value: 'Tier B',
+                                        label: 'Tier B',
+                                        icon: Icons.storefront_rounded),
+                                    M3SegmentItem(
+                                        value: 'Tier C',
+                                        label: 'Tier C',
+                                        icon:
+                                            Icons.store_mall_directory_rounded),
+                                  ];
+                                  return Wrap(
+                                    spacing: M3Spacing.xs,
+                                    runSpacing: M3Spacing.xs,
+                                    children: [
+                                      for (final s in tiers)
+                                        _filterTab(
+                                          value: s.value,
+                                          label: s.label,
+                                          icon: s.icon ?? Icons.apps_rounded,
+                                          selected: _selectedTier == s.value,
+                                          onSelected: _onTierFilterChanged,
+                                          maxWidth: maxW,
+                                        ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              M3Spacing.gapMD,
+
+              // Tier Summary KPI Cards — shared Sell-Out tokens
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 840.0
+                      ? 3
+                      : (constraints.maxWidth >= 580.0 ? 2 : 1);
+                  return M3EqualHeightGrid(
+                    key: const ValueKey('store_matrix_kpi_grid'),
+                    columns: columns,
+                    spacing: M3Spacing.sm,
+                    runSpacing: M3Spacing.sm,
+                    children: [
+                      M3SummaryKpiCard(
+                        key: const ValueKey('kpi_card_Tier A'),
+                        valueKey: const ValueKey('kpi_value_Tier A'),
+                        title: 'Tier A (الفئة الأولى - الرائدة)',
+                        titleMaxLines: 3,
+                        subtitleMaxLines: 3,
+                        value: CurrencyFormatter.formatCompactEGP(tierARevenue),
+                        subtitle: countBranches(tierAStores.length),
+                        icon: Icons.star_rounded,
+                        color: colorScheme.primary,
+                      ),
+                      M3SummaryKpiCard(
+                        key: const ValueKey('kpi_card_Tier B'),
+                        valueKey: const ValueKey('kpi_value_Tier B'),
+                        title: 'Tier B (الفئة المتوسطة)',
+                        titleMaxLines: 3,
+                        subtitleMaxLines: 3,
+                        value: CurrencyFormatter.formatCompactEGP(tierBRevenue),
+                        subtitle: countBranches(tierBStores.length),
+                        icon: Icons.storefront_rounded,
+                        color: colorScheme.secondary,
+                      ),
+                      M3SummaryKpiCard(
+                        key: const ValueKey('kpi_card_Tier C'),
+                        valueKey: const ValueKey('kpi_value_Tier C'),
+                        title: 'Tier C (الفئة القياسية / الناشئة)',
+                        titleMaxLines: 3,
+                        subtitleMaxLines: 3,
+                        value: CurrencyFormatter.formatCompactEGP(tierCRevenue),
+                        subtitle: countBranches(tierCStores.length),
+                        icon: Icons.store_mall_directory_rounded,
+                        color: colorScheme.tertiary,
+                      ),
+                    ],
+                  );
+                },
+              ),
+
+              M3Spacing.gapMD,
+
+              // Comparative Store Ranking Table Card
+              Card(
+                elevation: 0,
+                color: colorScheme.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: M3Shape.radiusLg,
+                  side: BorderSide(
+                      color: colorScheme.outlineVariant.withOpacity(0.5)),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(isCompactScreen ? 12.0 : 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isDesktop = constraints.maxWidth >= 600.0;
+                          if (isDesktop) {
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.leaderboard_rounded,
+                                          color: colorScheme.primary,
+                                          size: 24.0),
+                                      const SizedBox(width: M3Spacing.xs),
+                                      Expanded(
+                                        child: M3SectionTitle(
+                                          'جدول المقارنة المعيارية وترتيب الفروع (${countBranches(visible.length)})',
+                                          maxLines: 3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: M3Spacing.sm),
+                                Wrap(
+                                  spacing: 8.0,
+                                  runSpacing: 4.0,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10.0, vertical: 4.0),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primaryContainer
+                                            .withOpacity(0.4),
+                                        borderRadius: M3Shape.radiusMd,
+                                        border: Border.all(
+                                            color: colorScheme.primary
+                                                .withOpacity(0.2)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.calendar_today_rounded,
+                                              size: 13.0,
+                                              color: colorScheme.primary),
+                                          const SizedBox(width: 4.0),
+                                          Text(
+                                            _activePeriodLabel,
+                                            style: theme.textTheme.labelSmall
+                                                ?.copyWith(
+                                              color: colorScheme.primary,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10.0, vertical: 4.0),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            colorScheme.surfaceContainerHighest,
+                                        borderRadius: M3Shape.radiusMd,
+                                      ),
+                                      child: Text(
+                                        'الترتيب حسب إجمالي المبيعات تنازلياً',
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
+                              ],
+                            );
+                          }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.leaderboard_rounded,
+                                      color: colorScheme.primary, size: 22.0),
+                                  const SizedBox(width: M3Spacing.xs),
+                                  Expanded(
+                                    child: M3SectionTitle(
+                                      'جدول المقارنة المعيارية وترتيب الفروع (${countBranches(visible.length)})',
+                                      maxLines: 3,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: M3Spacing.sm),
+                              const SizedBox(height: M3Spacing.xs),
                               Wrap(
                                 spacing: 8.0,
                                 runSpacing: 4.0,
-                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10.0, vertical: 4.0),
                                     decoration: BoxDecoration(
-                                      color: colorScheme.primaryContainer.withOpacity(0.4),
+                                      color: colorScheme.primaryContainer
+                                          .withOpacity(0.4),
                                       borderRadius: M3Shape.radiusMd,
-                                      border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
+                                      border: Border.all(
+                                          color: colorScheme.primary
+                                              .withOpacity(0.2)),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.calendar_today_rounded, size: 13.0, color: colorScheme.primary),
+                                        Icon(Icons.calendar_today_rounded,
+                                            size: 13.0,
+                                            color: colorScheme.primary),
                                         const SizedBox(width: 4.0),
                                         Text(
                                           _activePeriodLabel,
-                                          style: theme.textTheme.labelSmall?.copyWith(
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
                                             color: colorScheme.primary,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -476,14 +723,17 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> with DataRefreshM
                                     ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10.0, vertical: 4.0),
                                     decoration: BoxDecoration(
-                                      color: colorScheme.surfaceContainerHighest,
+                                      color:
+                                          colorScheme.surfaceContainerHighest,
                                       borderRadius: M3Shape.radiusMd,
                                     ),
                                     child: Text(
                                       'الترتيب حسب إجمالي المبيعات تنازلياً',
-                                      style: theme.textTheme.labelSmall?.copyWith(
+                                      style:
+                                          theme.textTheme.labelSmall?.copyWith(
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
@@ -492,580 +742,638 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> with DataRefreshM
                               ),
                             ],
                           );
-                        }
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.leaderboard_rounded, color: colorScheme.primary, size: 22.0),
-                                const SizedBox(width: M3Spacing.xs),
-                                Expanded(
-                                  child: Text(
-                                    'جدول المقارنة المعيارية وترتيب الفروع (${_stores.length} فرع)',
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: M3Spacing.xs),
-                            Wrap(
-                              spacing: 8.0,
-                              runSpacing: 4.0,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.primaryContainer.withOpacity(0.4),
-                                    borderRadius: M3Shape.radiusMd,
-                                    border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.calendar_today_rounded, size: 13.0, color: colorScheme.primary),
-                                      const SizedBox(width: 4.0),
-                                      Text(
-                                        _activePeriodLabel,
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: colorScheme.primary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.surfaceContainerHighest,
-                                    borderRadius: M3Shape.radiusMd,
-                                  ),
-                                  child: Text(
-                                    'الترتيب حسب إجمالي المبيعات تنازلياً',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                    const Divider(height: 24.0),
-                    M3FadeThroughSwitcher(
-                      duration: M3Motion.medium1,
-                      child: _isLoading
-                          ? const Padding(
-                              key: ValueKey('store_matrix_loading'),
-                              padding: EdgeInsets.all(40.0),
-                              child: Center(child: CircularProgressIndicator()),
-                            )
-                          : _stores.isEmpty
-                              ? Padding(
-                                  key: const ValueKey('store_matrix_empty'),
-                                  padding: const EdgeInsets.all(40.0),
-                                  child: Center(
-                                    child: Column(
-                                      children: [
-                                        Icon(Icons.search_off_rounded, size: 48.0, color: colorScheme.onSurfaceVariant),
-                                        const SizedBox(height: 12.0),
-                                        Text(
-                                          'لا توجد فروع مطابقة لمعايير البحث الحالية',
-                                          style: theme.textTheme.titleMedium?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              : LayoutBuilder(
-                                  key: ValueKey('store_matrix_table_${_selectedRegion}_${_selectedTier}_${_stores.length}'),
-                                  builder: (context, tableConstraints) {
-                                    final availableWidth = tableConstraints.maxWidth.isFinite
-                                        ? tableConstraints.maxWidth
-                                        : MediaQuery.sizeOf(context).width;
-                                    final isCompact = availableWidth < 580.0;
-                                    if (isCompact) {
-                                      return Column(
-                                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                                        children: _stores.map((store) {
-                                          return Container(
-                                            margin: const EdgeInsets.only(bottom: 10.0),
-                                            padding: const EdgeInsets.all(14.0),
-                                            decoration: BoxDecoration(
-                                              color: colorScheme.surface,
-                                              borderRadius: M3Shape.radiusMd,
-                                              border: Border.all(
-                                                color: colorScheme.outlineVariant.withOpacity(0.55),
-                                              ),
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                                              children: [
-                                                Row(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Container(
-                                                      width: 32.0,
-                                                      height: 32.0,
-                                                      decoration: BoxDecoration(
-                                                        shape: BoxShape.circle,
-                                                        color: store.rank == 1
-                                                            ? colorScheme.primaryContainer
-                                                            : store.rank == 2
-                                                                ? colorScheme.secondaryContainer
-                                                                : store.rank == 3
-                                                                    ? colorScheme.tertiaryContainer
-                                                                    : colorScheme.surfaceContainerHighest,
-                                                      ),
-                                                      child: Center(
-                                                        child: Text(
-                                                          '#${store.rank}',
-                                                          style: TextStyle(
-                                                            fontWeight: FontWeight.bold,
-                                                            fontSize: M3FontSize.bodySmall,
-                                                            color: store.rank == 1
-                                                                ? colorScheme.onPrimaryContainer
-                                                                : store.rank == 2
-                                                                    ? colorScheme.onSecondaryContainer
-                                                                    : store.rank == 3
-                                                                        ? colorScheme.onTertiaryContainer
-                                                                        : colorScheme.onSurfaceVariant,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 10.0),
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          Text(
-                                                            store.storeName,
-                                                            style: theme.textTheme.bodyMedium?.copyWith(
-                                                              fontWeight: FontWeight.w800,
-                                                            ),
-                                                          ),
-                                                          const SizedBox(height: 2.0),
-                                                          Wrap(
-                                                            spacing: 8.0,
-                                                            runSpacing: 2.0,
-                                                            crossAxisAlignment: WrapCrossAlignment.center,
-                                                            children: [
-                                                              Row(
-                                                                mainAxisSize: MainAxisSize.min,
-                                                                children: [
-                                                                  Container(
-                                                                    width: 8.0,
-                                                                    height: 8.0,
-                                                                    decoration: BoxDecoration(
-                                                                      shape: BoxShape.circle,
-                                                                      color: _getChainColor(store.retailerChain),
-                                                                    ),
-                                                                  ),
-                                                                  const SizedBox(width: 5.0),
-                                                                  Flexible(
-                                                                    child: Text(
-                                                                      _getChainDisplayName(store.retailerChain),
-                                                                      maxLines: 1,
-                                                                      overflow: TextOverflow.ellipsis,
-                                                                      style: theme.textTheme.bodySmall?.copyWith(
-                                                                        color: colorScheme.onSurfaceVariant,
-                                                                        fontSize: M3FontSize.labelSmallPlus,
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                              Row(
-                                                                mainAxisSize: MainAxisSize.min,
-                                                                children: [
-                                                                  Icon(
-                                                                    Icons.location_on_rounded,
-                                                                    size: 13.0,
-                                                                    color: colorScheme.onSurfaceVariant,
-                                                                  ),
-                                                                  const SizedBox(width: 2.0),
-                                                                  Flexible(
-                                                                    child: Text(
-                                                                      store.region,
-                                                                      maxLines: 1,
-                                                                      overflow: TextOverflow.ellipsis,
-                                                                      style: theme.textTheme.bodySmall?.copyWith(
-                                                                        color: colorScheme.onSurfaceVariant,
-                                                                        fontSize: M3FontSize.labelSmallPlus,
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8.0),
-                                                    _buildTierBadge(context, store.tier),
-                                                  ],
-                                                ),
-                                                const Padding(
-                                                  padding: EdgeInsets.symmetric(vertical: 8.0),
-                                                  child: Divider(height: 1.0),
-                                                ),
-                                                Wrap(
-                                                  alignment: WrapAlignment.spaceBetween,
-                                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                                  spacing: 12.0,
-                                                  runSpacing: 6.0,
-                                                  children: [
-                                                    Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Text(
-                                                          'إجمالي المبيعات',
-                                                          style: theme.textTheme.labelSmall?.copyWith(
-                                                            color: colorScheme.onSurfaceVariant,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(height: 2.0),
-                                                        Text(
-                                                          CurrencyFormatter.formatEGP(store.totalRevenue),
-                                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                                            fontWeight: FontWeight.w800,
-                                                            color: colorScheme.primary,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                                      children: [
-                                                        Text(
-                                                          'الوحدات',
-                                                          style: theme.textTheme.labelSmall?.copyWith(
-                                                            color: colorScheme.onSurfaceVariant,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(height: 2.0),
-                                                        Text(
-                                                          '${CurrencyFormatter.formatUnits(store.totalUnits)} وحدة',
-                                                          style: theme.textTheme.bodySmall?.copyWith(
-                                                            fontWeight: FontWeight.w700,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(
-                                                        horizontal: 8.0,
-                                                        vertical: 4.0,
-                                                      ),
-                                                      decoration: BoxDecoration(
-                                                        color: colorScheme.secondaryContainer.withOpacity(0.5),
-                                                        borderRadius: M3Shape.radiusSm,
-                                                      ),
-                                                      child: Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          Icon(
-                                                            Icons.trending_up_rounded,
-                                                            size: 14.0,
-                                                            color: colorScheme.onSecondaryContainer,
-                                                          ),
-                                                          const SizedBox(width: 4.0),
-                                                          Text(
-                                                            '${store.velocityUnitsPerDay.toStringAsFixed(1)} / يوم',
-                                                            style: TextStyle(
-                                                              fontSize: M3FontSize.labelSmallPlus,
-                                                              fontWeight: FontWeight.w700,
-                                                              color: colorScheme.onSecondaryContainer,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        }).toList(),
-                                      );
-                                    }
-
-                                    final isMedium = availableWidth >= 580.0 && availableWidth < 960.0;
-                                    final double dynamicColumnSpacing = isMedium
-                                        ? 24.0
-                                        : ((availableWidth - 540.0) / 6.0).clamp(24.0, 64.0);
-                                    const double horizontalMargin = 20.0;
-
-                                    return SizedBox(
-                                      width: availableWidth,
-                                      child: TableScrollContainer(
-                                        showSwipeHint: true,
-                                        child: ConstrainedBox(
-                                          constraints: BoxConstraints(minWidth: availableWidth),
-                                          child: DataTable(
-                                            columnSpacing: dynamicColumnSpacing,
-                                            horizontalMargin: horizontalMargin,
-                                            dataRowMinHeight: 56.0,
-                                            dataRowMaxHeight: 68.0,
-                                            headingRowHeight: 52.0,
-                                            headingRowColor: WidgetStateProperty.all(
-                                              colorScheme.surfaceContainerHighest.withOpacity(0.4),
-                                            ),
-                                            columns: const [
-                                              DataColumn(label: Text('الترتيب')),
-                                              DataColumn(label: Text('اسم الفرع والسلسلة')),
-                                              DataColumn(label: Text('المنطقة الجغرافية')),
-                                              DataColumn(label: Text('تصنيف الفئة')),
-                                              DataColumn(label: Text('إجمالي المبيعات')),
-                                              DataColumn(label: Text('إجمالي الوحدات')),
-                                              DataColumn(label: Text('معدل السرعة اليومي')),
-                                            ],
-                                            rows: _stores.map((store) {
-                            return DataRow(
-                              cells: [
-                                // Rank Badge
-                                DataCell(
-                                  Container(
-                                    width: 32.0,
-                                    height: 32.0,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: store.rank == 1
-                                          ? colorScheme.primaryContainer
-                                          : store.rank == 2
-                                              ? colorScheme.secondaryContainer
-                                              : store.rank == 3
-                                                  ? colorScheme.tertiaryContainer
-                                                  : colorScheme.surfaceContainerHighest,
-                                    ),
+                        },
+                      ),
+                      const Divider(height: 24.0),
+                      M3FadeThroughSwitcher(
+                        duration: M3Motion.medium1,
+                        child: _isLoading
+                            ? const Padding(
+                                key: ValueKey('store_matrix_loading'),
+                                padding: EdgeInsets.all(40.0),
+                                child:
+                                    Center(child: CircularProgressIndicator()),
+                              )
+                            : visible.isEmpty
+                                ? Padding(
+                                    key: const ValueKey('store_matrix_empty'),
+                                    padding: const EdgeInsets.all(40.0),
                                     child: Center(
-                                      child: Text(
-                                        '#${store.rank}',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: M3FontSize.bodySmall,
-                                          color: store.rank == 1
-                                              ? colorScheme.onPrimaryContainer
-                                              : store.rank == 2
-                                                  ? colorScheme.onSecondaryContainer
-                                                  : store.rank == 3
-                                                      ? colorScheme.onTertiaryContainer
-                                                      : colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
-                                // Store Name & Chain
-                                DataCell(
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        store.storeName,
-                                        style: theme.textTheme.bodyMedium?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2.0),
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                      child: Column(
                                         children: [
-                                          Container(
-                                            width: 8.0,
-                                            height: 8.0,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: _getChainColor(store.retailerChain),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6.0),
+                                          Icon(Icons.search_off_rounded,
+                                              size: 48.0,
+                                              color:
+                                                  colorScheme.onSurfaceVariant),
+                                          const SizedBox(height: 12.0),
                                           Text(
-                                            _getChainDisplayName(store.retailerChain),
-                                            style: theme.textTheme.bodySmall?.copyWith(
-                                              color: colorScheme.onSurfaceVariant,
-                                              fontSize: M3FontSize.labelSmall,
-                                              fontWeight: FontWeight.w500,
+                                            'لا توجد فروع مطابقة لمعايير البحث الحالية',
+                                            style: theme.textTheme.titleMedium
+                                                ?.copyWith(
+                                              color:
+                                                  colorScheme.onSurfaceVariant,
                                             ),
                                           ),
                                         ],
                                       ),
-                                    ],
-                                  ),
-                                ),
-
-                                // Region
-                                DataCell(
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.location_on_rounded, size: 16.0, color: colorScheme.onSurfaceVariant),
-                                      const SizedBox(width: 4.0),
-                                      Text(store.region, style: theme.textTheme.bodyMedium),
-                                    ],
-                                  ),
-                                ),
-
-                                // Tier Badge
-                                DataCell(_buildTierBadge(context, store.tier)),
-
-                                // Total Revenue
-                                DataCell(
-                                  Text(
-                                    CurrencyFormatter.formatEGP(store.totalRevenue),
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.primary,
                                     ),
-                                  ),
-                                ),
-
-                                // Units Sold
-                                DataCell(
-                                  Text(
-                                    '${CurrencyFormatter.formatUnits(store.totalUnits)} وحدة',
-                                    style: theme.textTheme.bodyMedium,
-                                  ),
-                                ),
-
-                                // Velocity (Units / Day)
-                                DataCell(
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
-                                        decoration: BoxDecoration(
-                                          color: colorScheme.secondaryContainer.withOpacity(0.5),
-                                          borderRadius: M3Shape.radiusSm,
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.trending_up_rounded,
-                                              size: 14.0,
-                                              color: colorScheme.onSecondaryContainer,
-                                            ),
-                                            const SizedBox(width: 4.0),
-                                            Text(
-                                              '${store.velocityUnitsPerDay.toStringAsFixed(1)} / يوم',
-                                              style: TextStyle(
-                                                fontSize: M3FontSize.bodySmall,
-                                                fontWeight: FontWeight.w600,
-                                                color: colorScheme.onSecondaryContainer,
+                                  )
+                                : LayoutBuilder(
+                                    key: ValueKey(
+                                        'store_matrix_table_${_selectedRegion}_${_selectedTier}_${visible.length}'),
+                                    builder: (context, tableConstraints) {
+                                      final availableWidth = tableConstraints
+                                              .maxWidth.isFinite
+                                          ? tableConstraints.maxWidth
+                                          : MediaQuery.sizeOf(context).width;
+                                      final isCompact = availableWidth < 580.0;
+                                      if (isCompact) {
+                                        return Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: visible.map((store) {
+                                            return Container(
+                                              margin: const EdgeInsets.only(
+                                                  bottom: 10.0),
+                                              padding:
+                                                  const EdgeInsets.all(14.0),
+                                              decoration: BoxDecoration(
+                                                color: colorScheme.surface,
+                                                borderRadius: M3Shape.radiusMd,
+                                                border: Border.all(
+                                                  color: colorScheme
+                                                      .outlineVariant
+                                                      .withOpacity(0.55),
+                                                ),
                                               ),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.stretch,
+                                                children: [
+                                                  Row(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Container(
+                                                        width: 32.0,
+                                                        height: 32.0,
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          shape:
+                                                              BoxShape.circle,
+                                                          color: store.rank == 1
+                                                              ? colorScheme
+                                                                  .primaryContainer
+                                                              : store.rank == 2
+                                                                  ? colorScheme
+                                                                      .secondaryContainer
+                                                                  : store.rank ==
+                                                                          3
+                                                                      ? colorScheme
+                                                                          .tertiaryContainer
+                                                                      : colorScheme
+                                                                          .surfaceContainerHighest,
+                                                        ),
+                                                        child: Center(
+                                                          child: Text(
+                                                            '#${store.rank}',
+                                                            style: TextStyle(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              fontSize:
+                                                                  M3FontSize
+                                                                      .bodySmall,
+                                                              color: store.rank ==
+                                                                      1
+                                                                  ? colorScheme
+                                                                      .onPrimaryContainer
+                                                                  : store.rank ==
+                                                                          2
+                                                                      ? colorScheme
+                                                                          .onSecondaryContainer
+                                                                      : store.rank ==
+                                                                              3
+                                                                          ? colorScheme
+                                                                              .onTertiaryContainer
+                                                                          : colorScheme
+                                                                              .onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                          width: 10.0),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            Text(
+                                                              _displayStoreName(
+                                                                  store),
+                                                              maxLines: 3,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              textAlign:
+                                                                  TextAlign
+                                                                      .start,
+                                                              style: theme
+                                                                  .textTheme
+                                                                  .bodyMedium
+                                                                  ?.copyWith(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w800,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                                height: 2.0),
+                                                            Wrap(
+                                                              spacing: 8.0,
+                                                              runSpacing: 2.0,
+                                                              crossAxisAlignment:
+                                                                  WrapCrossAlignment
+                                                                      .center,
+                                                              children: [
+                                                                Row(
+                                                                  mainAxisSize:
+                                                                      MainAxisSize
+                                                                          .min,
+                                                                  children: [
+                                                                    Container(
+                                                                      width:
+                                                                          8.0,
+                                                                      height:
+                                                                          8.0,
+                                                                      decoration:
+                                                                          BoxDecoration(
+                                                                        shape: BoxShape
+                                                                            .circle,
+                                                                        color: _getChainColor(
+                                                                            store.retailerChain),
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(
+                                                                        width:
+                                                                            5.0),
+                                                                    Flexible(
+                                                                      child:
+                                                                          Text(
+                                                                        _getChainDisplayName(
+                                                                            store.retailerChain),
+                                                                        maxLines:
+                                                                            3,
+                                                                        overflow:
+                                                                            TextOverflow.ellipsis,
+                                                                        style: theme
+                                                                            .textTheme
+                                                                            .bodySmall
+                                                                            ?.copyWith(
+                                                                          color:
+                                                                              colorScheme.onSurfaceVariant,
+                                                                          fontSize:
+                                                                              M3FontSize.labelSmallPlus,
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                                Row(
+                                                                  mainAxisSize:
+                                                                      MainAxisSize
+                                                                          .min,
+                                                                  children: [
+                                                                    Icon(
+                                                                      Icons
+                                                                          .location_on_rounded,
+                                                                      size:
+                                                                          13.0,
+                                                                      color: colorScheme
+                                                                          .onSurfaceVariant,
+                                                                    ),
+                                                                    const SizedBox(
+                                                                        width:
+                                                                            2.0),
+                                                                    Flexible(
+                                                                      child:
+                                                                          Text(
+                                                                        store
+                                                                            .region,
+                                                                        maxLines:
+                                                                            3,
+                                                                        overflow:
+                                                                            TextOverflow.ellipsis,
+                                                                        style: theme
+                                                                            .textTheme
+                                                                            .bodySmall
+                                                                            ?.copyWith(
+                                                                          color:
+                                                                              colorScheme.onSurfaceVariant,
+                                                                          fontSize:
+                                                                              M3FontSize.labelSmallPlus,
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ],
+                                                            ),
+                                                            const SizedBox(
+                                                                height: 4.0),
+                                                            _buildTierBadge(
+                                                              context,
+                                                              store.tier,
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const Padding(
+                                                    padding:
+                                                        EdgeInsets.symmetric(
+                                                            vertical: 8.0),
+                                                    child: Divider(height: 1.0),
+                                                  ),
+                                                  Wrap(
+                                                    alignment: WrapAlignment
+                                                        .spaceBetween,
+                                                    crossAxisAlignment:
+                                                        WrapCrossAlignment
+                                                            .center,
+                                                    spacing: 12.0,
+                                                    runSpacing: 6.0,
+                                                    children: [
+                                                      Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            'إجمالي المبيعات',
+                                                            style: theme
+                                                                .textTheme
+                                                                .labelSmall
+                                                                ?.copyWith(
+                                                              color: colorScheme
+                                                                  .onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                              height: 2.0),
+                                                          Text(
+                                                            CurrencyFormatter
+                                                                .formatCompactEGP(
+                                                                    store
+                                                                        .totalRevenue),
+                                                            style: theme
+                                                                .textTheme
+                                                                .bodyMedium
+                                                                ?.copyWith(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w800,
+                                                              color: colorScheme
+                                                                  .primary,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Text(
+                                                            'الوحدات',
+                                                            style: theme
+                                                                .textTheme
+                                                                .labelSmall
+                                                                ?.copyWith(
+                                                              color: colorScheme
+                                                                  .onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                              height: 2.0),
+                                                          Text(
+                                                            '${CurrencyFormatter.formatUnits(store.totalUnits)} وحدة',
+                                                            style: theme
+                                                                .textTheme
+                                                                .bodySmall
+                                                                ?.copyWith(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                          horizontal: 8.0,
+                                                          vertical: 4.0,
+                                                        ),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: colorScheme
+                                                              .secondaryContainer
+                                                              .withOpacity(0.5),
+                                                          borderRadius:
+                                                              M3Shape.radiusSm,
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            Icon(
+                                                              Icons
+                                                                  .trending_up_rounded,
+                                                              size: 14.0,
+                                                              color: colorScheme
+                                                                  .onSecondaryContainer,
+                                                            ),
+                                                            const SizedBox(
+                                                                width: 4.0),
+                                                            Text(
+                                                              '${store.velocityUnitsPerDay.toStringAsFixed(1)} / يوم',
+                                                              style: TextStyle(
+                                                                fontSize: M3FontSize
+                                                                    .labelSmallPlus,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                                color: colorScheme
+                                                                    .onSecondaryContainer,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          }).toList(),
+                                        );
+                                      }
+
+                                      const spacing = M3Spacing.xs;
+                                      const nameFlex = 2.2;
+                                      const otherFlex =
+                                          0.45 + 1.0 + 0.9 + 1.0 + 0.9 + 1.0;
+                                      final inner = availableWidth -
+                                          (2 * spacing) -
+                                          (6 * spacing);
+                                      final nameMaxWidth = (inner *
+                                              nameFlex /
+                                              (nameFlex + otherFlex))
+                                          .clamp(140.0, 420.0);
+
+                                      return TableScrollContainer(
+                                        key: const ValueKey(
+                                            'store_matrix_table'),
+                                        showSwipeHint: true,
+                                        columnFlex: _tableColumnFlex,
+                                        child: DataTable(
+                                          columnSpacing: spacing,
+                                          horizontalMargin: spacing,
+                                          dataRowMinHeight: _tableRowHeight,
+                                          dataRowMaxHeight: _tableRowHeight,
+                                          headingRowHeight: _tableHeadingHeight,
+                                          headingRowColor:
+                                              WidgetStateProperty.all(
+                                            colorScheme.surfaceContainerHighest
+                                                .withOpacity(0.4),
+                                          ),
+                                          columns: const [
+                                            DataColumn(
+                                              headingRowAlignment:
+                                                  MainAxisAlignment.center,
+                                              label: Text('الترتيب'),
+                                            ),
+                                            DataColumn(
+                                              label: Text('اسم الفرع والسلسلة'),
+                                            ),
+                                            DataColumn(
+                                              headingRowAlignment:
+                                                  MainAxisAlignment.center,
+                                              label: Text('المنطقة الجغرافية'),
+                                            ),
+                                            DataColumn(
+                                              headingRowAlignment:
+                                                  MainAxisAlignment.center,
+                                              label: Text('تصنيف الفئة'),
+                                            ),
+                                            DataColumn(
+                                              headingRowAlignment:
+                                                  MainAxisAlignment.center,
+                                              label: Text('إجمالي المبيعات'),
+                                            ),
+                                            DataColumn(
+                                              headingRowAlignment:
+                                                  MainAxisAlignment.center,
+                                              label: Text('إجمالي الوحدات'),
+                                            ),
+                                            DataColumn(
+                                              headingRowAlignment:
+                                                  MainAxisAlignment.center,
+                                              label: Text('معدل السرعة اليومي'),
                                             ),
                                           ],
+                                          rows: [
+                                            for (final store in visible)
+                                              _buildStoreDataRow(
+                                                context,
+                                                store,
+                                                nameMaxWidth: nameMaxWidth,
+                                              ),
+                                          ],
                                         ),
-                                      ),
-                                    ],
+                                      );
+                                    },
                                   ),
-                                ),
-                              ],
-                            );
-                                            }).toList(),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildTierKpiCard({
-    required BuildContext context,
-    required String tierName,
-    required int storeCount,
-    required double totalRevenue,
-    required Color containerColor,
-    required Color onContainerColor,
-    required IconData icon,
-    required Color badgeColor,
+  DataRow _buildStoreDataRow(
+    BuildContext context,
+    StoreBenchmarkItem store, {
+    required double nameMaxWidth,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-
-    return Card(
-      elevation: 0,
-      color: colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: M3Shape.radiusLg,
-        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
-      ),
-      child: Padding(
-        padding: M3Spacing.pMd,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10.0),
-                  decoration: BoxDecoration(
-                    color: containerColor,
-                    borderRadius: M3Shape.radiusMd,
+    return DataRow(
+      cells: [
+        DataCell(
+          Center(
+            child: Container(
+              width: 32.0,
+              height: 32.0,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: store.rank == 1
+                    ? colorScheme.primaryContainer
+                    : store.rank == 2
+                        ? colorScheme.secondaryContainer
+                        : store.rank == 3
+                            ? colorScheme.tertiaryContainer
+                            : colorScheme.surfaceContainerHighest,
+              ),
+              child: Center(
+                child: Text(
+                  '#${store.rank}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: M3FontSize.bodySmall,
+                    color: store.rank == 1
+                        ? colorScheme.onPrimaryContainer
+                        : store.rank == 2
+                            ? colorScheme.onSecondaryContainer
+                            : store.rank == 3
+                                ? colorScheme.onTertiaryContainer
+                                : colorScheme.onSurfaceVariant,
                   ),
-                  child: Icon(icon, color: onContainerColor, size: 22.0),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                  decoration: BoxDecoration(
-                    color: containerColor.withOpacity(0.75),
-                    borderRadius: M3Shape.radiusLg,
-                  ),
-                  child: Text(
-                    '$storeCount فروع',
-                    style: TextStyle(
-                      color: onContainerColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: M3FontSize.bodySmall,
+              ),
+            ),
+          ),
+        ),
+        DataCell(
+          KeyedSubtree(
+            key: ValueKey('store_name_${store.storeId}'),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: nameMaxWidth),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Tooltip(
+                    message: store.storeName,
+                    child: Text(
+                      _displayStoreName(store),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.start,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 2.0),
+                  Row(
+                    children: [
+                      Container(
+                        width: 8.0,
+                        height: 8.0,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _getChainColor(store.retailerChain),
+                        ),
+                      ),
+                      const SizedBox(width: 6.0),
+                      Expanded(
+                        child: Text(
+                          _getChainDisplayName(store.retailerChain),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.start,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: M3Spacing.sm),
-            Text(
-              tierName,
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        DataCell(
+          Center(
+            child: Text(
+              store.region,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ),
+        DataCell(Center(child: _buildTierBadge(context, store.tier))),
+        DataCell(
+          Center(
+            child: Text(
+              CurrencyFormatter.formatCompactEGP(store.totalRevenue),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: colorScheme.primary,
+              ),
+            ),
+          ),
+        ),
+        DataCell(
+          Center(
+            child: Text(
+              '${CurrencyFormatter.formatUnits(store.totalUnits)} وحدة',
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 6.0),
-            Text(
-              CurrencyFormatter.formatEGP(totalRevenue),
-              style: theme.textTheme.headlineSmall?.copyWith(
-                color: badgeColor,
-                fontWeight: FontWeight.bold,
+          ),
+        ),
+        DataCell(
+          Center(
+            child: M3ChipSurface(
+              color: colorScheme.secondaryContainer.withOpacity(0.5),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.trending_up_rounded,
+                    size: 14.0,
+                    color: colorScheme.onSecondaryContainer,
+                  ),
+                  const SizedBox(width: 4.0),
+                  Text(
+                    '${store.velocityUnitsPerDay.toStringAsFixed(1)} / يوم',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -1073,39 +1381,55 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> with DataRefreshM
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    Color bg;
-    Color fg;
+    late final Color bg;
+    late final Color fg;
+    late final String description;
 
     switch (tier.toUpperCase()) {
       case 'TIER A':
         bg = colorScheme.primaryContainer;
         fg = colorScheme.onPrimaryContainer;
+        description = 'الفئة الأولى - الرائدة';
         break;
       case 'TIER B':
         bg = colorScheme.secondaryContainer;
         fg = colorScheme.onSecondaryContainer;
+        description = 'الفئة المتوسطة';
         break;
       case 'TIER C':
       default:
         bg = colorScheme.tertiaryContainer;
         fg = colorScheme.onTertiaryContainer;
+        description = 'الفئة القياسية / الناشئة';
         break;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: M3Shape.radiusMd,
-      ),
-      child: Text(
-        tier,
-        style: TextStyle(
-          color: fg,
-          fontWeight: FontWeight.bold,
-          fontSize: M3FontSize.labelSmall,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        M3ChipSurface(
+          color: bg,
+          child: Text(
+            tier,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
-      ),
+        const SizedBox(height: 2.0),
+        Text(
+          description,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 
@@ -1145,6 +1469,47 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> with DataRefreshM
     }
   }
 
+  Widget _filterTab({
+    required String value,
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required ValueChanged<String> onSelected,
+    required double maxWidth,
+  }) {
+    final child = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: M3ToolbarButton.iconSize),
+        const SizedBox(width: 8.0),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 3,
+            overflow: TextOverflow.visible,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ],
+    );
+    final button = selected
+        ? FilledButton.tonal(
+            onPressed: () => onSelected(value),
+            child: child,
+          )
+        : OutlinedButton(
+            onPressed: () => onSelected(value),
+            child: child,
+          );
+    return KeyedSubtree(
+      key: ValueKey('store_matrix_filter_$value'),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: button,
+      ),
+    );
+  }
+
   Widget _buildFilterDropdown<T>({
     required BuildContext context,
     required String label,
@@ -1168,8 +1533,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> with DataRefreshM
             Flexible(
               child: Text(
                 label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                maxLines: 3,
+                overflow: TextOverflow.visible,
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
@@ -1181,6 +1546,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen> with DataRefreshM
         const SizedBox(height: M3Spacing.xs),
         M3Dropdown<T>(
           expand: isCompact,
+          fitOptions: true,
+          width: label.startsWith('السنة') ? kYearDropdownWidth : null,
           value: value,
           options: m3OptionsFromMenuItems(items),
           onChanged: onChanged,
