@@ -50,87 +50,88 @@ class TenantProfileCard extends StatelessWidget {
     final userNameEn = _cleanUserNameEn(currentUser, currentDisplayName);
     final roleEn = currentUser?.roleDisplayEn ?? 'Vendor Admin';
 
-    return Container(
-      padding: M3Spacing.pSm,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: M3Shape.radiusMd,
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.6)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: onOpenProfile,
-            borderRadius: M3Shape.radiusSm,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 18.0,
-                    backgroundColor: brandSeedColor,
-                    child: Text(
-                      normalizedActive.isNotEmpty
-                          ? normalizedActive[0].toUpperCase()
-                          : 'A',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+    return Card.filled(
+      color: colorScheme.surfaceContainerLow,
+      margin: EdgeInsets.zero,
+      shape: const RoundedRectangleBorder(borderRadius: M3Shape.radiusMd),
+      child: Padding(
+        padding: M3Spacing.pSm,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: onOpenProfile,
+              borderRadius: M3Shape.radiusSm,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18.0,
+                      backgroundColor: brandSeedColor,
+                      child: Text(
+                        normalizedActive.isNotEmpty
+                            ? normalizedActive[0].toUpperCase()
+                            : 'A',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                  M3Spacing.gapXS,
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                currentDisplayName,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
+                    M3Spacing.gapXS,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  currentDisplayName,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            const SizedBox(width: 6.0),
-                            Container(
-                              width: 7.0,
-                              height: 7.0,
-                              decoration: BoxDecoration(
-                                color: M3StatusColors.of(context).success,
-                                shape: BoxShape.circle,
+                              const SizedBox(width: 6.0),
+                              Container(
+                                width: 7.0,
+                                height: 7.0,
+                                decoration: BoxDecoration(
+                                  color: M3StatusColors.of(context).success,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          '$userNameEn • $roleEn',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontSize: M3FontSize.tinyPlus,
+                            ],
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                          Text(
+                            '$userNameEn • $roleEn',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              fontSize: M3FontSize.tinyPlus,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  if (onOpenProfile != null)
-                    IconButton(
-                      icon: const Icon(Icons.manage_accounts_rounded, size: 20.0),
-                      tooltip: 'User Profile & Settings',
-                      onPressed: onOpenProfile,
-                    ),
-                ],
+                    if (onOpenProfile != null)
+                      IconButton(
+                        icon: const Icon(Icons.manage_accounts_rounded,
+                            size: 20.0),
+                        tooltip: 'User Profile & Settings',
+                        onPressed: onOpenProfile,
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

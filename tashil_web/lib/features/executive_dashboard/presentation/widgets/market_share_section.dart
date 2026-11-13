@@ -119,11 +119,15 @@ class _CardHeader extends StatelessWidget {
       required this.title,
       required this.subtitle,
       required this.count,
+      this.unit = '',
       this.badgeKey});
   final IconData icon;
   final String title;
   final String subtitle;
   final int count;
+
+  /// Count unit shown in the neutral tag, e.g. "أصناف" → "6 أصناف".
+  final String unit;
   final Key? badgeKey;
 
   @override
@@ -134,7 +138,7 @@ class _CardHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          Icon(icon, size: 20.0, color: cs.primary),
+          Icon(icon, size: 20.0, color: cs.onSurfaceVariant),
           M3Spacing.gapXS,
           Flexible(
             child: Text(title,
@@ -142,11 +146,12 @@ class _CardHeader extends StatelessWidget {
                 style: theme.textTheme.titleMedium),
           ),
           M3Spacing.gapXS,
-          Badge.count(
-              key: badgeKey,
-              count: count,
-              backgroundColor: cs.error,
-              textColor: cs.onError),
+          // Neutral count tag (not an error-red badge).
+          M3StatusTag(
+            key: badgeKey,
+            label: unit.isEmpty ? '$count' : '$count $unit',
+            icon: AppIcons.filterList,
+          ),
         ]),
         M3Spacing.gapXXS,
         Text(subtitle,
@@ -215,7 +220,6 @@ class _SkuShareCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final acc = M3StatusColors.of(context).accents;
     final cats = {for (final c in kpis.categoryContributions) c.category: c};
     final rows = <({
       ParetoSkuItemModel sku,
@@ -245,13 +249,14 @@ class _SkuShareCard extends StatelessWidget {
               title: 'الحصة حسب الصنف',
               subtitle: 'حصة أهم الأصناف من مبيعات الفئة',
               count: rows.length,
+              unit: 'أصناف',
               badgeKey: const ValueKey('share_per_sku_badge'),
             ),
             M3Spacing.gapSM,
             _Legend([
               (cs.primary, 'هذا الصنف'),
-              (cs.primaryContainer, 'أصنافنا الأخرى'),
-              (acc.competitor, 'Competitors'),
+              (cs.tertiaryContainer, 'أصنافنا الأخرى'),
+              (cs.surfaceContainerHighest, 'المنافسون'),
             ]),
             M3Spacing.gapSM,
             if (rows.isEmpty)
@@ -280,10 +285,10 @@ class _SkuShareCard extends StatelessWidget {
                         borderRadius: M3Shape.radiusSm,
                         child: Row(children: [
                           _seg(context, rows[i].self, cs.primary, cs.onPrimary),
-                          _seg(context, rows[i].ownOther, cs.primaryContainer,
-                              cs.onPrimaryContainer),
-                          _seg(context, rows[i].comp, acc.competitor,
-                              cs.onSurface),
+                          _seg(context, rows[i].ownOther, cs.tertiaryContainer,
+                              cs.onTertiaryContainer),
+                          _seg(context, rows[i].comp, cs.surfaceContainerHighest,
+                              cs.onSurfaceVariant),
                         ]),
                       ),
                     ),
@@ -309,7 +314,7 @@ class _SkuShareCard extends StatelessWidget {
                 style: Theme.of(context)
                     .textTheme
                     .labelSmall
-                    ?.copyWith(color: fg, fontWeight: FontWeight.w600))
+                    ?.copyWith(color: fg))
             : null,
       ),
     );
@@ -342,6 +347,7 @@ class _CategoryShareCard extends StatelessWidget {
               title: 'الحصة حسب الفئة',
               subtitle: 'حصتنا في كل فئة',
               count: top.length,
+              unit: 'فئات',
               badgeKey: const ValueKey('share_per_category_badge'),
             ),
             M3Spacing.gapSM,
@@ -591,6 +597,7 @@ class _StockCard extends StatelessWidget {
             title: 'المخزون حسب الصنف',
             subtitle: 'منذ بداية العام (وحدة) · الحالة من تقرير CPFR',
             count: top.length,
+            unit: 'أصناف',
             badgeKey: const ValueKey('stock_per_sku_badge'),
           ),
           M3Spacing.gapSM,
@@ -728,7 +735,6 @@ class _MonthlyBarsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final acc = M3StatusColors.of(context).accents;
     final maxV = months.fold<int>(
         1,
         (a, m) =>
@@ -739,6 +745,7 @@ class _MonthlyBarsCard extends StatelessWidget {
       title: '\u2068Sell-In\u2069 مقابل \u2068Sell-Out\u2069 شهرياً',
       subtitle: 'بالوحدات · إيقاع الأعمدة تقريبي للعرض',
       count: months.length,
+      unit: 'شهور',
       badgeKey: const ValueKey('sell_in_vs_out_badge'),
     );
     return Card.outlined(
@@ -761,7 +768,8 @@ class _MonthlyBarsCard extends StatelessWidget {
                   keyName: 'sell_in_vs_out_empty',
                 )
               else ...[
-                _Legend([(cs.primary, 'Sell-In'), (acc.tealBase, 'Sell-Out')]),
+                // Sell-Out is the hero series; Sell-In is the neutral reference.
+                _Legend([(cs.primary, 'Sell-Out'), (cs.outline, 'Sell-In')]),
                 M3Spacing.gapMD,
                 _plotArea(
                   Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -777,11 +785,11 @@ class _MonthlyBarsCard extends StatelessWidget {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
-                                      _bar(m.sellInUnits / maxV * chartH,
+                                      _bar(m.sellOutUnits / maxV * chartH,
                                           cs.primary),
                                       const SizedBox(width: 3.0),
-                                      _bar(m.sellOutUnits / maxV * chartH,
-                                          acc.tealBase),
+                                      _bar(m.sellInUnits / maxV * chartH,
+                                          cs.outline),
                                     ]),
                                 M3Spacing.gapXXS,
                                 Text(

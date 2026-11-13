@@ -98,15 +98,15 @@ void main() {
       );
 
       expect(find.text('+14.8% مقارنة بالشهر السابق'), findsOneWidget);
-      expect(find.text('MoM'), findsNWidgets(2));
+      expect(find.text('MoM'), findsNothing); // Arabic-only M3 KPI tags
       expect(find.text('+24.5% مقارنة بالعام السابق'), findsOneWidget);
-      expect(find.text('YoY'), findsNWidgets(2));
+      expect(find.text('YoY'), findsNothing);
       expect(find.text('+9.2% مقارنة بالشهر السابق'), findsOneWidget);
       expect(find.text('+16.4% مقارنة بالعام السابق'), findsOneWidget);
       expect(find.text('التوفر على الرف (OSA) 96.8%'), findsOneWidget);
-      expect(find.textContaining('OSA '), findsWidgets);
+      expect(find.textContaining('OSA)'), findsWidgets);
       expect(find.textContaining('نفاد المخزون 3.2%'), findsOneWidget);
-      expect(find.textContaining('OOS rate •'), findsOneWidget);
+      expect(find.textContaining('OOS rate •'), findsNothing);
     });
 
     testWidgets('ParetoCategorySection renders Category Contribution and Pareto 80/20 cards and handles empty lists', (WidgetTester tester) async {

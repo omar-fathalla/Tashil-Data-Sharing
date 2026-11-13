@@ -1,5 +1,6 @@
 import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/widgets/m3_status_tag.dart';
 import 'package:tashil_web/core/widgets/m3_tonal_surface.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_status_colors.dart';
@@ -133,51 +134,27 @@ class ChainSharePie extends StatelessWidget {
                     children: [
                       Text(
                         'حصة كل سلسلة من المبيعات',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: theme.textTheme.titleMedium,
                       ),
                       const SizedBox(height: 2.0),
                       Text(
                         'Sales by Chain',
                         style: theme.textTheme.labelMedium?.copyWith(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.2,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8.0),
-                M3TonalSurface(
-                  color: colorScheme.secondaryContainer,
-                  borderRadius: M3Shape.radiusMd,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10.0, vertical: 4.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${chainShares.length} ${chainShares.length == 1 ? "سلسلة نشطة" : "سلاسل نشطة"}',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        '${chainShares.length} Active ${chainShares.length == 1 ? "Chain" : "Chains"}',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
+                M3StatusTag(
+                  label:
+                      '${chainShares.length} ${chainShares.length == 1 ? "سلسلة نشطة" : "سلاسل نشطة"}',
+                  icon: AppIcons.filterList,
                 ),
                 const SizedBox(width: 6.0),
-                Icon(AppIcons.pieChart, size: 20.0, color: colorScheme.primary),
+                Icon(AppIcons.pieChart,
+                    size: 20.0, color: colorScheme.onSurfaceVariant),
               ],
             ),
             const SizedBox(height: 4.0),
@@ -248,8 +225,7 @@ class ChainSharePie extends StatelessWidget {
                             Text(
                               parts.en!,
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: colorScheme.primary,
-                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],

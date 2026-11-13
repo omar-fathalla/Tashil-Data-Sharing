@@ -283,7 +283,7 @@ void main() {
       expect(find.text('Competitor Floor cleaner 0'), findsOneWidget);
       expect(find.text('هذا الصنف'), findsOneWidget);
       expect(find.text('أصنافنا الأخرى'), findsOneWidget);
-      expect(find.text('Competitors'), findsWidgets);
+      expect(find.text('المنافسون'), findsWidgets);
       final donut = tester.getSize(find.byKey(const ValueKey('category_donut_Floor cleaner')));
       // Compact 64dp unless row B stretches the category card.
       expect(donut.height, greaterThanOrEqualTo(64));

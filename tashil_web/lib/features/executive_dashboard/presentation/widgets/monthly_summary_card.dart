@@ -35,7 +35,7 @@ class MonthlySummaryCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(AppIcons.insights, size: 18, color: cs.primary),
+                Icon(AppIcons.insights, size: 18, color: cs.onSurfaceVariant),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(

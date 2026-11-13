@@ -181,7 +181,9 @@ void main() {
     await _pump(tester, const Size(1440, 1400));
     expect(find.byType(MarketShareSection), findsOneWidget);
     final tags = find.descendant(
-        of: find.byKey(const ValueKey('stock_per_sku_table')),
+        of: find.descendant(
+            of: find.byKey(const ValueKey('stock_per_sku_table')),
+            matching: find.byType(Table)),
         matching: find.byType(M3StatusTag));
     expect(tags, findsNWidgets(3));
     for (final label in ['Healthy', 'Overstock', 'Replenish']) {
