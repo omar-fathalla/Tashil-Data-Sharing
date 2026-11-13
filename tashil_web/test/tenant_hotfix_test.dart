@@ -48,10 +48,10 @@ void main() {
           ),
         ));
     await pump(true);
-    expect(find.text('Edit'), findsOneWidget);
+    expect(find.text('تعديل'), findsOneWidget);
     await pump(false);
-    expect(find.text('Edit'), findsNothing);
-    expect(find.text('Download'), findsOneWidget);
-    expect(find.text('Delete'), findsOneWidget);
+    expect(find.text('تعديل'), findsNothing);
+    expect(find.text('تحميل'), findsOneWidget);
+    expect(find.text('حذف'), findsOneWidget);
   });
 }

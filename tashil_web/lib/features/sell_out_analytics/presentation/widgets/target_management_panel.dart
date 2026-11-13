@@ -18,6 +18,8 @@ import '../../../product_master/presentation/screens/product_master_screen.dart'
 import '../../../../core/widgets/m3_toolbar_button.dart';
 import '../../../../core/widgets/m3_section_title.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
+import '../../../../core/widgets/m3_table_surface.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
 
 /// TargetManagementPanel provides a unified Target entry, Excel upload, and
 /// real-time Actual vs. Target achievement comparison experience for both
@@ -767,11 +769,11 @@ onChanged: m3Legacy<int>((v) {
         'الصنف / العلامة التجارية (SKU / Brand)',
         'القطاع (Sector)',
         'حصة النطاق % (Share %)',
-        'القيمة المستهدفة بالجنيه (Target EGP)',
-        'المحقق بالجنيه (Actual EGP)',
-        'الفجوة بالجنيه (Variance EGP)',
-        'الكمية المستهدفة بالكرتونة (Target Cases)',
-        'الكمية الفعلية بالكرتونة (Actual Cases)',
+        'القيمة المستهدفة بالجنيه',
+        'المحقق بالجنيه',
+        'الفجوة بالجنيه',
+        'الكمية المستهدفة بالكرتونة',
+        'الكمية الفعلية بالكرتونة',
         'الوزن المستهدف بالطن (Target Tons)',
         'نسبة التحقيق % (Achievement %)',
         'الحالة / المخزون',
@@ -913,15 +915,15 @@ onChanged: m3Legacy<int>((v) {
       'القطاع (Sector)',
       'حصة الصنف بالفرع %',
       'متوسط سعر الكرتونة (ج.م)',
-      'الكمية المستهدفة للفرع بالكرتونة (Target Cases)',
-      'القيمة المستهدفة للفرع بالجنيه (Target EGP)',
+      'الكمية المستهدفة للفرع بالكرتونة',
+      'القيمة المستهدفة للفرع بالجنيه',
       'الوزن المستهدف بالطن (Tons)',
-      'الكمية المحققة (Actual Cases)',
-      'القيمة المحققة (Actual EGP)',
-      'المتبقي بالكرتونة (Variance Cases)',
-      'المتبقي بالجنيه (Variance EGP)',
+      'الكمية المحققة',
+      'القيمة المحققة',
+      'المتبقي بالكرتونة',
+      'المتبقي بالجنيه',
       'نسبة التحقيق %',
-      'المخزون المتبقي بالفرع (Cases)',
+      'المخزون المتبقي بالفرع',
       'حالة المخزون بالفرع',
     ];
     final rows = branch.skus
@@ -976,6 +978,11 @@ onChanged: m3Legacy<int>((v) {
         LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
+            // No targets yet: neutral cards with one empty-state line instead
+            // of contradictory 'فوق المستهدف' / 'أقل من المستهدف'.
+            final hasTargets = summary.items.isNotEmpty;
+            const noTargets = 'لا توجد مستهدفات بعد';
+            final neutral = colorScheme.onSurfaceVariant;
             final card1 = _buildKpiCard(
               context,
               titleAr: _isSellIn
@@ -983,7 +990,7 @@ onChanged: m3Legacy<int>((v) {
                   : 'مستهدف Sell-Out',
               titleEn: _isSellIn
                   ? 'Sell-In Target'
-                  : 'Sell-Out Target (EGP)',
+                  : 'Sell-Out Target',
               value: CurrencyFormatter.formatCompactEGP(
                 summary.totalTargetRevenueEgp,
               ),
@@ -1002,8 +1009,8 @@ onChanged: m3Legacy<int>((v) {
                   ? 'المحقق صافي بعد المرتجعات (Sell-In)'
                   : 'المحقق (Sell-Out)',
               titleEn: _isSellIn
-                  ? 'Actual net Sell-In after returns (EGP)'
-                  : 'Actual Sell-Out (EGP)',
+                  ? 'Actual net Sell-In after returns'
+                  : 'Actual Sell-Out',
               value: CurrencyFormatter.formatCompactEGP(
                 summary.totalActualRevenueEgp,
               ),
@@ -1021,23 +1028,28 @@ onChanged: m3Legacy<int>((v) {
               titleAr: 'نسبة التحقيق الإجمالية',
               titleEn: 'Overall Achievement %',
               value: '${summary.overallAchievementPct.toStringAsFixed(1)}%',
-              subtitleAr: summary.overallAchievementPct >= 100
-                  ? 'فوق المستهدف'
-                  : (summary.overallAchievementPct >= 85
-                      ? 'قريب من المستهدف'
-                      : 'أقل من المستهدف'),
+              subtitleAr: !hasTargets
+                  ? noTargets
+                  : summary.overallAchievementPct >= 100
+                      ? 'فوق المستهدف'
+                      : (summary.overallAchievementPct >= 85
+                          ? 'قريب من المستهدف'
+                          : 'أقل من المستهدف'),
               subtitleEn: summary.overallAchievementPct >= 100
                   ? 'Above target'
                   : (summary.overallAchievementPct >= 85
                       ? 'Near target'
                       : 'Below target'),
               icon: Icons.pie_chart_rounded,
-              color: summary.overallAchievementPct >= 100
+              color: !hasTargets
+                  ? neutral
+                  : summary.overallAchievementPct >= 100
                   ? M3StatusColors.of(context).accents.positive
                   : (summary.overallAchievementPct >= 85
                       ? M3StatusColors.of(context).accents.caution
                       : colorScheme.error),
-              progressPct: summary.overallAchievementPct,
+              progressPct: hasTargets ? summary.overallAchievementPct : null,
+              reserveProgress: true,
             );
             final card4 = _buildKpiCard(
               context,
@@ -1045,72 +1057,38 @@ onChanged: m3Legacy<int>((v) {
                   ? 'الفرق'
                   : 'الفرق',
               titleEn: 'Variance',
-              value:
-                  '${summary.totalVarianceEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatCompactEGP(summary.totalVarianceEgp)}',
-              subtitleAr: _isSellIn && summary.totalBranchesCovered > 0
-                  ? 'موزع على ${summary.totalBranchesCovered} فرع • ${summary.totalSkusCovered} صنف'
-                  : (summary.totalVarianceEgp >= 0
-                      ? 'فوق المستهدف'
-                      : 'المتبقي للمستهدف'),
+              value: !hasTargets
+                  ? '—'
+                  : '${summary.totalVarianceEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatCompactEGP(summary.totalVarianceEgp)}',
+              subtitleAr: !hasTargets
+                  ? noTargets
+                  : _isSellIn && summary.totalBranchesCovered > 0
+                      ? 'موزع على ${summary.totalBranchesCovered} فرع • ${summary.totalSkusCovered} صنف'
+                      : (summary.totalVarianceEgp >= 0
+                          ? 'فوق المستهدف'
+                          : 'المتبقي للمستهدف'),
               subtitleEn: summary.totalVarianceEgp >= 0
                   ? 'Above target'
                   : 'To go',
               icon: summary.totalVarianceEgp >= 0
                   ? Icons.trending_up_rounded
                   : Icons.account_tree_rounded,
-              color: summary.totalVarianceEgp >= 0
-                  ? M3StatusColors.of(context).accents.positive
-                  : M3StatusColors.of(context).accents.indigo,
+              color: !hasTargets
+                  ? neutral
+                  : summary.totalVarianceEgp >= 0
+                      ? M3StatusColors.of(context).accents.positive
+                      : M3StatusColors.of(context).accents.indigo,
             );
 
-            if (width >= 1100) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: card1),
-                  const SizedBox(width: 12.0),
-                  Expanded(child: card2),
-                  const SizedBox(width: 12.0),
-                  Expanded(child: card3),
-                  const SizedBox(width: 12.0),
-                  Expanded(child: card4),
-                ],
-              );
-            } else if (width >= 650) {
-              return Column(
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: card1),
-                      const SizedBox(width: 12.0),
-                      Expanded(child: card2),
-                    ],
-                  ),
-                  const SizedBox(height: 12.0),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: card3),
-                      const SizedBox(width: 12.0),
-                      Expanded(child: card4),
-                    ],
-                  ),
-                ],
-              );
-            } else {
-              return Column(
-                children: [
-                  card1,
-                  const SizedBox(height: 12.0),
-                  card2,
-                  const SizedBox(height: 12.0),
-                  card3,
-                  const SizedBox(height: 12.0),
-                  card4,
-                ],
-              );
-            }
+            // Equal-height grid (as on the other tabs) so the progress bar
+            // card is not taller than its siblings.
+            return M3EqualHeightGrid(
+              key: const ValueKey('targets_kpi_grid'),
+              columns: width >= 1100 ? 4 : (width >= 650 ? 2 : 1),
+              spacing: M3Spacing.sm,
+              runSpacing: M3Spacing.sm,
+              children: [card1, card2, card3, card4],
+            );
           },
         ),
 
@@ -1118,7 +1096,8 @@ onChanged: m3Legacy<int>((v) {
 
         // 2. Action & Filter Toolbar
         Container(
-          padding: const EdgeInsets.all(14.0),
+          key: const ValueKey('targets_filter_bar'),
+          padding: M3Spacing.pSm,
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
             borderRadius: M3Shape.radiusLg,
@@ -1127,24 +1106,24 @@ onChanged: m3Legacy<int>((v) {
             ),
           ),
           child: Wrap(
-            spacing: 12.0,
-            runSpacing: 12.0,
+            spacing: M3Spacing.sm,
+            runSpacing: M3Spacing.xs,
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               // Filters: Year + Chain
               Wrap(
-                spacing: 12.0,
-                runSpacing: 8.0,
+                spacing: M3Spacing.sm,
+                runSpacing: M3Spacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   SizedBox(
-                    width: 175.0,
+                    width: 190.0,
                     child: M3Dropdown<int>(
 value: [0, ..._targetPlanningYears].contains(_selectedYear)
                           ? _selectedYear
                           : 0,
-label: 'السنة',
+label: 'سنة البيانات',
 expand: true,
 options: m3OptionsFromMenuItems<int>([
                         const DropdownMenuItem(value: 0, child: Text('كل السنوات')),
@@ -1245,8 +1224,9 @@ onChanged: m3Legacy<String>((v) {
 
         // 3. Level 1: Chain Target vs. Actual Summary Table
         Container(
+          key: const ValueKey('targets_chain_table_section'),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLowest,
+            color: M3TableSurface.color(colorScheme),
             borderRadius: M3Shape.radiusLg,
             border: Border.all(
               color: colorScheme.outlineVariant.withOpacity(0.5),
@@ -1313,7 +1293,7 @@ onChanged: m3Legacy<String>((v) {
                               ),
                               const DataColumn(
                                 numeric: true,
-                                label: Text('المستهدف (Target EGP)'),
+                                label: Text('المستهدف'),
                               ),
                               const DataColumn(
                                 numeric: true,
@@ -1628,9 +1608,9 @@ onChanged: m3Legacy<String>((v) {
     final activeBranch = _getActiveBranch(target);
 
     return Container(
-      padding: const EdgeInsets.all(18.0),
+      padding: M3Spacing.pSm,
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLowest,
+        color: M3TableSurface.color(colorScheme),
         borderRadius: M3Shape.radiusLg,
         border: Border.all(
           color: colorScheme.primary.withOpacity(0.35),
@@ -2009,7 +1989,7 @@ onChanged: m3Legacy<String>((v) {
               DataColumn(numeric: true, label: Text('حصة الفرع %')),
               DataColumn(
                 numeric: true,
-                label: Text('المستهدف للفرع (Target EGP)'),
+                label: Text('المستهدف للفرع'),
               ),
               DataColumn(
                 numeric: true,
@@ -2657,7 +2637,7 @@ onChanged: m3Legacy<String>((v) {
           ),
           const DataColumn(
             numeric: true,
-            label: Text('القيمة المستهدفة (Target EGP)'),
+            label: Text('القيمة المستهدفة'),
           ),
           const DataColumn(numeric: true, label: Text('الوزن (طن)')),
           const DataColumn(
@@ -2945,7 +2925,7 @@ onChanged: m3Legacy<String>((v) {
               DataColumn(numeric: true, label: Text('حصة المندوب %')),
               DataColumn(
                 numeric: true,
-                label: Text('المستهدف للمندوب (Target EGP)'),
+                label: Text('المستهدف للمندوب'),
               ),
               DataColumn(
                 numeric: true,
@@ -3039,7 +3019,7 @@ onChanged: m3Legacy<String>((v) {
               DataColumn(numeric: true, label: Text('حصة العلامة التجارية %')),
               DataColumn(
                 numeric: true,
-                label: Text('المستهدف بالجنيه (Target EGP)'),
+                label: Text('المستهدف بالجنيه'),
               ),
               DataColumn(
                 numeric: true,
@@ -3133,7 +3113,7 @@ onChanged: m3Legacy<String>((v) {
               DataColumn(numeric: true, label: Text('الوزن الموسمي %')),
               DataColumn(
                 numeric: true,
-                label: Text('مستهدف الشهر (Target EGP)'),
+                label: Text('مستهدف الشهر'),
               ),
               DataColumn(
                 numeric: true,
@@ -3232,10 +3212,12 @@ onChanged: m3Legacy<String>((v) {
     required IconData icon,
     required Color color,
     double? progressPct,
+    bool reserveProgress = false,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Container(
+      key: ValueKey('targets_kpi_card_$titleAr'),
       constraints: const BoxConstraints(minHeight: 145.0),
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
@@ -3275,17 +3257,6 @@ onChanged: m3Legacy<String>((v) {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2.0),
-                    Text(
-                      titleEn,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant.withOpacity(0.85),
-                        fontWeight: FontWeight.w600,
-                        fontSize: M3FontSize.bodySmall,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
                   ],
                 ),
               ),
@@ -3299,7 +3270,9 @@ onChanged: m3Legacy<String>((v) {
               color: colorScheme.onSurface,
             ),
           ),
-          if (progressPct != null) ...[
+          if (progressPct == null && reserveProgress)
+            const SizedBox(height: 14.0)
+          else if (progressPct != null) ...[
             const SizedBox(height: 8.0),
             ClipRRect(
               borderRadius: M3Shape.radiusFull,
@@ -3326,16 +3299,6 @@ onChanged: m3Legacy<String>((v) {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (subtitleEn.isNotEmpty) ...[
-                const SizedBox(width: 4.0),
-                Text(
-                  '• $subtitleEn',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant.withOpacity(0.7),
-                    fontSize: M3FontSize.labelSmall,
-                  ),
-                ),
-              ],
             ],
           ),
         ],

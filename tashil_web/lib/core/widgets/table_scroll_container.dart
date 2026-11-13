@@ -23,6 +23,11 @@ class TableScrollContainer extends StatefulWidget {
   final EdgeInsetsGeometry? padding;
   final Decoration? decoration;
 
+  /// Optional column pinned at the inline end (left in RTL), outside the
+  /// horizontal scroll view, e.g. a row-actions column that must stay on
+  /// screen. Its rows must use the same heights as the table's rows.
+  final Widget? pinnedEnd;
+
   const TableScrollContainer({
     super.key,
     required this.child,
@@ -36,6 +41,7 @@ class TableScrollContainer extends StatefulWidget {
     this.showSwipeHint = true,
     this.padding,
     this.decoration,
+    this.pinnedEnd,
   });
 
   @override
@@ -217,13 +223,15 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
                             alignment: AlignmentDirectional.centerEnd,
-                            child: _buildScrollControls(context, compact: isVeryNarrow),
+                            child: _buildScrollControls(context,
+                                compact: isVeryNarrow),
                           ),
                         ),
                     ],
                   );
 
-                  final hasTitleOrIcon = widget.title != null || widget.icon != null;
+                  final hasTitleOrIcon =
+                      widget.title != null || widget.icon != null;
 
                   if (!hasTitleOrIcon) {
                     return Align(
@@ -261,30 +269,43 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
           ],
 
           // Scrollable Table Area with Always-Visible Scrollbar & Full-Width Column Expansion
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final availableWidth =
-                  constraints.maxWidth.isFinite ? constraints.maxWidth : 0.0;
-              return Scrollbar(
-                controller: _effectiveController,
-                thumbVisibility: true,
-                trackVisibility: true,
-                interactive: true,
-                thickness: 9.0,
-                radius: const Radius.circular(8.0),
-                child: SingleChildScrollView(
-                  controller: _effectiveController,
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics(),
-                  ),
-                  child: _buildExpandedChild(widget.child, availableWidth),
-                ),
-              );
-            },
-          ),
+          if (widget.pinnedEnd != null)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildScrollArea()),
+                widget.pinnedEnd!,
+              ],
+            )
+          else
+            _buildScrollArea(),
         ],
       ),
+    );
+  }
+
+  Widget _buildScrollArea() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth =
+            constraints.maxWidth.isFinite ? constraints.maxWidth : 0.0;
+        return Scrollbar(
+          controller: _effectiveController,
+          thumbVisibility: true,
+          trackVisibility: true,
+          interactive: true,
+          thickness: 9.0,
+          radius: const Radius.circular(8.0),
+          child: SingleChildScrollView(
+            controller: _effectiveController,
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            child: _buildExpandedChild(widget.child, availableWidth),
+          ),
+        );
+      },
     );
   }
 
