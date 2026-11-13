@@ -24,9 +24,9 @@ Map<String, dynamic> cpfrRichDashboardJson({String chain = 'all'}) => {
       'active_reps_count': 3,
       'sales_manager_name': 'مدير مبيعات تجريبي',
       'ka_officer_name': 'مسؤول حسابات تجريبي',
-      'jan_2026_sell_in_egp': 1250000.0,
-      'jan_2026_sell_out_egp': 980000.0,
-      'jan_2026_gap_egp': 270000.0,
+      'jan_2026_sell_in_egp': 128400000.0,
+      'jan_2026_sell_out_egp': 121700000.0,
+      'jan_2026_gap_egp': 11200000.0,
       'jan_2026_sell_through_pct': 78.4,
       'ytd_2026_sell_in_egp': 1250000.0,
       'ytd_2026_sell_in_cases': 4200.0,
@@ -47,14 +47,21 @@ Map<String, dynamic> cpfrRichDashboardJson({String chain = 'all'}) => {
       'safety_stock_days': 7,
       'monthly_reconciliation': [
         for (final m in [
-          [1, 'January', 'يناير', 'مغلق (Full Month)', 91.8, true],
+          [
+            1,
+            'January Extended Reconciled Period Across All Retail Chains',
+            'يناير / كانون الثاني للفترة التجريبية الممتدة عبر كل السلاسل',
+            'مغلق (Full Month)',
+            91.8,
+            true,
+          ],
           [
             2,
             'February',
             'فبراير',
             'مفتوح (Partial Month — حتى يوم 13)',
             74.2,
-            true
+            true,
           ],
         ])
           {
