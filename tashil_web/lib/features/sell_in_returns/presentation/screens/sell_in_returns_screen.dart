@@ -5,13 +5,18 @@ import 'package:tashil_web/core/layout/m3_content_boundary.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/testing/test_semantics.dart';
 import 'package:tashil_web/core/theme/m3_spacing.dart';
+import 'package:tashil_web/core/utils/arabic_plural.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/core/utils/excel_export_service.dart';
 import 'package:tashil_web/core/utils/export_columns.dart';
-import 'package:tashil_web/core/widgets/kpi_card.dart';
+import 'package:tashil_web/core/utils/shared_display_prefix.dart';
+import 'package:tashil_web/core/widgets/m3_button.dart';
 import 'package:tashil_web/core/widgets/m3_dropdown.dart';
+import 'package:tashil_web/core/widgets/m3_equal_height_grid.dart';
 import 'package:tashil_web/core/widgets/m3_feedback.dart';
 import 'package:tashil_web/core/widgets/m3_states.dart';
+import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
+import 'package:tashil_web/core/widgets/m3_toolbar_button.dart';
 
 import '../../data/sell_in_returns_repository.dart';
 import '../../domain/sell_in_returns_models.dart';
@@ -130,45 +135,55 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: M3ContentBoundary(
-        padding: M3Spacing.pMd,
-        child: RefreshIndicator(
-          onRefresh: () => _load(force: true),
-          child: ListView(
-            children: [
-              _buildHeader(theme, cs),
-              const SizedBox(height: 12),
-              _buildFilters(theme, cs),
-              const SizedBox(height: 16),
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 48),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_error != null)
-                M3ErrorState(
-                  title: 'تعذر تحميل المرتجعات',
-                  message: _error,
-                  onRetry: () => _load(force: true),
-                )
-              else ...[
-                _buildKpis(theme, cs),
+    return M3ToolbarButtonTheme(
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: M3ContentBoundary(
+          padding: M3Spacing.pMd,
+          child: RefreshIndicator(
+            onRefresh: () => _load(force: true),
+            child: ListView(
+              children: [
+                _buildHeader(theme, cs),
+                const SizedBox(height: 12),
+                _buildFilters(theme, cs),
                 const SizedBox(height: 16),
-                ReturnsMonthlyChart(points: _report.monthly),
-                if (_report.topReturnedProducts.isNotEmpty) ...[
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 48),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_error != null)
+                  M3ErrorState(
+                    title: 'تعذر تحميل المرتجعات',
+                    message: _error,
+                    onRetry: () => _load(force: true),
+                  )
+                else ...[
+                  _buildKpis(theme, cs),
                   const SizedBox(height: 16),
-                  _buildTopProducts(theme, cs),
+                  ReturnsMonthlyChart(points: _report.monthly),
+                  if (_report.topReturnedProducts.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _buildTopProducts(theme, cs),
+                  ],
+                  const SizedBox(height: 16),
+                  _buildMatrixCard(theme, cs),
                 ],
-                const SizedBox(height: 16),
-                _buildMatrixCard(theme, cs),
               ],
-            ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  Map<String, String> get _branchDisplay {
+    final names = <String>{
+      ..._report.filterOptions.branches,
+      ..._report.branches.map((b) => b.branchName),
+    };
+    return displayNamesWithoutSharedPrefix(names);
   }
 
   void _handleExportExcel() {
@@ -251,13 +266,15 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
                 label: 'المرتجعات',
                 child: Text(
                   'المرتجعات',
-                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+                  style: theme.textTheme.headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w900),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 'Sell-In Returns · Adeco → chains (read-only)',
-                style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: cs.onSurfaceVariant),
               ),
             ],
           ),
@@ -265,17 +282,23 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
         TestSemantics(
           identifier: 'returns-export-excel',
           label: 'تصدير Excel',
-          child: OutlinedButton.icon(
+          child: M3Button.outlined(
             onPressed: _handleExportExcel,
-            icon: const Icon(Icons.download_rounded, size: 18),
-            label: const Text('تصدير Excel'),
+            icon: Icons.download_rounded,
+            label: 'تصدير Excel',
           ),
         ),
         const SizedBox(width: 12),
         SegmentedButton<bool>(
           segments: const [
-            ButtonSegment(value: false, label: Text('قيمة'), icon: Icon(Icons.payments_rounded, size: 18)),
-            ButtonSegment(value: true, label: Text('نسبة %'), icon: Icon(Icons.percent_rounded, size: 18)),
+            ButtonSegment(
+                value: false,
+                label: Text('قيمة'),
+                icon: Icon(Icons.payments_rounded, size: 18)),
+            ButtonSegment(
+                value: true,
+                label: Text('نسبة %'),
+                icon: Icon(Icons.percent_rounded, size: 18)),
           ],
           selected: {_showPct},
           onSelectionChanged: (s) => setState(() => _showPct = s.first),
@@ -316,7 +339,8 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
               label: 'الشهر',
               value: _month,
               options: [
-                for (var m = 0; m <= 12; m++) M3DropdownOption(m, _monthLabelsAr[m]),
+                for (var m = 0; m <= 12; m++)
+                  M3DropdownOption(m, _monthLabelsAr[m]),
               ],
               onChanged: (v) {
                 setState(() => _month = v);
@@ -330,7 +354,10 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
               value: branches.contains(_branch) ? _branch : 'all',
               options: [
                 for (final b in branches)
-                  M3DropdownOption(b, b == 'all' ? 'كل الفروع' : b),
+                  M3DropdownOption(
+                    b,
+                    b == 'all' ? 'كل الفروع' : (_branchDisplay[b] ?? b),
+                  ),
               ],
               onChanged: (v) {
                 setState(() => _branch = v);
@@ -376,87 +403,77 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
     final mom = k.momChangePct;
     final momUp = k.momDirection == 'up';
     final momDown = k.momDirection == 'down';
-    final momLabel = mom == null
-        ? 'لا مقارنة'
-        : '${momUp ? '↑' : momDown ? '↓' : '→'} ${mom.abs().toStringAsFixed(1)}%';
-    final momEn = mom == null ? 'n/a' : '${k.momDirection} ${mom.toStringAsFixed(1)}%';
+    final momSubtitle = k.focusMonth > 0
+        ? 'مقارنة ${_monthLabelsAr[k.focusMonth]} بالشهر السابق'
+        : 'لا توجد بيانات للمقارنة';
+
+    final cards = [
+      M3SummaryKpiCard(
+        key: const ValueKey('returns_kpi_card_قيمة المرتجعات'),
+        titleKey: const ValueKey('returns_kpi_title_قيمة المرتجعات'),
+        subtitleKey: const ValueKey('returns_kpi_subtitle_قيمة المرتجعات'),
+        title: 'قيمة المرتجعات',
+        value: CurrencyFormatter.formatCompactEGP(k.returnsValueEgp),
+        subtitle: 'مجموع قيم المرتجع (موجب للعرض)',
+        icon: Icons.undo_rounded,
+        color: cs.primary,
+        titleMaxLines: null,
+        subtitleMaxLines: 3,
+      ),
+      M3SummaryKpiCard(
+        key: const ValueKey('returns_kpi_card_كمية المرتجعات'),
+        titleKey: const ValueKey('returns_kpi_title_كمية المرتجعات'),
+        subtitleKey: const ValueKey('returns_kpi_subtitle_كمية المرتجعات'),
+        title: 'كمية المرتجعات',
+        value: CurrencyFormatter.formatNumber(k.returnsQty.round()),
+        subtitle: 'كرتونة / وحدة مرتجعة',
+        icon: Icons.inventory_2_rounded,
+        color: cs.tertiary,
+        titleMaxLines: null,
+        subtitleMaxLines: 3,
+      ),
+      M3SummaryKpiCard(
+        key: const ValueKey('returns_kpi_card_نسبة المرتجع من الإجمالي'),
+        titleKey: const ValueKey('returns_kpi_title_نسبة المرتجع من الإجمالي'),
+        subtitleKey:
+            const ValueKey('returns_kpi_subtitle_نسبة المرتجع من الإجمالي'),
+        title: 'نسبة المرتجع من الإجمالي',
+        value: '${k.returnPctOfGross.toStringAsFixed(1)}%',
+        subtitle: 'Returns ÷ Gross',
+        icon: Icons.percent_rounded,
+        color: k.returnPctOfGross >= 10 ? cs.error : cs.secondary,
+        titleMaxLines: null,
+        subtitleMaxLines: 3,
+      ),
+      M3SummaryKpiCard(
+        key: const ValueKey('returns_kpi_card_التغير الشهري (MoM)'),
+        titleKey: const ValueKey('returns_kpi_title_التغير الشهري (MoM)'),
+        subtitleKey: const ValueKey('returns_kpi_subtitle_التغير الشهري (MoM)'),
+        title: 'التغير الشهري (MoM)',
+        value: mom == null
+            ? '—'
+            : '${mom >= 0 ? '+' : ''}${mom.toStringAsFixed(1)}%',
+        subtitle: mom == null ? 'لا توجد بيانات للمقارنة' : momSubtitle,
+        icon: momUp
+            ? Icons.trending_up_rounded
+            : momDown
+                ? Icons.trending_down_rounded
+                : Icons.trending_flat_rounded,
+        color: momUp ? cs.error : cs.primary,
+        titleMaxLines: null,
+        subtitleMaxLines: 3,
+      ),
+    ];
 
     return LayoutBuilder(
       builder: (context, c) {
-        final wide = c.maxWidth >= 900;
-        final cards = [
-          KpiCard(
-            title: 'قيمة المرتجعات',
-            titleEn: 'Returns Value',
-            value: CurrencyFormatter.formatCompactEGP(k.returnsValueEgp),
-            subtitle: 'مجموع قيم المرتجع (موجب للعرض)',
-            icon: Icons.undo_rounded,
-            growthPct: mom ?? 0,
-            badgeLabel: momLabel,
-            badgeLabelEn: momEn,
-            isPositive: !momUp,
-            isAlert: momUp,
-          ),
-          KpiCard(
-            title: 'كمية المرتجعات',
-            titleEn: 'Returns Qty',
-            value: CurrencyFormatter.formatNumber(k.returnsQty.round()),
-            subtitle: 'كرتونة / وحدة مرتجعة',
-            icon: Icons.inventory_2_rounded,
-            growthPct: 0,
-            badgeLabel: 'كمية',
-            badgeLabelEn: 'Qty',
-            isPositive: true,
-            usePrimaryBadge: true,
-          ),
-          KpiCard(
-            title: 'نسبة المرتجع من الإجمالي',
-            titleEn: 'Return % of Gross',
-            value: '${k.returnPctOfGross.toStringAsFixed(1)}%',
-            subtitle: 'Returns ÷ Gross',
-            icon: Icons.percent_rounded,
-            growthPct: k.returnPctOfGross,
-            badgeLabel: 'من الإجمالي',
-            badgeLabelEn: 'of gross',
-            isPositive: k.returnPctOfGross < 5,
-            isAlert: k.returnPctOfGross >= 10,
-          ),
-          KpiCard(
-            title: 'التغير الشهري (MoM)',
-            titleEn: 'MoM Change',
-            value: mom == null ? '—' : '${mom >= 0 ? '+' : ''}${mom.toStringAsFixed(1)}%',
-            subtitle: k.focusMonth > 0
-                ? 'مقارنة ${_monthLabelsAr[k.focusMonth]} بالشهر السابق'
-                : 'لا يوجد شهر مقارنة',
-            icon: momUp
-                ? Icons.trending_up_rounded
-                : momDown
-                    ? Icons.trending_down_rounded
-                    : Icons.trending_flat_rounded,
-            growthPct: mom ?? 0,
-            badgeLabel: momUp ? 'ارتفاع' : momDown ? 'انخفاض' : 'ثابت',
-            badgeLabelEn: k.momDirection,
-            isPositive: !momUp,
-            isAlert: momUp,
-          ),
-        ];
-        if (wide) {
-          return Row(
-            children: [
-              for (var i = 0; i < cards.length; i++) ...[
-                if (i > 0) const SizedBox(width: 12),
-                Expanded(child: cards[i]),
-              ],
-            ],
-          );
-        }
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            for (final card in cards)
-              SizedBox(width: (c.maxWidth - 12) / 2, child: card),
-          ],
+        final columns = c.maxWidth >= 960 ? 4 : (c.maxWidth >= 580 ? 2 : 1);
+        return M3EqualHeightGrid(
+          key: const ValueKey('returns_kpi_cards_row'),
+          columns: columns,
+          spacing: M3Spacing.sm,
+          runSpacing: M3Spacing.sm,
+          children: cards,
         );
       },
     );
@@ -471,12 +488,14 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
           children: [
             Text(
               'أعلى الأصناف المرتجعة',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 4),
             Text(
               'Top returned products · مرتّبة حسب قيمة المرتجع',
-              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
             ReturnsTopProductsTable(products: _report.topReturnedProducts),
@@ -497,14 +516,16 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
           children: [
             Text(
               'مصفوفة المرتجعات · فرع × شهر',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 4),
             Text(
               _showPct
-                  ? 'عرض نسبة المرتجع من الإجمالي لكل خلية'
-                  : 'عرض قيمة المرتجع (موجب) لكل خلية — تلوين حسب الحجم',
-              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ? '${countBranches(_report.branches.length)} · عرض نسبة المرتجع من الإجمالي لكل خلية'
+                  : '${countBranches(_report.branches.length)} · عرض قيمة المرتجع (موجب) لكل خلية — تلوين حسب الحجم',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
             if (months.isEmpty || _report.branches.isEmpty)
@@ -512,7 +533,8 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Text(
                   'لا توجد مرتجعات ضمن الفلاتر الحالية',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: cs.onSurfaceVariant),
                   textAlign: TextAlign.center,
                 ),
               )
@@ -524,6 +546,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
                 grandTotal: _report.grandTotal,
                 monthLabelsAr: _monthLabelsAr,
                 showPct: _showPct,
+                branchDisplayNames: _branchDisplay,
               ),
           ],
         ),

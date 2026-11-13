@@ -351,15 +351,29 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (widget.pinnedStart != null) widget.pinnedStart!,
+                if (widget.pinnedStart != null)
+                  _pinWithScrollbarGutter(widget.pinnedStart!),
                 Expanded(child: _buildScrollArea()),
-                if (widget.pinnedEnd != null) widget.pinnedEnd!,
+                if (widget.pinnedEnd != null)
+                  _pinWithScrollbarGutter(widget.pinnedEnd!),
               ],
             )
           else
             _buildScrollArea(),
         ],
       ),
+    );
+  }
+
+  /// Keep frozen columns aligned with the scrollable rows when the
+  /// horizontal scrollbar reserves space under the last row.
+  Widget _pinWithScrollbarGutter(Widget child) {
+    if (!_overflows) return child;
+    return Padding(
+      padding: const EdgeInsets.only(
+        bottom: _scrollbarThickness + _scrollbarGap,
+      ),
+      child: child,
     );
   }
 
@@ -393,9 +407,8 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
               child: Padding(
                 // Room for the scrollbar so it never covers row content.
                 padding: EdgeInsets.only(
-                    bottom: _overflows
-                        ? _scrollbarThickness + _scrollbarGap
-                        : 0.0),
+                    bottom:
+                        _overflows ? _scrollbarThickness + _scrollbarGap : 0.0),
                 child: _buildExpandedChild(widget.child, availableWidth),
               ),
             ),
@@ -429,8 +442,7 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
         _shrink = 0.0;
         _shrinkSteps = 0;
       }
-      final fitWidth =
-          (availableWidth - _shrink).clamp(0.0, double.infinity);
+      final fitWidth = (availableWidth - _shrink).clamp(0.0, double.infinity);
       final colCount = dt.columns.length;
       final hMargin = dt.horizontalMargin ?? 24.0;
       final colSpacing = dt.columnSpacing ??
@@ -438,8 +450,7 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
                   (colCount > 1 ? colCount - 1 : 1))
               .clamp(24.0, 56.0);
       final rawMinColWidth =
-          (fitWidth - (2 * hMargin) - ((colCount - 1) * colSpacing)) /
-              colCount;
+          (fitWidth - (2 * hMargin) - ((colCount - 1) * colSpacing)) / colCount;
       final minColWidth = rawMinColWidth.clamp(0.0, double.infinity);
 
       final flex = widget.columnFlex;
@@ -521,35 +532,34 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
 /// share one axis. For DataTables not wrapped in [TableScrollContainer].
 List<DataRow> centerCellsUnderCenteredHeadings(
     List<DataColumn> columns, List<DataRow> rows) {
-    final centered = [
-      for (final c in columns)
-        c.headingRowAlignment == MainAxisAlignment.center,
-    ];
-    if (!centered.contains(true)) return rows;
-    return [
-      for (final r in rows)
-        DataRow(
-          key: r.key,
-          selected: r.selected,
-          onSelectChanged: r.onSelectChanged,
-          onLongPress: r.onLongPress,
-          color: r.color,
-          mouseCursor: r.mouseCursor,
-          cells: [
-            for (var i = 0; i < r.cells.length; i++)
-              i < centered.length && centered[i]
-                  ? DataCell(
-                      Center(child: r.cells[i].child),
-                      placeholder: r.cells[i].placeholder,
-                      showEditIcon: r.cells[i].showEditIcon,
-                      onTap: r.cells[i].onTap,
-                      onLongPress: r.cells[i].onLongPress,
-                      onTapDown: r.cells[i].onTapDown,
-                      onDoubleTap: r.cells[i].onDoubleTap,
-                      onTapCancel: r.cells[i].onTapCancel,
-                    )
-                  : r.cells[i],
-          ],
-        ),
-    ];
+  final centered = [
+    for (final c in columns) c.headingRowAlignment == MainAxisAlignment.center,
+  ];
+  if (!centered.contains(true)) return rows;
+  return [
+    for (final r in rows)
+      DataRow(
+        key: r.key,
+        selected: r.selected,
+        onSelectChanged: r.onSelectChanged,
+        onLongPress: r.onLongPress,
+        color: r.color,
+        mouseCursor: r.mouseCursor,
+        cells: [
+          for (var i = 0; i < r.cells.length; i++)
+            i < centered.length && centered[i]
+                ? DataCell(
+                    Center(child: r.cells[i].child),
+                    placeholder: r.cells[i].placeholder,
+                    showEditIcon: r.cells[i].showEditIcon,
+                    onTap: r.cells[i].onTap,
+                    onLongPress: r.cells[i].onLongPress,
+                    onTapDown: r.cells[i].onTapDown,
+                    onDoubleTap: r.cells[i].onDoubleTap,
+                    onTapCancel: r.cells[i].onTapCancel,
+                  )
+                : r.cells[i],
+        ],
+      ),
+  ];
 }

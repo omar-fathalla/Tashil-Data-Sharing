@@ -1,16 +1,22 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/testing/test_semantics.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
+import 'package:tashil_web/core/utils/shared_display_prefix.dart';
 import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 
 import '../../domain/sell_in_returns_models.dart';
 
-/// Branch × month returns heatmap with:
-/// - shared fixed month column widths (header + body aligned, including RTL)
-/// - sticky branch + total columns
-/// - uniform full-cell heat fill (no uneven white chips)
-class ReturnsHeatmapMatrix extends StatefulWidget {
+/// Branch × month returns heatmap.
+///
+/// One shared row-height model: the frozen branch column, the month cells and
+/// the total column all use the same header height and the same per-row
+/// height (branch names wrap up to 3 lines and the whole row grows with
+/// them). Month columns expand to fill the width when they fit; otherwise
+/// the table scrolls with a reserved scrollbar gutter and no arrow buttons.
+class ReturnsHeatmapMatrix extends StatelessWidget {
   const ReturnsHeatmapMatrix({
     super.key,
     required this.months,
@@ -19,6 +25,7 @@ class ReturnsHeatmapMatrix extends StatefulWidget {
     required this.grandTotal,
     required this.monthLabelsAr,
     required this.showPct,
+    this.branchDisplayNames = const {},
   });
 
   final List<int> months;
@@ -28,251 +35,439 @@ class ReturnsHeatmapMatrix extends StatefulWidget {
   final List<String> monthLabelsAr;
   final bool showPct;
 
-  static const double rowH = 44;
+  /// Optional original → display map (shared prefix already stripped).
+  /// When empty, the widget derives the map from [branches].
+  final Map<String, String> branchDisplayNames;
+
+  static const double minRowH = 44;
   static const double branchW = 168;
-  static const double monthW = 92;
+  static const double minMonthW = 72;
   static const double totalW = 108;
+  static const double hPad = 8;
+  static const double vPad = 6;
   static const double cellGap = 1;
 
-  @override
-  State<ReturnsHeatmapMatrix> createState() => _ReturnsHeatmapMatrixState();
-}
-
-class _ReturnsHeatmapMatrixState extends State<ReturnsHeatmapMatrix> {
-  final ScrollController _scrollCtrl = ScrollController();
-
-  @override
-  void dispose() {
-    _scrollCtrl.dispose();
-    super.dispose();
-  }
-
-  double _raw(SellInReturnsCell c) =>
-      widget.showPct ? c.returnPctOfGross : c.returnsValueEgp;
-
-  String _fmt(SellInReturnsCell c) {
-    if (widget.showPct) return '${c.returnPctOfGross.toStringAsFixed(1)}%';
-    return CurrencyFormatter.formatCompactEGP(c.returnsValueEgp);
-  }
+  static Key branchCellKey(String branchKey) =>
+      ValueKey('returns-matrix-branch-$branchKey');
+  static Key monthsRowKey(String branchKey) =>
+      ValueKey('returns-matrix-months-$branchKey');
+  static Key totalCellKey(String branchKey) =>
+      ValueKey('returns-matrix-total-$branchKey');
+  static const Key headerRowKey = ValueKey('returns-matrix-header');
+  static const Key branchHeaderKey = ValueKey('returns-matrix-branch-header');
+  static const Key totalHeaderKey = ValueKey('returns-matrix-total-header');
+  static const Key totalsRowKey = ValueKey('returns-matrix-totals');
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final status = M3StatusColors.of(context);
-    final months = widget.months;
-    final branches = widget.branches;
-
-    final maxRet = branches.fold<double>(0, (m, b) {
-      for (final cell in b.byMonth.values) {
-        final v = _raw(cell);
-        if (v > m) m = v;
-      }
-      return m;
-    });
+    final dir = Directionality.of(context);
+    final scaler = MediaQuery.textScalerOf(context);
 
     final headerStyle = theme.textTheme.labelLarge?.copyWith(
       fontWeight: FontWeight.w800,
       color: cs.onSurfaceVariant,
     );
-    final bodyStyle = theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
-    final boldStyle = theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w900);
+    final bodyStyle =
+        theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
+    final boldStyle =
+        theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w900);
 
-    Widget labelCell({
+    final display = branchDisplayNames.isNotEmpty
+        ? branchDisplayNames
+        : displayNamesWithoutSharedPrefix(
+            branches.map((b) => b.branchName),
+          );
+
+    String labelOf(SellInReturnsBranchRow b) =>
+        display[b.branchName] ?? b.branchName;
+
+    double rawOf(SellInReturnsCell c) =>
+        showPct ? c.returnPctOfGross : c.returnsValueEgp;
+
+    String fmt(SellInReturnsCell c) {
+      if (showPct) return '${c.returnPctOfGross.toStringAsFixed(1)}%';
+      return CurrencyFormatter.formatCompactEGP(c.returnsValueEgp);
+    }
+
+    var maxRet = 0.0;
+    for (final b in branches) {
+      for (final cell in b.byMonth.values) {
+        final v = rawOf(cell);
+        if (v > maxRet) maxRet = v;
+      }
+    }
+
+    double measure({
       required String text,
-      required double width,
-      TextStyle? style,
-      Color? bg,
-      TextAlign align = TextAlign.start,
-      bool boldEdge = false,
+      required TextStyle? style,
+      required double maxWidth,
+      required int maxLines,
     }) {
-      return SizedBox(
-        width: width,
-        height: ReturnsHeatmapMatrix.rowH,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: bg,
-            border: Border(
-              bottom: BorderSide(color: cs.outlineVariant.withOpacity(0.35)),
-              left: boldEdge ? BorderSide(color: cs.outlineVariant.withOpacity(0.55)) : BorderSide.none,
-              right: boldEdge ? BorderSide(color: cs.outlineVariant.withOpacity(0.55)) : BorderSide.none,
+      final tp = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: dir,
+        textScaler: scaler,
+        maxLines: maxLines,
+        ellipsis: '…',
+      )..layout(maxWidth: math.max(0, maxWidth));
+      return tp.height;
+    }
+
+    double measureWidth(String text, TextStyle? style) {
+      final tp = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: dir,
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      return tp.width;
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available =
+            constraints.maxWidth.isFinite ? constraints.maxWidth : 0.0;
+
+        var neededMonth = minMonthW;
+        for (final m in months) {
+          final label =
+              (m >= 1 && m < monthLabelsAr.length) ? monthLabelsAr[m] : '$m';
+          neededMonth = math.max(
+            neededMonth,
+            measureWidth(label, headerStyle) + hPad * 2,
+          );
+        }
+
+        final leftover = available - branchW - totalW;
+        final monthW =
+            (months.isNotEmpty && leftover / months.length >= neededMonth)
+                ? leftover / months.length
+                : neededMonth;
+
+        final headerH = math.max(
+          minRowH,
+          math.max(
+                measure(
+                  text: 'الفرع',
+                  style: headerStyle,
+                  maxWidth: branchW - hPad * 2,
+                  maxLines: 2,
+                ),
+                math.max(
+                  measure(
+                    text: 'الإجمالي',
+                    style: headerStyle,
+                    maxWidth: totalW - hPad * 2,
+                    maxLines: 2,
+                  ),
+                  measure(
+                    text: 'سبتمبر',
+                    style: headerStyle,
+                    maxWidth: monthW - cellGap - hPad * 2,
+                    maxLines: 1,
+                  ),
+                ),
+              ) +
+              vPad * 2,
+        );
+
+        final rowHeights = <double>[
+          for (final b in branches)
+            math.max(
+              minRowH,
+              measure(
+                    text: labelOf(b),
+                    style: bodyStyle,
+                    maxWidth: branchW - hPad * 2,
+                    maxLines: 3,
+                  ) +
+                  vPad * 2,
             ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Align(
-              alignment: align == TextAlign.center
-                  ? Alignment.center
-                  : align == TextAlign.end
-                      ? AlignmentDirectional.centerEnd
-                      : AlignmentDirectional.centerStart,
-              child: Text(
-                text,
-                style: style,
-                textAlign: align,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+        ];
+
+        final totalsH = minRowH;
+
+        Widget box({
+          required double width,
+          required double height,
+          required Widget child,
+          Color? bg,
+          Color? border,
+          bool boldEdge = false,
+          Key? key,
+        }) {
+          return SizedBox(
+            key: key,
+            width: width,
+            height: height,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: bg,
+                border: Border(
+                  bottom:
+                      BorderSide(color: cs.outlineVariant.withOpacity(0.35)),
+                  left: boldEdge
+                      ? BorderSide(color: cs.outlineVariant.withOpacity(0.55))
+                      : BorderSide.none,
+                  right: boldEdge
+                      ? BorderSide(color: cs.outlineVariant.withOpacity(0.55))
+                      : BorderSide.none,
+                ),
+              ),
+              child: child,
+            ),
+          );
+        }
+
+        Widget textCell({
+          required String text,
+          required double width,
+          required double height,
+          required TextStyle? style,
+          required TextAlign align,
+          int maxLines = 1,
+          Color? bg,
+          bool boldEdge = false,
+          Key? key,
+        }) {
+          final alignment = align == TextAlign.center
+              ? Alignment.center
+              : align == TextAlign.end
+                  ? AlignmentDirectional.centerEnd
+                  : AlignmentDirectional.centerStart;
+          return box(
+            key: key,
+            width: width,
+            height: height,
+            bg: bg,
+            boldEdge: boldEdge,
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+              child: Align(
+                alignment: alignment,
+                child: Text(
+                  text,
+                  style: style,
+                  textAlign: align,
+                  maxLines: maxLines,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
-          ),
-        ),
-      );
-    }
+          );
+        }
 
-    Widget heatCell(SellInReturnsCell cell, {TextStyle? style}) {
-      final raw = _raw(cell);
-      final t = maxRet <= 0 ? 0.0 : (raw / maxRet).clamp(0.0, 1.0);
-      final bg = raw <= 0
-          ? cs.surface
-          : Color.lerp(cs.surface, status.warningContainer.withOpacity(0.9), t);
-      return Padding(
-        padding: const EdgeInsets.all(ReturnsHeatmapMatrix.cellGap / 2),
-        child: SizedBox(
-          width: ReturnsHeatmapMatrix.monthW - ReturnsHeatmapMatrix.cellGap,
-          height: ReturnsHeatmapMatrix.rowH - ReturnsHeatmapMatrix.cellGap,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: bg,
-              border: Border.all(color: cs.outlineVariant.withOpacity(0.25)),
-            ),
-            child: Center(
-              child: Text(
-                _fmt(cell),
-                style: style ?? bodyStyle,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+        Widget heatCell(SellInReturnsCell cell, double height,
+            {TextStyle? style}) {
+          final raw = rawOf(cell);
+          final t = maxRet <= 0 ? 0.0 : (raw / maxRet).clamp(0.0, 1.0);
+          final bg = raw <= 0
+              ? cs.surface
+              : Color.lerp(
+                  cs.surface, status.warningContainer.withOpacity(0.9), t);
+          return Padding(
+            padding: const EdgeInsets.all(cellGap / 2),
+            child: SizedBox(
+              width: monthW - cellGap,
+              height: height - cellGap,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: bg,
+                  border:
+                      Border.all(color: cs.outlineVariant.withOpacity(0.25)),
+                ),
+                child: Center(
+                  child: Text(
+                    fmt(cell),
+                    style: style ?? bodyStyle,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-      );
-    }
+          );
+        }
 
-    Widget monthHeader(int m) {
-      final label = (m >= 1 && m < widget.monthLabelsAr.length)
-          ? widget.monthLabelsAr[m]
-          : '$m';
-      return Padding(
-        padding: const EdgeInsets.all(ReturnsHeatmapMatrix.cellGap / 2),
-        child: SizedBox(
-          width: ReturnsHeatmapMatrix.monthW - ReturnsHeatmapMatrix.cellGap,
-          height: ReturnsHeatmapMatrix.rowH - ReturnsHeatmapMatrix.cellGap,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest.withOpacity(0.45),
-              border: Border.all(color: cs.outlineVariant.withOpacity(0.25)),
-            ),
-            child: Center(
-              child: TestSemantics(
-                identifier: 'returns-month-col-$m',
-                label: label,
-                child: Text(label, style: headerStyle, textAlign: TextAlign.center, maxLines: 1),
+        Widget monthHeader(int m) {
+          final label =
+              (m >= 1 && m < monthLabelsAr.length) ? monthLabelsAr[m] : '$m';
+          return Padding(
+            padding: const EdgeInsets.all(cellGap / 2),
+            child: SizedBox(
+              width: monthW - cellGap,
+              height: headerH - cellGap,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest.withOpacity(0.45),
+                  border:
+                      Border.all(color: cs.outlineVariant.withOpacity(0.25)),
+                ),
+                child: Center(
+                  child: TestSemantics(
+                    identifier: 'returns-month-col-$m',
+                    label: label,
+                    child: Text(
+                      label,
+                      style: headerStyle,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-      );
-    }
+          );
+        }
 
-    Widget monthsStrip({required bool isHeader, SellInReturnsBranchRow? branch, bool isTotals = false}) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final m in months)
-            if (isHeader)
-              monthHeader(m)
-            else if (isTotals)
-              heatCell(widget.columnTotals[m] ?? const SellInReturnsCell(), style: boldStyle)
-            else
-              heatCell(branch!.byMonth[m] ?? const SellInReturnsCell()),
-        ],
-      );
-    }
+        Widget monthsRow({
+          required double height,
+          required Key key,
+          bool isHeader = false,
+          SellInReturnsBranchRow? branch,
+          bool isTotals = false,
+        }) {
+          return SizedBox(
+            key: key,
+            height: height,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final m in months)
+                  if (isHeader)
+                    monthHeader(m)
+                  else if (isTotals)
+                    heatCell(
+                      columnTotals[m] ?? const SellInReturnsCell(),
+                      height,
+                      style: boldStyle,
+                    )
+                  else
+                    heatCell(
+                      branch!.byMonth[m] ?? const SellInReturnsCell(),
+                      height,
+                    ),
+              ],
+            ),
+          );
+        }
 
-    // Sticky columns must be width-bounded: a bare Column in a Row gets
-    // maxWidth=Infinity, and CrossAxisAlignment.stretch then asserts.
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: ReturnsHeatmapMatrix.branchW,
+        final headerBg = cs.surfaceContainerHighest.withOpacity(0.45);
+        final totalsBg = cs.surfaceContainerHighest.withOpacity(0.5);
+
+        final pinnedStart = SizedBox(
+          width: branchW,
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              labelCell(
+              textCell(
+                key: branchHeaderKey,
                 text: 'الفرع',
-                width: ReturnsHeatmapMatrix.branchW,
+                width: branchW,
+                height: headerH,
                 style: headerStyle,
-                bg: cs.surfaceContainerHighest.withOpacity(0.45),
+                align: TextAlign.start,
+                maxLines: 2,
+                bg: headerBg,
                 boldEdge: true,
               ),
-              for (final b in branches)
-                labelCell(
-                  text: b.branchName,
-                  width: ReturnsHeatmapMatrix.branchW,
+              for (var i = 0; i < branches.length; i++)
+                textCell(
+                  key: branchCellKey(branches[i].branchKey),
+                  text: labelOf(branches[i]),
+                  width: branchW,
+                  height: rowHeights[i],
                   style: bodyStyle,
+                  align: TextAlign.start,
+                  maxLines: 3,
                   boldEdge: true,
                 ),
-              labelCell(
+              textCell(
                 text: 'الإجمالي',
-                width: ReturnsHeatmapMatrix.branchW,
+                width: branchW,
+                height: totalsH,
                 style: boldStyle,
-                bg: cs.surfaceContainerHighest.withOpacity(0.5),
+                align: TextAlign.start,
+                bg: totalsBg,
                 boldEdge: true,
               ),
             ],
           ),
-        ),
-        Expanded(
-          child: TableScrollContainer(
-            controller: _scrollCtrl,
-            showControls: true,
-            showSwipeHint: months.length > 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                monthsStrip(isHeader: true),
-                for (final b in branches) monthsStrip(isHeader: false, branch: b),
-                monthsStrip(isHeader: false, isTotals: true),
-              ],
-            ),
-          ),
-        ),
-        SizedBox(
-          width: ReturnsHeatmapMatrix.totalW,
+        );
+
+        final pinnedEnd = SizedBox(
+          width: totalW,
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              labelCell(
+              textCell(
+                key: totalHeaderKey,
                 text: 'الإجمالي',
-                width: ReturnsHeatmapMatrix.totalW,
+                width: totalW,
+                height: headerH,
                 style: headerStyle,
-                bg: cs.surfaceContainerHighest.withOpacity(0.45),
                 align: TextAlign.center,
+                bg: headerBg,
                 boldEdge: true,
               ),
-              for (final b in branches)
-                labelCell(
-                  text: _fmt(b.total),
-                  width: ReturnsHeatmapMatrix.totalW,
+              for (var i = 0; i < branches.length; i++)
+                textCell(
+                  key: totalCellKey(branches[i].branchKey),
+                  text: fmt(branches[i].total),
+                  width: totalW,
+                  height: rowHeights[i],
                   style: boldStyle,
                   align: TextAlign.center,
                   boldEdge: true,
                 ),
-              labelCell(
-                text: _fmt(widget.grandTotal),
-                width: ReturnsHeatmapMatrix.totalW,
+              textCell(
+                text: fmt(grandTotal),
+                width: totalW,
+                height: totalsH,
                 style: boldStyle,
-                bg: cs.surfaceContainerHighest.withOpacity(0.5),
                 align: TextAlign.center,
+                bg: totalsBg,
                 boldEdge: true,
               ),
             ],
           ),
-        ),
-      ],
+        );
+
+        final monthsStrip = Column(
+          key: const ValueKey('returns-matrix-months-strip'),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            monthsRow(height: headerH, key: headerRowKey, isHeader: true),
+            for (var i = 0; i < branches.length; i++)
+              monthsRow(
+                height: rowHeights[i],
+                key: monthsRowKey(branches[i].branchKey),
+                branch: branches[i],
+              ),
+            monthsRow(
+              height: totalsH,
+              key: totalsRowKey,
+              isTotals: true,
+            ),
+          ],
+        );
+
+        return TableScrollContainer(
+          showControls: false,
+          showSwipeHint: false,
+          pinnedStart: pinnedStart,
+          pinnedEnd: pinnedEnd,
+          child: monthsStrip,
+        );
+      },
     );
   }
 }

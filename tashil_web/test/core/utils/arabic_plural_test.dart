@@ -16,4 +16,13 @@ void main() {
     expect(countSku(103), '103 أصناف');
     expect(countSku(111), '111 صنفًا');
   });
+
+  test('countBranches uses the Arabic counted-noun rules', () {
+    expect(countBranches(0), '0 فروع');
+    expect(countBranches(1), 'فرع واحد');
+    expect(countBranches(2), 'فرعان');
+    expect(countBranches(4), '4 فروع');
+    expect(countBranches(12), '12 فرعًا');
+    expect(countBranches(100), '100 فرع');
+  });
 }
