@@ -1,0 +1,247 @@
+import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/features/cpfr_replenishment/domain/cpfr_models.dart';
+
+import '../cpfr_dashboard_refinements_test.dart' show MockCPFRApiClient;
+
+/// Made-up CPFR fixture with long Arabic names for layout tests and shots.
+/// Numbers and names are fictional — never production data.
+const kCpfrLongSkuName =
+    'منظف أرضيات تجريبي برائحة اللافندر عبوة اقتصادية كبيرة الحجم مع غطاء محكم';
+
+const kCpfrLongBrand = 'علامة تجارية تجريبية للعناية المنزلية المتخصصة';
+
+const kCpfrLongRep =
+    'مندوب المبيعات التجريبي لمنطقة القاهرة الكبرى والإسكندرية';
+
+const kCpfrLongGovernorate = 'القاهرة الكبرى والمنطقة المحيطة';
+
+Map<String, dynamic> cpfrRichDashboardJson({String chain = 'all'}) => {
+      'tenant_id': 'tenant-adeco',
+      'retailer_chain': chain,
+      'source_filename': 'CPFR_Demo_Fixture.xlsx',
+      'total_records': 48,
+      'active_skus_count': 12,
+      'active_reps_count': 3,
+      'sales_manager_name': 'مدير مبيعات تجريبي',
+      'ka_officer_name': 'مسؤول حسابات تجريبي',
+      'jan_2026_sell_in_egp': 1250000.0,
+      'jan_2026_sell_out_egp': 980000.0,
+      'jan_2026_gap_egp': 270000.0,
+      'jan_2026_sell_through_pct': 78.4,
+      'ytd_2026_sell_in_egp': 1250000.0,
+      'ytd_2026_sell_in_cases': 4200.0,
+      'ytd_2026_weight_tons': 48.5,
+      'ytd_2026_expected_egp': 1310000.0,
+      'oct_w1w2_actual_egp': 210000.0,
+      'oct_w1w2_actual_cases': 640.0,
+      'oct_projected_month_end_egp': 420000.0,
+      'oct_projected_cases': 1280.0,
+      'total_estimated_stock_cases': 860.0,
+      'total_estimated_stock_egp': 245000.0,
+      'total_suggested_po_cases': 310,
+      'total_suggested_po_egp': 88000.0,
+      'total_suggested_po_tons': 6.2,
+      'urgent_replenishment_count': 2,
+      'overstock_alert_count': 1,
+      'lead_time_days': 4,
+      'safety_stock_days': 7,
+      'monthly_reconciliation': [
+        for (final m in [
+          [1, 'January', 'يناير', 'مغلق (Full Month)', 91.8, true],
+          [
+            2,
+            'February',
+            'فبراير',
+            'مفتوح (Partial Month — حتى يوم 13)',
+            74.2,
+            true
+          ],
+        ])
+          {
+            'year': 2026,
+            'month_num': m[0],
+            'month_en': m[1],
+            'month_ar': m[2],
+            'period_status': m[3],
+            'has_actual_sell_out': m[5],
+            'active_skus_count': 12,
+            'opening_stock_cases': 400,
+            'sell_in_cases': 2100.5,
+            'sell_in_value_egp': 625000.0,
+            'sell_out_value_egp': 490000.0,
+            'monthly_net_value_egp': 135000.0,
+            'closing_stock_value_egp': 180000.0,
+            'closing_stock_cases': 430,
+            'sell_through_rate_pct': m[4],
+            'weight_tons': 24.2,
+            'expected_value_egp': 655000.0,
+          },
+      ],
+      'inventory_and_po_items': [
+        {
+          'item_code': 'T-100',
+          'barcode': '000000000001',
+          'sku_name': kCpfrLongSkuName,
+          'brand': kCpfrLongBrand,
+          'sector': 'MT',
+          'governorate': kCpfrLongGovernorate,
+          'region_code': 'CIR',
+          'sales_rep': kCpfrLongRep,
+          'sell_in_cases': 120.0,
+          'sell_out_est_cases': 95.0,
+          'estimated_stock_cases': 25.0,
+          'daily_run_rate_cases': 3.2,
+          'days_of_inventory': 7.8,
+          'stock_status': 'urgent_replenishment',
+          'stock_status_ar': 'خطر نفاد عاجل (يحتاج توريد فوري)',
+          'suggested_po_cases': 40,
+          'suggested_po_value_egp': 11500.0,
+          'suggested_po_tons': 0.8,
+        },
+        {
+          'item_code': 'T-101',
+          'barcode': '000000000002',
+          'sku_name': 'صنف تجريبي قصير',
+          'brand': 'Test',
+          'sector': 'CC',
+          'governorate': 'الإسكندرية',
+          'region_code': 'ALX',
+          'sales_rep': 'مندوب تجريبي',
+          'sell_in_cases': 80.0,
+          'sell_out_est_cases': 20.0,
+          'estimated_stock_cases': 60.0,
+          'daily_run_rate_cases': 0.6,
+          'days_of_inventory': 100.0,
+          'stock_status': 'overstock',
+          'stock_status_ar': 'تكدس مخزني (تغطية تتجاوز 28 يوماً)',
+          'suggested_po_cases': 0,
+          'suggested_po_value_egp': 0.0,
+          'suggested_po_tons': 0.0,
+        },
+      ],
+      'brand_forecasts': [
+        {
+          'sector': 'MT',
+          'sector_name_ar': 'المنظفات والعناية المنزلية',
+          'brand': kCpfrLongBrand,
+          'active_skus_count': 8,
+          'actual_cases': 2100.0,
+          'actual_value_egp': 980000.0,
+          'expected_cases': 2400.0,
+          'expected_value_egp': 1120000.0,
+          'weight_tons': 36.4,
+          'share_of_total_pct': 72.5,
+        },
+        {
+          'sector': 'CC',
+          'brand': 'علامة قصيرة',
+          'active_skus_count': 4,
+          'actual_cases': 640.0,
+          'actual_value_egp': 270000.0,
+          'expected_cases': 700.0,
+          'expected_value_egp': 290000.0,
+          'weight_tons': 12.1,
+          'share_of_total_pct': 27.5,
+        },
+      ],
+      'region_performances': [
+        {
+          'region_code': 'CIR',
+          'governorate': kCpfrLongGovernorate,
+          'actual_cases': 1500.0,
+          'actual_value_egp': 620000.0,
+          'weight_tons': 22.0,
+          'share_pct': 50.0,
+        },
+        {
+          'region_code': 'ALX',
+          'governorate': 'الإسكندرية',
+          'actual_cases': 900.0,
+          'actual_value_egp': 360000.0,
+          'weight_tons': 14.0,
+          'share_pct': 29.0,
+        },
+        {
+          'region_code': 'TNT',
+          'governorate': 'الغربية',
+          'actual_cases': 640.0,
+          'actual_value_egp': 260000.0,
+          'weight_tons': 8.5,
+          'share_pct': 21.0,
+        },
+      ],
+      'sales_rep_scorecards': [
+        {
+          'sales_rep': kCpfrLongRep,
+          'governorate': kCpfrLongGovernorate,
+          'region_code': 'CIR',
+          'active_skus_count': 8,
+          'actual_cases': 1500.0,
+          'actual_value_egp': 620000.0,
+          'expected_value_egp': 680000.0,
+          'weight_tons': 22.05,
+          'promo_share_pct': 11.3,
+          'return_rate_pct': 6.4,
+        },
+        {
+          'sales_rep': 'مندوب تجريبي قصير',
+          'governorate': 'الإسكندرية',
+          'region_code': 'ALX',
+          'active_skus_count': 4,
+          'actual_cases': 900.0,
+          'actual_value_egp': 360000.0,
+          'expected_value_egp': 390000.0,
+          'weight_tons': 14.0,
+          'promo_share_pct': 4.0,
+          'return_rate_pct': 1.2,
+        },
+      ],
+      'promo_and_returns': {
+        'regular_records_count': 40,
+        'promo_records_count': 6,
+        'return_records_count': 3,
+        'regular_cases': 3800.0,
+        'promo_cases': 400.0,
+        'total_return_cases': 18.5,
+        'regular_value_egp': 1100000.0,
+        'promo_value_egp': 150000.0,
+        'total_return_value_egp': 9200.0,
+        'regular_tons': 42.0,
+        'promo_tons': 6.5,
+        'total_return_tons': 0.4,
+        'promo_share_pct': 12.0,
+        'promo_value_share_pct': 12.0,
+        'return_rate_pct': 0.74,
+        'overall_return_pct': 0.74,
+        'top_return_items': [
+          {
+            'item_name': kCpfrLongSkuName,
+            'brand': kCpfrLongBrand,
+            'sector': 'MT',
+            'governorate': kCpfrLongGovernorate,
+            'region_code': 'CIR',
+            'sales_rep': kCpfrLongRep,
+            'return_cases': 12.25,
+            'return_value_egp': 6100.0,
+            'return_rate_pct': 8.4,
+          },
+        ],
+      },
+    };
+
+class RichCPFRApiClient extends MockCPFRApiClient {
+  @override
+  Future<CPFRDashboardModel> fetchCPFRDashboard({
+    String chain = 'all',
+    String sector = 'all',
+    String region = 'all',
+    String brand = 'all',
+    String rep = 'all',
+    String stockStatus = 'all',
+    int leadTimeDays = 4,
+    int safetyStockDays = 7,
+    int? year,
+    bool allowLocalFallback = true,
+  }) async =>
+      CPFRDashboardModel.fromJson(cpfrRichDashboardJson(chain: chain));
+}

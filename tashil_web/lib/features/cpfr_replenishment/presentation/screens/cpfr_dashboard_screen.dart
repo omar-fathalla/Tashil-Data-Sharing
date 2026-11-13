@@ -11,12 +11,16 @@ import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
-import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_button_group.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
+import '../../../../core/utils/arabic_plural.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
+import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
+import '../../../sell_out_analytics/presentation/utils/monthly_status_text.dart';
 import '../../domain/cpfr_models.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 
@@ -38,48 +42,56 @@ class CPFRDashboardScreen extends StatefulWidget {
   State<CPFRDashboardScreen> createState() => _CPFRDashboardScreenState();
 }
 
-class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefreshMixin<CPFRDashboardScreen> {
+class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
+    with DataRefreshMixin<CPFRDashboardScreen> {
   // Headers and cells share one centred axis (owner table rule).
   static const List<DataColumn> _reconciliationColumns = [
-                          DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('الشهر')),
-                          DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('حالة الفترة')),
-                          DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                              label: Text('الأصناف النشطة'), numeric: true),
-                          DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                              label: Text('رصيد أول الشهر'), numeric: true),
-                          DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                              label: Text('التوريد (كرتونة)'), numeric: true),
-                          DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                              label: Text('قيمة التوريد (Sell-In)'),
-                              numeric: true),
-                          DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                              label: Text('مبيعات الكاشير (Sell-Out)'),
-                              numeric: true),
-                          DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                              label: Text('صافي حركة الشهر'), numeric: true),
-                          DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                              label: Text('الرصيد المتبقي آخر الشهر'),
-                              numeric: true),
-                          DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                              label: Text('معدل الدوران (STR %)'),
-                              numeric: true),
-                          DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('الوزن (طن)'), numeric: true),
-                          DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                              label: Text('المتوقع بنهاية الشهر (EXP)'),
-                              numeric: true),
-                        ];
+    DataColumn(
+        headingRowAlignment: MainAxisAlignment.center, label: Text('الشهر')),
+    DataColumn(
+        headingRowAlignment: MainAxisAlignment.center,
+        label: Text('حالة الفترة')),
+    DataColumn(
+        headingRowAlignment: MainAxisAlignment.center,
+        label: Text('الأصناف النشطة'),
+        numeric: true),
+    DataColumn(
+        headingRowAlignment: MainAxisAlignment.center,
+        label: Text('رصيد أول الشهر'),
+        numeric: true),
+    DataColumn(
+        headingRowAlignment: MainAxisAlignment.center,
+        label: Text('التوريد (كرتونة)'),
+        numeric: true),
+    DataColumn(
+        headingRowAlignment: MainAxisAlignment.center,
+        label: Text('قيمة التوريد (Sell-In)'),
+        numeric: true),
+    DataColumn(
+        headingRowAlignment: MainAxisAlignment.center,
+        label: Text('مبيعات الكاشير (Sell-Out)'),
+        numeric: true),
+    DataColumn(
+        headingRowAlignment: MainAxisAlignment.center,
+        label: Text('صافي حركة الشهر'),
+        numeric: true),
+    DataColumn(
+        headingRowAlignment: MainAxisAlignment.center,
+        label: Text('الرصيد المتبقي آخر الشهر'),
+        numeric: true),
+    DataColumn(
+        headingRowAlignment: MainAxisAlignment.center,
+        label: Text('معدل الدوران (STR %)'),
+        numeric: true),
+    DataColumn(
+        headingRowAlignment: MainAxisAlignment.center,
+        label: Text('الوزن (طن)'),
+        numeric: true),
+    DataColumn(
+        headingRowAlignment: MainAxisAlignment.center,
+        label: Text('المتوقع بنهاية الشهر (EXP)'),
+        numeric: true),
+  ];
 
   @override
   void onBackendDataChanged() {
@@ -102,10 +114,6 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
   String _uploadTargetChain = '';
   String? _lastUploadedSellInFilename;
 
-  // Horizontal ScrollController for Monthly Reconciliation Table
-  final ScrollController _reconciliationTableScrollController =
-      ScrollController();
-
   // Interactive Filters & Replenishment Parameters
   String _selectedSector = 'all'; // all, MT, CC
   String _selectedRegion = 'all'; // all, ALX, CIR, TNT, BHR, MNS
@@ -118,12 +126,6 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
   void initState() {
     super.initState();
     _initChainsAndLoadDashboard();
-  }
-
-  @override
-  void dispose() {
-    _reconciliationTableScrollController.dispose();
-    super.dispose();
   }
 
   Future<void> _initChainsAndLoadDashboard() async {
@@ -210,21 +212,26 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
     setState(() => _isUploadingSellIn = true);
     try {
       if (!mounted) return;
-      final res = await runUploadWithQuestions(context, (replaceConfirmed, periodChoice) => widget.apiClient.uploadSellInFile(
-            filename: picked.name,
-            fileBytes: picked.bytes,
-            chain: targetChain,
-            year: targetYear,
-            month: targetMonth,
-            replaceConfirmed: replaceConfirmed,
-            periodChoice: periodChoice,
-          ).timeout(sellInUploadTimeout));
+      final res = await runUploadWithQuestions(
+          context,
+          (replaceConfirmed, periodChoice) => widget.apiClient
+              .uploadSellInFile(
+                filename: picked.name,
+                fileBytes: picked.bytes,
+                chain: targetChain,
+                year: targetYear,
+                month: targetMonth,
+                replaceConfirmed: replaceConfirmed,
+                periodChoice: periodChoice,
+              )
+              .timeout(sellInUploadTimeout));
       if (!mounted) return;
       if (res == null) {
         M3Feedback.showInfo(context, 'اتلغى الرفع ومفيش حاجة اتحفظت');
         return;
       }
-      final notes = uploadWarningsSummary(IngestionWarningsView(res.quarantinedCustomers.length, res.unknownBarcodes.length));
+      final notes = uploadWarningsSummary(IngestionWarningsView(
+          res.quarantinedCustomers.length, res.unknownBarcodes.length));
       if (notes.isNotEmpty) M3Feedback.showWarning(context, notes);
       setState(() {
         _lastUploadedSellInFilename = picked.name;
@@ -552,7 +559,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
             const Expanded(
               child: Text(
                 'دليل البيانات المطلوبة لمحرك CPFR (Sell-In & Sell-Out)',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.titleMediumPlus),
+                style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: M3FontSize.titleMediumPlus),
               ),
             ),
           ],
@@ -887,6 +896,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                 children: [
                   // Target chain selector for Sell-In upload
                   M3Dropdown<String?>(
+                    fitOptions: true,
                     value:
                         _companyChains.any((c) => c.code == _uploadTargetChain)
                             ? _uploadTargetChain
@@ -965,6 +975,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1108,6 +1119,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
             ],
           ),
           M3Dropdown<String>(
+            fitOptions: true,
             value: _companyChains.any((c) => c.code == _selectedChain) ||
                     _selectedChain == 'all'
                 ? _selectedChain
@@ -1184,16 +1196,19 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                 ?.copyWith(fontWeight: FontWeight.w700),
           ),
           M3Dropdown<String>(
+            fitOptions: true,
             value: _selectedRegion,
             options: m3OptionsFromMenuItems<String>([
-              const DropdownMenuItem(value: 'all', child: Text('جميع الأقاليم')),
+              const DropdownMenuItem(
+                  value: 'all', child: Text('جميع الأقاليم')),
               const DropdownMenuItem(
                   value: 'ALX', child: Text('ALX - الإسكندرية ومطروح')),
               const DropdownMenuItem(
                   value: 'CIR', child: Text('CIR - القاهرة الكبرى')),
               const DropdownMenuItem(
                   value: 'TNT', child: Text('TNT - الغربية (طنطا)')),
-              const DropdownMenuItem(value: 'BHR', child: Text('BHR - البحيرة')),
+              const DropdownMenuItem(
+                  value: 'BHR', child: Text('BHR - البحيرة')),
               const DropdownMenuItem(
                   value: 'MNS', child: Text('MNS - المنصورة والدلتا')),
             ]),
@@ -1388,7 +1403,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
               child: Text(
                 title,
                 textAlign: TextAlign.center,
-                maxLines: 2,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: isSelected
@@ -1407,46 +1422,19 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
   Widget _buildResponsiveCardGrid(List<Widget> cards) {
     if (cards.isEmpty) return const SizedBox.shrink();
 
+    // Same breakpoints, gutters and equal-height behavior as Sell-Out / Sell-In.
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final int columns;
-        if (width >= 1050) {
-          columns = cards.length <= 5 ? cards.length : 4;
-        } else if (width >= 680) {
-          columns = 2;
-        } else {
-          columns = 1;
-        }
-
-        final rows = <Widget>[];
-        for (var i = 0; i < cards.length; i += columns) {
-          final chunk = cards.sublist(i, (i + columns).clamp(0, cards.length));
-          rows.add(
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var j = 0; j < chunk.length; j++) ...[
-                    if (j > 0) const SizedBox(width: M3Spacing.md),
-                    Expanded(child: chunk[j]),
-                  ],
-                  for (var k = chunk.length; k < columns; k++) ...[
-                    const SizedBox(width: M3Spacing.md),
-                    const Expanded(child: SizedBox.shrink()),
-                  ],
-                ],
-              ),
-            ),
-          );
-          if (i + columns < cards.length) {
-            rows.add(const SizedBox(height: M3Spacing.md));
-          }
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: rows,
+        final maxWidth = constraints.maxWidth;
+        final columns = maxWidth >= 960
+            ? (cards.length >= 4 ? 4 : cards.length)
+            : (maxWidth >= 580 ? (cards.length >= 2 ? 2 : 1) : 1);
+        return M3EqualHeightGrid(
+          key: const ValueKey('kpi_cards_row'),
+          columns: columns,
+          spacing: M3Spacing.sm,
+          runSpacing: M3Spacing.sm,
+          children: cards,
         );
       },
     );
@@ -1467,49 +1455,57 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
       children: [
         // Spotlight KPI Cards for Multi-Chain / Selected Chain Reconciliation
         _buildResponsiveCardGrid([
-          _buildKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_Sell-In'),
+            valueKey: const ValueKey('kpi_value_Sell-In'),
+            subtitleKey: const ValueKey('kpi_subtitle_Sell-In'),
             title: 'إجمالي التوريد للسلاسل',
-            titleEn: 'Sell-In',
             value: CurrencyFormatter.formatCompactEGP(d.jan2026SellInEgp),
             subtitle:
                 'القيمة الدقيقة: ${CurrencyFormatter.formatEGP(d.jan2026SellInEgp)}',
             icon: Icons.local_shipping_rounded,
-            accentColor: colorScheme.primary,
+            color: colorScheme.primary,
+            titleMaxLines: null,
+            subtitleMaxLines: 3,
           ),
-          _buildKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_Sell-Out'),
+            valueKey: const ValueKey('kpi_value_Sell-Out'),
+            subtitleKey: const ValueKey('kpi_subtitle_Sell-Out'),
             title: 'مبيعات الكاشير الفعلية',
-            titleEn: 'Sell-Out',
             value: CurrencyFormatter.formatCompactEGP(d.jan2026SellOutEgp),
             subtitle:
                 'القيمة الدقيقة: ${CurrencyFormatter.formatEGP(d.jan2026SellOutEgp)}',
             icon: Icons.point_of_sale_rounded,
-            accentColor: colorScheme.secondary,
+            color: colorScheme.secondary,
+            titleMaxLines: null,
+            subtitleMaxLines: 3,
           ),
-          _buildKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_Sell-Through Rate'),
+            valueKey: const ValueKey('kpi_value_Sell-Through Rate'),
+            subtitleKey: const ValueKey('kpi_subtitle_Sell-Through Rate'),
             title: 'معدل دوران المخزون',
-            titleEn: 'Sell-Through Rate',
             value: '${d.jan2026SellThroughPct.toStringAsFixed(1)}%',
             subtitle:
                 'نسبة تصريف المبيعات الفعلية مقابل التوريد (المعيار القياسي 85%)',
             icon: Icons.autorenew_rounded,
-            accentColor: colorScheme.primary,
+            color: colorScheme.primary,
+            titleMaxLines: null,
+            subtitleMaxLines: 3,
           ),
-          _buildKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
-            title: 'الفجوة المخزنية والرصيد المرحّل',
-            titleEn: 'Inventory Gap',
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_Inventory Gap'),
+            valueKey: const ValueKey('kpi_value_Inventory Gap'),
+            subtitleKey: const ValueKey('kpi_subtitle_Inventory Gap'),
+            title: 'الفجوة المخزنية',
             value: CurrencyFormatter.formatCompactEGP(d.jan2026GapEgp),
             subtitle:
                 'فرق التوريد عن البيع (${CurrencyFormatter.formatEGP(d.jan2026GapEgp)})',
             icon: Icons.warehouse_rounded,
-            accentColor: colorScheme.tertiary,
+            color: colorScheme.tertiary,
+            titleMaxLines: null,
+            subtitleMaxLines: 3,
           ),
         ]),
         const SizedBox(height: M3Spacing.lg),
@@ -1551,7 +1547,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
               _buildMiniStat(
                 theme,
                 'عدد الأصناف النشطة بالسلاسل',
-                '${d.activeSkusCount} صنف نشط',
+                countSku(d.activeSkusCount),
               ),
             ],
           ),
@@ -1572,202 +1568,119 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'جدول مطابقة التوريد الشهري مع البيع الفعلي (Sell-In vs. Sell-Out Reconciliation) — $chainLabel',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'يوضح مطابقة كميات وقيم التوريد (Sell-In) بالكرتونة والعملة والوزن بالطن مقابل المبيعات الفعلية للكاشير (Sell-Out) والفجوة المخزنية ومعدل الدوران والمتوقع (EXP)',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                    Text(
+                      'جدول مطابقة التوريد الشهري مع البيع الفعلي (Sell-In vs. Sell-Out Reconciliation) — $chainLabel',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Tooltip(
-                          // Scrolls toward the reading start (right in RTL,
-                          // left in LTR); the chevron mirrors automatically.
-                          message: 'تمرير الجدول للبداية',
-                          child: IconButton.outlined(
-                            key: const ValueKey('cpfr_scroll_start'),
-                            icon: const Icon(AppIcons.chevronStart, size: 18),
-                            onPressed: () {
-                              if (_reconciliationTableScrollController
-                                  .hasClients) {
-                                _reconciliationTableScrollController.animateTo(
-                                  (_reconciliationTableScrollController.offset -
-                                          300)
-                                      .clamp(
-                                    0.0,
-                                    _reconciliationTableScrollController
-                                        .position.maxScrollExtent,
-                                  ),
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Tooltip(
-                          message: 'تمرير الجدول للنهاية',
-                          child: IconButton.outlined(
-                            key: const ValueKey('cpfr_scroll_end'),
-                            icon: const Icon(AppIcons.chevronEnd, size: 18),
-                            onPressed: () {
-                              if (_reconciliationTableScrollController
-                                  .hasClients) {
-                                _reconciliationTableScrollController.animateTo(
-                                  (_reconciliationTableScrollController.offset +
-                                          300)
-                                      .clamp(
-                                    0.0,
-                                    _reconciliationTableScrollController
-                                        .position.maxScrollExtent,
-                                  ),
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                              }
-                            },
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 4),
+                    Text(
+                      'يوضح مطابقة كميات وقيم التوريد (Sell-In) بالكرتونة والعملة والوزن بالطن مقابل المبيعات الفعلية للكاشير (Sell-Out) والفجوة المخزنية ومعدل الدوران والمتوقع (EXP)',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
                 const SizedBox(height: M3Spacing.md),
-                Scrollbar(
-                  controller: _reconciliationTableScrollController,
-                  thumbVisibility: true,
-                  trackVisibility: true,
-                  child: SingleChildScrollView(
-                    controller: _reconciliationTableScrollController,
-                    scrollDirection: Axis.horizontal,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minWidth: 1450),
-                      child: DataTable(
-                        headingRowColor: WidgetStateProperty.all(
-                          colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                        ),
-                        columns: _reconciliationColumns,
-                        rows: centerCellsUnderCenteredHeadings(_reconciliationColumns, d.monthlyReconciliation.map((m) {
-                          final isJan = m.monthNum == 1;
-                          final isOct = m.monthNum == 10;
-                          return DataRow(
-                            color: isJan
+                TableScrollContainer(
+                  key: const ValueKey('cpfr_reconciliation_table'),
+                  showSwipeHint: true,
+                  child: DataTable(
+                    dataRowMinHeight: 56.0,
+                    dataRowMaxHeight: double.infinity,
+                    headingRowColor: WidgetStateProperty.all(
+                      colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    ),
+                    columns: _reconciliationColumns,
+                    rows: d.monthlyReconciliation.map((m) {
+                      final isJan = m.monthNum == 1;
+                      final isOct = m.monthNum == 10;
+                      return DataRow(
+                        color: isJan
+                            ? WidgetStateProperty.all(
+                                colorScheme.primaryContainer.withOpacity(0.22))
+                            : (isOct
                                 ? WidgetStateProperty.all(colorScheme
-                                    .primaryContainer
+                                    .tertiaryContainer
                                     .withOpacity(0.22))
-                                : (isOct
-                                    ? WidgetStateProperty.all(colorScheme
-                                        .tertiaryContainer
-                                        .withOpacity(0.22))
-                                    : null),
-                            cells: [
-                              DataCell(Text(
-                                '${m.monthNum} - ${m.monthAr} (${m.monthEn}) ${m.year}',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700),
-                              )),
-                              DataCell(_buildBadge(
-                                m.periodStatus,
-                                isOct
-                                    ? colorScheme.tertiary
-                                    : colorScheme.secondary,
-                              )),
-                              DataCell(Text('${m.activeSkusCount}')),
-                              DataCell(Text(
-                                '${CurrencyFormatter.formatNumber(m.openingStockCases.round())} كرتونة',
-                                style: TextStyle(
-                                  fontSize: M3FontSize.bodySmall,
+                                : null),
+                        cells: [
+                          DataCell(_cellText(
+                            '${m.monthNum} - ${m.monthAr} (${m.monthEn}) ${m.year}',
+                            weight: FontWeight.w700,
+                          )),
+                          DataCell(_statusChip(
+                            status: m.periodStatus,
+                            label: m.periodStatus,
+                            color: isOct
+                                ? colorScheme.tertiary
+                                : colorScheme.secondary,
+                          )),
+                          DataCell(_cellText('${m.activeSkusCount}')),
+                          DataCell(_cellText(
+                            '${CurrencyFormatter.formatNumber(m.openingStockCases.round())} كرتونة',
+                            fontSize: M3FontSize.bodySmall,
+                            color: colorScheme.onSurfaceVariant,
+                          )),
+                          DataCell(_cellText(m.sellInCases.toStringAsFixed(1))),
+                          DataCell(_cellText(
+                            CurrencyFormatter.formatEGP(m.sellInValueEgp),
+                            weight: FontWeight.w700,
+                          )),
+                          DataCell(_cellText(
+                            CurrencyFormatter.formatEGP(m.sellOutValueEgp),
+                            weight: FontWeight.w700,
+                            color: colorScheme.secondary,
+                          )),
+                          DataCell(_cellText(
+                            CurrencyFormatter.formatEGP(m.monthlyNetValueEgp),
+                            weight: FontWeight.w600,
+                            color: colorScheme.tertiary,
+                          )),
+                          DataCell(
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _cellText(
+                                  CurrencyFormatter.formatEGP(
+                                      m.closingStockValueEgp),
+                                  weight: FontWeight.w800,
+                                  color: colorScheme.primary,
+                                ),
+                                _cellText(
+                                  '${CurrencyFormatter.formatNumber(m.closingStockCases.round())} كرتونة',
+                                  fontSize: M3FontSize.labelSmall,
+                                  weight: FontWeight.w600,
                                   color: colorScheme.onSurfaceVariant,
                                 ),
-                              )),
-                              DataCell(Text(m.sellInCases.toStringAsFixed(1))),
-                              DataCell(Text(
-                                CurrencyFormatter.formatEGP(m.sellInValueEgp),
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700),
-                              )),
-                              DataCell(Text(
-                                CurrencyFormatter.formatEGP(m.sellOutValueEgp),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: colorScheme.secondary,
-                                ),
-                              )),
-                              DataCell(Text(
-                                CurrencyFormatter.formatEGP(
-                                    m.monthlyNetValueEgp),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: colorScheme.tertiary,
-                                ),
-                              )),
-                              DataCell(
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      CurrencyFormatter.formatEGP(
-                                          m.closingStockValueEgp),
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        color: colorScheme.primary,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${CurrencyFormatter.formatNumber(m.closingStockCases.round())} كرتونة',
-                                      style: TextStyle(
-                                        fontSize: M3FontSize.labelSmall,
-                                        fontWeight: FontWeight.w600,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              DataCell(_buildBadge(
-                                '${m.sellThroughRatePct.toStringAsFixed(1)}%',
-                                m.sellThroughRatePct >= 85
-                                    ? colorScheme.primary
-                                    : colorScheme.tertiary,
-                              )),
-                              DataCell(Text(
-                                  '${m.weightTons.toStringAsFixed(1)} طن')),
-                              DataCell(Text(
-                                CurrencyFormatter.formatEGP(m.expectedValueEgp),
-                                style: TextStyle(
-                                  fontWeight: isOct
-                                      ? FontWeight.w800
-                                      : FontWeight.normal,
-                                  color: isOct ? colorScheme.primary : null,
-                                ),
-                              )),
-                            ],
-                          );
-                        }).toList()),
-                      ),
-                    ),
+                              ],
+                            ),
+                          ),
+                          DataCell(_metricChip(
+                            '${m.sellThroughRatePct.toStringAsFixed(1)}%',
+                            m.sellThroughRatePct >= 85
+                                ? colorScheme.primary
+                                : colorScheme.tertiary,
+                          )),
+                          DataCell(_cellText(
+                              '${m.weightTons.toStringAsFixed(1)} طن')),
+                          DataCell(_cellText(
+                            CurrencyFormatter.formatEGP(m.expectedValueEgp),
+                            weight: isOct ? FontWeight.w800 : FontWeight.normal,
+                            color: isOct ? colorScheme.primary : null,
+                          )),
+                        ],
+                      );
+                    }).toList(),
                   ),
-                ),
+                )
               ],
             ),
           ),
@@ -1819,10 +1732,13 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                 children: [
                   const Text('مهلة التوريد (Lead Time): '),
                   M3Dropdown<int>(
+                    fitOptions: true,
                     value: _leadTimeDays,
                     options: m3OptionsFromMenuItems<int>([
-                      const DropdownMenuItem(value: 2, child: Text('يومان (2 Days)')),
-                      const DropdownMenuItem(value: 4, child: Text('4 أيام (قياسي)')),
+                      const DropdownMenuItem(
+                          value: 2, child: Text('يومان (2 Days)')),
+                      const DropdownMenuItem(
+                          value: 4, child: Text('4 أيام (قياسي)')),
                       const DropdownMenuItem(value: 7, child: Text('7 أيام')),
                       const DropdownMenuItem(value: 10, child: Text('10 أيام')),
                     ]),
@@ -1839,13 +1755,15 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                 children: [
                   const Text('حد الأمان (Safety Stock): '),
                   M3Dropdown<int>(
+                    fitOptions: true,
                     value: _safetyStockDays,
                     options: m3OptionsFromMenuItems<int>([
                       const DropdownMenuItem(value: 5, child: Text('5 أيام')),
                       const DropdownMenuItem(
                           value: 7, child: Text('7 أيام (موصى به)')),
                       const DropdownMenuItem(value: 10, child: Text('10 أيام')),
-                      const DropdownMenuItem(value: 14, child: Text('14 يوماً')),
+                      const DropdownMenuItem(
+                          value: 14, child: Text('14 يوماً')),
                     ]),
                     onChanged: m3Legacy<int>((v) {
                       if (v == null) return;
@@ -1860,6 +1778,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                 children: [
                   const Text('تصفية الحالة: '),
                   M3Dropdown<String>(
+                    fitOptions: true,
                     value: _selectedStockStatus,
                     options: m3OptionsFromMenuItems<String>([
                       const DropdownMenuItem(
@@ -1888,46 +1807,58 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
 
         // KPI Summary Cards for Estimated Stock & Suggested PO
         _buildResponsiveCardGrid([
-          _buildKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
-            title: 'إجمالي الرصيد التقديري الحالي بالفروع',
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_Estimated stock'),
+            valueKey: const ValueKey('kpi_value_Estimated stock'),
+            subtitleKey: const ValueKey('kpi_subtitle_Estimated stock'),
+            title: 'الرصيد التقديري بالفروع',
             value:
                 '${CurrencyFormatter.formatUnits(d.totalEstimatedStockCases.round())} كرتونة',
             subtitle:
                 'بقيمة تقديرية: ${CurrencyFormatter.formatCompactEGP(d.totalEstimatedStockEgp)}',
             icon: Icons.inventory_rounded,
-            accentColor: colorScheme.primary,
+            color: colorScheme.primary,
+            titleMaxLines: null,
+            subtitleMaxLines: 3,
           ),
-          _buildKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
-            title: 'إجمالي أوامر التوريد المقترحة \u200E(Suggested PO)\u200E',
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_Suggested PO'),
+            valueKey: const ValueKey('kpi_value_Suggested PO'),
+            subtitleKey: const ValueKey('kpi_subtitle_Suggested PO'),
+            title: 'أوامر التوريد المقترحة',
             value:
                 '${CurrencyFormatter.formatUnits(d.totalSuggestedPoCases)} كرتونة',
             subtitle:
                 'بقيمة: ${CurrencyFormatter.formatCompactEGP(d.totalSuggestedPoEgp)} (${d.totalSuggestedPoTons.toStringAsFixed(1)} طن)',
             icon: Icons.add_shopping_cart_rounded,
-            accentColor: colorScheme.secondary,
+            color: colorScheme.secondary,
+            titleMaxLines: null,
+            subtitleMaxLines: 3,
           ),
-          _buildKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_Urgent replenishment'),
+            valueKey: const ValueKey('kpi_value_Urgent replenishment'),
+            subtitleKey: const ValueKey('kpi_subtitle_Urgent replenishment'),
             title: 'أصناف تحتاج أمر توريد عاجل',
-            value: '${d.urgentReplenishmentCount} صنف/إقليم',
+            value: countSku(d.urgentReplenishmentCount),
             subtitle: 'رصيدها يغطي أقل من مهلة التوريد + حد الأمان',
             icon: Icons.notification_important_rounded,
-            accentColor: colorScheme.error,
+            color: colorScheme.error,
+            titleMaxLines: null,
+            subtitleMaxLines: 3,
           ),
-          _buildKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
-            title: 'خيارات تصريف التكدس المخزني \u200E(Overstock)\u200E',
-            value: '${d.overstockAlertCount} صنف/إقليم',
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_Overstock'),
+            valueKey: const ValueKey('kpi_value_Overstock'),
+            subtitleKey: const ValueKey('kpi_subtitle_Overstock'),
+            title: 'تكدس مخزني للتصريف',
+            value: countSku(d.overstockAlertCount),
             subtitle:
                 'تغطيتها تتجاوز 28 يوماً (يوصى بعمل عرض ترويجي لتصريف الرصيد)',
             icon: Icons.hourglass_bottom_rounded,
-            accentColor: colorScheme.tertiary,
+            color: colorScheme.tertiary,
+            titleMaxLines: null,
+            subtitleMaxLines: 3,
           ),
         ]),
         const SizedBox(height: M3Spacing.lg),
@@ -1997,34 +1928,45 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                     columns: const [
                       DataColumn(label: Text('الصنف (SKU)')),
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('العلامة / القطاع')),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('الإقليم')),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('المندوب المسند')),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('العلامة / القطاع')),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          label: Text('التوريد (كرتونة)'), numeric: true),
+                          label: Text('الإقليم')),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          label: Text('المبيعات (كرتونة)'), numeric: true),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('الرصيد التقديري'), numeric: true),
+                          label: Text('المندوب المسند')),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          label: Text('السحب اليومي (ADR)'), numeric: true),
+                          label: Text('التوريد (كرتونة)'),
+                          numeric: true),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          label: Text('أيام التغطية (DOI)'), numeric: true),
+                          label: Text('المبيعات (كرتونة)'),
+                          numeric: true),
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('حالة المخزون')),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('الرصيد التقديري'),
+                          numeric: true),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('السحب اليومي (ADR)'),
+                          numeric: true),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('أيام التغطية (DOI)'),
+                          numeric: true),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('حالة المخزون')),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
                           label: Text('أمر التوريد المقترح (PO)'),
                           numeric: true),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          label: Text('قيمة أمر التوريد'), numeric: true),
+                          label: Text('قيمة أمر التوريد'),
+                          numeric: true),
                     ],
                     rows: d.inventoryAndPoItems.take(60).map((item) {
                       final isUrgent =
@@ -2055,47 +1997,48 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                                       color: colorScheme.primary,
                                       fontWeight: FontWeight.w700,
                                     ),
+                                    maxLines: 3,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                               ],
                             ),
                           )),
-                          DataCell(Text('${item.brand} (${item.sector})')),
+                          DataCell(_cellText('${item.brand} (${item.sector})')),
+                          DataCell(_cellText(
+                              '${item.governorate} (${item.regionCode})')),
+                          DataCell(_cellText(item.salesRep)),
                           DataCell(
-                              Text('${item.governorate} (${item.regionCode})')),
-                          DataCell(Text(item.salesRep)),
-                          DataCell(Text(item.sellInCases.toStringAsFixed(1))),
-                          DataCell(
-                              Text(item.sellOutEstCases.toStringAsFixed(1))),
-                          DataCell(Text(
+                              _cellText(item.sellInCases.toStringAsFixed(1))),
+                          DataCell(_cellText(
+                              item.sellOutEstCases.toStringAsFixed(1))),
+                          DataCell(_cellText(
                             '${item.estimatedStockCases.toStringAsFixed(1)} ك',
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                            weight: FontWeight.w800,
                           )),
-                          DataCell(Text(
+                          DataCell(_cellText(
                               '${item.dailyRunRateCases.toStringAsFixed(2)} ك/يوم')),
-                          DataCell(Text(
+                          DataCell(_cellText(
                               '${item.daysOfInventory.toStringAsFixed(1)} يوم')),
-                          DataCell(_buildBadge(
-                            item.stockStatusAr,
-                            isUrgent
+                          DataCell(_statusChip(
+                            status: item.stockStatus,
+                            label: item.stockStatusAr,
+                            color: isUrgent
                                 ? colorScheme.error
                                 : (item.stockStatus == 'overstock'
                                     ? colorScheme.tertiary
                                     : colorScheme.primary),
                           )),
-                          DataCell(Text(
+                          DataCell(_cellText(
                             '${item.suggestedPoCases} كرتونة',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: item.suggestedPoCases > 0
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
-                            ),
+                            weight: FontWeight.w800,
+                            color: item.suggestedPoCases > 0
+                                ? colorScheme.primary
+                                : colorScheme.onSurfaceVariant,
                           )),
-                          DataCell(Text(
+                          DataCell(_cellText(
                             CurrencyFormatter.formatEGP(
                                 item.suggestedPoValueEgp),
-                            style: const TextStyle(fontWeight: FontWeight.w700),
+                            weight: FontWeight.w700,
                           )),
                         ],
                       );
@@ -2124,46 +2067,58 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
       children: [
         // W1 + W2 -> EXP Forecasting Cards
         _buildResponsiveCardGrid([
-          _buildKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
-            title: 'المسحوبات الفعلية للفترة الحالية \u200E(W1 + W2)\u200E',
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_W1+W2 actual'),
+            valueKey: const ValueKey('kpi_value_W1+W2 actual'),
+            subtitleKey: const ValueKey('kpi_subtitle_W1+W2 actual'),
+            title: 'المسحوبات الفعلية (W1 + W2)',
             value: CurrencyFormatter.formatCompactEGP(d.octW1W2ActualEgp),
             subtitle:
                 '${CurrencyFormatter.formatUnits(d.octW1W2ActualCases.round())} كرتونة محققة فعلياً',
             icon: Icons.calendar_today_rounded,
-            accentColor: colorScheme.primary,
+            color: colorScheme.primary,
+            titleMaxLines: null,
+            subtitleMaxLines: 3,
           ),
-          _buildKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
-            title: 'محرك التنبؤ بنهاية الشهر \u200E(Projected EXP)\u200E',
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_Projected EXP'),
+            valueKey: const ValueKey('kpi_value_Projected EXP'),
+            subtitleKey: const ValueKey('kpi_subtitle_Projected EXP'),
+            title: 'المتوقع بنهاية الشهر',
             value:
                 CurrencyFormatter.formatCompactEGP(d.octProjectedMonthEndEgp),
             subtitle:
                 'متوقع إغلاق ${CurrencyFormatter.formatUnits(d.octProjectedCases.round())} كرتونة (معادلة Run-Rate)',
             icon: Icons.auto_graph_rounded,
-            accentColor: colorScheme.tertiary,
+            color: colorScheme.tertiary,
+            titleMaxLines: null,
+            subtitleMaxLines: 3,
           ),
-          _buildKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
-            title: 'مساهمة العروض الترويجية \u200E(Promotions)\u200E',
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_Promotions'),
+            valueKey: const ValueKey('kpi_value_Promotions'),
+            subtitleKey: const ValueKey('kpi_subtitle_Promotions'),
+            title: 'مساهمة العروض الترويجية',
             value: CurrencyFormatter.formatCompactEGP(pr.promoValueEgp),
             subtitle:
                 '${pr.promoValueSharePct.toStringAsFixed(1)}% من القيمة (${pr.promoRecordsCount} حركة عرض • ${pr.promoTons.toStringAsFixed(1)} طن)',
             icon: Icons.local_offer_rounded,
-            accentColor: colorScheme.secondary,
+            color: colorScheme.secondary,
+            titleMaxLines: null,
+            subtitleMaxLines: 3,
           ),
-          _buildKpiCard(
-            theme: theme,
-            colorScheme: colorScheme,
-            title: 'تحليل المرتجعات السالبة \u200E(Returns Rate)\u200E',
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_Returns Rate'),
+            valueKey: const ValueKey('kpi_value_Returns Rate'),
+            subtitleKey: const ValueKey('kpi_subtitle_Returns Rate'),
+            title: 'معدل المرتجعات',
             value: '${pr.overallReturnPct.toStringAsFixed(2)}%',
             subtitle:
                 '${pr.returnRecordsCount} سجل مرتجع (${pr.totalReturnCases.toStringAsFixed(1)} كرتونة • ${CurrencyFormatter.formatCompactEGP(pr.totalReturnValueEgp)})',
             icon: Icons.assignment_return_rounded,
-            accentColor: colorScheme.error,
+            color: colorScheme.error,
+            titleMaxLines: null,
+            subtitleMaxLines: 3,
           ),
         ]),
         const SizedBox(height: M3Spacing.lg),
@@ -2192,66 +2147,77 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                 TableScrollContainer(
                   showSwipeHint: true,
                   child: DataTable(
+                    dataRowMinHeight: 56.0,
+                    dataRowMaxHeight: double.infinity,
                     headingRowColor: WidgetStateProperty.all(
                       colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     ),
                     columns: const [
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('القطاع')),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('القطاع')),
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('العلامة التجارية (Brand)')),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('العلامة التجارية (Brand)')),
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('عدد الأصناف'), numeric: true),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('عدد الأصناف'),
+                          numeric: true),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
                           label: Text('الكمية الفعلية (كرتونة)'),
                           numeric: true),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          label: Text('القيمة الفعلية (ج.م)'), numeric: true),
+                          label: Text('القيمة الفعلية (ج.م)'),
+                          numeric: true),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          label: Text('الكمية المتوقعة (EXP)'), numeric: true),
+                          label: Text('الكمية المتوقعة (EXP)'),
+                          numeric: true),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
                           label: Text('القيمة المتوقعة (EXP ج.م)'),
                           numeric: true),
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('الوزن (طن)'), numeric: true),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('الوزن (طن)'),
+                          numeric: true),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          label: Text('الحصة من الإجمالي %'), numeric: true),
+                          label: Text('الحصة من الإجمالي %'),
+                          numeric: true),
                     ],
                     rows: d.brandForecasts.map((b) {
                       final isCC = b.sector.toUpperCase() == 'CC';
                       return DataRow(
                         cells: [
-                          DataCell(_buildBadge(
+                          DataCell(_metricChip(
                             b.sector,
                             isCC ? colorScheme.tertiary : colorScheme.primary,
                           )),
-                          DataCell(Text(
+                          DataCell(_cellText(
                             b.brand,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                            key: const ValueKey('cpfr_forecast_brand'),
+                            weight: FontWeight.w800,
                           )),
-                          DataCell(Text('${b.activeSkusCount}')),
-                          DataCell(Text(b.actualCases.toStringAsFixed(1))),
-                          DataCell(Text(
+                          DataCell(_cellText('${b.activeSkusCount}')),
+                          DataCell(_cellText(b.actualCases.toStringAsFixed(1))),
+                          DataCell(_cellText(
                             CurrencyFormatter.formatEGP(b.actualValueEgp),
-                            style: const TextStyle(fontWeight: FontWeight.w700),
+                            weight: FontWeight.w700,
                           )),
-                          DataCell(Text(b.expectedCases.toStringAsFixed(1))),
-                          DataCell(Text(
+                          DataCell(
+                              _cellText(b.expectedCases.toStringAsFixed(1))),
+                          DataCell(_cellText(
                             CurrencyFormatter.formatEGP(b.expectedValueEgp),
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: colorScheme.primary,
-                            ),
+                            weight: FontWeight.w700,
+                            color: colorScheme.primary,
                           )),
-                          DataCell(
-                              Text('${b.weightTons.toStringAsFixed(1)} طن')),
-                          DataCell(
-                              Text('${b.shareOfTotalPct.toStringAsFixed(1)}%')),
+                          DataCell(_cellText(
+                              '${b.weightTons.toStringAsFixed(1)} طن')),
+                          DataCell(_cellText(
+                              '${b.shareOfTotalPct.toStringAsFixed(1)}%')),
                         ],
                       );
                     }).toList(),
@@ -2287,52 +2253,58 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                 TableScrollContainer(
                   showSwipeHint: true,
                   child: DataTable(
+                    dataRowMinHeight: 56.0,
+                    dataRowMaxHeight: double.infinity,
                     headingRowColor: WidgetStateProperty.all(
                       colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     ),
                     columns: const [
                       DataColumn(label: Text('اسم الصنف')),
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('العلامة التجارية')),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('الإقليم والمحافظة')),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('المندوب')),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('العلامة التجارية')),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          label: Text('كمية المرتجع (كرتونة)'), numeric: true),
+                          label: Text('الإقليم والمحافظة')),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          label: Text('قيمة المرتجع (ج.م)'), numeric: true),
+                          label: Text('المندوب')),
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('نسبة المرتجع %'), numeric: true),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('كمية المرتجع (كرتونة)'),
+                          numeric: true),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('قيمة المرتجع (ج.م)'),
+                          numeric: true),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('نسبة المرتجع %'),
+                          numeric: true),
                     ],
                     rows: pr.topReturnItems.take(15).map((ret) {
                       return DataRow(
                         cells: [
-                          DataCell(Text(
+                          DataCell(_cellText(
                             ret.itemName,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
+                            key: const ValueKey('cpfr_returns_sku_name'),
+                            weight: FontWeight.w700,
                           )),
-                          DataCell(Text('${ret.brand} (${ret.sector})')),
-                          DataCell(
-                              Text('${ret.governorate} (${ret.regionCode})')),
-                          DataCell(Text(ret.salesRep)),
-                          DataCell(Text(
+                          DataCell(_cellText('${ret.brand} (${ret.sector})')),
+                          DataCell(_cellText(
+                              '${ret.governorate} (${ret.regionCode})')),
+                          DataCell(_cellText(ret.salesRep)),
+                          DataCell(_cellText(
                             ret.returnCases.toStringAsFixed(2),
-                            style: TextStyle(
-                              color: colorScheme.error,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            color: colorScheme.error,
+                            weight: FontWeight.w700,
                           )),
-                          DataCell(Text(
+                          DataCell(_cellText(
                             CurrencyFormatter.formatEGP(ret.returnValueEgp),
-                            style: TextStyle(
-                              color: colorScheme.error,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            color: colorScheme.error,
+                            weight: FontWeight.w700,
                           )),
-                          DataCell(_buildBadge(
+                          DataCell(_metricChip(
                             '${ret.returnRatePct.toStringAsFixed(1)}%',
                             colorScheme.error,
                           )),
@@ -2402,15 +2374,18 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
         // Regional Summary Cards
         _buildResponsiveCardGrid(
           d.regionPerformances.map((reg) {
-            return _buildKpiCard(
-              theme: theme,
-              colorScheme: colorScheme,
-              title: 'إقليم ${reg.governorate} \u200E(${reg.regionCode})\u200E',
+            return M3SummaryKpiCard(
+              key: ValueKey('kpi_card_Region ${reg.regionCode}'),
+              valueKey: ValueKey('kpi_value_Region ${reg.regionCode}'),
+              subtitleKey: ValueKey('kpi_subtitle_Region ${reg.regionCode}'),
+              title: 'إقليم ${reg.governorate}',
               value: CurrencyFormatter.formatCompactEGP(reg.actualValueEgp),
               subtitle:
                   '${CurrencyFormatter.formatUnits(reg.actualCases.round())} كرتونة • ${reg.weightTons.toStringAsFixed(1)} طن (${reg.sharePct}%)',
               icon: Icons.location_on_rounded,
-              accentColor: colorScheme.secondary,
+              color: colorScheme.secondary,
+              titleMaxLines: null,
+              subtitleMaxLines: 3,
             );
           }).toList(),
         ),
@@ -2440,61 +2415,74 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                 TableScrollContainer(
                   showSwipeHint: true,
                   child: DataTable(
+                    dataRowMinHeight: 56.0,
+                    dataRowMaxHeight: double.infinity,
                     headingRowColor: WidgetStateProperty.all(
                       colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     ),
                     columns: const [
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('مندوب المبيعات (Sales Rep)')),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('مندوب المبيعات (Sales Rep)')),
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('الإقليم / المحافظة')),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('الإقليم / المحافظة')),
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('الأصناف النشطة'), numeric: true),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('الأصناف النشطة'),
+                          numeric: true),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
                           label: Text('الكمية الفعلية (كرتونة)'),
                           numeric: true),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          label: Text('القيمة الفعلية (ج.م)'), numeric: true),
+                          label: Text('القيمة الفعلية (ج.م)'),
+                          numeric: true),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
                           label: Text('المتوقع بنهاية الشهر (EXP)'),
                           numeric: true),
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('الوزن (طن)'), numeric: true),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('الوزن (طن)'),
+                          numeric: true),
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('نسبة العروض %'), numeric: true),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('نسبة العروض %'),
+                          numeric: true),
                       DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,label: Text('نسبة المرتجع %'), numeric: true),
+                          headingRowAlignment: MainAxisAlignment.center,
+                          label: Text('نسبة المرتجع %'),
+                          numeric: true),
                     ],
                     rows: d.salesRepScorecards.map((rep) {
                       return DataRow(
                         cells: [
-                          DataCell(Text(
+                          DataCell(_cellText(
                             rep.salesRep,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                            key: const ValueKey('cpfr_rep_name'),
+                            weight: FontWeight.w800,
                           )),
+                          DataCell(_cellText(
+                              '${rep.governorate} (${rep.regionCode})')),
+                          DataCell(_cellText('${rep.activeSkusCount}')),
                           DataCell(
-                              Text('${rep.governorate} (${rep.regionCode})')),
-                          DataCell(Text('${rep.activeSkusCount}')),
-                          DataCell(Text(rep.actualCases.toStringAsFixed(1))),
-                          DataCell(Text(
+                              _cellText(rep.actualCases.toStringAsFixed(1))),
+                          DataCell(_cellText(
                             CurrencyFormatter.formatEGP(rep.actualValueEgp),
-                            style: const TextStyle(fontWeight: FontWeight.w700),
+                            weight: FontWeight.w700,
                           )),
-                          DataCell(Text(
+                          DataCell(_cellText(
                             CurrencyFormatter.formatEGP(rep.expectedValueEgp),
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: colorScheme.primary,
-                            ),
+                            weight: FontWeight.w700,
+                            color: colorScheme.primary,
                           )),
-                          DataCell(
-                              Text('${rep.weightTons.toStringAsFixed(2)} طن')),
-                          DataCell(
-                              Text('${rep.promoSharePct.toStringAsFixed(1)}%')),
-                          DataCell(_buildBadge(
+                          DataCell(_cellText(
+                              '${rep.weightTons.toStringAsFixed(2)} طن')),
+                          DataCell(_cellText(
+                              '${rep.promoSharePct.toStringAsFixed(1)}%')),
+                          DataCell(_metricChip(
                             '${rep.returnRatePct.toStringAsFixed(1)}%',
                             rep.returnRatePct > 5
                                 ? colorScheme.error
@@ -2513,87 +2501,107 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
     );
   }
 
-  Widget _buildKpiCard({
-    required ThemeData theme,
-    required ColorScheme colorScheme,
-    required String title,
-    String? titleEn,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color accentColor,
+  Widget _cellText(
+    String text, {
+    Key? key,
+    FontWeight? weight,
+    Color? color,
+    double? fontSize,
+    String? fontFamily,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(M3Spacing.md),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: M3Shape.radiusLg,
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+    return Text(
+      text,
+      key: key,
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontWeight: weight,
+        color: color,
+        fontSize: fontSize,
+        fontFamily: fontFamily,
       ),
+    );
+  }
+
+  /// CPFR Suggested-PO stock statuses. Kept local so Sell-In's monthly
+  /// health map (and its text-style snapshot) stays unchanged.
+  static const Map<String, MonthlyStatusText> _stockStatusText = {
+    'urgent_replenishment': MonthlyStatusText(
+      'نفاد عاجل',
+      'يحتاج توريد فوري',
+    ),
+    'optimal': MonthlyStatusText(
+      'رصيد آمن',
+      'رصيد آمن ومثالي',
+    ),
+    'overstock': MonthlyStatusText(
+      'تكدس مخزني',
+      'التغطية تتجاوز حد الأمان الموصى به',
+    ),
+  };
+
+  /// Short status chip + grey description underneath (Sell-In monthly status).
+  Widget _statusChip({
+    required String status,
+    required String label,
+    required Color color,
+  }) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final t =
+        _stockStatusText[status] ?? MonthlyStatusText.resolve(status, label);
+    return Tooltip(
+      message: label,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.14),
-                  borderRadius: M3Shape.radiusSm,
-                ),
-                child: Icon(icon, color: accentColor, size: 20.0),
-              ),
-              const SizedBox(width: 10.0),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.w800,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (titleEn != null && titleEn.isNotEmpty) ...[
-                      const SizedBox(height: 2.0),
-                      Text(
-                        titleEn,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
+          M3ChipSurface(
+            color: color.withValues(alpha: 0.12),
+            borderColor: color.withValues(alpha: 0.35),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: M3Spacing.xxs),
+              child: Text(
+                t.short,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 12.0),
-          Text(
-            value,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: colorScheme.onSurface,
             ),
           ),
-          const SizedBox(height: 4.0),
-          Text(
-            subtitle,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+          if (t.description.isNotEmpty) ...[
+            const SizedBox(height: M3Spacing.xxs),
+            Text(
+              t.description,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: cs.onSurfaceVariant),
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
+          ],
         ],
+      ),
+    );
+  }
+
+  /// Compact 8dp metric/category chip (percentages, sector codes).
+  Widget _metricChip(String label, Color color) {
+    return M3ChipSurface(
+      color: color.withValues(alpha: 0.12),
+      borderColor: color.withValues(alpha: 0.35),
+      child: Text(
+        label,
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: M3FontSize.bodySmall,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -2604,6 +2612,9 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
       children: [
         Text(
           label,
+          textAlign: TextAlign.center,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
           style: theme.textTheme.labelMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -2611,30 +2622,14 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
         const SizedBox(height: 4.0),
         Text(
           value,
+          textAlign: TextAlign.center,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w800,
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildBadge(String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: M3Shape.radiusLg,
-        border: Border.all(color: color.withOpacity(0.35)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: M3FontSize.bodySmall,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
     );
   }
 
