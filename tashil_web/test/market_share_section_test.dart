@@ -113,7 +113,7 @@ void main() {
       // and the older sections (category contribution, trend, Pareto) stay below that.
       final kpiTop = tester.getTopLeft(find.byType(BentoKpiGrid)).dy;
       final shareTop = tester.getTopLeft(find.byKey(const ValueKey('market_share_section'))).dy;
-      final categoryTop = tester.getTopLeft(find.text('Category Contribution').first).dy;
+      final categoryTop = tester.getTopLeft(find.text('مساهمة الفئات').first).dy;
       expect(kpiTop, lessThan(shareTop));
       expect(shareTop, lessThan(categoryTop));
       expect(find.text('إجمالي Sell-Out'), findsOneWidget);
@@ -388,5 +388,17 @@ void main() {
         find.descendant(of: table, matching: find.text('\u2066+80\u2069')),
         findsOneWidget);
     expect(find.text('\u2066+2,400\u2069'), findsOneWidget); // net tile
+  });
+
+  testWidgets('Inventory headings keep ≥ 8dp between نسبة التصريف and الحالة',
+      (tester) async {
+    await _pumpAt(tester, 1280.0);
+    final table = find.byKey(const ValueKey('stock_per_sku_table'));
+    final a = tester.getRect(
+        find.descendant(of: table, matching: find.text('نسبة التصريف')));
+    final b = tester
+        .getRect(find.descendant(of: table, matching: find.text('الحالة')));
+    final gap = a.left >= b.right ? a.left - b.right : b.left - a.right;
+    expect(gap, greaterThanOrEqualTo(8.0 - 0.01));
   });
 }

@@ -85,8 +85,8 @@
 256 صنف | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
 256 صنف | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
 256 صنف | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
-3 | 12.0 | FontWeight.w500 | ff3d4b36 | 0.5 | 1.3333333333333333
-3 | 12.0 | FontWeight.w500 | ff3d4b36 | 0.5 | 1.3333333333333333
+3 أصناف | 12.0 | FontWeight.w500 | ff3d4b36 | 0.5 | 1.3333333333333333
+3 أصناف | 12.0 | FontWeight.w500 | ff3d4b36 | 0.5 | 1.3333333333333333
 3.10M ج.م من إجمالي سوق 7.42M ج.م | 12.0 | FontWeight.w400 | ff43483f | 0.4 | 1.3333333333333333
 3.10M ج.م من إجمالي سوق 7.42M ج.م | 12.0 | FontWeight.w400 | ff43483f | 0.4 | 1.3333333333333333
 3.10M ج.م من إجمالي سوق 7.42M ج.م | 12.0 | FontWeight.w400 | ff43483f | 0.4 | 1.3333333333333333
@@ -178,8 +178,6 @@ Arma | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
 Arma | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
 Carrefour | 11.0 | FontWeight.w500 | ff43483f | 0.5 | 1.4545454545454546
 Carrefour | 11.0 | FontWeight.w500 | ff43483f | 0.5 | 1.4545454545454546
-Category Contribution | 12.0 | FontWeight.w500 | ff43483f | 0.5 | 1.3333333333333333
-Category Contribution | 12.0 | FontWeight.w500 | ff43483f | 0.5 | 1.3333333333333333
 Fathalla | 11.0 | FontWeight.w500 | ff43483f | 0.5 | 1.4545454545454546
 Fathalla | 11.0 | FontWeight.w500 | ff43483f | 0.5 | 1.4545454545454546
 Fridal | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
@@ -188,17 +186,10 @@ Gomla | 11.0 | FontWeight.w500 | ff43483f | 0.5 | 1.4545454545454546
 Gomla | 11.0 | FontWeight.w500 | ff43483f | 0.5 | 1.4545454545454546
 Henkel | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
 Henkel | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
-Market Share vs Competitors | 12.0 | FontWeight.w500 | ff43483f | 0.5 | 1.3333333333333333
-Market Share vs Competitors | 12.0 | FontWeight.w500 | ff43483f | 0.5 | 1.3333333333333333
-Market leader | 11.0 | FontWeight.w600 | ff3d4b36 | 0.5 | 1.4545454545454546
-Market leader | 11.0 | FontWeight.w600 | ff3d4b36 | 0.5 | 1.4545454545454546
 P&G | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
 P&G | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
 Spinneys | 11.0 | FontWeight.w500 | ff43483f | 0.5 | 1.4545454545454546
 Spinneys | 11.0 | FontWeight.w500 | ff43483f | 0.5 | 1.4545454545454546
-Top SKUs (Pareto 80/20) | 12.0 | FontWeight.w500 | ff43483f | 0.5 | 1.3333333333333333
-Top SKUs (Pareto 80/20) | 12.0 | FontWeight.w500 | ff43483f | 0.5 | 1.3333333333333333
-Top SKUs (Pareto 80/20) | 12.0 | FontWeight.w500 | ff43483f | 0.5 | 1.3333333333333333
 أبريل | 14.0 | FontWeight.w500 | ff191d17 | 0.1 | 1.4285714285714286
 أبريل | 14.0 | FontWeight.w500 | ff191d17 | 0.1 | 1.4285714285714286
 أداء المبيعات في سلاسل التجزئة | 24.0 | FontWeight.w400 | ff191d17 | 0.0 | 1.3333333333333333

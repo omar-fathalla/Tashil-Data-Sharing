@@ -655,9 +655,12 @@ class _StockCard extends StatelessWidget {
                     'نسبة التصريف',
                     'الحالة'
                   ])
+                    // 8dp end gap so adjacent headings ("نسبة التصريف" |
+                    // "الحالة") never read as one phrase.
                     Padding(
-                        padding: const EdgeInsets.only(bottom: M3Spacing.xs),
-                        child: Text(h, style: label)),
+                        padding: const EdgeInsetsDirectional.only(
+                            end: M3Spacing.xs, bottom: M3Spacing.xs),
+                        child: Text(h, style: label, maxLines: 2)),
                 ]),
                 for (final r in top)
                   TableRow(

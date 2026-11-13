@@ -119,4 +119,53 @@ void main() {
         .getRect(find.byKey(const ValueKey('executive_period_segmented')));
     expect(month.top - period.top, lessThanOrEqualTo(48.0 + 8.0 + 0.5));
   });
+
+  double dividerWidth(WidgetTester tester) => tester
+      .getSize(find.byKey(const ValueKey('m3_divided_controls_divider')))
+      .width;
+
+  testWidgets('@1920 with the sidebar: controls are one row under the title',
+      (tester) async {
+    await _pump(tester, const Size(1920, 1000), sidebar: true);
+    expect(tester.takeException(), isNull);
+    final title = tester.getRect(find.text('أداء المبيعات في سلاسل التجزئة'));
+    final period = tester
+        .getRect(find.byKey(const ValueKey('executive_period_segmented')));
+    final chain =
+        tester.getRect(find.byKey(const ValueKey('executive_chain_dropdown')));
+    final month =
+        tester.getRect(find.byKey(const ValueKey('executive_month_dropdown')));
+    expect(period.top, greaterThan(title.bottom), reason: 'own row');
+    expect(chain.center.dy, closeTo(period.center.dy, 4.0));
+    expect(month.center.dy, closeTo(period.center.dy, 4.0));
+    // Divider shown, between the period control and the filters (RTL).
+    expect(dividerWidth(tester), 16.0);
+    final div = tester
+        .getRect(find.byKey(const ValueKey('m3_divided_controls_divider')));
+    expect(div.right, lessThanOrEqualTo(period.left + 0.5));
+    expect(div.left, greaterThanOrEqualTo(month.right - 0.5));
+  });
+
+  testWidgets('@1440 the controls sit on one line under the title',
+      (tester) async {
+    await _pump(tester, const Size(1440, 900), sidebar: true);
+    final title = tester.getRect(find.text('أداء المبيعات في سلاسل التجزئة'));
+    final period = tester
+        .getRect(find.byKey(const ValueKey('executive_period_segmented')));
+    final chain =
+        tester.getRect(find.byKey(const ValueKey('executive_chain_dropdown')));
+    expect(period.top, greaterThan(title.bottom));
+    expect(chain.center.dy, closeTo(period.center.dy, 4.0));
+    expect(dividerWidth(tester), 16.0);
+  });
+
+  testWidgets('@1019 stacked: no dangling divider', (tester) async {
+    await _pump(tester, const Size(1019, 900), sidebar: true);
+    final period = tester
+        .getRect(find.byKey(const ValueKey('executive_period_segmented')));
+    final month =
+        tester.getRect(find.byKey(const ValueKey('executive_month_dropdown')));
+    expect(month.top, greaterThan(period.bottom - 0.5));
+    expect(dividerWidth(tester), 0.0);
+  });
 }

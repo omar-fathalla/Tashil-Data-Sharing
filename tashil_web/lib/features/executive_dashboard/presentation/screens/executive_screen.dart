@@ -7,6 +7,7 @@ import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_segment_label.dart';
+import '../../../../core/widgets/m3_divided_controls.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_menu_filter.dart';
 import '../widgets/bento_kpi_grid.dart';
@@ -537,26 +538,19 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
         ),
       );
     }
-    // Wide: the three filters stay together as one group, so a narrow
-    // content area (e.g. ~745dp next to the full sidebar at 1019) breaks
-    // into two clean lines: period | filters, never a lone chain filter.
-    return Wrap(
-      spacing: M3Spacing.xs,
-      runSpacing: M3Spacing.xs,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        children[0],
-        children[1],
-        // A nested Wrap sizes to its content, so the group moves to the next
-        // line as a unit and only wraps inside if it is wider than the row.
-        Wrap(
-          key: const ValueKey('executive_filter_group'),
-          spacing: M3Spacing.xs,
-          runSpacing: M3Spacing.xs,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: children.sublist(2),
-        ),
-      ],
+    // Wide: period | divider | filters on one line when everything fits;
+    // otherwise the filter group drops under the period control as a unit
+    // and the divider is hidden (no dangling divider, no lone chain filter).
+    return M3DividedControls(
+      key: const ValueKey('executive_header_controls'),
+      leading: children[0],
+      trailing: Wrap(
+        key: const ValueKey('executive_filter_group'),
+        spacing: M3Spacing.xs,
+        runSpacing: M3Spacing.xs,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: children.sublist(2),
+      ),
     );
   }
 
@@ -600,7 +594,9 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
               subtitle: 'لوحة الأداء التنفيذية · ${_tenantNameAr()}',
               // Mockup: up to 1440 (sidebar + content ≈ 1140dp) the
               // controls sit under the title as one full row.
-              stackActionsBelow: 1600.0,
+              // Controls always get their own row under the title (mockup
+              // after-1440); beside the title they only had ~50% width.
+              stackActionsBelow: double.infinity,
               actions: _buildHeaderControls(context, isCompact),
             ),
 
