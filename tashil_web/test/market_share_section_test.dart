@@ -113,7 +113,7 @@ void main() {
       // and the older sections (category contribution, trend, Pareto) stay below that.
       final kpiTop = tester.getTopLeft(find.byType(BentoKpiGrid)).dy;
       final shareTop = tester.getTopLeft(find.byKey(const ValueKey('market_share_section'))).dy;
-      final categoryTop = tester.getTopLeft(find.text('Category Contribution').first).dy;
+      final categoryTop = tester.getTopLeft(find.text('مساهمة الفئات').first).dy;
       expect(kpiTop, lessThan(shareTop));
       expect(shareTop, lessThan(categoryTop));
       expect(find.text('إجمالي Sell-Out'), findsOneWidget);

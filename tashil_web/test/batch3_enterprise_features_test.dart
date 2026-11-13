@@ -138,8 +138,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Category Contribution'), findsOneWidget);
-      expect(find.text('Top SKUs (Pareto 80/20)'), findsOneWidget);
+      expect(find.text('مساهمة الفئات'), findsOneWidget);
+      expect(find.text('Category Contribution'), findsNothing);
+      expect(find.text('Top SKUs (Pareto 80/20)'), findsNothing);
       expect(find.text('المبيعات والحصة السوقية لكل فئة'), findsOneWidget);
       // Exclude the new Market Share section above, which also lists categories.
       final inNewSection = find.descendant(

@@ -253,13 +253,6 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(height: 1.0),
-                          Text(
-                            'Market Share vs Competitors',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
                           const SizedBox(height: 2.0),
                           Text(
                             'حصتنا مقارنة بالمنافسين في كل الفئات',
@@ -538,20 +531,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                             Text(
                                               rank == 1
                                                   ? 'الأولى في السوق'
-                                                  : 'المركز #$rank',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: theme.textTheme.labelSmall
-                                                  ?.copyWith(
-                                                color: colorScheme
-                                                    .onSecondaryContainer,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            Text(
-                                              rank == 1
-                                                  ? 'Market leader'
-                                                  : 'Rank #$rank',
+                                                  : 'المركز $rank',
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: theme.textTheme.labelSmall
@@ -955,13 +935,6 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                         'مساهمة الفئات',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 1.0),
-                      Text(
-                        'Category Contribution',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 2.0),
@@ -1460,20 +1433,10 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Flexible(
-                            child: Text(
-                              'Top SKUs (Pareto 80/20)',
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6.0),
                           M3StatusTag(
                             key: const ValueKey('pareto_class_a_badge'),
                             label:
-                                '${paretoSkus.where((s) => s.isTop80Contributor).length}',
+                                '${paretoSkus.where((s) => s.isTop80Contributor).length} أصناف',
                             tone: M3StatusTone.info,
                           ),
                         ],

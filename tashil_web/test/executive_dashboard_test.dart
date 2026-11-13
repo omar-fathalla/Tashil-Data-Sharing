@@ -639,13 +639,15 @@ void main() {
     expect(find.text('السلسلة: جملة ماركت'), findsOneWidget);
     expect(find.text('100.0%'), findsOneWidget);
 
-    // Verify ParetoCategorySection cards also render Arabic on Line 1 and English on Line 2
+    // ParetoCategorySection cards are Arabic-only (mockup); brand names
+    // such as "Fathalla Market" are data and stay as they are.
     expect(find.text('الحصة السوقية مقارنة بالمنافسين'), findsOneWidget);
-    expect(find.text('Market Share vs Competitors'), findsOneWidget);
     expect(find.text('مساهمة الفئات'), findsOneWidget);
-    expect(find.text('Category Contribution'), findsOneWidget);
     expect(find.text('الأصناف الأعلى مبيعًا (80/20)'), findsOneWidget);
-    expect(find.text('Top SKUs (Pareto 80/20)'), findsOneWidget);
+    expect(
+        find.textContaining(RegExp(
+            r'Market Share vs|Market leader|Rank #|Category Contribution|Top SKUs')),
+        findsNothing);
   });
 
   testWidgets('ChainSharePie.splitBilingualLabel handles edge cases and SelloutTrendChart renders all 12 months at full width', (WidgetTester tester) async {
