@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'app_icons.dart';
 
+/// Width of a year [M3Dropdown] with a leading calendar icon (Sell-Out
+/// 'سنة البيانات', Trade Marketing 'Year'): fits "2026" and "All Years"
+/// next to the icon and arrow without clipping.
+const double kYearDropdownWidth = 190.0;
+
 /// One option of an [M3Dropdown].
 class M3DropdownOption<T> {
   const M3DropdownOption(this.value, this.label, {this.icon, this.enabled = true});

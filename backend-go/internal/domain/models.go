@@ -573,6 +573,9 @@ type MonthlySummaryAggregates struct {
 	RevenueMoMPct      float64                    `json:"revenue_mom_pct"`
 	UnitsMoMPct        float64                    `json:"units_mom_pct"`
 	RevenueYoYPct      float64                    `json:"revenue_yoy_pct"`
+	// YoYAvailable mirrors ExecutiveKPIs.YoYAvailable: false when there is no
+	// comparable last-year data, so RevenueYoYPct (0) must not be quoted.
+	YoYAvailable       bool                       `json:"yoy_available"`
 	ActiveStores       int                        `json:"active_stores"`
 	MarketSharePct     float64                    `json:"market_share_pct"`
 	CurrentMonthKey    string                     `json:"current_month_key,omitempty"`

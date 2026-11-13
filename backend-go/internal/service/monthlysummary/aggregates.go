@@ -42,6 +42,7 @@ func BuildAggregates(kpis *domain.ExecutiveKPIs) domain.MonthlySummaryAggregates
 		RevenueMoMPct:  round1(kpis.RevenueMoMPct),
 		UnitsMoMPct:    round1(kpis.UnitsMoMPct),
 		RevenueYoYPct:  round1(kpis.RevenueYoYPct),
+		YoYAvailable:   kpis.YoYAvailable,
 		ActiveStores:   kpis.ActiveStoresCount,
 		MarketSharePct: round1(kpis.TenantMarketSharePct),
 	}
@@ -196,7 +197,9 @@ func notableDeltas(agg domain.MonthlySummaryAggregates, kpis *domain.ExecutiveKP
 	}
 	addPct("revenue_mom", "تغير الإيراد شهرياً", agg.RevenueMoMPct)
 	addPct("units_mom", "تغير الوحدات شهرياً", agg.UnitsMoMPct)
-	addPct("revenue_yoy", "تغير الإيراد سنوياً", agg.RevenueYoYPct)
+	if agg.YoYAvailable {
+		addPct("revenue_yoy", "تغير الإيراد سنوياً", agg.RevenueYoYPct)
+	}
 
 	if kpis != nil && kpis.OOSRatePct >= 10 {
 		out = append(out, domain.MonthlySummaryDelta{

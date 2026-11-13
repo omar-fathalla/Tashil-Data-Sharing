@@ -8,6 +8,10 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/domain"
 )
 
+// NoLastYearSentenceAR replaces the yearly-change sentence when there is no
+// comparable last-year data (never "+0.0%").
+const NoLastYearSentenceAR = " التغير السنوي: لا توجد بيانات للعام السابق للمقارنة."
+
 // DeterministicNarrateAR builds an Arabic summary that quotes only agg figures.
 func DeterministicNarrateAR(agg domain.MonthlySummaryAggregates) string {
 	if agg.TotalRevenue == 0 && agg.TotalUnits == 0 && len(agg.TopChains) == 0 {
@@ -41,7 +45,9 @@ func DeterministicNarrateAR(agg domain.MonthlySummaryAggregates) string {
 	if agg.MarketSharePct > 0 {
 		b.WriteString(fmt.Sprintf(" الحصة السوقية للمستأجر %.1f%%.", agg.MarketSharePct))
 	}
-	if agg.RevenueYoYPct != 0 {
+	if !agg.YoYAvailable {
+		b.WriteString(NoLastYearSentenceAR)
+	} else if agg.RevenueYoYPct != 0 {
 		b.WriteString(fmt.Sprintf(" التغير السنوي للإيراد %+.1f%%.", agg.RevenueYoYPct))
 	}
 

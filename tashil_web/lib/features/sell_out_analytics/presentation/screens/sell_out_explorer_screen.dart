@@ -2190,7 +2190,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                 children: [
                   // 1. Year Filter (Default: 2026)
                   SizedBox(
-                    width: 190.0,
+                    width: kYearDropdownWidth,
                     child: M3Dropdown<int>(
 key: const ValueKey('perf_year_dropdown'),
 value: [..._recentYears, 0].contains(_selectedYear)

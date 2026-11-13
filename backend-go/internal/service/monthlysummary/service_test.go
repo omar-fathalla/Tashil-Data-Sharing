@@ -18,6 +18,7 @@ func fixtureKPIs() *domain.ExecutiveKPIs {
 		TenantMarketSharePct: 18.5,
 		RevenueMoMPct:        12.4,
 		RevenueYoYPct:        8.0,
+		YoYAvailable:         true,
 		TotalUnitsSold:       42000,
 		UnitsMoMPct:          6.5,
 		ActiveStoresCount:    37,
