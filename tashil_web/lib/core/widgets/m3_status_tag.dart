@@ -23,7 +23,7 @@ class M3StatusTag extends StatelessWidget {
   final Color? color;
   final Color? onColor;
 
-  /// Optional leading icon (16dp) so status is not conveyed by colour alone.
+  /// Optional leading icon (18dp) so status is not conveyed by colour alone.
   final IconData? icon;
 
   @override
@@ -61,9 +61,17 @@ class M3StatusTag extends StatelessWidget {
         borderRadius: M3Shape.radiusSm,
         side: useBorder ? BorderSide(color: border) : BorderSide.none,
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-        child: _content(theme, onColor ?? fg),
+      // 32dp like the mockup chip; content centred vertically.
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 32.0),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          child: Center(
+            widthFactor: 1.0,
+            heightFactor: 1.0,
+            child: _content(theme, onColor ?? fg),
+          ),
+        ),
       ),
     );
   }
@@ -79,7 +87,7 @@ class M3StatusTag extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16.0, color: fg),
+        Icon(icon, size: 18.0, color: fg),
         const SizedBox(width: 4.0),
         Flexible(child: text),
       ],
