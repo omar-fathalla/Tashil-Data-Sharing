@@ -212,7 +212,7 @@ void main() {
   });
 
   testWidgets(
-      '4. density: 14px names on 2 lines + tooltip, 12px muted secondary, tall rows',
+      '4. density: 14px names on 3 lines + tooltip, 12px muted secondary, tall rows',
       (tester) async {
     await http.runWithClient(() async {
       await _pump(tester);
@@ -222,7 +222,7 @@ void main() {
       expect(names, findsNWidgets(4));
       for (final e in names.evaluate()) {
         final t = e.widget as Text;
-        expect(t.maxLines, 2);
+        expect(t.maxLines, 3);
         final style = DefaultTextStyle.of(e).style.merge(t.style);
         expect(style.fontSize, 14.0);
         final tip =
@@ -246,7 +246,7 @@ void main() {
       expect(sku, findsNWidgets(3));
       for (final e in sku.evaluate()) {
         final t = e.widget as Text;
-        expect(t.maxLines, 2);
+        expect(t.maxLines, 3);
         expect(DefaultTextStyle.of(e).style.merge(t.style).fontSize, 14.0);
       }
     }, _client);
