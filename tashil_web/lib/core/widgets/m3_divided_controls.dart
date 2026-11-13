@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
@@ -186,20 +188,29 @@ class RenderM3DividedControls extends RenderBox
         k[2].getMaxIntrinsicWidth(height);
   }
 
+  /// Same decision as [performLayout], without laying children out: one
+  /// line when leading + divider + one-line trailing fit, else stacked
+  /// (divider takes no space).
   @override
   Size computeDryLayout(BoxConstraints constraints) {
-    // Not needed by the header (it is laid out normally); conservative.
-    return constraints.constrain(Size(computeMaxIntrinsicWidth(double.infinity),
-        computeMaxIntrinsicHeight(constraints.maxWidth)));
+    final k = _kids;
+    final maxW = constraints.maxWidth;
+    final l = k[0].getDryLayout(BoxConstraints(maxWidth: maxW));
+    final d = k[1].getDryLayout(BoxConstraints(maxWidth: maxW));
+    final t1 = k[2].getDryLayout(const BoxConstraints());
+    final inlineW = l.width + d.width + t1.width;
+    if (inlineW <= maxW) {
+      return constraints.constrain(
+          Size(inlineW, math.max(l.height, math.max(d.height, t1.height))));
+    }
+    final t = k[2].getDryLayout(BoxConstraints(maxWidth: maxW));
+    return constraints.constrain(
+        Size(math.max(l.width, t.width), l.height + _runSpacing + t.height));
   }
 
   @override
-  double computeMaxIntrinsicHeight(double width) {
-    final k = _kids;
-    return k[0].getMaxIntrinsicHeight(width) +
-        _runSpacing +
-        k[2].getMaxIntrinsicHeight(width);
-  }
+  double computeMaxIntrinsicHeight(double width) =>
+      computeDryLayout(BoxConstraints(maxWidth: width)).height;
 
   @override
   double computeMinIntrinsicHeight(double width) =>

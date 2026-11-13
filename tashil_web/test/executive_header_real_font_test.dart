@@ -4,6 +4,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
@@ -205,4 +206,69 @@ void main() {
       expect(tag.didExceedMaxLines, isFalse, reason: label);
     }
   });
+
+  testWidgets(
+      '@1440 quarterly mode: no overflow, divider shown or cleanly hidden',
+      (tester) async {
+    await _pump(tester, const Size(1440, 900), sidebar: true);
+    await tester.tap(find.text('ربع سنوي'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('executive_quarter_segmented')),
+        findsOneWidget);
+    final w = dividerWidth(tester);
+    expect(w == 16.0 || w == 0.0, isTrue, reason: 'divider width $w');
+    final period = tester
+        .getRect(find.byKey(const ValueKey('executive_period_segmented')));
+    final month =
+        tester.getRect(find.byKey(const ValueKey('executive_month_dropdown')));
+    if (w == 0.0) {
+      expect(month.top, greaterThan(period.bottom - 0.5));
+    } else {
+      expect(month.center.dy, closeTo(period.center.dy, 4.0));
+    }
+  });
+
+  for (final size in const [Size(1440, 900), Size(1019, 900)]) {
+    testWidgets(
+        'focus order @${size.width.toInt()}: period → month → year → chain',
+        (tester) async {
+      await _pump(tester, size, sidebar: true);
+      const names = {
+        'executive_period_segmented': 'period',
+        'executive_month_dropdown': 'month',
+        'executive_year_dropdown': 'year',
+        'executive_chain_dropdown': 'chain',
+      };
+      String? focused() {
+        final ctx = FocusManager.instance.primaryFocus?.context;
+        if (ctx == null) return null;
+        String? hit;
+        void check(Element e) {
+          final k = e.widget.key;
+          if (k is ValueKey<String>) hit ??= names[k.value];
+        }
+
+        check(ctx as Element);
+        ctx.visitAncestorElements((e) {
+          check(e);
+          return hit == null;
+        });
+        return hit;
+      }
+
+      Focus.of(tester.element(find.text('شهري'))).requestFocus();
+      await tester.pump();
+      final order = <String>[];
+      for (var i = 0; i < 10 && !order.contains('chain'); i++) {
+        final f = focused();
+        if (f != null && (order.isEmpty || order.last != f)) order.add(f);
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+      }
+      final f = focused();
+      if (f != null && order.last != f) order.add(f);
+      expect(order.take(4).toList(), ['period', 'month', 'year', 'chain']);
+    });
+  }
 }
