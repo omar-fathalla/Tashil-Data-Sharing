@@ -39,6 +39,48 @@ class CPFRDashboardScreen extends StatefulWidget {
 }
 
 class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefreshMixin<CPFRDashboardScreen> {
+  // Headers and cells share one centred axis (owner table rule).
+  static const List<DataColumn> _reconciliationColumns = [
+                          DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('الشهر')),
+                          DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('حالة الفترة')),
+                          DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                              label: Text('الأصناف النشطة'), numeric: true),
+                          DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                              label: Text('رصيد أول الشهر'), numeric: true),
+                          DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                              label: Text('التوريد (كرتونة)'), numeric: true),
+                          DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                              label: Text('قيمة التوريد (Sell-In)'),
+                              numeric: true),
+                          DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                              label: Text('مبيعات الكاشير (Sell-Out)'),
+                              numeric: true),
+                          DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                              label: Text('صافي حركة الشهر'), numeric: true),
+                          DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                              label: Text('الرصيد المتبقي آخر الشهر'),
+                              numeric: true),
+                          DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                              label: Text('معدل الدوران (STR %)'),
+                              numeric: true),
+                          DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('الوزن (طن)'), numeric: true),
+                          DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
+                              label: Text('المتوقع بنهاية الشهر (EXP)'),
+                              numeric: true),
+                        ];
+
   @override
   void onBackendDataChanged() {
     _initChainsAndLoadDashboard();
@@ -1623,35 +1665,8 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                         headingRowColor: WidgetStateProperty.all(
                           colorScheme.surfaceContainerHighest.withOpacity(0.5),
                         ),
-                        columns: const [
-                          DataColumn(label: Text('الشهر')),
-                          DataColumn(label: Text('حالة الفترة')),
-                          DataColumn(
-                              label: Text('الأصناف النشطة'), numeric: true),
-                          DataColumn(
-                              label: Text('رصيد أول الشهر'), numeric: true),
-                          DataColumn(
-                              label: Text('التوريد (كرتونة)'), numeric: true),
-                          DataColumn(
-                              label: Text('قيمة التوريد (Sell-In)'),
-                              numeric: true),
-                          DataColumn(
-                              label: Text('مبيعات الكاشير (Sell-Out)'),
-                              numeric: true),
-                          DataColumn(
-                              label: Text('صافي حركة الشهر'), numeric: true),
-                          DataColumn(
-                              label: Text('الرصيد المتبقي آخر الشهر'),
-                              numeric: true),
-                          DataColumn(
-                              label: Text('معدل الدوران (STR %)'),
-                              numeric: true),
-                          DataColumn(label: Text('الوزن (طن)'), numeric: true),
-                          DataColumn(
-                              label: Text('المتوقع بنهاية الشهر (EXP)'),
-                              numeric: true),
-                        ],
-                        rows: d.monthlyReconciliation.map((m) {
+                        columns: _reconciliationColumns,
+                        rows: centerCellsUnderCenteredHeadings(_reconciliationColumns, d.monthlyReconciliation.map((m) {
                           final isJan = m.monthNum == 1;
                           final isOct = m.monthNum == 10;
                           return DataRow(
@@ -1748,7 +1763,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                               )),
                             ],
                           );
-                        }).toList(),
+                        }).toList()),
                       ),
                     ),
                   ),
@@ -1978,23 +1993,34 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                     ),
                     columns: const [
                       DataColumn(label: Text('الصنف (SKU)')),
-                      DataColumn(label: Text('العلامة / القطاع')),
-                      DataColumn(label: Text('الإقليم')),
-                      DataColumn(label: Text('المندوب المسند')),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('العلامة / القطاع')),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('الإقليم')),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('المندوب المسند')),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('التوريد (كرتونة)'), numeric: true),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('المبيعات (كرتونة)'), numeric: true),
-                      DataColumn(label: Text('الرصيد التقديري'), numeric: true),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('الرصيد التقديري'), numeric: true),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('السحب اليومي (ADR)'), numeric: true),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('أيام التغطية (DOI)'), numeric: true),
-                      DataColumn(label: Text('حالة المخزون')),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('حالة المخزون')),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('أمر التوريد المقترح (PO)'),
                           numeric: true),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('قيمة أمر التوريد'), numeric: true),
                     ],
                     rows: d.inventoryAndPoItems.take(60).map((item) {
@@ -2165,21 +2191,30 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                       colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     ),
                     columns: const [
-                      DataColumn(label: Text('القطاع')),
-                      DataColumn(label: Text('العلامة التجارية (Brand)')),
-                      DataColumn(label: Text('عدد الأصناف'), numeric: true),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('القطاع')),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('العلامة التجارية (Brand)')),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('عدد الأصناف'), numeric: true),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('الكمية الفعلية (كرتونة)'),
                           numeric: true),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('القيمة الفعلية (ج.م)'), numeric: true),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('الكمية المتوقعة (EXP)'), numeric: true),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('القيمة المتوقعة (EXP ج.م)'),
                           numeric: true),
-                      DataColumn(label: Text('الوزن (طن)'), numeric: true),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('الوزن (طن)'), numeric: true),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('الحصة من الإجمالي %'), numeric: true),
                     ],
                     rows: d.brandForecasts.map((b) {
@@ -2252,14 +2287,20 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                     ),
                     columns: const [
                       DataColumn(label: Text('اسم الصنف')),
-                      DataColumn(label: Text('العلامة التجارية')),
-                      DataColumn(label: Text('الإقليم والمحافظة')),
-                      DataColumn(label: Text('المندوب')),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('العلامة التجارية')),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('الإقليم والمحافظة')),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('المندوب')),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('كمية المرتجع (كرتونة)'), numeric: true),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('قيمة المرتجع (ج.م)'), numeric: true),
-                      DataColumn(label: Text('نسبة المرتجع %'), numeric: true),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('نسبة المرتجع %'), numeric: true),
                     ],
                     rows: pr.topReturnItems.take(15).map((ret) {
                       return DataRow(
@@ -2398,20 +2439,29 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen> with DataRefr
                       colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     ),
                     columns: const [
-                      DataColumn(label: Text('مندوب المبيعات (Sales Rep)')),
-                      DataColumn(label: Text('الإقليم / المحافظة')),
-                      DataColumn(label: Text('الأصناف النشطة'), numeric: true),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('مندوب المبيعات (Sales Rep)')),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('الإقليم / المحافظة')),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('الأصناف النشطة'), numeric: true),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('الكمية الفعلية (كرتونة)'),
                           numeric: true),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('القيمة الفعلية (ج.م)'), numeric: true),
                       DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,
                           label: Text('المتوقع بنهاية الشهر (EXP)'),
                           numeric: true),
-                      DataColumn(label: Text('الوزن (طن)'), numeric: true),
-                      DataColumn(label: Text('نسبة العروض %'), numeric: true),
-                      DataColumn(label: Text('نسبة المرتجع %'), numeric: true),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('الوزن (طن)'), numeric: true),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('نسبة العروض %'), numeric: true),
+                      DataColumn(
+                          headingRowAlignment: MainAxisAlignment.center,label: Text('نسبة المرتجع %'), numeric: true),
                     ],
                     rows: d.salesRepScorecards.map((rep) {
                       return DataRow(

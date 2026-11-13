@@ -1674,9 +1674,9 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                 runSpacing: M3Spacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  SizedBox(
-                    width: 190.0,
-                    child: M3Dropdown<String>(
+                  M3Dropdown<String>(
+width: 190.0,
+fitOptions: true,
 value: _selectedChain,
 label: 'السلسلة',
 options: m3OptionsFromMenuItems<String>([
@@ -1696,10 +1696,9 @@ onChanged: m3Legacy<String>((v) {
                         }
                       }),
 ),
-                  ),
-                  SizedBox(
-                    width: 130.0,
-                    child: M3Dropdown<int>(
+                  M3Dropdown<int>(
+width: 130.0,
+fitOptions: true,
 value: _selectedYear,
 label: 'سنة البيانات',
 options: m3OptionsFromMenuItems<int>([
@@ -1718,10 +1717,9 @@ onChanged: m3Legacy<int>((v) {
                         }
                       }),
 ),
-                  ),
-                  SizedBox(
-                    width: 150.0,
-                    child: M3Dropdown<int>(
+                  M3Dropdown<int>(
+width: 150.0,
+fitOptions: true,
 value: _selectedMonth,
 label: 'الشهر',
 options: m3OptionsFromMenuItems<int>([
@@ -1746,7 +1744,6 @@ onChanged: m3Legacy<int>((v) {
                         }
                       }),
 ),
-                  ),
                   M3SearchFieldWidth(
                     hintText: 'ابحث بالصنف أو الكود أو الباركود',
                     hintStyle: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w300),
@@ -2161,9 +2158,9 @@ onChanged: m3Legacy<int>((v) {
                 runSpacing: M3Spacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  SizedBox(
-                    width: 190.0,
-                    child: M3Dropdown<String>(
+                  M3Dropdown<String>(
+width: 190.0,
+fitOptions: true,
 value: _selectedChain,
 label: 'السلسلة',
 options: m3OptionsFromMenuItems<String>([
@@ -2180,10 +2177,9 @@ onChanged: m3Legacy<String>((v) {
                         }
                       }),
 ),
-                  ),
-                  SizedBox(
-                    width: 140.0,
-                    child: M3Dropdown<int>(
+                  M3Dropdown<int>(
+width: 140.0,
+fitOptions: true,
 value: _selectedYear,
 label: 'سنة البيانات',
 options: m3OptionsFromMenuItems<int>([
@@ -2202,10 +2198,9 @@ onChanged: m3Legacy<int>((v) {
                         }
                       }),
 ),
-                  ),
-                  SizedBox(
-                    width: 210.0,
-                    child: M3Dropdown<String>(
+                  M3Dropdown<String>(
+width: 210.0,
+fitOptions: true,
 value: _stockStatusFilter,
 label: 'حالة المخزون',
 options: m3OptionsFromMenuItems<String>([
@@ -2230,7 +2225,6 @@ onChanged: m3Legacy<String>((v) {
                         }
                       }),
 ),
-                  ),
                 ],
               ),
               Wrap(
@@ -2696,6 +2690,8 @@ onChanged: m3Legacy<String>((v) {
                             );
 
                             final brandDropdown = M3Dropdown<String>(
+key: const ValueKey('sellin_stock_brand_dropdown'),
+fitOptions: true,
 value: availableBrands.contains(_selectedSkuBrand) ? _selectedSkuBrand : 'all',
 label: 'العلامة التجارية',
 leadingIcon: Icons.branding_watermark_rounded,
@@ -2728,6 +2724,7 @@ onChanged: m3Legacy<String>((val) {
 );
 
                             final statusDropdown = M3Dropdown<String>(
+fitOptions: true,
 value: _skuStockStatusFilter,
 label: 'حالة المخزون',
 leadingIcon: Icons.filter_alt_rounded,
@@ -2777,13 +2774,15 @@ onChanged: m3Legacy<String>((val) {
                               );
                             }
 
+                            // Dropdowns take the width of their longest option
+                            // (never clipped); search fills the rest.
                             return Row(
                               children: [
-                                Expanded(flex: 3, child: searchField),
+                                Expanded(child: searchField),
                                 const SizedBox(width: 12.0),
-                                Expanded(flex: 2, child: brandDropdown),
+                                brandDropdown,
                                 const SizedBox(width: 12.0),
-                                Expanded(flex: 2, child: statusDropdown),
+                                statusDropdown,
                               ],
                             );
                           },

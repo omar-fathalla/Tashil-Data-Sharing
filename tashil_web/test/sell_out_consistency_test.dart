@@ -276,14 +276,14 @@ void main() {
     });
 
     testWidgets(
-        '4. SKU table names wrap to 2 lines with the full name in a tooltip',
+        '4. SKU table names wrap to 3 lines with the full name in a tooltip',
         (tester) async {
       await _pump(tester);
       final names = find.byKey(const ValueKey('sku_table_sku_name'));
       expect(names, findsWidgets);
       for (final e in names.evaluate()) {
         final t = e.widget as Text;
-        expect(t.maxLines, 2);
+        expect(t.maxLines, 3);
         expect(t.style?.fontSize, 14.0);
         final tip =
             find.ancestor(of: find.byWidget(t), matching: find.byType(Tooltip));
@@ -412,7 +412,7 @@ void main() {
         );
 
     testWidgets(
-        '2+4+5. neutral strip, 2-line names with tooltip, isolated minus',
+        '2+4+5. neutral strip, 3-line names with tooltip, isolated minus',
         (tester) async {
       tester.view.physicalSize = const Size(1440, 3000);
       tester.view.devicePixelRatio = 1.0;
@@ -448,7 +448,7 @@ void main() {
         expect(names, findsNWidgets(2));
         for (final e in names.evaluate()) {
           final t = e.widget as Text;
-          expect(t.maxLines, 2);
+          expect(t.maxLines, 3);
           expect(t.style?.fontSize, 14.0);
           final tip = find.ancestor(
               of: find.byWidget(t), matching: find.byType(Tooltip));

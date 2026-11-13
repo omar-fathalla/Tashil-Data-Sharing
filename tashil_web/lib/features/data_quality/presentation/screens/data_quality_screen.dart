@@ -342,6 +342,7 @@ class _Filters extends StatelessWidget {
         key: const ValueKey('dq_filter_status'),
         label: 'الحالة',
         width: 170.0,
+        fitOptions: true,
         value: filter.status,
         options: const [
           M3DropdownOption('', kDqOpen),
@@ -355,6 +356,7 @@ class _Filters extends StatelessWidget {
         key: const ValueKey('dq_filter_severity'),
         label: 'الخطورة',
         width: 150.0,
+        fitOptions: true,
         value: filter.severity,
         options: const [
           M3DropdownOption('', 'الكل'),
@@ -367,6 +369,7 @@ class _Filters extends StatelessWidget {
         key: const ValueKey('dq_filter_source'),
         label: 'المصدر',
         width: 170.0,
+        fitOptions: true,
         value: filter.source,
         options: [
           const M3DropdownOption('', 'الكل'),
@@ -378,6 +381,7 @@ class _Filters extends StatelessWidget {
         key: const ValueKey('dq_filter_type'),
         label: 'النوع',
         width: 240.0,
+        fitOptions: true,
         value: filter.type,
         options: [
           const M3DropdownOption('', 'الكل'),

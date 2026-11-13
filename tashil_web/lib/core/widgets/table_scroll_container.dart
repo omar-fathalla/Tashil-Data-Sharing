@@ -407,39 +407,8 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
 
   /// Columns that opt in with `headingRowAlignment: MainAxisAlignment.center`
   /// get their cells centred too (header and content share one axis).
-  static List<DataRow> _centerCells(DataTable dt) {
-    final centered = [
-      for (final c in dt.columns)
-        c.headingRowAlignment == MainAxisAlignment.center,
-    ];
-    if (!centered.contains(true)) return dt.rows;
-    return [
-      for (final r in dt.rows)
-        DataRow(
-          key: r.key,
-          selected: r.selected,
-          onSelectChanged: r.onSelectChanged,
-          onLongPress: r.onLongPress,
-          color: r.color,
-          mouseCursor: r.mouseCursor,
-          cells: [
-            for (var i = 0; i < r.cells.length; i++)
-              i < centered.length && centered[i]
-                  ? DataCell(
-                      Center(child: r.cells[i].child),
-                      placeholder: r.cells[i].placeholder,
-                      showEditIcon: r.cells[i].showEditIcon,
-                      onTap: r.cells[i].onTap,
-                      onLongPress: r.cells[i].onLongPress,
-                      onTapDown: r.cells[i].onTapDown,
-                      onDoubleTap: r.cells[i].onDoubleTap,
-                      onTapCancel: r.cells[i].onTapCancel,
-                    )
-                  : r.cells[i],
-          ],
-        ),
-    ];
-  }
+  static List<DataRow> _centerCells(DataTable dt) =>
+      centerCellsUnderCenteredHeadings(dt.columns, dt.rows);
 
   Widget _buildExpandedChild(Widget child, double availableWidth) {
     if (availableWidth <= 0) return child;
@@ -545,4 +514,42 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
       child: child,
     );
   }
+}
+
+/// Centres the cells of every column whose heading uses
+/// `headingRowAlignment: MainAxisAlignment.center`, so header and content
+/// share one axis. For DataTables not wrapped in [TableScrollContainer].
+List<DataRow> centerCellsUnderCenteredHeadings(
+    List<DataColumn> columns, List<DataRow> rows) {
+    final centered = [
+      for (final c in columns)
+        c.headingRowAlignment == MainAxisAlignment.center,
+    ];
+    if (!centered.contains(true)) return rows;
+    return [
+      for (final r in rows)
+        DataRow(
+          key: r.key,
+          selected: r.selected,
+          onSelectChanged: r.onSelectChanged,
+          onLongPress: r.onLongPress,
+          color: r.color,
+          mouseCursor: r.mouseCursor,
+          cells: [
+            for (var i = 0; i < r.cells.length; i++)
+              i < centered.length && centered[i]
+                  ? DataCell(
+                      Center(child: r.cells[i].child),
+                      placeholder: r.cells[i].placeholder,
+                      showEditIcon: r.cells[i].showEditIcon,
+                      onTap: r.cells[i].onTap,
+                      onLongPress: r.cells[i].onLongPress,
+                      onTapDown: r.cells[i].onTapDown,
+                      onDoubleTap: r.cells[i].onDoubleTap,
+                      onTapCancel: r.cells[i].onTapCancel,
+                    )
+                  : r.cells[i],
+          ],
+        ),
+    ];
 }

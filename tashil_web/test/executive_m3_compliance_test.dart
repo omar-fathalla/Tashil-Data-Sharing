@@ -334,7 +334,7 @@ void main() {
     expect(name.style?.fontSize, 14.0);
     expect(name.style?.fontWeight, FontWeight.w500);
     expect(name.style?.color, cs.onSurface);
-    expect(name.maxLines, 2); // long SKU names wrap (tooltip has the rest)
+    expect(name.maxLines, 3); // long SKU names wrap to 3 lines (tooltip has the rest)
     expect(tester.takeException(), isNull);
   });
 

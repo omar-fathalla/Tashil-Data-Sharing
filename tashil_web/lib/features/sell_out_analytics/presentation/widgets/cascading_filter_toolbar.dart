@@ -604,6 +604,7 @@ class _CascadingFilterToolbarState extends State<CascadingFilterToolbar> {
         key: const ValueKey('sellout_year_selector_pill'),
         child: M3Dropdown<int>(
           width: 210.0,
+          fitOptions: true,
           value: [...years, 0].contains(activeYr) ? activeYr : nowYr,
           leadingIcon: AppIcons.calendar,
           options: [

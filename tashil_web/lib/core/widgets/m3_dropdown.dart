@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'app_icons.dart';
 
@@ -41,7 +43,8 @@ class M3Dropdown<T> extends StatelessWidget {
   /// Size the field from its longest option or hint (measured with the
   /// field's text style) so nothing ever clips, e.g. "All Months" /
   /// "من الملف تلقائيًا".
-  /// Ignored when [width] or [expand] is set.
+  /// With [width] set, the field is at least [width] and grows only when an
+  /// option would clip. Ignored when [expand] is set.
   final bool fitOptions;
 
   final List<M3DropdownOption<T>> options;
@@ -71,7 +74,9 @@ class M3Dropdown<T> extends StatelessWidget {
       enabled: enabled && onChanged != null,
       width: expand
           ? double.infinity
-          : (width ?? (fitOptions ? _fitWidth(context, theme) : null)),
+          : (fitOptions
+              ? math.max(width ?? 0.0, _fitWidth(context, theme))
+              : width),
       menuHeight: menuHeight,
       requestFocusOnTap: false,
       enableSearch: false,
