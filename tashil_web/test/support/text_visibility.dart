@@ -232,3 +232,53 @@ bool codeIsSingleLine(WidgetTester tester, String code, {Finder? scope}) {
   }
   return tops.length == 1;
 }
+
+/// Painted line count of [code] from glyph boxes. 1 is required at the
+/// live 1280+sidebar shell.
+int codePaintedLineCount(WidgetTester tester, String code, {Finder? scope}) {
+  final key = find.byKey(ValueKey('dq_item_code_$code'));
+  final target =
+      scope == null ? key : find.descendant(of: scope, matching: key);
+  if (target.evaluate().isEmpty) return 0;
+  final texts = find.descendant(of: target, matching: find.byType(Text));
+  if (texts.evaluate().isEmpty) return 0;
+  final tops = <int>{};
+  for (final e in texts.evaluate()) {
+    final para = _paragraphForText(tester, e);
+    if (para == null) return 0;
+    if (para.didExceedMaxLines) {
+      return (para.maxLines ?? 0) + 1;
+    }
+    final data = (e.widget as Text).data ?? '';
+    final boxes = para.getBoxesForSelection(
+        TextSelection(baseOffset: 0, extentOffset: data.length));
+    if (boxes.isEmpty) return 0;
+    for (final b in boxes) {
+      tops.add(b.toRect().top.round());
+    }
+  }
+  return tops.length;
+}
+
+/// True when the code cell is at least [slack] dp wider than the one-line
+/// Cairo advance of [code]. v157 used a 154.7dp measurement with almost no
+/// slack, so the slightly wider live web Cairo wrapped QA-NOT-IN-MASTER-999.
+bool codeColumnHasSlack(WidgetTester tester, String code,
+    {double slack = 16.0, Finder? scope}) {
+  final key = find.byKey(ValueKey('dq_item_code_$code'));
+  final target =
+      scope == null ? key : find.descendant(of: scope, matching: key);
+  if (target.evaluate().isEmpty) return false;
+  final width = tester.getSize(target).width;
+  final texts = find.descendant(of: target, matching: find.byType(Text));
+  if (texts.evaluate().isEmpty) return false;
+  final first = texts.evaluate().first;
+  final widget = first.widget as Text;
+  final style = widget.style ?? DefaultTextStyle.of(first).style;
+  final painter = TextPainter(
+    text: TextSpan(text: code, style: style),
+    textDirection: TextDirection.ltr,
+    maxLines: 1,
+  )..layout();
+  return width + 0.5 >= painter.width + slack;
+}
