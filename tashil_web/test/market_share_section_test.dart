@@ -185,7 +185,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('Rank #2 of 4'), findsOneWidget);
+    expect(find.text('المرتبة 2 من 4'), findsOneWidget);
     expect(find.text('P&G'), findsOneWidget);
     expect(find.text('Henkel'), findsOneWidget);
     expect(find.byKey(const ValueKey('category_competitor_Laundry_1')), findsOneWidget);
@@ -279,7 +279,7 @@ void main() {
       expect(bars.right, lessThanOrEqualTo(cat.left + 1));
       expect(find.text('Test SKU 0'), findsOneWidget);
       expect(find.text('Test SKU 5'), findsOneWidget);
-      expect(find.text('Rank #1 of 14'), findsOneWidget);
+      expect(find.text('المرتبة 1 من 14'), findsOneWidget);
       expect(find.text('Competitor Floor cleaner 0'), findsOneWidget);
       expect(find.text('هذا الصنف'), findsOneWidget);
       expect(find.text('أصنافنا الأخرى'), findsOneWidget);
@@ -299,7 +299,7 @@ void main() {
     expect(cat.height, closeTo(bars.height, 1));
     expect(tester.getSize(find.byKey(const ValueKey('sku_share_bar_0'))).height, greaterThan(12));
     expect(find.text('Test SKU 0'), findsOneWidget);
-    expect(find.text('Rank #2 of 8'), findsOneWidget);
+    expect(find.text('المرتبة 2 من 8'), findsOneWidget);
     expect(find.text('Competitor Bleach 2'), findsOneWidget);
   });
 
@@ -313,7 +313,7 @@ void main() {
     expect(find.text('الحصة حسب الصنف'), findsOneWidget);
     expect(find.text('الحصة حسب الفئة'), findsOneWidget);
     expect(find.text('Test SKU 5'), findsOneWidget);
-    expect(find.text('Rank #1 of 4'), findsOneWidget);
+    expect(find.text('المرتبة 1 من 4'), findsOneWidget);
     // Compact donut when the card is not stretched to a sibling.
     expect(tester.getSize(find.byKey(const ValueKey('category_donut_Floor cleaner'))).height, closeTo(64, 1));
   });

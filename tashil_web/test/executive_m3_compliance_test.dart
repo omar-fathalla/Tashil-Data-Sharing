@@ -197,7 +197,7 @@ void main() {
             matching: find.byType(Table)),
         matching: find.byType(M3StatusTag));
     expect(tags, findsNWidgets(3));
-    for (final label in ['Healthy', 'Overstock', 'Replenish']) {
+    for (final label in ['سليم', 'مخزون زائد', 'تموين']) {
       expect(find.text(label), findsOneWidget);
     }
     // Pixel-sampling textContrastGuideline is unreliable with test fonts, so

@@ -136,13 +136,6 @@ class ChainSharePie extends StatelessWidget {
                         'حصة كل سلسلة من المبيعات',
                         style: theme.textTheme.titleMedium,
                       ),
-                      const SizedBox(height: 2.0),
-                      Text(
-                        'Sales by Chain',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
                     ],
                   ),
                 ),

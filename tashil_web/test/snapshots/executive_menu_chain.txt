@@ -200,8 +200,6 @@ Market leader | 11.0 | FontWeight.w600 | ff3d4b36 | 0.5 | 1.4545454545454546
 Market leader | 11.0 | FontWeight.w600 | ff3d4b36 | 0.5 | 1.4545454545454546
 P&G | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
 P&G | 11.0 | FontWeight.w600 | ff43483f | 0.5 | 1.4545454545454546
-Sales by Chain | 12.0 | FontWeight.w500 | ff43483f | 0.5 | 1.3333333333333333
-Sales by Chain | 12.0 | FontWeight.w500 | ff43483f | 0.5 | 1.3333333333333333
 Spinneys | 11.0 | FontWeight.w500 | ff43483f | 0.5 | 1.4545454545454546
 Spinneys | 11.0 | FontWeight.w500 | ff43483f | 0.5 | 1.4545454545454546
 Spinneys | 11.0 | FontWeight.w500 | ff43483f | 0.5 | 1.4545454545454546
