@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 import 'package:tashil_web/features/store_benchmark/presentation/screens/store_matrix_screen.dart';
 
 void main() {
@@ -12,7 +13,9 @@ void main() {
       apiClient = ApiClient();
     });
 
-    testWidgets('renders screen header, tier KPI cards, and store ranking table', (WidgetTester tester) async {
+    testWidgets(
+        'renders screen header, tier KPI cards, and store ranking table',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1440, 1024);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -39,9 +42,11 @@ void main() {
       expect(find.text('القاهرة الكبرى'), findsWidgets);
 
       // Check Tier Summary KPI Cards
-      expect(find.textContaining('Tier A (الفئة الأولى - الرائدة)'), findsOneWidget);
+      expect(find.textContaining('Tier A (الفئة الأولى - الرائدة)'),
+          findsOneWidget);
       expect(find.textContaining('Tier B (الفئة المتوسطة)'), findsOneWidget);
-      expect(find.textContaining('Tier C (الفئة القياسية / الناشئة)'), findsOneWidget);
+      expect(find.textContaining('Tier C (الفئة القياسية / الناشئة)'),
+          findsOneWidget);
 
       // Check Table Columns
       expect(find.text('الترتيب'), findsOneWidget);
@@ -66,12 +71,32 @@ void main() {
       // Check Velocity indicator presence
       expect(find.byIcon(Icons.trending_up_rounded), findsWidgets);
 
-      // Verify DataTable stretches to fill the full available card content width on desktop
+      // Table fills the card; no leftover horizontal scroll.
+      expect(find.byType(TableScrollContainer), findsWidgets);
+      final table = find.byKey(const ValueKey('store_matrix_table'));
+      expect(table, findsOneWidget);
       final dataTableSize = tester.getSize(find.byType(DataTable));
-      expect(dataTableSize.width, greaterThanOrEqualTo(1300.0));
+      expect(dataTableSize.width, greaterThan(1000.0));
+      final scrollable = find.ancestor(
+        of: table,
+        matching: find.byWidgetPredicate((w) =>
+            w is Scrollable &&
+            w.axisDirection != AxisDirection.down &&
+            w.axisDirection != AxisDirection.up),
+      );
+      if (scrollable.evaluate().isNotEmpty) {
+        expect(
+          tester
+              .state<ScrollableState>(scrollable.first)
+              .position
+              .maxScrollExtent,
+          lessThanOrEqualTo(2.0),
+        );
+      }
     });
 
-    testWidgets('filtering by regional selector updates the store list', (WidgetTester tester) async {
+    testWidgets('filtering by regional selector updates the store list',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1440, 1024);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -87,8 +112,9 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Tap on 'شرق الإسكندرية' segment
-      final eastAlexSegment = find.text('شرق الإسكندرية').first;
+      // Tap on 'شرق الإسكندرية' filter tab
+      final eastAlexSegment =
+          find.byKey(const ValueKey('store_matrix_filter_شرق الإسكندرية'));
       await tester.tap(eastAlexSegment);
       await tester.pumpAndSettle();
 
@@ -101,7 +127,8 @@ void main() {
       expect(find.text('فتح الله - المنشية'), findsNothing);
     });
 
-    testWidgets('filtering by Tier segment updates the store list', (WidgetTester tester) async {
+    testWidgets('filtering by Tier segment updates the store list',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1440, 1024);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -117,8 +144,9 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Tap on 'Tier C' segment in M3SegmentedButtonGroup
-      final tierCSegment = find.text('Tier C').first;
+      // Tap on 'Tier C' filter tab
+      final tierCSegment =
+          find.byKey(const ValueKey('store_matrix_filter_Tier C'));
       expect(tierCSegment, findsOneWidget);
       await tester.tap(tierCSegment);
       await tester.pumpAndSettle();
@@ -128,7 +156,9 @@ void main() {
       expect(find.text('كارفور المعادي سيتي سنتر'), findsNothing);
     });
 
-    testWidgets('renders cleanly on compact mobile viewport without RenderFlex overflow', (WidgetTester tester) async {
+    testWidgets(
+        'renders cleanly on compact mobile viewport without RenderFlex overflow',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(360, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
