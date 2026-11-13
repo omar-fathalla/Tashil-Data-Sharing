@@ -72,9 +72,47 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
   /// whenever the scroll metrics change (resize, data change).
   bool _overflows = false;
 
+  /// Thickness of the horizontal scrollbar. While the table overflows, the
+  /// scroll area reserves this (plus a small gap) below the rows so the
+  /// scrollbar never covers the last row's content.
+  static const double _scrollbarThickness = 9.0;
+  static const double _scrollbarGap = 4.0;
+
+  /// DataTable fitting: column shares from [columnFlex] are only minimums, so
+  /// a column whose content is wider than its share pushes the table past
+  /// the available width even when the natural columns would fit. When that
+  /// happens the shares are computed for a width reduced by the overflow
+  /// (others give up slack, content-bound columns keep their size) until the
+  /// table fits or the shares run out. Reset when the width or row count
+  /// changes. The table never ends up narrower than the available width.
+  double _shrink = 0.0;
+  int _shrinkSteps = 0;
+  double _shrinkForWidth = -1.0;
+  int _shrinkForRows = -1;
+  bool _fitsDataTable = false;
+  bool _shrinkPending = false;
+  static const int _maxShrinkSteps = 8;
+
   void _setOverflow(double maxScrollExtent) {
     // Ignore sub-pixel rounding (< 2dp) from intrinsic column layout.
     final next = maxScrollExtent > 2.0;
+    // Shrink even for a sub-2dp remainder so a fitting table ends with no
+    // scroll extent at all (nothing for the scrollbar to paint).
+    if (maxScrollExtent > 0.01 &&
+        _fitsDataTable &&
+        !_shrinkPending &&
+        _shrinkSteps < _maxShrinkSteps &&
+        mounted) {
+      _shrinkPending = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _shrinkPending = false;
+        if (!mounted) return;
+        setState(() {
+          _shrink += maxScrollExtent.ceilToDouble() + 1.0;
+          _shrinkSteps++;
+        });
+      });
+    }
     if (next == _overflows || !mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _overflows != next) setState(() => _overflows = next);
@@ -332,10 +370,12 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
             constraints.maxWidth.isFinite ? constraints.maxWidth : 0.0;
         return Scrollbar(
           controller: _effectiveController,
-          thumbVisibility: true,
-          trackVisibility: true,
+          // Only shown while the table really overflows (no empty track
+          // painted over a table that fits).
+          thumbVisibility: _overflows,
+          trackVisibility: _overflows,
           interactive: true,
-          thickness: 9.0,
+          thickness: _scrollbarThickness,
           radius: const Radius.circular(8.0),
           child: NotificationListener<ScrollMetricsNotification>(
             onNotification: (n) {
@@ -350,7 +390,14 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
               physics: const BouncingScrollPhysics(
                 parent: AlwaysScrollableScrollPhysics(),
               ),
-              child: _buildExpandedChild(widget.child, availableWidth),
+              child: Padding(
+                // Room for the scrollbar so it never covers row content.
+                padding: EdgeInsets.only(
+                    bottom: _overflows
+                        ? _scrollbarThickness + _scrollbarGap
+                        : 0.0),
+                child: _buildExpandedChild(widget.child, availableWidth),
+              ),
             ),
           ),
         );
@@ -404,7 +451,17 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
       dt = child.child as DataTable;
     }
 
+    _fitsDataTable = dt != null && dt.columns.isNotEmpty;
     if (dt != null && dt.columns.isNotEmpty) {
+      if (availableWidth != _shrinkForWidth ||
+          dt.rows.length != _shrinkForRows) {
+        _shrinkForWidth = availableWidth;
+        _shrinkForRows = dt.rows.length;
+        _shrink = 0.0;
+        _shrinkSteps = 0;
+      }
+      final fitWidth =
+          (availableWidth - _shrink).clamp(0.0, double.infinity);
       final colCount = dt.columns.length;
       final hMargin = dt.horizontalMargin ?? 24.0;
       final colSpacing = dt.columnSpacing ??
@@ -412,7 +469,7 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
                   (colCount > 1 ? colCount - 1 : 1))
               .clamp(24.0, 56.0);
       final rawMinColWidth =
-          (availableWidth - (2 * hMargin) - ((colCount - 1) * colSpacing)) /
+          (fitWidth - (2 * hMargin) - ((colCount - 1) * colSpacing)) /
               colCount;
       final minColWidth = rawMinColWidth.clamp(0.0, double.infinity);
 
