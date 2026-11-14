@@ -736,7 +736,11 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			UnitsYoYPct:          payload.UnitsYoYPct,
 		}
 		if !dryRun {
-			// Replace tenant facts, workbook analytics, and OOS alerts for this chain
+			// Snapshot latest stored period before merge so a historical upload cannot
+			// overwrite OOS alerts derived from a newer period already on the tenant/chain.
+			storedOOSPeriod := p.latestStoredSellOutPeriod(ctx, tenantID, payload.RetailerDetected)
+			uploadOOSPeriod := maxPeriodYM(validFacts, payload.RetailerDetected)
+			// Replace tenant facts, workbook analytics, and (when period allows) OOS alerts
 			if err := p.bqRepo.ReplaceTenantFacts(ctx, tenantID, validFacts); err != nil {
 				return nil, fmt.Errorf("failed to replace tenant facts in bigquery: %w", err)
 			}
@@ -744,8 +748,10 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			if err := p.bqRepo.SetTenantWorkbookAnalytics(ctx, tenantID, wbMeta); err != nil {
 				return nil, fmt.Errorf("failed to store workbook analytics in bigquery: %w", err)
 			}
-			if err := p.fsRepo.ReplaceOOSAlerts(ctx, tenantID, payload.ComputedOOSAlerts); err != nil {
-				return nil, fmt.Errorf("failed to update OOS alerts in firestore: %w", err)
+			if shouldReplaceOOSAlerts(uploadOOSPeriod, storedOOSPeriod) {
+				if err := p.fsRepo.ReplaceOOSAlerts(ctx, tenantID, payload.ComputedOOSAlerts); err != nil {
+					return nil, fmt.Errorf("failed to update OOS alerts in firestore: %w", err)
+				}
 			}
 		}
 	} else {
@@ -1150,6 +1156,10 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		markPrimaryCommitted()
 		commitSync = p.sinkSellIn(ctx, sinkMeta, staged.SellInRecords)
 	} else if staged.IsWideMatrix {
+		// Snapshot latest stored period before merge so a historical upload cannot
+		// overwrite OOS alerts derived from a newer period already on the tenant/chain.
+		storedOOSPeriod := p.latestStoredSellOutPeriod(ctx, tenantID, chainToUse)
+		uploadOOSPeriod := maxPeriodYM(staged.ValidFacts, chainToUse)
 		if err := p.bqRepo.ReplaceTenantFacts(ctx, tenantID, staged.ValidFacts); err != nil {
 			return nil, fmt.Errorf("failed to replace tenant facts in bigquery: %w", err)
 		}
@@ -1158,8 +1168,10 @@ func (p *Processor) CommitStagedUpload(ctx context.Context, tenantID, batchID, t
 		if err := p.bqRepo.SetTenantWorkbookAnalytics(ctx, tenantID, staged.WBMeta); err != nil {
 			return nil, fmt.Errorf("failed to store workbook analytics in bigquery: %w", err)
 		}
-		if err := p.fsRepo.ReplaceOOSAlerts(ctx, tenantID, staged.OOSAlerts); err != nil {
-			return nil, fmt.Errorf("failed to update OOS alerts in firestore: %w", err)
+		if shouldReplaceOOSAlerts(uploadOOSPeriod, storedOOSPeriod) {
+			if err := p.fsRepo.ReplaceOOSAlerts(ctx, tenantID, staged.OOSAlerts); err != nil {
+				return nil, fmt.Errorf("failed to update OOS alerts in firestore: %w", err)
+			}
 		}
 	} else {
 		if err := p.bqRepo.InsertSellOutFacts(ctx, staged.ValidFacts); err != nil {
