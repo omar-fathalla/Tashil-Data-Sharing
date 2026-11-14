@@ -309,7 +309,11 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     }
   }
 
-  void _applyLocalFilters() {
+  /// Recomputes [_filteredGroups]. When [resetPage] is true (search / category
+  /// / data reload), pagination restarts at page 1. Callers that only need to
+  /// re-slice must pass `resetPage: false` so page navigation stays intact —
+  /// M3 [DropdownMenu] can re-fire `onSelected` with the same value on rebuild.
+  void _applyLocalFilters({bool resetPage = true}) {
     final q = _searchQuery.trim().toLowerCase();
     final filtered = _allGroups.where((g) {
       if (_selectedCategory != 'الكل' && g.category != _selectedCategory) {
@@ -331,9 +335,14 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       return true;
     }).toList();
 
-    // Search / category (and data refresh via this path) always restart at page 1.
-    _ownSkuPageIndex = 0;
+    if (resetPage) {
+      _ownSkuPageIndex = 0;
+    }
     _filteredGroups = filtered;
+    if (!resetPage) {
+      final last = _ownSkuTotalPages - 1;
+      if (_ownSkuPageIndex > last) _ownSkuPageIndex = last < 0 ? 0 : last;
+    }
     if (_filteredGroups.isNotEmpty) {
       final stillExists = _filteredGroups
           .any((g) => g.ownBarcode == _selectedOwnBarcode);
@@ -1061,9 +1070,12 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     for (final cat in categories) M3DropdownOption(cat, cat),
                   ],
                   onChanged: (cat) {
+                    // DropdownMenu may re-emit the same value on rebuild; ignore
+                    // so own-SKU pagination is not reset to page 1.
+                    if (cat == _selectedCategory) return;
                     setState(() {
                       _selectedCategory = cat;
-                      _applyLocalFilters();
+                      _applyLocalFilters(resetPage: true);
                     });
                   },
                 ),

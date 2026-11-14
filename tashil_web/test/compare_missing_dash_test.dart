@@ -81,7 +81,8 @@ void main() {
 
     expect(find.text('غير مقارن'), findsWidgets);
     expect(find.textContaining('مساوي لمتوسط السوق'), findsNothing);
-    expect(find.textContaining('0.00 ج.م'), findsNothing);
+    // Exact match — textContaining('0.00 ج.م') false-matches '160.00 ج.م'.
+    expect(find.text('0.00 ج.م'), findsNothing);
   });
 
   testWidgets('mapped fixture still shows a real competitive index',

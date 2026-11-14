@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/data/available_months.dart';
+import 'package:tashil_web/core/data/available_years.dart';
 import 'package:tashil_web/core/data/result.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:tashil_web/features/competitor_comparison/data/competitor_comparison_repository.dart';
 import 'package:tashil_web/features/competitor_comparison/presentation/screens/competitor_comparison_screen.dart';
+
+import 'helpers/m3_dropdown_tester.dart';
 
 class _FakeRepo implements CompetitorComparisonSource {
   _FakeRepo(this.groups);
@@ -129,7 +132,16 @@ Future<void> _pumpCompare(
 }
 
 void main() {
-  setUp(AvailableMonths.clearForTest);
+  setUp(() {
+    AvailableMonths.clearForTest();
+    AvailableYears.setForTest(
+      const YearOptions(years: [2026], defaultYear: 2026),
+    );
+    AvailableMonths.setForTest(
+      const MonthOptions(year: 2026, months: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+    );
+  });
+  tearDown(AvailableMonths.clearForTest);
 
   testWidgets('own-SKU list shows 10 per page with Arabic indicators', (tester) async {
     final groups = [for (var i = 1; i <= 25; i++) _group(index: i)];
@@ -189,9 +201,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('صفحة 2 من 2'), findsOneWidget);
 
-    // Category filter → page 1 of the filtered subset (3 floor cleaners).
-    await tester.tap(find.widgetWithText(FilterChip, 'منظف ارضيات'));
-    await tester.pumpAndSettle();
+    // Category filter (M3Dropdown) → page 1 of the filtered subset (3 floor cleaners).
+    await selectM3Option(
+      tester,
+      find.byKey(const ValueKey('compare_category_dropdown')),
+      'منظف ارضيات',
+    );
 
     expect(find.text('صفحة 1 من 1'), findsOneWidget);
     expect(find.text('1–3 من 3'), findsOneWidget);
