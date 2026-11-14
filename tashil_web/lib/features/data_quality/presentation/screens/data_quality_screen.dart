@@ -350,12 +350,17 @@ class _SummaryRow extends StatelessWidget {
     // Defensive empty-state UI. Backend row totals when Runs are missing are
     // fixed in PR #86 / TDS-76 — keep this guard so 0 rows never show 100%.
     final hasRows = summary.totalRows > 0;
-    final cleanRows = hasRows ? summary.totalRows - summary.criticalRows : 0;
     final cleanlinessValue =
         hasRows ? '${summary.cleanlinessPct.toStringAsFixed(1)}%' : '—';
+    // Display-only clarification: formula is critical-rows only
+    // ((total − critical) / total). Open warnings do not lower it.
+    // Short on-card (≤1 line at 1024/4-col); full wording in tooltip.
     final cleanlinessSubtitle = hasRows
-        ? '$cleanRows من ${countRows(summary.totalRows)}'
+        ? 'حرجة فقط — ${summary.criticalRows} حرجة'
         : 'مفيش صفوف اتفحصت';
+    final cleanlinessSubtitleTooltip = hasRows
+        ? 'محسوبة على الأخطاء الحرجة فقط — ${summary.criticalRows} حرجة'
+        : null;
     final openSubtitle = countError(summary.open);
 
     return Column(
@@ -382,8 +387,8 @@ class _SummaryRow extends StatelessWidget {
                   subtitleMaxLines: 1,
                   value: cleanlinessValue,
                   subtitle: cleanlinessSubtitle,
-                  icon: AppIcons.verified,
-                  color: !hasRows
+                  subtitleTooltip: cleanlinessSubtitleTooltip,
+                  icon: AppIcons.verified,                  color: !hasRows
                       ? cs.onSurfaceVariant
                       : (summary.cleanlinessPct >= 95
                           ? cs.primary

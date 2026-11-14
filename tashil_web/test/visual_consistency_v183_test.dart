@@ -9,6 +9,7 @@ import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_equal_height_grid.dart';
+import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/core/widgets/m3_table_text.dart';
 import 'package:tashil_web/core/widgets/m3_wrap_text.dart';
 import 'package:tashil_web/features/data_quality/data/data_quality_repository.dart';
@@ -145,9 +146,13 @@ void main() {
       width: 1280,
     );
     expect(find.text('100.0%'), findsOneWidget);
-    // Subtitle uses countRows → «1974 صفًا» (11–99 many form).
-    expect(find.textContaining('1974 من'), findsOneWidget);
-    expect(find.textContaining('صف'), findsWidgets);
+    // Display-only: critical-only formula clarified under the KPI.
+    expect(find.textContaining('حرجة فقط'), findsOneWidget);
+    expect(find.textContaining('0 حرجة'), findsOneWidget);
+    final card = tester.widget<M3SummaryKpiCard>(
+      find.byKey(const ValueKey('dq_cleanliness_card')),
+    );
+    expect(card.subtitleTooltip, contains('محسوبة على الأخطاء الحرجة فقط'));
     expect(
       tester.widget<Text>(find.byKey(const ValueKey('dq_value_open'))).data,
       '80',

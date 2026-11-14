@@ -1173,7 +1173,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   }
 
   /// Short status chip matching Sell-Out / Trade Marketing geometry.
-  /// Labels stay on one line (no wrap) so «مسحوب» never clips as «مسحو / ب».
+  /// Labels stay on one line (no mid-word split). When an icon is present and
+  /// the chip is squeezed (e.g. price col → 64dp inner), [Flexible] lets the
+  /// text fade instead of blowing the Row.
   Widget _statusChip(String label, Color color, {Key? key, IconData? icon}) {
     final style = TextStyle(
       fontWeight: FontWeight.w800,
@@ -1184,7 +1186,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       label,
       maxLines: 1,
       softWrap: false,
-      overflow: TextOverflow.clip,
+      overflow: TextOverflow.fade,
       textAlign: TextAlign.center,
       style: style,
     );
@@ -1198,7 +1200,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               children: [
                 Icon(icon, size: 14.0, color: color),
                 const SizedBox(width: M3Spacing.xxs),
-                text,
+                Flexible(child: text),
               ],
             ),
     );
@@ -2105,40 +2107,47 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                               ],
                             ),
                           ),
-                          // Item Type & Pull Status: short chip + description
+                          // Item Type & Pull Status: short chip + description.
+                          // box(9) locks the live 96 / compact 88 type floor so
+                          // «مسحوب» / «غير مسحوب» stay one line in-test and live.
                           DataCell(
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                _statusChip(
-                                  isPromo ? 'عرض' : 'عادي',
-                                  isPromo
-                                      ? M3Palette.amberDeep
-                                      : M3Palette.teal,
-                                ),
-                                const SizedBox(height: 4.0),
-                                _statusChip(
-                                  item.isActiveInChains ? 'مسحوب' : 'غير مسحوب',
-                                  item.isActiveInChains
-                                      ? M3Palette.info
-                                      : cs.onSurfaceVariant,
-                                ),
-                                const SizedBox(height: 2.0),
-                                M3WrapText(
-                                  item.isActiveInChains
-                                      ? (item.totalPosUnitsSold > 0
-                                          ? '${_intFmt.format(item.totalPosUnitsSold)} وحدة'
-                                          : 'نشط بالسلاسل')
-                                      : 'فرصة توزيع',
-                                  maxLines: 2,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    fontSize: M3FontSize.tiny,
-                                    color: cs.onSurfaceVariant,
+                            box(
+                              9,
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  _statusChip(
+                                    isPromo ? 'عرض' : 'عادي',
+                                    isPromo
+                                        ? M3Palette.amberDeep
+                                        : M3Palette.teal,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 4.0),
+                                  _statusChip(
+                                    item.isActiveInChains
+                                        ? 'مسحوب'
+                                        : 'غير مسحوب',
+                                    item.isActiveInChains
+                                        ? M3Palette.info
+                                        : cs.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(height: 2.0),
+                                  M3WrapText(
+                                    item.isActiveInChains
+                                        ? (item.totalPosUnitsSold > 0
+                                            ? '${_intFmt.format(item.totalPosUnitsSold)} وحدة'
+                                            : 'نشط بالسلاسل')
+                                        : 'فرصة توزيع',
+                                    maxLines: 2,
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      fontSize: M3FontSize.tiny,
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           // Actions
@@ -2258,15 +2267,19 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     if (leftover > 0) {
       widths[2] += leftover;
     } else if (leftover < 0) {
-      // Shrink the name column first, then the others, never below 85% of min.
-      // Shrink type (9) last so pull-status chips keep one-line width.
-      for (final i in [2, 4, 8, 1, 3, 10, 5, 6, 7, 0, 9]) {
+      // Never shrink type (9): live 96 / compact 88 hold «مسحوب» / «غير مسحوب».
+      // Other columns: first to 85% of min, then harder (70%) so the table
+      // still fits the 1024+sidebar shell without horizontal scroll.
+      for (final floorFactor in [0.85, 0.70]) {
         if (leftover >= 0) break;
-        final reducible = widths[i] - mins[i] * 0.85;
-        if (reducible <= 0) continue;
-        final cut = reducible < -leftover ? reducible : -leftover;
-        widths[i] -= cut;
-        leftover += cut;
+        for (final i in [2, 4, 8, 1, 3, 10, 5, 6, 7, 0]) {
+          if (leftover >= 0) break;
+          final reducible = widths[i] - mins[i] * floorFactor;
+          if (reducible <= 0) continue;
+          final cut = reducible < -leftover ? reducible : -leftover;
+          widths[i] -= cut;
+          leftover += cut;
+        }
       }
     }
     return widths;

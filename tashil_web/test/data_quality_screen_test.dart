@@ -101,7 +101,8 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text('90.2%'), findsOneWidget);
-    expect(find.textContaining('من 389 صفًا'), findsOneWidget);
+    expect(find.textContaining('حرجة فقط'), findsOneWidget);
+    expect(find.textContaining('38 حرجة'), findsOneWidget);
     expect(find.byKey(const ValueKey('dq_value_open')), findsOneWidget);
     expect(find.text('79'), findsOneWidget);
     expect(find.text('0 من 0 صف بدون أخطاء حرجة'), findsNothing);
