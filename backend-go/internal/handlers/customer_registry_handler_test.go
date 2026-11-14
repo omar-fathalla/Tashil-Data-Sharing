@@ -51,6 +51,12 @@ func (s stubRegistryProc) CustomerRegistry() *customers.Registry { return nil }
 func (s stubRegistryProc) ReapplySellInFiles(context.Context, string, []string, []string) ([]ingestion.ReapplyResult, []string) {
 	return nil, nil
 }
+func (s stubRegistryProc) ApplyCustomerAliasAttributions(context.Context, string) ingestion.AliasRemapResult {
+	return ingestion.AliasRemapResult{}
+}
+func (s stubRegistryProc) RestoreCustomerAliasAttribution(context.Context, string, string) ingestion.AliasRemapResult {
+	return ingestion.AliasRemapResult{}
+}
 func (s stubRegistryProc) SellInYears(string) []int { return nil }
 func (s stubRegistryProc) SellOutMonths(_ string, year int) []int {
 	if year != 2026 {
@@ -91,18 +97,32 @@ func TestHandleMonthsReturnsJanThroughOct(t *testing.T) {
 }
 
 type mergeProc struct {
-	reg        *customers.Registry
-	lastFiles  []string
-	lastChains []string
-	nilFiles   bool
-	stats      map[string]ingestion.CustomerLiveStat
+	reg          *customers.Registry
+	lastFiles    []string
+	lastChains   []string
+	nilFiles     bool
+	reapplyCalls int
+	remapRows    int
+	restoreRows  int
+	appliedAlias bool
+	restored     bool
+	stats        map[string]ingestion.CustomerLiveStat
 }
 
 func (m *mergeProc) CustomerRegistry() *customers.Registry { return m.reg }
 func (m *mergeProc) ReapplySellInFiles(_ context.Context, _ string, files, chains []string) ([]ingestion.ReapplyResult, []string) {
 	m.lastFiles, m.lastChains = files, chains
 	m.nilFiles = files == nil
+	m.reapplyCalls++
 	return []ingestion.ReapplyResult{{File: "in26.xlsx", Rows: 2}}, nil
+}
+func (m *mergeProc) ApplyCustomerAliasAttributions(context.Context, string) ingestion.AliasRemapResult {
+	m.appliedAlias = true
+	return ingestion.AliasRemapResult{Remapped: m.remapRows}
+}
+func (m *mergeProc) RestoreCustomerAliasAttribution(context.Context, string, string) ingestion.AliasRemapResult {
+	m.restored = true
+	return ingestion.AliasRemapResult{Restored: m.restoreRows}
 }
 func (m *mergeProc) SellInYears(string) []int        { return nil }
 func (m *mergeProc) SellOutMonths(string, int) []int { return nil }
@@ -281,7 +301,7 @@ func TestHandleApproveMergeOfLiveOnlyCustomers(t *testing.T) {
 	reg := customers.New(&customers.MemoryStore{})
 	canonical := "عائله فتح الله ماركت - كفر الدوار 2"
 	alias := "عائله فتح الله ماركت مواد عناية - كفر الدوار2"
-	proc := &mergeProc{reg: reg, stats: map[string]ingestion.CustomerLiveStat{
+	proc := &mergeProc{reg: reg, remapRows: 75, stats: map[string]ingestion.CustomerLiveStat{
 		customers.NormalizeName(alias):     {Name: alias, Chain: "fathalla", Rows: 75, Value: 15667.11, Files: []string{"in26.xlsx"}},
 		customers.NormalizeName(canonical): {Name: canonical, Chain: "fathalla", Rows: 1492, Value: 1058327.30, Files: []string{"in26.xlsx"}},
 	}}
@@ -305,7 +325,23 @@ func TestHandleApproveMergeOfLiveOnlyCustomers(t *testing.T) {
 	if !sawAlias || !sawCanonical {
 		t.Fatalf("expected both names approved with alias_of on the source: %+v", approved)
 	}
-	if !proc.nilFiles && len(proc.lastFiles) == 0 {
-		t.Fatalf("expected a re-apply, files=%v chains=%v", proc.lastFiles, proc.lastChains)
+	if !proc.appliedAlias {
+		t.Fatal("live merge must apply alias attributions directly")
+	}
+	if proc.reapplyCalls != 0 {
+		t.Fatalf("live merge with remapped rows must not re-parse archives, reapply=%d", proc.reapplyCalls)
+	}
+	if !strings.Contains(rec.Body.String(), `"remapped_rows":75`) {
+		t.Fatalf("response must report remapped rows: %s", rec.Body.String())
+	}
+
+	proc.restoreRows = 75
+	rec = postRegistry(t, h, "/api/v1/customers/registry/unmerge",
+		`{"name":"`+alias+`"}`, domain.RoleVendorAdmin)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unmerge HTTP %d body %s", rec.Code, rec.Body.String())
+	}
+	if !proc.restored || proc.reapplyCalls != 0 {
+		t.Fatalf("unmerge must restore attribution without archive re-parse, restored=%v reapply=%d", proc.restored, proc.reapplyCalls)
 	}
 }

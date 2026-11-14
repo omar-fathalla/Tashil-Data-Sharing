@@ -200,6 +200,14 @@ func main() {
 			}
 		}
 		ingestProcessor.SyncDurableFromStore(context.Background(), "tenant-adeco", true)
+		// Re-apply recorded alias_of merges (e.g. Kafr El-Dawar decision saved before
+		// attribution remapped). Idempotent; never invents a merge without a decision.
+		for _, t := range durableTenants {
+			ar := ingestProcessor.ApplyCustomerAliasAttributions(context.Background(), t)
+			if ar.Remapped > 0 || len(ar.Errors) > 0 {
+				log.Printf("[customer-alias] startup tenant=%s remapped=%d sources=%v errs=%v", t, ar.Remapped, ar.Sources, ar.Errors)
+			}
+		}
 		// Fill kpiCache + sell-in-returns cache before serving so cold-start YTD
 		// and year-scoped المرتجعات do not rebuild on the request path.
 		bqRepo.WarmCommonTenantAnalytics(context.Background(), durableTenants)
