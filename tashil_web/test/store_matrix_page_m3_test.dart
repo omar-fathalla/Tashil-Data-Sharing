@@ -369,7 +369,7 @@ void main() {
       final items = [
         StoreBenchmarkItem(
           storeId: 's1',
-          storeName: '${prefix}سيدي جابر ميني',
+          storeName: '$prefixسيدي جابر ميني',
           retailerChain: 'fathalla',
           region: 'شرق الإسكندرية',
           tier: 'Tier A',
@@ -380,7 +380,7 @@ void main() {
         ),
         StoreBenchmarkItem(
           storeId: 's2',
-          storeName: '${prefix}نيس2',
+          storeName: '$prefixنيس2',
           retailerChain: 'fathalla',
           region: 'شرق الإسكندرية',
           tier: 'Tier A',
@@ -391,7 +391,7 @@ void main() {
         ),
         StoreBenchmarkItem(
           storeId: 's3',
-          storeName: '${prefix}الدخيلة ميني',
+          storeName: '$prefixالدخيلة ميني',
           retailerChain: 'fathalla',
           region: 'غرب الإسكندرية',
           tier: 'Tier A',

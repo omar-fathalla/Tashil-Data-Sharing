@@ -205,7 +205,7 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
       );
     }
 
-    final defaultNames = kReturnsFixtureBranches;
+    const defaultNames = kReturnsFixtureBranches;
     final valuesByIndex = [
       values[defaultNames[0]]!,
       values[defaultNames[1]]!,

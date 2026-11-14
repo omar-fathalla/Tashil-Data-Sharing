@@ -78,10 +78,10 @@ class _MissingMetricsArchiveApi extends ApiClient {
     String? fileType,
     bool forceRefresh = false,
   }) async {
-    return UploadedFilesArchiveResponse(
+    return const UploadedFilesArchiveResponse(
       tenantId: 'tenant-adeco',
       totalCount: 1,
-      chainCounts: const {'fathalla': 1},
+      chainCounts: {'fathalla': 1},
       files: [
         ArchivedExcelFileModel(
           id: 'missing-1',
@@ -289,7 +289,7 @@ void main() {
   testWidgets('anomaly table renders M3ChipSurface short labels', (tester) async {
     await _pump(
       tester,
-      AnomalyResolutionTable(anomalies: const [
+      const AnomalyResolutionTable(anomalies: [
         {
           'row_number': 7,
           'issue_type': 'invalid_barcode',

@@ -31,8 +31,8 @@ const kLiveLongName =
 const kLiveLongName2 =
     'عرض شرك فيبا بلس + 3 كجم & فيبا 3 كجم - 3 مجموعه';
 
-SellOutExplorerData _livePriceData() => SellOutExplorerData(
-      records: const [],
+SellOutExplorerData _livePriceData() => const SellOutExplorerData(
+      records: [],
       summary: SellOutRecordsSummaryModel(
         totalCount: 3,
         totalNetRevenue: 32740000,
@@ -90,9 +90,9 @@ SellOutExplorerData _livePriceData() => SellOutExplorerData(
           ),
         ],
       ),
-      stores: const [],
-      currentBranchMatrix: const [],
-      prevBranchMatrix: const [],
+      stores: [],
+      currentBranchMatrix: [],
+      prevBranchMatrix: [],
     );
 
 class _OneShotRepo extends SellOutExplorerRepository {

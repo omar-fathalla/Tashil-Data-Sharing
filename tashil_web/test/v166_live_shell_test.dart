@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/services.dart';
 // Live 1280+DesktopSidebar harness (real Cairo): v166 follow-up to the
 // v165 review. Targets / Sell-In KPI cards must match Sell-Out (138px,
