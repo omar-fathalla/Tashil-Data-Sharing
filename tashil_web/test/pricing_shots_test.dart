@@ -5,7 +5,6 @@ import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/features/pricing_compliance/presentation/screens/pricing_compliance_screen.dart';
 
 import 'pricing_m3_support.dart';
-import 'support/real_fonts.dart';
 
 /// Writes PNG shots when PRICING_SHOT_DIR is set. Skipped otherwise so the
 /// regular suite never writes files.

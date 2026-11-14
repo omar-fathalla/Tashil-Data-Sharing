@@ -37,13 +37,13 @@ void main() {
       const lri = '\u2066';
       const pdi = '\u2069';
       const minus = '\u2212';
-      expect(CurrencyFormatter.formatCompactEGP(-847), '${lri}${minus}847 ج.م${pdi}');
-      expect(CurrencyFormatter.formatCompactEGP(-238), '${lri}${minus}238 ج.م${pdi}');
-      expect(CurrencyFormatter.formatCompactEGP(-118), '${lri}${minus}118 ج.م${pdi}');
+      expect(CurrencyFormatter.formatCompactEGP(-847), '$lri${minus}847 ج.م$pdi');
+      expect(CurrencyFormatter.formatCompactEGP(-238), '$lri${minus}238 ج.م$pdi');
+      expect(CurrencyFormatter.formatCompactEGP(-118), '$lri${minus}118 ج.م$pdi');
       // isolate:true on a negative still uses a single LRI, not a nested FSI.
       expect(
           CurrencyFormatter.formatCompactEGP(-2500, isolate: true),
-          '${lri}${minus}2.5${wj}K ج.م${pdi}');
+          '$lri${minus}2.5${wj}K ج.م$pdi');
     });
 
     test('formatEGP negatives isolate the minus; positives stay unchanged', () {

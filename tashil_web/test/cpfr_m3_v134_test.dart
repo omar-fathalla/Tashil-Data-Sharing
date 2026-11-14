@@ -243,7 +243,7 @@ void main() {
     final card = find.byKey(const ValueKey('kpi_card_Sell-In'));
     expect(card, findsOneWidget);
     expect(tester.widget(card), isA<M3SummaryKpiCard>());
-    final pad = M3SummaryKpiStyle.padding;
+    const pad = M3SummaryKpiStyle.padding;
     expect(pad, const EdgeInsets.all(16.0));
     final icon = tester.widget<Icon>(
       find.descendant(of: card, matching: find.byType(Icon)),

@@ -55,7 +55,7 @@ class UploadFixtureApi extends ApiClient {
     bool forceRefresh = false,
   }) async {
     final files = [
-      ArchivedExcelFileModel(
+      const ArchivedExcelFileModel(
         id: 'u1',
         tenantId: 'tenant-adeco',
         fileName:
@@ -74,7 +74,7 @@ class UploadFixtureApi extends ApiClient {
         uploadedAt: '2026-11-02T10:15:00Z',
         lastIngestedAt: '2026-11-12T18:40:00Z',
       ),
-      ArchivedExcelFileModel(
+      const ArchivedExcelFileModel(
         id: 'u2',
         tenantId: 'tenant-adeco',
         fileName: 'Gomla-SellOut-Sep-2026-revised-final-v3.xlsx',

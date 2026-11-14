@@ -643,7 +643,7 @@ void main() {
         lessThanOrEqualTo(2.0));
     for (final code in [kLiveMissingCode, kLiveFgccCode, kLivePrccCode]) {
       expect(codeBreaksOnlyAtHyphens(tester, code, scope: table), isTrue,
-          reason: '$code');
+          reason: code);
     }
     expect(
         _onScreen(tester, find.byKey(const ValueKey('dq_item_name')),

@@ -2099,8 +2099,9 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
 
   Color _getChainColor(String chain) {
     final c = chain.toLowerCase().trim();
-    if (c.contains('fathalla') || c.contains('فتح الله'))
+    if (c.contains('fathalla') || c.contains('فتح الله')) {
       return M3Palette.emerald;
+    }
     if (c.contains('beet') || c.contains('بيت الجملة')) return M3Palette.violet;
     if (c.contains('gomla') || c.contains('جملة')) return M3Palette.amber;
     if (c.contains('carrefour') || c.contains('كارفور')) return M3Palette.blue;

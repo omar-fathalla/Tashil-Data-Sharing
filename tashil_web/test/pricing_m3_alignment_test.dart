@@ -73,7 +73,7 @@ _CardMetrics _metrics(WidgetTester tester, Finder card) {
       of: card,
       matching: find.byWidgetPredicate((w) =>
           w is Text &&
-          (w as Text).key is ValueKey &&
+          (w).key is ValueKey &&
           (w.key as ValueKey).value.toString().startsWith('kpi_value_')));
   // Fall back to the first headline-ish text after the title.
   Text? value;

@@ -292,12 +292,15 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
   List<MarketingExpenseItem> get _filteredExpenses {
     final q = _searchQuery.trim().toLowerCase();
     final list = _expenses.where((item) {
-      if (_selectedChain != 'all' && item.chainName != _selectedChain)
+      if (_selectedChain != 'all' && item.chainName != _selectedChain) {
         return false;
+      }
       if (_selectedYear != 0 && item.year != _selectedYear) return false;
       if (_selectedMonth != 0 && item.month != _selectedMonth) return false;
       if (_selectedCategoryId != 'all' &&
-          item.category.id != _selectedCategoryId) return false;
+          item.category.id != _selectedCategoryId) {
+        return false;
+      }
       if (q.isNotEmpty) {
         final match = item.campaignTitle.toLowerCase().contains(q) ||
             item.brandName.toLowerCase().contains(q) ||
@@ -523,8 +526,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                                             value: c, child: Text(c)))
                                         .toList()),
                                 onChanged: m3Legacy<String>((val) {
-                                  if (val != null)
+                                  if (val != null) {
                                     setDialogState(() => chain = val);
+                                  }
                                 }),
                               ),
                             ),
@@ -546,8 +550,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                                   );
                                 })),
                                 onChanged: m3Legacy<int>((val) {
-                                  if (val != null)
+                                  if (val != null) {
                                     setDialogState(() => month = val);
+                                  }
                                 }),
                               ),
                             ),
@@ -565,8 +570,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                                       value: 2025, child: Text('2025')),
                                 ]),
                                 onChanged: m3Legacy<int>((val) {
-                                  if (val != null)
+                                  if (val != null) {
                                     setDialogState(() => year = val);
+                                  }
                                 }),
                               ),
                             ),
@@ -600,8 +606,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                             );
                           }).toList()),
                           onChanged: m3Legacy<MarketingExpenseCategory>((val) {
-                            if (val != null)
+                            if (val != null) {
                               setDialogState(() => category = val);
+                            }
                           }),
                         ),
                         const SizedBox(height: 14.0),
@@ -903,8 +910,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                                           value: c, child: Text(c)))
                                       .toList()),
                               onChanged: m3Legacy<String>((v) {
-                                if (v != null)
+                                if (v != null) {
                                   setDialogState(() => simChain = v);
+                                }
                               }),
                             ),
                           ),
@@ -924,8 +932,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                                 );
                               })),
                               onChanged: m3Legacy<int>((v) {
-                                if (v != null)
+                                if (v != null) {
                                   setDialogState(() => simMonth = v);
+                                }
                               }),
                             ),
                           ),
@@ -1049,15 +1058,12 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                               'العائد لكل 1 جنيه تسويق:',
                               projection.romiMultiple == null
                                   ? '—'
-                                  : ltrIsolate(
+                                  : '${ltrIsolate(
                                       '${projection.romiMultiple!.toStringAsFixed(2)}x',
-                                    ) +
-                                      ' (كل 1 ج.م يحقق ' +
-                                      ltrIsolate(
+                                    )} (كل 1 ج.م يحقق ${ltrIsolate(
                                         projection.romiMultiple!
                                             .toStringAsFixed(2),
-                                      ) +
-                                      ' ج.م نمو مبيعات)',
+                                      )} ج.م نمو مبيعات)',
                               M3Palette.violet,
                               isBold: true,
                             ),

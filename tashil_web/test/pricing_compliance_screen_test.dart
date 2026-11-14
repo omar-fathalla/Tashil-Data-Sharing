@@ -322,12 +322,15 @@ class _FakePaginatedComplianceApiClient extends ApiClient {
 
     final cats = _all60Items.map((e) => e.category).toSet().toList()..sort();
     var filtered = _all60Items.where((item) {
-      if (chain != null && chain.isNotEmpty && item.retailerChain != chain)
+      if (chain != null && chain.isNotEmpty && item.retailerChain != chain) {
         return false;
-      if (category != null && category.isNotEmpty && item.category != category)
+      }
+      if (category != null && category.isNotEmpty && item.category != category) {
         return false;
-      if (violationOnly == true && item.violationType == 'compliant')
+      }
+      if (violationOnly == true && item.violationType == 'compliant') {
         return false;
+      }
       if (promoOnly == true && !item.isPromoActive) return false;
       if (search != null && search.trim().isNotEmpty) {
         if (!ApiClient.matchesProductSearch(

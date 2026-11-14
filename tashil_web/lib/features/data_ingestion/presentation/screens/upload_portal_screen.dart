@@ -583,8 +583,9 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
   }
 
   String _getChainDisplayName(String? code) {
-    if (code == null || code.isEmpty)
+    if (code == null || code.isEmpty) {
       return '-- اختر سلسلة التجزئة المستهدفة --';
+    }
     final match = _availableChains.where((c) => c.code == code);
     if (match.isNotEmpty) return match.first.displayName;
     return ApiClient.getRetailChainDisplayName(code);
