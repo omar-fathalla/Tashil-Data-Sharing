@@ -20,7 +20,9 @@ import '../../../../core/utils/bidi_text.dart';
 import '../../../../core/utils/app_date_format.dart';
 import '../../../../core/widgets/hyphenated_code_text.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_responsive_tab_bar.dart';
 import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../../core/widgets/m3_toolbar_button.dart';
@@ -123,6 +125,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (mounted && !_tabController.indexIsChanging) setState(() {});
+    });
     if (widget.initialSearchQuery != null &&
         widget.initialSearchQuery!.trim().isNotEmpty) {
       _searchController.text = widget.initialSearchQuery!.trim();
@@ -1119,40 +1124,35 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   const SizedBox(height: 16.0),
                   _buildKpiCardsRow(theme, cs, summary, filtered.length),
                   const SizedBox(height: 16.0),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerLow,
-                      borderRadius: M3Shape.radiusMd,
-                      border: Border.all(
-                        color: cs.outlineVariant.withValues(alpha: 0.45),
+                  M3ResponsiveTabBar<int>(
+                    key: const ValueKey('product_master_tabs'),
+                    textDirection: TextDirection.ltr,
+                    selectedValue: _tabController.index,
+                    items: [
+                      M3ResponsiveTabItem<int>(
+                        value: 0,
+                        icon: Icons.qr_code_2_rounded,
+                        selectedIcon: Icons.qr_code_2_rounded,
+                        label: 'كارتة الأصناف (${filtered.length})',
                       ),
-                    ),
-                    child: TabBar(
-                      controller: _tabController,
-                      labelColor: cs.primary,
-                      unselectedLabelColor: cs.onSurfaceVariant,
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      dividerColor: Colors.transparent,
-                      tabs: [
-                        _buildBilingualTab(
-                          icon: Icons.qr_code_2_rounded,
-                          titleAr:
-                              'كارتة تعريف الأصناف والأسعار (${filtered.length})',
-                          titleEn: 'Official SKU Catalog & Price List',
-                        ),
-                        _buildBilingualTab(
-                          icon: Icons.calculate_rounded,
-                          titleAr: 'حاسبة الطلبيات والخصومات والهامش',
-                          titleEn: 'Order, VAT & Margin Calculator',
-                        ),
-                        _buildBilingualTab(
-                          icon: Icons.cloud_upload_rounded,
-                          titleAr:
-                              'الشيتات المرفوعة وتحديث الكارتة (${_archivedMasterFiles.length})',
-                          titleEn: 'Uploaded Price Sheets & Sync',
-                        ),
-                      ],
-                    ),
+                      const M3ResponsiveTabItem<int>(
+                        value: 1,
+                        icon: Icons.calculate_rounded,
+                        selectedIcon: Icons.calculate_rounded,
+                        label: 'حاسبة الطلبيات والخصومات والهامش',
+                      ),
+                      M3ResponsiveTabItem<int>(
+                        value: 2,
+                        icon: Icons.cloud_upload_rounded,
+                        selectedIcon: Icons.cloud_upload_rounded,
+                        label:
+                            'الشيتات المرفوعة (${_archivedMasterFiles.length})',
+                      ),
+                    ],
+                    onChanged: (next) {
+                      _tabController.animateTo(next);
+                      setState(() {});
+                    },
                   ),
                 ],
               ),
@@ -1172,38 +1172,33 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     );
   }
 
-  Widget _buildBilingualTab({
-    required IconData icon,
-    required String titleAr,
-    required String titleEn,
-  }) {
-    return Tab(
-      height: 56.0,
-      child: Tooltip(
-        message: titleEn,
+  /// Short status chip matching Sell-Out / Trade Marketing geometry.
+  Widget _statusChip(String label, Color color, {Key? key, IconData? icon}) =>
+      M3ChipSurface(
+        key: key,
+        color: color.withValues(alpha: 0.14),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18.0),
-            const SizedBox(width: 8.0),
+            if (icon != null) ...[
+              Icon(icon, size: 14.0, color: color),
+              const SizedBox(width: M3Spacing.xxs),
+            ],
             Flexible(
-              child: Text(
-                titleAr,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: M3WrapText(
+                label,
+                maxLines: 3,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w800,
-                  fontSize: M3FontSize.bodySmallPlus,
+                  fontSize: M3FontSize.labelSmallPlus,
+                  color: color,
                 ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
+      );
 
   Widget _buildHeaderBanner(
     ThemeData theme,
@@ -1285,12 +1280,12 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                         _buildMetaChip(
                           cs,
                           Icons.discount_rounded,
-                          'خصم الفاتورة الأساسي: ${summary.defaultDiscountPct.toStringAsFixed(0)}%',
+                          'خصم فاتورة ${summary.defaultDiscountPct.toStringAsFixed(0)}%',
                         ),
                         _buildMetaChip(
                           cs,
                           Icons.receipt_long_rounded,
-                          'ضريبة القيمة المضافة: ${(summary.defaultVatRate * 100).toStringAsFixed(0)}%',
+                          'ضريبة ${(summary.defaultVatRate * 100).toStringAsFixed(0)}%',
                         ),
                         // Compact interactive File Sheets bubble button replacing cluttered file list
                         InkWell(
@@ -1463,29 +1458,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   }
 
   Widget _buildMetaChip(ColorScheme cs, IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-      decoration: BoxDecoration(
-        color: cs.surface.withValues(alpha: 0.85),
-        borderRadius: M3Shape.radiusFull,
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14.0, color: cs.primary),
-          const SizedBox(width: 5.0),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: M3FontSize.labelSmallPlus,
-              fontWeight: FontWeight.w700,
-              color: cs.onSurface,
-            ),
-          ),
-        ],
-      ),
-    );
+    return _statusChip(label, cs.primary, icon: icon);
   }
 
   Widget _buildKpiCardsRow(
@@ -1867,7 +1840,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                       cs.surfaceContainerHighest.withValues(alpha: 0.45),
                     ),
                     dataRowMinHeight: 52.0,
-                    dataRowMaxHeight: 108.0,
+                    dataRowMaxHeight: 120.0,
                     headingRowHeight: 44.0,
                     columnSpacing: 6.0,
                     horizontalMargin: 8.0,
@@ -1988,7 +1961,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                             ),
                             ),
                           ),
-                          // Official Name & Brand
+                          // Official Name & Brand (wrap ≤3 like Sell-Out / TM)
                           DataCell(
                             Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -1996,7 +1969,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                               children: [
                                 M3WrapText(
                                   item.officialName,
-                                  maxLines: 2,
+                                  maxLines: 3,
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -2004,7 +1977,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 const SizedBox(height: 2.0),
                                 M3WrapText(
                                   '${item.brand} • ${item.category}',
-                                  maxLines: 1,
+                                  maxLines: 2,
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: cs.onSurfaceVariant,
                                     fontSize: M3FontSize.tinyPlus,
@@ -2124,49 +2097,37 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                               ],
                             ),
                           ),
-                          // Item Type & Pull Status badge
+                          // Item Type & Pull Status: short chip + description
                           DataCell(
                             Column(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10.0,
-                                    vertical: 3.0,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isPromo
-                                        ? M3Palette.warning
-                                            .withValues(alpha: 0.15)
-                                        : M3Palette.teal
-                                            .withValues(alpha: 0.15),
-                                    borderRadius: M3Shape.radiusFull,
-                                  ),
-                                  child: Text(
-                                    isPromo ? 'عرض' : 'عادي',
-                                    style: TextStyle(
-                                      fontSize: M3FontSize.tinyPlus,
-                                      fontWeight: FontWeight.w800,
-                                      color: isPromo
-                                          ? M3Palette.amberDeep
-                                          : M3Palette.teal,
-                                    ),
-                                  ),
+                                _statusChip(
+                                  isPromo ? 'عرض' : 'عادي',
+                                  isPromo
+                                      ? M3Palette.amberDeep
+                                      : M3Palette.teal,
                                 ),
-                                const SizedBox(height: 3.0),
+                                const SizedBox(height: 4.0),
+                                _statusChip(
+                                  item.isActiveInChains ? 'مسحوب' : 'غير مسحوب',
+                                  item.isActiveInChains
+                                      ? M3Palette.info
+                                      : cs.onSurfaceVariant,
+                                ),
+                                const SizedBox(height: 2.0),
                                 M3WrapText(
                                   item.isActiveInChains
-                                      ? 'مسحوب (${_intFmt.format(item.totalPosUnitsSold)} وحدة)'
-                                      : 'غير مسحوب',
+                                      ? (item.totalPosUnitsSold > 0
+                                          ? '${_intFmt.format(item.totalPosUnitsSold)} وحدة'
+                                          : 'نشط بالسلاسل')
+                                      : 'فرصة توزيع',
                                   maxLines: 2,
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
+                                  style: theme.textTheme.labelSmall?.copyWith(
                                     fontSize: M3FontSize.tiny,
-                                    fontWeight: FontWeight.w700,
-                                    color: item.isActiveInChains
-                                        ? M3Palette.info
-                                        : cs.onSurfaceVariant,
+                                    color: cs.onSurfaceVariant,
                                   ),
                                 ),
                               ],
@@ -2387,35 +2348,35 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           buildChip(
             keyId: 'price_filter_all',
             value: 'all',
-            label: 'كل الأصناف (${summary.totalSkus})',
+            label: 'الكل (${summary.totalSkus})',
             icon: Icons.apps_rounded,
             color: cs.primary,
           ),
           buildChip(
             keyId: 'price_filter_changed',
             value: 'changed',
-            label: 'الأصناف التي تغير سعرها فقط ($changedCount)',
+            label: 'تغير السعر ($changedCount)',
             icon: Icons.published_with_changes_rounded,
             color: M3Palette.warning,
           ),
           buildChip(
             keyId: 'price_filter_up',
             value: 'up',
-            label: 'زاد السعر ↑ ($upCount)',
+            label: 'زاد ↑ ($upCount)',
             icon: Icons.trending_up_rounded,
             color: M3Palette.danger,
           ),
           buildChip(
             keyId: 'price_filter_down',
             value: 'down',
-            label: 'انخفض السعر ↓ ($downCount)',
+            label: 'انخفض ↓ ($downCount)',
             icon: Icons.trending_down_rounded,
             color: M3Palette.teal,
           ),
           buildChip(
             keyId: 'price_filter_new',
             value: 'new',
-            label: 'أصناف جديدة ($newCount)',
+            label: 'جديد ($newCount)',
             icon: Icons.fiber_new_rounded,
             color: M3Palette.info,
           ),
@@ -2452,6 +2413,18 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     final isUp = dir == 'up';
     final isDown = dir == 'down';
     final isNew = dir == 'new';
+    final hasPrev = item.prevUnitPriceInclVat > 0;
+    final changeColor = isUp
+        ? M3Palette.danger
+        : isDown
+            ? M3Palette.teal
+            : M3Palette.info;
+    // Missing prior price / pct → «—», never advertise a fake +0.0%.
+    final changeLabel = isNew
+        ? 'جديد'
+        : (!hasPrev || item.priceChangePct == 0)
+            ? '—'
+            : CurrencyFormatter.formatSignedPct(item.priceChangePct);
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -2468,47 +2441,38 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         ),
         if (isUp || isDown || isNew) ...[
           const SizedBox(height: 2.0),
-          Container(
-                key: ValueKey('price_indicator_${item.itemCode}_$dir'),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6.0,
-                  vertical: 2.0,
-                ),
-                decoration: BoxDecoration(
-                  color: isUp
-                      ? M3Palette.danger.withValues(alpha: 0.14)
-                      : isDown
-                          ? M3Palette.teal.withValues(alpha: 0.14)
-                          : M3Palette.info.withValues(alpha: 0.14),
-                  borderRadius: M3Shape.radiusFull,
-                ),
-                child: M3WrapText(
-                  isNew
-                      ? 'جديد'
-                      : CurrencyFormatter.formatSignedPct(item.priceChangePct),
-                  maxLines: 1,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: M3FontSize.microPlus,
-                    fontWeight: FontWeight.w900,
-                    color: isUp
-                        ? M3Palette.danger
-                        : isDown
-                            ? M3Palette.teal
-                            : M3Palette.info,
-                  ),
-                ),
-              ),
-        ],
-        if ((isUp || isDown) && item.prevUnitPriceInclVat > 0)
-          Text(
-            'كان: ${_currFmt.format(item.prevUnitPriceInclVat)} ج.م',
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontSize: M3FontSize.microPlus,
-              color: cs.onSurfaceVariant,
-              decoration: TextDecoration.lineThrough,
-            ),
+          _statusChip(
+            changeLabel,
+            changeColor,
+            key: ValueKey('price_indicator_${item.itemCode}_$dir'),
+            icon: isUp
+                ? Icons.trending_up_rounded
+                : isDown
+                    ? Icons.trending_down_rounded
+                    : Icons.fiber_new_rounded,
           ),
+          if ((isUp || isDown) && hasPrev)
+            M3WrapText(
+              'كان: ${_currFmt.format(item.prevUnitPriceInclVat)} ج.م',
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: M3FontSize.microPlus,
+                color: cs.onSurfaceVariant,
+                decoration: TextDecoration.lineThrough,
+              ),
+            )
+          else if ((isUp || isDown) && !hasPrev)
+            M3WrapText(
+              'لا يوجد سعر سابق للمقارنة',
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: M3FontSize.microPlus,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+        ],
       ],
     );
   }
@@ -2681,9 +2645,11 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     final totalDiscountEgp = grossInclVat - netPayable;
     final netUnitCost = totalUnits > 0 ? netPayable / totalUnits : 0.0;
 
-    final totalShelfRevenue = totalUnits * shelfUnitPrice;
-    final retailerProfitEgp = totalShelfRevenue - netPayable;
-    final retailerMarginPct = totalShelfRevenue > 0
+    final shelfMissing = shelfUnitPrice <= 0;
+    final totalShelfRevenue = shelfMissing ? 0.0 : totalUnits * shelfUnitPrice;
+    final retailerProfitEgp =
+        shelfMissing ? 0.0 : totalShelfRevenue - netPayable;
+    final retailerMarginPct = !shelfMissing && totalShelfRevenue > 0
         ? (retailerProfitEgp / totalShelfRevenue) * 100.0
         : 0.0;
 
@@ -2926,11 +2892,15 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                         title: 'هامش ربح السلسلة المتوقع',
                         titleMaxLines: 2,
                         subtitleMaxLines: 2,
-                        value: '${retailerMarginPct.toStringAsFixed(1)}%',
-                        subtitle:
-                            'Projected Retailer Shelf Margin · ${_currFmt.format(retailerProfitEgp)} ج.م',
+                        value: shelfMissing
+                            ? '—'
+                            : '${retailerMarginPct.toStringAsFixed(1)}%',
+                        subtitle: shelfMissing
+                            ? 'أدخل سعر بيع السلسلة لحساب الهامش'
+                            : 'Projected Retailer Shelf Margin · ${_currFmt.format(retailerProfitEgp)} ج.م',
                         icon: Icons.trending_up_rounded,
                         color: M3Palette.indigo,
+                        textValue: shelfMissing,
                       ),
                     ],
                   );

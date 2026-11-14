@@ -144,7 +144,9 @@ class ChainDiscountProfilesCard extends StatelessWidget {
                 horizontalMargin: 12.0,
                 columnSpacing: 16.0,
                 columns: const [
-                  DataColumn(label: Text('السلسلة')),
+                  DataColumn(
+                      label: Text('السلسلة'),
+                      headingRowAlignment: MainAxisAlignment.center),
                   DataColumn(
                       label: Text('خصم الفاتورة %'),
                       numeric: true,
@@ -163,16 +165,20 @@ class ChainDiscountProfilesCard extends StatelessWidget {
                 rows: [
                   for (final p in profiles)
                     DataRow(cells: [
-                      DataCell(M3WrapText(p.chain, maxLines: 3)),
-                      DataCell(Text(_pct(p.invoiceDiscountPct))),
-                      DataCell(Text(_pct(p.additionalDiscountPct))),
+                      DataCell(M3WrapText(p.chain,
+                          maxLines: 3, textAlign: TextAlign.center)),
+                      DataCell(Text(_pct(p.invoiceDiscountPct),
+                          textAlign: TextAlign.center)),
+                      DataCell(Text(_pct(p.additionalDiscountPct),
+                          textAlign: TextAlign.center)),
                       DataCell(M3WrapText(
                         [
                           if (p.updatedAt != null)
                             p.updatedAt!.toLocal().toString().substring(0, 16),
                           if (p.updatedBy.isNotEmpty) p.updatedBy,
                         ].join(' • '),
-                        maxLines: 2,
+                        maxLines: 3,
+                        textAlign: TextAlign.center,
                         style: theme.textTheme.labelSmall,
                       )),
                       DataCell(Row(mainAxisSize: MainAxisSize.min, children: [

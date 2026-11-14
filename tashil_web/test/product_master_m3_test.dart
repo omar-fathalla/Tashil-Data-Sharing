@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_equal_height_grid.dart';
+import 'package:tashil_web/core/widgets/m3_responsive_tab_bar.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/core/widgets/m3_toolbar_button.dart';
+import 'package:tashil_web/core/widgets/m3_wrap_text.dart';
 import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
 
@@ -154,6 +157,22 @@ void main() {
     expect(find.textContaining('البادئة'), findsWidgets);
     expect(find.textContaining('العلامة'), findsWidgets);
     expect(find.text('بحث بكود الصنف أو الباركود أو الاسم'), findsWidgets);
+
+    // Sell-Out / TM symmetry: responsive tabs + short M3 chips.
+    expect(find.byKey(const ValueKey('product_master_tabs')), findsOneWidget);
+    expect(find.byType(M3ResponsiveTabBar<int>), findsOneWidget);
+    expect(find.byType(M3ChipSurface), findsWidgets);
+    expect(find.text('مسحوب'), findsWidgets);
+    expect(find.text('غير مسحوب'), findsWidgets);
+    expect(find.textContaining('تغير السعر'), findsOneWidget);
+    expect(find.textContaining('زاد ↑'), findsOneWidget);
+
+    // Catalog name wrap ≤3 (Sell-Out / TM hard rule).
+    final nameWraps = tester
+        .widgetList<M3WrapText>(find.byType(M3WrapText))
+        .where((w) => w.text.contains('كلوريل أبيض مركز'));
+    expect(nameWraps, isNotEmpty);
+    expect(nameWraps.every((w) => w.maxLines >= 3), isTrue);
   });
 
   testWidgets('1024+sidebar: KPI height 138, no horizontal scroll, no overflow',
@@ -262,5 +281,35 @@ void main() {
         reason: 'calculator title "$title" must sit fully inside the 138 card',
       );
     }
+  });
+
+  testWidgets(
+      'calculator margin shows «—» when shelf price is missing, not fake 0.0%',
+      (tester) async {
+    final errors = await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 3600,
+      withSidebar: true,
+    );
+    expect(errors, isEmpty, reason: errors.map((e) => e.exception).join('\n'));
+
+    await tester.tap(find.textContaining('حاسبة الطلبيات والخصومات والهامش'));
+    await tester.pumpAndSettle();
+
+    final shelfField = find.widgetWithText(
+      TextField,
+      'سعر بيع السلسلة للمستهلك (Shelf EGP)',
+    );
+    expect(shelfField, findsOneWidget);
+    await tester.enterText(shelfField, '0');
+    await tester.pumpAndSettle();
+
+    final marginCard = tester.widget<M3SummaryKpiCard>(
+      find.byKey(const ValueKey('pm_calc_card_margin')),
+    );
+    expect(marginCard.value, '—');
+    expect(marginCard.subtitle, contains('أدخل سعر بيع السلسلة'));
+    expect(find.textContaining('0.0%'), findsNothing);
   });
 }
