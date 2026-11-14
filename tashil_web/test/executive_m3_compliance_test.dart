@@ -16,6 +16,7 @@ import 'package:tashil_web/core/widgets/m3_segment_label.dart';
 import 'package:tashil_web/core/widgets/m3_status_tag.dart';
 import 'package:tashil_web/core/widgets/m3_tonal_surface.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/screens/executive_screen.dart';
+import 'package:tashil_web/features/executive_dashboard/presentation/widgets/bento_kpi_grid.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/widgets/market_share_section.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/widgets/sellout_trend_chart.dart';
 
@@ -335,7 +336,56 @@ void main() {
     expect(name.style?.fontWeight, FontWeight.w500);
     expect(name.style?.color, cs.onSurface);
     expect(name.maxLines, 3); // long SKU names wrap to 3 lines (tooltip has the rest)
+    expect(name.overflow, isNot(TextOverflow.ellipsis));
+    // Stock numeric cells are centred; status chip is present (wrap ≤3 table).
+    expect(find.text('سليم'), findsOneWidget);
+    expect(find.text('مخزون زائد'), findsOneWidget);
+    expect(find.text('تموين'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('empty last-year KPI detail is — + Arabic note, never fake +0.0%',
+      (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final kpis = ExecutiveKPIsModel(
+      totalRevenue: 1000000,
+      revenueGrowthPct: 0,
+      revenueMomPct: 0,
+      revenueYoyPct: 12.1,
+      yoyAvailable: false,
+      totalUnitsSold: 1000,
+      unitsGrowthPct: 0,
+      unitsMomPct: 0,
+      unitsYoyPct: 9.8,
+      activeStoresCount: 2,
+      oosRatePct: 1.0,
+      osaRatePct: 99.0,
+      totalOOSIncidents: 0,
+      estimatedLostRevenue: 0,
+      currency: 'EGP',
+      reportingPeriod: '2026',
+      chainShares: const [],
+      dailyTrends: const [],
+    );
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(
+        body: Directionality(
+          textDirection: TextDirection.rtl,
+          child: BentoKpiGrid(kpis: kpis),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('لا توجد بيانات للعام السابق'), findsNWidgets(2));
+    expect(find.textContaining('—'), findsWidgets);
+    expect(find.textContaining('مقارنة بالعام السابق'), findsNothing);
+    expect(find.textContaining('+12.1%'), findsNothing);
+    expect(find.textContaining('+9.8%'), findsNothing);
+    expect(find.textContaining('+0.0%'), findsNothing);
   });
 
   testWidgets('v2 trend chart: axis labels are one line with a space',

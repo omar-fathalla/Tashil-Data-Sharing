@@ -268,86 +268,28 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                 Wrap(
                   spacing: 8.0,
                   runSpacing: 6.0,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.end,
                   children: [
-                    M3ChipSurface(
-                      color: colorScheme.surfaceContainerLowest,
-                      borderColor: colorScheme.outlineVariant,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            AppIcons.leaderboard,
-                            size: 15.0,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 8.0),
-                          Flexible(
-                            child: Text(
-                              'حصتنا السوقية ${widget.tenantMarketSharePct.toStringAsFixed(2)}% (المركز $adecoRank)',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    // Short chip + description (TM / Compare pattern).
+                    _ShortChipWithDesc(
+                      key: const ValueKey('pareto_share_chip'),
+                      icon: AppIcons.leaderboard,
+                      shortLabel:
+                          '${widget.tenantMarketSharePct.toStringAsFixed(2)}%',
+                      description: 'حصتنا السوقية · المركز $adecoRank',
                     ),
                     if (widget.totalMarketRevenue > 0) ...[
-                      M3ChipSurface(
-                        color: colorScheme.surfaceContainerLowest,
-                        borderColor: colorScheme.outlineVariant,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              AppIcons.storeMatrix,
-                              size: 15.0,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 8.0),
-                            Flexible(
-                              child: Text(
-                                'إجمالي السوق: ${CurrencyFormatter.formatCompactEGP(widget.totalMarketRevenue)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                      _ShortChipWithDesc(
+                        key: const ValueKey('pareto_market_total_chip'),
+                        icon: AppIcons.storeMatrix,
+                        shortLabel: CurrencyFormatter.formatCompactEGP(
+                            widget.totalMarketRevenue),
+                        description: 'إجمالي السوق',
                       ),
-                      M3ChipSurface(
-                        color: colorScheme.surfaceContainerLowest,
-                        borderColor: colorScheme.outlineVariant,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              AppIcons.groups,
-                              size: 15.0,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 8.0),
-                            Flexible(
-                              child: Text(
-                                countCompetitors(widget.competitorsCount),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                      _ShortChipWithDesc(
+                        key: const ValueKey('pareto_competitors_chip'),
+                        icon: AppIcons.groups,
+                        shortLabel: countCompetitors(widget.competitorsCount),
                       ),
                     ],
                     if (widget.supplierShares.length > 8)
@@ -432,12 +374,15 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                     ),
                                   )),
                               // 2. Company Name (Arabic on Line 1, English on Line 2)
+                              // Wrap ≤3 like Sell-Out / stock / category tiles — no ellipsis.
                               Column(
                                 mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     supplierParts.ar,
+                                    key: ValueKey(
+                                        'pareto_supplier_name_$rank'),
                                     style: (isTenant
                                             ? theme.textTheme.titleMedium
                                             : theme.textTheme.bodyMedium)
@@ -448,17 +393,19 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                       fontWeight:
                                           isTenant ? FontWeight.w500 : null,
                                     ),
-                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.clip,
                                   ),
                                   if (supplierParts.en != null)
                                     Text(
                                       supplierParts.en!,
-                                      style:
-                                          theme.textTheme.labelSmall?.copyWith(
+                                      style: theme.textTheme.labelSmall
+                                          ?.copyWith(
                                         color: colorScheme.onSurfaceVariant,
                                         fontWeight: FontWeight.w600,
                                       ),
-                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.clip,
                                     ),
                                 ],
                               ),
@@ -490,44 +437,17 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                   ],
                                 ),
                               ),
-                              // 4. Leader Status Chip (For Adeco)
+                              // 4. Leader status: short chip + description (TM pattern).
                               if (isTenant)
-                                M3ChipSurface(
-                                  color: colorScheme.surfaceContainerLowest,
-                                  borderColor: colorScheme.outlineVariant,
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        AppIcons.premium,
-                                        size: 15.0,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                      const SizedBox(width: 8.0),
-                                      Flexible(
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              rank == 1
-                                                  ? 'الأولى في السوق'
-                                                  : 'المركز $rank',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: theme.textTheme.labelSmall
-                                                  ?.copyWith(
-                                                color: colorScheme
-                                                    .onSecondaryContainer,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                _ShortChipWithDesc(
+                                  key: const ValueKey('pareto_leader_chip'),
+                                  icon: AppIcons.premium,
+                                  shortLabel:
+                                      rank == 1 ? 'الأولى' : 'المركز $rank',
+                                  description:
+                                      rank == 1 ? 'في السوق' : 'بين الموردين',
+                                  shortColor:
+                                      colorScheme.onSecondaryContainer,
                                 ),
                             ],
                           );
@@ -1015,17 +935,12 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                   ),
                                 ),
                                 if (cat.tenantCategorySharePct > 0)
-                                  M3ChipSurface(
-                                    color: colorScheme.surfaceContainerLowest,
-                                    borderColor: colorScheme.outlineVariant,
-                                    child: Text(
-                                      'حصتنا السوقية ${cat.tenantCategorySharePct.toStringAsFixed(1)}%',
-                                      style:
-                                          theme.textTheme.labelSmall?.copyWith(
-                                        color: colorScheme.onSurfaceVariant,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                                  _ShortChipWithDesc(
+                                    key: ValueKey(
+                                        'pareto_cat_share_${cat.category}'),
+                                    shortLabel:
+                                        '${cat.tenantCategorySharePct.toStringAsFixed(1)}%',
+                                    description: 'حصتنا السوقية',
                                   ),
                                 if (isSelected)
                                   Icon(
@@ -1598,6 +1513,82 @@ class _ParetoPowerSkusCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Short [M3ChipSurface] label with an optional description underneath
+/// (Trade Marketing / Compare pattern). Keeps long explanatory copy out of
+/// the chip so geometry stays 32dp and text is never ellipsized inside it.
+class _ShortChipWithDesc extends StatelessWidget {
+  const _ShortChipWithDesc({
+    super.key,
+    required this.shortLabel,
+    this.description,
+    this.icon,
+    this.shortColor,
+  });
+
+  final String shortLabel;
+  final String? description;
+  final IconData? icon;
+  final Color? shortColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final labelColor = shortColor ?? cs.onSurfaceVariant;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        M3ChipSurface(
+          color: cs.surfaceContainerLowest,
+          borderColor: cs.outlineVariant,
+          child: icon == null
+              ? Text(
+                  shortLabel,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.clip,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: labelColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 15.0, color: labelColor),
+                    const SizedBox(width: 8.0),
+                    Flexible(
+                      child: Text(
+                        shortLabel,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.clip,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: labelColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+        if (description != null && description!.isNotEmpty) ...[
+          const SizedBox(height: 2.0),
+          Text(
+            description!,
+            maxLines: 2,
+            overflow: TextOverflow.clip,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

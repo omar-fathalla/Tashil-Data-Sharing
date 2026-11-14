@@ -7,6 +7,7 @@ import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/shared_display_prefix.dart';
 import 'chain_share_pie.dart';
 
 /// SelloutTrendChart renders an interactive monthly time-series curve
@@ -188,7 +189,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
             return (chainTotals[b] ?? 0).compareTo(chainTotals[a] ?? 0);
           });
 
-    return activeChains.map((code) {
+    final raw = activeChains.map((code) {
       final values = <double>[];
       final growths = <double>[];
       String? backendDisplayName;
@@ -227,6 +228,22 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
         sellInValues: _sellInFor(code, effectiveTrends),
       );
     }).toList();
+    // Display-only: strip a shared chain-name prefix across the legend.
+    final labels = displayNamesWithoutSharedPrefix(
+      raw.map((s) => s.displayName),
+    );
+    return [
+      for (final s in raw)
+        _ChainSeriesData(
+          chainCode: s.chainCode,
+          displayName: labels[s.displayName] ?? s.displayName,
+          color: s.color,
+          values: s.values,
+          growthPcts: s.growthPcts,
+          totalRevenue: s.totalRevenue,
+          sellInValues: s.sellInValues,
+        ),
+    ];
   }
 
   @override
