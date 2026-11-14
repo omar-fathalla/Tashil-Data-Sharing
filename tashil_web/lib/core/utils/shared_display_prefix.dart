@@ -3,11 +3,13 @@
 /// surrounding whitespace) that is shared by at least two names in the
 /// dataset after normalisation.
 ///
-/// Multiple prefix clusters are handled independently, so a minority
-/// group such as "… مواد عناية - …" is stripped even when another
-/// "… ماركت - …" group is the majority. Matching is robust to Arabic
-/// letter variants (ة/ه, أ/إ/آ/ا), dash variants, and invisible/odd
-/// whitespace (NBSP, thin space, RLM, ZWJ, …).
+/// When every name in the dataset shares the same leading segment (the
+/// Returns owner rule: a prefix repeated across **all** branches), that
+/// segment is always removed. Multiple prefix clusters are also handled
+/// independently, so a minority group such as "… مواد عناية - …" is
+/// stripped even when another "… ماركت - …" group is the majority.
+/// Matching is robust to Arabic letter variants (ة/ه, أ/إ/آ/ا), dash
+/// variants, and invisible/odd whitespace (NBSP, thin space, RLM, ZWJ, …).
 ///
 /// A name is never left empty. If stripping would make two originally
 /// different names share a display label after normalisation (including
@@ -90,7 +92,9 @@ String displayNameWithoutSharedPrefix(String name, Iterable<String> dataset) {
 }
 
 /// Longest leading separator-segment of [name] that is a prefix of at
-/// least two normalised names in [all].
+/// least two normalised names in [all]. When every name shares a cut,
+/// that all-branches prefix is included in the candidates and wins
+/// whenever it is also the longest (≥ cluster cuts that are shorter).
 String? _longestSharedSeparatorPrefix(String name, List<String> all) {
   if (name.isEmpty || all.length < 2) return null;
   String? best;

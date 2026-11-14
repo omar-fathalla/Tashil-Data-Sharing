@@ -88,10 +88,14 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
     String labelOf(SellInReturnsBranchRow b) =>
         display[b.branchName] ?? b.branchName;
 
-    double rawOf(SellInReturnsCell c) =>
-        showPct ? c.returnPctOfGross : c.returnsValueEgp;
+    double? rawOf(SellInReturnsCell? c) {
+      if (c == null) return null;
+      return showPct ? c.returnPctOfGross : c.returnsValueEgp;
+    }
 
-    String fmt(SellInReturnsCell c) {
+    /// Missing month → «—» (never fabricate 0 / 0.0%). Present zeros stay 0.
+    String fmt(SellInReturnsCell? c) {
+      if (c == null) return '—';
       if (showPct) return '${c.returnPctOfGross.toStringAsFixed(1)}%';
       return CurrencyFormatter.formatCompactEGP(c.returnsValueEgp);
     }
@@ -100,7 +104,7 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
     for (final b in branches) {
       for (final cell in b.byMonth.values) {
         final v = rawOf(cell);
-        if (v > maxRet) maxRet = v;
+        if (v != null && v > maxRet) maxRet = v;
       }
     }
 
@@ -210,33 +214,35 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
           );
         }
 
+        // One shared height model: branch label, month cells, and total all
+        // include the same vertical padding so pinned columns stay aligned.
         final rowHeights = <double>[
           for (final b in branches)
             math.max(
               minRowH,
               math.max(
-                measure(
+                    measure(
                       text: labelOf(b),
                       style: bodyStyle,
                       maxWidth: branchW - hPad * 2,
                       maxLines: 3,
-                    ) +
-                    vPad * 2,
-                math.max(
-                  valueBlockH(fmt(b.total), boldStyle, totalInnerW) + vPad * 2,
-                  months.isEmpty
-                      ? 0.0
-                      : months
-                            .map(
-                              (m) => valueBlockH(
-                                fmt(b.byMonth[m] ?? const SellInReturnsCell()),
-                                bodyStyle,
-                                valueW,
-                              ),
-                            )
-                            .reduce(math.max),
-                ),
-              ),
+                    ),
+                    math.max(
+                      valueBlockH(fmt(b.total), boldStyle, totalInnerW),
+                      months.isEmpty
+                          ? 0.0
+                          : months
+                                .map(
+                                  (m) => valueBlockH(
+                                    fmt(b.byMonth[m]),
+                                    bodyStyle,
+                                    valueW,
+                                  ),
+                                )
+                                .reduce(math.max),
+                    ),
+                  ) +
+                  vPad * 2,
             ),
         ];
 
@@ -245,16 +251,15 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
           totalsH = math.max(
             totalsH,
             months
-                .map(
-                  (m) =>
-                      valueBlockH(
-                        fmt(columnTotals[m] ?? const SellInReturnsCell()),
+                    .map(
+                      (m) => valueBlockH(
+                        fmt(columnTotals[m]),
                         boldStyle,
                         valueW,
-                      ) +
-                      cellGap,
-                )
-                .reduce(math.max),
+                      ),
+                    )
+                    .reduce(math.max) +
+                vPad * 2,
           );
         }
         totalsH = math.max(
@@ -338,19 +343,22 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
         }
 
         Widget heatCell(
-          SellInReturnsCell cell,
+          SellInReturnsCell? cell,
           double height, {
           TextStyle? style,
         }) {
           final raw = rawOf(cell);
-          final t = maxRet <= 0 ? 0.0 : (raw / maxRet).clamp(0.0, 1.0);
-          final bg = raw <= 0
+          final t = (raw == null || maxRet <= 0)
+              ? 0.0
+              : (raw / maxRet).clamp(0.0, 1.0);
+          final bg = (raw == null || raw <= 0)
               ? cs.surface
               : Color.lerp(
                   cs.surface,
                   status.warningContainer.withOpacity(0.9),
                   t,
                 );
+          final label = fitValue(fmt(cell), style ?? bodyStyle, valueW);
           return Padding(
             padding: const EdgeInsets.all(cellGap / 2),
             child: SizedBox(
@@ -365,7 +373,7 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    fitValue(fmt(cell), style ?? bodyStyle, valueW),
+                    label,
                     style: style ?? bodyStyle,
                     textAlign: TextAlign.center,
                     maxLines: 2,
@@ -428,13 +436,13 @@ class ReturnsHeatmapMatrix extends StatelessWidget {
                     monthHeader(m)
                   else if (isTotals)
                     heatCell(
-                      columnTotals[m] ?? const SellInReturnsCell(),
+                      columnTotals[m],
                       height,
                       style: boldStyle,
                     )
                   else
                     heatCell(
-                      branch!.byMonth[m] ?? const SellInReturnsCell(),
+                      branch!.byMonth[m],
                       height,
                     ),
               ],

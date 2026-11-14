@@ -72,6 +72,8 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
     this.kpiQty,
     this.kpiReturnPct,
     this.monthValuesEgp,
+    this.empty = false,
+    this.omitMonths = const {},
   });
 
   final double? momChangePct;
@@ -83,11 +85,43 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
   /// When set, month returns are used as EGP amounts (no ×1000).
   final List<List<double>>? monthValuesEgp;
 
+  /// Empty report (no branches / months) — KPIs must show «—», not fake zeros.
+  final bool empty;
+
+  /// Month numbers omitted from every branch's [byMonth] map so the matrix
+  /// renders «—» instead of fabricating 0 / 0.0%.
+  final Set<int> omitMonths;
+
   @override
   Future<Result<SellInReturnsReport>> load(
     SellInReturnsQuery q, {
     bool forceRefresh = false,
   }) async {
+    if (empty) {
+      return const Success(
+        SellInReturnsReport(
+          year: 2026,
+          months: [],
+          kpis: SellInReturnsKpis(
+            returnsValueEgp: 0,
+            returnsQty: 0,
+            grossValueEgp: 0,
+            netValueEgp: 0,
+            returnPctOfGross: 0,
+            momChangePct: null,
+            momDirection: 'n/a',
+            focusMonth: 0,
+          ),
+          monthly: [],
+          branches: [],
+          columnTotals: {},
+          grandTotal: SellInReturnsCell(),
+          filterOptions: SellInReturnsFilterOptions(years: [2026]),
+          topReturnedProducts: [],
+        ),
+      );
+    }
+
     const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     final values = <String, List<double>>{
       kReturnsFixtureBranches[0]: [
@@ -151,12 +185,14 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
       var totRet = 0.0, totGross = 0.0, totQty = 0.0;
       final override = monthValuesEgp;
       for (var i = 0; i < months.length; i++) {
+        final month = months[i];
+        if (omitMonths.contains(month)) continue;
         final ret = override != null
             ? override[index % override.length][i]
             : values[name]![i] * 1000;
         final qty = qtys[name]![i];
         final gross = ret * 5;
-        byMonth[months[i]] = _cell(gross: gross, returnsValue: ret, qty: qty);
+        byMonth[month] = _cell(gross: gross, returnsValue: ret, qty: qty);
         totRet += ret;
         totGross += gross;
         totQty += qty;
@@ -192,9 +228,11 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
     ];
     final columnTotals = <int, SellInReturnsCell>{};
     for (final m in months) {
+      if (omitMonths.contains(m)) continue;
       var ret = 0.0, gross = 0.0, qty = 0.0;
       for (final b in branches) {
-        final c = b.byMonth[m]!;
+        final c = b.byMonth[m];
+        if (c == null) continue;
         ret += c.returnsValueEgp;
         gross += c.grossValueEgp;
         qty += c.returnsQty;
@@ -227,25 +265,26 @@ class ReturnsFakeRepo implements SellInReturnsRepository {
         ),
         monthly: [
           for (final m in months)
-            SellInReturnsMonthPoint(
-              monthNum: m,
-              monthAr: const [
-                '',
-                'يناير',
-                'فبراير',
-                'مارس',
-                'أبريل',
-                'مايو',
-                'يونيو',
-                'يوليو',
-                'أغسطس',
-                'سبتمبر',
-                'أكتوبر',
-              ][m],
-              returnsValueEgp: columnTotals[m]!.returnsValueEgp,
-              grossValueEgp: columnTotals[m]!.grossValueEgp,
-              netValueEgp: columnTotals[m]!.netValueEgp,
-            ),
+            if (!omitMonths.contains(m))
+              SellInReturnsMonthPoint(
+                monthNum: m,
+                monthAr: const [
+                  '',
+                  'يناير',
+                  'فبراير',
+                  'مارس',
+                  'أبريل',
+                  'مايو',
+                  'يونيو',
+                  'يوليو',
+                  'أغسطس',
+                  'سبتمبر',
+                  'أكتوبر',
+                ][m],
+                returnsValueEgp: columnTotals[m]!.returnsValueEgp,
+                grossValueEgp: columnTotals[m]!.grossValueEgp,
+                netValueEgp: columnTotals[m]!.netValueEgp,
+              ),
         ],
         branches: branches,
         columnTotals: columnTotals,
