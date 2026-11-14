@@ -7,6 +7,7 @@ import {
   fileInputLocator,
   typeIntoSemanticsField,
   waitForFlutter,
+  withAutomationSemantics,
 } from '../helpers/flutter';
 
 /**
@@ -70,7 +71,9 @@ test.describe('Sell-Out upload preview (dry-run)', () => {
       await route.abort('failed');
     });
 
-    await page.goto(TENANT_PATH, { waitUntil: 'domcontentloaded' });
+    await page.goto(withAutomationSemantics(TENANT_PATH), {
+      waitUntil: 'domcontentloaded',
+    });
     await waitForFlutter(page);
 
     await typeIntoSemanticsField(page, 'login-email', email);
@@ -147,7 +150,9 @@ test.describe('Sell-Out upload preview (dry-run)', () => {
   test('hidden file input is mounted before login interaction', async ({
     page,
   }) => {
-    await page.goto(TENANT_PATH, { waitUntil: 'domcontentloaded' });
+    await page.goto(withAutomationSemantics(TENANT_PATH), {
+      waitUntil: 'domcontentloaded',
+    });
     await waitForFlutter(page);
     await expect(fileInputLocator(page)).toBeAttached({ timeout: 60_000 });
     await expect(fileInputLocator(page)).toHaveAttribute(

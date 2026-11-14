@@ -1,3 +1,5 @@
+import 'dart:ui' show SemanticsHitTestBehavior;
+
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../core/widgets/app_icons.dart';
@@ -483,16 +485,24 @@ class _AppShellState extends State<AppShell> {
                 top: 0,
                 bottom: 0,
                 width: sidebarWidth,
-                child: DesktopSidebar(
-                  selectedIndex: _navHighlightIndex ?? -1,
-                  onDestinationSelected: (index) => _selectPage(index),
-                  activeTenant: widget.activeTenant,
-                  currentUser: widget.apiClient.currentUser,
-                  onTenantChanged: widget.onTenantChanged,
-                  onOpenProfile: _openUserProfile,
-                  onNavigateToAdmin: widget.onNavigateToAdmin,
-                  isSuperAdmin:
-                      widget.apiClient.currentUser?.isSuperAdmin == true,
+                // Opaque web flt-semantics strip (same pattern as dialogs /
+                // bottom sheets): when automation forces ensureSemantics(),
+                // Pricing chips near Compare's Y must not steal sidebar hits.
+                child: Semantics(
+                  container: true,
+                  explicitChildNodes: true,
+                  hitTestBehavior: SemanticsHitTestBehavior.opaque,
+                  child: DesktopSidebar(
+                    selectedIndex: _navHighlightIndex ?? -1,
+                    onDestinationSelected: (index) => _selectPage(index),
+                    activeTenant: widget.activeTenant,
+                    currentUser: widget.apiClient.currentUser,
+                    onTenantChanged: widget.onTenantChanged,
+                    onOpenProfile: _openUserProfile,
+                    onNavigateToAdmin: widget.onNavigateToAdmin,
+                    isSuperAdmin:
+                        widget.apiClient.currentUser?.isSuperAdmin == true,
+                  ),
                 ),
               ),
             ],
