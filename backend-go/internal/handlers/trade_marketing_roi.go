@@ -46,7 +46,7 @@ type MonthlyChainRoiSummary struct {
 	// YoYAvailable is false when the same month last year has no Sell-Out;
 	// YoYGrowthPct is then 0 and the UI shows "—" instead of +0.0%.
 	YoYAvailable bool `json:"yoy_available"`
-	// Campaign-free baseline and incremental ROMI (see domain.ComputeRoiLift).
+	// Seasonal YoY baseline and incremental ROMI (see domain.ComputeRoiLift).
 	BaselineSalesEGP   *float64 `json:"baseline_sales_egp"`
 	BaselineAvailable  bool     `json:"baseline_available"`
 	BaselineMethod     string   `json:"baseline_method"`
@@ -222,7 +222,7 @@ func applyLift(s *MonthlyChainRoiSummary, sales map[domain.RoiMonthKey]float64, 
 		s.BaselineSalesEGP = &b
 		s.IncrementalLiftEGP = &lift
 		s.LiftVsBaselinePct = &pct
-		if res.Method == domain.RoiBaselineMethodYoyTrend {
+		if res.Method == domain.RoiBaselineMethodYoySeasonal {
 			r := res.OrganicYoYRatio
 			s.OrganicYoYRatio = &r
 		}

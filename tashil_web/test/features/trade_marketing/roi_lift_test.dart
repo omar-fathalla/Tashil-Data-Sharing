@@ -5,8 +5,22 @@ import 'package:tashil_web/features/trade_marketing/domain/trade_marketing_model
 
 void main() {
   group('computeRoiLift', () {
-    test('yoy trend uses the average organic ratio of 3 non-campaign months',
-        () {
+    test('seasonal YoY uses last-year same month as the baseline', () {
+      final res = computeRoiLift(
+        currentSalesEgp: 1200000,
+        lastYearSameMonthSalesEgp: 800000,
+        marketingSpendEgp: 50000,
+        target: const RoiMonthKey(2026, 2),
+      );
+      expect(res.method, RoiBaselineMethod.yoySeasonal);
+      expect(res.baselineSalesEgp, closeTo(800000, 1e-6));
+      expect(res.incrementalLiftEgp, closeTo(400000, 1e-6));
+      expect(res.romiMultiple, closeTo(8, 1e-9));
+      expect(res.netRoiPct, closeTo(700, 1e-9));
+      expect(res.methodAr, kRoiYoySeasonalMethodAr);
+    });
+
+    test('does not apply an organic YoY ratio from prior months', () {
       const target = RoiMonthKey(2026, 2);
       final res = computeRoiLift(
         currentSalesEgp: 1000000,
@@ -20,32 +34,13 @@ void main() {
           const RoiMonthKey(2024, 12): 200000,
           const RoiMonthKey(2025, 11): 120000,
           const RoiMonthKey(2024, 11): 100000,
-          const RoiMonthKey(2025, 10): 999999,
-          const RoiMonthKey(2024, 10): 100000,
         },
         campaignMonths: {const RoiMonthKey(2025, 10), target},
       );
-      expect(res.method, RoiBaselineMethod.yoyTrend);
-      expect(res.organicMonthsUsed, 3);
-      expect(res.organicYoyRatio, closeTo(1.10, 1e-9));
-      expect(res.baselineSalesEgp, closeTo(880000, 1e-6));
-      expect(res.incrementalLiftEgp, closeTo(120000, 1e-6));
-      expect(res.romiMultiple, closeTo(2.4, 1e-9));
-      expect(res.netRoiPct, closeTo(140, 1e-9));
-    });
-
-    test('yoy trend uses ratio 1 when no organic months exist', () {
-      final res = computeRoiLift(
-        currentSalesEgp: 1200000,
-        lastYearSameMonthSalesEgp: 800000,
-        marketingSpendEgp: 50000,
-        target: const RoiMonthKey(2026, 2),
-      );
-      expect(res.organicMonthsUsed, 0);
-      expect(res.organicYoyRatio, 1);
+      // Old organic-ratio method would have used 880k baseline / 2.4x ROMI.
       expect(res.baselineSalesEgp, closeTo(800000, 1e-6));
-      expect(res.incrementalLiftEgp, closeTo(400000, 1e-6));
-      expect(res.romiMultiple, closeTo(8, 1e-9));
+      expect(res.incrementalLiftEgp, closeTo(200000, 1e-6));
+      expect(res.romiMultiple, closeTo(4, 1e-9));
     });
 
     test('negative lift and ROMI are returned honestly', () {
@@ -60,8 +55,7 @@ void main() {
       expect(res.netRoiPct, closeTo(-300, 1e-9));
     });
 
-    test('falls back to the average of prior non-campaign months when no LY',
-        () {
+    test('no last-year data is unavailable — not a prior-organic average', () {
       final res = computeRoiLift(
         currentSalesEgp: 130000,
         lastYearSameMonthSalesEgp: 0,
@@ -69,31 +63,15 @@ void main() {
         target: const RoiMonthKey(2026, 4),
         salesByMonth: {
           const RoiMonthKey(2026, 3): 110000,
-          const RoiMonthKey(2026, 2): 999999,
           const RoiMonthKey(2026, 1): 100000,
           const RoiMonthKey(2025, 12): 90000,
         },
         campaignMonths: {const RoiMonthKey(2026, 2)},
       );
-      expect(res.method, RoiBaselineMethod.priorOrganicAverage);
-      expect(res.organicMonthsUsed, 3);
-      expect(res.baselineSalesEgp, closeTo(100000, 1e-6));
-      expect(res.incrementalLiftEgp, closeTo(30000, 1e-6));
-      expect(res.romiMultiple, closeTo(3, 1e-9));
-      expect(res.methodAr, contains('لا توجد بيانات للعام السابق'));
-    });
-
-    test('unavailable when there is no last-year sales and no organic history',
-        () {
-      final res = computeRoiLift(
-        currentSalesEgp: 300000,
-        lastYearSameMonthSalesEgp: 0,
-        marketingSpendEgp: 15000,
-        target: const RoiMonthKey(2026, 2),
-      );
       expect(res.available, isFalse);
       expect(res.romiMultiple, isNull);
-      expect(res.unavailableMessageAr, kRoiBaselineUnavailableAr);
+      expect(res.unavailableMessageAr, kRoiNoLastYearAr);
+      expect(res.methodAr, kRoiNoLastYearAr);
     });
 
     test('does not cherry-pick a positive MoM lift over a seasonal baseline',
@@ -105,6 +83,13 @@ void main() {
         target: const RoiMonthKey(2026, 2),
       );
       expect(res.incrementalLiftEgp, closeTo(-300000, 1e-6));
+    });
+
+    test('legacy yoy_trend id maps to seasonal YoY', () {
+      expect(roiBaselineMethodFromId('yoy_trend'), RoiBaselineMethod.yoySeasonal);
+      expect(roiBaselineMethodFromId('yoy_seasonal'),
+          RoiBaselineMethod.yoySeasonal);
+      expect(roiBaselineMethodId(RoiBaselineMethod.yoySeasonal), 'yoy_seasonal');
     });
   });
 
@@ -131,7 +116,7 @@ void main() {
     }
 
     test('excellent when ROMI >= 3.5 and lift vs baseline >= 10%', () {
-      // LY 800k, ratio 1 → baseline 800k, lift 400k / 50k = 8x, 50% lift.
+      // LY 800k → baseline 800k, lift 400k / 50k = 8x, 50% lift.
       final s = row();
       expect(s.romiMultiple, closeTo(8, 1e-9));
       expect(s.verdictAr, 'عائد ممتاز ونمو قياسي');
@@ -139,9 +124,7 @@ void main() {
     });
 
     test('successful when ROMI >= 1.5 even if MoM is weak', () {
-      // Current almost flat MoM (prev 1M) but well above LY baseline.
       final s = row(current: 1000000, lastYear: 600000, spend: 200000);
-      // lift 400k / 200k = 2x, lift pct 66.7%, MoM 0.
       expect(s.romiMultiple, closeTo(2, 1e-9));
       expect(s.momGrowthPct, closeTo(0, 1e-9));
       expect(s.verdictAr, 'حملة ناجحة ونمو إيجابي');
@@ -155,13 +138,13 @@ void main() {
       expect(s.verdictColor, M3Palette.danger);
     });
 
-    test('unavailable baseline shows the dash verdict, not 0.00x', () {
+    test('unavailable baseline shows the no-last-year message, not 0.00x', () {
       final s = row(
         lastYear: 0,
         lift: RoiLiftResult.unavailable,
       );
       expect(s.romiMultiple, isNull);
-      expect(s.verdictAr, 'لا يمكن حساب العائد');
+      expect(s.verdictAr, kRoiNoLastYearAr);
     });
 
     test('no spend keeps the no-promo verdict', () {

@@ -109,8 +109,8 @@ func TestTradeMarketingROIMathTenantAndKAM(t *testing.T) {
 		"marketing_spend_egp": 50000, "activities_count": 2, "current_month_sales_egp": 1200000,
 		"previous_month_sales_egp": 1000000, "last_year_same_month_sales_egp": 800000,
 		"current_month_sell_in_egp": 1500000, "mom_growth_pct": 20, "yoy_growth_pct": 50,
-		// No organic YoY months in the fixture → ratio 1, baseline = last year 800k,
-		// lift = 400k, ROMI = 8x (not the old cherry-picked MoM 4x).
+		// Seasonal YoY: baseline = last year 800k, lift = 400k, ROMI = 8x
+		// (not the old cherry-picked MoM 4x, and not an organic-ratio adjust).
 		"baseline_sales_egp": 800000, "incremental_lift_egp": 400000, "romi_multiple": 8,
 		"net_roi_pct": 700, "organic_yoy_ratio": 1,
 	}
@@ -122,7 +122,7 @@ func TestTradeMarketingROIMathTenantAndKAM(t *testing.T) {
 	if fath["baseline_available"] != true {
 		t.Errorf("Fathalla baseline_available: %v", fath["baseline_available"])
 	}
-	if fath["baseline_method"] != "yoy_trend" {
+	if fath["baseline_method"] != "yoy_seasonal" {
 		t.Errorf("Fathalla baseline_method: %v", fath["baseline_method"])
 	}
 	var beet map[string]interface{}
@@ -135,7 +135,7 @@ func TestTradeMarketingROIMathTenantAndKAM(t *testing.T) {
 	if beet == nil {
 		t.Fatal("missing Beet El Gomla summary")
 	}
-	// Beet has Feb sales but no last-year or prior-month history → no baseline.
+	// Beet has Feb sales but no last-year history → no baseline / «لا توجد بيانات للعام السابق».
 	if beet["baseline_available"] != false {
 		t.Errorf("Beet baseline_available want false got %v", beet["baseline_available"])
 	}
@@ -144,6 +144,9 @@ func TestTradeMarketingROIMathTenantAndKAM(t *testing.T) {
 	}
 	if beet["baseline_method"] != "unavailable" {
 		t.Errorf("Beet baseline_method: %v", beet["baseline_method"])
+	}
+	if beet["baseline_method_ar"] != domain.RoiNoLastYearAR {
+		t.Errorf("Beet baseline_method_ar: %v", beet["baseline_method_ar"])
 	}
 
 	// Tenant isolation: another tenant sees no adeco expenses and no adeco sales.

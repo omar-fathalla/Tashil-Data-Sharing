@@ -2056,7 +2056,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
       case 'بدون إنفاق ترويجي':
         return ('بدون إنفاق', 'لا يوجد إنفاق ترويجي');
       case 'لا يمكن حساب العائد':
-        return ('غير محسوب', 'لا توجد بيانات أساس كافية');
+      case 'لا توجد بيانات للعام السابق':
+        return ('غير محسوب', 'لا توجد بيانات للعام السابق');
     }
     return (verdictAr, '');
   }
@@ -2127,7 +2128,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                     ),
                     const SizedBox(height: M3Spacing.s2),
                     Text(
-                      'العائد يُحسب من الزيادة عن المبيعات المتوقعة بدون الحملة، مش من المقارنة بالشهر السابق. اضغط على أي صف للتفاصيل • اضغط على عنوان العمود للترتيب',
+                      'العائد يُحسب من الزيادة عن مبيعات نفس الشهر العام السابق (مقارنة موسمية)، مش من المقارنة بالشهر السابق. اضغط على أي صف للتفاصيل • اضغط على عنوان العمود للترتيب',
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: colorScheme.onSurfaceVariant),
                     ),

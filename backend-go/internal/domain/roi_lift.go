@@ -1,20 +1,24 @@
 package domain
 
-import "strconv"
-
 // Incremental-lift / ROMI calculation used by GET /trade-marketing/roi
-// and mirrored in the Flutter computeRoiLift helper. No MoM/YoY cherry-pick.
+// and mirrored in the Flutter computeRoiLift helper.
+//
+// Method: seasonal YoY baseline (same calendar month last year).
+// No MoM/YoY cherry-pick, no organic-ratio adjustment across mismatched
+// months, and no prior-organic-average substitute when last year is missing.
 
 const (
-	RoiOrganicLookbackMonths = 12
-	RoiOrganicWindow         = 3
+	RoiBaselineMethodYoySeasonal = "yoy_seasonal"
+	RoiBaselineMethodUnavailable = "unavailable"
 
+	// Kept for older clients / mid-deploy responses; new code never emits them.
 	RoiBaselineMethodYoyTrend        = "yoy_trend"
 	RoiBaselineMethodPriorOrganicAvg = "prior_organic_avg"
-	RoiBaselineMethodUnavailable     = "unavailable"
 
-	RoiBaselineUnavailableAR = "لا يمكن حساب العائد: لا توجد بيانات أساس كافية"
-	RoiLiftMethodExplainerAR = "العائد = الزيادة عن المبيعات المتوقعة بدون الحملة ÷ المصروف. المبيعات المتوقعة = مبيعات نفس الشهر العام السابق × متوسط النمو العضوي للسلسلة في الأشهر بدون حملات، أو متوسط تلك الأشهر إذا لم تتوفر بيانات العام السابق."
+	RoiNoLastYearAR = "لا توجد بيانات للعام السابق"
+	RoiBaselineUnavailableAR = RoiNoLastYearAR
+	RoiYoySeasonalMethodAR = "الأساس = مبيعات نفس الشهر العام السابق (مقارنة موسمية)"
+	RoiLiftMethodExplainerAR = "العائد = (مبيعات الشهر الحالي − مبيعات نفس الشهر العام السابق) ÷ المصروف. الزيادة قد تكون سالبة. عند غياب بيانات العام السابق يُعرض —."
 )
 
 // RoiMonthKey is a calendar month.
@@ -51,104 +55,53 @@ type RoiLiftResult struct {
 	UnavailableMessageAR string
 }
 
-// YoyTrendMethodAR is the Arabic method line when last-year sales exist.
-func YoyTrendMethodAR(monthsUsed int) string {
-	if monthsUsed <= 0 {
-		return "الأساس = مبيعات نفس الشهر العام السابق (لا يوجد أشهر عضوية كافية لحساب الاتجاه)"
-	}
-	return "الأساس = مبيعات نفس الشهر العام السابق × متوسط النمو العضوي لآخر " + strconv.Itoa(monthsUsed) + " أشهر بدون حملات"
-}
-
-// PriorOrganicMethodAR is the Arabic method line when last-year sales are missing.
-func PriorOrganicMethodAR(monthsUsed int) string {
-	return "الأساس = متوسط مبيعات آخر " + strconv.Itoa(monthsUsed) + " أشهر بدون حملات (لا توجد بيانات للعام السابق)"
-}
-
 func ptrFloat(v float64) *float64 { return &v }
 
-// ComputeRoiLift returns expected sales without the campaign, incremental
-// lift (which may be negative), ROMI = lift/spend and Net ROI%.
+// ComputeRoiLift returns expected sales without the campaign (seasonal YoY
+// baseline), incremental lift (which may be negative), ROMI = lift/spend and
+// Net ROI%.
 //
-// When last-year same-month sales exist, baseline = that figure times the
-// average YoY ratio of up to 3 prior non-campaign months (lookback 12).
-// If no organic months are available the ratio is 1 (raw seasonal baseline).
-// When last-year sales are missing, baseline is the average of up to 3
-// prior non-campaign months. Otherwise the baseline is unavailable.
+// Baseline = last-year same-month Sell-Out when that figure is available.
+// When it is missing, ROMI is unavailable and the UI shows «—» with
+// «لا توجد بيانات للعام السابق». salesByMonth / campaignMonths are accepted
+// for call-site compatibility but are not used by this method.
 func ComputeRoiLift(currentSales, lastYearSameMonth, spend float64, target RoiMonthKey, salesByMonth map[RoiMonthKey]float64, campaignMonths map[RoiMonthKey]bool) RoiLiftResult {
-	finish := func(method string, baseline float64, organicRatio float64, monthsUsed int, methodAR string) RoiLiftResult {
-		lift := currentSales - baseline
-		var liftPct float64
-		if baseline > 0 {
-			liftPct = lift / baseline * 100
-		}
-		out := RoiLiftResult{
-			Available:          true,
-			Method:             method,
-			BaselineSalesEGP:   baseline,
-			OrganicYoYRatio:    organicRatio,
-			OrganicMonthsUsed:  monthsUsed,
-			IncrementalLiftEGP: lift,
-			LiftVsBaselinePct:  liftPct,
-			MethodAR:           methodAR,
-		}
-		if spend > 0 {
-			romi := lift / spend
-			net := (lift - spend) / spend * 100
-			out.RomiMultiple = &romi
-			out.NetRoiPct = &net
-		}
-		return out
-	}
+	_ = target
+	_ = salesByMonth
+	_ = campaignMonths
 
 	unavailable := RoiLiftResult{
 		Available:            false,
 		Method:               RoiBaselineMethodUnavailable,
-		MethodAR:             RoiBaselineUnavailableAR,
-		UnavailableMessageAR: RoiBaselineUnavailableAR,
+		MethodAR:             RoiNoLastYearAR,
+		UnavailableMessageAR: RoiNoLastYearAR,
 	}
 
-	if lastYearSameMonth > 0 {
-		ratios := make([]float64, 0, RoiOrganicWindow)
-		cursor := target.Prev()
-		for i := 0; i < RoiOrganicLookbackMonths && len(ratios) < RoiOrganicWindow; i++ {
-			if !campaignMonths[cursor] {
-				sales := salesByMonth[cursor]
-				ly := salesByMonth[cursor.LastYear()]
-				if sales > 0 && ly > 0 {
-					ratios = append(ratios, sales/ly)
-				}
-			}
-			cursor = cursor.Prev()
-		}
-		monthsUsed := len(ratios)
-		ratio := 1.0
-		if monthsUsed > 0 {
-			var sum float64
-			for _, r := range ratios {
-				sum += r
-			}
-			ratio = sum / float64(monthsUsed)
-		}
-		return finish(RoiBaselineMethodYoyTrend, lastYearSameMonth*ratio, ratio, monthsUsed, YoyTrendMethodAR(monthsUsed))
-	}
-
-	organic := make([]float64, 0, RoiOrganicWindow)
-	cursor := target.Prev()
-	for i := 0; i < RoiOrganicLookbackMonths && len(organic) < RoiOrganicWindow; i++ {
-		if !campaignMonths[cursor] {
-			if sales := salesByMonth[cursor]; sales > 0 {
-				organic = append(organic, sales)
-			}
-		}
-		cursor = cursor.Prev()
-	}
-	if len(organic) == 0 {
+	if lastYearSameMonth <= 0 {
 		return unavailable
 	}
-	var sum float64
-	for _, s := range organic {
-		sum += s
+
+	baseline := lastYearSameMonth
+	lift := currentSales - baseline
+	var liftPct float64
+	if baseline > 0 {
+		liftPct = lift / baseline * 100
 	}
-	monthsUsed := len(organic)
-	return finish(RoiBaselineMethodPriorOrganicAvg, sum/float64(monthsUsed), 0, monthsUsed, PriorOrganicMethodAR(monthsUsed))
+	out := RoiLiftResult{
+		Available:          true,
+		Method:             RoiBaselineMethodYoySeasonal,
+		BaselineSalesEGP:   baseline,
+		OrganicYoYRatio:    1,
+		OrganicMonthsUsed:  0,
+		IncrementalLiftEGP: lift,
+		LiftVsBaselinePct:  liftPct,
+		MethodAR:           RoiYoySeasonalMethodAR,
+	}
+	if spend > 0 {
+		romi := lift / spend
+		net := (lift - spend) / spend * 100
+		out.RomiMultiple = &romi
+		out.NetRoiPct = &net
+	}
+	return out
 }
