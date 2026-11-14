@@ -14,6 +14,7 @@ void main() {
     }
     final sellOut = File('lib/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart').readAsStringSync();
     expect(sellOut.contains("ValueKey('price_matrix_table')"), isTrue);
-    expect(sellOut.contains('BoxConstraints(minWidth: constraints.maxWidth)'), isTrue);
+    expect(sellOut.contains('TableScrollContainer('), isTrue);
+    expect(sellOut.contains('columnFlex: _priceMatrixFlex'), isTrue);
   });
 }

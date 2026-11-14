@@ -16,6 +16,7 @@ import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/arabic_plural.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
 import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
@@ -869,7 +870,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                       )
                                     else
                                       Text(
-                                        '${_currFmt.format(item.oldUnitPriceIncl)} ← ${_currFmt.format(item.newUnitPriceIncl)} ج.م (${item.diffPct > 0 ? '+' : ''}${item.diffPct.toStringAsFixed(1)}%)',
+                                        '${_currFmt.format(item.oldUnitPriceIncl)} ← ${_currFmt.format(item.newUnitPriceIncl)} ج.م (${CurrencyFormatter.formatSignedPct(item.diffPct)})',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w800,
                                           fontSize: M3FontSize.labelSmallPlus,
@@ -2467,7 +2468,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                 child: M3WrapText(
                   isNew
                       ? 'جديد'
-                      : '${item.priceChangePct > 0 ? '+' : ''}${item.priceChangePct.toStringAsFixed(1)}%',
+                      : CurrencyFormatter.formatSignedPct(item.priceChangePct),
                   maxLines: 1,
                   textAlign: TextAlign.center,
                   style: TextStyle(

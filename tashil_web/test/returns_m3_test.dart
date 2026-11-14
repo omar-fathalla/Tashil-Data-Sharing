@@ -12,6 +12,7 @@ import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/data/available_years.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/core/widgets/m3_toolbar_button.dart';
 import 'package:tashil_web/features/sell_in_returns/presentation/screens/sell_in_returns_screen.dart';
@@ -576,5 +577,46 @@ void main() {
         expect(m.size.height, closeTo(138.0, 1.0), reason: why);
       }
     });
+
+    testWidgets(
+      'MoM KPI paints the minus to the left of the digits in RTL',
+      (tester) async {
+        await _pump(
+          tester,
+          kLiveWindowWidth,
+          withSidebar: true,
+          repository: liveRepo,
+        );
+        final expected = CurrencyFormatter.formatSignedPct(-17.9);
+        expect(expected, contains('\u2212'));
+        final card = find.byKey(
+          const ValueKey('returns_kpi_card_التغير الشهري (MoM)'),
+        );
+        expect(card, findsOneWidget);
+        final value = find.descendant(
+          of: card,
+          matching: find.text(expected),
+        );
+        expect(value, findsOneWidget);
+
+        final para = tester.renderObject<RenderParagraph>(value);
+        final text = expected;
+        final minusIdx = text.indexOf('\u2212');
+        final digitIdx = text.indexOf(RegExp(r'\d'));
+        final minusBoxes = para.getBoxesForSelection(
+          TextSelection(baseOffset: minusIdx, extentOffset: minusIdx + 1),
+        );
+        final digitBoxes = para.getBoxesForSelection(
+          TextSelection(baseOffset: digitIdx, extentOffset: digitIdx + 1),
+        );
+        expect(minusBoxes, isNotEmpty);
+        expect(digitBoxes, isNotEmpty);
+        expect(
+          minusBoxes.first.toRect().left,
+          lessThan(digitBoxes.first.toRect().left),
+          reason: 'Returns MoM must paint −17.9% with the minus on the left',
+        );
+      },
+    );
   });
 }

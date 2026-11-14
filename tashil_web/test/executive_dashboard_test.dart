@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tashil_web/core/utils/currency_formatter.dart';
 
 import 'helpers/m3_dropdown_tester.dart';
 import 'package:tashil_web/core/network/api_client.dart';
@@ -116,14 +117,15 @@ void main() {
       ),
     );
 
-    // Must format negative percentages cleanly without '+-' (Arabic-only tags)
-    expect(find.textContaining('-16.0%'), findsWidgets);
+    // Must format negative percentages with LRI + U+2212 (never '+-' or a trailing minus)
+    expect(find.textContaining(CurrencyFormatter.formatSignedPct(-16.0)), findsWidgets);
     expect(find.text('MoM'), findsNothing);
-    expect(find.textContaining('-4.5%'), findsOneWidget);
+    expect(find.textContaining(CurrencyFormatter.formatSignedPct(-4.5)), findsOneWidget);
     expect(find.textContaining('مقارنة بالعام السابق'), findsWidgets);
     expect(find.text('YoY'), findsNothing);
-    expect(find.textContaining('-8.2%'), findsWidgets);
+    expect(find.textContaining(CurrencyFormatter.formatSignedPct(-8.2)), findsWidgets);
     expect(find.textContaining('+-'), findsNothing);
+    expect(find.textContaining('-16.0%'), findsNothing);
 
     // Dynamic single-chain subtitle for Gomla Market (not hardcoded Fathalla)
     expect(find.text('جملة ماركت'), findsOneWidget);

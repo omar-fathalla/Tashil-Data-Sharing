@@ -452,7 +452,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
         title: 'التغير الشهري (MoM)',
         value: mom == null
             ? '—'
-            : '${mom >= 0 ? '+' : ''}${mom.toStringAsFixed(1)}%',
+            : CurrencyFormatter.formatSignedPct(mom),
         subtitle: mom == null ? 'لا توجد بيانات للمقارنة' : momSubtitle,
         icon: momUp
             ? Icons.trending_up_rounded

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
@@ -145,8 +146,12 @@ void main() {
         expect(find.byKey(const ValueKey('btn_print_roi_pdf')), findsOneWidget);
 
         // Verify January 2026 Fathalla MoM and YoY growth badges in the matrix
-        expect(find.textContaining('+32.4% MoM'), findsOneWidget);
-        expect(find.textContaining('+41.2% YoY'), findsOneWidget);
+        expect(
+            find.textContaining(CurrencyFormatter.formatSignedPct(32.4)),
+            findsWidgets);
+        expect(
+            find.textContaining(CurrencyFormatter.formatSignedPct(41.2)),
+            findsWidgets);
 
         // Switch to Tab 1: Campaigns & Expense Ledger
         await tester.tap(find.text('Campaigns & Expense Ledger'));

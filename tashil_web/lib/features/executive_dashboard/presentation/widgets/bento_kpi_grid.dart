@@ -17,10 +17,8 @@ class BentoKpiGrid extends StatelessWidget {
   /// Shown on the detail line when there is no last-year data to compare.
   static const String noLastYearLabel = 'لا توجد بيانات للعام السابق';
 
-  static String _formatSignedPct(double pct) {
-    final sign = pct >= 0 ? '+' : '';
-    return '$sign${pct.toStringAsFixed(1)}%';
-  }
+  static String _formatSignedPct(double pct) =>
+      CurrencyFormatter.formatSignedPct(pct);
 
   /// One-line YoY/MoM detail. When last-year data is missing, the value is
   /// «—» and the explanation sits on the same detail line (Sell-Out 138px).

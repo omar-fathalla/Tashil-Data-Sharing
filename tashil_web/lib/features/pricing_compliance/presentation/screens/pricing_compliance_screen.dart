@@ -354,7 +354,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                         title: 'متوسط الأثر الترويجي',
                         titleMaxLines: 3,
                         subtitleMaxLines: 3,
-                        value: '+${avgPromoUplift.toStringAsFixed(1)}%',
+                        value: CurrencyFormatter.formatSignedPct(avgPromoUplift),
                         subtitle: 'زيادة في حجم المبيعات خلال فترات العروض',
                         icon: Icons.rocket_launch_rounded,
                         color: colorScheme.tertiary,
@@ -1438,7 +1438,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
   Widget _buildPriceDeltaBadge(
       BuildContext context, PricingComplianceItem item) {
     final delta = item.priceDeltaPct;
-    final deltaText = '${delta > 0 ? '+' : ''}${delta.toStringAsFixed(1)}%';
+    final deltaText = CurrencyFormatter.formatSignedPct(delta);
 
     late final String short;
     late final String description;
@@ -1469,7 +1469,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
     return _buildShortStatus(
       context,
       'أثر ترويجي',
-      '+${item.promoUpliftPct.toStringAsFixed(1)}% في حجم المبيعات',
+      '${CurrencyFormatter.formatSignedPct(item.promoUpliftPct)} في حجم المبيعات',
     );
   }
 
@@ -1641,7 +1641,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                         _buildMiniStatChip(
                           context,
                           'صافي تغير السعر',
-                          '${summary.netPriceChangePct >= 0 ? '+' : ''}${summary.netPriceChangePct.toStringAsFixed(1)}%',
+                          CurrencyFormatter.formatSignedPct(summary.netPriceChangePct),
                           summary.netPriceChangePct >= 0
                               ? Icons.arrow_upward_rounded
                               : Icons.arrow_downward_rounded,
@@ -1652,7 +1652,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                         _buildMiniStatChip(
                           context,
                           'نمو الإيرادات الإجمالي',
-                          '${summary.netRevenueGrowthPct >= 0 ? '+' : ''}${summary.netRevenueGrowthPct.toStringAsFixed(1)}%',
+                          CurrencyFormatter.formatSignedPct(summary.netRevenueGrowthPct),
                           summary.netRevenueGrowthPct >= 0
                               ? Icons.trending_up_rounded
                               : Icons.trending_down_rounded,
@@ -1736,7 +1736,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                 child: Text(
                                   point.revenueChangePct == 0
                                       ? 'مستقر'
-                                      : '${isRevUp ? '▲ +' : '▼ '}${point.revenueChangePct.toStringAsFixed(1)}% إيراد',
+                                      : '${isRevUp ? '▲ ' : '▼ '}${CurrencyFormatter.formatSignedPct(point.revenueChangePct)} إيراد',
                                   style: TextStyle(
                                     fontSize: M3FontSize.labelSmall,
                                     fontWeight: FontWeight.bold,
@@ -1779,7 +1779,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                   if (point.priceChangePct != 0) ...[
                                     const SizedBox(width: 4.0),
                                     Text(
-                                      '(${isPriceUp ? '+' : ''}${point.priceChangePct.toStringAsFixed(1)}%)',
+                                      '(${CurrencyFormatter.formatSignedPct(point.priceChangePct)})',
                                       style: TextStyle(
                                         fontSize: M3FontSize.labelSmall,
                                         fontWeight: FontWeight.w600,

@@ -17,6 +17,7 @@ import '../widgets/competitor_suggestions_review.dart';
 import '../utils/chart_callout_layout.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
@@ -1427,7 +1428,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     final String badgeText = weAreCheaper
         ? 'أرخص من السوق بـ ${vsAvgDiffPct.abs().toStringAsFixed(1)}%'
         : weAreMoreExpensive
-            ? 'أغلى من السوق بـ +${vsAvgDiffPct.toStringAsFixed(1)}%'
+            ? 'أغلى من السوق بـ ${CurrencyFormatter.formatSignedPct(vsAvgDiffPct)}'
             : 'مساوي لمتوسط السوق';
 
     final double momPct = group.periodPriceChangePct;
@@ -1528,8 +1529,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                                 ),
                                 child: Text(
                                   priceRose
-                                      ? '▲ +${momPct.toStringAsFixed(1)}% في $_selectedYear'
-                                      : '▼ ${momPct.toStringAsFixed(1)}% في $_selectedYear',
+                                      ? '▲ ${CurrencyFormatter.formatSignedPct(momPct)} في $_selectedYear'
+                                      : '▼ ${CurrencyFormatter.formatSignedPct(momPct)} في $_selectedYear',
                                   style: TextStyle(
                                     fontSize: M3FontSize.tiny,
                                     fontWeight: FontWeight.w800,
@@ -1957,9 +1958,9 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             : colorScheme.onSecondaryContainer;
 
     final String priceStatusText = isCompHigher
-        ? 'أغلى منك بـ +${competitor.priceDiffEgp.abs().toStringAsFixed(1)} ج (+${competitor.priceDiffPct.abs().toStringAsFixed(1)}%)'
+        ? 'أغلى منك بـ +${competitor.priceDiffEgp.abs().toStringAsFixed(1)} ج (${CurrencyFormatter.formatSignedPct(competitor.priceDiffPct.abs())})'
         : isCompLower
-            ? 'أرخص منك بـ -${competitor.priceDiffEgp.abs().toStringAsFixed(1)} ج (-${competitor.priceDiffPct.abs().toStringAsFixed(1)}%)'
+            ? 'أرخص منك بـ -${competitor.priceDiffEgp.abs().toStringAsFixed(1)} ج (${CurrencyFormatter.formatSignedPct(-competitor.priceDiffPct.abs())})'
             : 'مساوي لسعرك';
 
     const Color activeAccent = M3Palette.dangerAccent;
@@ -2551,10 +2552,10 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     String formatDelta(SkuMonthlyPricePointModel pt) {
       if (pt.trendDirection == 'baseline') return 'بداية الفترة';
       if (pt.trendDirection == 'up') {
-        return '▲ +${pt.priceChangePct.toStringAsFixed(1)}%';
+        return '▲ ${CurrencyFormatter.formatSignedPct(pt.priceChangePct)}';
       }
       if (pt.trendDirection == 'down') {
-        return '▼ ${pt.priceChangePct.toStringAsFixed(1)}%';
+        return '▼ ${CurrencyFormatter.formatSignedPct(pt.priceChangePct)}';
       }
       return '• مستقر (0%)';
     }
@@ -2830,12 +2831,12 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       final upMonths = changes
           .where((m) => m.priceChangePct > 0.5)
           .map((m) =>
-              '${m.monthNameAr} (+${m.priceChangePct.toStringAsFixed(1)}%)')
+              '${m.monthNameAr} (${CurrencyFormatter.formatSignedPct(m.priceChangePct)})')
           .toList();
       final downMonths = changes
           .where((m) => m.priceChangePct < -0.5)
           .map((m) =>
-              '${m.monthNameAr} (${m.priceChangePct.toStringAsFixed(1)}%)')
+              '${m.monthNameAr} (${CurrencyFormatter.formatSignedPct(m.priceChangePct)})')
           .toList();
 
       final parts = <String>[];
@@ -2983,7 +2984,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     context,
                     label: 'التغير السعري في $_selectedYear',
                     value:
-                        '${group.periodPriceChangePct >= 0 ? '+' : ''}${group.periodPriceChangePct.toStringAsFixed(1)}%',
+                        CurrencyFormatter.formatSignedPct(group.periodPriceChangePct),
                     subValue:
                         '${group.periodPriceChangeEgp >= 0 ? '+' : ''}${group.periodPriceChangeEgp.toStringAsFixed(1)} ج.م (${_monthRangeLabel.replaceFirst(' - ', ' ← ')})',
                   ),
@@ -3244,7 +3245,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             alignment: WrapAlignment.spaceBetween,
             children: [
               Text(
-                'السعر التجريبي: ${currentVal.toStringAsFixed(1)} ج.م (${(pctChange * 100).toStringAsFixed(1)}%)',
+                'السعر التجريبي: ${currentVal.toStringAsFixed(1)} ج.م (${CurrencyFormatter.formatSignedPct(pctChange * 100)})',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: colorScheme.primary,

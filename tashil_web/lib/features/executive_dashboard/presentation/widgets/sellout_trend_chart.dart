@@ -598,7 +598,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                 final growth =
                     idx < s.growthPcts.length ? s.growthPcts[idx] : 0.0;
                 final growthStr = (val > 0 && growth != 0.0)
-                    ? ' (\u200E${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(1)}%\u200E)'
+                    ? ' (${CurrencyFormatter.formatSignedPct(growth)})'
                     : '';
                 final sellOutText = val > 0
                     ? '${CurrencyFormatter.formatEGP(val)}$growthStr'
