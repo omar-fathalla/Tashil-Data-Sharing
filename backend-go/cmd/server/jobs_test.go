@@ -172,3 +172,137 @@ func TestAsyncJobSharedMountConcurrentReadersSeeConsistentJSON(t *testing.T) {
 		t.Fatalf("final peer load: %+v", got)
 	}
 }
+
+func TestCommitAlwaysReturns202WithoutAsyncHeader(t *testing.T) {
+	release := make(chan struct{})
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"batch_id":"batch_out26","valid_rows":81294,"is_committed":true}`))
+	})
+	h := newAsyncJobs(t.TempDir()).wrap(next)
+
+	// No X-Tashil-Async — commit must still be backgrounded so large writes never hit WriteTimeout.
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/ingest/commit",
+		strings.NewReader(`{"batch_id":"batch_out26","chain":"fathalla"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("commit without async header: want 202, got %d %s", rr.Code, rr.Body.String())
+	}
+	var started map[string]string
+	_ = json.Unmarshal(rr.Body.Bytes(), &started)
+	id := started["job_id"]
+	if !isValidJobID(id) {
+		t.Fatalf("invalid job_id: %q", id)
+	}
+
+	// Poll while running, then finish.
+	pr := httptest.NewRecorder()
+	h.ServeHTTP(pr, httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+id, nil))
+	var running jobRecord
+	_ = json.Unmarshal(pr.Body.Bytes(), &running)
+	if running.Status != "running" {
+		t.Fatalf("expected running, got %+v", running)
+	}
+	close(release)
+	deadline := time.Now().Add(3 * time.Second)
+	var rec jobRecord
+	for time.Now().Before(deadline) {
+		pr = httptest.NewRecorder()
+		h.ServeHTTP(pr, httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+id, nil))
+		_ = json.Unmarshal(pr.Body.Bytes(), &rec)
+		if rec.Status != "running" {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if rec.Status != "done" || rec.HTTPStatus != 200 || !strings.Contains(string(rec.Body), `"valid_rows":81294`) {
+		t.Fatalf("unexpected terminal job: %+v", rec)
+	}
+}
+
+func TestCommitRetryReusesRunningJob(t *testing.T) {
+	release := make(chan struct{})
+	var handlerCalls int
+	var mu sync.Mutex
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		handlerCalls++
+		mu.Unlock()
+		<-release
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"batch_id":"batch_idem","is_committed":true}`))
+	})
+	h := newAsyncJobs(t.TempDir()).wrap(next)
+	body := `{"batch_id":"batch_idem","chain":"fathalla"}`
+
+	start := func() string {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/ingest/commit", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		h.ServeHTTP(rr, req)
+		if rr.Code != http.StatusAccepted {
+			t.Fatalf("want 202, got %d %s", rr.Code, rr.Body.String())
+		}
+		var started map[string]string
+		_ = json.Unmarshal(rr.Body.Bytes(), &started)
+		return started["job_id"]
+	}
+
+	id1 := start()
+	id2 := start()
+	if id1 != id2 {
+		t.Fatalf("retry must reuse running job: %s vs %s", id1, id2)
+	}
+	close(release)
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		pr := httptest.NewRecorder()
+		h.ServeHTTP(pr, httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+id1, nil))
+		var rec jobRecord
+		_ = json.Unmarshal(pr.Body.Bytes(), &rec)
+		if rec.Status == "done" {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	mu.Lock()
+	calls := handlerCalls
+	mu.Unlock()
+	if calls != 1 {
+		t.Fatalf("handler must run once for idempotent commit, got %d", calls)
+	}
+
+	// After the job finishes, a new commit may start (BQ replace stays idempotent).
+	// release is already closed, so the second handler returns immediately.
+	id3 := start()
+	if id3 == id1 {
+		t.Fatal("after terminal status a new job id is expected")
+	}
+	deadline = time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		pr := httptest.NewRecorder()
+		h.ServeHTTP(pr, httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+id3, nil))
+		var rec jobRecord
+		_ = json.Unmarshal(pr.Body.Bytes(), &rec)
+		if rec.Status == "done" {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("second commit job did not finish")
+}
+
+func TestUploadStillRequiresAsyncHeader(t *testing.T) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(201)
+	})
+	rr := httptest.NewRecorder()
+	newAsyncJobs("").wrap(next).ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/v1/ingest/upload", nil))
+	if rr.Code != 201 {
+		t.Fatalf("upload without header stays sync, got %d", rr.Code)
+	}
+}

@@ -75,6 +75,17 @@ void main() {
     expect(isUploadWaitTimeout(UploadRejectedException('x')), isFalse);
   });
 
+  test('HTTP 429 is rate-limit copy, never "file rejected"', () {
+    expect(uploadFailureMessage(UploadRateLimitedException()), uploadRateLimitMessage);
+    expect(uploadFailureMessage(UploadRateLimitedException()), contains('حاول تاني'));
+    expect(isUploadRateLimited(UploadRateLimitedException()), isTrue);
+    expect(isUploadRateLimited(UploadRejectedException('x')), isFalse);
+    expect(
+      () => throwIfUploadRefused(429, '{"error":"rate_limited","message":"$uploadRateLimitMessage"}', 'fail'),
+      throwsA(isA<UploadRateLimitedException>()),
+    );
+  });
+
   testWidgets('wait-timeout dialog never says nothing was saved', (tester) async {
     await tester.pumpWidget(MaterialApp(
       home: Builder(
@@ -90,6 +101,26 @@ void main() {
     await tester.tap(find.text('fail'));
     await tester.pumpAndSettle();
     expect(find.text(sellInUploadStillProcessingTitle), findsOneWidget);
+    expect(find.textContaining('مفيش حاجة اتحفظت'), findsNothing);
+    expect(find.textContaining('اترفض'), findsNothing);
+  });
+
+  testWidgets('rate-limit dialog never says file rejected', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: TextButton(
+            onPressed: () => showUploadFailureDialog(
+                context, 'in26.xlsx', UploadRateLimitedException()),
+            child: const Text('fail'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('fail'));
+    await tester.pumpAndSettle();
+    expect(find.text(sellInUploadRateLimitTitle), findsOneWidget);
+    expect(find.textContaining(uploadRateLimitMessage), findsOneWidget);
     expect(find.textContaining('مفيش حاجة اتحفظت'), findsNothing);
     expect(find.textContaining('اترفض'), findsNothing);
   });

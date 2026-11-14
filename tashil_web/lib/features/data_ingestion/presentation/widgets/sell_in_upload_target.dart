@@ -211,12 +211,19 @@ const sellInUploadStillProcessingMessage =
 /// Dialog title when the wait stopped without a server rejection (not "nothing was saved").
 const sellInUploadStillProcessingTitle = 'الملف لسه بيتعالج';
 
+/// Dialog title for HTTP 429 — never "file rejected / nothing saved".
+const sellInUploadRateLimitTitle = 'حاول تاني بعد شوية';
+
 /// True when the error means the client stopped waiting — not that the server rejected the file.
 bool isUploadWaitTimeout(Object error) =>
     error is TimeoutException || error is UploadStillProcessingException;
 
+/// True when the server asked the client to back off (rate limit / busy).
+bool isUploadRateLimited(Object error) => error is UploadRateLimitedException;
+
 /// Arabic text for an upload failure. The server's own Arabic message wins when there is one.
 String uploadFailureMessage(Object error) {
+  if (error is UploadRateLimitedException) return error.message;
   if (error is UploadRejectedException) return error.message;
   if (isUploadWaitTimeout(error)) return sellInUploadStillProcessingMessage;
   if (error is ServerConnectionException) return error.message;
@@ -224,12 +231,15 @@ String uploadFailureMessage(Object error) {
 }
 
 /// Shows an upload failure in an M3 dialog that stays until the user closes it.
-/// Wait-timeouts use a neutral title — never "nothing was saved" unless the server rejected.
+/// Wait-timeouts and rate-limits use a neutral title — never "nothing was saved"
+/// unless the server rejected the file.
 /// [title] defaults from the error kind; a failed commit may pass its own.
 Future<void> showUploadFailureDialog(
     BuildContext context, String fileName, Object error,
     {String? title}) {
   final waitTimeout = isUploadWaitTimeout(error);
+  final rateLimited = isUploadRateLimited(error);
+  final softFailure = waitTimeout || rateLimited;
   return showDialog<void>(
     context: context,
     builder: (ctx) {
@@ -237,13 +247,15 @@ Future<void> showUploadFailureDialog(
       final scheme = theme.colorScheme;
       return AlertDialog(
         icon: Icon(
-          waitTimeout ? AppIcons.info : AppIcons.error,
-          color: waitTimeout ? scheme.tertiary : scheme.error,
+          softFailure ? AppIcons.info : AppIcons.error,
+          color: softFailure ? scheme.tertiary : scheme.error,
         ),
         title: Text(title ??
-            (waitTimeout
-                ? sellInUploadStillProcessingTitle
-                : 'الملف اترفض ومفيش حاجة اتحفظت')),
+            (rateLimited
+                ? sellInUploadRateLimitTitle
+                : waitTimeout
+                    ? sellInUploadStillProcessingTitle
+                    : 'الملف اترفض ومفيش حاجة اتحفظت')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
