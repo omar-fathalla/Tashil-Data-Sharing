@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_palette.dart';
+import 'package:tashil_web/features/trade_marketing/domain/roi_lift.dart';
 
 /// Categories of FMCG Trade Marketing & Promotional activities
 enum MarketingExpenseCategory {
@@ -151,7 +152,12 @@ class MonthlyChainRoiSummary {
   /// Actual Sell-In (Supply) in the selected month (EGP)
   final double currentMonthSellInEgp;
 
-  const MonthlyChainRoiSummary({
+  /// Precomputed incremental lift / ROMI. When omitted, it is derived
+  /// from last-year sales only (ratio 1) or marked unavailable — never
+  /// by cherry-picking MoM vs YoY.
+  final RoiLiftResult lift;
+
+  MonthlyChainRoiSummary({
     required this.year,
     required this.month,
     required this.chainName,
@@ -162,7 +168,14 @@ class MonthlyChainRoiSummary {
     required this.previousMonthSalesEgp,
     required this.lastYearSameMonthSalesEgp,
     required this.currentMonthSellInEgp,
-  });
+    RoiLiftResult? lift,
+  }) : lift = lift ??
+            computeRoiLift(
+              currentSalesEgp: currentMonthSalesEgp,
+              lastYearSameMonthSalesEgp: lastYearSameMonthSalesEgp,
+              marketingSpendEgp: marketingSpendEgp,
+              target: RoiMonthKey(year, month),
+            );
 
   String get monthNameEn => MarketingExpenseItem.monthNamesEn[month] ?? 'M$month';
   String get monthNameAr => MarketingExpenseItem.monthNamesAr[month] ?? 'شهر $month';
@@ -192,29 +205,34 @@ class MonthlyChainRoiSummary {
       ? (marketingSpendEgp / currentMonthSalesEgp) * 100.0
       : 0.0;
 
-  /// Return on Marketing Investment Multiple (Incremental MoM Sales Lift / Marketing Spend)
-  /// If MoM lift is negative or seasonal, falls back to YoY lift for evaluation if positive.
-  double get romiMultiple {
-    if (marketingSpendEgp <= 0) return 0.0;
-    final effectiveLift = momLiftEgp >= 0 ? momLiftEgp : (yoyLiftEgp > 0 ? yoyLiftEgp : momLiftEgp);
-    return effectiveLift / marketingSpendEgp;
-  }
+  bool get hasBaseline => lift.available;
 
-  /// Net ROI % = ((Incremental Lift - Marketing Spend) / Marketing Spend) * 100
-  double get netRoiPct {
-    if (marketingSpendEgp <= 0) return 0.0;
-    final effectiveLift = momLiftEgp >= 0 ? momLiftEgp : (yoyLiftEgp > 0 ? yoyLiftEgp : momLiftEgp);
-    return ((effectiveLift - marketingSpendEgp) / marketingSpendEgp) * 100.0;
-  }
+  double? get baselineSalesEgp => lift.baselineSalesEgp;
 
-  /// Executive AI Verdict on whether the marketing spend drove profitable growth
+  double? get incrementalLiftEgp => lift.incrementalLiftEgp;
+
+  double? get liftVsBaselinePct => lift.liftVsBaselinePct;
+
+  /// Incremental lift / spend. Null when the baseline cannot be computed
+  /// or there is no spend (the UI shows «—»).
+  double? get romiMultiple => lift.romiMultiple;
+
+  /// ((lift - spend) / spend) * 100. Null in the same cases as [romiMultiple].
+  double? get netRoiPct => lift.netRoiPct;
+
+  String get baselineMethodAr => lift.methodAr;
+
+  /// Executive verdict from the new lift / ROMI, not from MoM/YoY.
   String get verdictAr {
     if (marketingSpendEgp <= 0) return 'بدون إنفاق ترويجي';
-    if (romiMultiple >= 3.5 && momGrowthPct >= 10.0) {
+    if (!hasBaseline) return 'لا يمكن حساب العائد';
+    final romi = romiMultiple!;
+    final liftPct = liftVsBaselinePct ?? 0.0;
+    if (romi >= 3.5 && liftPct >= 10.0) {
       return 'عائد ممتاز ونمو قياسي';
-    } else if (romiMultiple >= 1.5 || (momGrowthPct >= 5.0 && yoyGrowthPct >= 10.0)) {
+    } else if (romi >= 1.5) {
       return 'حملة ناجحة ونمو إيجابي';
-    } else if (momGrowthPct > 0 || yoyGrowthPct > 5.0) {
+    } else if (romi >= 1.0 || (incrementalLiftEgp ?? 0) > 0) {
       return 'نمو متوسط - يحتاج تحسين';
     } else {
       return 'عائد ضعيف / مراجعة التكلفة';
@@ -223,11 +241,14 @@ class MonthlyChainRoiSummary {
 
   String get verdictEn {
     if (marketingSpendEgp <= 0) return 'No Promo Spend';
-    if (romiMultiple >= 3.5 && momGrowthPct >= 10.0) {
+    if (!hasBaseline) return 'Baseline unavailable';
+    final romi = romiMultiple!;
+    final liftPct = liftVsBaselinePct ?? 0.0;
+    if (romi >= 3.5 && liftPct >= 10.0) {
       return 'High ROI & Strong Lift';
-    } else if (romiMultiple >= 1.5 || (momGrowthPct >= 5.0 && yoyGrowthPct >= 10.0)) {
+    } else if (romi >= 1.5) {
       return 'Positive Growth Impact';
-    } else if (momGrowthPct > 0 || yoyGrowthPct > 5.0) {
+    } else if (romi >= 1.0 || (incrementalLiftEgp ?? 0) > 0) {
       return 'Moderate Lift';
     } else {
       return 'Low Impact - Audit Spend';
@@ -236,11 +257,14 @@ class MonthlyChainRoiSummary {
 
   Color get verdictColor {
     if (marketingSpendEgp <= 0) return const Color(0xFF64748B);
-    if (romiMultiple >= 3.5 && momGrowthPct >= 10.0) {
+    if (!hasBaseline) return const Color(0xFF64748B);
+    final romi = romiMultiple!;
+    final liftPct = liftVsBaselinePct ?? 0.0;
+    if (romi >= 3.5 && liftPct >= 10.0) {
       return M3Palette.success;
-    } else if (romiMultiple >= 1.5 || (momGrowthPct >= 5.0 && yoyGrowthPct >= 10.0)) {
+    } else if (romi >= 1.5) {
       return M3Palette.info;
-    } else if (momGrowthPct > 0 || yoyGrowthPct > 5.0) {
+    } else if (romi >= 1.0 || (incrementalLiftEgp ?? 0) > 0) {
       return M3Palette.warning;
     } else {
       return M3Palette.danger;
@@ -249,62 +273,78 @@ class MonthlyChainRoiSummary {
 }
 
 /// Simulator-only average of historical campaign ROMI values (spend > 0
-/// and a positive [MonthlyChainRoiSummary.romiMultiple]). Returns null
-/// when there is no campaign basis — the simulator must not fall back
-/// to a hardcoded multiple. Does not change [MonthlyChainRoiSummary.romiMultiple].
+/// and a computable baseline). Includes negative ROMI so the average is
+/// not cherry-picked. Returns null when there is no campaign basis —
+/// the simulator must not fall back to a hardcoded multiple.
 double? averageHistoricalRomi(Iterable<MonthlyChainRoiSummary> rows) {
   final usable = rows
-      .where((s) => s.marketingSpendEgp > 0 && s.romiMultiple > 0)
+      .where((s) => s.marketingSpendEgp > 0 && s.romiMultiple != null)
       .toList();
   if (usable.isEmpty) return null;
-  return usable.fold<double>(0, (a, s) => a + s.romiMultiple) / usable.length;
+  return usable.fold<double>(0, (a, s) => a + s.romiMultiple!) /
+      usable.length;
 }
 
 /// What-if projection used by [_openRoiSimulatorDialog].
 ///
 /// When [historicalRomi] is null, every projected figure is null so the
-/// UI can show «—». When previous-month or last-year sales are missing
-/// the corresponding growth % is also null («—») instead of 0.0%.
-/// The lift formula itself (`budget * historicalRomi`) is unchanged
-/// when a historical multiple exists.
+/// UI can show «—». Incremental lift is `budget * historicalRomi` against
+/// the campaign-free [baselineSalesEgp]. MoM/YoY remain informational.
 class RoiSimulatorProjection {
   final double? historicalRomi;
+  final double? baselineSalesEgp;
   final double previousMonthSalesEgp;
   final double lastYearSalesEgp;
   final double budgetEgp;
 
   const RoiSimulatorProjection({
     required this.historicalRomi,
+    this.baselineSalesEgp,
     required this.previousMonthSalesEgp,
     required this.lastYearSalesEgp,
     required this.budgetEgp,
   });
 
-  bool get hasHistoricalRomi =>
-      historicalRomi != null && historicalRomi! > 0;
+  bool get hasHistoricalRomi => historicalRomi != null;
 
-  double? get projectedSalesEgp => hasHistoricalRomi
-      ? previousMonthSalesEgp + budgetEgp * historicalRomi!
-      : null;
-
-  double? get momLiftEgp =>
+  double? get projectedLiftEgp =>
       hasHistoricalRomi ? budgetEgp * historicalRomi! : null;
 
+  double? get projectedSalesEgp {
+    if (!hasHistoricalRomi || baselineSalesEgp == null) return null;
+    return baselineSalesEgp! + projectedLiftEgp!;
+  }
+
+  double? get liftVsBaselinePct =>
+      (hasHistoricalRomi &&
+              baselineSalesEgp != null &&
+              baselineSalesEgp! > 0)
+          ? (projectedLiftEgp! / baselineSalesEgp!) * 100.0
+          : null;
+
+  double? get momLiftEgp =>
+      projectedSalesEgp != null && previousMonthSalesEgp > 0
+          ? projectedSalesEgp! - previousMonthSalesEgp
+          : (projectedSalesEgp != null ? projectedSalesEgp! - previousMonthSalesEgp : null);
+
   double? get momGrowthPct =>
-      (hasHistoricalRomi && previousMonthSalesEgp > 0)
-          ? (momLiftEgp! / previousMonthSalesEgp) * 100.0
+      (projectedSalesEgp != null && previousMonthSalesEgp > 0)
+          ? ((projectedSalesEgp! - previousMonthSalesEgp) /
+                  previousMonthSalesEgp) *
+              100.0
           : null;
 
   double? get yoyLiftEgp =>
-      hasHistoricalRomi ? projectedSalesEgp! - lastYearSalesEgp : null;
+      projectedSalesEgp != null ? projectedSalesEgp! - lastYearSalesEgp : null;
 
   double? get yoyGrowthPct =>
-      (hasHistoricalRomi && lastYearSalesEgp > 0)
-          ? (yoyLiftEgp! / lastYearSalesEgp) * 100.0
+      (projectedSalesEgp != null && lastYearSalesEgp > 0)
+          ? ((projectedSalesEgp! - lastYearSalesEgp) / lastYearSalesEgp) *
+              100.0
           : null;
 
   double? get romiMultiple =>
-      hasHistoricalRomi && budgetEgp > 0 ? momLiftEgp! / budgetEgp : null;
+      hasHistoricalRomi && budgetEgp > 0 ? historicalRomi : null;
 }
 
 /// Provides initial realistic FMCG trade marketing campaigns and monthly sales baselines

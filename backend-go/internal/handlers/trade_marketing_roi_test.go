@@ -108,12 +108,42 @@ func TestTradeMarketingROIMathTenantAndKAM(t *testing.T) {
 	checks := map[string]float64{
 		"marketing_spend_egp": 50000, "activities_count": 2, "current_month_sales_egp": 1200000,
 		"previous_month_sales_egp": 1000000, "last_year_same_month_sales_egp": 800000,
-		"current_month_sell_in_egp": 1500000, "mom_growth_pct": 20, "yoy_growth_pct": 50, "romi_multiple": 4,
+		"current_month_sell_in_egp": 1500000, "mom_growth_pct": 20, "yoy_growth_pct": 50,
+		// No organic YoY months in the fixture → ratio 1, baseline = last year 800k,
+		// lift = 400k, ROMI = 8x (not the old cherry-picked MoM 4x).
+		"baseline_sales_egp": 800000, "incremental_lift_egp": 400000, "romi_multiple": 8,
+		"net_roi_pct": 700, "organic_yoy_ratio": 1,
 	}
 	for k, want := range checks {
 		if got, _ := fath[k].(float64); !near(got, want) {
 			t.Errorf("%s: want %v got %v", k, want, fath[k])
 		}
+	}
+	if fath["baseline_available"] != true {
+		t.Errorf("Fathalla baseline_available: %v", fath["baseline_available"])
+	}
+	if fath["baseline_method"] != "yoy_trend" {
+		t.Errorf("Fathalla baseline_method: %v", fath["baseline_method"])
+	}
+	var beet map[string]interface{}
+	for _, s := range sums {
+		m := s.(map[string]interface{})
+		if m["chain_name"] == "Beet El Gomla" {
+			beet = m
+		}
+	}
+	if beet == nil {
+		t.Fatal("missing Beet El Gomla summary")
+	}
+	// Beet has Feb sales but no last-year or prior-month history → no baseline.
+	if beet["baseline_available"] != false {
+		t.Errorf("Beet baseline_available want false got %v", beet["baseline_available"])
+	}
+	if beet["romi_multiple"] != nil {
+		t.Errorf("Beet romi_multiple want null got %v", beet["romi_multiple"])
+	}
+	if beet["baseline_method"] != "unavailable" {
+		t.Errorf("Beet baseline_method: %v", beet["baseline_method"])
 	}
 
 	// Tenant isolation: another tenant sees no adeco expenses and no adeco sales.

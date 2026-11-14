@@ -5,6 +5,7 @@ import 'package:tashil_web/core/network/backend_http.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../domain/roi_lift.dart';
 import '../domain/trade_marketing_models.dart';
 
 /// Error raised by [TradeMarketingRepository] calls, with a user-facing message.
@@ -29,6 +30,7 @@ class TradeMarketingSalesBaseline {
   final double lastYearSameMonthSalesEgp;
   final double currentMonthSellInEgp;
   final double marketingSpendEgp;
+  final RoiLiftResult? lift;
 
   const TradeMarketingSalesBaseline({
     required this.year,
@@ -39,9 +41,11 @@ class TradeMarketingSalesBaseline {
     required this.lastYearSameMonthSalesEgp,
     required this.currentMonthSellInEgp,
     this.marketingSpendEgp = 0,
+    this.lift,
   });
 
-  factory TradeMarketingSalesBaseline.fromJson(Map<String, dynamic> j) => TradeMarketingSalesBaseline(
+  factory TradeMarketingSalesBaseline.fromJson(Map<String, dynamic> j) =>
+      TradeMarketingSalesBaseline(
         year: _toInt(j['year']),
         month: _toInt(j['month']),
         chainName: (j['chain_name'] ?? '').toString(),
@@ -50,7 +54,35 @@ class TradeMarketingSalesBaseline {
         lastYearSameMonthSalesEgp: _toDouble(j['last_year_same_month_sales_egp']),
         currentMonthSellInEgp: _toDouble(j['current_month_sell_in_egp']),
         marketingSpendEgp: _toDouble(j['marketing_spend_egp']),
+        lift: _liftFromJson(j),
       );
+}
+
+RoiLiftResult? _liftFromJson(Map<String, dynamic> j) {
+  if (j['baseline_method'] == null && j['baseline_available'] == null) {
+    return null;
+  }
+  final method = roiBaselineMethodFromId(j['baseline_method']?.toString());
+  if (method == RoiBaselineMethod.unavailable) {
+    final msg = (j['baseline_method_ar'] ?? kRoiBaselineUnavailableAr).toString();
+    return RoiLiftResult(
+      method: method,
+      methodAr: msg,
+      unavailableMessageAr: msg,
+    );
+  }
+  final spend = _toDouble(j['marketing_spend_egp']);
+  return RoiLiftResult(
+    method: method,
+    baselineSalesEgp: _toDoubleOrNull(j['baseline_sales_egp']),
+    organicYoyRatio: _toDoubleOrNull(j['organic_yoy_ratio']),
+    organicMonthsUsed: _toInt(j['organic_months_used']),
+    incrementalLiftEgp: _toDoubleOrNull(j['incremental_lift_egp']),
+    liftVsBaselinePct: _toDoubleOrNull(j['lift_vs_baseline_pct']),
+    romiMultiple: spend > 0 ? _toDoubleOrNull(j['romi_multiple']) : null,
+    netRoiPct: spend > 0 ? _toDoubleOrNull(j['net_roi_pct']) : null,
+    methodAr: (j['baseline_method_ar'] ?? '').toString(),
+  );
 }
 
 /// Result of an Excel/CSV expense upload.
@@ -70,6 +102,11 @@ String tradeMarketingBaselineKey(int year, int month, String chain) =>
 
 int _toInt(dynamic v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;
 double _toDouble(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0.0;
+double? _toDoubleOrNull(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v.toDouble();
+  return double.tryParse('$v');
+}
 
 MarketingExpenseItem marketingExpenseFromJson(Map<String, dynamic> j) => MarketingExpenseItem(
       id: (j['id'] ?? '').toString(),

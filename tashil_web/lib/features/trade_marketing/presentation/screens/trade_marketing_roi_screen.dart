@@ -25,6 +25,7 @@ import '../../../../core/widgets/m3_toolbar_button.dart';
 import '../../../../core/widgets/m3_wrap_text.dart';
 import '../../data/cached_trade_marketing_repository.dart';
 import '../../data/trade_marketing_repository.dart';
+import '../../domain/roi_lift.dart';
 import '../../domain/trade_marketing_models.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 
@@ -365,6 +366,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
           previousMonthSalesEgp: baseline?.previousMonthSalesEgp ?? 0.0,
           lastYearSameMonthSalesEgp: baseline?.lastYearSameMonthSalesEgp ?? 0.0,
           currentMonthSellInEgp: baseline?.currentMonthSellInEgp ?? 0.0,
+          lift: baseline?.lift,
         ),
       );
     }
@@ -385,7 +387,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
           cmp = a.yoyGrowthPct.compareTo(b.yoyGrowthPct);
           break;
         case 'roi':
-          cmp = a.romiMultiple.compareTo(b.romiMultiple);
+          cmp = (a.romiMultiple ?? double.negativeInfinity)
+              .compareTo(b.romiMultiple ?? double.negativeInfinity);
           break;
         case 'month':
         default:
@@ -798,8 +801,16 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
             }
             final prevSales = baseline?.previousMonthSalesEgp ?? 0.0;
             final lastYearSales = baseline?.lastYearSameMonthSalesEgp ?? 0.0;
+            final simLift = baseline?.lift ??
+                computeRoiLift(
+                  currentSalesEgp: baseline?.currentMonthSalesEgp ?? 0.0,
+                  lastYearSameMonthSalesEgp: lastYearSales,
+                  marketingSpendEgp: 0,
+                  target: RoiMonthKey(simYear, simMonth),
+                );
             final projection = RoiSimulatorProjection(
               historicalRomi: historicalRomi,
+              baselineSalesEgp: simLift.baselineSalesEgp,
               previousMonthSalesEgp: prevSales,
               lastYearSalesEgp: lastYearSales,
               budgetEgp: proposedBudget,
@@ -954,6 +965,22 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                               ),
                             ],
                             const SizedBox(height: 12.0),
+                            Text(
+                              simLift.methodAr,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 10.0),
+                            _buildSimMetricRow(
+                              'مبيعات الأساس بدون حملة:',
+                              simLift.available
+                                  ? moneyOrDash(simLift.baselineSalesEgp)
+                                  : '—',
+                              colorScheme.onSurface,
+                            ),
+                            const SizedBox(height: 6.0),
                             _buildSimMetricRow(
                               'مبيعات الشهر السابق:',
                               prevSales > 0
@@ -974,6 +1001,14 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                               'المبيعات المتوقعة بعد الحملة:',
                               moneyOrDash(projection.projectedSalesEgp),
                               colorScheme.primary,
+                              isBold: true,
+                            ),
+                            const SizedBox(height: 6.0),
+                            _buildSimMetricRow(
+                              'الزيادة المتوقعة عن الأساس:',
+                              liftAndPct(projection.projectedLiftEgp,
+                                  projection.liftVsBaselinePct),
+                              M3Palette.success,
                               isBold: true,
                             ),
                             const SizedBox(height: 6.0),
@@ -1138,6 +1173,30 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                           color: colorScheme.primary,
                         ),
                         _buildMiniDrillCard(
+                          titleAr: 'مبيعات الأساس بدون حملة',
+                          titleEn: 'Expected sales without the campaign',
+                          value: summary.hasBaseline
+                              ? CurrencyFormatter.formatEGP(summary.baselineSalesEgp!)
+                              : '—',
+                          sub: summary.baselineMethodAr,
+                          color: colorScheme.primary,
+                        ),
+                        _buildMiniDrillCard(
+                          titleAr: 'الزيادة عن الأساس',
+                          titleEn: 'Incremental lift vs baseline',
+                          value: summary.hasBaseline
+                              ? '${(summary.incrementalLiftEgp ?? 0) >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(summary.incrementalLiftEgp!)}'
+                              : '—',
+                          sub: summary.hasBaseline && summary.liftVsBaselinePct != null
+                              ? '${CurrencyFormatter.formatSignedPct(summary.liftVsBaselinePct!)} عن الأساس'
+                              : kRoiBaselineUnavailableAr,
+                          color: !summary.hasBaseline
+                              ? M3Palette.neutral
+                              : ((summary.incrementalLiftEgp ?? 0) >= 0
+                                  ? M3Palette.success
+                                  : M3Palette.danger),
+                        ),
+                        _buildMiniDrillCard(
                           titleAr: 'النمو عن الشهر السابق (MoM)',
                           titleEn:
                               'vs. Previous Month (${CurrencyFormatter.formatEGP(summary.previousMonthSalesEgp)})',
@@ -1182,7 +1241,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                           const SizedBox(width: 10.0),
                           Expanded(
                             child: Text(
-                              'التقييم التحليلي: ${summary.verdictAr} — كل 1 جنيه تم صرفه في ${summary.monthNameAr} حقق ${summary.romiMultiple.toStringAsFixed(2)} جنيه زيادة في المبيعات مقارنة بالشهر السابق.',
+                              summary.hasBaseline && summary.romiMultiple != null
+                                  ? 'التقييم التحليلي: ${summary.verdictAr} — الزيادة عن الأساس ${CurrencyFormatter.formatEGP(summary.incrementalLiftEgp!)} (ROMI ${summary.romiMultiple!.toStringAsFixed(2)}x). ${summary.baselineMethodAr}'
+                                  : 'التقييم التحليلي: ${summary.verdictAr} — ${summary.lift.unavailableMessageAr ?? kRoiBaselineUnavailableAr}',
                               style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 color: summary.verdictColor,
@@ -1311,6 +1372,10 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
       'Marketing Spend (EGP)',
       'Previous Month Sales (EGP)',
       'Campaign Month Sales (EGP)',
+      'Baseline Sales (EGP)',
+      'Incremental Lift vs Baseline (EGP)',
+      'Lift vs Baseline (%)',
+      'Baseline Method',
       'MoM Sales Lift (EGP)',
       'MoM Growth (%)',
       'Last Year Same Month Sales (EGP)',
@@ -1318,6 +1383,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
       'YoY Growth (%)',
       'Spend-to-Sales Ratio (%)',
       'ROMI Multiple (x)',
+      'Net ROI (%)',
       'Evaluation Verdict',
     ];
 
@@ -1331,13 +1397,20 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
         s.marketingSpendEgp.toStringAsFixed(0),
         s.previousMonthSalesEgp.toStringAsFixed(0),
         s.currentMonthSalesEgp.toStringAsFixed(0),
+        s.hasBaseline ? s.baselineSalesEgp!.toStringAsFixed(0) : '—',
+        s.hasBaseline ? s.incrementalLiftEgp!.toStringAsFixed(0) : '—',
+        s.hasBaseline && s.liftVsBaselinePct != null
+            ? '${s.liftVsBaselinePct!.toStringAsFixed(1)}%'
+            : '—',
+        s.baselineMethodAr,
         s.momLiftEgp.toStringAsFixed(0),
         '${s.momGrowthPct.toStringAsFixed(1)}%',
         s.lastYearSameMonthSalesEgp.toStringAsFixed(0),
         s.hasYoY ? s.yoyLiftEgp.toStringAsFixed(0) : '—',
         s.hasYoY ? '${s.yoyGrowthPct.toStringAsFixed(1)}%' : '—',
         '${s.spendToSalesRatioPct.toStringAsFixed(1)}%',
-        '${s.romiMultiple.toStringAsFixed(2)}x',
+        s.romiMultiple != null ? '${s.romiMultiple!.toStringAsFixed(2)}x' : '—',
+        s.netRoiPct != null ? '${s.netRoiPct!.toStringAsFixed(0)}%' : '—',
         s.verdictAr,
       ];
     }).toList();
@@ -1364,6 +1437,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
       'المصروف التسويقي',
       'مبيعات الشهر السابق',
       'مبيعات شهر الحملة',
+      'مبيعات الأساس',
+      'الزيادة عن الأساس',
       'النمو الشهري (MoM)',
       'النمو السنوي (YoY)',
       'العائد (ROMI)',
@@ -1377,11 +1452,17 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
         CurrencyFormatter.formatEGP(s.marketingSpendEgp),
         CurrencyFormatter.formatEGP(s.previousMonthSalesEgp),
         CurrencyFormatter.formatEGP(s.currentMonthSalesEgp),
+        s.hasBaseline
+            ? CurrencyFormatter.formatEGP(s.baselineSalesEgp!)
+            : '—',
+        s.hasBaseline
+            ? CurrencyFormatter.formatEGP(s.incrementalLiftEgp!)
+            : '—',
         '${s.momGrowthPct >= 0 ? '+' : ''}${s.momGrowthPct.toStringAsFixed(1)}%',
         s.hasYoY
             ? '${s.yoyGrowthPct >= 0 ? '+' : ''}${s.yoyGrowthPct.toStringAsFixed(1)}%'
             : '—',
-        '${s.romiMultiple.toStringAsFixed(2)}x',
+        s.romiMultiple != null ? '${s.romiMultiple!.toStringAsFixed(2)}x' : '—',
         s.verdictAr,
       ];
     }).toList();
@@ -1433,7 +1514,13 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
     final totalYoyPct =
         totalYoyAvailable ? (totalYoyLift / totalLastYearSales) * 100.0 : 0.0;
 
-    final overallRomi = totalSpend > 0 ? (totalMomLift / totalSpend) : 0.0;
+    final baselineRows = summaries.where((e) => e.hasBaseline).toList();
+    final totalIncrementalLift = baselineRows.fold<double>(
+        0.0, (s, e) => s + (e.incrementalLiftEgp ?? 0));
+    final spendWithBaseline = baselineRows.fold<double>(
+        0.0, (s, e) => s + e.marketingSpendEgp);
+    final double? overallRomi =
+        spendWithBaseline > 0 ? totalIncrementalLift / spendWithBaseline : null;
     final spendRatioPct =
         totalCurrentSales > 0 ? (totalSpend / totalCurrentSales) * 100.0 : 0.0;
 
@@ -1558,7 +1645,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
     required double totalYoyLift,
     required double totalYoyPct,
     required bool totalYoyAvailable,
-    required double overallRomi,
+    required double? overallRomi,
     required double spendRatioPct,
   }) {
     String pct(double v) =>
@@ -1606,8 +1693,13 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
         key: const ValueKey('tm_kpi_romi'),
         valueKey: const ValueKey('tm_kpi_romi_value'),
         title: 'العائد على الإنفاق',
-        value: '${overallRomi.toStringAsFixed(2)}x',
-        subtitle: 'كل 1 ج.م حقق ${overallRomi.toStringAsFixed(2)} ج.م نمو',
+        titleTooltip: kRoiLiftMethodExplainerAr,
+        value: overallRomi == null
+            ? '—'
+            : '${overallRomi.toStringAsFixed(2)}x',
+        subtitle: overallRomi == null
+            ? kRoiBaselineUnavailableAr
+            : 'كل 1 ج.م حقق ${overallRomi.toStringAsFixed(2)} ج.م نمو',
         icon: Icons.workspace_premium_rounded,
         color: M3Palette.warning,
       ),
@@ -1945,6 +2037,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
         return ('ضعيف', 'راجع التكلفة');
       case 'بدون إنفاق ترويجي':
         return ('بدون إنفاق', 'لا يوجد إنفاق ترويجي');
+      case 'لا يمكن حساب العائد':
+        return ('غير محسوب', 'لا توجد بيانات أساس كافية');
     }
     return (verdictAr, '');
   }
@@ -2015,7 +2109,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                     ),
                     const SizedBox(height: M3Spacing.s2),
                     Text(
-                      'اضغط على أي صف لعرض تفاصيل الحملات وأثرها على المبيعات مقارنة بالشهر السابق ونفس الشهر من العام السابق • اضغط على عنوان العمود للترتيب',
+                      'العائد يُحسب من الزيادة عن المبيعات المتوقعة بدون الحملة، مش من المقارنة بالشهر السابق. اضغط على أي صف للتفاصيل • اضغط على عنوان العمود للترتيب',
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: colorScheme.onSurfaceVariant),
                     ),
@@ -2174,16 +2268,28 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                                       fontWeight: FontWeight.w800)),
                               _txt('لا توجد بيانات للعام السابق', style: small),
                             ]))),
-                      DataCell(_cell(_lines([
-                        _txt('${s.romiMultiple.toStringAsFixed(2)}x',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: M3FontSize.bodyMediumPlus,
-                                color: s.verdictColor)),
-                        _txt(
-                            'ROI ${CurrencyFormatter.formatSignedPct(s.netRoiPct, decimals: 0)}',
-                            style: small),
-                      ]))),
+                      DataCell(_cell(Tooltip(
+                        message: s.hasBaseline
+                            ? s.baselineMethodAr
+                            : kRoiBaselineUnavailableAr,
+                        child: _lines([
+                          _txt(
+                              s.romiMultiple != null
+                                  ? '${s.romiMultiple!.toStringAsFixed(2)}x'
+                                  : '—',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: M3FontSize.bodyMediumPlus,
+                                  color: s.verdictColor)),
+                          _txt(
+                              s.netRoiPct != null
+                                  ? 'ROI ${CurrencyFormatter.formatSignedPct(s.netRoiPct!, decimals: 0)}'
+                                  : (s.hasBaseline
+                                      ? s.baselineMethodAr
+                                      : kRoiBaselineUnavailableAr),
+                              style: small),
+                        ]),
+                      ))),
                       DataCell(_cell(_lines([
                         _chip(verdictShort, s.verdictColor),
                         if (verdictDesc.isNotEmpty) ...[
