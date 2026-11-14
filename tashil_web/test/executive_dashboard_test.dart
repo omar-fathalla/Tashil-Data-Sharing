@@ -709,11 +709,17 @@ void main() {
     expect(pareto, findsOneWidget);
     expect(find.descendant(of: pareto, matching: find.textContaining('#')),
         findsNothing);
+    // Short chip + description: rank sits in the description under the chip.
+    expect(
+        find.descendant(
+            of: pareto,
+            matching: find.textContaining(RegExp(r'المركز \d+'))),
+        findsWidgets);
     expect(
         find.descendant(
             of: pareto,
             matching: find.textContaining(RegExp(r'\(المركز \d+\)'))),
-        findsOneWidget);
+        findsNothing);
   });
 
   testWidgets(

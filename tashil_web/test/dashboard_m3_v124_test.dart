@@ -167,6 +167,19 @@ void main() {
         expect(int.tryParse((c.child as Text).data ?? ''), isNotNull);
       }
     }
+    // Short chip + description: market-share phrase is under the chip, not in it.
+    final share = find.byKey(const ValueKey('pareto_share_chip'));
+    expect(share, findsOneWidget);
+    expect(
+      find.descendant(
+          of: find.descendant(of: share, matching: find.byType(M3ChipSurface)),
+          matching: find.textContaining('حصتنا السوقية')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: share, matching: find.textContaining('حصتنا السوقية')),
+      findsOneWidget,
+    );
     handle.dispose();
   });
 

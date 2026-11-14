@@ -116,7 +116,17 @@ void main() {
 
       expect(find.byKey(const ValueKey('supplier_market_share_card')), findsOneWidget);
       expect(find.textContaining('حصتنا مقارنة بالمنافسين'), findsOneWidget);
-      expect(find.textContaining('حصتنا السوقية 18.44% (المركز 1)'), findsOneWidget);
+      // Short chip (18.44%) + description under it (TM pattern).
+      expect(find.byKey(const ValueKey('pareto_share_chip')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('pareto_share_chip')),
+          matching: find.text('18.44%'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('حصتنا السوقية · المركز 1'), findsOneWidget);
+      expect(find.textContaining('حصتنا السوقية 18.44% (المركز 1)'), findsNothing);
     });
 
     test('uploadFile correctly extracts repeated branches from Column H under إسم الفرع and skips preamble', () async {

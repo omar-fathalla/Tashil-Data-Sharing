@@ -5,15 +5,20 @@
 // live-scale (made-up) values. The Dashboard KPI row must use the
 // same column count, card width, and 138px height as Sell-Out;
 // the stock table must fit with no horizontal scroll; empty last-year
-// shows «—» + «لا توجد بيانات للعام السابق»; shared prefix is stripped.
+// shows «—» + «لا توجد بيانات للعام السابق»; shared prefix is stripped;
+// status chips are short word/value + description (TM pattern).
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/features/cpfr_replenishment/domain/cpfr_models.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/widgets/bento_kpi_grid.dart';
@@ -258,6 +263,26 @@ Widget _dashboardBody({bool yoy = false}) => SingleChildScrollView(
             ParetoCategorySection(
               categories: _liveKpis(yoyAvailable: yoy).categoryContributions,
               paretoSkus: _liveKpis(yoyAvailable: yoy).paretoSkus,
+              supplierShares: [
+                SupplierShareModel(
+                  supplierName: 'أديكو للصناعات الغذائية (Adeco)',
+                  totalRevenue: 128400000,
+                  totalUnits: 214000,
+                  marketSharePct: 48.0,
+                  skuCount: 32,
+                  isTenant: true,
+                  rank: 1,
+                ),
+                SupplierShareModel(
+                  supplierName: kLongCompetitor,
+                  totalRevenue: 71200000,
+                  totalUnits: 118000,
+                  marketSharePct: 27.0,
+                  skuCount: 18,
+                  isTenant: false,
+                  rank: 2,
+                ),
+              ],
               totalMarketRevenue: 265700000,
               tenantMarketSharePct: 48.0,
               competitorsCount: 6,
@@ -324,6 +349,11 @@ void main() {
   GoogleFonts.config.allowRuntimeFetching = false;
   setUpAll(() async {
     await loadRealCairoFont();
+    final bytes =
+        File('test/fonts/NotoSansSymbols2-Arrows.ttf').readAsBytesSync();
+    await (FontLoader('NotoSansSymbols2')
+          ..addFont(Future.value(ByteData.view(bytes.buffer))))
+        .load();
   });
   setUp(AppCache.clear);
 
@@ -395,6 +425,10 @@ void main() {
         find.textContaining('لا توجد بيانات للعام السابق'), findsNWidgets(2));
     expect(find.textContaining('—'), findsWidgets);
     expect(find.textContaining('مقارنة بالعام السابق'), findsNothing);
+    // No fabricated YoY/MoM percentages when last-year is missing.
+    expect(find.textContaining('+0.0%'), findsNothing);
+    expect(find.textContaining('+12.1%'), findsNothing);
+    expect(find.textContaining('+9.8%'), findsNothing);
 
     final at1024 = await measureSellOut(1024);
     expect(at1024.height, closeTo(kSellOutKpiHeight, 2.0),
@@ -512,5 +546,53 @@ void main() {
 
     await assertAt(kLiveViewportWidth, 'live 1280+sidebar');
     await assertAt(1024, 'live 1024+sidebar');
+  });
+
+  testWidgets(
+      'Pareto metric chips are short value + description (TM pattern)',
+      (tester) async {
+    await _pumpAt(tester, _dashboardBody());
+    expect(tester.takeException(), isNull);
+
+    final shareChip = find.byKey(const ValueKey('pareto_share_chip'));
+    expect(shareChip, findsOneWidget);
+    // Short value lives in the chip; long phrase is the description under it.
+    expect(
+      find.descendant(of: shareChip, matching: find.text('48.00%')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+          of: shareChip, matching: find.textContaining('حصتنا السوقية')),
+      findsOneWidget,
+    );
+    final shareSurfaces = find.descendant(
+        of: shareChip, matching: find.byType(M3ChipSurface));
+    expect(shareSurfaces, findsOneWidget);
+    expect(
+      find.descendant(
+          of: shareSurfaces, matching: find.textContaining('حصتنا السوقية')),
+      findsNothing,
+      reason: 'long phrase must not sit inside the chip',
+    );
+
+    final totalChip = find.byKey(const ValueKey('pareto_market_total_chip'));
+    expect(totalChip, findsOneWidget);
+    expect(
+      find.descendant(of: totalChip, matching: find.text('إجمالي السوق')),
+      findsOneWidget,
+    );
+    final totalSurfaces = find.descendant(
+        of: totalChip, matching: find.byType(M3ChipSurface));
+    expect(
+      find.descendant(
+          of: totalSurfaces, matching: find.textContaining('إجمالي السوق')),
+      findsNothing,
+      reason: 'market-total description stays under the chip',
+    );
+
+    // Category share chip: short % + «حصتنا السوقية» description.
+    expect(find.text('حصتنا السوقية'), findsWidgets);
+    expect(find.textContaining('حصتنا السوقية 33.7%'), findsNothing);
   });
 }
