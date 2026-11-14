@@ -1,11 +1,11 @@
 import '../../../core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
-import '../../../../core/config/app_version.dart';
-import '../../../../core/network/api_client.dart';
-import '../../../../core/testing/test_semantics.dart';
-import '../../../../core/theme/m3_motion.dart';
-import '../../../../core/theme/m3_spacing.dart';
-import '../../../../core/widgets/data_sharing_logo.dart';
+import '../../../core/config/app_version.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/testing/test_semantics.dart';
+import '../../../core/theme/m3_motion.dart';
+import '../../../core/theme/m3_spacing.dart';
+import '../../../core/widgets/data_sharing_logo.dart';
 import 'tenant_profile_card.dart';
 
 /// DesktopSidebar provides a permanent Material Design 3 Navigation Drawer
@@ -166,13 +166,18 @@ class DesktopSidebar extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 6.0),
-                            Text(
-                              AppVersion.label,
-                              key: const ValueKey('sidebar-app-version'),
-                              textDirection: TextDirection.ltr,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                            ValueListenableBuilder<String>(
+                              valueListenable: AppVersion.listenable,
+                              builder: (context, versionLabel, _) {
+                                return Text(
+                                  versionLabel,
+                                  key: const ValueKey('sidebar-app-version'),
+                                  textDirection: TextDirection.ltr,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),

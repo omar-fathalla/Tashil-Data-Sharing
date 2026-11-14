@@ -3,6 +3,14 @@
 class AppPageRoute {
   AppPageRoute._();
 
+  /// True for `/`, empty path, or `/index.html` — the site root entry.
+  /// Root must show company login (or redirect a valid session to the
+  /// tenant portal); it must never resolve to a blank route.
+  static bool isBareRoot(String path) {
+    final p = path.trim().toLowerCase();
+    return p.isEmpty || p == '/' || p == '/index.html';
+  }
+
   static const List<String> pageSlugs = [
     'dashboard',
     'sell-out',

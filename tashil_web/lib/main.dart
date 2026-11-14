@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'core/config/app_version.dart';
 import 'core/data/app_cache.dart';
 import 'core/network/api_client.dart';
 import 'core/security/zero_trust_digest.dart';
@@ -33,6 +34,8 @@ void toggleAppLocale() {
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Prefer the hosted stamp over a stale dart-define (partial web deploys).
+  AppVersion.hydrateFromDocument();
   if (kIsWeb) {
     usePathUrlStrategy();
     // Opt-in only: Playwright passes ?semantics=1 (see e2e/helpers/flutter.ts).
@@ -46,6 +49,7 @@ void main() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       WebFileHelper.ensureMounted();
     });
+    unawaited(AppVersion.hydrateFromVersionJson());
   }
   runApp(const TashilDataSharingApp());
 }
@@ -93,7 +97,8 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
       cleanPath = cleanPath.substring(1);
     }
     String candidateSlug = cleanPath.split('/').first.trim().toLowerCase();
-    if (candidateSlug.isEmpty ||
+    if (AppPageRoute.isBareRoot(path) ||
+        candidateSlug.isEmpty ||
         candidateSlug == 'index.html' ||
         candidateSlug == 'favicon.png') {
       String cleanFragment = fragment;
@@ -104,6 +109,8 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
       }
       candidateSlug = cleanFragment.split('/').first.trim().toLowerCase();
     }
+    // Site root `/` is the company login entry (or session → tenant redirect
+    // below) — not an unknown URL / Not Found page.
     final isExplicitCompanySlug = candidateSlug.isNotEmpty &&
         candidateSlug != 'admin' &&
         candidateSlug != 'index.html' &&
@@ -486,11 +493,24 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
     );
   }
 
+  /// Always paints app state — never return null from route generators
+  /// (null initial routes hard-reload as a blank white page on web).
+  Route<dynamic> _routeForCurrentAppState(RouteSettings settings) {
+    return MaterialPageRoute<void>(
+      settings: settings,
+      builder: (_) => Theme(
+        data: AppTheme.light(seedColor: _currentSeed),
+        child: _buildCurrentScreen(),
+      ),
+    );
+  }
+
   Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
     final name = settings.name ?? '/';
     final uri = Uri.parse(name);
+    final path = uri.path.isEmpty ? '/' : uri.path;
 
-    if (uri.path == '/admin') {
+    if (path == '/admin' || path.startsWith('/admin/')) {
       return MaterialPageRoute(
         settings: settings,
         builder: (_) => Theme(
@@ -592,7 +612,13 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
       );
     }
 
-    return null;
+    // Bare `/`, `/{tenant}`, `/{tenant}/{page}`: paint session-restored UI.
+    // Returning null here left hard-reloads on some paths blank white.
+    return _routeForCurrentAppState(settings);
+  }
+
+  Route<dynamic> _onUnknownRoute(RouteSettings settings) {
+    return _routeForCurrentAppState(settings);
   }
 
   @override
@@ -622,6 +648,7 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
           ],
 
           onGenerateRoute: _onGenerateRoute,
+          onUnknownRoute: _onUnknownRoute,
           home: _buildCurrentScreen(),
         );
       },
