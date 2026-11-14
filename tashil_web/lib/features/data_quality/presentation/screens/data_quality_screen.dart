@@ -6,15 +6,19 @@ import '../../../../core/data/data_refresh_mixin.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/theme/m3_status_colors.dart';
+import '../../../../core/theme/m3_typography.dart';
 import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/atomic_numeric_text.dart';
 import '../../../../core/widgets/hyphenated_code_text.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/widgets/app_icons.dart';
+import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/widgets/m3_button_group.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_states.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
@@ -149,8 +153,7 @@ class _DataQualityScreenState extends State<DataQualityScreen>
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+      M3Feedback.showError(context, e.toString());
     }
   }
 
@@ -273,58 +276,66 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Wrap(
-      spacing: M3Spacing.xs,
-      runSpacing: M3Spacing.xs,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Icon(AppIcons.dataQuality, color: theme.colorScheme.primary),
-        Text(
-          'الأخطاء وجودة البيانات',
-          style: theme.textTheme.headlineSmall
-              ?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        IconButton(
-          key: const ValueKey('dq_refresh'),
-          tooltip: 'تحديث',
-          onPressed: onRefresh,
-          icon: const Icon(AppIcons.refresh),
-        ),
-        if (apiClient != null)
-          IconButton(
-            key: const ValueKey('dq_pending_customers'),
-            tooltip: 'عملاء محتاجين تأكيد',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-              builder: (_) => PendingCustomersScreen(apiClient: apiClient),
-            )),
-            icon: const Icon(AppIcons.pendingCustomers),
+    return M3PageHeader(
+      titleEn: 'Errors',
+      subtitleAr: 'الأخطاء وجودة البيانات',
+      actions: M3ButtonGroup(
+        maxVisibleCompact: 2,
+        items: [
+          M3GroupItem(
+            key: const ValueKey('dq_refresh'),
+            label: 'تحديث',
+            icon: AppIcons.refresh,
+            kind: M3GroupItemKind.tonal,
+            tooltip: 'تحديث',
+            onPressed: onRefresh,
           ),
-        if (apiClient != null)
-          IconButton(
-            key: const ValueKey('dq_sellin_assist'),
-            tooltip: 'مساعدة Gemini للتوريد',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-              builder: (_) => SellInAssistScreen(apiClient: apiClient),
-            )),
-            icon: const Icon(AppIcons.sellInAssist),
+          if (apiClient != null)
+            M3GroupItem(
+              key: const ValueKey('dq_pending_customers'),
+              label: 'عملاء معلّقون',
+              icon: AppIcons.pendingCustomers,
+              kind: M3GroupItemKind.tonal,
+              tooltip: 'عملاء محتاجين تأكيد',
+              onPressed: () =>
+                  Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => PendingCustomersScreen(apiClient: apiClient),
+              )),
+            ),
+          if (apiClient != null)
+            M3GroupItem(
+              key: const ValueKey('dq_sellin_assist'),
+              label: 'مساعدة التوريد',
+              icon: AppIcons.sellInAssist,
+              kind: M3GroupItemKind.tonal,
+              tooltip: 'مساعدة Gemini للتوريد',
+              onPressed: () =>
+                  Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => SellInAssistScreen(apiClient: apiClient),
+              )),
+            ),
+          if (apiClient != null)
+            M3GroupItem(
+              key: const ValueKey('dq_product_match_review'),
+              label: 'مطابقة الأصناف',
+              icon: AppIcons.productMatchReview,
+              kind: M3GroupItemKind.tonal,
+              tooltip: 'مراجعة مطابقة الأصناف',
+              onPressed: () =>
+                  Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) =>
+                    ProductMatchReviewScreen(apiClient: apiClient),
+              )),
+            ),
+          M3GroupItem(
+            key: const ValueKey('dq_export'),
+            label: 'تصدير Excel/CSV',
+            icon: AppIcons.download,
+            kind: M3GroupItemKind.tonal,
+            onPressed: canExport ? onExport : null,
           ),
-        if (apiClient != null)
-          IconButton(
-            key: const ValueKey('dq_product_match_review'),
-            tooltip: 'مراجعة مطابقة الأصناف',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-              builder: (_) => ProductMatchReviewScreen(apiClient: apiClient),
-            )),
-            icon: const Icon(AppIcons.productMatchReview),
-          ),
-        FilledButton.tonalIcon(
-          key: const ValueKey('dq_export'),
-          onPressed: canExport ? onExport : null,
-          icon: const Icon(AppIcons.download),
-          label: const Text('تصدير Excel/CSV'),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -372,7 +383,7 @@ class _SummaryRow extends StatelessWidget {
                   subtitle: cleanlinessSubtitle,
                   icon: AppIcons.verified,
                   color: !hasRows
-                      ? cs.outline
+                      ? cs.onSurfaceVariant
                       : (summary.cleanlinessPct >= 95
                           ? cs.primary
                           : (summary.cleanlinessPct >= 85
@@ -411,7 +422,7 @@ class _SummaryRow extends StatelessWidget {
                   value: CurrencyFormatter.formatNumber(summary.ignored),
                   subtitle: countError(summary.ignored),
                   icon: AppIcons.block,
-                  color: cs.outline,
+                  color: cs.onSurfaceVariant,
                 ),
               ],
             );
@@ -435,29 +446,65 @@ class _TypeChips extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     return Wrap(
-      spacing: M3Spacing.xs,
+      spacing: M3Spacing.sm,
       runSpacing: M3Spacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.start,
       children: [
         for (final t in types)
-          M3ChipSurface(
-            key: ValueKey('dq_type_chip_${t.type}'),
-            color: t.severity == kDqCritical
-                ? cs.errorContainer
-                : cs.tertiaryContainer,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 280.0),
-              child: Text(
-                t.impactEgp > 0
-                    ? '${t.typeLabel} · ${countError(t.open)} · ${CurrencyFormatter.formatCompactEGP(t.impactEgp)}'
-                    : '${t.typeLabel} · ${countError(t.open)}',
-                maxLines: 3,
-                overflow: TextOverflow.clip,
-                style: theme.textTheme.labelLarge?.copyWith(
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 280.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                M3ChipSurface(
+                  key: ValueKey('dq_type_chip_${t.type}'),
                   color: t.severity == kDqCritical
-                      ? cs.onErrorContainer
-                      : cs.onTertiaryContainer,
+                      ? cs.errorContainer
+                      : cs.tertiaryContainer,
+                  child: Text(
+                    dqTypeShort(t.type, t.typeLabel),
+                    maxLines: 3,
+                    softWrap: true,
+                    overflow: TextOverflow.clip,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontSize: M3FontSize.labelSmallPlus,
+                      fontWeight: FontWeight.w800,
+                      color: t.severity == kDqCritical
+                          ? cs.onErrorContainer
+                          : cs.onTertiaryContainer,
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: M3Spacing.xxs),
+                Text(
+                  t.typeLabel,
+                  key: ValueKey('dq_type_desc_${t.type}'),
+                  maxLines: 3,
+                  softWrap: true,
+                  overflow: TextOverflow.clip,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  [
+                    countError(t.open),
+                    if (t.impactEgp > 0)
+                      CurrencyFormatter.formatCompactEGP(t.impactEgp),
+                  ].join(' · '),
+                  key: ValueKey('dq_type_meta_${t.type}'),
+                  maxLines: 2,
+                  softWrap: true,
+                  overflow: TextOverflow.clip,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           ),
       ],
@@ -664,25 +711,26 @@ class _IssuesTable extends StatelessWidget {
           );
         }
 
+        // Short severity chip only (color encodes critical vs warning). An
+        // in-chip icon steals width from the 52-flex column and mid-splits
+        // «تحذير» / «حرجة» at the live 1030 shell.
         Widget wrapTag(int i, String label,
-            {required Color color, required Color onColor, IconData? icon}) {
+            {required Color color, required Color onColor}) {
           return cellBox(
             i,
             M3ChipSurface(
               color: color,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (icon != null) Icon(icon, size: 16.0, color: onColor),
-                  Text(
-                    label,
-                    maxLines: 3,
-                    softWrap: true,
-                    overflow: TextOverflow.clip,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.labelLarge?.copyWith(color: onColor),
-                  ),
-                ],
+              child: Text(
+                label,
+                maxLines: 3,
+                softWrap: true,
+                overflow: TextOverflow.clip,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: onColor,
+                  fontSize: M3FontSize.labelSmallPlus,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           );
@@ -758,7 +806,6 @@ class _IssuesTable extends StatelessWidget {
                       onColor: critical
                           ? cs.onErrorContainer
                           : cs.onTertiaryContainer,
-                      icon: critical ? AppIcons.error : AppIcons.warning,
                     )),
                     DataCell(cellText(1, i.typeLabel)),
                     DataCell(cellText(
@@ -820,8 +867,11 @@ class _IssuesTable extends StatelessWidget {
                                 softWrap: true,
                                 overflow: TextOverflow.clip,
                                 textAlign: TextAlign.center,
-                                style: theme.textTheme.labelLarge
-                                    ?.copyWith(color: fg),
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: fg,
+                                  fontSize: M3FontSize.labelSmallPlus,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
                             if (statusDesc.isNotEmpty)
