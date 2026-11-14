@@ -143,15 +143,14 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // 1. Verify English tab titles and 4th Arabic tab
+      // 1. Verify English tab titles and 4th Arabic tab via M3ResponsiveTabBar
+      expect(find.byKey(const ValueKey('cpfr_tab_bar')), findsOneWidget);
       expect(find.text('Sell-In vs Sell-Out'), findsOneWidget);
       expect(find.text('Suggested PO & Replenishment'), findsOneWidget);
       expect(find.text('Demand Forecasting & Promos (EXP)'), findsOneWidget);
       expect(find.text('أداء فريق المبيعات وهيكل الحسابات'), findsOneWidget);
-      for (var i = 1; i <= 4; i++) {
-        expect(find.byKey(ValueKey('cpfr_tab_badge_$i')), findsOneWidget);
-      }
-      // Number is not glued into the label string.
+      // Numbered InkWell badges are gone — shared Sell-Out / TM tab bar.
+      expect(find.byKey(const ValueKey('cpfr_tab_badge_1')), findsNothing);
       expect(find.text('1. Sell-In vs Sell-Out'), findsNothing);
       expect(find.text('3. Demand Forecasting & Promos (EXP)'), findsNothing);
 

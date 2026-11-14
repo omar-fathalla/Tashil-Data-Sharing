@@ -11,6 +11,7 @@ import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/theme/m3_spacing.dart';
 import 'package:tashil_web/core/widgets/m3_dropdown.dart';
+import 'package:tashil_web/core/widgets/m3_responsive_tab_bar.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/core/widgets/table_scroll_container.dart';
@@ -307,6 +308,41 @@ void main() {
     expect(find.text('مفتوح'), findsOneWidget);
     // The long raw backend label is no longer the chip text.
     expect(find.text('مغلق (Full Month)'), findsNothing);
+  });
+
+  testWidgets('tabs use M3ResponsiveTabBar; sector filter is M3Dropdown', (
+    tester,
+  ) async {
+    await _pump(tester, CPFRDashboardScreen(apiClient: RichCPFRApiClient()));
+    expect(find.byKey(const ValueKey('cpfr_tab_bar')), findsOneWidget);
+    expect(find.byType(M3ResponsiveTabBar<int>), findsOneWidget);
+    // Sector is a dropdown (Sell-Out / TM), not a segmented control.
+    expect(find.text('كل القطاعات'), findsWidgets);
+    final stringDropdowns = tester
+        .widgetList<M3Dropdown<String>>(find.byType(M3Dropdown<String>))
+        .toList();
+    expect(stringDropdowns.length, greaterThanOrEqualTo(3));
+  });
+
+  testWidgets('matched YoY + margin KPIs show real values when available', (
+    tester,
+  ) async {
+    await _pump(tester, CPFRDashboardScreen(apiClient: RichCPFRApiClient()));
+    expect(find.byKey(const ValueKey('kpi_card_Sell-Out Growth YoY')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey('kpi_value_Sell-Out Growth YoY')),
+        findsOneWidget);
+    final yoy = tester.widget<Text>(
+      find.byKey(const ValueKey('kpi_value_Sell-Out Growth YoY')),
+    );
+    expect(yoy.data, isNot('—'));
+    expect(yoy.data, contains('%'));
+    expect(find.textContaining('+0.0%'), findsNothing);
+    expect(find.byKey(const ValueKey('kpi_card_Chain Margin')), findsOneWidget);
+    final margin = tester.widget<Text>(
+      find.byKey(const ValueKey('kpi_value_Chain Margin')),
+    );
+    expect(margin.data, isNot('—'));
   });
 
   testWidgets('dropdowns never clip their value; fitOptions is on', (

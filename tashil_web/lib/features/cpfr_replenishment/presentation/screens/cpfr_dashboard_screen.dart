@@ -15,15 +15,22 @@ import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_button_group.dart';
 import '../../../../core/widgets/m3_feedback.dart';
-import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_responsive_tab_bar.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../sell_out_analytics/presentation/utils/monthly_status_text.dart';
 import '../../domain/cpfr_models.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
+
+/// Missing-metric honesty (Sell-Out / TM): never paint fake +0.0% / 0.00.
+const String _kMissingDash = '—';
+const String _kNoLastYearAr = 'لا توجد بيانات للعام السابق';
+const String _kNoPeriodDataAr = 'لا توجد بيانات للفترة';
+const String _kNoPromoDataAr = 'لا توجد عروض في الفترة';
+const String _kNoReturnDataAr = 'لا توجد مرتجعات في الفترة';
 
 /// CPFRDashboardScreen implements the multi-company, multi-chain
 /// Collaborative Planning, Forecasting & Replenishment (CPFR) system:
@@ -780,7 +787,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
             else if (_error != null)
               _buildErrorCard(theme, colorScheme)
             else if (_data != null) ...[
-              _buildTabSelector(theme, colorScheme),
+              _buildTabSelector(),
               const SizedBox(height: M3Spacing.lg),
               if (_activeTab == 0)
                 _buildReconciliationTab(theme, colorScheme, _data!),
@@ -945,28 +952,12 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
           // Independent standalone row for the Sell-In Upload Action Button
           Row(
             children: [
-              FilledButton.icon(
-                onPressed: _isUploadingSellIn ? null : _pickAndUploadSellInFile,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12.0,
-                    horizontal: 22.0,
-                  ),
-                ),
-                icon: _isUploadingSellIn
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.upload_file_rounded, size: 20),
-                label: const Text(
-                  'رفع ملف Sell-In هنا',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: M3FontSize.bodyMedium,
-                  ),
-                ),
+              M3Button.tonal(
+                label: 'رفع ملف Sell-In هنا',
+                icon: Icons.upload_file_rounded,
+                isLoading: _isUploadingSellIn,
+                onPressed:
+                    _isUploadingSellIn ? null : _pickAndUploadSellInFile,
               ),
               const SizedBox(width: 12.0),
               Flexible(
@@ -1150,7 +1141,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
 
           const SizedBox(width: M3Spacing.sm),
 
-          // 2. Product Sector Filter (القطاع السلعي)
+          // 2. Product Sector Filter (القطاع السلعي) — M3Dropdown like Sell-Out / TM
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1168,31 +1159,28 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
               ),
             ],
           ),
-          M3SegmentedButtonGroup<String>(
-            selectedValue: _selectedSector,
-            segments: const [
-              M3SegmentItem(
+          M3Dropdown<String>(
+            fitOptions: true,
+            value: _selectedSector,
+            options: m3OptionsFromMenuItems<String>([
+              const DropdownMenuItem(
                 value: 'all',
-                label: 'الكل',
-                icon: Icons.dashboard_customize_rounded,
+                child: Text('كل القطاعات'),
               ),
-              M3SegmentItem(
+              const DropdownMenuItem(
                 value: 'MT',
-                label: 'المنظفات والعناية المنزلية',
-                icon: Icons.cleaning_services_rounded,
+                child: Text('المنظفات والعناية المنزلية'),
               ),
-              M3SegmentItem(
+              const DropdownMenuItem(
                 value: 'CC',
-                label: 'العناية المتخصصة',
-                icon: Icons.category_rounded,
+                child: Text('العناية المتخصصة'),
               ),
-            ],
-            onSelectionChanged: (sector) {
-              if (_selectedSector != sector) {
-                setState(() => _selectedSector = sector);
-                _loadDashboard();
-              }
-            },
+            ]),
+            onChanged: m3Legacy<String>((sector) {
+              if (sector == null || _selectedSector == sector) return;
+              setState(() => _selectedSector = sector);
+              _loadDashboard();
+            }),
           ),
 
           const SizedBox(width: M3Spacing.sm),
@@ -1244,211 +1232,44 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
     );
   }
 
-  Widget _buildTabSelector(ThemeData theme, ColorScheme colorScheme) {
-    final tabs = [
-      (0, Icons.compare_arrows_rounded, 'Sell-In vs Sell-Out'),
-      (1, Icons.calculate_rounded, 'Suggested PO & Replenishment'),
-      (2, Icons.trending_up_rounded, 'Demand Forecasting & Promos (EXP)'),
-      (3, Icons.badge_rounded, 'أداء فريق المبيعات وهيكل الحسابات'),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= 960;
-        final isTablet =
-            constraints.maxWidth >= 600 && constraints.maxWidth < 960;
-
-        if (isDesktop) {
-          return IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < tabs.length; i++) ...[
-                  if (i > 0) const SizedBox(width: M3Spacing.sm),
-                  Expanded(
-                    child: _buildTabButton(
-                      theme: theme,
-                      colorScheme: colorScheme,
-                      tabIndex: tabs[i].$1,
-                      icon: tabs[i].$2,
-                      title: tabs[i].$3,
-                      isSelected: _activeTab == tabs[i].$1,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          );
-        } else if (isTablet) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: _buildTabButton(
-                        theme: theme,
-                        colorScheme: colorScheme,
-                        tabIndex: tabs[0].$1,
-                        icon: tabs[0].$2,
-                        title: tabs[0].$3,
-                        isSelected: _activeTab == tabs[0].$1,
-                      ),
-                    ),
-                    const SizedBox(width: M3Spacing.sm),
-                    Expanded(
-                      child: _buildTabButton(
-                        theme: theme,
-                        colorScheme: colorScheme,
-                        tabIndex: tabs[1].$1,
-                        icon: tabs[1].$2,
-                        title: tabs[1].$3,
-                        isSelected: _activeTab == tabs[1].$1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: M3Spacing.sm),
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: _buildTabButton(
-                        theme: theme,
-                        colorScheme: colorScheme,
-                        tabIndex: tabs[2].$1,
-                        icon: tabs[2].$2,
-                        title: tabs[2].$3,
-                        isSelected: _activeTab == tabs[2].$1,
-                      ),
-                    ),
-                    const SizedBox(width: M3Spacing.sm),
-                    Expanded(
-                      child: _buildTabButton(
-                        theme: theme,
-                        colorScheme: colorScheme,
-                        tabIndex: tabs[3].$1,
-                        icon: tabs[3].$2,
-                        title: tabs[3].$3,
-                        isSelected: _activeTab == tabs[3].$1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        } else {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < tabs.length; i++) ...[
-                if (i > 0) const SizedBox(height: M3Spacing.sm),
-                _buildTabButton(
-                  theme: theme,
-                  colorScheme: colorScheme,
-                  tabIndex: tabs[i].$1,
-                  icon: tabs[i].$2,
-                  title: tabs[i].$3,
-                  isSelected: _activeTab == tabs[i].$1,
-                ),
-              ],
-            ],
-          );
-        }
-      },
-    );
-  }
-
-  Widget _buildTabButton({
-    required ThemeData theme,
-    required ColorScheme colorScheme,
-    required int tabIndex,
-    required IconData icon,
-    required String title,
-    required bool isSelected,
-  }) {
-    final number = tabIndex + 1;
-    // Selected uses secondaryContainer (not primary solid) — G6 / CPFR solids.
-    return InkWell(
-      borderRadius: M3Shape.radiusMd,
-      onTap: () => setState(() => _activeTab = tabIndex),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
-        alignment: Alignment.center,
-        constraints: const BoxConstraints(minHeight: 48.0),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? colorScheme.secondaryContainer
-              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-          borderRadius: M3Shape.radiusMd,
-          border: Border.all(
-            color: isSelected
-                ? colorScheme.secondaryContainer
-                : colorScheme.outlineVariant.withValues(alpha: 0.5),
-          ),
+  /// Full-width M3 tab bar — same geometry as Sell-Out / Trade Marketing.
+  Widget _buildTabSelector() {
+    return M3ResponsiveTabBar<int>(
+      key: const ValueKey('cpfr_tab_bar'),
+      textDirection: TextDirection.ltr,
+      selectedValue: _activeTab,
+      // labelKey uses 1-based indices (cpfr_tab_label_N) for Mac/web tests.
+      items: const [
+        M3ResponsiveTabItem<int>(
+          value: 0,
+          icon: Icons.compare_arrows_rounded,
+          selectedIcon: Icons.compare_arrows_rounded,
+          label: 'Sell-In vs Sell-Out',
+          labelKey: ValueKey('cpfr_tab_label_1'),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 20.0,
-              color: isSelected
-                  ? colorScheme.onSecondaryContainer
-                  : colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 8.0),
-            // Count is a badge (one unit). The label wraps as a whole,
-            // so the number never sits mid-label at 1024.
-            Container(
-              key: ValueKey('cpfr_tab_badge_$number'),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 7.0,
-                vertical: 2.0,
-              ),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? colorScheme.secondary
-                    : colorScheme.surfaceContainerHighest,
-                borderRadius: M3Shape.radiusFull,
-              ),
-              child: Text(
-                '$number',
-                maxLines: 1,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: isSelected
-                      ? colorScheme.onSecondary
-                      : colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            const SizedBox(width: 6.0),
-            Flexible(
-              child: Text(
-                title,
-                key: ValueKey('cpfr_tab_label_$number'),
-                textAlign: TextAlign.center,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: isSelected
-                      ? colorScheme.onSecondaryContainer
-                      : colorScheme.onSurface,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
+        M3ResponsiveTabItem<int>(
+          value: 1,
+          icon: Icons.calculate_rounded,
+          selectedIcon: Icons.calculate_rounded,
+          label: 'Suggested PO & Replenishment',
+          labelKey: ValueKey('cpfr_tab_label_2'),
         ),
-      ),
+        M3ResponsiveTabItem<int>(
+          value: 2,
+          icon: Icons.trending_up_rounded,
+          selectedIcon: Icons.trending_up_rounded,
+          label: 'Demand Forecasting & Promos (EXP)',
+          labelKey: ValueKey('cpfr_tab_label_3'),
+        ),
+        M3ResponsiveTabItem<int>(
+          value: 3,
+          icon: Icons.badge_rounded,
+          selectedIcon: Icons.badge_rounded,
+          label: 'أداء فريق المبيعات وهيكل الحسابات',
+          labelKey: ValueKey('cpfr_tab_label_4'),
+        ),
+      ],
+      onChanged: (next) => setState(() => _activeTab = next),
     );
   }
 
@@ -1527,6 +1348,50 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
             subtitle: CurrencyFormatter.formatEGP(d.jan2026GapEgp),
             icon: Icons.warehouse_rounded,
             color: colorScheme.tertiary,
+          ),
+        ]),
+        const SizedBox(height: M3Spacing.sm),
+
+        // Sell-In symmetry: chain margin + YoY — «—» when cost / last-year missing.
+        _buildResponsiveCardGrid([
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_Chain Margin'),
+            valueKey: const ValueKey('kpi_value_Chain Margin'),
+            subtitleKey: const ValueKey('kpi_subtitle_Chain Margin'),
+            title: 'هامش السلسلة',
+            value: d.matchedSellOutPosValueEgp <= 0
+                ? _kMissingDash
+                : (d.matchedSellOutValueWithCostEgp <= 0
+                    ? _kMissingDash
+                    : CurrencyFormatter.formatMarginSummary(
+                        d.matchedChainGrossMarginEgp,
+                        d.matchedChainGrossMarginPct,
+                      )),
+            subtitle: d.matchedSellOutPosValueEgp <= 0
+                ? 'لا توجد مبيعات مطابقة لحساب الهامش'
+                : (d.matchedSellOutValueWithCostEgp <= 0
+                    ? 'تكلفة المصنع غير متوفرة للأصناف المباعة'
+                    : (d.matchedMissingCostSellOutEgp > 0
+                        ? 'محسوب على الأصناف المعروفة تكلفتها فقط · مستبعد ${CurrencyFormatter.formatCompactEGP(d.matchedMissingCostSellOutEgp)}'
+                        : 'سعر البيع للمستهلك ناقص صافي تكلفة التوريد')),
+            icon: Icons.paid_rounded,
+            color: d.matchedChainGrossMarginEgp < 0
+                ? colorScheme.error
+                : colorScheme.primary,
+          ),
+          M3SummaryKpiCard(
+            key: const ValueKey('kpi_card_Sell-Out Growth YoY'),
+            valueKey: const ValueKey('kpi_value_Sell-Out Growth YoY'),
+            subtitleKey: const ValueKey('kpi_subtitle_Sell-Out Growth YoY'),
+            title: 'النمو عن العام السابق',
+            value: d.matchedYoyAvailable
+                ? '${CurrencyFormatter.formatSignedPct(d.matchedYoyValueGrowthPct)} بالقيمة'
+                : _kMissingDash,
+            subtitle: d.matchedYoyAvailable
+                ? 'بالكمية: ${CurrencyFormatter.formatSignedPct(d.matchedYoyUnitsGrowthPct)} عن نفس الفترة من العام السابق'
+                : _kNoLastYearAr,
+            icon: Icons.trending_up_rounded,
+            color: colorScheme.secondary,
           ),
         ]),
         const SizedBox(height: M3Spacing.lg),
@@ -2005,7 +1870,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
                         ],
                       ),
                     ),
-                    M3Button.primary(
+                    M3Button.tonal(
                       label: 'تصدير PO',
                       icon: Icons.download_rounded,
                       onPressed: () => _exportReplenishmentPOExcel(d),
@@ -2027,7 +1892,10 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
                       colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     ),
                     columns: [
-                      DataColumn(label: _headerLabel('الصنف', 'SKU', 260)),
+                      DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: _headerLabel('الصنف', 'SKU', 260),
+                      ),
                       DataColumn(
                         headingRowAlignment: MainAxisAlignment.center,
                         label: _headerLabel('العلامة', 'والإقليم'),
@@ -2059,12 +1927,13 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
                           DataCell(
                             _bounded(
                               Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
                                     item.skuName,
                                     key: const ValueKey('cpfr_po_sku_name'),
+                                    textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -2075,6 +1944,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
                                       item.barcode.isNotEmpty)
                                     Text(
                                       '${item.itemCode.isNotEmpty ? item.itemCode : ""}${item.itemCode.isNotEmpty && item.barcode.isNotEmpty ? " • " : ""}${item.barcode}',
+                                      textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontFamily: 'monospace',
                                         fontSize: M3FontSize.tiny,
@@ -2168,16 +2038,19 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // W1 + W2 -> EXP Forecasting Cards
+        // W1 + W2 -> EXP Forecasting Cards (— when the period has no data)
         _buildResponsiveCardGrid([
           M3SummaryKpiCard(
             key: const ValueKey('kpi_card_W1+W2 actual'),
             valueKey: const ValueKey('kpi_value_W1+W2 actual'),
             subtitleKey: const ValueKey('kpi_subtitle_W1+W2 actual'),
             title: 'المسحوبات الفعلية',
-            value: CurrencyFormatter.formatCompactEGP(d.octW1W2ActualEgp),
-            subtitle:
-                'W1 + W2 · ${CurrencyFormatter.formatUnits(d.octW1W2ActualCases.round())} كرتونة',
+            value: (d.octW1W2ActualEgp <= 0 && d.octW1W2ActualCases <= 0)
+                ? _kMissingDash
+                : CurrencyFormatter.formatCompactEGP(d.octW1W2ActualEgp),
+            subtitle: (d.octW1W2ActualEgp <= 0 && d.octW1W2ActualCases <= 0)
+                ? _kNoPeriodDataAr
+                : 'W1 + W2 · ${CurrencyFormatter.formatUnits(d.octW1W2ActualCases.round())} كرتونة',
             icon: Icons.calendar_today_rounded,
             color: colorScheme.primary,
           ),
@@ -2186,11 +2059,14 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
             valueKey: const ValueKey('kpi_value_Projected EXP'),
             subtitleKey: const ValueKey('kpi_subtitle_Projected EXP'),
             title: 'المتوقع بنهاية الشهر',
-            value: CurrencyFormatter.formatCompactEGP(
-              d.octProjectedMonthEndEgp,
-            ),
-            subtitle:
-                '${CurrencyFormatter.formatUnits(d.octProjectedCases.round())} كرتونة · Run-Rate',
+            value: d.octProjectedMonthEndEgp <= 0
+                ? _kMissingDash
+                : CurrencyFormatter.formatCompactEGP(
+                    d.octProjectedMonthEndEgp,
+                  ),
+            subtitle: d.octProjectedMonthEndEgp <= 0
+                ? _kNoPeriodDataAr
+                : '${CurrencyFormatter.formatUnits(d.octProjectedCases.round())} كرتونة · Run-Rate',
             icon: Icons.auto_graph_rounded,
             color: colorScheme.tertiary,
           ),
@@ -2199,9 +2075,12 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
             valueKey: const ValueKey('kpi_value_Promotions'),
             subtitleKey: const ValueKey('kpi_subtitle_Promotions'),
             title: 'مساهمة العروض',
-            value: CurrencyFormatter.formatCompactEGP(pr.promoValueEgp),
-            subtitle:
-                '${pr.promoValueSharePct.toStringAsFixed(1)}% · ${pr.promoRecordsCount} حركة',
+            value: (pr.promoValueEgp <= 0 && pr.promoRecordsCount <= 0)
+                ? _kMissingDash
+                : CurrencyFormatter.formatCompactEGP(pr.promoValueEgp),
+            subtitle: (pr.promoValueEgp <= 0 && pr.promoRecordsCount <= 0)
+                ? _kNoPromoDataAr
+                : '${pr.promoValueSharePct.toStringAsFixed(1)}% · ${pr.promoRecordsCount} حركة',
             icon: Icons.local_offer_rounded,
             color: colorScheme.secondary,
           ),
@@ -2210,9 +2089,12 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
             valueKey: const ValueKey('kpi_value_Returns Rate'),
             subtitleKey: const ValueKey('kpi_subtitle_Returns Rate'),
             title: 'معدل المرتجعات',
-            value: '${pr.overallReturnPct.toStringAsFixed(2)}%',
-            subtitle:
-                '${pr.returnRecordsCount} مرتجع · ${CurrencyFormatter.formatCompactEGP(pr.totalReturnValueEgp)}',
+            value: pr.returnRecordsCount <= 0
+                ? _kMissingDash
+                : '${pr.overallReturnPct.toStringAsFixed(2)}%',
+            subtitle: pr.returnRecordsCount <= 0
+                ? _kNoReturnDataAr
+                : '${pr.returnRecordsCount} مرتجع · ${CurrencyFormatter.formatCompactEGP(pr.totalReturnValueEgp)}',
             icon: Icons.assignment_return_rounded,
             color: colorScheme.error,
           ),
@@ -2348,7 +2230,10 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
                       colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     ),
                     columns: [
-                      DataColumn(label: _headerLabel('اسم الصنف', null, 260)),
+                      DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: _headerLabel('اسم الصنف', null, 260),
+                      ),
                       DataColumn(
                         headingRowAlignment: MainAxisAlignment.center,
                         label: _headerLabel('العلامة', 'والإقليم'),
@@ -2667,6 +2552,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
       key: key,
       maxLines: 3,
       overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
       style: TextStyle(
         fontWeight: weight,
         color: color,
