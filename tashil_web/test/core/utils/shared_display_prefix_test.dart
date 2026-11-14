@@ -19,6 +19,34 @@ void main() {
       },
     );
 
+    test(
+      'strips a prefix repeated across ALL branches (Returns owner rule)',
+      () {
+        // Every name shares the chain prefix; display-only strip leaves the
+        // branch remainder. Stored strings are unchanged (map keys).
+        final names = [
+          'فرع سلسلة تجريبية - الأنفوشي',
+          'فرع سلسلة تجريبية - سيدي جابر',
+          'فرع سلسلة تجريبية - الدخيلة',
+          'فرع سلسلة تجريبية - العجمي',
+          'فرع سلسلة تجريبية - كفر 2',
+        ];
+        final stripped = stripSharedLeadingPrefix(names);
+        expect(stripped, [
+          'الأنفوشي',
+          'سيدي جابر',
+          'الدخيلة',
+          'العجمي',
+          'كفر 2',
+        ]);
+        final map = displayNamesWithoutSharedPrefix(names);
+        for (var i = 0; i < names.length; i++) {
+          expect(map[names[i]], stripped[i]);
+          expect(names[i], startsWith('فرع سلسلة تجريبية -'));
+        }
+      },
+    );
+
     test('supports en-dash, em-dash and colon separators', () {
       expect(
         stripSharedLeadingPrefix([

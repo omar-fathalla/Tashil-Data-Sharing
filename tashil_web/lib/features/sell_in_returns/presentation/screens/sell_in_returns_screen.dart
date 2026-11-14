@@ -144,7 +144,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
             onRefresh: () => _load(force: true),
             child: ListView(
               children: [
-                _buildHeader(theme, cs),
+                _buildHeader(),
                 const SizedBox(height: 12),
                 _buildFilters(theme, cs),
                 const SizedBox(height: 16),
@@ -254,56 +254,39 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
     );
   }
 
-  Widget _buildHeader(ThemeData theme, ColorScheme cs) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TestSemantics(
-                identifier: 'returns-page-title',
-                label: 'المرتجعات',
-                child: Text(
-                  'المرتجعات',
-                  style: theme.textTheme.headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.w900),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Sell-In Returns · Adeco → chains (read-only)',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: cs.onSurfaceVariant),
-              ),
-            ],
-          ),
-        ),
-        TestSemantics(
-          identifier: 'returns-export-excel',
-          label: 'تصدير Excel',
-          child: M3Button.outlined(
-            onPressed: _handleExportExcel,
-            icon: Icons.download_rounded,
+  Widget _buildHeader() {
+    return M3PageHeader(
+      titleEn: 'Returns',
+      subtitleAr: 'المرتجعات',
+      actions: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TestSemantics(
+            identifier: 'returns-export-excel',
             label: 'تصدير Excel',
+            child: M3Button.outlined(
+              onPressed: _handleExportExcel,
+              icon: Icons.download_rounded,
+              label: 'تصدير Excel',
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        SegmentedButton<bool>(
-          segments: const [
-            ButtonSegment(
-                value: false,
-                label: Text('قيمة'),
-                icon: Icon(Icons.payments_rounded, size: 18)),
-            ButtonSegment(
-                value: true,
-                label: Text('نسبة\u00A0%', maxLines: 1, softWrap: false),
-                icon: Icon(Icons.percent_rounded, size: 18)),
-          ],
-          selected: {_showPct},
-          onSelectionChanged: (s) => setState(() => _showPct = s.first),
-        ),
-      ],
+          const SizedBox(width: 12),
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(
+                  value: false,
+                  label: Text('قيمة'),
+                  icon: Icon(Icons.payments_rounded, size: 18)),
+              ButtonSegment(
+                  value: true,
+                  label: Text('نسبة\u00A0%', maxLines: 1, softWrap: false),
+                  icon: Icon(Icons.percent_rounded, size: 18)),
+            ],
+            selected: {_showPct},
+            onSelectionChanged: (s) => setState(() => _showPct = s.first),
+          ),
+        ],
+      ),
     );
   }
 
@@ -400,6 +383,9 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
 
   Widget _buildKpis(ThemeData theme, ColorScheme cs) {
     final k = _report.kpis;
+    final hasRows =
+        _report.branches.isNotEmpty && _report.months.isNotEmpty;
+    final hasGross = hasRows && k.grossValueEgp > 0;
     final mom = k.momChangePct;
     final momUp = k.momDirection == 'up';
     final momDown = k.momDirection == 'down';
@@ -413,10 +399,15 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
         titleKey: const ValueKey('returns_kpi_title_قيمة المرتجعات'),
         subtitleKey: const ValueKey('returns_kpi_subtitle_قيمة المرتجعات'),
         title: 'قيمة المرتجعات',
-        value: CurrencyFormatter.formatCompactEGP(k.returnsValueEgp),
-        subtitle: 'مجموع قيم المرتجع (موجب للعرض)',
+        value: hasRows
+            ? CurrencyFormatter.formatCompactEGP(k.returnsValueEgp)
+            : '—',
+        subtitle: hasRows
+            ? 'مجموع قيم المرتجع (موجب للعرض)'
+            : 'لا توجد مرتجعات ضمن الفلاتر الحالية',
         icon: Icons.undo_rounded,
         color: cs.primary,
+        textValue: !hasRows,
         titleMaxLines: null,
         subtitleMaxLines: 3,
       ),
@@ -425,10 +416,15 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
         titleKey: const ValueKey('returns_kpi_title_كمية المرتجعات'),
         subtitleKey: const ValueKey('returns_kpi_subtitle_كمية المرتجعات'),
         title: 'كمية المرتجعات',
-        value: CurrencyFormatter.formatNumber(k.returnsQty.round()),
-        subtitle: 'كرتونة / وحدة مرتجعة',
+        value: hasRows
+            ? CurrencyFormatter.formatNumber(k.returnsQty.round())
+            : '—',
+        subtitle: hasRows
+            ? 'كرتونة / وحدة مرتجعة'
+            : 'لا توجد مرتجعات ضمن الفلاتر الحالية',
         icon: Icons.inventory_2_rounded,
         color: cs.tertiary,
+        textValue: !hasRows,
         titleMaxLines: null,
         subtitleMaxLines: 3,
       ),
@@ -438,10 +434,17 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
         subtitleKey:
             const ValueKey('returns_kpi_subtitle_نسبة المرتجع من الإجمالي'),
         title: 'نسبة المرتجع',
-        value: '${k.returnPctOfGross.toStringAsFixed(1)}%',
-        subtitle: 'من الإجمالي · Returns ÷ Gross',
+        value: hasGross
+            ? '${k.returnPctOfGross.toStringAsFixed(1)}%'
+            : '—',
+        subtitle: hasGross
+            ? 'من الإجمالي · Returns ÷ Gross'
+            : (hasRows
+                ? 'لا يوجد إجمالي لحساب النسبة'
+                : 'لا توجد مرتجعات ضمن الفلاتر الحالية'),
         icon: Icons.percent_rounded,
-        color: k.returnPctOfGross >= 10 ? cs.error : cs.secondary,
+        color: hasGross && k.returnPctOfGross >= 10 ? cs.error : cs.secondary,
+        textValue: !hasGross,
         titleMaxLines: null,
         subtitleMaxLines: 3,
       ),
@@ -460,6 +463,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
                 ? Icons.trending_down_rounded
                 : Icons.trending_flat_rounded,
         color: momUp ? cs.error : cs.primary,
+        textValue: mom == null,
         titleMaxLines: null,
         subtitleMaxLines: 3,
       ),

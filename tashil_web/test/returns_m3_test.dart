@@ -255,6 +255,53 @@ void main() {
         expect(find.text('لا توجد بيانات للمقارنة'), findsWidgets);
       });
 
+      testWidgets('empty report KPIs show — not fake 0.0% / 0 ج.م', (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          width,
+          repository: ReturnsFakeRepo(empty: true),
+        );
+        expect(find.text('—'), findsWidgets);
+        expect(find.text('0.0%'), findsNothing);
+        expect(find.text('+0.0%'), findsNothing);
+        expect(
+          find.text('لا توجد مرتجعات ضمن الفلاتر الحالية'),
+          findsWidgets,
+        );
+        expect(find.text('لا توجد بيانات للمقارنة'), findsWidgets);
+        // Populated compact values must not appear on an empty load.
+        expect(find.textContaining('K ج.م'), findsNothing);
+      });
+
+      testWidgets('missing matrix months show — not fabricated zeros', (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          width,
+          repository: ReturnsFakeRepo(omitMonths: const {5}),
+        );
+        final matrix = find.byType(ReturnsHeatmapMatrix);
+        expect(matrix, findsOneWidget);
+        // May column still exists (months list) but every cell is «—».
+        expect(
+          find.descendant(of: matrix, matching: find.text('مايو')),
+          findsWidgets,
+        );
+        final dashes = find.descendant(
+          of: matrix,
+          matching: find.text('—'),
+        );
+        expect(dashes, findsWidgets);
+        // A present zero would be "0 ج.م"; omitted months must not invent that.
+        expect(
+          find.descendant(of: matrix, matching: find.text('0 ج.م')),
+          findsNothing,
+        );
+      });
+
       testWidgets('export button is a 40dp stadium control', (tester) async {
         await _pump(tester, width);
         final label = find.text('تصدير Excel');

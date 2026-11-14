@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
+import 'package:tashil_web/core/utils/glue_hyphen_tokens.dart';
 import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 
 import '../../domain/sell_in_returns_models.dart';
 
-/// Top returned products table with shared fixed column widths so RTL headers
-/// stay aligned with body cells (avoids DataTable + TableScrollContainer expand mismatch).
+/// Top returned products table with shared column widths so RTL headers
+/// stay aligned with body cells. Rank stays narrow; name + numeric columns
+/// flex so the table fills the available width (Sell-Out / TM treatment).
 class ReturnsTopProductsTable extends StatelessWidget {
   const ReturnsTopProductsTable({
     super.key,
@@ -21,18 +23,16 @@ class ReturnsTopProductsTable extends StatelessWidget {
 
   static const double _rowH = 44;
   static const double _rankW = 36;
-  static const double _nameW = 240;
-  static const double _numW = 112;
 
   /// Exposed for widget tests (rank col must stay narrow next to the name).
   static final Map<int, TableColumnWidth> columnWidths = {
     0: const FixedColumnWidth(_rankW),
-    1: const FixedColumnWidth(_nameW),
-    2: const FixedColumnWidth(_numW),
-    3: const FixedColumnWidth(_numW),
-    4: const FixedColumnWidth(_numW),
-    5: const FixedColumnWidth(_numW),
-    6: const FixedColumnWidth(_numW),
+    1: const FlexColumnWidth(3.2),
+    2: const FlexColumnWidth(1.1),
+    3: const FlexColumnWidth(1.0),
+    4: const FlexColumnWidth(1.1),
+    5: const FlexColumnWidth(1.1),
+    6: const FlexColumnWidth(1.2),
   };
 
   @override
@@ -85,6 +85,12 @@ class ReturnsTopProductsTable extends StatelessWidget {
           ),
         );
 
+    String productLabel(SellInReturnsTopProduct p) {
+      final name = p.productName;
+      if (p.productCode.isEmpty) return name;
+      return '$name (${glueHyphenTokens(p.productCode)})';
+    }
+
     return TableScrollContainer(
       showControls: false,
       showSwipeHint: false,
@@ -114,11 +120,7 @@ class ReturnsTopProductsTable extends StatelessWidget {
             TableRow(
               children: [
                 cell('${p.rank}', align: TextAlign.center),
-                cell(
-                  p.productCode.isEmpty
-                      ? p.productName
-                      : '${p.productName} (${p.productCode})',
-                ),
+                cell(productLabel(p)),
                 cell(CurrencyFormatter.formatCompactEGP(p.returnsValueEgp),
                     align: TextAlign.center),
                 cell(CurrencyFormatter.formatNumber(p.returnsQty.round()),
