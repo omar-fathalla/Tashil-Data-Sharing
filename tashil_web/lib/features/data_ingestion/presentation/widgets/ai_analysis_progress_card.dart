@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/theme/m3_shape.dart';
-import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
+import '../../../../core/theme/m3_status_colors.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/shared_display_prefix.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/m3_chip_surface.dart';
 
 /// AiAnalysisProgressCard displays real-time ingestion execution stages
 /// and highlights Gemini 3.8 Flash semantic structured extraction.
@@ -64,6 +66,20 @@ class AiAnalysisProgressCard extends StatelessWidget {
     return 'درجة ثقة الذكاء الاصطناعي: ${(conf * 100).toStringAsFixed(1)}%';
   }
 
+  /// Short status chip + description under it (Sell-Out / TM / Compare pattern).
+  static (String, String) stagedStatusParts() =>
+      ('معاينة', 'لم تُحفظ بعد');
+
+  /// Short confidence chip + percentage description. Null when not AI-mapped.
+  static (String, String)? confidenceStatusParts(IngestionResultModel result) {
+    if (!result.usedAiMapping) return null;
+    final conf = result.mappingConfidence > 0
+        ? result.mappingConfidence
+        : result.confidenceScore;
+    if (conf <= 0) return null;
+    return ('ثقة', '${(conf * 100).toStringAsFixed(1)}%');
+  }
+
   /// Arabic branch-normalization summary from payload.branch_norm.summary_ar.
   static String? branchNormLabel(IngestionResultModel result) {
     final text = result.branchNormSummaryAr.trim();
@@ -121,16 +137,29 @@ class AiAnalysisProgressCard extends StatelessWidget {
     return parts.join(' • ');
   }
 
+  /// Stat value honesty: never advertise a fake measured 0 for revenue / share.
+  static String revenueStatValue(IngestionResultModel result) =>
+      result.totalRevenue > 0
+          ? CurrencyFormatter.formatCompactEGP(result.totalRevenue)
+          : '—';
+
+  static String? marketShareStatValue(IngestionResultModel result) =>
+      result.tenantMarketSharePct > 0
+          ? '${result.tenantMarketSharePct.toStringAsFixed(2)}%'
+          : null;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final status = M3StatusColors.of(context);
 
     if (!isAnalyzing && result == null) {
       return const SizedBox.shrink();
     }
 
-    final confidenceText = result == null ? null : aiConfidenceLabel(result!);
+    final confidenceParts =
+        result == null ? null : confidenceStatusParts(result!);
 
     return Card(
       child: Padding(
@@ -153,12 +182,12 @@ class AiAnalysisProgressCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(8.0),
                         decoration: BoxDecoration(
-                          color: Colors.purple.withOpacity(0.12),
+                          color: colorScheme.tertiary.withOpacity(0.12),
                           borderRadius: M3Shape.radiusSm,
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.auto_awesome_rounded,
-                          color: Colors.purple,
+                          color: colorScheme.tertiary,
                           size: 22.0,
                         ),
                       ),
@@ -174,7 +203,8 @@ class AiAnalysisProgressCard extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              statusSubtitle(isAnalyzing: isAnalyzing, result: result),
+                              statusSubtitle(
+                                  isAnalyzing: isAnalyzing, result: result),
                               softWrap: true,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
@@ -193,46 +223,26 @@ class AiAnalysisProgressCard extends StatelessWidget {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       if (result!.isStaged)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.withOpacity(0.18),
-                            borderRadius: M3Shape.radiusLg,
-                            border: Border.all(color: Colors.amber.shade700.withOpacity(0.4)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.pending_actions_rounded, size: 14.0, color: Colors.amber.shade900),
-                              const SizedBox(width: 4.0),
-                              Text(
-                                'معاينة قيد المراجعة (لم تُحفظ بعد)',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: Colors.amber.shade900,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
+                        _statusChipWithDesc(
+                          key: const ValueKey('upload_status_staged_chip'),
+                          shortLabel: stagedStatusParts().$1,
+                          description: stagedStatusParts().$2,
+                          bg: status.warningContainer,
+                          fg: status.onWarningContainer,
+                          icon: Icons.pending_actions_rounded,
+                          theme: theme,
                         ),
-                      if (confidenceText != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.15),
-                            borderRadius: M3Shape.radiusLg,
-                          ),
-                          child: Text(
-                            confidenceText,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: Colors.green.shade800,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                      if (confidenceParts != null)
+                        _statusChipWithDesc(
+                          key: const ValueKey('upload_status_confidence_chip'),
+                          shortLabel: confidenceParts.$1,
+                          description: confidenceParts.$2,
+                          bg: status.successContainer,
+                          fg: status.onSuccessContainer,
+                          theme: theme,
                         ),
                     ],
                   ),
-
               ],
             ),
 
@@ -243,9 +253,10 @@ class AiAnalysisProgressCard extends StatelessWidget {
                 width: double.infinity,
                 padding: M3Spacing.pSm,
                 decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.12),
+                  color: status.warningContainer.withOpacity(0.55),
                   borderRadius: M3Shape.radiusMd,
-                  border: Border.all(color: Colors.amber.shade700.withOpacity(0.35)),
+                  border: Border.all(
+                      color: status.warning.withOpacity(0.35)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -254,7 +265,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                       humanApprovalBanner(result!)!,
                       style: theme.textTheme.labelLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.amber.shade900,
+                        color: status.onWarningContainer,
                       ),
                     ),
                     const SizedBox(height: 4.0),
@@ -272,7 +283,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                               child: Text(
                                 '• $r',
                                 style: theme.textTheme.labelSmall?.copyWith(
-                                  color: Colors.amber.shade900,
+                                  color: status.onWarningContainer,
                                 ),
                               ),
                             ),
@@ -287,10 +298,26 @@ class AiAnalysisProgressCard extends StatelessWidget {
             if (isAnalyzing) ...[
               const LinearProgressIndicator(),
               M3Spacing.gapMD,
-              _buildStageItem('1. استخراج المجموعات الرئيسية والموردين المنافسين والباركود الكامل', true, true),
-              _buildStageItem('2. اكتشاف وإنشاء الفروع تلقائياً (سموحة، جاردينيا، هانوفيل، إلخ)', true, false),
-              _buildStageItem('3. استنتاج سعر البيع وسعر المنتج (RRP) والحصة السوقية بالذكاء الاصطناعي', false, false),
-              _buildStageItem('4. التوزيع المباشر على الفروع والتحميل في Google BigQuery & Firestore', false, false),
+              _buildStageItem(
+                  '1. استخراج المجموعات الرئيسية والموردين المنافسين والباركود الكامل',
+                  true,
+                  true,
+                  status),
+              _buildStageItem(
+                  '2. اكتشاف وإنشاء الفروع تلقائياً (سموحة، جاردينيا، هانوفيل، إلخ)',
+                  true,
+                  false,
+                  status),
+              _buildStageItem(
+                  '3. استنتاج سعر البيع وسعر المنتج (RRP) والحصة السوقية بالذكاء الاصطناعي',
+                  false,
+                  false,
+                  status),
+              _buildStageItem(
+                  '4. التوزيع المباشر على الفروع والتحميل في Google BigQuery & Firestore',
+                  false,
+                  false,
+                  status),
             ] else if (result != null) ...[
               // Summary Metrics Row
               Container(
@@ -304,34 +331,49 @@ class AiAnalysisProgressCard extends StatelessWidget {
                   runSpacing: M3Spacing.sm,
                   alignment: WrapAlignment.spaceAround,
                   children: [
-                    _buildStatCol('السلسلة المكتشفة', result!.retailerDetected.toUpperCase(), colorScheme.primary),
-                    _buildStatCol('إجمالي السجلات', '${result!.totalRows} صف', null),
-                    _buildStatCol('السجلات الصالحة', '${result!.validRows} صف', Colors.green),
-                    _buildStatCol('الفروع المنشأة تلقائياً', '${result!.autoCreatedStoresCount} فرع', colorScheme.primary),
+                    _buildStatCol('السلسلة المكتشفة',
+                        result!.retailerDetected.toUpperCase(),
+                        colorScheme.primary),
+                    _buildStatCol(
+                        'إجمالي السجلات', '${result!.totalRows} صف', null),
+                    _buildStatCol('السجلات الصالحة', '${result!.validRows} صف',
+                        status.success),
+                    _buildStatCol(
+                        'الفروع المنشأة تلقائياً',
+                        '${result!.autoCreatedStoresCount} فرع',
+                        colorScheme.primary),
                     if (result!.competitorsDetected > 0)
-                      _buildStatCol('الموردون المنافسون', '${result!.competitorsDetected} مورد', colorScheme.tertiary),
-                    if (result!.tenantMarketSharePct > 0)
-                      _buildStatCol('حصة أديكو السوقية', '${result!.tenantMarketSharePct.toStringAsFixed(2)}%', Colors.green.shade800),
-                    _buildStatCol('الشذوذ المكتشف', '${result!.anomalyRows} ملاحظة', Colors.amber.shade800),
-                    _buildStatCol('إجمالي المبيعات', CurrencyFormatter.formatCompactEGP(result!.totalRevenue), colorScheme.primary),
+                      _buildStatCol('الموردون المنافسون',
+                          '${result!.competitorsDetected} مورد',
+                          colorScheme.tertiary),
+                    if (marketShareStatValue(result!) != null)
+                      _buildStatCol('حصة أديكو السوقية',
+                          marketShareStatValue(result!)!, status.success),
+                    _buildStatCol('الشذوذ المكتشف',
+                        '${result!.anomalyRows} ملاحظة', status.warning),
+                    _buildStatCol('إجمالي المبيعات', revenueStatValue(result!),
+                        colorScheme.primary),
                   ],
                 ),
               ),
-              if (result!.detectedSheets.isNotEmpty || result!.sheetsProcessed.isNotEmpty) ...[
+              if (result!.detectedSheets.isNotEmpty ||
+                  result!.sheetsProcessed.isNotEmpty) ...[
                 M3Spacing.gapMD,
                 Container(
                   padding: M3Spacing.pSm,
                   decoration: BoxDecoration(
                     color: colorScheme.secondaryContainer.withOpacity(0.25),
                     borderRadius: M3Shape.radiusMd,
-                    border: Border.all(color: colorScheme.secondary.withOpacity(0.35)),
+                    border: Border.all(
+                        color: colorScheme.secondary.withOpacity(0.35)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.layers_rounded, size: 18.0, color: colorScheme.secondary),
+                          Icon(Icons.layers_rounded,
+                              size: 18.0, color: colorScheme.secondary),
                           const SizedBox(width: 6.0),
                           Expanded(
                             child: Text(
@@ -342,20 +384,15 @@ class AiAnalysisProgressCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
-                            decoration: BoxDecoration(
-                              color: colorScheme.surface,
-                              borderRadius: M3Shape.radiusSm,
-                            ),
+                          M3ChipSurface(
+                            color: colorScheme.surface,
                             child: Text(
                               result!.usedAiMapping
-                                  ? 'استيعاب بمساعدة الذكاء الاصطناعي'
-                                  : 'استيعاب بقواعد القراءة المحددة',
+                                  ? 'ذكاء اصطناعي'
+                                  : 'قواعد قراءة',
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: Colors.green.shade800,
+                                color: status.success,
                                 fontWeight: FontWeight.bold,
-                                fontSize: M3FontSize.tiny,
                               ),
                             ),
                           ),
@@ -378,24 +415,24 @@ class AiAnalysisProgressCard extends StatelessWidget {
                                     .toList())
                             .map((sh) {
                           final isHidden = sh.state.toLowerCase() == 'hidden';
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                            decoration: BoxDecoration(
-                              color: isHidden
-                                  ? colorScheme.surfaceContainerHighest.withOpacity(0.5)
-                                  : colorScheme.surface,
-                              borderRadius: M3Shape.radiusSm,
-                              border: Border.all(
-                                color: isHidden
-                                    ? colorScheme.outlineVariant.withOpacity(0.4)
-                                    : colorScheme.secondary.withOpacity(0.4),
-                              ),
-                            ),
+                          final revenueBit = sh.totalRevenue > 0
+                              ? ' • ${CurrencyFormatter.formatCompactEGP(sh.totalRevenue)}'
+                              : (isHidden ? ' • مخفي' : '');
+                          return M3ChipSurface(
+                            color: isHidden
+                                ? colorScheme.surfaceContainerHighest
+                                    .withOpacity(0.5)
+                                : colorScheme.surface,
+                            borderColor: isHidden
+                                ? colorScheme.outlineVariant.withOpacity(0.4)
+                                : colorScheme.secondary.withOpacity(0.4),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  isHidden ? Icons.visibility_off_rounded : Icons.tab_rounded,
+                                  isHidden
+                                      ? Icons.visibility_off_rounded
+                                      : Icons.tab_rounded,
                                   size: 13.0,
                                   color: isHidden
                                       ? colorScheme.onSurfaceVariant
@@ -403,10 +440,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4.0),
                                 Text(
-                                  sh.name +
-                                      (sh.totalRevenue > 0
-                                          ? ' • ${CurrencyFormatter.formatCompactEGP(sh.totalRevenue)}'
-                                          : (isHidden ? ' • مخفي' : '')),
+                                  sh.name + revenueBit,
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: isHidden
@@ -526,21 +560,24 @@ class AiAnalysisProgressCard extends StatelessWidget {
                   ),
                 ),
               ],
-              if (result!.discoveredBranches.isNotEmpty || result!.discoveredCategories.isNotEmpty) ...[
+              if (result!.discoveredBranches.isNotEmpty ||
+                  result!.discoveredCategories.isNotEmpty) ...[
                 M3Spacing.gapMD,
                 Container(
                   padding: M3Spacing.pSm,
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer.withOpacity(0.22),
                     borderRadius: M3Shape.radiusMd,
-                    border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
+                    border:
+                        Border.all(color: colorScheme.primary.withOpacity(0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.store_mall_directory_rounded, size: 18.0, color: colorScheme.primary),
+                          Icon(Icons.store_mall_directory_rounded,
+                              size: 18.0, color: colorScheme.primary),
                           const SizedBox(width: 6.0),
                           Expanded(
                             child: Text(
@@ -559,33 +596,36 @@ class AiAnalysisProgressCard extends StatelessWidget {
                         runSpacing: 6.0,
                         children: () {
                           final rawNames = result!.discoveredBranches
-                              .map((b) => (b['branch_name'] ?? b['id'] ?? '').toString())
+                              .map((b) =>
+                                  (b['branch_name'] ?? b['id'] ?? '').toString())
                               .toList();
-                          final labels = displayNamesWithoutSharedPrefix(rawNames);
+                          final labels =
+                              displayNamesWithoutSharedPrefix(rawNames);
                           return result!.discoveredBranches.take(18).map((b) {
-                          final name = labels[(b['branch_name'] ?? b['id'] ?? '').toString()] ??
-                              (b['branch_name'] ?? b['id'] ?? '').toString();
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                            decoration: BoxDecoration(
+                            final name = labels[(b['branch_name'] ??
+                                        b['id'] ??
+                                        '')
+                                    .toString()] ??
+                                (b['branch_name'] ?? b['id'] ?? '').toString();
+                            return M3ChipSurface(
                               color: colorScheme.surface,
-                              borderRadius: M3Shape.radiusSm,
-                              border: Border.all(color: colorScheme.outlineVariant),
-                            ),
-                            child: Text(
-                              name,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
+                              borderColor: colorScheme.outlineVariant,
+                              child: Text(
+                                name,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                          );
-                        }).toList(); }(),
+                            );
+                          }).toList();
+                        }(),
                       ),
                       if (result!.discoveredCategories.isNotEmpty) ...[
                         M3Spacing.gapSM,
                         Row(
                           children: [
-                            Icon(Icons.category_rounded, size: 18.0, color: colorScheme.tertiary),
+                            Icon(Icons.category_rounded,
+                                size: 18.0, color: colorScheme.tertiary),
                             const SizedBox(width: 6.0),
                             Expanded(
                               child: Text(
@@ -602,13 +642,12 @@ class AiAnalysisProgressCard extends StatelessWidget {
                         Wrap(
                           spacing: 6.0,
                           runSpacing: 6.0,
-                          children: result!.discoveredCategories.take(14).map((cat) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                              decoration: BoxDecoration(
-                                color: colorScheme.tertiaryContainer.withOpacity(0.55),
-                                borderRadius: M3Shape.radiusSm,
-                              ),
+                          children: result!.discoveredCategories
+                              .take(14)
+                              .map((cat) {
+                            return M3ChipSurface(
+                              color: colorScheme.tertiaryContainer
+                                  .withOpacity(0.55),
                               child: Text(
                                 cat,
                                 style: theme.textTheme.labelSmall?.copyWith(
@@ -631,18 +670,77 @@ class AiAnalysisProgressCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStageItem(String title, bool isDone, bool isInProgress) {
+  /// Short M3ChipSurface + smaller description underneath (TM / Compare).
+  static Widget _statusChipWithDesc({
+    Key? key,
+    required String shortLabel,
+    required String description,
+    required Color bg,
+    required Color fg,
+    required ThemeData theme,
+    IconData? icon,
+  }) {
+    return Column(
+      key: key,
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        M3ChipSurface(
+          color: bg,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 14.0, color: fg),
+                const SizedBox(width: 4.0),
+              ],
+              Text(
+                shortLabel,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: fg,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: M3Spacing.xxs),
+        Text(
+          description,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStageItem(
+      String title, bool isDone, bool isInProgress, M3StatusColors status) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         children: [
           Icon(
-            isDone ? Icons.check_circle_rounded : (isInProgress ? Icons.hourglass_top_rounded : Icons.radio_button_unchecked_rounded),
+            isDone
+                ? Icons.check_circle_rounded
+                : (isInProgress
+                    ? Icons.hourglass_top_rounded
+                    : Icons.radio_button_unchecked_rounded),
             size: 16.0,
-            color: isDone ? Colors.green : (isInProgress ? Colors.amber : Colors.grey),
+            color: isDone
+                ? status.success
+                : (isInProgress
+                    ? status.warning
+                    : Colors.grey),
           ),
           const SizedBox(width: 8.0),
-          Text(title, style: const TextStyle(fontSize: M3FontSize.bodySmall)),
+          Text(title,
+              style: const TextStyle(fontSize: M3FontSize.bodySmall)),
         ],
       ),
     );
@@ -651,7 +749,9 @@ class AiAnalysisProgressCard extends StatelessWidget {
   Widget _buildStatCol(String title, String val, Color? valColor) {
     return Column(
       children: [
-        Text(title, style: const TextStyle(fontSize: M3FontSize.labelSmall, color: Colors.grey)),
+        Text(title,
+            style: const TextStyle(
+                fontSize: M3FontSize.labelSmall, color: Colors.grey)),
         const SizedBox(height: 2.0),
         Text(
           val,

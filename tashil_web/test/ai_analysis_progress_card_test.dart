@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/features/data_ingestion/presentation/widgets/ai_analysis_progress_card.dart';
 
 IngestionResultModel _result({
@@ -93,6 +95,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
+        theme: AppTheme.light(),
         home: Scaffold(
           body: SizedBox(
             width: 720,
@@ -110,13 +113,14 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('AI staged card shows model and mapping confidence', (tester) async {
+  testWidgets('AI staged card shows model and short confidence chip', (tester) async {
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
+        theme: AppTheme.light(),
         home: Scaffold(
           body: SizedBox(
             width: 720,
@@ -133,7 +137,11 @@ void main() {
       ),
     );
     expect(find.textContaining('gemini-3.8-flash'), findsOneWidget);
-    expect(find.textContaining('87.0%'), findsOneWidget);
+    expect(find.byType(M3ChipSurface), findsWidgets);
+    expect(find.text('ثقة'), findsOneWidget);
+    expect(find.text('87.0%'), findsOneWidget);
+    expect(find.text('معاينة'), findsOneWidget);
+    expect(find.text('لم تُحفظ بعد'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -197,6 +205,7 @@ void main() {
   testWidgets('card shows Arabic totals explanation when flagged', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: AppTheme.light(),
         home: Scaffold(
           body: AiAnalysisProgressCard(
             isAnalyzing: false,
@@ -220,6 +229,7 @@ void main() {
   testWidgets('card shows Arabic branch-norm summary', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: AppTheme.light(),
         home: Scaffold(
           body: AiAnalysisProgressCard(
             isAnalyzing: false,
@@ -267,6 +277,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
+        theme: AppTheme.light(),
         home: Scaffold(
           body: SizedBox(
             width: 720,

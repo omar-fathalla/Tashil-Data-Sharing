@@ -44,6 +44,44 @@ class UploadPortalScreen extends StatefulWidget {
     required this.apiClient,
   });
 
+  /// True when the archive entry has no measured sell-out metrics yet.
+  static bool archiveMetricsMissing(ArchivedExcelFileModel file) =>
+      file.rowsIngested <= 0 &&
+      file.branchesCount <= 0 &&
+      file.totalRevenue <= 0;
+
+  /// Branches cell: «—» when metrics were never recorded (not a measured 0).
+  static String? archiveBranchesLabel(ArchivedExcelFileModel file) {
+    if (file.fileType == 'product_master' || archiveMetricsMissing(file)) {
+      return null;
+    }
+    return CurrencyFormatter.formatNumber(file.branchesCount);
+  }
+
+  /// Rows cell: «—» when the file has no ingested metrics.
+  static String? archiveRowsLabel(ArchivedExcelFileModel file) {
+    if (archiveMetricsMissing(file)) return null;
+    return CurrencyFormatter.formatNumber(file.rowsIngested);
+  }
+
+  /// Revenue cell: «—» for product-master or when metrics are absent.
+  static String? archiveRevenueLabel(ArchivedExcelFileModel file) {
+    if (file.fileType == 'product_master' || archiveMetricsMissing(file)) {
+      return null;
+    }
+    return CurrencyFormatter.formatCompactEGP(file.totalRevenue);
+  }
+
+  static const String archiveMissingMetricNote = 'لا تتوفر مؤشرات لهذا الملف';
+
+  /// Formats an archive ISO timestamp. Empty → «—» (never invent a date).
+  static String formatArchiveDateTime(String iso) {
+    if (iso.isEmpty) return '—';
+    if (iso.length >= 16) return iso.substring(0, 16).replaceAll('T', ' ');
+    if (iso.length >= 10) return iso.substring(0, 10);
+    return iso;
+  }
+
   @override
   State<UploadPortalScreen> createState() => _UploadPortalScreenState();
 }
@@ -2104,6 +2142,19 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
     final totalRevenue =
         _archivedFiles.fold<double>(0, (s, f) => s + f.totalRevenue);
     final chainCount = chainKeys.length;
+    // Empty filter → missing aggregates (not a measured 0). Mirror TM/Compare.
+    final hasArchiveRows = _archivedFiles.isNotEmpty;
+    final recordsValue = hasArchiveRows
+        ? CurrencyFormatter.formatNumber(totalRows)
+        : '—';
+    final recordsSubtitle = hasArchiveRows
+        ? countRecords(totalRows)
+        : 'لا توجد ملفات مطابقة للفلتر';
+    final revenueValue = hasArchiveRows
+        ? CurrencyFormatter.formatCompactEGP(totalRevenue)
+        : '—';
+    final revenueSubtitle =
+        hasArchiveRows ? 'مجموع الملفات الظاهرة' : 'لا توجد مبيعات للعرض';
 
     return Container(
       key: const ValueKey('excel_upload_archive_section'),
@@ -2223,8 +2274,9 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
                     title: 'إجمالي السجلات',
                     titleMaxLines: 3,
                     subtitleMaxLines: 3,
-                    value: CurrencyFormatter.formatNumber(totalRows),
-                    subtitle: countRecords(totalRows),
+                    value: recordsValue,
+                    subtitle: recordsSubtitle,
+                    textValue: !hasArchiveRows,
                     icon: Icons.fact_check_rounded,
                     color: colorScheme.tertiary,
                   ),
@@ -2234,8 +2286,9 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
                     title: 'إجمالي المبيعات',
                     titleMaxLines: 3,
                     subtitleMaxLines: 3,
-                    value: CurrencyFormatter.formatCompactEGP(totalRevenue),
-                    subtitle: 'مجموع الملفات الظاهرة',
+                    value: revenueValue,
+                    subtitle: revenueSubtitle,
+                    textValue: !hasArchiveRows,
                     icon: Icons.payments_rounded,
                     color: colorScheme.primary,
                   ),
@@ -2578,21 +2631,22 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
           ),
         ),
         DataCell(_archiveCenteredText(periodText, theme)),
-        DataCell(_archiveCenteredText(
-          CurrencyFormatter.formatNumber(file.branchesCount),
+        DataCell(_archiveMetricCell(
           theme,
           key: ValueKey('file_branches_${file.id}'),
+          value: UploadPortalScreen.archiveBranchesLabel(file),
           weight: FontWeight.w700,
         )),
-        DataCell(_archiveCenteredText(
-          CurrencyFormatter.formatNumber(file.rowsIngested),
+        DataCell(_archiveMetricCell(
           theme,
           key: ValueKey('file_rows_${file.id}'),
+          value: UploadPortalScreen.archiveRowsLabel(file),
           weight: FontWeight.w700,
         )),
-        DataCell(_archiveCenteredText(
-          CurrencyFormatter.formatCompactEGP(file.totalRevenue),
+        DataCell(_archiveMetricCell(
           theme,
+          key: ValueKey('file_revenue_${file.id}'),
+          value: UploadPortalScreen.archiveRevenueLabel(file),
           weight: FontWeight.w800,
           color: colorScheme.primary,
         )),
@@ -2621,6 +2675,50 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
           ),
         ),
       ],
+    );
+  }
+
+  static Widget _archiveMetricCell(
+    ThemeData theme, {
+    Key? key,
+    required String? value,
+    FontWeight weight = FontWeight.w600,
+    Color? color,
+  }) {
+    if (value == null) {
+      return KeyedSubtree(
+        key: key,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '—',
+              maxLines: 1,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              UploadPortalScreen.archiveMissingMetricNote,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return _archiveCenteredText(
+      value,
+      theme,
+      key: key,
+      weight: weight,
+      color: color,
     );
   }
 
@@ -2779,10 +2877,6 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
     return '${mb.toStringAsFixed(2)} MB';
   }
 
-  static String _formatArchiveDateTime(String iso) {
-    if (iso.isEmpty) return '2026-03-08';
-    if (iso.length >= 16) return iso.substring(0, 16).replaceAll('T', ' ');
-    if (iso.length >= 10) return iso.substring(0, 10);
-    return iso;
-  }
+  static String _formatArchiveDateTime(String iso) =>
+      UploadPortalScreen.formatArchiveDateTime(iso);
 }
