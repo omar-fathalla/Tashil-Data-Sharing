@@ -30,5 +30,32 @@ void main() {
           CurrencyFormatter.formatCompactEGP(1e6, words: true, isolate: true),
           '\u20681 مليون ج.م\u2069');
     });
+
+    test('negative compact wraps minus inside LRI and keeps currency placement', () {
+      const lri = '\u2066';
+      const pdi = '\u2069';
+      const minus = '\u2212';
+      expect(CurrencyFormatter.formatCompactEGP(-847), '${lri}${minus}847 ج.م${pdi}');
+      expect(CurrencyFormatter.formatCompactEGP(-238), '${lri}${minus}238 ج.م${pdi}');
+      expect(CurrencyFormatter.formatCompactEGP(-118), '${lri}${minus}118 ج.م${pdi}');
+      // isolate:true on a negative still uses a single LRI, not a nested FSI.
+      expect(
+          CurrencyFormatter.formatCompactEGP(-2500, isolate: true),
+          '${lri}${minus}2.5K ج.م${pdi}');
+    });
+
+    test('formatEGP negatives isolate the minus; positives stay unchanged', () {
+      expect(CurrencyFormatter.formatEGP(14500), '14,500 ج.م');
+      expect(CurrencyFormatter.formatEGP(-14500), '\u2066\u221214,500 ج.م\u2069');
+      expect(
+          CurrencyFormatter.formatEGP(-847.4, showDecimals: true),
+          '\u2066\u2212847.40 ج.م\u2069');
+    });
+
+    test('formatNumber negatives isolate the minus; positives stay unchanged', () {
+      expect(CurrencyFormatter.formatNumber(125400), '125,400');
+      expect(CurrencyFormatter.formatNumber(-125400), '\u2066\u2212125,400\u2069');
+    });
+
   });
 }
