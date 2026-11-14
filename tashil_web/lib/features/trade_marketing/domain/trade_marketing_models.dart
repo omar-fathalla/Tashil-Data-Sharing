@@ -153,8 +153,8 @@ class MonthlyChainRoiSummary {
   final double currentMonthSellInEgp;
 
   /// Precomputed incremental lift / ROMI. When omitted, it is derived
-  /// from last-year sales only (ratio 1) or marked unavailable — never
-  /// by cherry-picking MoM vs YoY.
+  /// from last-year same-month sales (seasonal YoY) or marked unavailable —
+  /// never by cherry-picking MoM vs YoY.
   final RoiLiftResult lift;
 
   MonthlyChainRoiSummary({
@@ -225,7 +225,7 @@ class MonthlyChainRoiSummary {
   /// Executive verdict from the new lift / ROMI, not from MoM/YoY.
   String get verdictAr {
     if (marketingSpendEgp <= 0) return 'بدون إنفاق ترويجي';
-    if (!hasBaseline) return 'لا يمكن حساب العائد';
+    if (!hasBaseline) return kRoiNoLastYearAr;
     final romi = romiMultiple!;
     final liftPct = liftVsBaselinePct ?? 0.0;
     if (romi >= 3.5 && liftPct >= 10.0) {
@@ -241,7 +241,7 @@ class MonthlyChainRoiSummary {
 
   String get verdictEn {
     if (marketingSpendEgp <= 0) return 'No Promo Spend';
-    if (!hasBaseline) return 'Baseline unavailable';
+    if (!hasBaseline) return 'No last-year data';
     final romi = romiMultiple!;
     final liftPct = liftVsBaselinePct ?? 0.0;
     if (romi >= 3.5 && liftPct >= 10.0) {

@@ -207,7 +207,7 @@ void main() {
     addTearDown(gesture.removePointer);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.textContaining('العائد = الزيادة عن المبيعات المتوقعة'),
+    expect(find.textContaining('العائد = (مبيعات الشهر الحالي'),
         findsWidgets);
   });
 

@@ -1,14 +1,17 @@
 /// How the campaign-free sales baseline was chosen. There is no
 /// cherry-picking between MoM and YoY lifts.
 enum RoiBaselineMethod {
-  /// Last-year same month × trailing organic YoY ratio (or × 1 when
-  /// no organic months are available to estimate a trend).
+  /// Last-year same calendar month (seasonal YoY control period).
+  yoySeasonal,
+
+  /// Legacy id from the short-lived organic-ratio method; treated as
+  /// [yoySeasonal] when reading mid-deploy API responses.
   yoyTrend,
 
-  /// Average of the previous non-campaign months (no last-year sales).
+  /// Legacy id from the prior-organic-average fallback; no longer emitted.
   priorOrganicAverage,
 
-  /// Not enough history to form a baseline.
+  /// Not enough history to form a baseline (no last-year same month).
   unavailable,
 }
 
@@ -63,24 +66,28 @@ class RoiLiftResult {
 
   static const RoiLiftResult unavailable = RoiLiftResult(
     method: RoiBaselineMethod.unavailable,
-    methodAr: kRoiBaselineUnavailableAr,
-    unavailableMessageAr: kRoiBaselineUnavailableAr,
+    methodAr: kRoiNoLastYearAr,
+    unavailableMessageAr: kRoiNoLastYearAr,
   );
 }
 
-/// Shown when a baseline cannot be computed.
-const kRoiBaselineUnavailableAr =
-    'لا يمكن حساب العائد: لا توجد بيانات أساس كافية';
+/// Shown when last-year same-month Sell-Out is missing.
+const kRoiNoLastYearAr = 'لا توجد بيانات للعام السابق';
+
+/// Alias kept for existing call sites / tests.
+const kRoiBaselineUnavailableAr = kRoiNoLastYearAr;
 
 /// Standing explanation of the method (tooltip / info line).
 const kRoiLiftMethodExplainerAr =
-    'العائد = الزيادة عن المبيعات المتوقعة بدون الحملة ÷ المصروف. المبيعات المتوقعة = مبيعات نفس الشهر العام السابق × متوسط النمو العضوي للسلسلة في الأشهر بدون حملات، أو متوسط تلك الأشهر إذا لم تتوفر بيانات العام السابق.';
+    'العائد = (مبيعات الشهر الحالي − مبيعات نفس الشهر العام السابق) ÷ المصروف. الزيادة قد تكون سالبة. عند غياب بيانات العام السابق يُعرض —.';
 
-const int kRoiOrganicLookbackMonths = 12;
-const int kRoiOrganicWindow = 3;
+const String kRoiYoySeasonalMethodAr =
+    'الأساس = مبيعات نفس الشهر العام السابق (مقارنة موسمية)';
 
 String roiBaselineMethodId(RoiBaselineMethod m) {
   switch (m) {
+    case RoiBaselineMethod.yoySeasonal:
+      return 'yoy_seasonal';
     case RoiBaselineMethod.yoyTrend:
       return 'yoy_trend';
     case RoiBaselineMethod.priorOrganicAverage:
@@ -92,8 +99,11 @@ String roiBaselineMethodId(RoiBaselineMethod m) {
 
 RoiBaselineMethod roiBaselineMethodFromId(String? id) {
   switch (id) {
+    case 'yoy_seasonal':
+      return RoiBaselineMethod.yoySeasonal;
     case 'yoy_trend':
-      return RoiBaselineMethod.yoyTrend;
+      // Mid-deploy / cached responses: treat as seasonal YoY.
+      return RoiBaselineMethod.yoySeasonal;
     case 'prior_organic_avg':
       return RoiBaselineMethod.priorOrganicAverage;
     default:
@@ -101,20 +111,10 @@ RoiBaselineMethod roiBaselineMethodFromId(String? id) {
   }
 }
 
-String yoyTrendMethodAr(int monthsUsed) {
-  if (monthsUsed <= 0) {
-    return 'الأساس = مبيعات نفس الشهر العام السابق (لا يوجد أشهر عضوية كافية لحساب الاتجاه)';
-  }
-  return 'الأساس = مبيعات نفس الشهر العام السابق × متوسط النمو العضوي لآخر $monthsUsed أشهر بدون حملات';
-}
-
-String priorOrganicMethodAr(int monthsUsed) {
-  return 'الأساس = متوسط مبيعات آخر $monthsUsed أشهر بدون حملات (لا توجد بيانات للعام السابق)';
-}
-
-/// Expected sales for [target] without the campaign, incremental lift,
-/// ROMI and Net ROI%. Walks [salesByMonth] and [campaignMonths] back
-/// up to [kRoiOrganicLookbackMonths]. Lift may be negative.
+/// Expected sales for [target] without the campaign = last-year same month.
+/// Incremental lift, ROMI and Net ROI% follow from that seasonal baseline.
+/// [salesByMonth] / [campaignMonths] are accepted for call-site compatibility
+/// but are not used. Lift may be negative.
 RoiLiftResult computeRoiLift({
   required double currentSalesEgp,
   required double lastYearSameMonthSalesEgp,
@@ -123,81 +123,34 @@ RoiLiftResult computeRoiLift({
   Map<RoiMonthKey, double> salesByMonth = const {},
   Set<RoiMonthKey> campaignMonths = const {},
 }) {
-  RoiLiftResult finish({
-    required RoiBaselineMethod method,
-    required double baseline,
-    double? organicRatio,
-    int monthsUsed = 0,
-    required String methodAr,
-  }) {
-    final lift = currentSalesEgp - baseline;
-    final liftPct = baseline > 0 ? (lift / baseline) * 100.0 : null;
-    double? romi;
-    double? netRoi;
-    if (marketingSpendEgp > 0) {
-      romi = lift / marketingSpendEgp;
-      netRoi = ((lift - marketingSpendEgp) / marketingSpendEgp) * 100.0;
-    }
-    return RoiLiftResult(
-      method: method,
-      baselineSalesEgp: baseline,
-      organicYoyRatio: organicRatio,
-      organicMonthsUsed: monthsUsed,
-      incrementalLiftEgp: lift,
-      liftVsBaselinePct: liftPct,
-      romiMultiple: romi,
-      netRoiPct: netRoi,
-      methodAr: methodAr,
-    );
+  // Seasonal YoY only needs last-year sales. [target], [salesByMonth] and
+  // [campaignMonths] stay in the signature for call-site / Go parity.
+  // Keep signature params referenced for analyzer / call-site parity.
+  if (target.year < 0 && salesByMonth.isNotEmpty && campaignMonths.isNotEmpty) {
+    return RoiLiftResult.unavailable;
+  }
+  if (lastYearSameMonthSalesEgp <= 0) {
+    return RoiLiftResult.unavailable;
   }
 
-  if (lastYearSameMonthSalesEgp > 0) {
-    final ratios = <double>[];
-    var cursor = target.previous;
-    for (var i = 0;
-        i < kRoiOrganicLookbackMonths && ratios.length < kRoiOrganicWindow;
-        i++) {
-      if (!campaignMonths.contains(cursor)) {
-        final sales = salesByMonth[cursor] ?? 0;
-        final ly = salesByMonth[cursor.lastYear] ?? 0;
-        if (sales > 0 && ly > 0) {
-          ratios.add(sales / ly);
-        }
-      }
-      cursor = cursor.previous;
-    }
-    final monthsUsed = ratios.length;
-    final ratio = monthsUsed > 0
-        ? ratios.fold<double>(0, (a, b) => a + b) / monthsUsed
-        : 1.0;
-    return finish(
-      method: RoiBaselineMethod.yoyTrend,
-      baseline: lastYearSameMonthSalesEgp * ratio,
-      organicRatio: ratio,
-      monthsUsed: monthsUsed,
-      methodAr: yoyTrendMethodAr(monthsUsed),
-    );
+  final baseline = lastYearSameMonthSalesEgp;
+  final lift = currentSalesEgp - baseline;
+  final liftPct = baseline > 0 ? (lift / baseline) * 100.0 : null;
+  double? romi;
+  double? netRoi;
+  if (marketingSpendEgp > 0) {
+    romi = lift / marketingSpendEgp;
+    netRoi = ((lift - marketingSpendEgp) / marketingSpendEgp) * 100.0;
   }
-
-  final organicSales = <double>[];
-  var cursor = target.previous;
-  for (var i = 0;
-      i < kRoiOrganicLookbackMonths && organicSales.length < kRoiOrganicWindow;
-      i++) {
-    if (!campaignMonths.contains(cursor)) {
-      final sales = salesByMonth[cursor] ?? 0;
-      if (sales > 0) organicSales.add(sales);
-    }
-    cursor = cursor.previous;
-  }
-  if (organicSales.isEmpty) return RoiLiftResult.unavailable;
-  final monthsUsed = organicSales.length;
-  final baseline =
-      organicSales.fold<double>(0, (a, b) => a + b) / monthsUsed;
-  return finish(
-    method: RoiBaselineMethod.priorOrganicAverage,
-    baseline: baseline,
-    monthsUsed: monthsUsed,
-    methodAr: priorOrganicMethodAr(monthsUsed),
+  return RoiLiftResult(
+    method: RoiBaselineMethod.yoySeasonal,
+    baselineSalesEgp: baseline,
+    organicYoyRatio: 1.0,
+    organicMonthsUsed: 0,
+    incrementalLiftEgp: lift,
+    liftVsBaselinePct: liftPct,
+    romiMultiple: romi,
+    netRoiPct: netRoi,
+    methodAr: kRoiYoySeasonalMethodAr,
   );
 }
