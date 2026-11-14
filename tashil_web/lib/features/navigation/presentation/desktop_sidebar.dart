@@ -122,7 +122,12 @@ class DesktopSidebar extends StatelessWidget {
       ),
     ];
 
+    // Elevation keeps sidebar (and its flt-semantics nodes) above page
+    // content when ensureSemantics() is on for web automation.
     return Material(
+      elevation: 1.0,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
       color: colorScheme.surfaceContainer,
       shape: BorderDirectional(
         end: BorderSide(color: colorScheme.outlineVariant, width: 1.0),
@@ -209,7 +214,12 @@ class DesktopSidebar extends StatelessWidget {
                   final isSelected = selectedIndex == index;
 
                   // M3 nav indicator: a pill-shaped Material (no BoxDecoration).
+                  // Own the web flt-semantics tap (onTap) so page overlays /
+                  // mis-sized content semantics cannot swallow sidebar clicks
+                  // (live: Pricing → Compare stayed put while OOS still worked).
+                  void select() => onDestinationSelected(index);
                   Widget item = Material(
+                    key: ValueKey('sidebar_nav_${dest.label}'),
                     color: isSelected
                         ? colorScheme.secondaryContainer
                         : Colors.transparent,
@@ -217,7 +227,7 @@ class DesktopSidebar extends StatelessWidget {
                     clipBehavior: Clip.antiAlias,
                     animationDuration: M3Motion.short4,
                     child: InkWell(
-                      onTap: () => onDestinationSelected(index),
+                      onTap: select,
                       customBorder: const StadiumBorder(),
                       child: Container(
                         height: 52.0,
@@ -273,13 +283,15 @@ class DesktopSidebar extends StatelessWidget {
                     ),
                   );
                   final id = dest.semanticsIdentifier;
-                  if (id != null && id.isNotEmpty) {
-                    item = TestSemantics.navTarget(
-                      identifier: id,
-                      label: dest.label,
-                      child: item,
-                    );
-                  }
+                  item = Semantics(
+                    identifier: id,
+                    label: dest.label,
+                    button: true,
+                    container: true,
+                    excludeSemantics: true,
+                    onTap: select,
+                    child: item,
+                  );
                   return item;
                 },
               ),
