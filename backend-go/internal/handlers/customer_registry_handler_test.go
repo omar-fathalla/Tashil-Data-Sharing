@@ -234,3 +234,78 @@ func TestHandleListIncludesLiveStats(t *testing.T) {
 		t.Fatalf("missing live stats: %s", body)
 	}
 }
+
+func TestHandleListLiveIncludesExactMatchCustomers(t *testing.T) {
+	ctx := context.Background()
+	reg := customers.New(&customers.MemoryStore{})
+	canonical := "عائله فتح الله ماركت - كفر الدوار 2"
+	alias := "عائله فتح الله ماركت مواد عناية - كفر الدوار2"
+	qa := "فرع qa_test - QA عميل جديد خالص"
+	if _, err := reg.Decide(ctx, "tenant-adeco", qa, customers.StatusApproved, "qa_test", "", "qa"); err != nil {
+		t.Fatal(err)
+	}
+	proc := &mergeProc{reg: reg, stats: map[string]ingestion.CustomerLiveStat{
+		customers.NormalizeName(alias):     {Name: alias, Chain: "fathalla", Rows: 75, Value: 15667.11, Files: []string{"in26.xlsx"}},
+		customers.NormalizeName(canonical): {Name: canonical, Chain: "fathalla", Rows: 1492, Value: 1058327.30, Files: []string{"in26.xlsx"}},
+	}}
+	h := NewCustomerRegistryHandler(proc, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/customers/registry?status=live", nil)
+	req = req.WithContext(context.WithValue(req.Context(), middleware.UserClaimsContextKey, mergeClaims(domain.RoleVendorAdmin)))
+	rec := httptest.NewRecorder()
+	h.HandleList(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HTTP %d %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, canonical) || !strings.Contains(body, alias) {
+		t.Fatalf("live list must include exact-match customers: %s", body)
+	}
+	if !strings.Contains(body, `"live_rows":1492`) || !strings.Contains(body, `"live_rows":75`) {
+		t.Fatalf("missing live counts: %s", body)
+	}
+	if strings.Contains(body, qa) {
+		t.Fatalf("zero-row QA approval should stay off the live tab: %s", body)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/customers/registry?status=approved", nil)
+	req = req.WithContext(context.WithValue(req.Context(), middleware.UserClaimsContextKey, mergeClaims(domain.RoleVendorAdmin)))
+	rec = httptest.NewRecorder()
+	h.HandleList(rec, req)
+	if !strings.Contains(rec.Body.String(), qa) {
+		t.Fatalf("approved filter must still show the QA test entry: %s", rec.Body.String())
+	}
+}
+
+func TestHandleApproveMergeOfLiveOnlyCustomers(t *testing.T) {
+	ctx := context.Background()
+	reg := customers.New(&customers.MemoryStore{})
+	canonical := "عائله فتح الله ماركت - كفر الدوار 2"
+	alias := "عائله فتح الله ماركت مواد عناية - كفر الدوار2"
+	proc := &mergeProc{reg: reg, stats: map[string]ingestion.CustomerLiveStat{
+		customers.NormalizeName(alias):     {Name: alias, Chain: "fathalla", Rows: 75, Value: 15667.11, Files: []string{"in26.xlsx"}},
+		customers.NormalizeName(canonical): {Name: canonical, Chain: "fathalla", Rows: 1492, Value: 1058327.30, Files: []string{"in26.xlsx"}},
+	}}
+	h := NewCustomerRegistryHandler(proc, nil)
+
+	rec := postRegistry(t, h, "/api/v1/customers/registry/approve",
+		`{"name":"`+alias+`","chain":"fathalla","alias_of":"`+canonical+`"}`, domain.RoleVendorAdmin)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("live merge HTTP %d body %s", rec.Code, rec.Body.String())
+	}
+	approved := reg.List(ctx, "tenant-adeco", customers.StatusApproved, false)
+	var sawAlias, sawCanonical bool
+	for _, e := range approved {
+		if e.Name == alias && e.AliasOf == canonical {
+			sawAlias = true
+		}
+		if e.Name == canonical && e.AliasOf == "" {
+			sawCanonical = true
+		}
+	}
+	if !sawAlias || !sawCanonical {
+		t.Fatalf("expected both names approved with alias_of on the source: %+v", approved)
+	}
+	if !proc.nilFiles && len(proc.lastFiles) == 0 {
+		t.Fatalf("expected a re-apply, files=%v chains=%v", proc.lastFiles, proc.lastChains)
+	}
+}

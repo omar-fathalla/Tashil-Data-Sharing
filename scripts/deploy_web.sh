@@ -13,7 +13,7 @@ restore() { echo "$OLD" > "$VFILE"; echo "Deploy failed; version restored to $OL
 trap restore ERR
 
 echo "==> Building web v$NEW"
-(cd "$ROOT/tashil_web" && flutter build web --release --dart-define=APP_VERSION="$NEW")
+bash "$ROOT/scripts/flutter_build_web.sh" "$NEW"
 echo "==> Deploying to Firebase Hosting ($PROJECT)"
 (cd "$ROOT" && firebase deploy --only hosting --project "$PROJECT")
 trap - ERR

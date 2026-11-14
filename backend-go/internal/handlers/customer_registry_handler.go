@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
@@ -52,7 +53,9 @@ func (h *CustomerRegistryHandler) WithSellOutMonthsQuerier(q SellOutMonthsQuerie
 	return h
 }
 
-// HandleList serves GET /api/v1/customers/registry?status=pending|approved|rejected&include_seed=true.
+// HandleList serves GET /api/v1/customers/registry?status=pending|approved|rejected|live&include_seed=true.
+// status=live returns distinct counted Sell-In customers (plus registry aliases with no
+// remaining rows, so a merge can be undone) rather than only explicit approvals.
 func (h *CustomerRegistryHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 	c, ok := tmClaims(w, r)
 	if !ok {
@@ -64,23 +67,86 @@ func (h *CustomerRegistryHandler) HandleList(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	stats := h.liveStats(c.TenantID)
+	if status == "live" {
+		out := h.listLiveEntries(r.Context(), c.TenantID, reg, stats)
+		writeJSON(w, http.StatusOK, map[string]interface{}{"entries": out, "count": len(out)})
+		return
+	}
 	entries := reg.List(r.Context(), c.TenantID, status, r.URL.Query().Get("include_seed") == "true")
 	out := make([]registryListEntry, 0, len(entries))
-	stats := h.liveStats(c.TenantID)
 	for _, e := range entries {
-		item := registryListEntry{Entry: e}
-		if st, ok := stats[e.Key]; ok {
+		out = append(out, decorateRegistryEntry(e, reg, stats))
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"entries": out, "count": len(out)})
+}
+
+func decorateRegistryEntry(e customers.Entry, reg *customers.Registry, stats map[string]ingestion.CustomerLiveStat) registryListEntry {
+	item := registryListEntry{Entry: e}
+	if st, ok := stats[e.Key]; ok {
+		item.LiveRows = st.Rows
+		item.LiveValue = st.Value
+		item.LiveChain = st.Chain
+		item.LiveFiles = st.Files
+	}
+	if item.LiveChain == "" && reg != nil {
+		item.LiveChain = reg.EntryChain(e)
+	}
+	return item
+}
+
+func (h *CustomerRegistryHandler) listLiveEntries(ctx context.Context, tenantID string, reg *customers.Registry, stats map[string]ingestion.CustomerLiveStat) []registryListEntry {
+	byKey := map[string]registryListEntry{}
+	if reg != nil {
+		for _, e := range reg.List(ctx, tenantID, "", false) {
+			item := decorateRegistryEntry(e, reg, stats)
+			byKey[e.Key] = item
+		}
+	}
+	for key, st := range stats {
+		if key == "" {
+			continue
+		}
+		if item, ok := byKey[key]; ok {
 			item.LiveRows = st.Rows
 			item.LiveValue = st.Value
-			item.LiveChain = st.Chain
-			item.LiveFiles = st.Files
+			if item.LiveChain == "" {
+				item.LiveChain = st.Chain
+			}
+			if len(item.LiveFiles) == 0 {
+				item.LiveFiles = st.Files
+			}
+			if item.Name == "" {
+				item.Name = st.Name
+			}
+			byKey[key] = item
+			continue
 		}
-		if item.LiveChain == "" {
-			item.LiveChain = reg.EntryChain(e)
+		byKey[key] = registryListEntry{
+			Entry: customers.Entry{
+				Name:   st.Name,
+				Key:    key,
+				Status: "live",
+				Chain:  st.Chain,
+			},
+			LiveRows:  st.Rows,
+			LiveValue: st.Value,
+			LiveChain: st.Chain,
+			LiveFiles: st.Files,
+		}
+	}
+	out := make([]registryListEntry, 0, len(byKey))
+	for _, item := range byKey {
+		// Keep counted names, plus registry rows that still need a decision or an undo.
+		if item.LiveRows == 0 && item.Status != customers.StatusPending && item.Status != customers.StatusRejected && strings.TrimSpace(item.AliasOf) == "" {
+			continue
 		}
 		out = append(out, item)
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"entries": out, "count": len(out)})
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].Name < out[j].Name
+	})
+	return out
 }
 
 // registryListEntry adds counted (in-totals) Sell-In stats to a stored registry entry.
@@ -198,6 +264,12 @@ func (h *CustomerRegistryHandler) decideWith(w http.ResponseWriter, r *http.Requ
 			}
 		}
 	}
+	if status == customers.StatusApproved && strings.TrimSpace(req.AliasOf) != "" {
+		if err := h.ensureLiveCanonicalApproved(r.Context(), c, reg, req); err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 	entry, err := reg.Decide(r.Context(), c.TenantID, req.Name, status, req.Chain, req.AliasOf, c.Email)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
@@ -263,6 +335,30 @@ func (h *CustomerRegistryHandler) decideWith(w http.ResponseWriter, r *http.Requ
 		names = append(names, a.File)
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"entry": entry, "reapplied_files": names, "reapplied": applied, "errors": errs})
+}
+
+// ensureLiveCanonicalApproved records the merge target as approved when it is
+// already counted in Sell-In (exact-match / seed) but has no registry decision yet.
+func (h *CustomerRegistryHandler) ensureLiveCanonicalApproved(ctx context.Context, c *domain.UserClaims, reg *customers.Registry, req customerDecisionRequest) error {
+	canKey := customers.NormalizeName(req.AliasOf)
+	if canKey == "" {
+		return fmt.Errorf("اختار العميل اللي هتندمج عليه")
+	}
+	for _, e := range reg.List(ctx, c.TenantID, "", false) {
+		if e.Key == canKey && e.Status == customers.StatusApproved {
+			return nil
+		}
+	}
+	st, ok := h.liveStats(c.TenantID)[canKey]
+	if !ok || st.Rows <= 0 {
+		return fmt.Errorf("العميل المختار مش متأكد، فمقدرش نضمّ عليه")
+	}
+	chain := strings.TrimSpace(req.Chain)
+	if chain == "" {
+		chain = st.Chain
+	}
+	_, err := reg.Decide(ctx, c.TenantID, req.AliasOf, customers.StatusApproved, chain, "", c.Email)
+	return err
 }
 
 // HandleYears serves GET /api/v1/sell-in/years: years that have data plus the current year,

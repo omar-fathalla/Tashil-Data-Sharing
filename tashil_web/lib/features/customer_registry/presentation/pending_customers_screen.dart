@@ -28,13 +28,15 @@ class PendingCustomersScreen extends StatefulWidget {
 class _PendingCustomersScreenState extends State<PendingCustomersScreen> {
   late final CustomerRegistryDataSource _ds =
       widget.dataSource ?? HttpCustomerRegistryDataSource(widget.apiClient!);
-  String _status = 'pending';
+  String _status = 'live';
   List<RegistryEntry> _entries = const [];
   bool _loading = true;
   String? _error;
   String? _busyName;
+  String _query = '';
 
   static const _statusLabels = {
+    'live': 'كل العملاء',
     'pending': 'محتاج تأكيد',
     'approved': 'متأكد',
     'rejected': 'مرفوض',
@@ -128,6 +130,12 @@ class _PendingCustomersScreenState extends State<PendingCustomersScreen> {
     if (ok == true) await _decide('approve', e, chain: chainCtl.text.trim());
   }
 
+  List<RegistryEntry> get _visible {
+    final q = _query.trim();
+    if (q.isEmpty) return _entries;
+    return [for (final e in _entries) if (e.name.contains(q)) e];
+  }
+
   bool get _canWrite =>
       widget.apiClient == null ||
       (widget.apiClient!.currentUser?.canWriteCustomerRegistry ?? false);
@@ -146,11 +154,12 @@ class _PendingCustomersScreenState extends State<PendingCustomersScreen> {
   }
 
   Future<List<RegistryEntry>> _mergeTargets(RegistryEntry source) async {
+    final live = await _ds.list(status: 'live');
     final approved = await _ds.list(status: 'approved', includeSeed: true);
     final pending = await _ds.list(status: 'pending');
     final seen = <String>{};
     final out = <RegistryEntry>[];
-    for (final e in [...approved, ...pending]) {
+    for (final e in [...live, ...approved, ...pending]) {
       if (e.name == source.name) continue;
       if (e.status == 'rejected') continue;
       if (!_sameChain(source, e)) continue;
@@ -305,19 +314,36 @@ class _PendingCustomersScreenState extends State<PendingCustomersScreen> {
                 ],
                 selected: {_status},
                 onSelectionChanged: (v) {
-                  setState(() => _status = v.first);
+                  setState(() {
+                    _status = v.first;
+                    _query = '';
+                  });
                   _load();
                 },
               ),
               const SizedBox(height: M3Spacing.sm),
+              if (_status == 'live' || _entries.length > 8)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: M3Spacing.sm),
+                  child: TextField(
+                    key: const Key('registry_live_search'),
+                    decoration: const InputDecoration(
+                      labelText: 'دور باسم العميل',
+                      hintText: 'دور باسم العميل',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                    onChanged: (v) => setState(() => _query = v),
+                  ),
+                ),
               if (_loading)
                 const Center(child: Padding(padding: EdgeInsets.all(M3Spacing.md), child: CircularProgressIndicator()))
               else if (_error != null)
                 ListTile(leading: Icon(AppIcons.error, color: cs.error), title: Text(_error!))
-              else if (_entries.isEmpty)
+              else if (_visible.isEmpty)
                 const ListTile(leading: Icon(AppIcons.empty), title: Text('مفيش عملاء هنا'))
               else
-                for (final e in _entries) _entryCard(e, theme),
+                for (final e in _visible) _entryCard(e, theme),
             ],
           ),
         ),
@@ -342,7 +368,7 @@ class _PendingCustomersScreenState extends State<PendingCustomersScreen> {
             ]),
             if (e.displayRows > 0)
               Text(
-                e.status == 'approved'
+                e.status == 'approved' || e.status == 'live'
                     ? '${e.displayRows} صف • ${CurrencyFormatter.formatCompactEGP(e.displayValue)}'
                     : '${e.displayRows} صف • ${CurrencyFormatter.formatCompactEGP(e.displayValue)} برّه الإجماليات'
                         '${e.months.isEmpty ? '' : ' • ${e.months.join('، ')}'}',
@@ -354,28 +380,28 @@ class _PendingCustomersScreenState extends State<PendingCustomersScreen> {
             const SizedBox(height: M3Spacing.xs),
             if (_canWrite)
               Wrap(spacing: M3Spacing.xs, runSpacing: M3Spacing.xs, children: [
-                if (e.status != 'approved')
+                if (e.status != 'approved' && e.status != 'live')
                   FilledButton.icon(
                     key: Key('approve_${e.name}'),
                     onPressed: busy ? null : () => _approve(e),
                     icon: const Icon(AppIcons.check),
                     label: const Text('تأكيد'),
                   ),
-                if (e.status == 'pending' || e.status == 'approved')
+                if (e.status == 'pending' || e.status == 'approved' || e.status == 'live')
                   OutlinedButton.icon(
                     key: Key('merge_${e.name}'),
                     onPressed: busy ? null : () => _merge(e),
                     icon: const Icon(AppIcons.merge),
                     label: const Text('دمج مع عميل آخر'),
                   ),
-                if (e.status != 'rejected')
+                if (e.status != 'rejected' && e.status != 'live')
                   OutlinedButton.icon(
                     key: Key('reject_${e.name}'),
                     onPressed: busy ? null : () => _decide('reject', e),
                     icon: const Icon(AppIcons.block),
                     label: const Text('رفض'),
                   ),
-                if (e.status != 'pending')
+                if ((e.status != 'pending' && e.status != 'live') || e.aliasOf.isNotEmpty)
                   OutlinedButton.icon(
                     key: Key('unmerge_${e.name}'),
                     onPressed: busy ? null : () => _decide('unmerge', e),

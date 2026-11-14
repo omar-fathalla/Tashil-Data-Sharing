@@ -13,6 +13,12 @@ class _FakeRegistry implements CustomerRegistryDataSource {
     String status = '',
     bool includeSeed = false,
   }) async {
+    if (status == 'live') {
+      return [
+        for (final e in entries)
+          if (e.status == 'live' || e.liveRows > 0) e,
+      ];
+    }
     return [
       for (final e in entries)
         if (status.isEmpty || e.status == status) e,
@@ -69,38 +75,91 @@ const _rejected = RegistryEntry(
   value: 100,
 );
 
-Future<void> _open(
-  WidgetTester tester, {
-  required _FakeRegistry ds,
-  String? openStatus,
-}) async {
-  await tester.pumpWidget(
-    MaterialApp(
-      home: PendingCustomersScreen(dataSource: ds),
-    ),
-  );
+const _liveGrocery = RegistryEntry(
+  name: 'عائله فتح الله ماركت - كفر الدوار 2',
+  status: 'live',
+  chain: 'fathalla',
+  liveRows: 1492,
+  liveValue: 1058327.30,
+);
+
+const _liveCare = RegistryEntry(
+  name: 'عائله فتح الله ماركت مواد عناية - كفر الدوار2',
+  status: 'live',
+  chain: 'fathalla',
+  liveRows: 75,
+  liveValue: 15667.11,
+);
+
+const _qaApproved = RegistryEntry(
+  name: 'فرع qa_test - QA عميل جديد خالص',
+  status: 'approved',
+  chain: 'qa_test',
+);
+
+Future<void> _open(WidgetTester tester, {_FakeRegistry? ds, List<RegistryEntry>? entries}) async {
+  final source = ds ?? _FakeRegistry(List.of(entries ?? const []));
+  tester.view.physicalSize = const Size(1280, 800);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(MaterialApp(home: PendingCustomersScreen(dataSource: source)));
   await tester.pumpAndSettle();
-  if (openStatus != null) {
-    final label = {
-      'pending': 'محتاج تأكيد',
-      'approved': 'متأكد',
-      'rejected': 'مرفوض',
-    }[openStatus]!;
-    await tester.tap(find.widgetWithText(ButtonSegment<String>, label).first);
-    // SegmentedButton child may be Text; tap the text.
-    await tester.pumpAndSettle();
-  }
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  final seed = [_pendingKafr, _approvedKafr, _otherChain, _rejected];
+  final registrySeed = [_pendingKafr, _approvedKafr, _otherChain, _rejected];
+  final liveSeed = [_liveGrocery, _liveCare, _qaApproved, _otherChain];
 
-  testWidgets('pending and approved cards show merge; rejected does not',
+  testWidgets('كل العملاء lists exact-match Sell-In names and hides zero-row QA approval',
       (tester) async {
-    final ds = _FakeRegistry(List.of(seed));
+    final ds = _FakeRegistry(List.of(liveSeed));
     await _open(tester, ds: ds);
+    expect(find.text('كل العملاء'), findsWidgets);
+    expect(find.byKey(const Key('merge_عائله فتح الله ماركت - كفر الدوار 2')), findsOneWidget);
+    expect(find.byKey(const Key('merge_عائله فتح الله ماركت مواد عناية - كفر الدوار2')), findsOneWidget);
+    expect(find.text('فرع qa_test - QA عميل جديد خالص'), findsNothing);
+
+    await tester.enterText(find.byKey(const Key('registry_live_search')), 'عناية');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('merge_عائله فتح الله ماركت مواد عناية - كفر الدوار2')), findsOneWidget);
+    expect(find.byKey(const Key('merge_عائله فتح الله ماركت - كفر الدوار 2')), findsNothing);
+  });
+
+  testWidgets('live merge confirm posts approve with alias_of for same-chain names',
+      (tester) async {
+    final ds = _FakeRegistry(List.of(liveSeed));
+    await _open(tester, ds: ds);
+    await tester.tap(find.byKey(const Key('merge_عائله فتح الله ماركت مواد عناية - كفر الدوار2')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('merge_picker_dialog')), findsOneWidget);
+    expect(find.byKey(const Key('merge_pick_عائله فتح الله ماركت - كفر الدوار 2')), findsOneWidget);
+    expect(find.byKey(const Key('merge_pick_عميل سلسلة تانية')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('merge_pick_عائله فتح الله ماركت - كفر الدوار 2')));
+    await tester.pumpAndSettle();
+    final confirm = find.byKey(const Key('merge_confirm_dialog'));
+    expect(confirm, findsOneWidget);
+    expect(find.descendant(of: confirm, matching: find.textContaining('1492 صف')), findsOneWidget);
+    expect(find.descendant(of: confirm, matching: find.textContaining('75 صف')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('merge_confirm')));
+    await tester.pumpAndSettle();
+    expect(ds.calls, hasLength(1));
+    expect(ds.calls.single['action'], 'approve');
+    expect(ds.calls.single['name'], 'عائله فتح الله ماركت مواد عناية - كفر الدوار2');
+    expect(ds.calls.single['aliasOf'], 'عائله فتح الله ماركت - كفر الدوار 2');
+    expect(ds.calls.single['chain'], 'fathalla');
+  });
+
+  testWidgets('pending and approved cards show merge; rejected does not', (tester) async {
+    final ds = _FakeRegistry(List.of(registrySeed));
+    await _open(tester, ds: ds);
+    await tester.tap(find.text('محتاج تأكيد'));
+    await tester.pumpAndSettle();
     expect(find.text('دمج مع عميل آخر'), findsOneWidget);
     expect(find.byKey(const Key('merge_كفر الدوار 2 — فرع أ')), findsOneWidget);
 
@@ -117,10 +176,11 @@ void main() {
     expect(find.byKey(const Key('merge_عميل مرفوض')), findsNothing);
   });
 
-  testWidgets('picker lists same-chain names only and search filters them',
-      (tester) async {
-    final ds = _FakeRegistry(List.of(seed));
+  testWidgets('picker lists same-chain names only and search filters them', (tester) async {
+    final ds = _FakeRegistry(List.of(registrySeed));
     await _open(tester, ds: ds);
+    await tester.tap(find.text('محتاج تأكيد'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('merge_كفر الدوار 2 — فرع أ')));
     await tester.pumpAndSettle();
 
@@ -140,10 +200,11 @@ void main() {
     expect(find.byKey(const Key('merge_pick_كفر الدوار 2')), findsOneWidget);
   });
 
-  testWidgets('confirm shows both counts and posts approve with alias_of',
-      (tester) async {
-    final ds = _FakeRegistry(List.of(seed));
+  testWidgets('confirm shows both counts and posts approve with alias_of', (tester) async {
+    final ds = _FakeRegistry(List.of(registrySeed));
     await _open(tester, ds: ds);
+    await tester.tap(find.text('محتاج تأكيد'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('merge_كفر الدوار 2 — فرع أ')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('merge_pick_كفر الدوار 2')));
@@ -153,8 +214,9 @@ void main() {
     expect(confirm, findsOneWidget);
     expect(find.text('تأكيد دمج العملاء'), findsOneWidget);
     expect(find.text('تأكيد الدمج'), findsOneWidget);
-    expect(find.descendant(of: confirm, matching: find.textContaining('كفر الدوار 2 — فرع أ')), findsOneWidget);
-    expect(find.descendant(of: confirm, matching: find.textContaining('كفر الدوار 2')), findsOneWidget);
+    expect(
+        find.descendant(of: confirm, matching: find.textContaining('كفر الدوار 2 — فرع أ')),
+        findsOneWidget);
     expect(find.descendant(of: confirm, matching: find.textContaining('800 صف')), findsOneWidget);
     expect(find.descendant(of: confirm, matching: find.textContaining('767 صف')), findsOneWidget);
 
@@ -169,8 +231,10 @@ void main() {
   });
 
   testWidgets('cancel on confirm does not call decide', (tester) async {
-    final ds = _FakeRegistry(List.of(seed));
+    final ds = _FakeRegistry(List.of(registrySeed));
     await _open(tester, ds: ds);
+    await tester.tap(find.text('محتاج تأكيد'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('merge_كفر الدوار 2 — فرع أ')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('merge_pick_كفر الدوار 2')));
