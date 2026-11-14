@@ -21,6 +21,8 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/testing/test_semantics.dart';
 import '../../data/sell_out_explorer_repository.dart';
 import '../../domain/sell_out_upload_flow.dart';
+import '../../domain/archive_delete_copy.dart';
+import '../../../../core/network/backend_http.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/bidi_text.dart';
@@ -276,10 +278,10 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     }
   }
 
-  Future<void> _loadAllData() async {
+  Future<void> _loadAllData({bool forceRefresh = false}) async {
     await Future.wait([
       _loadRecords(),
-      _loadSellOutArchive(),
+      _loadSellOutArchive(forceRefresh: forceRefresh),
     ]);
   }
 
@@ -430,11 +432,15 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     }
   }
 
-  Future<void> _loadSellOutArchive() async {
+  Future<void> _loadSellOutArchive({bool forceRefresh = false}) async {
+    if (forceRefresh) {
+      _repo.invalidateAll();
+    }
     if (mounted) setState(() => _isLoadingArchive = true);
     try {
       final res = await widget.apiClient.getUploadedFilesArchive(
         fileType: 'sell_out',
+        forceRefresh: forceRefresh,
       );
       if (mounted) {
         setState(() {
@@ -623,7 +629,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
           _repo.cache.invalidatePrefix(
             CacheStore.prefix(widget.apiClient.tenantId, TargetRepository.feature),
           );
-          await _loadAllData();
+          BackendHttp.cache.invalidateAll();
+          await _loadAllData(forceRefresh: true);
       }
     } catch (e) {
       if (!mounted) return;
@@ -703,7 +710,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               ),
               const SizedBox(height: 10.0),
               Text(
-                rtlEnd('لن تتأثر باقي الشهور ولا بيانات ${ltrIsolate('Sell-In')}.'),
+                sellOutDeleteConsequenceText(
+                  coversAllMonths: archiveFileCoversAllMonths(
+                    file.targetMonth,
+                    isLastFile: _archivedSellOutFiles.length <= 1,
+                  ),
+                ),
                 style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(fontSize: M3FontSize.bodySmall, color: cs.onSurfaceVariant)),
               ),
             ],
@@ -753,7 +765,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       );
       _repo.invalidateAll();
       _repo.cache.invalidatePrefix(CacheStore.prefix(widget.apiClient.tenantId, TargetRepository.feature));
-      await _loadAllData();
+      BackendHttp.cache.invalidateAll();
+      await _loadAllData(forceRefresh: true);
     } catch (e) {
       if (!mounted) return;
       debugPrint('Archive delete failed: $e');
@@ -762,7 +775,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
           : 'تعذّر حذف الملف.';
       M3Feedback.showError(context, msg);
       // Failed deletes must keep the file listed — refresh from server truth.
-      await _loadAllData();
+      await _loadAllData(forceRefresh: true);
     } finally {
       if (mounted) {
         setState(() => _deletingFileId = null);
@@ -940,7 +953,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               onChanged: (next) {
                 setState(() => _activeTab = next);
                 if (next == 3) {
-                  _loadSellOutArchive();
+                  _loadSellOutArchive(forceRefresh: true);
                 }
               },
             ),
@@ -3111,7 +3124,7 @@ onChanged: m3Legacy<int>((v) {
                         ),
                       ),
                       OutlinedButton.icon(
-                        onPressed: _isLoadingArchive ? null : _loadSellOutArchive,
+                        onPressed: _isLoadingArchive ? null : () => _loadSellOutArchive(forceRefresh: true),
                         icon: const Icon(Icons.refresh_rounded, size: 18.0),
                         label: const Text('تحديث'),
                       ),
@@ -3151,7 +3164,7 @@ onChanged: m3Legacy<int>((v) {
                           key: const ValueKey('sell_out_archive_load_error'),
                           title: 'تعذّر تحميل الملفات المرفوعة',
                           message: 'الخادم مشغول أو الاتصال انقطع. حاول مرة أخرى بعد لحظات.',
-                          onRetry: _loadSellOutArchive,
+                          onRetry: () => _loadSellOutArchive(forceRefresh: true),
                         ),
                       )
                 : _archivedSellOutFiles.isEmpty

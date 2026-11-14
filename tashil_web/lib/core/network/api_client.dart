@@ -4759,12 +4759,16 @@ class ApiClient {
     String? searchQuery,
     String? targetTenant,
     String? fileType,
+    bool forceRefresh = false,
   }) async {
     final effectiveTenant = (targetTenant != null && targetTenant.isNotEmpty)
         ? targetTenant
         : tenantId;
     final cleanSlug = normalizeDataTenantSlug(effectiveTenant);
     final archiveKey = [cleanSlug, chain ?? '', year ?? '', searchQuery?.trim() ?? '', fileType ?? ''].join('|');
+    if (forceRefresh) {
+      _lastArchiveByKey.remove(archiveKey);
+    }
     try {
       final queryParams = <String, String>{};
       if (chain != null && chain.isNotEmpty && chain != 'all' && chain != 'الكل') {
@@ -4782,6 +4786,9 @@ class ApiClient {
       final uri = Uri.parse(ApiEndpoints.ingestArchive).replace(
         queryParameters: queryParams.isEmpty ? null : queryParams,
       );
+      if (forceRefresh) {
+        BackendHttp.cache.invalidateUrl(uri);
+      }
       final resp = await getWithTransientRetry(
         uri,
         headers: {

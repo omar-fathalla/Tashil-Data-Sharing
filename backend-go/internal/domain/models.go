@@ -367,6 +367,9 @@ type SellOutFact struct {
 	TransactionDate      string    `json:"transaction_date" bigquery:"transaction_date"` // YYYY-MM-DD
 	IngestionBatchID     string    `json:"ingestion_batch_id" bigquery:"ingestion_batch_id"`
 	IngestedAt           time.Time `json:"ingested_at" bigquery:"ingested_at"`
+	// SourceFilename is the archive file name. json "source_file" matches the sink meta
+	// column (skipped by SchemaFor) so in-memory purge can fall back by filename.
+	SourceFilename string `json:"source_file,omitempty"`
 }
 
 // SellOutSKUSummary aggregates full-dataset sell-out performance, official factory pricing, and chain margin for a single SKU across the selected filter scope.

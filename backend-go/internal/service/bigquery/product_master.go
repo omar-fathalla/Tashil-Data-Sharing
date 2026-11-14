@@ -1304,12 +1304,31 @@ func (c *Client) enrichSellInRecordLocked(r *domain.SellInRecord) {
 		r.CanonicalFamilyKey = CanonicalSellInFamilyKey(nil, r.ItemName)
 	}
 
+	if r.SOPNeedsPackFallback && !r.SOPQtyConverted {
+		// Official rule: piece lines with no U of M2 use Product Master pack size only.
+		fb := 0.0
+		if ok && pm.UnitsPerCarton > 0 {
+			fb = float64(pm.UnitsPerCarton)
+		}
+		if fb >= 1 {
+			r.NetQtyCases = math.Round(r.NetQtyCases/fb*10000) / 10000
+			r.ExpectedQtyCases = math.Round(r.ExpectedQtyCases/fb*10000) / 10000
+			r.UnitsPerCarton = int(math.Round(fb))
+			r.SOPQtyConverted = true
+			r.SOPUsedPackFallback = true
+			r.SOPNeedsPackFallback = false
+			if math.Abs(r.NetQtyCases) > 0.0001 && math.Abs(r.NetValueEGP) > 0.01 {
+				actualCasePriceExcl = math.Round(math.Abs(r.NetValueEGP/r.NetQtyCases)*100) / 100
+				r.ActualCasePriceExclEGP = actualCasePriceExcl
+			}
+		}
+	}
 	if r.UnitsPerCarton <= 0 {
 		r.UnitsPerCarton = 12
 	}
-	if ok && sellInQtyLooksLikePieces(r.NetQtyCases, r.NetValueEGP, r.OfficialUnitExclVATEGP, r.OfficialCartonExclVATEGP, r.UnitsPerCarton) {
-		// The Fathalla "out" exports carry quantity in pieces; storing it as cases inflated the list value
-		// (and the "discount") by the pack size. Convert to cases once; the ratio test is idempotent.
+	if !r.SOPQtyConverted && ok && sellInQtyLooksLikePieces(r.NetQtyCases, r.NetValueEGP, r.OfficialUnitExclVATEGP, r.OfficialCartonExclVATEGP, r.UnitsPerCarton) {
+		// Only for records that were not already converted from the file UOM (CRT or QTY/U of M2).
+		// SOP official cases must not be divided again when the PM pack differs from U of M2.
 		r.NetQtyCases = math.Round(r.NetQtyCases/float64(r.UnitsPerCarton)*10000) / 10000
 		if math.Abs(r.NetQtyCases) > 0.0001 && math.Abs(r.NetValueEGP) > 0.01 {
 			actualCasePriceExcl = math.Round(math.Abs(r.NetValueEGP/r.NetQtyCases)*100) / 100

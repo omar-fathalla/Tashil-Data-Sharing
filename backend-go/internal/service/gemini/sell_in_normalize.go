@@ -16,6 +16,9 @@ type SellInParseReport struct {
 	Columns    map[string]int `json:"columns,omitempty"`
 	MonthCheck string         `json:"month_check,omitempty"`
 	ReturnRows int            `json:"return_rows,omitempty"`
+	// QtyUOMFallbackRows is the number of piece-UOM lines with no U of M2,
+	// so Product Master UnitsPerCarton will be used at enrich time (if present).
+	QtyUOMFallbackRows int `json:"qty_uom_fallback_rows,omitempty"`
 }
 
 // SellInLayoutError: required headers were not found, so nothing is read by position.
@@ -429,8 +432,20 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 				}
 			}
 		}
-		qty := math.Round(parseFloatDefault(getCol(r, cols["qty"]), 0)) // QTY = pieces on the invoice line
-		val := parseFloatDefault(getCol(r, cols["value"]), 0)            // Extended Price or TO; keep sign (returns negative)
+		rawQty := math.Round(parseFloatDefault(getCol(r, cols["qty"]), 0))
+		uom := ""
+		if idx, ok := cols["uom"]; ok {
+			uom = getCol(r, idx)
+		}
+		uom2 := 0.0
+		if idx, ok := cols["units_per_carton"]; ok {
+			uom2 = parseFloatDefault(getCol(r, idx), 0)
+		}
+		qty, upcFromFile, usedFallback := ConvertSOPQtyToCases(rawQty, uom2, 0, uom)
+		if usedFallback || (isPieceUOM(uom) && uom2 < 1) {
+			report.QtyUOMFallbackRows++
+		}
+		val := parseFloatDefault(getCol(r, cols["value"]), 0) // Extended Price or TO; keep sign (returns negative)
 		// Collapse whitespace around the chain/branch dash (… -  فلمنج) but keep the upload chain
 		// authoritative — never re-infer retailer from the customer label (zahran/gomla GP SOP).
 		cust := collapseSpace(getCol(r, cols["customer"]))
@@ -460,31 +475,34 @@ func parseGPSOPExport(tenantID, filename string, rows [][]string, hdr int, chain
 		// Always Full Month for this layout; week stays unused by status logic.
 		// One Sell-In record per source row — never collapse lines (in26 acceptance: 40927 rows).
 		rec := domain.SellInRecord{
-			RecordID:           fmt.Sprintf("sellin_%s_%d", tenantID, i),
-			TenantID:           tenantID,
-			RetailerChain:      chain,
-			Year:               y,
-			MonthNum:           m,
-			MonthEN:            monthNumToEN(m),
-			MonthAR:            ArabicMonthName(m),
-			PeriodWeek:         "Full Month",
-			RegionCode:         region,
-			Governorate:        st.Governorate,
-			Sector:             "MT",
-			CustomerName:       gpSOPCustomerName(cust, st.BranchName),
-			CustomerBranchCode: st.ID,
-			ItemGroup:          strings.TrimSpace(getCol(r, cols["item_code"])),
-			ItemName:           strings.TrimSpace(getCol(r, cols["item_name"])),
-			PromotionType:      "عادي",
-			SalesRep:           "فريق مبيعات السلاسل",
-			NetQtyCases:        qty,
-			NetValueEGP:        val,
-			TurnoverEGP:        val,
-			WeightTons:         math.Round(math.Abs(qty)*0.012*10000) / 10000,
-			ExpectedQtyCases:   qty,
-			ExpectedValueEGP:   val,
-			TransactionType:    tx,
-			IngestedAt:         now,
+			RecordID:             fmt.Sprintf("sellin_%s_%d", tenantID, i),
+			TenantID:             tenantID,
+			RetailerChain:        chain,
+			Year:                 y,
+			MonthNum:             m,
+			MonthEN:              monthNumToEN(m),
+			MonthAR:              ArabicMonthName(m),
+			PeriodWeek:           "Full Month",
+			RegionCode:           region,
+			Governorate:          st.Governorate,
+			Sector:               "MT",
+			CustomerName:         gpSOPCustomerName(cust, st.BranchName),
+			CustomerBranchCode:   st.ID,
+			ItemGroup:            strings.TrimSpace(getCol(r, cols["item_code"])),
+			ItemName:             strings.TrimSpace(getCol(r, cols["item_name"])),
+			PromotionType:        "عادي",
+			SalesRep:             "فريق مبيعات السلاسل",
+			UnitsPerCarton:       upcFromFile,
+			NetQtyCases:          qty,
+			NetValueEGP:          val,
+			TurnoverEGP:          val,
+			WeightTons:           math.Round(math.Abs(rawQty)*0.012*10000) / 10000, // weight follows the file QTY column
+			ExpectedQtyCases:     qty,
+			ExpectedValueEGP:     val,
+			TransactionType:      tx,
+			IngestedAt:           now,
+			SOPQtyConverted:      !(isPieceUOM(uom) && uom2 < 1),
+			SOPNeedsPackFallback: isPieceUOM(uom) && uom2 < 1,
 		}
 		out = append(out, rec)
 	}

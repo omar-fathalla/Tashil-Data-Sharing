@@ -67,8 +67,30 @@ func TestSellOutRowRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if out.SourceFilename != "2026 out.xlsx" {
+		t.Fatalf("source file from meta: %q", out.SourceFilename)
+	}
+	in.SourceFilename = "2026 out.xlsx"
 	if out != in {
 		t.Fatalf("round trip mismatch:\n in=%+v\nout=%+v", in, out)
+	}
+}
+
+func TestDecodeSellOutRowMapsBatchIDWhenStructFieldEmpty(t *testing.T) {
+	now := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
+	row := map[string]bigquery.Value{
+		"record_id": "fact_x", "tenant_id": "tenant-adeco", "retailer_chain": "fathalla",
+		"store_id": "s1", "store_name": "فرع 1", "barcode": "1", "sku_name": "x",
+		"quantity_sold": 1, "net_revenue": 10.0, "unit_price": 10.0,
+		"transaction_date": "2026-03-14", "ingested_at": now,
+		ColBatchID: "batch_from_meta", ColSourceFile: "out26.xlsx",
+	}
+	out, err := DecodeSellOutRow(row)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.IngestionBatchID != "batch_from_meta" || out.SourceFilename != "out26.xlsx" {
+		t.Fatalf("meta mapping: batch=%q file=%q", out.IngestionBatchID, out.SourceFilename)
 	}
 }
 

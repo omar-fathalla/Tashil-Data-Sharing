@@ -28,7 +28,8 @@ class HttpSwrCache {
   final ValueNotifier<int> revision = ValueNotifier<int>(0);
 
   final Map<String, _SwrEntry> _entries = <String, _SwrEntry>{};
-  final Map<String, Future<http.Response>> _inFlight = <String, Future<http.Response>>{};
+  final Map<String, Future<http.Response>> _inFlight =
+      <String, Future<http.Response>>{};
 
   int get length => _entries.length;
 
@@ -61,7 +62,8 @@ class HttpSwrCache {
         return _revalidate(key, hit, headers, send);
       }
       if (_now().difference(hit.checkedAt) >= freshFor) {
-        unawaited(_revalidate(key, hit, headers, send).catchError((_) => hit.toResponse()));
+        unawaited(_revalidate(key, hit, headers, send)
+            .catchError((_) => hit.toResponse()));
       }
       return hit.toResponse();
     }
@@ -112,7 +114,8 @@ class HttpSwrCache {
       final plain = <String, String>{...?headers}..remove('If-None-Match');
       resp = await send(plain);
       if (resp.statusCode == 304) {
-        throw http.ClientException('Unexpected 304 for unconditional request', resp.request?.url);
+        throw http.ClientException(
+            'Unexpected 304 for unconditional request', resp.request?.url);
       }
     }
     if (stale || generation != _generation) return resp;
@@ -165,6 +168,19 @@ class HttpSwrCache {
     }
   }
 
+  /// Drops cached responses for [url] (any headers) and bumps [revision] so
+  /// the next read hits the network without If-None-Match. Used after archive
+  /// delete/upload so the files tab does not keep an empty or stale list.
+  void invalidateUrl(Uri url) {
+    final prefix = '$url\n';
+    final before = _entries.length;
+    _entries.removeWhere((k, _) => k.startsWith(prefix));
+    if (_entries.length != before) {
+      _generation++;
+      _bump();
+    }
+  }
+
   /// Drops every cached response without notifying (logout / session switch).
   void clear() {
     _generation++;
@@ -182,5 +198,6 @@ class _SwrEntry {
   DateTime checkedAt;
   bool mustRevalidate = false;
 
-  http.Response toResponse() => http.Response.bytes(bodyBytes, 200, headers: headers);
+  http.Response toResponse() =>
+      http.Response.bytes(bodyBytes, 200, headers: headers);
 }

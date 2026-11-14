@@ -1333,12 +1333,34 @@ func (p *Processor) purgeAnalyticsForDeletedArchive(ctx context.Context, normTen
 		return nil
 	}
 
-	// Sell-Out: always scope to this archive's batch (and chain). Never wipe the whole tenant
-	// or clear Firestore tenant data as a side effect of deleting the last uploaded file.
-	if err := p.bqRepo.RemoveBatchRecords(ctx, normTenant, deletedEntry.BatchID, deletedEntry.RetailChain); err != nil {
+	// Sell-Out: drop this file's facts by batch id, then by filename (like Sell-In).
+	// When this is the tenant's last Sell-Out archive, also clear leftover in-memory
+	// facts whose batch id no longer matches (hydrated rows, stale index). Never call
+	// ClearTenantData — that would wipe Sell-In, product master and Firestore.
+	if err := p.bqRepo.RemoveSellOutFileRecords(ctx, normTenant, deletedEntry.BatchID, deletedEntry.FileName, deletedEntry.RetailChain); err != nil {
 		return &ArchiveDeleteError{Stage: "memory_store", Message: "failed to remove sell-out records for archived file", Cause: err}
 	}
+	if p.isLastSellOutArchive(normTenant, deletedEntry.ID) {
+		if err := p.bqRepo.ClearSellOutFacts(ctx, normTenant); err != nil {
+			return &ArchiveDeleteError{Stage: "memory_store", Message: "failed to clear leftover sell-out facts after last file delete", Cause: err}
+		}
+	}
 	return nil
+}
+
+// isLastSellOutArchive reports whether tenant has no other Sell-Out archive besides excludeID.
+func (p *Processor) isLastSellOutArchive(normTenant, excludeID string) bool {
+	p.archiveMu.RLock()
+	defer p.archiveMu.RUnlock()
+	for _, f := range p.archivedFiles {
+		if f == nil || f.ID == excludeID {
+			continue
+		}
+		if f.TenantID == normTenant && !isSellInArchiveEntry(f) && !isProductMasterArchiveEntry(f) {
+			return false
+		}
+	}
+	return true
 }
 
 // ClearTenantArchives removes all archived files for a specific tenant from memory, disk, and records deletion tombstones in Cloud Firestore.

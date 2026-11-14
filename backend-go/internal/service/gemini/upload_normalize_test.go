@@ -150,6 +150,61 @@ func TestGPSOPParserByHeaderNames(t *testing.T) {
 	}
 }
 
+func TestGPSOPOfficialCartonRuleUsesUofM2(t *testing.T) {
+	header := append(append([]string{}, sopHeader...), "U of M2")
+	row := func(uom, qty, u2, val string) []string {
+		r := sopRow("2026-03-02", "FG-1", "QA عميل تجريبي", qty, val)
+		r[5] = uom // U Of M
+		return append(r, u2)
+	}
+	rows := [][]string{{"report"}, {""}, header,
+		row("CRT", "10", "12", "100"),
+		row("Each", "24", "12", "50"),
+	}
+	x := buildMultiSheetXLSX(t, []string{"Sheet1"}, map[string][][]string{"Sheet1": rows})
+	recs, rep, err := ParseSellInPlanWorkbookWithReport("tenant-adeco", "in26.xlsx", x, "fathalla")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recs) != 2 {
+		t.Fatalf("rows=%d", len(recs))
+	}
+	var q float64
+	for _, r := range recs {
+		q += r.NetQtyCases
+		if r.ExpectedQtyCases != r.NetQtyCases {
+			t.Fatalf("expected cases must follow official cartons: %+v", r)
+		}
+	}
+	if q != 12 { // 10 CRT cartons + 24/12 Each
+		t.Fatalf("official cases=%v want 12 (rep=%+v)", q, rep)
+	}
+	if rep != nil && rep.QtyUOMFallbackRows != 0 {
+		t.Fatalf("file provided U of M2, fallback=%d", rep.QtyUOMFallbackRows)
+	}
+}
+
+func TestGPSOPOfficialCartonRuleCountsMissingU2(t *testing.T) {
+	header := append(append([]string{}, sopHeader...), "U of M2")
+	row := sopRow("2026-03-02", "FG-1", "QA عميل تجريبي", "24", "50")
+	row[5] = "Each"
+	rows := [][]string{{"report"}, {""}, header, append(row, "")}
+	x := buildMultiSheetXLSX(t, []string{"Sheet1"}, map[string][][]string{"Sheet1": rows})
+	recs, rep, err := ParseSellInPlanWorkbookWithReport("tenant-adeco", "in26.xlsx", x, "fathalla")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recs) != 1 || recs[0].NetQtyCases != 24 {
+		t.Fatalf("piece line without U2 stays raw until PM fallback: %+v", recs)
+	}
+	if recs[0].SOPQtyConverted || !recs[0].SOPNeedsPackFallback {
+		t.Fatalf("should need PM fallback: %+v", recs[0])
+	}
+	if rep == nil || rep.QtyUOMFallbackRows != 1 {
+		t.Fatalf("fallback count: %+v", rep)
+	}
+}
+
 func TestUncachedFormulaCells(t *testing.T) {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)

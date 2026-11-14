@@ -68,6 +68,12 @@ type SellInRecord struct {
 	PricingWaveStatus        string  `json:"pricing_wave_status"`          // "current_list" | "historical_pre_aug" | "promo_discounted" | "unmatched"
 	DepartmentAr             string  `json:"department_ar,omitempty"`      // القسم الإنتاجي (منظفات سائلة / بودر / معطر / رابيدو)
 	CanonicalFamilyKey       string  `json:"canonical_family_key,omitempty"`
+
+	// SOPQtyConverted / SOPNeedsPackFallback are ingest-only flags (not stored in BigQuery).
+	// After official CRT + Each/U of M2 conversion, enrich must not run the pieces heuristic again.
+	SOPQtyConverted      bool `json:"-"`
+	SOPNeedsPackFallback bool `json:"-"`
+	SOPUsedPackFallback  bool `json:"-"`
 }
 
 // ReconciliationMonthItem compares Supplier Sell-In vs Retailer Cashier Sell-Out for a given month.
