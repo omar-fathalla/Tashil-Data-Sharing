@@ -13,7 +13,7 @@ Pushing to `main` runs `.github/workflows/deploy.yml`:
    (not `github.event.before`). That way a failed backend deploy followed by a web-only push still
    redeploys the backend. Empty, unreachable, or **malformed** live version JSON fail-safe to
    redeploy (`deploy=true`); they must not abort the job. `workflow_dispatch` always redeploys.
-3. Web: `flutter build web --dart-define=APP_VERSION=<n>` and `firebase deploy --only hosting`.
+3. Web: `scripts/flutter_build_web.sh <n>` (pwa-strategy=none, kill-switch SW, version.json) and `firebase deploy --only hosting`.
 
 Docs-only changes (`**.md`, `docs/**`) do not deploy. Runs are serialized (`deploy-production`
 concurrency group, never cancelled mid-deploy). It can also be started by hand (workflow_dispatch).

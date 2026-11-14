@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html dir="rtl" lang="ar">
+<html dir="rtl" lang="ar" data-app-version="__TASHIL_APP_VERSION__">
 <head>
   <base href="$FLUTTER_BASE_HREF">
 
@@ -32,6 +32,43 @@
 </head>
 <body>
   <!-- Persistent #tashil-file-input is created by WebFileHelper.ensureMounted after first frame. -->
+  <script>
+    (function () {
+      var baked = document.documentElement.getAttribute('data-app-version') || '';
+      if (baked === '__TASHIL_APP_VERSION__') baked = '';
+      var onceKey = 'tashil_reload_' + (baked || 'unknown');
+      function clearWorkersAndCaches() {
+        var tasks = [];
+        if ('serviceWorker' in navigator) {
+          tasks.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
+            return Promise.all(regs.map(function (r) { return r.unregister(); }));
+          }));
+        }
+        if (window.caches) {
+          tasks.push(caches.keys().then(function (keys) {
+            return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+          }));
+        }
+        return Promise.all(tasks);
+      }
+      clearWorkersAndCaches();
+      fetch('version.json?t=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' })
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (info) {
+          if (!info) return;
+          var live = String(info.app_version || '');
+          if (!live || !baked || live === baked) return;
+          if (sessionStorage.getItem(onceKey)) return;
+          sessionStorage.setItem(onceKey, '1');
+          return clearWorkersAndCaches().then(function () {
+            var url = new URL(window.location.href);
+            url.searchParams.set('v', live);
+            window.location.replace(url.toString());
+          });
+        })
+        .catch(function () {});
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
