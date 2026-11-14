@@ -20,8 +20,11 @@ import '../../../../core/utils/bidi_text.dart';
 import '../../../../core/utils/app_date_format.dart';
 import '../../../../core/widgets/hyphenated_code_text.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/widgets/m3_button_group.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_responsive_tab_bar.dart';
 import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
@@ -382,12 +385,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() => _isUploading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Theme.of(context).colorScheme.error,
-          content: Text('تعذر رفع شيت كارتة الأصناف: $e'),
-        ),
-      );
+      M3Feedback.showError(context, 'تعذر رفع شيت كارتة الأصناف: $e');
     }
   }
 
@@ -444,11 +442,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       if (!mounted) return;
       final msg =
           e is ArchiveDeleteException ? e.message : 'تعذّر حذف ملف الماستر.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            backgroundColor: Theme.of(context).colorScheme.error,
-            content: Text(msg)),
-      );
+      M3Feedback.showError(context, msg);
       await _loadData();
       return;
     }
@@ -460,13 +454,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     _repo.invalidateAll();
     await _loadData();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: M3Palette.teal,
-        content: Text(
-          'تم حذف الشيت "${file.fileName}" وإلغاء تأثيراته واسترجاع الأسعار السابقة بنجاح.',
-        ),
-      ),
+    M3Feedback.showSuccess(
+      context,
+      'تم حذف الشيت "${file.fileName}" وإلغاء تأثيراته واسترجاع الأسعار السابقة بنجاح.',
     );
   }
 
@@ -1017,12 +1007,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
 
   void _copyToClipboard(String value, String labelAr) {
     Clipboard.setData(ClipboardData(text: value));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 2),
-        content: Text('تم نسخ $labelAr: $value'),
-      ),
-    );
+    M3Feedback.showInfo(context, 'تم نسخ $labelAr: $value');
   }
 
   @override
@@ -1044,44 +1029,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Product Master & Price List',
-                          style: theme.textTheme.headlineSmall,
-                        ),
-                        Text(
-                          'كارتة الأصناف والأسعار',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  FilledButton.tonalIcon(
-                    key: const ValueKey('product_master_upload_btn'),
-                    onPressed:
-                        _isUploading ? null : _handleUploadMasterWorkbook,
-                    icon: _isUploading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.upload_file_rounded),
-                    label: Text(
-                      _isUploading
-                          ? 'جاري تحديث الكارتة...'
-                          : 'رفع تحديث شيت الأسعار',
-                    ),
-                  ),
-                ],
-              ),
+              _buildPageHeader(summary: null),
               const SizedBox(height: 16.0),
               M3ErrorBanner(
                 title: 'تعذّر تحميل كارتة الأصناف والأسعار',
@@ -1120,7 +1068,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildHeaderBanner(theme, cs, summary),
+                  _buildPageHeader(summary: summary),
+                  const SizedBox(height: 12.0),
+                  _buildHeaderMetaStrip(theme, cs, summary),
                   const SizedBox(height: 16.0),
                   _buildKpiCardsRow(theme, cs, summary, filtered.length),
                   const SizedBox(height: 16.0),
@@ -1206,7 +1156,93 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     );
   }
 
-  Widget _buildHeaderBanner(
+  /// Sell-Out / Errors / OOS symmetry: shared page chrome + tonal actions.
+  Widget _buildPageHeader({ProductMasterSummaryModel? summary}) {
+    final canExport = summary != null && _filteredItems.isNotEmpty;
+    return M3PageHeader(
+      key: const ValueKey('product_master_page_header'),
+      titleEn: 'Product Master & Price List',
+      subtitleAr: 'كارتة الأصناف والأسعار',
+      actions: M3ButtonGroup(
+        maxVisibleCompact: 2,
+        items: [
+          M3GroupItem(
+            key: const ValueKey('product_master_header_sheets_btn'),
+            label: 'File Sheets (${_archivedMasterFiles.length})',
+            icon: Icons.layers_rounded,
+            kind: M3GroupItemKind.tonal,
+            tooltip: 'الشيتات المرفوعة',
+            onPressed: _showFileSheetsModal,
+          ),
+          M3GroupItem(
+            key: const ValueKey('product_master_export_csv_btn'),
+            label: 'تصدير Excel (CSV)',
+            icon: Icons.download_rounded,
+            kind: M3GroupItemKind.tonal,
+            tooltip: 'تصدير الكتالوج',
+            onPressed: canExport ? _exportFilteredCatalogToCsv : null,
+          ),
+          M3GroupItem(
+            key: const ValueKey('product_master_add_sku_btn'),
+            label: 'إضافة صنف جديد',
+            icon: Icons.add_box_rounded,
+            kind: M3GroupItemKind.tonal,
+            tooltip: 'إضافة صنف جديد',
+            onPressed: summary == null ? null : () => _openNewSkuCard(summary),
+          ),
+          M3GroupItem(
+            key: const ValueKey('product_master_upload_btn'),
+            label: _isUploading
+                ? 'جاري تحديث الكارتة...'
+                : 'رفع تحديث شيت الأسعار',
+            icon: Icons.upload_file_rounded,
+            kind: M3GroupItemKind.tonal,
+            tooltip: 'رفع تحديث شيت الأسعار',
+            isLoading: _isUploading,
+            onPressed: _isUploading ? null : _handleUploadMasterWorkbook,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openNewSkuCard(ProductMasterSummaryModel summary) async {
+    final newItem = ProductMasterItemModel(
+      serialNo: summary.totalSkus + 1,
+      itemCode: 'FGCL-0550-0999',
+      itemCodePrefix: 'FGCL',
+      officialName: '',
+      barcode: '6221133000000',
+      category: 'الكلور والمطهرات (Chlorine & Disinfectants)',
+      brand: 'كلوريل (Clorel)',
+      packagingType: 'عبوة',
+      unitsPerCarton: 12,
+      unitPriceExclVat: 20.0,
+      vatRate: 0.14,
+      unitPriceInclVat: 22.80,
+      cartonPriceExclVat: 240.0,
+      cartonPriceInclVat: 273.60,
+      invoiceDiscountPct: 10.0,
+      extraDiscountPct: 0.0,
+      netUnitInvoiceCost: 20.52,
+      netCartonInvoiceCost: 246.24,
+      itemType: 'عادي',
+    );
+    await ProductMasterScreen.showProductIdCardModal(
+      context,
+      apiClient: widget.apiClient,
+      item: newItem,
+      onUpdated: (updatedSummary) {
+        _repo.prime(updatedSummary);
+        if (mounted) {
+          setState(() => _summary = updatedSummary);
+        }
+      },
+    );
+  }
+
+  /// Meta chips under the page header (date / VAT / sheets / price-diff).
+  Widget _buildHeaderMetaStrip(
     ThemeData theme,
     ColorScheme cs,
     ProductMasterSummaryModel summary,
@@ -1214,252 +1250,56 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     final totalChanged = summary.priceIncreasedCount +
         summary.priceDecreasedCount +
         summary.newSkusCount;
-    return Container(
-      padding: const EdgeInsets.all(20.0),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            cs.primaryContainer.withValues(alpha: 0.55),
-            cs.surfaceContainer,
-          ],
-          begin: AlignmentDirectional.topStart,
-          end: AlignmentDirectional.bottomEnd,
+    return Wrap(
+      spacing: 8.0,
+      runSpacing: 6.0,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _buildMetaChip(cs, Icons.verified_rounded, summary.sheetDateLabel),
+        _buildMetaChip(
+          cs,
+          Icons.discount_rounded,
+          'خصم فاتورة ${summary.defaultDiscountPct.toStringAsFixed(0)}%',
         ),
-        borderRadius: M3Shape.radiusLg,
-        border: Border.all(color: cs.primary.withValues(alpha: 0.25)),
-      ),
-      child: Wrap(
-        spacing: 16.0,
-        runSpacing: 14.0,
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12.0),
-                decoration: BoxDecoration(
-                  color: cs.primary,
-                  borderRadius: M3Shape.radiusMd,
-                ),
-                child: Icon(
-                  Icons.inventory_rounded,
-                  color: cs.onPrimary,
-                  size: 28.0,
-                ),
-              ),
-              const SizedBox(width: 14.0),
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'كارتة الأصناف والأسعار المعتمدة • أدكو (Adeco)',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 2.0),
-                    Text(
-                      'Canonical Product Master, Item Codes (كود الصنف), Barcodes & Official Carton/Unit Pricing',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8.0),
-                    Wrap(
-                      spacing: 8.0,
-                      runSpacing: 6.0,
-                      children: [
-                        _buildMetaChip(
-                          cs,
-                          Icons.verified_rounded,
-                          summary.sheetDateLabel,
-                        ),
-                        _buildMetaChip(
-                          cs,
-                          Icons.discount_rounded,
-                          'خصم فاتورة ${summary.defaultDiscountPct.toStringAsFixed(0)}%',
-                        ),
-                        _buildMetaChip(
-                          cs,
-                          Icons.receipt_long_rounded,
-                          'ضريبة ${(summary.defaultVatRate * 100).toStringAsFixed(0)}%',
-                        ),
-                        // Compact interactive File Sheets bubble button replacing cluttered file list
-                        InkWell(
-                          key: const ValueKey('product_master_file_sheets_btn'),
-                          onTap: _showFileSheetsModal,
-                          borderRadius: M3Shape.radiusFull,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0,
-                              vertical: 4.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: cs.primary.withValues(alpha: 0.12),
-                              borderRadius: M3Shape.radiusFull,
-                              border: Border.all(
-                                color: cs.primary.withValues(alpha: 0.45),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.folder_special_rounded,
-                                  size: 15.0,
-                                  color: cs.primary,
-                                ),
-                                const SizedBox(width: 6.0),
-                                Text(
-                                  'File Sheets • شيتات الأسعار (${_archivedMasterFiles.length})',
-                                  style: TextStyle(
-                                    fontSize: M3FontSize.labelSmallPlus,
-                                    fontWeight: FontWeight.w800,
-                                    color: cs.primary,
-                                  ),
-                                ),
-                                const SizedBox(width: 4.0),
-                                Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  size: 16.0,
-                                  color: cs.primary,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (totalChanged > 0)
-                          InkWell(
-                            key: const ValueKey(
-                                'product_master_diff_summary_chip'),
-                            onTap: () => _showUploadDiffSummaryDialog(summary),
-                            borderRadius: M3Shape.radiusFull,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10.0,
-                                vertical: 4.5,
-                              ),
-                              decoration: BoxDecoration(
-                                color:
-                                    M3Palette.warning.withValues(alpha: 0.14),
-                                borderRadius: M3Shape.radiusFull,
-                                border: Border.all(
-                                  color:
-                                      M3Palette.warning.withValues(alpha: 0.45),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.price_change_rounded,
-                                    size: 14.0,
-                                    color: M3Palette.amberDeep,
-                                  ),
-                                  const SizedBox(width: 5.0),
-                                  Text(
-                                    'ملخص فروق الأسعار: ↑${summary.priceIncreasedCount} ↓${summary.priceDecreasedCount} +${summary.newSkusCount}',
-                                    style: const TextStyle(
-                                      fontSize: M3FontSize.labelSmallPlus,
-                                      fontWeight: FontWeight.w800,
-                                      color: M3Palette.amberDeep,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        _buildMetaChip(
+          cs,
+          Icons.receipt_long_rounded,
+          'ضريبة ${(summary.defaultVatRate * 100).toStringAsFixed(0)}%',
+        ),
+        InkWell(
+          key: const ValueKey('product_master_file_sheets_btn'),
+          onTap: _showFileSheetsModal,
+          borderRadius: M3Shape.radiusFull,
+          child: _statusChip(
+            'شيتات الأسعار (${_archivedMasterFiles.length})',
+            cs.primary,
+            icon: Icons.folder_special_rounded,
           ),
-          Wrap(
-            spacing: 10.0,
-            runSpacing: 8.0,
-            children: [
-              OutlinedButton.icon(
-                key: const ValueKey('product_master_header_sheets_btn'),
-                onPressed: _showFileSheetsModal,
-                icon: const Icon(Icons.layers_rounded, size: 18.0),
-                label: Text('File Sheets (${_archivedMasterFiles.length})'),
-              ),
-              OutlinedButton.icon(
-                key: const ValueKey('product_master_export_csv_btn'),
-                onPressed: _exportFilteredCatalogToCsv,
-                icon: const Icon(Icons.download_rounded, size: 18.0),
-                label: const Text('تصدير Excel (CSV)'),
-              ),
-              OutlinedButton.icon(
-                key: const ValueKey('product_master_add_sku_btn'),
-                onPressed: () async {
-                  final newItem = ProductMasterItemModel(
-                    serialNo: summary.totalSkus + 1,
-                    itemCode: 'FGCL-0550-0999',
-                    itemCodePrefix: 'FGCL',
-                    officialName: '',
-                    barcode: '6221133000000',
-                    category: 'الكلور والمطهرات (Chlorine & Disinfectants)',
-                    brand: 'كلوريل (Clorel)',
-                    packagingType: 'عبوة',
-                    unitsPerCarton: 12,
-                    unitPriceExclVat: 20.0,
-                    vatRate: 0.14,
-                    unitPriceInclVat: 22.80,
-                    cartonPriceExclVat: 240.0,
-                    cartonPriceInclVat: 273.60,
-                    invoiceDiscountPct: 10.0,
-                    extraDiscountPct: 0.0,
-                    netUnitInvoiceCost: 20.52,
-                    netCartonInvoiceCost: 246.24,
-                    itemType: 'عادي',
-                  );
-                  await ProductMasterScreen.showProductIdCardModal(
-                    context,
-                    apiClient: widget.apiClient,
-                    item: newItem,
-                    onUpdated: (updatedSummary) {
-                      _repo.prime(updatedSummary);
-                      if (mounted) {
-                        setState(() => _summary = updatedSummary);
-                      }
-                    },
-                  );
-                },
-                icon: const Icon(Icons.add_box_rounded, size: 18.0),
-                label: const Text('إضافة صنف جديد'),
-              ),
-              FilledButton.icon(
-                key: const ValueKey('product_master_upload_btn'),
-                onPressed: _isUploading ? null : _handleUploadMasterWorkbook,
-                icon: _isUploading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.upload_file_rounded, size: 18.0),
-                label: Text(
-                  _isUploading
-                      ? 'جاري تحديث الكارتة...'
-                      : 'رفع تحديث شيت الأسعار',
+        ),
+        if (totalChanged > 0)
+          InkWell(
+            key: const ValueKey('product_master_diff_summary_chip'),
+            onTap: () => _showUploadDiffSummaryDialog(summary),
+            borderRadius: M3Shape.radiusFull,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _statusChip('فروق', M3Palette.amberDeep,
+                    icon: Icons.price_change_rounded),
+                const SizedBox(height: 2.0),
+                M3WrapText(
+                  '↑${summary.priceIncreasedCount} ↓${summary.priceDecreasedCount} +${summary.newSkusCount}',
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: M3FontSize.tiny,
+                    color: cs.onSurfaceVariant,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -3170,9 +3010,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر حفظ تعديلات الصنف: $e')),
-      );
+      M3Feedback.showError(context, 'تعذر حفظ تعديلات الصنف: $e');
     }
   }
 

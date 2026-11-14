@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
+import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/utils/arabic_plural.dart';
 import 'package:tashil_web/core/widgets/m3_status_tag.dart';
@@ -892,19 +893,69 @@ class _StatusChip extends StatelessWidget {
   final String status;
   @override
   Widget build(BuildContext context) {
-    // M3StatusTag tones: container/on-container pairs (≥ 4.5:1), plus an icon
-    // so the state is not conveyed by colour alone.
-    final (M3StatusTone tone, IconData icon, String text) = switch (status) {
-      'optimal' => (M3StatusTone.success, AppIcons.success, 'سليم'),
-      'overstock' => (M3StatusTone.error, AppIcons.warning, 'مخزون زائد'),
-      'urgent_replenishment' => (M3StatusTone.warning, AppIcons.info, 'تموين'),
+    // Short chip + description underneath (OOS / TM / Errors finishing pass).
+    // Long phrases stay out of the 32dp chip so they never clip mid-word.
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final statusColors = M3StatusColors.of(context);
+    final (String short, String description, Color bg, Color fg) =
+        switch (status) {
+      'optimal' => (
+          'سليم',
+          'مخزون متوازن',
+          statusColors.successContainer,
+          statusColors.onSuccessContainer,
+        ),
+      'overstock' => (
+          'زائد',
+          'مخزون زائد',
+          cs.errorContainer,
+          cs.onErrorContainer,
+        ),
+      'urgent_replenishment' => (
+          'تموين',
+          'يحتاج إعادة توريد',
+          cs.tertiaryContainer,
+          cs.onTertiaryContainer,
+        ),
       _ => (
-          M3StatusTone.neutral,
-          AppIcons.info,
-          status.isEmpty ? 'غير معروف' : status,
+          status.isEmpty ? '—' : status,
+          status.isEmpty ? 'حالة غير معروفة' : status,
+          cs.surfaceContainerLowest,
+          cs.onSurfaceVariant,
         ),
     };
-    return M3StatusTag(label: text, tone: tone, icon: icon);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        M3ChipSurface(
+          color: bg,
+          child: Text(
+            short,
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.clip,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(height: M3Spacing.xxs),
+        Text(
+          description,
+          maxLines: 3,
+          softWrap: true,
+          overflow: TextOverflow.clip,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
   }
 }
 

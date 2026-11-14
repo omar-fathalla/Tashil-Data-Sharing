@@ -199,8 +199,14 @@ void main() {
     // Longest word ("التصريف") must fit the column, or it breaks mid-word.
     expect(rp.getMinIntrinsicWidth(double.infinity),
         lessThanOrEqualTo(rp.size.width + 0.5));
-    // Status tags are not truncated by the narrower columns.
-    for (final label in const ['سليم', 'مخزون زائد', 'تموين']) {
+    // Short status chips + descriptions are not truncated mid-word.
+    for (final label in const [
+      'سليم',
+      'زائد',
+      'مخزون زائد',
+      'تموين',
+      'يحتاج إعادة توريد',
+    ]) {
       final tag = tester.renderObject<RenderParagraph>(
           find.descendant(of: table, matching: find.text(label)));
       expect(tag.didExceedMaxLines, isFalse, reason: label);

@@ -35,7 +35,8 @@ class _ChainSeriesData {
   final String displayName;
   final Color color;
   final List<double> values;
-  final List<double> growthPcts;
+  /// MoM growth per month; `null` = no prior baseline (show «—», never +0.0%).
+  final List<double?> growthPcts;
   final double totalRevenue;
 
   /// Sell-In per month (null = no Sell-In data for that month).
@@ -161,7 +162,7 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
           displayName: 'الإجمالي',
           color: colorScheme.primary,
           values: effectiveTrends.map((e) => e.revenue).toList(),
-          growthPcts: List<double>.filled(effectiveTrends.length, 0.0),
+          growthPcts: List<double?>.filled(effectiveTrends.length, null),
           totalRevenue: totalRev,
           sellInValues: _sellInFor(null, effectiveTrends),
         ),
@@ -191,16 +192,18 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
 
     final raw = activeChains.map((code) {
       final values = <double>[];
-      final growths = <double>[];
+      final growths = <double?>[];
       String? backendDisplayName;
       for (int i = 0; i < effectiveTrends.length; i++) {
         final t = effectiveTrends[i];
         double val = t.chainRevenues[code] ?? 0.0;
-        double growth = 0.0;
+        double? growth;
+        var hasBackendGrowth = false;
         for (final d in t.chainDetails) {
           if (d.retailerChain.toLowerCase() == code.toLowerCase()) {
             if (val <= 0) val = d.revenue;
             growth = d.growthPct;
+            hasBackendGrowth = true;
             if (d.displayName.trim().isNotEmpty &&
                 d.displayName.trim().toLowerCase() != code.toLowerCase()) {
               backendDisplayName = d.displayName.trim();
@@ -208,8 +211,16 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
             break;
           }
         }
-        if (growth == 0.0 && i > 0 && values[i - 1] > 0 && val > 0) {
-          growth = ((val - values[i - 1]) / values[i - 1]) * 100.0;
+        // Missing prior month / zero baseline → null (UI shows «—»), not +0.0%.
+        if (!hasBackendGrowth) {
+          if (i > 0 && values[i - 1] > 0 && val > 0) {
+            growth = ((val - values[i - 1]) / values[i - 1]) * 100.0;
+          } else {
+            growth = null;
+          }
+        } else if (growth == 0.0 &&
+            (i == 0 || values[i - 1] <= 0 || val <= 0)) {
+          growth = null;
         }
         values.add(val);
         growths.add(growth);
@@ -613,10 +624,16 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
               ...seriesList.map((s) {
                 final val = idx < s.values.length ? s.values[idx] : 0.0;
                 final growth =
-                    idx < s.growthPcts.length ? s.growthPcts[idx] : 0.0;
-                final growthStr = (val > 0 && growth != 0.0)
-                    ? ' (${CurrencyFormatter.formatSignedPct(growth)})'
-                    : '';
+                    idx < s.growthPcts.length ? s.growthPcts[idx] : null;
+                final String growthStr;
+                if (val <= 0) {
+                  growthStr = '';
+                } else if (growth == null) {
+                  growthStr = ' (— · لا توجد بيانات للنمو)';
+                } else {
+                  growthStr =
+                      ' (${CurrencyFormatter.formatSignedPct(growth)})';
+                }
                 final sellOutText = val > 0
                     ? '${CurrencyFormatter.formatEGP(val)}$growthStr'
                     : 'لم تُرفع بيانات بعد';
