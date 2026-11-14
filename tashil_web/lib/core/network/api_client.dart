@@ -2275,6 +2275,20 @@ class UploadRejectedException implements Exception {
   String toString() => message;
 }
 
+/// HTTP 429 during upload/commit — not a file rejection; ask the user to retry shortly.
+class UploadRateLimitedException implements Exception {
+  final String message;
+
+  UploadRateLimitedException([this.message = uploadRateLimitMessage]);
+
+  @override
+  String toString() => message;
+}
+
+/// Arabic copy when the ingest rate limit (or Cloud Run 429) blocks an upload session.
+const String uploadRateLimitMessage =
+    'طلبات كتير دلوقتي. حاول تاني بعد شوية.';
+
 /// Client stopped waiting for a background ingest job; the server may still be saving.
 /// Never treat this as "nothing was saved" — guide the user to the files list instead.
 class UploadStillProcessingException implements Exception {
@@ -2304,6 +2318,16 @@ void throwIfUploadRefused(int statusCode, String body, String fallbackMessage) {
   }
   if (statusCode == 403) {
     throw UploadRejectedException(uploadForbiddenMessage);
+  }
+  if (statusCode == 429) {
+    String message = uploadRateLimitMessage;
+    try {
+      final j = jsonDecode(body);
+      if (j is Map && j['message'] is String && (j['message'] as String).isNotEmpty) {
+        message = j['message'] as String;
+      }
+    } catch (_) {}
+    throw UploadRateLimitedException(message);
   }
   String message = '$fallbackMessage (HTTP $statusCode)';
   try {
@@ -4490,7 +4514,7 @@ class ApiClient {
         );
         return model;
       }
-      if (resp.statusCode == 422 || resp.statusCode == 409) {
+      if (resp.statusCode == 422 || resp.statusCode == 409 || resp.statusCode == 429) {
         final blocked = PreuploadCheckReport.tryParseBlocked(resp.body);
         if (blocked != null) {
           throw PreuploadBlockedException(blocked);
@@ -4502,6 +4526,8 @@ class ApiClient {
     } on PreuploadBlockedException {
       rethrow;
     } on UploadRejectedException {
+      rethrow;
+    } on UploadRateLimitedException {
       rethrow;
     } on UploadConfirmationRequiredException {
       rethrow;
@@ -4646,15 +4672,19 @@ class ApiClient {
     _stagedLocalArchiveRollback.remove(batchId);
     try {
       final uri = Uri.parse(ApiEndpoints.ingestCommit);
+      final authHeaders = {
+        'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
+        'X-Tenant-ID': _asciiSafeHeader(effectiveTenant),
+        'Content-Type': 'application/json',
+        // Large commits (80k+ rows) exceed Cloud Run / WriteTimeout when sync;
+        // always take the 202 + poll path (server also forces async for commit).
+        BackendHttp.asyncJobHeader: '1',
+        if (currentUser != null && currentUser!.role.isNotEmpty)
+          'X-Simulated-Role': _asciiSafeHeader(currentUser!.role),
+      };
       final resp = await BackendHttp.post(
         uri,
-        headers: {
-          'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
-          'X-Tenant-ID': _asciiSafeHeader(effectiveTenant),
-          'Content-Type': 'application/json',
-          if (currentUser != null && currentUser!.role.isNotEmpty)
-            'X-Simulated-Role': _asciiSafeHeader(currentUser!.role),
-        },
+        headers: authHeaders,
         body: jsonEncode({
           'batch_id': batchId,
           if (targetChain != null && targetChain.isNotEmpty) 'chain': targetChain,
@@ -4663,18 +4693,38 @@ class ApiClient {
           if (replaceConfirmed) 'replace_confirmed': true,
           if (periodChoice != null && periodChoice.isNotEmpty) 'period_choice': periodChoice,
         }),
-      ).timeout(const Duration(seconds: 120));
+      ).timeout(const Duration(seconds: 120)).then((r) => BackendHttp.awaitJob(r, headers: {
+            'Authorization': 'Bearer ${_asciiSafeHeader(authToken)}',
+            'X-Tenant-ID': _asciiSafeHeader(effectiveTenant),
+          }));
 
       if (resp.statusCode == 200) {
         return IngestionResultModel.fromJson(jsonDecode(resp.body) as Map<String, dynamic>);
       }
+      if (resp.statusCode == 504) {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is Map && decoded['still_processing'] == true) {
+          throw UploadStillProcessingException(
+            decoded['message'] is String
+                ? decoded['message'] as String
+                : UploadStillProcessingException().message,
+          );
+        }
+      }
       // A refused commit saved nothing: never report it as saved. (Server checks answer 409/422; in
       // offline/test mode other statuses still fall back to the local preview.)
-      if (resp.statusCode == 409 || resp.statusCode == 422 || !allowMockFallback) {
+      if (resp.statusCode == 409 ||
+          resp.statusCode == 422 ||
+          resp.statusCode == 429 ||
+          !allowMockFallback) {
         throwIfUploadRefused(resp.statusCode, resp.body, 'فشل حفظ البيانات ومفيش حاجة اتحفظت');
       }
       throw Exception('commit HTTP ${resp.statusCode}');
     } on UploadRejectedException {
+      rethrow;
+    } on UploadRateLimitedException {
+      rethrow;
+    } on UploadStillProcessingException {
       rethrow;
     } on UploadConfirmationRequiredException {
       rethrow;
@@ -8992,12 +9042,18 @@ class ApiClient {
       if (resp.statusCode == 504) {
         throw UploadStillProcessingException();
       }
-      // Rejected or needs an answer: nothing was saved, so never show a fake success.
-      if (resp.statusCode == 403 || resp.statusCode == 409 || resp.statusCode == 422 || !allowMockFallback) {
+      // Rejected, rate-limited, or needs an answer: nothing was saved, so never show a fake success.
+      if (resp.statusCode == 403 ||
+          resp.statusCode == 409 ||
+          resp.statusCode == 422 ||
+          resp.statusCode == 429 ||
+          !allowMockFallback) {
         throwIfUploadRefused(resp.statusCode, resp.body, 'فشل رفع ملف التوريد');
       }
       throw Exception('فشل رفع ملف التوريد (${resp.statusCode})');
     } on UploadRejectedException {
+      rethrow;
+    } on UploadRateLimitedException {
       rethrow;
     } on UploadStillProcessingException {
       rethrow;

@@ -415,9 +415,12 @@ func main() {
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/approve", competitorSuggestionsHandler.HandleApproveSuggestion)
 	mux.HandleFunc("POST /api/v1/competitors/suggestions/reject", competitorSuggestionsHandler.HandleRejectSuggestion)
 
-	// 6. Wrap Middleware Chain: CORS -> Data-ready gate -> Auth -> Snapshot hook -> Router
+	// 6. Wrap Middleware Chain: CORS -> ingest rate limit -> Data-ready gate -> Auth -> Snapshot hook -> Router
+	// Ingest rate limit sits inside CORS so 429s keep Access-Control-* headers for Flutter Web.
+	// OPTIONS is answered by CORS (and also exempt inside the limiter) so preflights never 429.
 	protectedHandler := authMiddleware.Handler(middleware.ETag(newAsyncJobs(archDir).wrap(snapshotOnMutation(mux, ingestProcessor))))
-	corsHandler := middleware.CORS(waitForData(protectedHandler, dataReady, archiveReady))
+	gated := waitForData(protectedHandler, dataReady, archiveReady)
+	corsHandler := middleware.CORS(middleware.NewIngestRateLimiter().Handler(gated))
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
