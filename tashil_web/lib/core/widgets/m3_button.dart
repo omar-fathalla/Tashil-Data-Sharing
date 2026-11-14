@@ -230,18 +230,23 @@ class M3PageHeader extends StatelessWidget {
     final isCompact = screenWidth < 600;
     final stacked = screenWidth < stackActionsBelow;
 
+    // Always use a bounded Row (Expanded, not Flexible + mainAxisSize.min).
+    // A min-sized Row lets a long Arabic headline take its intrinsic width
+    // and stretch the page past the viewport, clipping the RTL start.
     final titleRow = Row(
-      mainAxisSize: stacked ? MainAxisSize.max : MainAxisSize.min,
       children: [
         if (leading != null) ...[
           leading!,
           const SizedBox(width: M3Spacing.s12),
         ],
-        Flexible(
+        Expanded(
           child: Text(
             title,
             style: theme.textTheme.headlineSmall
                 ?.copyWith(color: colorScheme.onSurface),
+            softWrap: true,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -257,6 +262,9 @@ class M3PageHeader extends StatelessWidget {
             subtitle!,
             style: theme.textTheme.bodyMedium
                 ?.copyWith(color: colorScheme.onSurfaceVariant),
+            softWrap: true,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ],

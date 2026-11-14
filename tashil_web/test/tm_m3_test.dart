@@ -2,6 +2,7 @@
 // grid), tables fit 1280-with-sidebar (≈1024 content) with no horizontal
 // scroll and wrap ≤3 lines, «—» + «لا توجد بيانات للعام السابق» without
 // last-year data, Arabic plurals. Real Cairo font; made-up fixtures.
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -11,11 +12,14 @@ import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
+import 'package:tashil_web/core/widgets/m3_button.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
+import 'package:tashil_web/features/trade_marketing/domain/roi_lift.dart';
 import 'package:tashil_web/features/trade_marketing/presentation/screens/trade_marketing_roi_screen.dart';
 
+import 'support/live_viewport.dart';
 import 'support/real_fonts.dart';
 import 'support/tm_fixture.dart';
 
@@ -166,5 +170,60 @@ void main() {
     expect(tmActivitiesCount(5), '5 أنشطة');
     expect(tmActivitiesCount(30), '30 نشاطًا');
     expect(tmActivitiesCount(300), '300 نشاط');
+  });
+
+  testWidgets(
+      'header, tabs and KPI cards stay inside 1280-with-sidebar content',
+      (tester) async {
+    await _pump(tester, kLiveContentWidth, _tm());
+    expect(tester.takeException(), isNull);
+    final header = find.byType(M3PageHeader);
+    expect(header, findsOneWidget);
+    expect(tester.getSize(header).width,
+        lessThanOrEqualTo(kLiveContentWidth + 0.5));
+    final romi = tester.getRect(find.byKey(const ValueKey('tm_kpi_romi')));
+    expect(romi.right, lessThanOrEqualTo(kLiveContentWidth + 0.5));
+    expect(romi.left, greaterThanOrEqualTo(-0.5));
+    final spend = tester.getRect(find.byKey(const ValueKey('tm_kpi_spend')));
+    expect(spend.left, greaterThanOrEqualTo(-0.5));
+    expect(find.text('Trade Marketing & Promo ROI'), findsOneWidget);
+    expect(find.text('Activity & Brand Analytics'), findsOneWidget);
+    expect(find.text('Export Excel'), findsOneWidget);
+  });
+
+  testWidgets('ROMI method tooltip appears on card hover', (tester) async {
+    await _pump(tester, kLiveContentWidth, _tm());
+    final tooltip = tester.widget<Tooltip>(find
+        .descendant(
+          of: find.byKey(const ValueKey('tm_kpi_romi')),
+          matching: find.byType(Tooltip),
+        )
+        .first);
+    expect(tooltip.message, kRoiLiftMethodExplainerAr);
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(
+        location: tester.getCenter(find.byKey(const ValueKey('tm_kpi_romi'))));
+    addTearDown(gesture.removePointer);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.textContaining('العائد = الزيادة عن المبيعات المتوقعة'),
+        findsWidgets);
+  });
+
+  testWidgets('ROI simulator dialog stays inside a 1280 viewport',
+      (tester) async {
+    await _pump(tester, kLiveViewportWidth, _tm());
+    await tester.ensureVisible(find.byKey(const ValueKey('btn_roi_simulator')));
+    await tester.tap(find.byKey(const ValueKey('btn_roi_simulator')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final dialog = find.byType(AlertDialog);
+    expect(dialog, findsOneWidget);
+    final rect = tester.getRect(dialog);
+    expect(rect.left, greaterThanOrEqualTo(-0.5),
+        reason: 'dialog clipped on the start: $rect');
+    expect(rect.right, lessThanOrEqualTo(kLiveViewportWidth + 0.5),
+        reason: 'dialog clipped on the end: $rect');
+    expect(find.text('محاكي العائد التسويقي الذكي'), findsOneWidget);
   });
 }

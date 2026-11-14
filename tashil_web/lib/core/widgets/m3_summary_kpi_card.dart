@@ -59,6 +59,7 @@ class M3SummaryKpiCard extends StatelessWidget {
     this.subtitleMaxLines = 1,
     this.titleTooltip,
     this.subtitleTooltip,
+    this.cardTooltip,
     this.isLoading = false,
     this.titleKey,
     this.valueKey,
@@ -80,6 +81,10 @@ class M3SummaryKpiCard extends StatelessWidget {
   final String? titleTooltip;
   /// Optional tooltip with the full wording when the visible subtitle is shortened.
   final String? subtitleTooltip;
+  /// Optional tooltip for the whole card (hover anywhere, including the value).
+  /// When set, inner title/value/subtitle tooltips are skipped so they do not
+  /// swallow the pointer and hide this message.
+  final String? cardTooltip;
   final bool isLoading;
   final Key? titleKey;
   final Key? valueKey;
@@ -92,7 +97,8 @@ class M3SummaryKpiCard extends StatelessWidget {
     final valueStyle =
         M3SummaryKpiStyle.valueStyle(context, textValue: textValue);
     final subtitleStyle = M3SummaryKpiStyle.subtitleStyle(context);
-    return Container(
+    final useCardTooltip = cardTooltip != null && cardTooltip!.isNotEmpty;
+    final card = Container(
       padding: M3SummaryKpiStyle.padding,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
@@ -117,7 +123,7 @@ class M3SummaryKpiCard extends StatelessWidget {
               ),
               const SizedBox(width: M3SummaryKpiStyle.iconGap),
               Expanded(
-                child: titleTooltip == null
+                child: useCardTooltip || titleTooltip == null
                     ? M3SectionTitle(
                         title,
                         key: titleKey,
@@ -146,20 +152,30 @@ class M3SummaryKpiCard extends StatelessWidget {
             const SizedBox(height: M3SummaryKpiStyle.valueGap),
             const M3SkeletonBox(width: 180.0, height: 12.0),
           ] else ...[
-            // Up to 2 lines; the full value is always in the tooltip.
-            Tooltip(
-              message: value,
-              child: Text(
-                value,
-                key: valueKey,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: valueStyle,
-                strutStyle: M3SummaryKpiStyle.strut(valueStyle),
-              ),
-            ),
+            // Up to 2 lines; the full value is in the tooltip unless a
+            // card-level tooltip (e.g. ROMI method) covers the whole card.
+            useCardTooltip
+                ? Text(
+                    value,
+                    key: valueKey,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: valueStyle,
+                    strutStyle: M3SummaryKpiStyle.strut(valueStyle),
+                  )
+                : Tooltip(
+                    message: value,
+                    child: Text(
+                      value,
+                      key: valueKey,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: valueStyle,
+                      strutStyle: M3SummaryKpiStyle.strut(valueStyle),
+                    ),
+                  ),
             const SizedBox(height: M3SummaryKpiStyle.valueGap),
-            subtitleTooltip == null
+            useCardTooltip || subtitleTooltip == null
                 ? Text(
                     subtitle,
                     key: subtitleKey,
@@ -182,6 +198,14 @@ class M3SummaryKpiCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+    if (!useCardTooltip) return card;
+    return Tooltip(
+      message: cardTooltip!,
+      waitDuration: const Duration(milliseconds: 300),
+      showDuration: const Duration(seconds: 8),
+      preferBelow: true,
+      child: card,
     );
   }
 }

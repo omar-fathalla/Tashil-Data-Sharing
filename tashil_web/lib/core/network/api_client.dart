@@ -2400,6 +2400,29 @@ class ApiClient {
   static void installSessionGuard() {
     BackendHttp.onResponseStatus = reportAuthStatus;
   }
+
+  static const Duration sessionVerifyTimeout = Duration(seconds: 8);
+
+  /// Confirms the current token is still accepted by the backend.
+  ///
+  /// Returns false only when the token is missing or the server answers 401
+  /// (expired, rotated secret, or otherwise rejected). Timeouts, network
+  /// errors, and other HTTP statuses return true so a brief outage does not
+  /// force a re-login; later 401s still go through [reportAuthStatus].
+  Future<bool> verifySession() async {
+    if (_authToken.isEmpty) return false;
+    try {
+      final resp = await BackendHttp.get(
+        Uri.parse(ApiEndpoints.sessionMe),
+        headers: requestHeaders,
+      ).timeout(sessionVerifyTimeout);
+      return resp.statusCode != 401;
+    } on TimeoutException {
+      return true;
+    } catch (_) {
+      return true;
+    }
+  }
   String? lastConnectionError;
 
   ApiClient({

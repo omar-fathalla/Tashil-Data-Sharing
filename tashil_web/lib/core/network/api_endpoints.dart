@@ -78,6 +78,7 @@ class ApiEndpoints {
   static String get authForgotPassword => '$baseUrl/api/v1/auth/forgot-password';
   static String get authResetPassword => '$baseUrl/api/v1/auth/reset-password';
   static String get authChangePassword => '$baseUrl/api/v1/auth/change-password';
+  static String get sessionMe => '$baseUrl/api/v1/me';
   static String portalMeta(String slug) => '$baseUrl/api/v1/portal/$slug/meta';
 
   // Super Admin Provisioning & Security Audit Endpoints
