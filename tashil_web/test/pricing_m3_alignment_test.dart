@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/features/pricing_compliance/presentation/screens/pricing_compliance_screen.dart';
@@ -113,6 +114,88 @@ void main() {
   ignoreGoogleFontLoadErrors();
   setUpAll(loadPricingFonts);
   setUp(AppCache.clear);
+
+  testWidgets(
+      'empty load: compliance + promo KPIs show «—» notes, not fake 100.0% / 0.0%',
+      (tester) async {
+    await pumpPricing(
+      tester,
+      PricingComplianceScreen(apiClient: PricingEmptyApiClient()),
+      width: 1280,
+    );
+    expect(find.textContaining('100.0%'), findsNothing);
+    expect(find.textContaining('+0.0%'), findsNothing);
+    expect(find.textContaining('0.0%'), findsNothing);
+
+    final compliance =
+        tester.widget<Text>(find.byKey(const ValueKey('kpi_value_Compliance Rate')));
+    expect(compliance.data, '—');
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('kpi_subtitle_Compliance Rate')))
+          .data,
+      'لا توجد أصناف لحساب الالتزام',
+    );
+
+    final promo =
+        tester.widget<Text>(find.byKey(const ValueKey('kpi_value_Avg Promo Uplift')));
+    expect(promo.data, '—');
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('kpi_subtitle_Avg Promo Uplift')))
+          .data,
+      'لا توجد أصناف لحساب الأثر الترويجي',
+    );
+
+    // Status chips use M3ChipSurface geometry (empty → no table chips, but
+    // KPI dash honesty is the P0 empty-state contract).
+    expect(find.byKey(const ValueKey('pricing_empty')), findsOneWidget);
+  });
+
+  testWidgets(
+      'items without promos: avg uplift is «—» + Arabic note, not fake 0.0%',
+      (tester) async {
+    await pumpPricing(
+      tester,
+      PricingComplianceScreen(apiClient: PricingNoPromoApiClient()),
+      width: 1280,
+    );
+    expect(find.textContaining('100.0%'), findsNothing);
+    final promo =
+        tester.widget<Text>(find.byKey(const ValueKey('kpi_value_Avg Promo Uplift')));
+    expect(promo.data, '—');
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('kpi_subtitle_Avg Promo Uplift')))
+          .data,
+      'لا توجد عروض نشطة للمقارنة',
+    );
+    // Compliance still has a real rate from the fixture.
+    final compliance =
+        tester.widget<Text>(find.byKey(const ValueKey('kpi_value_Compliance Rate')));
+    expect(compliance.data, isNot('—'));
+    expect(compliance.data, isNot('100.0%'));
+    expect(find.text('بدون عرض'), findsWidgets);
+    expect(find.text('أثر ترويجي'), findsNothing);
+  });
+
+  testWidgets(
+      'populated fixture keeps real compliance % and short status chips',
+      (tester) async {
+    await pumpPricing(
+      tester,
+      PricingComplianceScreen(apiClient: PricingShotApiClient()),
+      width: 1280,
+    );
+    expect(find.text('33.3%'), findsOneWidget);
+    expect(find.textContaining('لا توجد أصناف لحساب الالتزام'), findsNothing);
+    expect(find.text('حرق سعر'), findsWidgets);
+    expect(find.text('مطابق'), findsWidgets);
+    expect(find.text('زيادة سعر'), findsWidgets);
+    expect(find.text('أثر ترويجي'), findsWidgets);
+    expect(find.text('بدون عرض'), findsWidgets);
+    expect(find.byType(M3ChipSurface), findsWidgets);
+  });
 
   for (final width in [1280.0, 1024.0]) {
     testWidgets(

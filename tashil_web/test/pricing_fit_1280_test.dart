@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
+import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/features/pricing_compliance/presentation/screens/pricing_compliance_screen.dart';
 import 'package:tashil_web/features/product_master/presentation/screens/product_master_screen.dart';
@@ -129,6 +130,9 @@ void main() {
     expect(_onScreen(tester, find.text('حرق سعر')), isTrue);
     expect(find.text('بدون عرض'), findsWidgets);
     expect(_onScreen(tester, find.text('بدون عرض')), isTrue);
+    // Short chip + description (M3ChipSurface), not a full sentence inside the chip.
+    expect(find.byType(M3ChipSurface), findsWidgets);
+    expect(find.textContaining('عن السعر الموصى به'), findsWidgets);
   });
 
   testWidgets('Long Active Promos category names wrap instead of ellipsizing',
