@@ -47,6 +47,7 @@ class _FitApiClient extends PricingShotApiClient {
     String? searchQuery,
     String? targetTenant,
     String? fileType,
+    bool forceRefresh = false,
   }) async {
     return const UploadedFilesArchiveResponse(
       tenantId: 'tenant-adeco',

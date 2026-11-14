@@ -193,6 +193,7 @@ class FakeProductMasterApiClient extends ApiClient {
     String? searchQuery,
     String? targetTenant,
     String? fileType,
+    bool forceRefresh = false,
   }) async {
     const files = [
       ArchivedExcelFileModel(

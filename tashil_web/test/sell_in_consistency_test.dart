@@ -47,6 +47,7 @@ class _Api extends ApiClient {
     String? searchQuery,
     String? targetTenant,
     String? fileType,
+    bool forceRefresh = false,
   }) async {
     final files = [
       for (final f in [

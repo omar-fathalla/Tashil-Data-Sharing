@@ -56,6 +56,7 @@ class _FailingArchiveApi extends ApiClient {
     String? searchQuery,
     String? targetTenant,
     String? fileType,
+    bool forceRefresh = false,
   }) async =>
       throw ArchiveLoadException('HTTP 429');
 }
