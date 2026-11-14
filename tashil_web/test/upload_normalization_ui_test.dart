@@ -20,7 +20,10 @@ class _FakeRegistry implements CustomerRegistryDataSource {
   _FakeRegistry(this.entries);
 
   @override
-  Future<List<RegistryEntry>> list({String status = ''}) async =>
+  Future<List<RegistryEntry>> list({
+    String status = '',
+    bool includeSeed = false,
+  }) async =>
       entries.where((e) => status.isEmpty || e.status == status).toList();
 
   @override
@@ -218,6 +221,8 @@ void main() {
       }),
     ]);
     await tester.pumpWidget(MaterialApp(home: PendingCustomersScreen(dataSource: fake)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('محتاج تأكيد'));
     await tester.pumpAndSettle();
     expect(find.text('QA عميل تجريبي'), findsOneWidget);
     expect(find.textContaining('اقتراح بس'), findsOneWidget);

@@ -87,16 +87,17 @@ func TestParseProductMasterWorkbook_SeedFile(t *testing.T) {
 		t.Errorf("expected MatchesProductSearchQuery to match barcode 6223000231227")
 	}
 
-	// Write canonical seed JSON and XLSX copy if missing or updated
-	outDir := filepath.Join("..", "..", "..", "data", "product_master")
-	if err := os.MkdirAll(outDir, 0o755); err == nil {
-		jsonBytes, err := json.MarshalIndent(res, "", "  ")
-		if err == nil {
-			_ = os.WriteFile(filepath.Join(outDir, "tenant-adeco.json"), jsonBytes, 0o644)
-		}
-		xlsxDest := filepath.Join(outDir, "adeco_product_master_2026_08_01.xlsx")
-		if _, statErr := os.Stat(xlsxDest); os.IsNotExist(statErr) {
-			_ = os.WriteFile(xlsxDest, rawBytes, 0o644)
-		}
+	// Round-trip marshal into a temp dir only — never rewrite repo seed data.
+	outDir := t.TempDir()
+	jsonBytes, err := json.MarshalIndent(res, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal product master summary: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "tenant-adeco.json"), jsonBytes, 0o644); err != nil {
+		t.Fatalf("write temp tenant-adeco.json: %v", err)
+	}
+	xlsxDest := filepath.Join(outDir, "adeco_product_master_2026_08_01.xlsx")
+	if err := os.WriteFile(xlsxDest, rawBytes, 0o644); err != nil {
+		t.Fatalf("write temp seed xlsx: %v", err)
 	}
 }

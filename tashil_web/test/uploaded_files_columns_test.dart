@@ -21,6 +21,7 @@ class _ArchiveApi extends ApiClient {
     String? searchQuery,
     String? targetTenant,
     String? fileType,
+    bool forceRefresh = false,
   }) async {
     final files = (byType[fileType] ?? const [])
         .map(ArchivedExcelFileModel.fromJson)

@@ -52,6 +52,7 @@ class UploadFixtureApi extends ApiClient {
     String? searchQuery,
     String? targetTenant,
     String? fileType,
+    bool forceRefresh = false,
   }) async {
     final files = [
       ArchivedExcelFileModel(
@@ -137,6 +138,7 @@ class UploadLiveFixtureApi extends UploadFixtureApi {
     String? searchQuery,
     String? targetTenant,
     String? fileType,
+    bool forceRefresh = false,
   }) async {
     final base = await super.getUploadedFilesArchive(
       chain: chain,
@@ -144,6 +146,7 @@ class UploadLiveFixtureApi extends UploadFixtureApi {
       searchQuery: searchQuery,
       targetTenant: targetTenant,
       fileType: fileType,
+      forceRefresh: forceRefresh,
     );
     return UploadedFilesArchiveResponse(
       tenantId: base.tenantId,
