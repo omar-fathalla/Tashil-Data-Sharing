@@ -601,6 +601,24 @@ void main() {
   });
 
   testWidgets(
+      'table severity/type use short chip + description underneath',
+      (tester) async {
+    await _pumpPage(tester, width: 1280);
+    final table = find.byKey(const ValueKey('dq_table'));
+    expect(table, findsOneWidget);
+    expect(
+        find.descendant(of: table, matching: find.text('حرجة')), findsWidgets);
+    expect(
+        find.descendant(of: table, matching: find.text('تحذير')), findsWidgets);
+    expect(
+        find.descendant(of: table, matching: find.text('ناقص')), findsWidgets);
+    expect(
+        find.descendant(of: table, matching: find.text(kLongTypeMissing)),
+        findsWidgets);
+    expect(find.textContaining('+0.0%'), findsNothing);
+  });
+
+  testWidgets(
       'Errors table, headers and type chips fit at the live 1030 content width',
       (tester) async {
     await _pumpPage(tester, width: kLiveContentWidth);

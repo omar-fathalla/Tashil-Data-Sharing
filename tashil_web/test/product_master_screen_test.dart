@@ -409,8 +409,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify header, 5th KPI card, and SKUs are rendered
-    expect(find.textContaining('كارتة الأصناف والأسعار المعتمدة'), findsOneWidget);
+    // Verify M3 page header, 5th KPI card, and SKUs are rendered
+    expect(find.byKey(const ValueKey('product_master_page_header')),
+        findsOneWidget);
+    expect(find.text('Product Master & Price List'), findsOneWidget);
+    expect(find.text('كارتة الأصناف والأسعار'), findsOneWidget);
     expect(find.textContaining('التغطية بالسلاسل'), findsOneWidget);
     expect(find.byKey(const ValueKey('product_master_tabs')), findsOneWidget);
     expect(find.text('مسحوب'), findsWidgets);

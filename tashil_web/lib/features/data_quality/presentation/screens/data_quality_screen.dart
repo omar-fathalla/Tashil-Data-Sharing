@@ -725,8 +725,9 @@ class _IssuesTable extends StatelessWidget {
 
         // Short severity chip only (color encodes critical vs warning). An
         // in-chip icon steals width from the 52-flex column and mid-splits
-        // «تحذير» / «حرجة» at the live 1030 shell.
-        Widget wrapTag(int i, String label,
+        // «تحذير» / «حرجة» at the live 1030 shell. Status column already
+        // uses short chip + description underneath.
+        Widget wrapSeverity(int i, String label,
             {required Color color, required Color onColor}) {
           return cellBox(
             i,
@@ -744,6 +745,50 @@ class _IssuesTable extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
+            ),
+          );
+        }
+
+        // Type: short chip + full label underneath (TM / summary-chip pattern).
+        // UnconstrainedBox keeps the chip at intrinsic width so short words
+        // never mid-split inside the 104-flex column.
+        Widget wrapType(int i, DataQualityIssue issue) {
+          return cellBox(
+            i,
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                UnconstrainedBox(
+                  child: M3ChipSurface(
+                    color: cs.surfaceContainerLowest,
+                    borderColor: cs.outlineVariant,
+                    child: Text(
+                      dqTypeShort(issue.type, issue.typeLabel),
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.clip,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        fontSize: M3FontSize.labelSmallPlus,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: M3Spacing.xxs),
+                Text(
+                  issue.typeLabel,
+                  maxLines: 3,
+                  softWrap: true,
+                  overflow: TextOverflow.clip,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           );
         }
@@ -810,7 +855,7 @@ class _IssuesTable extends StatelessWidget {
                     if (i.statusReason.isNotEmpty) i.statusReason,
                   ].join(' · ');
                   return DataRow(cells: [
-                    DataCell(wrapTag(
+                    DataCell(wrapSeverity(
                       0,
                       i.severity,
                       color:
@@ -819,7 +864,7 @@ class _IssuesTable extends StatelessWidget {
                           ? cs.onErrorContainer
                           : cs.onTertiaryContainer,
                     )),
-                    DataCell(cellText(1, i.typeLabel)),
+                    DataCell(wrapType(1, i)),
                     DataCell(cellText(
                       2,
                       i.row > 0
@@ -958,14 +1003,16 @@ class _StatusDialogState extends State<_StatusDialog> {
                 Text(
                   '${widget.issue.typeLabel} — ${widget.issue.itemCode}',
                   maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
+                  overflow: TextOverflow.clip,
                 ),
                 if (widget.issue.itemName.isNotEmpty) ...[
                   const SizedBox(height: M3Spacing.xs),
                   Text(
                     widget.issue.itemName,
                     maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+                    softWrap: true,
+                    overflow: TextOverflow.clip,
                   ),
                 ],
                 M3Spacing.gapSM,

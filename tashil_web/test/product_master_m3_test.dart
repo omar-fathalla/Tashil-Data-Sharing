@@ -8,7 +8,6 @@ import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_equal_height_grid.dart';
 import 'package:tashil_web/core/widgets/m3_responsive_tab_bar.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
-import 'package:tashil_web/core/widgets/m3_toolbar_button.dart';
 import 'package:tashil_web/core/widgets/m3_wrap_text.dart';
 import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
@@ -141,16 +140,18 @@ void main() {
     expect(_horizontalExtent(tester), lessThanOrEqualTo(2.0),
         reason: 'catalog still scrolls horizontally');
 
+    // Sell-Out / Errors / OOS symmetry: M3PageHeader + tonal M3ButtonGroup.
+    expect(find.byKey(const ValueKey('product_master_page_header')),
+        findsOneWidget);
+    expect(find.text('Product Master & Price List'), findsOneWidget);
+    expect(find.text('كارتة الأصناف والأسعار'), findsOneWidget);
     final button =
         find.byKey(const ValueKey('product_master_export_csv_btn'));
     expect(button, findsOneWidget);
     expect(find.descendant(of: button, matching: find.text('تصدير Excel (CSV)')),
         findsOneWidget);
-    final material =
-        find.descendant(of: button, matching: find.byType(Material)).first;
-    expect(
-        tester.getSize(material).height, closeTo(M3ToolbarButton.height, 0.5));
-    expect(tester.widget<Material>(material).shape, isA<StadiumBorder>());
+    expect(find.byKey(const ValueKey('product_master_upload_btn')),
+        findsOneWidget);
 
     expect(find.textContaining('البادئة'), findsWidgets);
     expect(find.textContaining('العلامة'), findsWidgets);

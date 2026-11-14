@@ -22,6 +22,7 @@ class BentoKpiGrid extends StatelessWidget {
 
   /// One-line YoY/MoM detail. When last-year data is missing, the value is
   /// «—» and the explanation sits on the same detail line (Sell-Out 138px).
+  /// Never advertise a fake +0.0% YoY when the prior year is empty.
   static String _yearDetail({
     required bool yoyAvailable,
     required double momPct,

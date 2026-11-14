@@ -13,6 +13,7 @@ import 'package:tashil_web/core/theme/m3_status_colors.dart';
 import 'package:tashil_web/core/widgets/m3_feedback.dart';
 import 'package:tashil_web/core/widgets/kpi_card.dart';
 import 'package:tashil_web/core/widgets/m3_segment_label.dart';
+import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_status_tag.dart';
 import 'package:tashil_web/core/widgets/m3_tonal_surface.dart';
 import 'package:tashil_web/features/executive_dashboard/presentation/screens/executive_screen.dart';
@@ -189,33 +190,36 @@ void main() {
         _contrast(icon.color!, cs.inverseSurface), greaterThanOrEqualTo(3.0));
   });
 
-  testWidgets('Inventory status tags meet text contrast', (tester) async {
+  testWidgets('Inventory status chips: short word + description, contrast OK',
+      (tester) async {
     await _pump(tester, const Size(1440, 1400));
     expect(find.byType(MarketShareSection), findsOneWidget);
-    final tags = find.descendant(
-        of: find.descendant(
-            of: find.byKey(const ValueKey('stock_per_sku_table')),
-            matching: find.byType(Table)),
-        matching: find.byType(M3StatusTag));
-    expect(tags, findsNWidgets(3));
-    for (final label in ['سليم', 'مخزون زائد', 'تموين']) {
-      expect(find.text(label), findsOneWidget);
+    final stock = find.byKey(const ValueKey('stock_per_sku_table'));
+    expect(stock, findsOneWidget);
+    // Short chip labels + descriptions underneath (OOS / TM pattern).
+    for (final label in ['سليم', 'زائد', 'تموين']) {
+      expect(find.descendant(of: stock, matching: find.text(label)),
+          findsOneWidget,
+          reason: 'short status chip "$label"');
     }
-    // Pixel-sampling textContrastGuideline is unreliable with test fonts, so
-    // check the resolved role pairs used by each tag directly.
-    final ctx = tester.element(tags.first);
+    for (final desc in ['مخزون متوازن', 'مخزون زائد', 'يحتاج إعادة توريد']) {
+      expect(find.descendant(of: stock, matching: find.text(desc)),
+          findsOneWidget,
+          reason: 'status description "$desc"');
+    }
+    final chips = find.descendant(
+        of: find.descendant(of: stock, matching: find.byType(Table)),
+        matching: find.byType(M3ChipSurface));
+    expect(chips, findsWidgets);
+    final ctx = tester.element(chips.first);
     final status = M3StatusColors.of(ctx);
     final cs = Theme.of(ctx).colorScheme;
     for (final (bg, fg) in [
       (status.successContainer, status.onSuccessContainer),
-      (status.warningContainer, status.onWarningContainer),
+      (cs.tertiaryContainer, cs.onTertiaryContainer),
       (cs.errorContainer, cs.onErrorContainer),
     ]) {
       expect(_contrast(fg, bg), greaterThanOrEqualTo(4.5));
-    }
-    for (final t in tester.widgetList<Text>(
-        find.descendant(of: tags, matching: find.byType(Text)))) {
-      expect(t.style?.color, isNotNull);
     }
   });
 
@@ -337,8 +341,9 @@ void main() {
     expect(name.style?.color, cs.onSurface);
     expect(name.maxLines, 3); // long SKU names wrap to 3 lines (tooltip has the rest)
     expect(name.overflow, isNot(TextOverflow.ellipsis));
-    // Stock numeric cells are centred; status chip is present (wrap ≤3 table).
+    // Stock numeric cells are centred; short status chips + descriptions.
     expect(find.text('سليم'), findsOneWidget);
+    expect(find.text('زائد'), findsOneWidget);
     expect(find.text('مخزون زائد'), findsOneWidget);
     expect(find.text('تموين'), findsOneWidget);
     expect(tester.takeException(), isNull);
