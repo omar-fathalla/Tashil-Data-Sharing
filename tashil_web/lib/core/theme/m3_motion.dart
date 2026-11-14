@@ -219,11 +219,13 @@ class M3FadeThroughSwitcher extends StatelessWidget {
       switchOutCurve: M3Motion.emphasizedAccelerate,
       transitionBuilder: M3Motion.fadeThroughTransitionBuilder,
       layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+        // Outgoing pages must not steal hits while fading (and must not
+        // block the next destination if layout is incomplete).
         return Stack(
           alignment: alignment,
           fit: fit,
           children: <Widget>[
-            ...previousChildren,
+            for (final w in previousChildren) IgnorePointer(child: w),
             if (currentChild != null) currentChild,
           ],
         );

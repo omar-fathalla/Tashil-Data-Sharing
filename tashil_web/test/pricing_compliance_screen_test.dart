@@ -32,7 +32,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Check Screen Header
-      expect(find.textContaining('Pricing & Promo Compliance'), findsOneWidget);
+      expect(find.textContaining('Pricing & Promos'), findsOneWidget);
 
       // Check Summary KPI Cards
       expect(find.textContaining('معدل الالتزام السعري'), findsOneWidget);
@@ -193,7 +193,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Pricing & Promo Compliance'), findsOneWidget);
+      expect(find.textContaining('Pricing & Promos'), findsOneWidget);
       expect(find.textContaining('السعر الفعلي'), findsWidgets);
     });
 

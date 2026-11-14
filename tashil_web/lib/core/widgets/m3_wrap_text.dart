@@ -11,12 +11,16 @@ class M3WrapText extends StatefulWidget {
     super.key,
     this.style,
     this.maxLines = 3,
-    this.textAlign,
+    this.textAlign = TextAlign.center,
   });
 
   final String text;
   final TextStyle? style;
   final int maxLines;
+
+  /// Defaults to [TextAlign.center] so name columns match other cells
+  /// (headers and body share one axis). Pass [TextAlign.start] only when a
+  /// column intentionally opts out.
   final TextAlign? textAlign;
 
   @override

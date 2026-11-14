@@ -1173,32 +1173,36 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   }
 
   /// Short status chip matching Sell-Out / Trade Marketing geometry.
-  Widget _statusChip(String label, Color color, {Key? key, IconData? icon}) =>
-      M3ChipSurface(
-        key: key,
-        color: color.withValues(alpha: 0.14),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 14.0, color: color),
-              const SizedBox(width: M3Spacing.xxs),
-            ],
-            Flexible(
-              child: M3WrapText(
-                label,
-                maxLines: 3,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: M3FontSize.labelSmallPlus,
-                  color: color,
-                ),
-              ),
+  /// Labels stay on one line (no wrap) so «مسحوب» never clips as «مسحو / ب».
+  Widget _statusChip(String label, Color color, {Key? key, IconData? icon}) {
+    final style = TextStyle(
+      fontWeight: FontWeight.w800,
+      fontSize: M3FontSize.labelSmallPlus,
+      color: color,
+    );
+    final text = Text(
+      label,
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.clip,
+      textAlign: TextAlign.center,
+      style: style,
+    );
+    return M3ChipSurface(
+      key: key,
+      color: color.withValues(alpha: 0.14),
+      child: icon == null
+          ? text
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14.0, color: color),
+                const SizedBox(width: M3Spacing.xxs),
+                text,
+              ],
             ),
-          ],
-        ),
-      );
+    );
+  }
 
   Widget _buildHeaderBanner(
     ThemeData theme,
@@ -1469,11 +1473,12 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Same 960/580 breakpoints as Sell-Out. Five cards at the live
-        // 1280+sidebar shell (~982) are 4+1, so width matches the 4-col
-        // reference (~233dp) and height stays 138. Five-in-a-row would
-        // be ~183dp and clip titles such as «الباركودات الفريدة».
-        final columns = M3KpiGridColumns.forWidth(constraints.maxWidth);
+        // Even fill: 5 cards → 3+2 at the live shell (not a lonely 4+1).
+        // Card height stays Sell-Out 138 via M3SummaryKpiCard + equal grid.
+        final columns = M3KpiGridColumns.forWidthAndCount(
+          constraints.maxWidth,
+          5,
+        );
         final regularShare = summary.totalSkus > 0
             ? ((summary.regularSkusCount / summary.totalSkus) * 100)
                 .toStringAsFixed(1)
@@ -1855,6 +1860,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                         label: box(1, _buildColHeader('كود الصنف', 'Item Code')),
                       ),
                       DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
                         label: box(2, _buildColHeader('اسم الصنف', 'Official SKU Name')),
                       ),
                       DataColumn(
@@ -1961,15 +1967,16 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                             ),
                             ),
                           ),
-                          // Official Name & Brand (wrap ≤3 like Sell-Out / TM)
+                          // Official Name & Brand (centered, wrap ≤3)
                           DataCell(
                             Column(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 M3WrapText(
                                   item.officialName,
                                   maxLines: 3,
+                                  textAlign: TextAlign.center,
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -1978,6 +1985,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 M3WrapText(
                                   '${item.brand} • ${item.category}',
                                   maxLines: 2,
+                                  textAlign: TextAlign.center,
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: cs.onSurfaceVariant,
                                     fontSize: M3FontSize.tinyPlus,
@@ -2221,14 +2229,16 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   /// one monospace line (e.g. FGCL-0550-0001, 13-digit barcodes), and
   /// the price headers «سعر الوحدة / السعر ش.ض / سعر الكرتونة» are
   /// not cut. Leftover width still goes to the name column.
+  // Type col (index 9) must fit one-line chips «مسحوب» / «غير مسحوب»
+  // (M3ChipSurface padding + Cairo) without wrapping mid-word.
   static const _catalogColMinsLive = <double>[
-    24, 130, 140, 120, 64, 80, 80, 88, 64, 52, 52,
+    24, 130, 140, 120, 64, 80, 80, 88, 64, 96, 52,
   ];
 
   /// Narrower shell (1024+sidebar ≈ 774dp): codes wrap at dashes, no
   /// horizontal scroll.
   static const _catalogColMinsCompact = <double>[
-    24, 92, 120, 92, 60, 52, 52, 52, 60, 60, 52,
+    24, 92, 120, 92, 60, 52, 52, 52, 60, 88, 52,
   ];
 
   /// Column content widths that fill [available] (table chrome included)
@@ -2249,7 +2259,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       widths[2] += leftover;
     } else if (leftover < 0) {
       // Shrink the name column first, then the others, never below 85% of min.
-      for (final i in [2, 9, 4, 8, 1, 3, 10, 5, 6, 7, 0]) {
+      // Shrink type (9) last so pull-status chips keep one-line width.
+      for (final i in [2, 4, 8, 1, 3, 10, 5, 6, 7, 0, 9]) {
         if (leftover >= 0) break;
         final reducible = widths[i] - mins[i] * 0.85;
         if (reducible <= 0) continue;

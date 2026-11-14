@@ -467,13 +467,19 @@ class _AppShellState extends State<AppShell> {
                 isSuperAdmin: widget.apiClient.currentUser?.isSuperAdmin == true,
               ),
               // Main Content Area with Background (RTL preserved for Arabic dashboard and metrics)
+              // Clip so page overflow (e.g. Product Master tabs) cannot
+              // paint/hit-test over the sidebar and swallow nav taps.
               Expanded(
                 child: Directionality(
                   textDirection: TextDirection.rtl,
-                  child: Container(
+                  child: ColoredBox(
                     color: colorScheme.surface,
-                    alignment: Alignment.topCenter,
-                    child: currentScreen,
+                    child: ClipRect(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: currentScreen,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -591,10 +597,14 @@ class _AppShellState extends State<AppShell> {
               Expanded(
                 child: Directionality(
                   textDirection: TextDirection.rtl,
-                  child: Container(
+                  child: ColoredBox(
                     color: colorScheme.surface,
-                    alignment: Alignment.topCenter,
-                    child: currentScreen,
+                    child: ClipRect(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: currentScreen,
+                      ),
+                    ),
                   ),
                 ),
               ),

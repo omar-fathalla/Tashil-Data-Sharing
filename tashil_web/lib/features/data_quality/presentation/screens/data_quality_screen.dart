@@ -363,9 +363,10 @@ class _SummaryRow extends StatelessWidget {
       children: [
         LayoutBuilder(
           builder: (context, constraints) {
-            final columns = constraints.maxWidth >= 960.0
-                ? 4
-                : (constraints.maxWidth >= 580.0 ? 2 : 1);
+            final columns = M3KpiGridColumns.forWidthAndCount(
+              constraints.maxWidth,
+              4,
+            );
             return M3EqualHeightGrid(
               key: const ValueKey('dq_kpi_grid'),
               columns: columns,
@@ -637,7 +638,7 @@ class _Filters extends StatelessWidget {
 }
 
 class _IssuesTable extends StatelessWidget {
-  // Headers and cells centred; only the item name stays start-aligned.
+  // Headers and cells centred in every column (including اسم الصنف).
   // Pixel budget at the live 1030 shell (page padding 24, inner ~934
   // after xxs gutters), measured with real Cairo bodyMedium:
   //  - short words (الخطورة, مفتوحة, متجاهلة) never mid-word split
@@ -753,8 +754,8 @@ class _IssuesTable extends StatelessWidget {
               headingRowAlignment: MainAxisAlignment.center,
               label: cellText(4, 'الباركود')),
           DataColumn(
-              headingRowAlignment: MainAxisAlignment.start,
-              label: cellText(5, 'اسم الصنف', align: TextAlign.start)),
+              headingRowAlignment: MainAxisAlignment.center,
+              label: cellText(5, 'اسم الصنف')),
           DataColumn(
               headingRowAlignment: MainAxisAlignment.center,
               label: cellText(6, 'الموجود')),
@@ -823,8 +824,7 @@ class _IssuesTable extends StatelessWidget {
                     )),
                     DataCell(cellText(4, i.barcode)),
                     DataCell(cellText(5, i.itemName,
-                        key: const ValueKey('dq_item_name'),
-                        align: TextAlign.start)),
+                        key: const ValueKey('dq_item_name'))),
                     DataCell(cellText(6, i.foundValue)),
                     DataCell(cellText(7, i.expectedValue)),
                     DataCell(cellBox(

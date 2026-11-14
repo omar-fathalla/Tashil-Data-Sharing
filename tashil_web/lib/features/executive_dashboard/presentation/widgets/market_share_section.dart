@@ -797,26 +797,20 @@ class _StockCard extends StatelessWidget {
                         'نسبة التصريف',
                         'الحالة',
                       ].indexed)
-                        // Item name stays start-aligned; every other heading is
-                        // centred with the same padding as its cells.
+                        // Headers and cells centered in every column
+                        // (including الصنف), wrap ≤3.
                         Padding(
-                          padding: i == 0
-                              ? const EdgeInsetsDirectional.only(
-                                  end: M3Spacing.xs,
-                                  bottom: M3Spacing.xs,
-                                )
-                              : const EdgeInsets.only(
-                                  left: M3Spacing.xxs,
-                                  right: M3Spacing.xxs,
-                                  bottom: M3Spacing.xs,
-                                ),
+                          padding: const EdgeInsets.only(
+                            left: M3Spacing.xxs,
+                            right: M3Spacing.xxs,
+                            bottom: M3Spacing.xs,
+                          ),
                           child: Text(
                             h,
                             key: ValueKey('stock_head_$i'),
                             style: label,
                             maxLines: 2,
-                            textAlign:
-                                i == 0 ? TextAlign.start : TextAlign.center,
+                            textAlign: TextAlign.center,
                           ),
                         ),
                     ],
@@ -834,7 +828,7 @@ class _StockCard extends StatelessWidget {
                             vertical: M3Spacing.xs,
                           ),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Tooltip(
@@ -844,6 +838,7 @@ class _StockCard extends StatelessWidget {
                                   key: const ValueKey('stock_sku_name'),
                                   maxLines: 3,
                                   overflow: TextOverflow.clip,
+                                  textAlign: TextAlign.center,
                                   style: theme.textTheme.titleSmall?.copyWith(
                                     color: cs.onSurface,
                                   ),
@@ -854,6 +849,7 @@ class _StockCard extends StatelessWidget {
                                   r.category,
                                   maxLines: 3,
                                   overflow: TextOverflow.clip,
+                                  textAlign: TextAlign.center,
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: cs.onSurfaceVariant,
                                   ),

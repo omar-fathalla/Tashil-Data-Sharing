@@ -213,7 +213,7 @@ void main() {
       expect(names, findsWidgets);
       for (final t in tester.widgetList<Text>(names)) {
         expect(t.maxLines, 3);
-        expect(t.textAlign, TextAlign.start);
+        expect(t.textAlign, TextAlign.center);
       }
       final stores = find.byKey(const ValueKey('pricing_store_name'));
       expect(stores, findsWidgets);
@@ -225,13 +225,8 @@ void main() {
 
       final dt = tester.widget<DataTable>(table);
       for (final (i, c) in dt.columns.indexed) {
-        if (i == 0) {
-          expect(c.headingRowAlignment, isNot(MainAxisAlignment.center),
-              reason: 'item-name column');
-        } else {
-          expect(c.headingRowAlignment, MainAxisAlignment.center,
-              reason: 'column $i');
-        }
+        expect(c.headingRowAlignment, MainAxisAlignment.center,
+            reason: 'column $i');
       }
 
       expect(_clippedDropdowns(tester), isEmpty);

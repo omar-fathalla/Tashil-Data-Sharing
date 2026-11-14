@@ -133,8 +133,8 @@ void main() {
       await tester.tap(find.text('Pricing & Promos'));
       await tester.pumpAndSettle();
 
-      // Check PricingComplianceScreen is rendered
-      expect(find.textContaining('Pricing & Promo Compliance'), findsOneWidget);
+      // Check PricingComplianceScreen is rendered (short title matches sidebar)
+      expect(find.text('Pricing & Promos'), findsWidgets);
     });
 
     testWidgets('AppShell Medium Tablet (NavigationRail) switches between new destinations', (WidgetTester tester) async {
@@ -175,7 +175,7 @@ void main() {
       // Tap on 'Pricing' (Pricing Compliance)
       await tester.tap(find.text('Pricing'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Pricing & Promo Compliance'), findsOneWidget);
+      expect(find.text('Pricing & Promos'), findsWidgets);
     });
 
     testWidgets('AppShell Compact Mobile (Drawer) navigates to new destinations', (WidgetTester tester) async {

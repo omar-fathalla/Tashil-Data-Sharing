@@ -46,7 +46,7 @@ class ReturnsTopProductsTable extends StatelessWidget {
     final bodyStyle =
         theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
 
-    Widget head(String text, {TextAlign align = TextAlign.start, Key? key}) =>
+    Widget head(String text, {TextAlign align = TextAlign.center, Key? key}) =>
         SizedBox(
           height: _rowH,
           child: Align(
@@ -65,8 +65,9 @@ class ReturnsTopProductsTable extends StatelessWidget {
         );
 
     // Rows grow so long names wrap to 3 lines without ellipsis.
+    // Names and every other column stay centered (shared table rule).
     Widget cell(String text,
-            {TextAlign align = TextAlign.start, TextStyle? style}) =>
+            {TextAlign align = TextAlign.center, TextStyle? style}) =>
         ConstrainedBox(
           constraints: const BoxConstraints(minHeight: _rowH),
           child: Align(
