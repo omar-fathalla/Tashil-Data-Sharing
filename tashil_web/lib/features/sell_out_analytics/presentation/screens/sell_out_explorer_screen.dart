@@ -23,6 +23,8 @@ import '../../data/sell_out_explorer_repository.dart';
 import '../../domain/sell_out_upload_flow.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/bidi_text.dart';
+import '../../../../core/utils/app_date_format.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/widgets/app_icons.dart';
@@ -675,7 +677,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('سيتم حذف هذا الملف وبياناته من Sell-Out.'),
+              Text(rtlEnd('سيتم حذف هذا الملف وبياناته من ${ltrIsolate('Sell-Out')}.')),
               const SizedBox(height: 12.0),
               Container(
                 padding: const EdgeInsets.all(12.0),
@@ -688,6 +690,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   children: [
                     Text(
                       file.fileName,
+                      textDirection: TextDirection.ltr,
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 4.0),
@@ -700,7 +703,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               ),
               const SizedBox(height: 10.0),
               Text(
-                'لن تتأثر باقي الشهور ولا بيانات Sell-In.',
+                rtlEnd('لن تتأثر باقي الشهور ولا بيانات ${ltrIsolate('Sell-In')}.'),
                 style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(fontSize: M3FontSize.bodySmall, color: cs.onSurfaceVariant)),
               ),
             ],
@@ -3297,31 +3300,28 @@ onChanged: m3Legacy<int>((v) {
                                   ),
                                 ),
                                 DataCell(
-                                  // Date/time (and last import) wrap onto centred lines so the
-                                  // table fits 1030dp next to the pinned actions.
-                                  ConstrainedBox(
-                                    constraints: const BoxConstraints(maxWidth: 96.0),
-                                    child: Text(
-                                    textAlign: TextAlign.center,
-                                    () {
-                                      final uploaded = file.uploadedAt.length >= 16
-                                          ? file.uploadedAt.substring(0, 16).replaceAll('T', ' ')
-                                          : file.uploadedAt;
+                                  Tooltip(
+                                    message: () {
+                                      final uploaded = AppDateFormat.tryFormat(file.uploadedAt);
                                       if (file.lastIngestedAt.isEmpty ||
                                           file.lastIngestedAt == file.uploadedAt) {
                                         return uploaded;
                                       }
-                                      final ingested = file.lastIngestedAt.length >= 16
-                                          ? file.lastIngestedAt
-                                              .substring(0, 16)
-                                              .replaceAll('T', ' ')
-                                          : file.lastIngestedAt;
-                                      return '$uploaded\nآخر استيراد: $ingested';
+                                      return '$uploaded • آخر استيراد: ${AppDateFormat.tryFormat(file.lastIngestedAt)}';
                                     }(),
-                                    style: M3TextVariants.cell.copyWith(color: colorScheme.onSurfaceVariant),
-                                  ),
+                                    child: Text(
+                                      AppDateFormat.tryFormat(file.uploadedAt, withTime: false),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      overflow: TextOverflow.visible,
+                                      style: M3TextVariants.cell.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
                                   ),
                                 ),
+
                               ],
                             );
                           }).toList(),

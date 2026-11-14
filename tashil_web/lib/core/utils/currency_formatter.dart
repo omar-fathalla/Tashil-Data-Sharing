@@ -42,14 +42,15 @@ class CurrencyFormatter {
   /// Formats exact currency value: e.g. "14,500.50 ج.م".
   /// A negative amount keeps U+2212 on the left of the digits in RTL
   /// because the whole "−14,500 ج.م" sits in an LRI…PDI isolate.
-  static String formatEGP(double amount, {bool showDecimals = false}) {
+  static String formatEGP(double amount, {bool showDecimals = false, bool isolate = false}) {
     final negative = amount < 0;
     final value = amount.abs();
     final body = showDecimals
         ? _currencyFormat.format(value)
         : _integerFormat.format(value.round());
     final out = negative ? '\u2212$body ج.م' : '$body ج.م';
-    return negative ? '\u2066$out\u2069' : out;
+    if (negative || isolate) return '\u2066$out\u2069';
+    return out;
   }
 
   /// Compact EGP for charts & cards, one place for spacing/rounding.

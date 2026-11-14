@@ -280,9 +280,12 @@ class _ChainDiscountDialogState extends State<_ChainDiscountDialog> {
             TextField(
               key: const ValueKey('chain_discount_chain_field'),
               controller: _chain,
+              textDirection: TextDirection.ltr,
               decoration: const InputDecoration(
-                labelText: 'السلسلة (كما في شيت الكاشير، مثال: fathalla)',
+                labelText: 'السلسلة (كما في شيت الكاشير)',
+                hintText: 'fathalla',
                 border: OutlineInputBorder(),
+                alignLabelWithHint: true,
               ),
             ),
             const SizedBox(height: 12.0),

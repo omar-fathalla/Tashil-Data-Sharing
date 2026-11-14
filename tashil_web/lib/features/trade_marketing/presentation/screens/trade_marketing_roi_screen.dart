@@ -9,6 +9,7 @@ import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
+import '../../../../core/utils/bidi_text.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
@@ -281,13 +282,10 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
     return _baselines[key];
   }
 
-  /// Average historical ROMI from server data, used to project simulator lift.
-  double get _historicalRomi {
-    final rows = _monthlyRoiSummariesFor(_expenses)
-        .where((s) => s.marketingSpendEgp > 0 && s.romiMultiple > 0);
-    if (rows.isEmpty) return 3.45;
-    return rows.fold<double>(0, (a, s) => a + s.romiMultiple) / rows.length;
-  }
+  /// Average historical ROMI from recorded campaigns, or null when none exist.
+  /// Null must not fall back to a hardcoded multiple (owner rule).
+  double? get _historicalRomi =>
+      averageHistoricalRomi(_monthlyRoiSummariesFor(_expenses));
 
   /// Filtered individual expense items
   List<MarketingExpenseItem> get _filteredExpenses {
@@ -490,7 +488,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                             ),
                           ),
                           Text(
-                            'Add / Edit Trade Marketing & Promotional Expense',
+                            'أدخل تفاصيل المصروف أو الحملة',
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -514,7 +512,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                               flex: 2,
                               child: M3Dropdown<String>(
                                 value: chain,
-                                label: 'السلسلة التجارية (Retail Chain)',
+                                label: 'السلسلة',
                                 expand: true,
                                 options: m3OptionsFromMenuItems<String>(
                                     _availableChains
@@ -532,7 +530,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                               flex: 2,
                               child: M3Dropdown<int>(
                                 value: month,
-                                label: 'الشهر (Campaign Month)',
+                                label: 'الشهر',
                                 expand: true,
                                 options: m3OptionsFromMenuItems<int>(
                                     List.generate(12, (idx) {
@@ -555,7 +553,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                               flex: 1,
                               child: M3Dropdown<int>(
                                 value: year,
-                                label: 'السنة (Year)',
+                                label: 'السنة',
                                 expand: true,
                                 options: m3OptionsFromMenuItems<int>([
                                   const DropdownMenuItem(
@@ -576,7 +574,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                         // Row 2: Expense Category
                         M3Dropdown<MarketingExpenseCategory>(
                           value: category,
-                          label: 'نوع المصروف التسويقي (Expense Category)',
+                          label: 'نوع المصروف',
                           expand: true,
                           options:
                               m3OptionsFromMenuItems<MarketingExpenseCategory>(
@@ -589,8 +587,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                                   const SizedBox(width: 8.0),
                                   Expanded(
                                     child: Text(
-                                      '${cat.labelAr} (${cat.labelEn})',
-                                      overflow: TextOverflow.ellipsis,
+                                      cat.labelAr,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.visible,
                                     ),
                                   ),
                                 ],
@@ -615,9 +614,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                                     const TextInputType.numberWithOptions(
                                         decimal: true),
                                 decoration: const InputDecoration(
-                                  labelText:
-                                      'قيمة المصروف بالجنيه (Amount in EGP) *',
-                                  hintText: 'مثال: 100000',
+                                  labelText: 'قيمة المصروف (ج.م) *',
+                                  hintText: 'مثال: 100,000',
                                   prefixIcon: Icon(Icons.payments_rounded),
                                   border: OutlineInputBorder(),
                                   isDense: true,
@@ -630,7 +628,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                               child: TextField(
                                 controller: brandCtrl,
                                 decoration: const InputDecoration(
-                                  labelText: 'البراند المستهدف (Brand)',
+                                  labelText: 'البراند المستهدف',
                                   hintText: 'مثال: Diva / Maxell',
                                   prefixIcon: Icon(Icons.loyalty_rounded),
                                   border: OutlineInputBorder(),
@@ -646,8 +644,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                         TextField(
                           controller: titleCtrl,
                           decoration: const InputDecoration(
-                            labelText:
-                                'وصف النشاط الترويجي أو الحملة (Campaign / Activity Title) *',
+                            labelText: 'وصف الحملة أو النشاط الترويجي *',
                             hintText:
                                 'مثال: تأجير فلورات عرض رئيسية + إيفنت تذوق وهدايا مجانية',
                             prefixIcon: Icon(Icons.campaign_rounded),
@@ -661,8 +658,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                         TextField(
                           controller: vendorCtrl,
                           decoration: const InputDecoration(
-                            labelText:
-                                'شركة الدعاية أو جهة التعاقد (Agency / Retailer Contract)',
+                            labelText: 'جهة التعاقد أو شركة الدعاية',
                             hintText:
                                 'مثال: إدارة التعاقدات بالسلسلة / شركة دعاية وإيفنتات',
                             prefixIcon: Icon(Icons.business_rounded),
@@ -677,8 +673,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                           controller: notesCtrl,
                           maxLines: 2,
                           decoration: const InputDecoration(
-                            labelText:
-                                'ملاحظات وتفاصيل الفروع المستهدفة (Notes & Target Branches)',
+                            labelText: 'ملاحظات وتفاصيل الفروع المستهدفة',
                             hintText:
                                 'مثال: فروع سموحة، سان ستيفانو، المنتزه...',
                             border: OutlineInputBorder(),
@@ -692,7 +687,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(dialogCtx),
-                    child: const Text('Cancel / إلغاء'),
+                    child: const Text('إلغاء'),
                   ),
                   FilledButton.icon(
                     onPressed: () async {
@@ -760,7 +755,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                     icon: const Icon(Icons.check_circle_outline_rounded,
                         size: 18.0),
                     label: Text(
-                        existing == null ? 'Save Expense' : 'Update Expense'),
+                        existing == null ? 'حفظ المصروف' : 'تحديث المصروف'),
                   ),
                 ],
               ),
@@ -782,7 +777,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
     final requested = <String>{};
     final historicalRomi = _historicalRomi;
     double proposedBudget = 100000.0;
-    final budgetCtrl = TextEditingController(text: '100000');
+    final budgetCtrl = TextEditingController(
+      text: CurrencyFormatter.formatUnits(100000),
+    );
 
     showDialog<void>(
       context: context,
@@ -801,13 +798,28 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
             }
             final prevSales = baseline?.previousMonthSalesEgp ?? 0.0;
             final lastYearSales = baseline?.lastYearSameMonthSalesEgp ?? 0.0;
-            final projectedSales = prevSales + proposedBudget * historicalRomi;
-            final momLift = projectedSales - prevSales;
-            final momPct = prevSales > 0 ? (momLift / prevSales) * 100.0 : 0.0;
-            final yoyLift = projectedSales - lastYearSales;
-            final yoyPct =
-                lastYearSales > 0 ? (yoyLift / lastYearSales) * 100.0 : 0.0;
-            final romi = proposedBudget > 0 ? momLift / proposedBudget : 0.0;
+            final projection = RoiSimulatorProjection(
+              historicalRomi: historicalRomi,
+              previousMonthSalesEgp: prevSales,
+              lastYearSalesEgp: lastYearSales,
+              budgetEgp: proposedBudget,
+            );
+            const noCampaigns = 'لا توجد حملات سابقة لحساب العائد';
+            String moneyOrDash(double? v) =>
+                v == null ? '—' : CurrencyFormatter.formatEGP(v, isolate: true);
+            String liftAndPct(double? lift, double? pct) {
+              if (lift == null) return '—';
+              if (pct == null) {
+                return CurrencyFormatter.formatEGP(lift, isolate: true);
+              }
+              final amt = CurrencyFormatter.formatEGP(lift)
+                  .replaceAll(kLri, '')
+                  .replaceAll(kPdi, '');
+              final p = CurrencyFormatter.formatSignedPct(pct)
+                  .replaceAll(kLri, '')
+                  .replaceAll(kPdi, '');
+              return ltrIsolate('$amt ($p)');
+            }
 
             return Directionality(
               textDirection: TextDirection.rtl,
@@ -833,7 +845,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'محاكي العائد التسويقي الذكي (Promo Budget ROI Simulator)',
+                            'محاكي العائد التسويقي الذكي',
                             style: theme.textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
@@ -858,7 +870,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                           Expanded(
                             child: M3Dropdown<String>(
                               value: simChain,
-                              label: 'السلسلة (Chain)',
+                              label: 'السلسلة',
                               expand: true,
                               options: m3OptionsFromMenuItems<String>(
                                   _availableChains
@@ -875,7 +887,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                           Expanded(
                             child: M3Dropdown<int>(
                               value: simMonth,
-                              label: 'الشهر (Month)',
+                              label: 'الشهر',
                               expand: true,
                               options: m3OptionsFromMenuItems<int>(
                                   List.generate(12, (idx) {
@@ -883,7 +895,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                                 return DropdownMenuItem(
                                   value: m,
                                   child: Text(
-                                      '${MarketingExpenseItem.monthNamesAr[m]} (${MarketingExpenseItem.monthNamesEn[m]})'),
+                                      MarketingExpenseItem.monthNamesAr[m] ?? ''),
                                 );
                               })),
                               onChanged: m3Legacy<int>((v) {
@@ -899,8 +911,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                         controller: budgetCtrl,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
-                          labelText:
-                              'الميزانية التسويقية المقترحة للشهر (Proposed Budget in EGP)',
+                          labelText: 'الميزانية التسويقية المقترحة للشهر (ج.م)',
                           prefixIcon:
                               Icon(Icons.account_balance_wallet_rounded),
                           border: OutlineInputBorder(),
@@ -927,49 +938,77 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
-                              'النتائج المتوقعة بناءً على حساسية المبيعات التاريخية لـ $simChain:',
+                              'النتائج المتوقعة بناءً على حساسية المبيعات التاريخية لـ ${ltrIsolate(simChain)}:',
                               style: theme.textTheme.labelLarge
                                   ?.copyWith(fontWeight: FontWeight.w800),
                             ),
+                            if (!projection.hasHistoricalRomi) ...[
+                              const SizedBox(height: 8.0),
+                              Text(
+                                noCampaigns,
+                                key: const ValueKey('roi_sim_no_campaigns'),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 12.0),
                             _buildSimMetricRow(
-                              'مبيعات الشهر السابق (Baseline MoM):',
-                              CurrencyFormatter.formatEGP(prevSales),
+                              'مبيعات الشهر السابق:',
+                              prevSales > 0
+                                  ? moneyOrDash(prevSales)
+                                  : '—',
                               colorScheme.onSurface,
                             ),
                             const SizedBox(height: 6.0),
                             _buildSimMetricRow(
-                              'مبيعات نفس الشهر بالعام الماضي (Baseline YoY):',
-                              CurrencyFormatter.formatEGP(lastYearSales),
+                              'مبيعات نفس الشهر بالعام الماضي:',
+                              lastYearSales > 0
+                                  ? moneyOrDash(lastYearSales)
+                                  : '— لا توجد بيانات للعام السابق',
                               colorScheme.onSurface,
                             ),
                             const Divider(height: 20.0),
                             _buildSimMetricRow(
                               'المبيعات المتوقعة بعد الحملة:',
-                              CurrencyFormatter.formatEGP(projectedSales),
+                              moneyOrDash(projection.projectedSalesEgp),
                               colorScheme.primary,
                               isBold: true,
                             ),
                             const SizedBox(height: 6.0),
                             _buildSimMetricRow(
-                              'الزيادة المتوقعة عن الشهر السابق (MoM Lift):',
-                              '${CurrencyFormatter.formatEGP(momLift)} (${CurrencyFormatter.formatSignedPct(momPct)})',
+                              'الزيادة المتوقعة عن الشهر السابق:',
+                              liftAndPct(projection.momLiftEgp, projection.momGrowthPct),
                               M3Palette.success,
                               isBold: true,
                             ),
                             const SizedBox(height: 6.0),
                             _buildSimMetricRow(
-                              'الزيادة المتوقعة عن العام السابق (YoY Lift):',
-                              lastYearSales > 0
-                                  ? '${CurrencyFormatter.formatEGP(yoyLift)} (${CurrencyFormatter.formatSignedPct(yoyPct)})'
-                                  : '— لا توجد بيانات للعام السابق',
+                              'الزيادة المتوقعة عن العام السابق:',
+                              !projection.hasHistoricalRomi
+                                  ? '—'
+                                  : (lastYearSales > 0
+                                      ? liftAndPct(projection.yoyLiftEgp,
+                                          projection.yoyGrowthPct)
+                                      : '— لا توجد بيانات للعام السابق'),
                               M3Palette.info,
                               isBold: true,
                             ),
                             const SizedBox(height: 6.0),
                             _buildSimMetricRow(
-                              'العائد لكل 1 جنيه تسويق (ROMI Multiple):',
-                              '${romi.toStringAsFixed(2)}x (كل 1 ج.م يحقق ${romi.toStringAsFixed(2)} ج.م نمو مبيعات)',
+                              'العائد لكل 1 جنيه تسويق:',
+                              projection.romiMultiple == null
+                                  ? '—'
+                                  : ltrIsolate(
+                                      '${projection.romiMultiple!.toStringAsFixed(2)}x',
+                                    ) +
+                                      ' (كل 1 ج.م يحقق ' +
+                                      ltrIsolate(
+                                        projection.romiMultiple!
+                                            .toStringAsFixed(2),
+                                      ) +
+                                      ' ج.م نمو مبيعات)',
                               M3Palette.violet,
                               isBold: true,
                             ),
@@ -982,7 +1021,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(dialogCtx),
-                    child: const Text('Close / إغلاق'),
+                    child: const Text('إغلاق'),
                   ),
                 ],
               ),
@@ -996,19 +1035,29 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
   Widget _buildSimMetricRow(String label, String value, Color valueColor,
       {bool isBold = false}) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: M3FontSize.labelMediumPlus,
-                fontWeight: FontWeight.w600)),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize:
-                isBold ? M3FontSize.bodyMedium : M3FontSize.labelMediumPlus,
-            fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
-            color: valueColor,
+        Expanded(
+          child: Text(label,
+              maxLines: 2,
+              overflow: TextOverflow.visible,
+              style: const TextStyle(
+                  fontSize: M3FontSize.labelMediumPlus,
+                  fontWeight: FontWeight.w600)),
+        ),
+        const SizedBox(width: 8.0),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            maxLines: 3,
+            overflow: TextOverflow.visible,
+            style: TextStyle(
+              fontSize:
+                  isBold ? M3FontSize.bodyMedium : M3FontSize.labelMediumPlus,
+              fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+              color: valueColor,
+            ),
           ),
         ),
       ],
@@ -1199,7 +1248,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Close / إغلاق'),
+                child: const Text('إغلاق'),
               ),
             ],
           ),
@@ -1999,7 +2048,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
               padding: EdgeInsets.all(32.0),
               child: Center(
                 child: Text(
-                    'لا توجد مصروفات مطابقة للفلتر المحدد. اضغط Add Expense لإضافة مصروف تسويقي جديد.'),
+                    'لا توجد مصروفات مطابقة للفلتر المحدد. اضغط «إضافة مصروف» لإضافة مصروف تسويقي جديد.'),
               ),
             )
           else

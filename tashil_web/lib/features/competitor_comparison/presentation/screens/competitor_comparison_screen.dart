@@ -482,8 +482,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                         TextField(
                           controller: nameCtrl,
                           decoration: const InputDecoration(
-                            labelText:
-                                'اسم الصنف المنافس (مثال: بريل ليمون 2.5 لتر)',
+                            labelText: 'اسم الصنف المنافس',
+                            hintText: 'مثال: بريل ليمون 2.5 لتر',
                             prefixIcon: Icon(Icons.inventory_2_rounded),
                           ),
                         ),
@@ -494,7 +494,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                               child: TextField(
                                 controller: brandCtrl,
                                 decoration: const InputDecoration(
-                                  labelText: 'العلامة التجارية (Brand)',
+                                  labelText: 'العلامة التجارية',
                                   prefixIcon: Icon(Icons.sell_rounded),
                                 ),
                               ),
@@ -504,7 +504,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                               child: TextField(
                                 controller: supplierCtrl,
                                 decoration: const InputDecoration(
-                                  labelText: 'الشركة المنافسة (Supplier)',
+                                  labelText: 'الشركة المنافسة',
                                   prefixIcon: Icon(Icons.business_rounded),
                                 ),
                               ),
@@ -521,8 +521,9 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                                     const TextInputType.numberWithOptions(
                                         decimal: true),
                                 decoration: InputDecoration(
-                                  labelText:
-                                      'سعر بيع المنافس بالجنيه (سعرنا: ${currentGroup.ownUnitPrice.toStringAsFixed(1)} ج.م)',
+                                  labelText: 'سعر بيع المنافس (ج.م)',
+                                  hintText:
+                                      'سعرنا: ${currentGroup.ownUnitPrice.toStringAsFixed(1)} ج.م',
                                   prefixIcon:
                                       const Icon(Icons.payments_rounded),
                                 ),
@@ -537,7 +538,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                                         decimal: true),
                                 decoration: InputDecoration(
                                   labelText:
-                                      'الوزن/الحجم بالـ (${currentGroup.volumeUnitLabel})',
+                                      'الوزن / الحجم (${currentGroup.volumeUnitLabel})',
                                   prefixIcon: const Icon(Icons.scale_rounded),
                                 ),
                               ),

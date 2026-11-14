@@ -244,7 +244,10 @@ class _FakeProductMasterApiClient extends ApiClient {
   }
 }
 
+Finder itemCode(String code) => find.bySemanticsLabel(code);
+
 void main() {
+
   setUpAll(loadRealCairoFont);
 
   group('ProductMasterItemModel & ProductMasterSummaryModel JSON normalization', () {
@@ -408,8 +411,8 @@ void main() {
     // Verify header, 5th KPI card, and SKUs are rendered
     expect(find.textContaining('كارتة الأصناف والأسعار المعتمدة'), findsOneWidget);
     expect(find.textContaining('التغطية بالسلاسل'), findsOneWidget);
-    expect(find.text('FGCL-0550-0001'), findsWidgets);
-    expect(find.text('PRCL-0102-0015'), findsWidgets);
+    expect(itemCode('FGCL-0550-0001'), findsWidgets);
+    expect(itemCode('PRCL-0102-0015'), findsWidgets);
 
     // Search by Item Code
     final searchInput = find.byKey(const ValueKey('product_master_search_input'));
@@ -417,15 +420,15 @@ void main() {
     await tester.enterText(searchInput, 'PRCL-0102-0015');
     await tester.pumpAndSettle();
 
-    expect(find.text('PRCL-0102-0015'), findsWidgets);
-    expect(find.text('FGCL-0550-0001'), findsNothing);
+    expect(itemCode('PRCL-0102-0015'), findsWidgets);
+    expect(itemCode('FGCL-0550-0001'), findsNothing);
 
     // Search by FGSL phonetic alias
     await tester.enterText(searchInput, 'FGSL-0550');
     await tester.pumpAndSettle();
 
-    expect(find.text('FGCL-0550-0001'), findsWidgets);
-    expect(find.text('PRCL-0102-0015'), findsNothing);
+    expect(itemCode('FGCL-0550-0001'), findsWidgets);
+    expect(itemCode('PRCL-0102-0015'), findsNothing);
 
     // Switch to Tab 2 (Calculator) and verify Order CSV export button
     await tester.tap(find.textContaining('حاسبة الطلبيات والخصومات والهامش'));
@@ -470,25 +473,25 @@ void main() {
     // 2. Test Quick Price-Change Filter Chips (زاد السعر / انخفض السعر / أصناف جديدة)
     await tester.tap(find.byKey(const ValueKey('price_filter_up')));
     await tester.pumpAndSettle();
-    expect(find.text('FGCL-0550-0001'), findsWidgets);
-    expect(find.text('PRCL-0102-0015'), findsNothing);
-    expect(find.text('FGDW-0200-0099'), findsNothing);
+    expect(itemCode('FGCL-0550-0001'), findsWidgets);
+    expect(itemCode('PRCL-0102-0015'), findsNothing);
+    expect(itemCode('FGDW-0200-0099'), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('price_filter_down')));
     await tester.pumpAndSettle();
-    expect(find.text('PRCL-0102-0015'), findsWidgets);
-    expect(find.text('FGCL-0550-0001'), findsNothing);
+    expect(itemCode('PRCL-0102-0015'), findsWidgets);
+    expect(itemCode('FGCL-0550-0001'), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('price_filter_new')));
     await tester.pumpAndSettle();
-    expect(find.text('FGDW-0200-0099'), findsWidgets);
-    expect(find.text('FGCL-0550-0001'), findsNothing);
+    expect(itemCode('FGDW-0200-0099'), findsWidgets);
+    expect(itemCode('FGCL-0550-0001'), findsNothing);
 
     // Reset back to all
     await tester.tap(find.byKey(const ValueKey('price_filter_all')));
     await tester.pumpAndSettle();
-    expect(find.text('FGCL-0550-0001'), findsWidgets);
-    expect(find.text('PRCL-0102-0015'), findsWidgets);
+    expect(itemCode('FGCL-0550-0001'), findsWidgets);
+    expect(itemCode('PRCL-0102-0015'), findsWidgets);
 
     // 3. Open Diff Summary Modal and click "عرض الأصناف المتغيرة فقط في الجدول"
     final diffBtn = find.byKey(const ValueKey('product_master_open_diff_summary_btn'));
@@ -521,7 +524,7 @@ void main() {
 
     // Verify rollback occurred: sheet2Deleted is true, new SKU FGDW-0200-0099 is gone, and active sheet is 2026_08_01
     expect(client.sheet2Deleted, isTrue);
-    expect(find.text('FGDW-0200-0099'), findsNothing);
+    expect(itemCode('FGDW-0200-0099'), findsNothing);
     expect(find.textContaining('تحديث 01-08-2026'), findsWidgets);
   });
 }

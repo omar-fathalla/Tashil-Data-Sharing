@@ -104,7 +104,7 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
 
     // Page inside the portal (e.g. `sell-in` in `/adeco/sell-in`), kept so
     // a refresh or a login redirect returns to the same page.
-    final requestedPage = AppPageRoute.pageSlugFromPath(path);
+    final requestedPage = AppPageRoute.slugToPreserveFromPath(path);
 
     final saved = SessionStorage.loadSession();
     final savedUser = saved?.currentUserJson != null
@@ -314,7 +314,7 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
         // Return to the page that was requested before login, if any.
         final currentPath = SessionStorage.currentBrowserPath();
         final pendingPage = currentPath.toLowerCase().startsWith('/$cleanSlug/')
-            ? AppPageRoute.pageSlugFromPath(currentPath)
+            ? AppPageRoute.slugToPreserveFromPath(currentPath)
             : '';
         SessionStorage.updateBrowserUrl(
           AppPageRoute.pathFor(cleanSlug, pendingPage),

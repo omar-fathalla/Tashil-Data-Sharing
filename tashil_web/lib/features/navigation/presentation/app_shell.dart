@@ -26,6 +26,7 @@ import '../../product_master/presentation/screens/product_master_screen.dart';
 import '../../data_quality/presentation/screens/data_quality_screen.dart';
 import '../../trade_marketing/presentation/screens/trade_marketing_roi_screen.dart';
 import 'desktop_sidebar.dart';
+import 'not_found_page.dart';
 
 class _NavDestinationSpec {
   final int index;
@@ -70,16 +71,32 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
 
+  /// Set when the URL has an unknown page slug. The sidebar stays
+  /// visible and no destination is highlighted until the user picks
+  /// a real page or taps back to Dashboard.
+  String? _unknownSlug;
+
   @override
   void initState() {
     super.initState();
-    _selectedIndex = AppPageRoute.indexForSlug(
-      AppPageRoute.pageSlugFromPath(SessionStorage.currentBrowserPath()),
-    );
+    final path = SessionStorage.currentBrowserPath();
+    _unknownSlug = AppPageRoute.unknownPageSlugFromPath(path);
+    if (_unknownSlug == null) {
+      _selectedIndex = AppPageRoute.indexForSlug(
+        AppPageRoute.pageSlugFromPath(path),
+      );
+    }
     // The Navigator may report `/` after the first frame; re-assert the
     // current page so the address bar (and the next refresh) keep it.
+    // Unknown slugs are left as-is so the Not Found page stays reachable.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (_unknownSlug != null) {
+        SessionStorage.replaceBrowserUrl(
+          AppPageRoute.pathFor(widget.activeTenant, _unknownSlug!),
+        );
+        return;
+      }
       SessionStorage.replaceBrowserUrl(
         AppPageRoute.pathFor(
           widget.activeTenant,
@@ -90,7 +107,10 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _selectPage(int index) {
-    setState(() => _selectedIndex = index);
+    setState(() {
+      _selectedIndex = index;
+      _unknownSlug = null;
+    });
     SessionStorage.replaceBrowserUrl(
       AppPageRoute.pathFor(
         widget.activeTenant,
@@ -98,6 +118,8 @@ class _AppShellState extends State<AppShell> {
       ),
     );
   }
+
+  int? get _navHighlightIndex => _unknownSlug != null ? null : _selectedIndex;
 
   static const List<_NavDestinationSpec> _destinations = [
     _NavDestinationSpec(
@@ -412,8 +434,17 @@ class _AppShellState extends State<AppShell> {
       alignment: Alignment.topCenter,
       fit: StackFit.expand,
       child: KeyedSubtree(
-        key: ValueKey('nav_dest_${_selectedIndex}_$stateKey'),
-        child: screens[_selectedIndex],
+        key: ValueKey(
+          _unknownSlug != null
+              ? 'nav_dest_not_found_${_unknownSlug}_$stateKey'
+              : 'nav_dest_${_selectedIndex}_$stateKey',
+        ),
+        child: _unknownSlug != null
+            ? NotFoundPage(
+                attemptedSlug: _unknownSlug,
+                onBackToDashboard: () => _selectPage(0),
+              )
+            : screens[_selectedIndex],
       ),
     );
 
@@ -426,7 +457,7 @@ class _AppShellState extends State<AppShell> {
             children: [
               // Sidebar sits on the start side (right in RTL).
               DesktopSidebar(
-                selectedIndex: _selectedIndex,
+                selectedIndex: _navHighlightIndex ?? -1,
                 onDestinationSelected: (index) => _selectPage(index),
                 activeTenant: widget.activeTenant,
                 currentUser: widget.apiClient.currentUser,
@@ -461,7 +492,7 @@ class _AppShellState extends State<AppShell> {
             children: [
               // Sidebar sits on the start side (right in RTL).
               NavigationRail(
-                selectedIndex: _selectedIndex,
+                selectedIndex: _navHighlightIndex,
                 onDestinationSelected: (index) => _selectPage(index),
                 labelType: NavigationRailLabelType.all,
                 backgroundColor: colorScheme.surfaceContainer,
