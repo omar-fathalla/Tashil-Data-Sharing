@@ -16,6 +16,9 @@ class M3ResponsiveTabItem<T> {
   /// Optional stable web automation id (`flt-semantics-identifier`).
   final String? semanticsIdentifier;
 
+  /// Optional [Key] applied to the label [Text] (test / automation hooks).
+  final Key? labelKey;
+
   const M3ResponsiveTabItem({
     required this.value,
     required this.label,
@@ -23,6 +26,7 @@ class M3ResponsiveTabItem<T> {
     this.selectedIcon,
     this.subtitle,
     this.semanticsIdentifier,
+    this.labelKey,
   });
 }
 
@@ -250,6 +254,7 @@ class M3ResponsiveTabBar<T> extends StatelessWidget {
                     const SizedBox(width: 8.0),
                     if (item.subtitle != null)
                       M3TwoLineTabLabel(
+                        key: item.labelKey,
                         title: item.label,
                         subtitle: item.subtitle!,
                         color: fgColor,
@@ -257,6 +262,7 @@ class M3ResponsiveTabBar<T> extends StatelessWidget {
                     else
                       Text(
                         item.label,
+                        key: item.labelKey,
                         maxLines: 1,
                         style: TextStyle(
                           fontSize: M3FontSize.bodyMedium,

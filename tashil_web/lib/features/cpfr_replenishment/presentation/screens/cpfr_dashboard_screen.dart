@@ -1238,30 +1238,35 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
       key: const ValueKey('cpfr_tab_bar'),
       textDirection: TextDirection.ltr,
       selectedValue: _activeTab,
+      // labelKey uses 1-based indices (cpfr_tab_label_N) for Mac/web tests.
       items: const [
         M3ResponsiveTabItem<int>(
           value: 0,
           icon: Icons.compare_arrows_rounded,
           selectedIcon: Icons.compare_arrows_rounded,
           label: 'Sell-In vs Sell-Out',
+          labelKey: ValueKey('cpfr_tab_label_1'),
         ),
         M3ResponsiveTabItem<int>(
           value: 1,
           icon: Icons.calculate_rounded,
           selectedIcon: Icons.calculate_rounded,
           label: 'Suggested PO & Replenishment',
+          labelKey: ValueKey('cpfr_tab_label_2'),
         ),
         M3ResponsiveTabItem<int>(
           value: 2,
           icon: Icons.trending_up_rounded,
           selectedIcon: Icons.trending_up_rounded,
           label: 'Demand Forecasting & Promos (EXP)',
+          labelKey: ValueKey('cpfr_tab_label_3'),
         ),
         M3ResponsiveTabItem<int>(
           value: 3,
           icon: Icons.badge_rounded,
           selectedIcon: Icons.badge_rounded,
           label: 'أداء فريق المبيعات وهيكل الحسابات',
+          labelKey: ValueKey('cpfr_tab_label_4'),
         ),
       ],
       onChanged: (next) => setState(() => _activeTab = next),
