@@ -213,7 +213,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('osa_summary_card')), findsOneWidget);
-      expect(find.text('مؤشر التوافر على الرفوف OSA%'), findsOneWidget);
+      expect(find.text('نسبة التوافر OSA%'), findsOneWidget);
       expect(find.text('96.8%'), findsOneWidget);
     });
   });

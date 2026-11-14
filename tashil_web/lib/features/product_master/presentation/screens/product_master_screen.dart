@@ -1552,7 +1552,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               subtitleMaxLines: 1,
               value: '${_intFmt.format(summary.uniqueBarcodesCount)} باركود',
               subtitle:
-                  'متوسط سعة الكرتونة: ${summary.avgUnitsPerCarton.toStringAsFixed(1)} وحدة/كرتونة',
+                  'متوسط السعة: ${summary.avgUnitsPerCarton.toStringAsFixed(1)} وحدة/كرتونة',
               icon: Icons.view_in_ar_rounded,
               color: M3Palette.indigo,
             ),
