@@ -90,7 +90,7 @@ void main() {
   });
 
   test('bundled fonts cover every formatter / arrow / isolate character', () {
-    const formatChars = {0x2066, 0x2067, 0x2068, 0x2069};
+    const formatChars = {0x2060, 0x2066, 0x2067, 0x2068, 0x2069};
     final samples = <String>[
       CurrencyFormatter.formatSignedPct(-17.9),
       CurrencyFormatter.formatSignedPct(12),
@@ -98,6 +98,8 @@ void main() {
       CurrencyFormatter.formatSignedPct(0, plusForZero: true),
       CurrencyFormatter.formatCompactEGP(-847),
       CurrencyFormatter.formatCompactEGP(-45080),
+      CurrencyFormatter.formatCompactEGP(401000),
+      CurrencyFormatter.formatCompactEGP(1850000),
       CurrencyFormatter.formatUnits(-847),
       CurrencyFormatter.formatMarginSummary(-4600000, -60.3),
       '▲243 ▼46',

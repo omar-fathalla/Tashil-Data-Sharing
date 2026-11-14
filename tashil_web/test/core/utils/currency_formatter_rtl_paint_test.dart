@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
+import 'package:tashil_web/core/widgets/atomic_numeric_text.dart';
 
 void main() {
   Future<void> pumpRtlAmount(
@@ -99,5 +100,39 @@ void main() {
       await pumpRtlAmount(tester, text);
       expectMinusLeftOfDigits(paragraphOf(tester, text), text);
     });
+  });
+
+  testWidgets(
+      'compact K/M suffix stays on the same line as the number when ج.م wraps',
+      (tester) async {
+    final text = CurrencyFormatter.formatCompactEGP(401000);
+    expect(text.contains('401.0K'), isFalse);
+    await tester.pumpWidget(MaterialApp(
+      home: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Center(
+          child: AtomicNumericText(
+            text,
+            maxWidth: 48,
+            style: const TextStyle(fontSize: 14),
+          ),
+        ),
+      ),
+    ));
+    await tester.pump();
+    final (prefix, suffix) = AtomicNumericText.splitCurrency(text);
+    expect(prefix.contains('401.0'), isTrue);
+    expect(prefix.contains('K'), isTrue);
+    expect(prefix.contains('ج.م'), isFalse);
+    expect(suffix, 'ج.م');
+    expect(find.text(prefix), findsOneWidget);
+    expect(find.text('ج.م'), findsOneWidget);
+    final para = tester.renderObject<RenderParagraph>(find.text(prefix));
+    final boxes = para.getBoxesForSelection(
+      TextSelection(baseOffset: 0, extentOffset: prefix.length),
+    );
+    expect({for (final b in boxes) b.toRect().top.round()}, hasLength(1),
+        reason: 'number+K suffix must stay on one line');
+    expect(find.textContaining('401.0K'), findsNothing);
   });
 }

@@ -4,6 +4,19 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
+
+/// Sell-Out is the reference KPI row: 4 columns at ≥960, 2 at ≥580, else 1.
+/// Pages with 5 cards use the same breakpoints (4+1 at the live 1280+sidebar
+/// shell) so card width and the 138px height stay in family.
+abstract final class M3KpiGridColumns {
+  static const double fourColMinWidth = 960.0;
+  static const double twoColMinWidth = 580.0;
+
+  static int forWidth(double width) => width >= fourColMinWidth
+      ? 4
+      : (width >= twoColMinWidth ? 2 : 1);
+}
+
 /// Grid whose cards all share the tallest card's height (KPI rows,
 /// side-by-side section cards).
 ///

@@ -2,6 +2,16 @@ import 'package:intl/intl.dart';
 
 /// Formatter for Egyptian Pounds (EGP) and large metric numbers.
 class CurrencyFormatter {
+  /// Word joiner (U+2060) binds a compact number to its K/M suffix so
+  /// CanvasKit cannot break "401.0K" into "401.0" / "K". Zero-width;
+  /// currency (ج.م) stays after a normal space and may wrap.
+  static const scaleJoiner = '\u2060';
+
+  /// Bind a compact number to a Latin scale suffix (K/M) without a
+  /// visible gap and without a line-break opportunity.
+  static String bindScaleSuffix(String number, String suffix) =>
+      '$number$scaleJoiner$suffix';
+
   /// Signed percentage for RTL text: '+' / U+2212 MINUS SIGN stay on the
   /// left of the digits ("−3.5%", "+12.0%") because the whole value
   /// sits in an LRI…PDI isolate; a bare '-' in Arabic text renders as
@@ -43,7 +53,9 @@ class CurrencyFormatter {
   }
 
   /// Compact EGP for charts & cards, one place for spacing/rounding.
-  /// - `words: false` (default) → "127.14M ج.م" / "250.0K ج.م" (KPI cards, unchanged).
+  /// - `words: false` (default) → "127.14M ج.م" / "250.0K ج.م" (KPI cards).
+  ///   The K/M suffix is bound to the number with [scaleJoiner] so it
+  ///   cannot wrap apart from the digits; «ج.م» stays on a normal space.
   /// - `words: true` → "19.1 مليون ج.م" / "950 ألف ج.م" / "1.2 مليار ج.م" (chart axes).
   /// Always a normal space between number, scale word and currency; [isolate]
   /// wraps the value in FSI…PDI so it never reorders inside RTL text.
@@ -67,11 +79,11 @@ class CurrencyFormatter {
     } else if (amount >= 1e6) {
       out = words
           ? '${trim(amount / 1e6, decimals ?? 1)} مليون ج.م'
-          : '${(amount / 1e6).toStringAsFixed(decimals ?? 2)}M ج.م';
+          : '${bindScaleSuffix((amount / 1e6).toStringAsFixed(decimals ?? 2), 'M')} ج.م';
     } else if (amount >= 1e3) {
       out = words
           ? '${trim(amount / 1e3, decimals ?? 0)} ألف ج.م'
-          : '${(amount / 1e3).toStringAsFixed(decimals ?? 1)}K ج.م';
+          : '${bindScaleSuffix((amount / 1e3).toStringAsFixed(decimals ?? 1), 'K')} ج.م';
     } else {
       out = '${amount.toStringAsFixed(0)} ج.م';
     }
@@ -102,10 +114,10 @@ class CurrencyFormatter {
     final String out;
     if (value >= 1000000) {
       final inM = value / 1000000.0;
-      out = '${inM.toStringAsFixed(1)}M قطعة';
+      out = '${bindScaleSuffix(inM.toStringAsFixed(1), 'M')} قطعة';
     } else if (value >= 1000) {
       final inK = value / 1000.0;
-      out = '${inK.toStringAsFixed(1)}K قطعة';
+      out = '${bindScaleSuffix(inK.toStringAsFixed(1), 'K')} قطعة';
     } else {
       out = '$value قطعة';
     }

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:tashil_web/core/data/result.dart';
+import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/features/sell_out_analytics/data/sell_out_explorer_repository.dart';
@@ -110,14 +111,14 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 1));
 
       expect(find.textContaining('الأسعار وهامش السلسلة'), findsOneWidget);
-      expect(find.textContaining('خسارة 274.6K'), findsWidgets);
-      expect(find.textContaining('595.5K'), findsWidgets);
+      expect(find.textContaining('خسارة 274.6${CurrencyFormatter.scaleJoiner}K'), findsWidgets);
+      expect(find.textContaining('595.5${CurrencyFormatter.scaleJoiner}K'), findsWidgets);
 
       final toolbar = tester.widget<CascadingFilterToolbar>(find.byType(CascadingFilterToolbar));
       toolbar.onCategoryChanged('صابون سائل اطباق');
       await tester.pump(); // start load: table cleared immediately
-      expect(find.textContaining('595.5K'), findsNothing);
-      expect(find.textContaining('خسارة 274.6K'), findsNothing);
+      expect(find.textContaining('595.5${CurrencyFormatter.scaleJoiner}K'), findsNothing);
+      expect(find.textContaining('خسارة 274.6${CurrencyFormatter.scaleJoiner}K'), findsNothing);
 
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
@@ -125,8 +126,8 @@ void main() {
 
       expect(repo.calls, 2);
       expect(find.byKey(const ValueKey('sell_out_error_state')), findsOneWidget);
-      expect(find.textContaining('595.5K'), findsNothing);
-      expect(find.textContaining('خسارة 274.6K'), findsNothing);
+      expect(find.textContaining('595.5${CurrencyFormatter.scaleJoiner}K'), findsNothing);
+      expect(find.textContaining('خسارة 274.6${CurrencyFormatter.scaleJoiner}K'), findsNothing);
       expect(find.text('إعادة المحاولة'), findsOneWidget);
     }, () => MockClient((req) async {
           final body = req.url.path.contains('archive') || req.url.path.contains('upload')

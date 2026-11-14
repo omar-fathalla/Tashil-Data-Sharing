@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/core/widgets/m3_equal_height_grid.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/core/widgets/m3_toolbar_button.dart';
 import 'package:tashil_web/core/widgets/table_scroll_container.dart';
@@ -102,6 +103,19 @@ void main() {
 
     final cards = _pmCards();
     expect(cards, findsNWidgets(5));
+    final pmGrid = tester.widget<M3EqualHeightGrid>(
+        find.byKey(const ValueKey('product_master_kpi_grid')));
+    expect(pmGrid.columns, 4,
+        reason: 'Product Master must use Sell-Out 4-col breakpoints at 1280+sidebar');
+    final cardYs = [
+      for (final e in cards.evaluate())
+        tester.getTopLeft(find.byWidget(e.widget)).dy
+    ];
+    expect(cardYs[0], closeTo(cardYs[1], 1.0));
+    expect(cardYs[0], closeTo(cardYs[2], 1.0));
+    expect(cardYs[0], closeTo(cardYs[3], 1.0));
+    expect(cardYs[4], greaterThan(cardYs[0] + 100),
+        reason: '5th card should sit on the second row (4+1)');
     expect(find.text('إجمالي الأصناف'), findsWidgets);
     expect(find.text('أصناف العروض'), findsWidgets);
     expect(find.text('الباركودات الفريدة'), findsWidgets);

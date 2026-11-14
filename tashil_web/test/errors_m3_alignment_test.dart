@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/features/data_quality/presentation/screens/data_quality_screen.dart';
@@ -583,6 +584,52 @@ void main() {
     expect(codePaintedLineCount(tester, kLiveMissingCode, scope: table), 1);
     expect(codePaintedLineCount(tester, kLiveArabicCode, scope: table),
         lessThanOrEqualTo(3));
+    expect(
+        _hScrollExtent(tester, find.byKey(const ValueKey('dq_table_scroll'))),
+        lessThanOrEqualTo(2.0));
+  });
+
+  testWidgets(
+      'التأثير keeps the compact suffix on the number (401.0K) at 1280+sidebar',
+      (tester) async {
+    await _pumpPageWithSidebar(tester);
+    final table = find.byKey(const ValueKey('dq_table'));
+    expect(table, findsOneWidget);
+    final compact = CurrencyFormatter.formatCompactEGP(401000);
+    expect(compact, contains(CurrencyFormatter.scaleJoiner));
+    expect(compact.contains('401.0K'), isFalse);
+
+    final (prefix, suffix) = (
+      compact.split(' ').first,
+      compact.split(' ').last,
+    );
+    expect(prefix.contains('401.0'), isTrue);
+    expect(prefix.contains('K'), isTrue);
+    expect(suffix, 'ج.م');
+
+    // The bound prefix is painted on one line; currency may be on the next.
+    final prefixFinder = find.descendant(of: table, matching: find.textContaining('401.0'));
+    expect(prefixFinder, findsWidgets);
+    for (final e in prefixFinder.evaluate()) {
+      final data = (e.widget as Text).data ?? '';
+      if (!data.contains('K')) continue;
+      expect(data.contains('401.0K'), isFalse,
+          reason: 'K must be bound with a word joiner, got "$data"');
+      final para = tester.renderObject<RenderParagraph>(
+          find.byElementPredicate((x) => x == e));
+      final numStart = data.indexOf('401.0');
+      final kEnd = data.indexOf('K', numStart) + 1;
+      expect(kEnd, greaterThan(numStart));
+      final boxes = para.getBoxesForSelection(
+        TextSelection(baseOffset: numStart, extentOffset: kEnd),
+      );
+      expect(boxes, isNotEmpty);
+      expect({for (final b in boxes) b.toRect().top.round()}, hasLength(1),
+          reason: '401.0 and K must share one line in "$data"');
+      expect(data.contains('401.0'), isTrue);
+      expect(data.contains('K'), isTrue);
+    }
+    expect(find.textContaining('401.0K'), findsNothing);
     expect(
         _hScrollExtent(tester, find.byKey(const ValueKey('dq_table_scroll'))),
         lessThanOrEqualTo(2.0));

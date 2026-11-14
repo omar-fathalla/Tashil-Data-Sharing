@@ -16,6 +16,7 @@ import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/core/widgets/m3_equal_height_grid.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
+import 'package:tashil_web/core/widgets/atomic_numeric_text.dart';
 import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_status_tag.dart';
 import 'package:tashil_web/features/sell_out_analytics/data/sell_out_explorer_repository.dart';
@@ -467,7 +468,7 @@ void main() {
         final texts = find
             .byKey(const ValueKey('price_matrix_delta_pct'))
             .evaluate()
-            .map((e) => (e.widget as Text).data!)
+            .map((e) => (e.widget as AtomicNumericText).text)
             .toList();
         expect(texts,
             containsAll(['\u2066\u22123.5%\u2069', '\u2066+12.0%\u2069']));
