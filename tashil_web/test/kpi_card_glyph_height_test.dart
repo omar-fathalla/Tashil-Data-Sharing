@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
@@ -73,13 +70,8 @@ void main() {
   GoogleFonts.config.allowRuntimeFetching = false;
   setUpAll(() async {
     await loadRealCairoFont();
-    // ▲ ▼ ▴ ▾ subset of Noto Sans Symbols 2 (OFL, test/fonts/
-    // OFL-NotoSansSymbols2.txt): the browser's fallback for these glyphs.
-    final bytes =
-        File('test/fonts/NotoSansSymbols2-Arrows.ttf').readAsBytesSync();
-    await (FontLoader('NotoSansSymbols2')
-          ..addFont(Future.value(ByteData.view(bytes.buffer))))
-        .load();
+    // ▲ ▼ are covered by the bundled NotoSansSymbols2 fallback that
+    // loadRealCairoFont / AppTheme now register (OFL-NotoSansSymbols2.txt).
   });
 
   testWidgets('arrow glyphs (▲ ▼) do not change the KPI card height',

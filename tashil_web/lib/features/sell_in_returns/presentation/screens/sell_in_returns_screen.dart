@@ -297,7 +297,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
                 icon: Icon(Icons.payments_rounded, size: 18)),
             ButtonSegment(
                 value: true,
-                label: Text('نسبة %'),
+                label: Text('نسبة\u00A0%', maxLines: 1, softWrap: false),
                 icon: Icon(Icons.percent_rounded, size: 18)),
           ],
           selected: {_showPct},

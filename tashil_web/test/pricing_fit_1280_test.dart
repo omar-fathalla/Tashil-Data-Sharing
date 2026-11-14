@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/features/pricing_compliance/presentation/screens/pricing_compliance_screen.dart';
 import 'package:tashil_web/features/product_master/presentation/screens/product_master_screen.dart';
@@ -191,5 +192,41 @@ void main() {
     }
 
     expect(_ellipsizedBefore(tester, grid, 1), isEmpty);
+  });
+
+  testWidgets('هامش السلسلة uses formatSignedPct so the minus stays on the left',
+      (tester) async {
+    await pumpPricing(
+      tester,
+      PricingComplianceScreen(apiClient: _FitApiClient()),
+      width: 1280,
+      height: 2400,
+    );
+    final expected =
+        'هامش السلسلة: ${CurrencyFormatter.formatSignedPct(-5.0)}';
+    final label = find.text(expected);
+    expect(label, findsOneWidget);
+    await tester.ensureVisible(label);
+    await tester.pumpAndSettle();
+    expect(find.text('هامش السلسلة: -5.0%'), findsNothing);
+    expect(find.textContaining('%5.0-'), findsNothing);
+
+    final para = tester.renderObject<RenderParagraph>(label);
+    final text = expected;
+    final minusIdx = text.indexOf('\u2212');
+    final digitIdx = text.indexOf(RegExp(r'\d'));
+    expect(minusIdx, greaterThanOrEqualTo(0));
+    final minusBoxes = para.getBoxesForSelection(
+      TextSelection(baseOffset: minusIdx, extentOffset: minusIdx + 1),
+    );
+    final digitBoxes = para.getBoxesForSelection(
+      TextSelection(baseOffset: digitIdx, extentOffset: digitIdx + 1),
+    );
+    expect(minusBoxes, isNotEmpty);
+    expect(digitBoxes, isNotEmpty);
+    expect(
+      minusBoxes.first.toRect().left,
+      lessThan(digitBoxes.first.toRect().left),
+    );
   });
 }

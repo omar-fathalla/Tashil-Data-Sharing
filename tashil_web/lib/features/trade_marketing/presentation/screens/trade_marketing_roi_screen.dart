@@ -1512,7 +1512,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
     required double overallRomi,
     required double spendRatioPct,
   }) {
-    String pct(double v) => CurrencyFormatter.formatSignedPct(v);
+    String pct(double v) =>
+        CurrencyFormatter.formatSignedPct(v, plusForZero: true);
     final momUp = totalMomLift >= 0;
     final yoyUp = totalYoyLift >= 0;
     // Shared Sell-Out KPI card + grid (same geometry, fonts and icon size).

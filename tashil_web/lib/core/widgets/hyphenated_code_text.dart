@@ -16,12 +16,18 @@ class HyphenatedCodeText extends StatelessWidget {
     this.maxLines = 3,
     this.textAlign = TextAlign.center,
     this.style,
+    this.maxWidth,
   });
 
   final String code;
   final int maxLines;
   final TextAlign textAlign;
   final TextStyle? style;
+
+  /// When set, the one-line vs dash-wrap decision is made with this width
+  /// and no [LayoutBuilder] is used — required inside a [DataTable], which
+  /// queries intrinsic widths ([LayoutBuilder] cannot provide them).
+  final double? maxWidth;
 
   static bool isHyphenatedSku(String code) {
     final t = code.trim();
@@ -40,66 +46,80 @@ class HyphenatedCodeText extends StatelessWidget {
   Widget build(BuildContext context) {
     final effectiveStyle = style ?? DefaultTextStyle.of(context).style;
     final direction = directionFor(code);
+    final child = maxWidth != null
+        ? _atWidth(effectiveStyle, direction, maxWidth!, true)
+        : LayoutBuilder(
+            builder: (context, constraints) => _atWidth(
+              effectiveStyle,
+              direction,
+              constraints.maxWidth,
+              constraints.hasBoundedWidth,
+            ),
+          );
     return Semantics(
       label: code,
       excludeSemantics: true,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final painter = TextPainter(
-            text: TextSpan(text: code, style: effectiveStyle),
-            textDirection: direction,
-            maxLines: 1,
-          )..layout();
-          final fitsOneLine = !constraints.hasBoundedWidth ||
-              painter.width <= constraints.maxWidth + 0.5;
-          if (fitsOneLine || maxLines <= 1) {
-            return Text(
-              code,
-              maxLines: 1,
-              softWrap: false,
-              overflow: TextOverflow.clip,
-              textAlign: textAlign,
-              textDirection: direction,
-              style: effectiveStyle,
-            );
-          }
-          if (isHyphenatedSku(code)) {
-            final tokens = code.split('-');
-            final alignment = switch (textAlign) {
-              TextAlign.left || TextAlign.start => WrapAlignment.start,
-              TextAlign.right || TextAlign.end => WrapAlignment.end,
-              _ => WrapAlignment.center,
-            };
-            return Directionality(
-              textDirection: TextDirection.ltr,
-              child: Wrap(
-                alignment: alignment,
-                runAlignment: alignment,
-                children: [
-                  for (var i = 0; i < tokens.length; i++)
-                    Text(
-                      i == tokens.length - 1 ? tokens[i] : '${tokens[i]}-',
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.clip,
-                      textAlign: textAlign,
-                      style: effectiveStyle,
-                    ),
-                ],
+      child: child,
+    );
+  }
+
+  Widget _atWidth(
+    TextStyle effectiveStyle,
+    TextDirection direction,
+    double width,
+    bool bounded,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: code, style: effectiveStyle),
+      textDirection: direction,
+      maxLines: 1,
+    )..layout();
+    final fitsOneLine = !bounded || painter.width <= width + 0.5;
+    if (fitsOneLine || maxLines <= 1) {
+      return Text(
+        code,
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.clip,
+        textAlign: textAlign,
+        textDirection: direction,
+        style: effectiveStyle,
+      );
+    }
+    if (isHyphenatedSku(code)) {
+      final tokens = code.split('-');
+      final alignment = switch (textAlign) {
+        TextAlign.left || TextAlign.start => WrapAlignment.start,
+        TextAlign.right || TextAlign.end => WrapAlignment.end,
+        _ => WrapAlignment.center,
+      };
+      return Directionality(
+        textDirection: TextDirection.ltr,
+        child: Wrap(
+          alignment: alignment,
+          runAlignment: alignment,
+          children: [
+            for (var i = 0; i < tokens.length; i++)
+              Text(
+                i == tokens.length - 1 ? tokens[i] : '${tokens[i]}-',
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.clip,
+                textAlign: textAlign,
+                style: effectiveStyle,
               ),
-            );
-          }
-          return Text(
-            code,
-            maxLines: maxLines,
-            softWrap: true,
-            overflow: TextOverflow.clip,
-            textAlign: textAlign,
-            textDirection: direction,
-            style: effectiveStyle,
-          );
-        },
-      ),
+          ],
+        ),
+      );
+    }
+    return Text(
+      code,
+      maxLines: maxLines,
+      softWrap: true,
+      overflow: TextOverflow.clip,
+      textAlign: textAlign,
+      textDirection: direction,
+      style: effectiveStyle,
     );
   }
 }

@@ -25,3 +25,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: NotoSansSymbols2
+      fonts:
+        - asset: fonts/NotoSansSymbols2-Arrows.ttf

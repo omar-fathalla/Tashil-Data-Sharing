@@ -17,6 +17,7 @@ import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/features/navigation/presentation/desktop_sidebar.dart';
 import 'package:tashil_web/features/sell_out_analytics/data/sell_out_explorer_repository.dart';
+import 'package:tashil_web/core/widgets/hyphenated_code_text.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
 
 import 'support/real_fonts.dart';
@@ -53,8 +54,8 @@ SellOutExplorerData _livePriceData() => SellOutExplorerData(
             factoryUnitCost: 180.25,
             netCartonInvoiceCost: 520.40,
             totalNetRevenue: 7588000,
-            retailerGrossProfit: -1850000,
-            retailerMarginPct: -24.4,
+            retailerGrossProfit: -4600000,
+            retailerMarginPct: -60.3,
           ),
           SellOutSkuSummaryModel(
             itemCode: 'PRHC-0001-0001',
@@ -257,6 +258,32 @@ void main() {
             reason: label,
           );
         }
+
+        expect(find.byType(HyphenatedCodeText), findsWidgets);
+        for (final code in ['PRHC-0003-0009', 'PRHC-0001-0001', 'FGDG-0004-0001']) {
+          final f = find.descendant(of: table, matching: find.text(code));
+          expect(f, findsOneWidget, reason: 'code $code must stay on one line');
+          expect(_onScreen(tester, f), isTrue, reason: 'code $code off-screen');
+          final para = tester.renderObject<RenderParagraph>(f);
+          expect(para.didExceedMaxLines, isFalse, reason: code);
+          expect(
+            para.size.height,
+            lessThanOrEqualTo(22.0),
+            reason: 'code $code wrapped to more than one line (h=${para.size.height})',
+          );
+        }
+
+        final marginText = CurrencyFormatter.formatMarginSummary(-4600000, -60.3);
+        expect(marginText, contains('60.3%'));
+        final margin = find.descendant(of: table, matching: find.text(marginText));
+        expect(margin, findsOneWidget, reason: 'full margin "$marginText"');
+        expect(_onScreen(tester, margin), isTrue);
+        final marginPara = tester.renderObject<RenderParagraph>(margin);
+        expect(
+          marginPara.didExceedMaxLines,
+          isFalse,
+          reason: 'هامش السلسلة ellipsized: $marginText',
+        );
       },
           () => MockClient((req) async => http.Response.bytes(
                 utf8.encode(jsonEncode(req.url.path.contains('archive') ||

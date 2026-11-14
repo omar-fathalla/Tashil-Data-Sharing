@@ -5,6 +5,7 @@ import 'm3_motion.dart';
 import 'm3_shape.dart';
 import 'm3_spacing.dart';
 import 'm3_status_colors.dart';
+import 'm3_typography.dart';
 
 /// AppTheme builds the official Google Material Design 3 (M3) theme
 /// using single-seed dynamic color palette generation, M3 Motion & Transitions,
@@ -120,11 +121,13 @@ class AppTheme {
       ),
     );
 
+    final textThemeWithFallback = AppFontFallback.apply(textTheme);
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colorScheme.surface,
-      textTheme: textTheme,
+      textTheme: textThemeWithFallback,
       fontFamily: 'Cairo',
       pageTransitionsTheme: M3Motion.pageTransitionsTheme,
       // Desktop browsers otherwise pick VisualDensity.compact and shrink 40→32dp buttons.

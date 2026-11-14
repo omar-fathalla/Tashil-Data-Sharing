@@ -188,6 +188,10 @@ void main() {
           CurrencyFormatter.formatSignedPct(-3.46), '\u2066\u22123.5%\u2069');
       expect(CurrencyFormatter.formatSignedPct(12), '\u2066+12.0%\u2069');
       expect(CurrencyFormatter.formatSignedPct(-0.04), '\u20660.0%\u2069');
+      expect(CurrencyFormatter.formatSignedPct(0, plusForZero: true),
+          '\u2066+0.0%\u2069');
+      expect(CurrencyFormatter.formatSignedPct(-0.04, plusForZero: true),
+          '\u2066+0.0%\u2069');
       expect(CurrencyFormatter.formatSignedPct(-7.4, decimals: 0),
           '\u2066\u22127%\u2069');
     });

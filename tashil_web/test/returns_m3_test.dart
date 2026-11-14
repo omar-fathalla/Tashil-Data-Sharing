@@ -619,4 +619,35 @@ void main() {
       },
     );
   });
+
+
+  testWidgets('نسبة % toggle stays on one line at 1280+sidebar',
+      (tester) async {
+    final errors = await _pump(
+      tester,
+      kLiveWindowWidth,
+      withSidebar: true,
+    );
+    await tester.pumpAndSettle();
+    expect(errors, isEmpty);
+
+    final label = find.text('نسبة\u00A0%');
+    expect(label, findsOneWidget);
+    final para = tester.renderObject<RenderParagraph>(label);
+    expect(para.didExceedMaxLines, isFalse);
+    expect(
+      para.size.height,
+      lessThanOrEqualTo(22.0),
+      reason: 'نسبة % wrapped to ${para.size.height}px',
+    );
+
+    final toggle = find.byType(SegmentedButton<bool>);
+    expect(toggle, findsOneWidget);
+    final h = tester.getSize(toggle).height;
+    expect(
+      h,
+      lessThanOrEqualTo(48.0),
+      reason: 'نسبة % toggle height $h is taller than a one-line v160 button',
+    );
+  });
 }
