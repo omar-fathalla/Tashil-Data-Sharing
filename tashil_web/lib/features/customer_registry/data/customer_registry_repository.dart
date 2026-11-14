@@ -16,6 +16,10 @@ class RegistryEntry {
   final String uploadChain;
   final int rows;
   final double value;
+  final int liveRows;
+  final double liveValue;
+  final String liveChain;
+  final List<String> liveFiles;
   final List<String> months;
   final List<String> files;
 
@@ -30,9 +34,24 @@ class RegistryEntry {
     this.uploadChain = '',
     this.rows = 0,
     this.value = 0,
+    this.liveRows = 0,
+    this.liveValue = 0,
+    this.liveChain = '',
+    this.liveFiles = const [],
     this.months = const [],
     this.files = const [],
   });
+
+  /// Counts shown in the merge/confirm UI: in-totals when present, else quarantine.
+  int get displayRows => liveRows > 0 ? liveRows : rows;
+  double get displayValue => liveRows > 0 ? liveValue : value;
+
+  /// Explicit approval chain, else the chain of counted rows, else the upload chain.
+  String get displayChain {
+    if (chain.isNotEmpty) return chain;
+    if (liveChain.isNotEmpty) return liveChain;
+    return uploadChain;
+  }
 
   factory RegistryEntry.fromJson(Map<String, dynamic> j) {
     var rows = 0;
@@ -59,6 +78,12 @@ class RegistryEntry {
       uploadChain: '${j['upload_chain'] ?? ''}',
       rows: rows,
       value: value,
+      liveRows: (j['live_rows'] as num?)?.toInt() ?? 0,
+      liveValue: (j['live_value'] as num?)?.toDouble() ?? 0,
+      liveChain: '${j['live_chain'] ?? ''}',
+      liveFiles: [
+        for (final f in (j['live_files'] as List?) ?? const []) '$f',
+      ],
       months: months.toList()..sort(),
       files: files,
     );
@@ -72,7 +97,7 @@ class RegistryDecisionResult {
 }
 
 abstract class CustomerRegistryDataSource {
-  Future<List<RegistryEntry>> list({String status = ''});
+  Future<List<RegistryEntry>> list({String status = '', bool includeSeed = false});
   Future<RegistryDecisionResult> decide(String action, String name, {String chain = '', String aliasOf = '', String reason = ''});
 }
 
@@ -81,9 +106,11 @@ class HttpCustomerRegistryDataSource implements CustomerRegistryDataSource {
   HttpCustomerRegistryDataSource(this.api);
 
   @override
-  Future<List<RegistryEntry>> list({String status = ''}) async {
-    final uri = Uri.parse(ApiEndpoints.customerRegistry)
-        .replace(queryParameters: {if (status.isNotEmpty) 'status': status});
+  Future<List<RegistryEntry>> list({String status = '', bool includeSeed = false}) async {
+    final uri = Uri.parse(ApiEndpoints.customerRegistry).replace(queryParameters: {
+      if (status.isNotEmpty) 'status': status,
+      if (includeSeed) 'include_seed': 'true',
+    });
     final res = await BackendHttp.get(uri, headers: api.requestHeaders).timeout(const Duration(seconds: 20));
     if (res.statusCode != 200) throw Exception('تعذر تحميل قائمة العملاء (HTTP ${res.statusCode})');
     final j = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;

@@ -65,7 +65,43 @@ func (h *CustomerRegistryHandler) HandleList(w http.ResponseWriter, r *http.Requ
 	}
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
 	entries := reg.List(r.Context(), c.TenantID, status, r.URL.Query().Get("include_seed") == "true")
-	writeJSON(w, http.StatusOK, map[string]interface{}{"entries": entries, "count": len(entries)})
+	out := make([]registryListEntry, 0, len(entries))
+	stats := h.liveStats(c.TenantID)
+	for _, e := range entries {
+		item := registryListEntry{Entry: e}
+		if st, ok := stats[e.Key]; ok {
+			item.LiveRows = st.Rows
+			item.LiveValue = st.Value
+			item.LiveChain = st.Chain
+			item.LiveFiles = st.Files
+		}
+		if item.LiveChain == "" {
+			item.LiveChain = reg.EntryChain(e)
+		}
+		out = append(out, item)
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"entries": out, "count": len(out)})
+}
+
+// registryListEntry adds counted (in-totals) Sell-In stats to a stored registry entry.
+type registryListEntry struct {
+	customers.Entry
+	LiveRows  int      `json:"live_rows,omitempty"`
+	LiveValue float64  `json:"live_value,omitempty"`
+	LiveChain string   `json:"live_chain,omitempty"`
+	LiveFiles []string `json:"live_files,omitempty"`
+}
+
+type sellInLiveStatter interface {
+	SellInCustomerLiveStats(tenantID string) map[string]ingestion.CustomerLiveStat
+}
+
+func (h *CustomerRegistryHandler) liveStats(tenantID string) map[string]ingestion.CustomerLiveStat {
+	s, ok := h.p.(sellInLiveStatter)
+	if !ok || s == nil {
+		return nil
+	}
+	return s.SellInCustomerLiveStats(tenantID)
 }
 
 type customerDecisionRequest struct {
@@ -86,10 +122,40 @@ func (h *CustomerRegistryHandler) HandleReject(w http.ResponseWriter, r *http.Re
 	h.decide(w, r, customers.StatusRejected, "customer_registry_reject")
 }
 
-// HandleUnmerge serves POST /api/v1/customers/registry/unmerge: an approved name (or alias) goes
-// back to pending and every Sell-In file is re-applied, so its rows leave the totals again.
+// HandleUnmerge serves POST /api/v1/customers/registry/unmerge.
+// An approved name that was merged (alias_of set) stays approved under its own
+// name and Sell-In files on its chain are re-applied so the rows split again.
+// Any other decision goes back to pending and every Sell-In file is re-applied.
 func (h *CustomerRegistryHandler) HandleUnmerge(w http.ResponseWriter, r *http.Request) {
-	h.decide(w, r, customers.StatusPending, "customer_registry_unmerge")
+	c, ok := tmWriteClaims(w, r)
+	if !ok {
+		return
+	}
+	if !dataQualityWriteRoles[c.Role] {
+		writeErr(w, http.StatusForbidden, "مش مسموح لدورك تعتمد أو ترفض عملاء")
+		return
+	}
+	var req customerDecisionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Name) == "" {
+		writeErr(w, http.StatusBadRequest, "اسم العميل مطلوب")
+		return
+	}
+	reg := h.p.CustomerRegistry()
+	if reg == nil {
+		writeErr(w, http.StatusServiceUnavailable, "سجل العملاء مش متاح")
+		return
+	}
+	key := customers.NormalizeName(req.Name)
+	for _, e := range reg.List(r.Context(), c.TenantID, "", false) {
+		if e.Key == key && e.Status == customers.StatusApproved && strings.TrimSpace(e.AliasOf) != "" {
+			// Keep the customer approved; only undo the merge.
+			req.Chain = e.Chain
+			req.AliasOf = ""
+			h.decideWith(w, r, c, req, customers.StatusApproved, "customer_registry_unmerge")
+			return
+		}
+	}
+	h.decideWith(w, r, c, req, customers.StatusPending, "customer_registry_unmerge")
 }
 
 func (h *CustomerRegistryHandler) decide(w http.ResponseWriter, r *http.Request, status, action string) {
@@ -101,34 +167,33 @@ func (h *CustomerRegistryHandler) decide(w http.ResponseWriter, r *http.Request,
 		writeErr(w, http.StatusForbidden, "مش مسموح لدورك تعتمد أو ترفض عملاء")
 		return
 	}
-	reg := h.p.CustomerRegistry()
-	if reg == nil {
-		writeErr(w, http.StatusServiceUnavailable, "سجل العملاء مش متاح")
-		return
-	}
 	var req customerDecisionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Name) == "" {
 		writeErr(w, http.StatusBadRequest, "اسم العميل مطلوب")
 		return
 	}
-	// Files to re-apply: the name's quarantined files that were not fully superseded by a later
-	// confirmed upload. Chains: where those rows were held (re-apply touches only these chains).
-	var files []string
-	chainSet := map[string]bool{}
-	seenFile := map[string]bool{}
-	for _, e := range reg.List(r.Context(), c.TenantID, "", false) {
-		if e.Key == customers.NormalizeName(req.Name) {
-			for _, q := range e.Quarantine {
-				if !q.Live() || seenFile[q.File] {
-					continue
-				}
-				seenFile[q.File] = true
-				files = append(files, q.File)
-				if q.Chain != "" {
-					chainSet[q.Chain] = true
-				} else if e.UploadChain != "" {
-					// Stats recorded before FileStat.Chain existed: the upload chain + chain rules.
-					chainSet[reg.ChainOfName(e.Name, e.UploadChain)] = true
+	h.decideWith(w, r, c, req, status, action)
+}
+
+func (h *CustomerRegistryHandler) decideWith(w http.ResponseWriter, r *http.Request, c *domain.UserClaims, req customerDecisionRequest, status, action string) {
+	reg := h.p.CustomerRegistry()
+	if reg == nil {
+		writeErr(w, http.StatusServiceUnavailable, "سجل العملاء مش متاح")
+		return
+	}
+	// Files to re-apply: live quarantined files of this name, plus (when merging or
+	// already in totals) the archived files that currently hold its counted rows.
+	files, chainSet := collectReapplyScope(reg, r.Context(), c.TenantID, req.Name)
+	if st := h.liveStats(c.TenantID); len(st) > 0 {
+		for _, name := range []string{req.Name, req.AliasOf} {
+			if key := customers.NormalizeName(name); key != "" {
+				if s, ok := st[key]; ok {
+					for _, f := range s.Files {
+						files = appendUnique(files, f)
+					}
+					if s.Chain != "" {
+						chainSet[s.Chain] = true
+					}
 				}
 			}
 		}
@@ -142,23 +207,33 @@ func (h *CustomerRegistryHandler) decide(w http.ResponseWriter, r *http.Request,
 	var errs []string
 	switch status {
 	case customers.StatusApproved:
-		if len(files) > 0 {
-			if entry.Chain != "" {
-				// An explicit chain on approval moves the rows there; that chain is rewritten too.
-				chainSet[reg.ChainOfName(entry.Name, entry.Chain)] = true
-			}
-			chains := make([]string, 0, len(chainSet))
-			for ch := range chainSet {
-				chains = append(chains, ch)
-			}
-			sort.Strings(chains)
-			if len(chains) == 0 {
-				errs = append(errs, "مفيش سلسلة متسجلة لصفوف العميل ده، فمااتعادش أي ملف. ارفع الملف تاني")
-				break
-			}
-			// Order: original upload order (ReapplySellInFiles sorts by uploaded_at), not by name.
-			applied, errs = h.p.ReapplySellInFiles(r.Context(), c.TenantID, files, chains)
+		if entry.Chain != "" {
+			// An explicit chain on approval moves the rows there; that chain is rewritten too.
+			chainSet[reg.ChainOfName(entry.Name, entry.Chain)] = true
 		}
+		if aliasChain := reg.EntryChain(*entry); aliasChain != "" {
+			chainSet[aliasChain] = true
+		}
+		chains := make([]string, 0, len(chainSet))
+		for ch := range chainSet {
+			chains = append(chains, ch)
+		}
+		sort.Strings(chains)
+		if len(files) == 0 && strings.TrimSpace(entry.AliasOf) == "" && len(chains) == 0 {
+			break
+		}
+		if len(chains) == 0 {
+			errs = append(errs, "مفيش سلسلة متسجلة لصفوف العميل ده، فمااتعادش أي ملف. ارفع الملف تاني")
+			break
+		}
+		// A merge of already-counted names may have no quarantine files; re-apply
+		// every archived Sell-In file on the shared chain so attribution updates
+		// without a manual re-upload. Dedup / replacement rules stay as at upload.
+		runFiles := files
+		if len(files) == 0 && strings.TrimSpace(entry.AliasOf) != "" {
+			runFiles = nil
+		}
+		applied, errs = h.p.ReapplySellInFiles(r.Context(), c.TenantID, runFiles, chains)
 	case customers.StatusPending:
 		applied, errs = h.p.ReapplySellInFiles(r.Context(), c.TenantID, nil, nil)
 	}
@@ -288,4 +363,45 @@ func MonthList(months []int) []int {
 	}
 	sort.Ints(out)
 	return out
+}
+
+func collectReapplyScope(reg *customers.Registry, ctx context.Context, tenantID, name string) ([]string, map[string]bool) {
+	var files []string
+	chainSet := map[string]bool{}
+	seenFile := map[string]bool{}
+	key := customers.NormalizeName(name)
+	for _, e := range reg.List(ctx, tenantID, "", false) {
+		if e.Key != key {
+			continue
+		}
+		if c := reg.EntryChain(e); c != "" {
+			chainSet[c] = true
+		}
+		for _, q := range e.Quarantine {
+			if !q.Live() || seenFile[q.File] {
+				continue
+			}
+			seenFile[q.File] = true
+			files = append(files, q.File)
+			if q.Chain != "" {
+				chainSet[q.Chain] = true
+			} else if e.UploadChain != "" {
+				chainSet[reg.ChainOfName(e.Name, e.UploadChain)] = true
+			}
+		}
+	}
+	return files, chainSet
+}
+
+func appendUnique(files []string, file string) []string {
+	file = strings.TrimSpace(file)
+	if file == "" {
+		return files
+	}
+	for _, f := range files {
+		if f == file {
+			return files
+		}
+	}
+	return append(files, file)
 }

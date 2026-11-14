@@ -51,13 +51,73 @@ func TestRegistryAliasOfDoesNotAttachUnapprovedCanonical(t *testing.T) {
 	r := New(&MemoryStore{})
 	alias := "QA alias name"
 	r.Partition(ctx, "tenant-adeco", "x.xlsx", "fathalla", []domain.SellInRecord{rec(alias, 1)}, true)
-	// Approved alias of a name that is not itself approved must keep the alias row
-	// on its own approved entry (no attribution to an unknown customer).
-	if _, err := r.Decide(ctx, "tenant-adeco", alias, StatusApproved, "fathalla", "QA missing canonical", "admin@x"); err != nil {
+	_, err := r.Decide(ctx, "tenant-adeco", alias, StatusApproved, "fathalla", "QA missing canonical", "admin@x")
+	if err == nil {
+		t.Fatal("expected decide to reject an unapproved canonical")
+	}
+}
+
+func TestRegistryAliasOfRejectsSelfAndCrossChain(t *testing.T) {
+	ctx := context.Background()
+	r := New(&MemoryStore{})
+	a, b := "عميل سلسلة فتح الله", "عميل سلسلة كارفور"
+	if _, err := r.Decide(ctx, "tenant-adeco", a, StatusApproved, "fathalla", "", "admin@x"); err != nil {
 		t.Fatal(err)
 	}
-	kept, q := r.PartitionLayout(ctx, "tenant-adeco", "x.xlsx", "fathalla", AliasLayout, []domain.SellInRecord{rec(alias, 1)}, false)
-	if len(kept) != 1 || kept[0].CustomerName != alias || len(q) != 0 {
-		t.Fatalf("unapproved canonical must not swallow the row: kept=%+v q=%+v", kept, q)
+	if _, err := r.Decide(ctx, "tenant-adeco", b, StatusApproved, "carrefour", "", "admin@x"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Decide(ctx, "tenant-adeco", a, StatusApproved, "fathalla", a, "admin@x"); err == nil {
+		t.Fatal("self alias must be rejected")
+	}
+	if _, err := r.Decide(ctx, "tenant-adeco", a, StatusApproved, "fathalla", b, "admin@x"); err == nil {
+		t.Fatal("cross-chain alias must be rejected")
+	}
+}
+
+func TestRegistryAliasOfAlreadyApprovedRemapsAndUnmergeKeepsApproved(t *testing.T) {
+	ctx := context.Background()
+	r := New(&MemoryStore{})
+	canonical := "عائله فتح الله ماركت - كفر الدوار 2"
+	alias := "عائله فتح الله ماركت مواد عناية - كفر الدوار2"
+	if _, err := r.Decide(ctx, "tenant-adeco", canonical, StatusApproved, "fathalla", "", "admin@x"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Decide(ctx, "tenant-adeco", alias, StatusApproved, "fathalla", "", "admin@x"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Decide(ctx, "tenant-adeco", alias, StatusApproved, "fathalla", canonical, "admin@x"); err != nil {
+		t.Fatal(err)
+	}
+	kept, q := r.PartitionLayout(ctx, "tenant-adeco", "in26.xlsx", "fathalla", AliasLayout, []domain.SellInRecord{rec(alias, 3)}, false)
+	if len(q) != 0 || len(kept) != 1 || kept[0].CustomerName != canonical {
+		t.Fatalf("approved merge must remap: kept=%+v q=%+v", kept, q)
+	}
+	// Clearing alias_of while staying approved puts the spelling back on its own name.
+	if _, err := r.Decide(ctx, "tenant-adeco", alias, StatusApproved, "fathalla", "", "admin@x"); err != nil {
+		t.Fatal(err)
+	}
+	kept, q = r.PartitionLayout(ctx, "tenant-adeco", "in26.xlsx", "fathalla", AliasLayout, []domain.SellInRecord{rec(alias, 3)}, false)
+	if len(q) != 0 || len(kept) != 1 || kept[0].CustomerName != alias {
+		t.Fatalf("unmerge must keep the name approved under itself: kept=%+v q=%+v", kept, q)
+	}
+}
+
+func TestRegistryAliasOfDoesNotRemapAcrossChainsAtPartition(t *testing.T) {
+	ctx := context.Background()
+	r := New(&MemoryStore{})
+	canonical := "عميل فتح الله"
+	alias := "اسم مشترك"
+	if _, err := r.Decide(ctx, "tenant-adeco", canonical, StatusApproved, "fathalla", "", "admin@x"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Decide(ctx, "tenant-adeco", alias, StatusApproved, "fathalla", canonical, "admin@x"); err != nil {
+		t.Fatal(err)
+	}
+	row := rec(alias, 3)
+	row.RetailerChain = "carrefour"
+	kept, q := r.PartitionLayout(ctx, "tenant-adeco", "x.xlsx", "carrefour", "", []domain.SellInRecord{row}, false)
+	if len(q) != 0 || len(kept) != 1 || kept[0].CustomerName != alias {
+		t.Fatalf("row on another chain must not be remapped: kept=%+v q=%+v", kept, q)
 	}
 }

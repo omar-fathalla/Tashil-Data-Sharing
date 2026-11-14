@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/customers"
 )
 
 type reapplyCtxKey struct{}
@@ -298,4 +299,49 @@ func (p *Processor) unknownBarcodesAll(tenantID string, kept, all []domain.SellI
 		issue.MessageAR += " (جزء من الصفوف دي محجوز لعملاء مش متأكدين ومش داخل في الإجماليات)"
 	}
 	return u, issue
+}
+
+// CustomerLiveStat is the in-totals Sell-In footprint of one customer name.
+type CustomerLiveStat struct {
+	Name  string   `json:"name"`
+	Chain string   `json:"chain"`
+	Rows  int      `json:"rows"`
+	Value float64  `json:"value"`
+	Files []string `json:"files,omitempty"`
+}
+
+// SellInCustomerLiveStats sums counted Sell-In rows by normalized customer name.
+func (p *Processor) SellInCustomerLiveStats(tenantID string) map[string]CustomerLiveStat {
+	snap, ok := p.bqRepo.(sellInSnapshotter)
+	if !ok || p.bqRepo == nil {
+		return nil
+	}
+	out := map[string]CustomerLiveStat{}
+	seenFile := map[string]map[string]bool{}
+	for _, rec := range snap.SellInRecordsSnapshot(tenantID) {
+		key := customers.NormalizeName(rec.CustomerName)
+		if key == "" {
+			continue
+		}
+		st := out[key]
+		if st.Name == "" {
+			st.Name = strings.TrimSpace(rec.CustomerName)
+		}
+		if st.Chain == "" {
+			st.Chain = storedChain(rec)
+		}
+		st.Rows++
+		st.Value += rec.NetValueEGP
+		if fn := strings.TrimSpace(rec.SourceFilename); fn != "" {
+			if seenFile[key] == nil {
+				seenFile[key] = map[string]bool{}
+			}
+			if !seenFile[key][fn] {
+				seenFile[key][fn] = true
+				st.Files = append(st.Files, fn)
+			}
+		}
+		out[key] = st
+	}
+	return out
 }

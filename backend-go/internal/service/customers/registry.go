@@ -355,7 +355,10 @@ func (r *Registry) PartitionLayout(ctx context.Context, tenantID, filename, uplo
 		}
 		e, ok := r.resolveLocked(st, tenantID, key)
 		if ok {
-			if e.Chain != "" {
+			origChain := r.chainOf(rec)
+			// A plain approval may move the name onto the chain the admin chose.
+			// An alias must not move a row that arrived on a different chain.
+			if e.Chain != "" && (strings.TrimSpace(e.AliasOf) == "" || origChain == "" || origChain == strings.ToLower(strings.TrimSpace(e.Chain))) {
 				rec.RetailerChain = e.Chain
 			}
 			// Owner-approved alias_of: attach this spelling to the canonical approved customer.
@@ -365,17 +368,21 @@ func (r *Registry) PartitionLayout(ctx context.Context, tenantID, filename, uplo
 				canKey := NormalizeName(can)
 				if canKey != "" && canKey != key {
 					if canEntry, canOK := r.resolveLocked(st, tenantID, canKey); canOK {
-						rec.CustomerName = canEntry.Name
-						if canEntry.Name == "" {
-							rec.CustomerName = can
-						}
-						if strings.TrimSpace(canEntry.BranchCode) != "" {
-							rec.CustomerBranchCode = canEntry.BranchCode
-						} else {
-							rec.CustomerBranchCode = "" // filled by ingest with the canonical name
-						}
-						if canEntry.Chain != "" {
-							rec.RetailerChain = canEntry.Chain
+						// Never attribute a row on one chain to a customer on another.
+						canChain := r.entryChainLocked(canEntry)
+						if canChain == "" || origChain == "" || origChain == canChain {
+							rec.CustomerName = canEntry.Name
+							if canEntry.Name == "" {
+								rec.CustomerName = can
+							}
+							if strings.TrimSpace(canEntry.BranchCode) != "" {
+								rec.CustomerBranchCode = canEntry.BranchCode
+							} else {
+								rec.CustomerBranchCode = "" // filled by ingest with the canonical name
+							}
+							if canEntry.Chain != "" {
+								rec.RetailerChain = canEntry.Chain
+							}
 						}
 					}
 				}
@@ -609,6 +616,12 @@ func (r *Registry) Decide(ctx context.Context, tenantID, name, status, chain, al
 	e.AliasOf = strings.TrimSpace(aliasOf)
 	if status != StatusApproved {
 		e.Chain, e.AliasOf = "", ""
+	} else if e.AliasOf != "" {
+		root, _, err := r.validateAliasLocked(st, tenantID, key, e.AliasOf, e.Chain)
+		if err != nil {
+			return nil, err
+		}
+		e.AliasOf = root
 	}
 	e.DecidedBy, e.DecidedAt, e.UpdatedAt = by, &now, now
 	cp := *e
@@ -618,6 +631,89 @@ func (r *Registry) Decide(ctx context.Context, tenantID, name, status, chain, al
 		return nil, err
 	}
 	return &cp, nil
+}
+
+// EntryChain is the explicit approval chain, else the upload chain, else the
+// single chain recorded on quarantine stats. Empty if it cannot be determined
+// (or the name appears on more than one chain).
+func (r *Registry) EntryChain(e Entry) string {
+	return r.entryChainLocked(&e)
+}
+
+func (r *Registry) entryChainLocked(e *Entry) string {
+	if e == nil {
+		return ""
+	}
+	if s := strings.ToLower(strings.TrimSpace(e.Chain)); s != "" {
+		return s
+	}
+	if s := strings.ToLower(strings.TrimSpace(e.UploadChain)); s != "" {
+		if c := r.ChainOfName(e.Name, s); c != "" {
+			return c
+		}
+		return s
+	}
+	seen := map[string]bool{}
+	for _, q := range e.Quarantine {
+		if s := strings.ToLower(strings.TrimSpace(q.Chain)); s != "" {
+			seen[s] = true
+		}
+	}
+	if len(seen) == 1 {
+		for s := range seen {
+			return s
+		}
+	}
+	return ""
+}
+
+// validateAliasLocked checks alias_of: same chain, approved canonical, no self, no cycle.
+// It returns the root (flattened) canonical name.
+func (r *Registry) validateAliasLocked(st *State, tenantID, sourceKey, aliasOf, sourceChainHint string) (string, string, error) {
+	canKey := NormalizeName(aliasOf)
+	if canKey == "" {
+		return "", "", fmt.Errorf("اختار العميل اللي هتندمج عليه")
+	}
+	if canKey == sourceKey {
+		return "", "", fmt.Errorf("مقدرش ندمج العميل على نفسه")
+	}
+	canEntry, ok := r.resolveLocked(st, tenantID, canKey)
+	if !ok || canEntry == nil || canEntry.Status != StatusApproved {
+		return "", "", fmt.Errorf("العميل المختار مش متأكد، فمقدرش نضمّ عليه")
+	}
+	seen := map[string]bool{sourceKey: true, canKey: true}
+	root := canEntry
+	for hop := 0; hop < 8; hop++ {
+		next := strings.TrimSpace(root.AliasOf)
+		if next == "" {
+			break
+		}
+		nk := NormalizeName(next)
+		if seen[nk] {
+			return "", "", fmt.Errorf("الدمج ده هيعمل حلقة بين العملاء، اختار العميل الأصلي")
+		}
+		seen[nk] = true
+		ne, ok := r.resolveLocked(st, tenantID, nk)
+		if !ok || ne == nil {
+			break
+		}
+		root = ne
+	}
+	srcChain := strings.ToLower(strings.TrimSpace(sourceChainHint))
+	if srcChain == "" {
+		if i := findEntry(st, sourceKey); i >= 0 {
+			srcChain = r.entryChainLocked(&st.Entries[i])
+		}
+	}
+	canChain := r.entryChainLocked(root)
+	if srcChain != "" && canChain != "" && srcChain != canChain {
+		return "", "", fmt.Errorf("مقدرش ندمج عملاء من سلاسل مختلفة")
+	}
+	name := strings.TrimSpace(root.Name)
+	if name == "" {
+		name = strings.TrimSpace(aliasOf)
+	}
+	return name, canChain, nil
 }
 
 func round2(f float64) float64 {
