@@ -45,6 +45,14 @@ Map<String, dynamic> cpfrRichDashboardJson({String chain = 'all'}) => {
       'overstock_alert_count': 1,
       'lead_time_days': 4,
       'safety_stock_days': 7,
+      // Matched-period linkage KPIs (Sell-In symmetry).
+      'matched_sell_out_pos_value_egp': 980000.0,
+      'matched_sell_out_value_with_cost_egp': 720000.0,
+      'matched_chain_gross_margin_egp': 260000.0,
+      'matched_chain_gross_margin_pct': 26.5,
+      'matched_yoy_available': true,
+      'matched_yoy_value_growth_pct': 12.5,
+      'matched_yoy_units_growth_pct': 8.2,
       'monthly_reconciliation': [
         for (final m in [
           [
@@ -251,4 +259,50 @@ class RichCPFRApiClient extends MockCPFRApiClient {
     bool allowLocalFallback = true,
   }) async =>
       CPFRDashboardModel.fromJson(cpfrRichDashboardJson(chain: chain));
+}
+
+/// Empty matched/forecast period: YoY, margin, W1+W2 and EXP must show «—».
+Map<String, dynamic> cpfrMissingDashDashboardJson() {
+  final base = cpfrRichDashboardJson();
+  return {
+    ...base,
+    'matched_sell_out_pos_value_egp': 0.0,
+    'matched_sell_out_value_with_cost_egp': 0.0,
+    'matched_chain_gross_margin_egp': 0.0,
+    'matched_chain_gross_margin_pct': 0.0,
+    'matched_yoy_available': false,
+    'matched_yoy_value_growth_pct': 0.0,
+    'matched_yoy_units_growth_pct': 0.0,
+    'oct_w1w2_actual_egp': 0.0,
+    'oct_w1w2_actual_cases': 0.0,
+    'oct_projected_month_end_egp': 0.0,
+    'oct_projected_cases': 0.0,
+    'promo_and_returns': {
+      ...(base['promo_and_returns'] as Map<String, dynamic>),
+      'promo_records_count': 0,
+      'promo_value_egp': 0.0,
+      'promo_value_share_pct': 0.0,
+      'return_records_count': 0,
+      'total_return_value_egp': 0.0,
+      'overall_return_pct': 0.0,
+      'top_return_items': const <Map<String, dynamic>>[],
+    },
+  };
+}
+
+class MissingDashCPFRApiClient extends MockCPFRApiClient {
+  @override
+  Future<CPFRDashboardModel> fetchCPFRDashboard({
+    String chain = 'all',
+    String sector = 'all',
+    String region = 'all',
+    String brand = 'all',
+    String rep = 'all',
+    String stockStatus = 'all',
+    int leadTimeDays = 4,
+    int safetyStockDays = 7,
+    int? year,
+    bool allowLocalFallback = true,
+  }) async =>
+      CPFRDashboardModel.fromJson(cpfrMissingDashDashboardJson());
 }

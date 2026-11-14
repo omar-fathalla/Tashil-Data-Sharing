@@ -11,6 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/core/widgets/m3_responsive_tab_bar.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 import 'package:tashil_web/features/cpfr_replenishment/presentation/screens/cpfr_dashboard_screen.dart';
@@ -236,31 +237,19 @@ void main() {
   });
 
   testWidgets(
-      'at live 1280+sidebar and at 1024, the tab number is a badge and does not sit mid-label',
+      'at live 1280+sidebar and at 1024, CPFR uses M3ResponsiveTabBar like Sell-Out',
       (tester) async {
     await _pumpLive(
       tester,
       CPFRDashboardScreen(apiClient: RichCPFRApiClient()),
     );
     expect(tester.takeException(), isNull);
-    for (var i = 1; i <= 4; i++) {
-      expect(find.byKey(ValueKey('cpfr_tab_badge_$i')), findsOneWidget);
-      expect(find.byKey(ValueKey('cpfr_tab_label_$i')), findsOneWidget);
-    }
-    final label =
-        tester.widget<Text>(find.byKey(const ValueKey('cpfr_tab_label_3')));
-    expect(label.data, 'Demand Forecasting & Promos (EXP)');
+    expect(find.byKey(const ValueKey('cpfr_tab_bar')), findsOneWidget);
+    expect(find.byType(M3ResponsiveTabBar<int>), findsOneWidget);
+    expect(find.text('Demand Forecasting & Promos (EXP)'), findsOneWidget);
     expect(find.text('3. Demand Forecasting & Promos (EXP)'), findsNothing);
     expect(find.textContaining('Forecasting & 3'), findsNothing);
-    final badgeBox =
-        tester.getRect(find.byKey(const ValueKey('cpfr_tab_badge_3')));
-    final labelBox =
-        tester.getRect(find.byKey(const ValueKey('cpfr_tab_label_3')));
-    expect(
-      badgeBox.overlaps(labelBox),
-      isFalse,
-      reason: 'badge $badgeBox must sit beside the label $labelBox',
-    );
+    expect(find.byKey(const ValueKey('cpfr_tab_badge_3')), findsNothing);
 
     tester.view.physicalSize = const Size(1024, 4000);
     await tester.pumpWidget(
@@ -283,16 +272,8 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.byKey(const ValueKey('cpfr_tab_badge_3')), findsOneWidget);
+    expect(find.byKey(const ValueKey('cpfr_tab_bar')), findsOneWidget);
     expect(find.textContaining('Forecasting & 3'), findsNothing);
-    final badge1024 =
-        tester.getRect(find.byKey(const ValueKey('cpfr_tab_badge_3')));
-    final label1024 =
-        tester.getRect(find.byKey(const ValueKey('cpfr_tab_label_3')));
-    expect(
-      badge1024.overlaps(label1024),
-      isFalse,
-      reason: 'at 1024 badge $badge1024 overlaps label $label1024',
-    );
+    expect(find.text('Demand Forecasting & Promos (EXP)'), findsOneWidget);
   });
 }
