@@ -219,13 +219,14 @@ class M3FadeThroughSwitcher extends StatelessWidget {
       switchOutCurve: M3Motion.emphasizedAccelerate,
       transitionBuilder: M3Motion.fadeThroughTransitionBuilder,
       layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
-        // Outgoing pages must not steal hits while fading (and must not
-        // block the next destination if layout is incomplete).
+        // Outgoing pages must not steal pointer OR flt-semantics hits while
+        // fading (IgnorePointer alone leaves semantics active on web).
         return Stack(
           alignment: alignment,
           fit: fit,
           children: <Widget>[
-            for (final w in previousChildren) IgnorePointer(child: w),
+            for (final w in previousChildren)
+              ExcludeSemantics(child: IgnorePointer(child: w)),
             if (currentChild != null) currentChild,
           ],
         );

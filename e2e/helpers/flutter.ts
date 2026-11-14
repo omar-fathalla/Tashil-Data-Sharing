@@ -6,6 +6,17 @@ export function byTestId(id: string) {
 }
 
 /**
+ * Flutter only calls `ensureSemantics()` when the initial URL opts in
+ * (`?semantics=1` or `?e2e=1`). Production mouse users stay on canvas hits;
+ * Playwright must load with this query so `flt-semantics-*` nodes exist.
+ */
+export function withAutomationSemantics(path: string): string {
+  const url = new URL(path, 'http://local.invalid');
+  url.searchParams.set('semantics', '1');
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/**
  * Freeze DPR/screen metrics before Flutter boots. On Retina Mac hosts,
  * Flutter web otherwise places Semantics/input hit-boxes at ~2× CSS x
  * (e.g. x=2880 on a 1440-wide viewport) even when Playwright reports dpr=1.

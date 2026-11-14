@@ -9,6 +9,7 @@ import {
   probeSemantics,
   typeIntoSemanticsField,
   waitForFlutter,
+  withAutomationSemantics,
 } from '../helpers/flutter';
 
 /**
@@ -51,7 +52,9 @@ test.describe('Sell-Out semantics clickability', () => {
       await route.continue();
     });
 
-    await page.goto(TENANT_PATH, { waitUntil: 'domcontentloaded' });
+    await page.goto(withAutomationSemantics(TENANT_PATH), {
+      waitUntil: 'domcontentloaded',
+    });
     await waitForFlutter(page);
 
     await typeIntoSemanticsField(page, 'login-email', email);

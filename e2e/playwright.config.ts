@@ -8,6 +8,10 @@ import { defineConfig, devices } from '@playwright/test';
  * After deploy:
  *   BASE_ORIGIN=https://www.data.sw-point.com TENANT_PATH=/adeco npx playwright test
  *
+ * Flutter exposes flt-semantics only when the initial URL has ?semantics=1
+ * (see withAutomationSemantics in helpers/flutter.ts). Do not rely on
+ * always-on ensureSemantics in production builds.
+ *
  * macOS Retina hosts: force DPR=1 via launch args so Flutter web Semantics
  * hit-targets stay inside the Playwright viewport (avoids "outside of the
  * viewport" on locator.click).

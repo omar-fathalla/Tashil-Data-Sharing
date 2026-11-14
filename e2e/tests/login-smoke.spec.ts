@@ -9,13 +9,14 @@ import {
   typeLoginEmail,
   typeLoginPassword,
   waitForFlutter,
+  withAutomationSemantics,
 } from '../helpers/flutter';
 
 /**
  * Read-only smoke against the tenant login shell.
  *
  * Locators use Flutter web `flt-semantics-identifier` (requires
- * `ensureSemantics` at app startup) for presence/uniqueness.
+ * `?semantics=1` so main() calls `ensureSemantics`) for presence/uniqueness.
  *
  * Interaction uses accessible roles + Retina-safe activate (in-viewport click
  * or DOM focus) because on macOS Retina hosts Flutter web Semantics /
@@ -37,7 +38,9 @@ test.describe('Flutter web Semantics smoke', () => {
     await installRetinaGuards(page);
 
     // Absolute tenant path — do NOT use '/' (that strips /adeco from the URL).
-    await page.goto(TENANT_PATH, { waitUntil: 'domcontentloaded' });
+    await page.goto(withAutomationSemantics(TENANT_PATH), {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page).toHaveURL(new RegExp(`${TENANT_PATH}/?(\\?.*)?$`));
 
     await waitForFlutter(page);
@@ -104,7 +107,9 @@ test.describe('Flutter web Semantics smoke', () => {
     page,
   }) => {
     await installRetinaGuards(page);
-    await page.goto(TENANT_PATH, { waitUntil: 'domcontentloaded' });
+    await page.goto(withAutomationSemantics(TENANT_PATH), {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(page).toHaveURL(new RegExp(`${TENANT_PATH}/?`));
     await waitForFlutter(page);
 
@@ -117,7 +122,9 @@ test.describe('Flutter web Semantics smoke', () => {
     page,
   }) => {
     await installRetinaGuards(page);
-    await page.goto(TENANT_PATH, { waitUntil: 'domcontentloaded' });
+    await page.goto(withAutomationSemantics(TENANT_PATH), {
+      waitUntil: 'domcontentloaded',
+    });
     await waitForFlutter(page);
 
     const probe = await assertSemanticsNotDoubleScaled(page, 'login-email');
