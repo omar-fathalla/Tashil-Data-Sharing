@@ -531,9 +531,8 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
 /// `headingRowAlignment: MainAxisAlignment.center`, so header and content
 /// share one axis. For DataTables not wrapped in [TableScrollContainer].
 ///
-/// Uses a full-width box (not [Center]): [Center] loosens width so a
-/// fixed-width child can be wider than the real column and clip when
-/// [TextAlign.center] places glyphs on both edges (name columns).
+/// [Center] sizes to the child (typically a tight-width [SizedBox] from the
+/// page's flex budget) so wrap width stays the column share.
 List<DataRow> centerCellsUnderCenteredHeadings(
     List<DataColumn> columns, List<DataRow> rows) {
   final centered = [
@@ -553,10 +552,7 @@ List<DataRow> centerCellsUnderCenteredHeadings(
           for (var i = 0; i < r.cells.length; i++)
             i < centered.length && centered[i]
                 ? DataCell(
-                    SizedBox(
-                      width: double.infinity,
-                      child: r.cells[i].child,
-                    ),
+                    Center(child: r.cells[i].child),
                     placeholder: r.cells[i].placeholder,
                     showEditIcon: r.cells[i].showEditIcon,
                     onTap: r.cells[i].onTap,

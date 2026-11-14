@@ -453,7 +453,9 @@ class _TypeChips extends StatelessWidget {
       children: [
         for (final t in types)
           ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 280.0),
+            // minWidth keeps the type description from shrink-wrapping to
+            // the short chip («ناقص») so «صنف مش موجود…» can use ≤3 lines.
+            constraints: const BoxConstraints(minWidth: 168.0, maxWidth: 280.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -645,29 +647,33 @@ class _IssuesTable extends StatelessWidget {
   //  - item codes stay on ONE line. Live v157 wrapped QA-NOT-IN-MASTER-999
   //    at flex 158: real Cairo bodyMedium advance is 159.7dp, not the
   //    earlier 154.7dp, so a 158.7dp column had no slack. Flex 178
-  //    (178/930×934 ≈ 178.7dp) leaves ≥16dp slack. Name keeps its 3-line
-  //    floor (232).
+  //    (178/930×934 ≈ 178.7dp) leaves ≥16dp slack.
+  //  - Name (centered) needs ≥250dp for the live long SKU in ≤3 lines
+  //    (233dp still didExceedMaxLines). Flex 256 ≈ 256/954×934 ≈ 250.6dp.
+  //  - Type label «صنف مش موجود في كارتة الأصناف» exceeds 3 lines at
+  //    ~80dp; flex 104 ≈ 104dp. Status stays 72 so «متجاهلة»+chip pad fits.
   //  - expected must fit the live phrase «الصنف يتضاف لكارتة الأصناف»
   //    in ≤3 lines. The wrapping bottleneck is «يتضاف لكارتة» (74.2dp);
   //    v158's flex 72 (72.3dp) clipped «الأصناف». Flex 88 (88.4dp) leaves
-  //    ~14dp slack. The share comes from severity / found / status, which
-  //    have slack beyond «الخطورة» / «الموجود» / the «متجاهلة» chip.
+  //    ~14dp slack. Type/name share comes from severity / row / barcode /
+  //    found / status / actions, which have slack beyond short chips.
   //  - Arabic space-separated "codes" wrap at words, ≤3 lines (see
   //    HyphenatedCodeText); they must not clip mid-word.
   //  - at 1024+sidebar (inner ~678) one-line SKUs plus the name floor
   //    cannot both fit, so hyphenated codes may wrap at '-' only
+  // Shares ≈ dp at the live ~934 inner width (sum 936).
   static const _flex = [
-    52.0,
-    80.0,
-    40.0,
-    178.0,
-    44.0,
-    232.0,
-    54.0,
-    88.0,
-    48.0,
-    72.0,
-    42.0
+    52.0, // الخطورة ≥46.5 one-line
+    104.0, // type «صنف مش موجود…» ≤3 (80dp exceeded)
+    36.0, // الصف
+    178.0, // item code one-line floor
+    36.0, // barcode
+    256.0, // name centered ≥250
+    50.0, // الموجود ≥47.8
+    88.0, // expected
+    36.0, // impact compact
+    72.0, // status chip «متجاهلة» + 16dp pad
+    28.0, // row actions
   ];
 
   final List<DataQualityIssue> issues;

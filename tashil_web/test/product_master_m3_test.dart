@@ -252,13 +252,15 @@ void main() {
       expect(m.size.height, closeTo(138.0, 1.0), reason: why);
     }
 
+    // Short on-card titles (full phrase lives in titleTooltip) so the
+    // 138 Sell-Out KPI height budget stays one line.
     for (final title in [
-      'إجمالي الوحدات بالطلبية',
-      'إجمالي القيمة قبل الضريبة',
-      'قيمة ضريبة القيمة المضافة (14%)',
-      'إجمالي قيمة الخصومات التجارية',
-      'صافي الفاتورة المستحق لأدكو',
-      'هامش ربح السلسلة المتوقع',
+      'إجمالي الوحدات',
+      'القيمة قبل الضريبة',
+      'ضريبة القيمة المضافة',
+      'الخصومات التجارية',
+      'صافي الفاتورة',
+      'هامش ربح السلسلة',
     ]) {
       final card = cards
           .evaluate()
@@ -273,7 +275,7 @@ void main() {
           tester,
           title,
           scope: find.byWidget(card),
-          minMaxLines: 2,
+          minMaxLines: 1,
         ),
         isTrue,
         reason: 'calculator title "$title" must sit fully inside the 138 card',
