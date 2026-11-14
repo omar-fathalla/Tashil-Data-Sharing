@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
@@ -538,4 +539,51 @@ func TestFirestoreDynamicTenantAutoSeeding(t *testing.T) {
 	}
 }
 
+func TestHandleMeRequiresValidToken(t *testing.T) {
+	// Demo-token fallback is off so a missing/junk JWT is a real 401, matching production.
+	fsClient := firestore.NewClient("test-db", true)
+	authMW := middleware.NewAuthMiddleware("test-secret-key-32-chars-long-123456", false)
+	handler := NewAuthHandler(fsClient, authMW)
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/me", handler.HandleMe)
+	srv := authMW.Handler(mux)
 
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("missing token: expected 401, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	bad := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	bad.Header.Set("Authorization", "Bearer not-a-valid-token")
+	recBad := httptest.NewRecorder()
+	srv.ServeHTTP(recBad, bad)
+	if recBad.Code != http.StatusUnauthorized {
+		t.Fatalf("junk token: expected 401, got %d: %s", recBad.Code, recBad.Body.String())
+	}
+
+	token, err := authMW.GenerateToken(domain.UserClaims{
+		UserID:   "user-adeco-admin-01",
+		TenantID: "tenant-adeco",
+		Email:    "admin@adeco-retail.com",
+		Role:     domain.RoleVendorAdmin,
+	}, time.Hour)
+	if err != nil {
+		t.Fatalf("GenerateToken: %v", err)
+	}
+	okReq := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	okReq.Header.Set("Authorization", "Bearer "+token)
+	recOK := httptest.NewRecorder()
+	srv.ServeHTTP(recOK, okReq)
+	if recOK.Code != http.StatusOK {
+		t.Fatalf("valid token: expected 200, got %d: %s", recOK.Code, recOK.Body.String())
+	}
+	var body map[string]string
+	if err := json.NewDecoder(recOK.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["user_id"] != "user-adeco-admin-01" || body["tenant_id"] != "tenant-adeco" || body["email"] != "admin@adeco-retail.com" || body["role"] != string(domain.RoleVendorAdmin) {
+		t.Fatalf("unexpected body: %#v", body)
+	}
+}

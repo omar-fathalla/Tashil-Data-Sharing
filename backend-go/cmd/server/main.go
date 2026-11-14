@@ -309,6 +309,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/auth/forgot-password", authHandler.HandleForgotPassword)
 	mux.HandleFunc("POST /api/v1/auth/reset-password", authHandler.HandleResetPassword)
 	mux.HandleFunc("POST /api/v1/auth/change-password", authHandler.HandleChangePassword)
+	mux.HandleFunc("GET /api/v1/me", authHandler.HandleMe)
 	mux.HandleFunc("GET /api/v1/portal/{slug}/meta", portalHandler.HandleGetPortalMeta)
 
 	// Super Admin Tenant Provisioning & Management Routes

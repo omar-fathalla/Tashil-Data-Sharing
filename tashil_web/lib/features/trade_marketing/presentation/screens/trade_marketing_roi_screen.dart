@@ -870,9 +870,23 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                     ),
                   ],
                 ),
-                content: SizedBox(
-                  width: 560.0,
-                  child: Column(
+                insetPadding: const EdgeInsets.symmetric(
+                    horizontal: 16.0, vertical: 24.0),
+                content: Builder(builder: (dialogMediaCtx) {
+                  final maxW = MediaQuery.sizeOf(dialogMediaCtx).width - 32.0;
+                  final dialogW =
+                      maxW < 560.0 ? (maxW < 0 ? 0.0 : maxW) : 560.0;
+                  final rawH = MediaQuery.sizeOf(dialogMediaCtx).height - 160.0;
+                  final maxH = rawH < 240.0 ? 240.0 : rawH;
+                  return ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: dialogW,
+                      maxHeight: maxH,
+                    ),
+                    child: SingleChildScrollView(
+                      child: SizedBox(
+                        width: dialogW,
+                        child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -1051,8 +1065,11 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                         ),
                       ),
                     ],
-                  ),
-                ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(dialogCtx),
@@ -1694,6 +1711,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
         valueKey: const ValueKey('tm_kpi_romi_value'),
         title: 'العائد على الإنفاق',
         titleTooltip: kRoiLiftMethodExplainerAr,
+        cardTooltip: kRoiLiftMethodExplainerAr,
         value: overallRomi == null
             ? '—'
             : '${overallRomi.toStringAsFixed(2)}x',

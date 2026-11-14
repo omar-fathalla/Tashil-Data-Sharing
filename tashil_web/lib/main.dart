@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -58,6 +59,7 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
   bool _isAdminMode = false;
   bool _isLoginMode = false;
   bool _isGenericCompanyPortal = true;
+  bool _verifyingSession = false;
   late ApiClient _apiClient;
 
   @override
@@ -168,6 +170,11 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
       SessionStorage.replaceBrowserUrl(
         AppPageRoute.pathFor(_activeTenant, requestedPage),
       );
+      // A non-empty stored token is not enough after a JWT rotation: confirm
+      // it with the server before opening the shell, so a stale token shows
+      // the login screen instead of a burst of 401s from every page widget.
+      _verifyingSession = true;
+      unawaited(_verifyStoredCompanySession());
     } else {
       // Show Company Login Portal
       _isAdminMode = false;
@@ -325,11 +332,22 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
     });
   }
 
+  Future<void> _verifyStoredCompanySession() async {
+    final ok = await _apiClient.verifySession();
+    if (!mounted) return;
+    if (!ok) {
+      _logout();
+      return;
+    }
+    setState(() => _verifyingSession = false);
+  }
+
   void _logout() {
     AppCache.clear();
     _popPushedRoutes();
     SessionStorage.clearSession();
     setState(() {
+      _verifyingSession = false;
       _isLoginMode = true;
       _isGenericCompanyPortal = true;
       _apiClient.currentUser = null;
@@ -383,6 +401,11 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
     final Widget screen;
     if (_isAdminMode) {
       screen = _buildAdminGateOrScreen();
+    } else if (_verifyingSession) {
+      screen = const Scaffold(
+        key: ValueKey('session_verifying'),
+        body: Center(child: CircularProgressIndicator()),
+      );
     } else if (_isLoginMode) {
       screen = TenantLoginScreen(
         key: ValueKey('company_portal_login_$_activeTenant'),

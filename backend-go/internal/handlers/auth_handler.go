@@ -231,6 +231,25 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 // HandleForgotPassword serves POST /api/v1/auth/forgot-password.
 // Always returns the same generic 200 body; never returns the reset token.
 // Token is stored server-side for the reset-password endpoint (email OOB when wired).
+func (h *AuthHandler) HandleMe(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	claims, ok := middleware.GetUserClaims(r.Context())
+	if !ok || claims == nil {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"user_id":   claims.UserID,
+		"tenant_id": claims.TenantID,
+		"email":     claims.Email,
+		"role":      string(claims.Role),
+	})
+}
+
 func (h *AuthHandler) HandleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)

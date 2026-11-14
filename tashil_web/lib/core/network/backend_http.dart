@@ -18,8 +18,19 @@ class BackendHttp {
   /// (null if none), so a late 401 for an old/pre-login request can be ignored.
   static void Function(int statusCode, Uri url, String? sentAuthorization)? onResponseStatus;
 
+  /// Reads the Authorization header even when the caller used a different case
+  /// (`authorization` / `AUTHORIZATION`). A missed lookup would skip the
+  /// session-expired path and leave a stale token in place.
+  static String? authorizationHeader(Map<String, String>? headers) {
+    if (headers == null) return null;
+    for (final entry in headers.entries) {
+      if (entry.key.toLowerCase() == 'authorization') return entry.value;
+    }
+    return null;
+  }
+
   static T _note<T extends http.BaseResponse>(T r, Uri url, [Map<String, String>? headers]) {
-    onResponseStatus?.call(r.statusCode, url, headers?['Authorization']);
+    onResponseStatus?.call(r.statusCode, url, authorizationHeader(headers));
     return r;
   }
 
