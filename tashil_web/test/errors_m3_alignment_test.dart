@@ -10,6 +10,7 @@ import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
+import 'package:tashil_web/features/data_quality/data/data_quality_repository.dart';
 import 'package:tashil_web/features/data_quality/presentation/screens/data_quality_screen.dart';
 import 'package:tashil_web/features/navigation/presentation/desktop_sidebar.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
@@ -337,9 +338,19 @@ void _assertTableFitsLiveContent(WidgetTester tester,
   expect(chip, findsOneWidget);
   final chipText = tester.widget<Text>(
       find.descendant(of: chip, matching: find.byType(Text)).first);
-  expect(chipText.data, contains(kLongTypeMissing));
+  expect(chipText.data, 'ناقص');
   expect(_labelFullyVisible(tester, chip, chipText.data!), isTrue,
-      reason: 'type chip label must sit inside the chip at $contentWidth');
+      reason: 'short type chip must sit inside the chip at $contentWidth');
+  final desc = find.byKey(const ValueKey('dq_type_desc_missing_sku'));
+  expect(desc, findsOneWidget);
+  expect(tester.widget<Text>(desc).data, kLongTypeMissing);
+  // Key is on the Text itself — scope the page, not the Text (descendant
+  // lookup would miss self).
+  expect(
+      labelFullyVisible(tester, kLongTypeMissing,
+          scope: find.byType(DataQualityScreen)),
+      isTrue,
+      reason: 'type description must stay fully visible at $contentWidth');
 }
 
 void main() {
@@ -475,20 +486,123 @@ void main() {
     expect(find.text('السبب مطلوب عند التجاهل'), findsOneWidget);
   });
 
-  testWidgets('Long type chips wrap instead of ellipsizing at 1280',
+  testWidgets(
+      'Type chips use short word + description (TM pattern) at 1280',
       (tester) async {
     await _pumpPage(tester, width: 1280);
     final chip = find.byKey(const ValueKey('dq_type_chip_missing_sku'));
     expect(chip, findsOneWidget);
     expect(_onScreen(tester, chip), isTrue);
-    final texts = find.descendant(of: chip, matching: find.byType(Text));
-    expect(texts, findsWidgets);
-    for (final t in tester.widgetList<Text>(texts)) {
-      expect(t.maxLines, greaterThanOrEqualTo(3));
-      expect(t.overflow, isNot(TextOverflow.ellipsis));
-      expect(t.overflow, isNot(TextOverflow.fade));
-    }
-    expect(_cutBeforeThreeLines(tester, chip), isEmpty);
+    final chipText = tester.widget<Text>(
+        find.descendant(of: chip, matching: find.byType(Text)).first);
+    expect(chipText.data, 'ناقص');
+    expect(chipText.maxLines, greaterThanOrEqualTo(1));
+    expect(chipText.overflow, isNot(TextOverflow.ellipsis));
+    expect(chipText.softWrap, isTrue);
+
+    final desc = find.byKey(const ValueKey('dq_type_desc_missing_sku'));
+    expect(desc, findsOneWidget);
+    final descText = tester.widget<Text>(desc);
+    expect(descText.data, kLongTypeMissing);
+    expect(descText.maxLines, greaterThanOrEqualTo(3));
+    expect(descText.overflow, isNot(TextOverflow.ellipsis));
+    expect(descText.overflow, isNot(TextOverflow.fade));
+    expect(_cutBeforeThreeLines(tester, desc), isEmpty);
+    expect(find.byKey(const ValueKey('dq_type_meta_missing_sku')),
+        findsOneWidget);
+
+    expect(find.byKey(const ValueKey('dq_type_chip_duplicate_barcode')),
+        findsOneWidget);
+    expect(
+        tester
+            .widget<Text>(find.descendant(
+                of: find.byKey(const ValueKey('dq_type_chip_duplicate_barcode')),
+                matching: find.byType(Text)))
+            .data,
+        'مكرر');
+    expect(find.byKey(const ValueKey('dq_type_chip_price_mismatch')),
+        findsOneWidget);
+    expect(
+        tester
+            .widget<Text>(find.descendant(
+                of: find.byKey(const ValueKey('dq_type_chip_price_mismatch')),
+                matching: find.byType(Text)))
+            .data,
+        'سعر');
+  });
+
+  testWidgets(
+      'empty rows show — cleanliness gauge, never fake 100.0%',
+      (tester) async {
+    await pumpErrors(
+      tester,
+      DataQualityScreen(
+        dataSource: ErrorsShotSource(
+          sum: const DataQualitySummary(
+            types: [],
+            totalRows: 0,
+            criticalRows: 0,
+            cleanlinessPct: 100,
+            open: 79,
+            resolved: 4,
+          ),
+          list: const [],
+        ),
+        pollInterval: const Duration(hours: 1),
+      ),
+      width: 1280,
+    );
+    expect(find.text('—'), findsOneWidget);
+    expect(find.text('مفيش صفوف اتفحصت'), findsOneWidget);
+    expect(find.text('100.0%'), findsNothing);
+    expect(find.text('100%'), findsNothing);
+  });
+
+  testWidgets('missing impact cells show — not fake zeros', (tester) async {
+    await pumpErrors(
+      tester,
+      DataQualityScreen(
+        dataSource: ErrorsShotSource(
+          sum: DataQualitySummary(
+            types: kErrorsLiveSummary.types,
+            totalRows: kErrorsLiveSummary.totalRows,
+            criticalRows: kErrorsLiveSummary.criticalRows,
+            cleanlinessPct: kErrorsLiveSummary.cleanlinessPct,
+            open: 1,
+            resolved: 0,
+            ignored: 0,
+            updatedAt: kErrorsLiveSummary.updatedAt,
+          ),
+          list: const [
+            DataQualityIssue(
+              id: 'no-impact',
+              source: 'sell_out',
+              type: 'missing_sku',
+              typeLabel: kLongTypeMissing,
+              severity: kDqWarning,
+              itemCode: 'NO-IMPACT-1',
+              itemName: 'صنف بدون تأثير محسوب',
+              status: kDqOpen,
+            ),
+          ],
+        ),
+        pollInterval: const Duration(hours: 1),
+      ),
+      width: 1280,
+    );
+    expect(find.text('—'), findsWidgets);
+    expect(find.text('0.00'), findsNothing);
+    expect(find.text('0.0'), findsNothing);
+    expect(find.textContaining('+0.0%'), findsNothing);
+  });
+
+  testWidgets('Errors page header matches Sell-Out M3PageHeader pattern',
+      (tester) async {
+    await _pumpPage(tester, width: 1280);
+    expect(find.text('Errors'), findsOneWidget);
+    expect(find.text('الأخطاء وجودة البيانات'), findsOneWidget);
+    expect(find.byKey(const ValueKey('dq_refresh')), findsOneWidget);
+    expect(find.byKey(const ValueKey('dq_export')), findsOneWidget);
   });
 
   testWidgets(

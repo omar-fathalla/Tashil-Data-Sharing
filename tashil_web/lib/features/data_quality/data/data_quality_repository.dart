@@ -22,6 +22,42 @@ String dqSourceLabel(String source) {
   return kDqSourceLabels[source] ?? source;
 }
 
+/// Short chip word for a DQ type (Sell-Out / TM short-chip + description).
+String dqTypeShort(String type, [String typeLabel = '']) {
+  switch (type) {
+    case 'duplicate_barcode':
+      return 'مكرر';
+    case 'missing_sku':
+    case 'unknown_item':
+      return 'ناقص';
+    case 'missing_code':
+      return 'كود ناقص';
+    case 'missing_barcode':
+      return 'باركود ناقص';
+    case 'price_mismatch':
+    case 'invalid_price':
+    case 'carton_price_mismatch':
+      return 'سعر';
+    case 'vat_not_14':
+      return 'ضريبة';
+    case 'invoice_discount_out_of_range':
+      return 'خصم';
+    case 'missing_pack_type':
+      return 'عبوة';
+    case 'missing_units_per_carton':
+      return 'قطع';
+    case 'na_cell':
+      return '#N/A';
+    case 'malformed_barcode':
+      return 'باركود';
+    default:
+      final parts = typeLabel.trim().split(RegExp(r'\s+'));
+      if (parts.isEmpty || parts.first.isEmpty) return type;
+      if (parts.length == 1) return parts.first;
+      return '${parts[0]} ${parts[1]}';
+  }
+}
+
 double? _num(dynamic v) => v is num ? v.toDouble() : null;
 DateTime? _date(dynamic v) => v is String && v.isNotEmpty ? DateTime.tryParse(v) : null;
 
