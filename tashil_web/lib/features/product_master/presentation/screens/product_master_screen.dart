@@ -1954,7 +1954,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           ),
                           // Item Code pill
                           DataCell(
-                            InkWell(
+                            SizedBox(
+                              width: w[1],
+                              child: InkWell(
                               onTap: () =>
                                   _copyToClipboard(item.itemCode, 'كود الصنف'),
                               borderRadius: M3Shape.radiusSm,
@@ -1974,7 +1976,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 child: HyphenatedCodeText(
                                   item.itemCode,
                                   maxLines: 2,
-                                  maxWidth: w[1],
+                                  maxWidth: w[1] - 10,
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     fontFamily: 'monospace',
@@ -1983,6 +1985,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                   ),
                                 ),
                               ),
+                            ),
                             ),
                           ),
                           // Official Name & Brand
@@ -2012,7 +2015,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           ),
                           // Barcode
                           DataCell(
-                            InkWell(
+                            SizedBox(
+                              width: w[3],
+                              child: InkWell(
                               onTap: () =>
                                   _copyToClipboard(item.barcode, 'الباركود'),
                               borderRadius: M3Shape.radiusSm,
@@ -2029,7 +2034,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 child: HyphenatedCodeText(
                                   item.barcode,
                                   maxLines: 2,
-                                  maxWidth: w[3],
+                                  maxWidth: w[3] - 10,
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     fontFamily: 'monospace',
@@ -2038,6 +2043,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                   ),
                                 ),
                               ),
+                            ),
                             ),
                           ),
                           // Pack & Units/Carton
@@ -2250,7 +2256,17 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     );
   }
 
-  static const _catalogColMins = <double>[
+  /// Mins at the live 1030 content shell: item code / barcode stay on
+  /// one monospace line (e.g. FGCL-0550-0001, 13-digit barcodes), and
+  /// the price headers «سعر الوحدة / السعر ش.ض / سعر الكرتونة» are
+  /// not cut. Leftover width still goes to the name column.
+  static const _catalogColMinsLive = <double>[
+    24, 130, 140, 120, 64, 80, 80, 88, 64, 52, 52,
+  ];
+
+  /// Narrower shell (1024+sidebar ≈ 774dp): codes wrap at dashes, no
+  /// horizontal scroll.
+  static const _catalogColMinsCompact = <double>[
     24, 92, 120, 92, 60, 52, 52, 52, 60, 60, 52,
   ];
 
@@ -2259,9 +2275,13 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   List<double> _catalogColumnWidths(double available) {
     const spacing = 6.0;
     const margin = 8.0;
-    final mins = _catalogColMins;
-    // +8dp slack so rounding / heading insets don't leave a 3–9dp scroll.
-    final chrome = margin * 2 + spacing * (mins.length - 1) + 16.0;
+    // Live 1280+sidebar content is 1030, but the catalog tab has 24dp
+    // horizontal padding, so the table LayoutBuilder sees ~982dp — still
+    // the live profile. Compact is for the 1024+sidebar shell (~726–774).
+    final useLive = available >= 900;
+    final mins = useLive ? _catalogColMinsLive : _catalogColMinsCompact;
+    final slack = useLive ? 24.0 : 16.0;
+    final chrome = margin * 2 + spacing * (mins.length - 1) + slack;
     var leftover = available - chrome - mins.fold<double>(0, (a, b) => a + b);
     final widths = List<double>.from(mins);
     if (leftover > 0) {
