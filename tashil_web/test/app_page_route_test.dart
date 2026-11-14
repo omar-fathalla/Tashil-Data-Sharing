@@ -31,6 +31,11 @@ void main() {
       expect(AppPageRoute.pathFor('adeco', 'sell-in'), '/adeco/sell-in');
     });
 
+    test('isBareRoot is only the site root entry', () {
+      expect(AppPageRoute.isBareRoot('/'), isTrue);
+      expect(AppPageRoute.isBareRoot('/adeco'), isFalse);
+    });
+
     test('unknownPageSlugFromPath is null for Dashboard and known pages', () {
       expect(AppPageRoute.unknownPageSlugFromPath('/adeco'), isNull);
       expect(AppPageRoute.unknownPageSlugFromPath('/adeco/'), isNull);
