@@ -10,10 +10,13 @@ import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/utils/shared_display_prefix.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/bidi_text.dart';
+import '../../../../core/theme/m3_palette.dart';
 import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/widgets/m3_button.dart';
+import '../../../../core/widgets/m3_button_group.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
@@ -40,10 +43,14 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
   }
 
   bool isLoading = true;
+  /// True after a successful executive-KPI fetch (never invent OSA% / 0).
+  bool _hasExecutiveKpis = false;
+  /// True after a successful OOS monitor fetch (never invent 0 ج.م loss).
+  bool _hasMonitorReport = false;
   OOSMonitorResponseModel? _monitorReport;
   List<OOSAlertModel> alerts = [];
-  double osaRatePct = 96.8;
-  double oosRatePct = 3.2;
+  double osaRatePct = 0;
+  double oosRatePct = 0;
 
   // Filter States
   String _selectedBrand = 'الكل';
@@ -104,13 +111,21 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
           alerts = report.alerts;
           osaRatePct = kpis.osaRatePct;
           oosRatePct = kpis.oosRatePct;
+          _hasExecutiveKpis = true;
+          _hasMonitorReport = true;
           isLoading = false;
         });
       }
     } catch (e) {
       debugPrint('[OOSDashboardScreen] Error loading OOS report: $e');
       if (mounted) {
-        setState(() => isLoading = false);
+        setState(() {
+          _hasExecutiveKpis = false;
+          _hasMonitorReport = false;
+          _monitorReport = null;
+          alerts = [];
+          isLoading = false;
+        });
       }
     }
   }
@@ -240,17 +255,18 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
             M3PageHeader(
               titleEn: 'Out-of-Stock Alarm Monitor',
               subtitleAr: 'نظام المراقبة الاستباقية للنواقص ومحرك الذكاء الاصطناعي (Gemini Root-Cause AI)',
-              actions: M3ActionButtonGroup(
-                actions: [
-                  M3ActionItem(
+              actions: M3ButtonGroup(
+                items: [
+                  M3GroupItem(
                     label: 'تحديث البيانات',
                     icon: Icons.refresh_rounded,
+                    kind: M3GroupItemKind.tonal,
                     onPressed: isLoading ? null : _loadAlerts,
                   ),
-                  M3ActionItem(
+                  M3GroupItem(
                     label: 'إصدار أمر توريد طارئ',
                     icon: Icons.flash_on_rounded,
-                    isPrimary: true,
+                    kind: M3GroupItemKind.tonal,
                     onPressed: isLoading
                         ? null
                         : () {
@@ -331,6 +347,8 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
     required bool isCompact,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
+    final osaAvailable = _hasExecutiveKpis;
+    final lossAvailable = _hasMonitorReport;
     return LayoutBuilder(
       builder: (context, constraints) {
         // Same 960/580 breakpoints as Sell-Out (4+1 for five cards at 1280).
@@ -347,8 +365,11 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
               titleTooltip: 'مؤشر التوافر على الرفوف OSA%',
               titleMaxLines: 1,
               subtitleMaxLines: 1,
-              value: '${osaRatePct.toStringAsFixed(1)}%',
-              subtitle: 'كفاءة التوافر الفعلي عبر الفروع النشطة',
+              isLoading: isLoading && !osaAvailable,
+              value: osaAvailable ? '${osaRatePct.toStringAsFixed(1)}%' : '—',
+              subtitle: osaAvailable
+                  ? 'كفاءة التوافر الفعلي عبر الفروع النشطة'
+                  : 'لا توجد بيانات للتوافر',
               icon: Icons.fact_check_rounded,
               color: colorScheme.primary,
               valueKey: const ValueKey('kpi_value_OSA'),
@@ -360,10 +381,13 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
               titleTooltip: 'إجمالي الأصناف المنعدمة',
               titleMaxLines: 1,
               subtitleMaxLines: 1,
-              value: countSku(totalFilteredSKUs),
-              subtitle: criticalCount == 0
-                  ? 'لا توجد أصناف حرجة'
-                  : '${countSku(criticalCount)} ذات خطورة حرجة',
+              isLoading: isLoading && !lossAvailable,
+              value: lossAvailable ? countSku(totalFilteredSKUs) : '—',
+              subtitle: !lossAvailable
+                  ? 'لا توجد بيانات للنواقص'
+                  : (criticalCount == 0
+                      ? 'لا توجد أصناف حرجة'
+                      : '${countSku(criticalCount)} ذات خطورة حرجة'),
               icon: Icons.inventory_2_rounded,
               color: colorScheme.error,
               valueKey: const ValueKey('kpi_value_Total OOS SKUs'),
@@ -375,8 +399,11 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
               titleTooltip: 'الفروع المتأثرة بالنواقص',
               titleMaxLines: 1,
               subtitleMaxLines: 1,
-              value: countBranches(impactedBranchesCount),
-              subtitle: 'فروع وهايبر ماركت بها عجز على الرف',
+              isLoading: isLoading && !lossAvailable,
+              value: lossAvailable ? countBranches(impactedBranchesCount) : '—',
+              subtitle: lossAvailable
+                  ? 'فروع وهايبر ماركت بها عجز على الرف'
+                  : 'لا توجد بيانات للفروع',
               icon: Icons.store_rounded,
               color: colorScheme.tertiary,
               valueKey: const ValueKey('kpi_value_Impacted Branches'),
@@ -388,8 +415,13 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
               titleTooltip: 'الخسارة اليومية المقدرة',
               titleMaxLines: 1,
               subtitleMaxLines: 1,
-              value: CurrencyFormatter.formatCompactEGP(totalLostCost),
-              subtitle: 'فاقد مبيعات يومي بسبب نفاد المخزون',
+              isLoading: isLoading && !lossAvailable,
+              value: lossAvailable
+                  ? CurrencyFormatter.formatCompactEGP(totalLostCost)
+                  : '—',
+              subtitle: lossAvailable
+                  ? 'فاقد مبيعات يومي بسبب نفاد المخزون'
+                  : 'لا توجد بيانات للفاقد',
               icon: Icons.trending_down_rounded,
               color: colorScheme.error,
               valueKey: const ValueKey('kpi_value_Daily Lost Revenue'),
@@ -401,8 +433,13 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
               titleTooltip: 'الخسارة الشهرية المتوقعة',
               titleMaxLines: 1,
               subtitleMaxLines: 1,
-              value: CurrencyFormatter.formatCompactEGP(totalLostCost * 30.0),
-              subtitle: 'تقدير الفاقد الشهري في حال تأخر التوريد',
+              isLoading: isLoading && !lossAvailable,
+              value: lossAvailable
+                  ? CurrencyFormatter.formatCompactEGP(totalLostCost * 30.0)
+                  : '—',
+              subtitle: lossAvailable
+                  ? 'تقدير الفاقد الشهري في حال تأخر التوريد'
+                  : 'لا توجد بيانات للفاقد',
               icon: Icons.calendar_month_rounded,
               color: colorScheme.onSurfaceVariant,
               valueKey: const ValueKey('kpi_value_Monthly Projected Loss'),
@@ -485,17 +522,13 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                             ),
                           ),
                           const SizedBox(width: 8.0),
-                          Container(
-                            padding: M3ChipStyle.padding,
-                            decoration: BoxDecoration(
-                              color: colorScheme.tertiaryContainer,
-                              borderRadius: M3ChipStyle.radius,
-                            ),
+                          M3ChipSurface(
+                            color: colorScheme.tertiaryContainer,
                             child: Text(
                               'Gemini 1.5 Pro',
                               style: TextStyle(
-                                fontSize: M3FontSize.labelSmall,
-                                fontWeight: FontWeight.bold,
+                                fontSize: M3FontSize.labelSmallPlus,
+                                fontWeight: FontWeight.w800,
                                 color: colorScheme.onTertiaryContainer,
                               ),
                             ),
@@ -682,30 +715,30 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
 
               const SizedBox(height: 12.0),
 
-              // AI Actions Footer
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.compare_arrows_rounded, size: 16.0),
-                    label: const Text('إعادة موازنة المخزون بين الفروع'),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('تم توجيه اقتراح إعادة التوازن اللوجستي للمخزون بين فروع فتح الله المركزية والطرفية'),
-                          backgroundColor: colorScheme.primary,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 8.0),
-                  FilledButton.icon(
-                    icon: const Icon(Icons.flash_on_rounded, size: 16.0),
-                    label: const Text('تفعيل خطة التوريد الطارئة'),
-                    onPressed: () => _showEmergencyPOModal(context),
-                  ),
-                ],
+              // AI Actions Footer — tonal only; solid stays in the confirm dialog.
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: M3ButtonGroup(
+                  items: [
+                    M3GroupItem(
+                      label: 'إعادة موازنة المخزون بين الفروع',
+                      icon: Icons.compare_arrows_rounded,
+                      kind: M3GroupItemKind.outlined,
+                      onPressed: () {
+                        M3Feedback.showInfo(
+                          context,
+                          'تم توجيه اقتراح إعادة التوازن اللوجستي للمخزون بين فروع فتح الله المركزية والطرفية',
+                        );
+                      },
+                    ),
+                    M3GroupItem(
+                      label: 'تفعيل خطة التوريد الطارئة',
+                      icon: Icons.flash_on_rounded,
+                      kind: M3GroupItemKind.tonal,
+                      onPressed: () => _showEmergencyPOModal(context),
+                    ),
+                  ],
+                ),
               ),
             ],
           ],
@@ -764,20 +797,13 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                   ],
                 ),
               ),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: colorScheme.error,
-                  foregroundColor: colorScheme.onError,
-                ),
+              FilledButton.tonalIcon(
                 icon: const Icon(Icons.local_shipping_rounded, size: 16.0),
                 label: Text('طلب توريد لـ $_selectedBrand'),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('تم إنشاء مسودة أمر توريد طارئ لماركة $_selectedBrand لكافة الفروع المتأثرة (${branches.length} فروع)'),
-                      backgroundColor: colorScheme.error,
-                      behavior: SnackBarBehavior.floating,
-                    ),
+                  M3Feedback.showSuccess(
+                    context,
+                    'تم إنشاء مسودة أمر توريد طارئ لماركة $_selectedBrand لكافة الفروع المتأثرة (${branches.length} فروع)',
                   );
                 },
               ),
@@ -796,25 +822,25 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
             spacing: M3Spacing.xs,
             runSpacing: M3Spacing.xs,
             children: branches.map((bName) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
-                decoration: BoxDecoration(
-                  color: colorScheme.surface,
-                  borderRadius: M3ChipStyle.radius,
-                  border: Border.all(color: colorScheme.error.withOpacity(0.3)),
-                ),
+              return M3ChipSurface(
+                color: colorScheme.surface,
+                borderColor: colorScheme.error.withOpacity(0.3),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.location_on_rounded, size: 14.0, color: colorScheme.error),
-                    const SizedBox(width: 4.0),
-                    Text(
-                      bName,
-                      maxLines: 3,
-                      style: TextStyle(
-                        fontSize: M3FontSize.bodySmall,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
+                    Icon(Icons.location_on_rounded,
+                        size: 14.0, color: colorScheme.error),
+                    const SizedBox(width: M3Spacing.xxs),
+                    Flexible(
+                      child: Text(
+                        _displayBranch(bName),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: M3FontSize.labelSmallPlus,
+                          fontWeight: FontWeight.w800,
+                          color: colorScheme.onSurface,
+                        ),
                       ),
                     ),
                   ],
@@ -872,11 +898,14 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
             );
 
             final brandDropdown = M3Dropdown<String>(
-value: _availableBrands.contains(_selectedBrand) ? _selectedBrand : 'الكل',
-label: 'الماركة (Brand)',
-expand: true,
-fitOptions: true,
-options: m3OptionsFromMenuItems<String>(_availableBrands.map((b) {
+              value: _availableBrands.contains(_selectedBrand)
+                  ? _selectedBrand
+                  : 'الكل',
+              label: 'الماركة (Brand)',
+              expand: true,
+              fitOptions: true,
+              options: m3OptionsFromMenuItems<String>(
+                  _availableBrands.map((b) {
                 return DropdownMenuItem<String>(
                   value: b,
                   child: Text(
@@ -886,17 +915,20 @@ options: m3OptionsFromMenuItems<String>(_availableBrands.map((b) {
                   ),
                 );
               }).toList()),
-onChanged: m3Legacy<String>((val) {
+              onChanged: m3Legacy<String>((val) {
                 if (val != null) setState(() => _selectedBrand = val);
               }),
-);
+            );
 
             final branchDropdown = M3Dropdown<String>(
-value: _availableBranches.contains(_selectedBranch) ? _selectedBranch : 'الكل',
-label: 'الفرع (Branch)',
-expand: true,
-fitOptions: true,
-options: m3OptionsFromMenuItems<String>(_availableBranches.map((b) {
+              value: _availableBranches.contains(_selectedBranch)
+                  ? _selectedBranch
+                  : 'الكل',
+              label: 'الفرع (Branch)',
+              expand: true,
+              fitOptions: true,
+              options: m3OptionsFromMenuItems<String>(
+                  _availableBranches.map((b) {
                 return DropdownMenuItem<String>(
                   value: b,
                   child: Text(
@@ -906,25 +938,46 @@ options: m3OptionsFromMenuItems<String>(_availableBranches.map((b) {
                   ),
                 );
               }).toList()),
-onChanged: m3Legacy<String>((val) {
+              onChanged: m3Legacy<String>((val) {
                 if (val != null) setState(() => _selectedBranch = val);
               }),
-);
+            );
 
             final severityDropdown = M3Dropdown<String>(
-value: _selectedSeverity,
-label: 'مستوى الخطورة',
-expand: true,
-fitOptions: true,
-options: m3OptionsFromMenuItems<String>([
-                const DropdownMenuItem(value: 'الكل', child: Text('الكل', style: TextStyle(fontSize: M3FontSize.bodySmall))),
-                const DropdownMenuItem(value: 'حرج جداً', child: Text('حرج جداً', style: TextStyle(fontSize: M3FontSize.bodySmall, color: Colors.red))),
-                const DropdownMenuItem(value: 'أولوية مرتفعة', child: Text('أولوية مرتفعة', style: TextStyle(fontSize: M3FontSize.bodySmall, color: Colors.orange))),
+              value: _selectedSeverity,
+              label: 'مستوى الخطورة',
+              expand: true,
+              fitOptions: true,
+              options: m3OptionsFromMenuItems<String>([
+                const DropdownMenuItem(
+                    value: 'الكل',
+                    child: Text('الكل',
+                        style: TextStyle(fontSize: M3FontSize.bodySmall))),
+                DropdownMenuItem(
+                  value: 'حرج جداً',
+                  child: Text(
+                    'حرج جداً',
+                    style: TextStyle(
+                      fontSize: M3FontSize.bodySmall,
+                      color: colorScheme.error,
+                    ),
+                  ),
+                ),
+                const DropdownMenuItem(
+                  value: 'أولوية مرتفعة',
+                  child: Text(
+                    'أولوية مرتفعة',
+                    style: TextStyle(
+                      fontSize: M3FontSize.bodySmall,
+                      color: M3Palette.warning,
+                    ),
+                  ),
+                ),
               ]),
-onChanged: m3Legacy<String>((val) {
+              onChanged: m3Legacy<String>((val) {
                 if (val != null) setState(() => _selectedSeverity = val);
               }),
-);
+            );
 
             final resetButton = (_selectedBrand != 'الكل' || _selectedBranch != 'الكل' || _selectedSeverity != 'الكل' || _searchQuery.isNotEmpty)
                 ? IconButton(
@@ -1080,39 +1133,57 @@ onChanged: m3Legacy<String>((val) {
     );
   }
 
-  /// Short 8dp-radius chip with a grey description underneath.
+  /// Short chip ([M3ChipSurface]) + description underneath (TM / Compare).
   Widget _buildShortStatus(
-      BuildContext context, String short, String description) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    BuildContext context, {
+    required String short,
+    required String description,
+    required Color bgColor,
+    required Color fgColor,
+    IconData? icon,
+    Key? key,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
+      key: key,
+      mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: M3ChipStyle.padding,
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
-            borderRadius: M3ChipStyle.radius,
-          ),
-          constraints: const BoxConstraints(minHeight: M3ChipStyle.minHeight),
-          alignment: Alignment.center,
-          child: Text(
-            short,
-            maxLines: 2,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: colorScheme.onSurface,
-              fontWeight: FontWeight.w600,
-            ),
+        M3ChipSurface(
+          color: bgColor,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16.0, color: fgColor),
+                const SizedBox(width: M3Spacing.xxs),
+              ],
+              Flexible(
+                child: Text(
+                  short,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: fgColor,
+                    fontWeight: FontWeight.w800,
+                    fontSize: M3FontSize.labelSmallPlus,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 2.0),
+        const SizedBox(height: M3Spacing.s2),
         Text(
           description,
           maxLines: 3,
-          style: theme.textTheme.bodySmall?.copyWith(
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
             color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+            fontSize: M3FontSize.bodySmall,
           ),
         ),
       ],
@@ -1135,26 +1206,31 @@ onChanged: m3Legacy<String>((val) {
         final isCritical = alert.severity == 'critical';
         final severityChip = _buildShortStatus(
           context,
-          isCritical ? 'حرج جداً' : 'أولوية مرتفعة',
-          isCritical
+          key: ValueKey('oos_severity_${alert.alertId}'),
+          short: isCritical ? 'حرج' : 'مرتفع',
+          description: isCritical
               ? 'انعدام ممتد يؤثر على المبيعات اليومية'
               : 'نواقص تحتاج إعادة توريد سريع',
+          bgColor: isCritical
+              ? M3Palette.dangerSurface
+              : M3Palette.warningSurface,
+          fgColor: isCritical
+              ? M3Palette.onDangerSurface
+              : M3Palette.onWarningSurface,
+          icon: isCritical
+              ? Icons.warning_rounded
+              : Icons.priority_high_rounded,
         );
-        final brandChip = Container(
-          padding: M3ChipStyle.padding,
-          constraints: const BoxConstraints(minHeight: M3ChipStyle.minHeight),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            borderRadius: M3ChipStyle.radius,
-          ),
+        final brandChip = M3ChipSurface(
+          color: colorScheme.primaryContainer,
           child: Text(
             alert.brand,
             maxLines: 3,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: colorScheme.onPrimaryContainer,
-              fontSize: M3FontSize.labelSmall,
-              fontWeight: FontWeight.bold,
+              fontSize: M3FontSize.labelSmallPlus,
+              fontWeight: FontWeight.w800,
             ),
           ),
         );
@@ -1220,12 +1296,9 @@ onChanged: m3Legacy<String>((val) {
                 );
                 final poButton = OutlinedButton(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('تم إنشاء طلب توريد سريع للصنف: ${alert.skuName} لفرع ${_displayBranch(alert.storeName)}'),
-                        backgroundColor: colorScheme.primary,
-                        behavior: SnackBarBehavior.floating,
-                      ),
+                    M3Feedback.showSuccess(
+                      context,
+                      'تم إنشاء طلب توريد سريع للصنف: ${alert.skuName} لفرع ${_displayBranch(alert.storeName)}',
                     );
                   },
                   child: const Text('أمر توريد سريع'),
@@ -1438,6 +1511,7 @@ onChanged: m3Legacy<String>((val) {
 
                     final columns = [
                       DataColumn(
+                        headingRowAlignment: MainAxisAlignment.start,
                         label: cellText(0, 'الصنف', align: TextAlign.start),
                       ),
                       DataColumn(
@@ -1498,14 +1572,13 @@ onChanged: m3Legacy<String>((val) {
                   alignment: AlignmentDirectional.centerStart,
                   child: FilledButton.tonalIcon(
                     icon: const Icon(Icons.send_rounded, size: 20.0),
-                    label: Text('إصدار طلب توريد مجمع لـ ${_displayBranch(branchName)}', maxLines: 3),
+                    label: Text(
+                        'إصدار طلب توريد مجمع لـ ${_displayBranch(branchName)}',
+                        maxLines: 3),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('تم إنشاء طلب توريد مجمع لـ ${countSku(branchAlerts.length)} في ${_displayBranch(branchName)}'),
-                          backgroundColor: colorScheme.primary,
-                          behavior: SnackBarBehavior.floating,
-                        ),
+                      M3Feedback.showSuccess(
+                        context,
+                        'تم إنشاء طلب توريد مجمع لـ ${countSku(branchAlerts.length)} في ${_displayBranch(branchName)}',
                       );
                     },
                   ),
@@ -1653,15 +1726,12 @@ onChanged: m3Legacy<String>((val) {
               onPressed: (isLoading || filtered.isEmpty)
                   ? null
                   : () {
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('تم بنجاح إرسال أمر التوريد الطارئ إلى فرق الإمداد والتوزيع'),
-                    backgroundColor: colorScheme.primary,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
+                      Navigator.pop(ctx);
+                      M3Feedback.showSuccess(
+                        context,
+                        'تم بنجاح إرسال أمر التوريد الطارئ إلى فرق الإمداد والتوزيع',
+                      );
+                    },
             ),
           ],
         );
