@@ -1128,8 +1128,9 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
           children: [
             // Header (Unified M3 Left English Title + Right Arabic Subtitle)
             M3PageHeader(
-              titleEn: 'Smart Data Ingestion Portal',
-              subtitleAr: 'مبيعات الفروع وأرشفة شيتات الإكسيل حسب السلاسل',
+              title: 'رفع البيانات الذكي',
+              subtitle: 'Smart Data Ingestion Portal',
+              description: 'مبيعات الفروع وأرشفة شيتات الإكسيل حسب السلاسل',
               actions: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),

@@ -684,8 +684,9 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
           children: [
             // 1. Unified Page Header
             M3PageHeader(
-              titleEn: 'Compare',
-              subtitleAr: 'مقارنة أسعار أصناف شركة أديكو بالمنافسين',
+              title: 'مقارنة المنافسين',
+              subtitle: 'Compare',
+              description: 'مقارنة أسعار أصناف شركة أديكو بالمنافسين',
               actions: M3ActionButtonGroup(
                 actions: [
                   if (selectedGroup != null)

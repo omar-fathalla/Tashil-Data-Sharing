@@ -1623,8 +1623,9 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const M3PageHeader(
-          titleEn: 'Trade Marketing & Promo ROI',
-          subtitleAr:
+          title: 'التسويق التجاري والعائد',
+          subtitle: 'Trade Marketing & Promo ROI',
+          description:
               'متابعة إيجار الفلورات، الدعاية، الإعلانات، الهدايا، والإيفنتات شهرياً وقياس أثرها الفعلي على نمو المبيعات (MoM & YoY)',
         ),
         M3Spacing.gapSM,
