@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
@@ -97,7 +98,7 @@ void main() {
         final v = tester.getSize(find.byKey(ValueKey('${k}_value')));
         expect(v.height, 32.0, reason: '$k value wraps');
       }
-      expect(find.text('49.52M ج.م'), findsOneWidget);
+      expect(find.text('49.52${CurrencyFormatter.scaleJoiner}M ج.م'), findsOneWidget);
       expect(find.textContaining('180 نشاطًا'), findsOneWidget);
     });
   }

@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/atomic_numeric_text.dart';
 import 'package:tashil_web/core/widgets/hyphenated_code_text.dart';
 import 'package:tashil_web/core/widgets/m3_search_field.dart';
 import 'package:tashil_web/core/widgets/m3_states.dart';
@@ -92,22 +93,35 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   }
 
 
+  /// Per-column caps measured from the live longest bodyMedium values
+  /// (e.g. 11259.7, 1082.66, 87,233, −44.0%) so a number never wraps
+  /// internally. Currency («ج.م») may go to the next line.
+  static const double _priceColCode = 116;
+  static const double _priceColName = 220;
+  static const double _priceColUnitsPer = 36;
+  static const double _priceColUnits = 54;
+  static const double _priceColCartons = 58;
+  static const double _priceColList = 52;
+  static const double _priceColSell = 52;
+  static const double _priceColDelta = 54;
+  static const double _priceColFactory = 52;
+  static const double _priceColNetCarton = 60;
+  static const double _priceColNetSales = 52;
+  static const double _priceColMargin = 90;
+
   static Widget _priceCell(
     String text, {
     TextStyle? style,
     Key? key,
-    double maxWidth = 46,
-    int maxLines = 3,
+    required double maxWidth,
     TextAlign textAlign = TextAlign.center,
   }) {
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: maxWidth),
-      child: Text(
+      child: AtomicNumericText(
         text,
         key: key,
-        maxLines: maxLines,
-        softWrap: true,
-        overflow: TextOverflow.ellipsis,
+        maxWidth: maxWidth,
         textAlign: textAlign,
         style: style,
       ),
@@ -115,25 +129,35 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   }
 
   static List<DataColumn> get _priceMatrixColumns => [
-        _priceHeading('كود الصنف', numeric: false, maxWidth: 116),
-        _priceHeading('الصنف الرسمي', numeric: false, center: false, maxWidth: 220),
-        _priceHeading('وحدات/كرتونة', maxWidth: 46),
-        _priceHeading('الوحدات', maxWidth: 46),
-        _priceHeading('الكراتين', maxWidth: 46),
-        _priceHeading('سعر القائمة (شامل الضريبة)', maxWidth: 46),
-        _priceHeading('سعر البيع الفعلي', maxWidth: 46),
-        _priceHeading('فرق السعر %', maxWidth: 46),
-        _priceHeading('تكلفة المصنع للقطعة', maxWidth: 46),
-        _priceHeading('صافي سعر الكرتونة (فاتورة)', maxWidth: 46),
-        _priceHeading('صافي المبيعات', maxWidth: 46),
-        _priceHeading('هامش السلسلة', maxWidth: 90),
+        _priceHeading('كود الصنف', numeric: false, maxWidth: _priceColCode),
+        _priceHeading('الصنف الرسمي', numeric: false, center: false, maxWidth: _priceColName),
+        _priceHeading('وحدات/كرتونة', maxWidth: _priceColUnitsPer),
+        _priceHeading('الوحدات', maxWidth: _priceColUnits),
+        _priceHeading('الكراتين', maxWidth: _priceColCartons),
+        _priceHeading('سعر القائمة (شامل الضريبة)', maxWidth: _priceColList),
+        _priceHeading('سعر البيع الفعلي', maxWidth: _priceColSell),
+        _priceHeading('فرق السعر %', maxWidth: _priceColDelta),
+        _priceHeading('تكلفة المصنع للقطعة', maxWidth: _priceColFactory),
+        _priceHeading('صافي سعر الكرتونة (فاتورة)', maxWidth: _priceColNetCarton),
+        _priceHeading('صافي المبيعات', maxWidth: _priceColNetSales),
+        _priceHeading('هامش السلسلة', maxWidth: _priceColMargin),
       ];
 
   /// Flex shares for the price matrix at the live 1280+sidebar width.
-  /// Code stays wide enough for a one-line hyphenated SKU; margin is wide
-  /// enough for «خسارة 4.60M ج.م (60.3%)» wrapped ≤3 with no ellipsis.
+  /// Gutters are xxs so the measured numeric caps fit without h-scroll.
   static const List<double> _priceMatrixFlex = [
-    116, 220, 46, 46, 46, 46, 46, 46, 46, 46, 46, 90,
+    _priceColCode,
+    _priceColName,
+    _priceColUnitsPer,
+    _priceColUnits,
+    _priceColCartons,
+    _priceColList,
+    _priceColSell,
+    _priceColDelta,
+    _priceColFactory,
+    _priceColNetCarton,
+    _priceColNetSales,
+    _priceColMargin,
   ];
 
   @override
@@ -1330,8 +1354,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                 dataRowMinHeight: 52.0,
                 // Room for a 3-line item name (owner table rule).
                 dataRowMaxHeight: 80.0,
-                columnSpacing: M3Spacing.xs,
-                horizontalMargin: M3Spacing.xs,
+                columnSpacing: M3Spacing.xxs,
+                horizontalMargin: M3Spacing.xxs,
                 headingTextStyle: headStyle,
                 dataTextStyle: cellStyle,
                 columns: _priceMatrixColumns,
@@ -1376,23 +1400,24 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                           ),
                         ),
                       ),
-                      DataCell(_priceCell('${s.unitsPerCarton}', style: cellMuted)),
-                      DataCell(_priceCell(CurrencyFormatter.formatNumber(s.totalUnitsSold), style: cellStrong)),
-                      DataCell(_priceCell(s.totalCartonsSold.toStringAsFixed(1), style: cellStrong)),
-                      DataCell(_priceCell(s.officialConsumerRsp > 0 ? '${s.officialConsumerRsp.toStringAsFixed(2)} ج.م' : '—', style: cellMuted)),
-                      DataCell(_priceCell('${s.avgSellingPrice.toStringAsFixed(2)} ج.م', style: cellStrong)),
+                      DataCell(_priceCell('${s.unitsPerCarton}', style: cellMuted, maxWidth: _priceColUnitsPer)),
+                      DataCell(_priceCell(CurrencyFormatter.formatNumber(s.totalUnitsSold), style: cellStrong, maxWidth: _priceColUnits)),
+                      DataCell(_priceCell(s.totalCartonsSold.toStringAsFixed(1), style: cellStrong, maxWidth: _priceColCartons)),
+                      DataCell(_priceCell(s.officialConsumerRsp > 0 ? '${s.officialConsumerRsp.toStringAsFixed(2)} ج.م' : '—', style: cellMuted, maxWidth: _priceColList)),
+                      DataCell(_priceCell('${s.avgSellingPrice.toStringAsFixed(2)} ج.م', style: cellStrong, maxWidth: _priceColSell)),
                       DataCell(
                         _priceCell(
                           s.officialConsumerRsp > 0 ? CurrencyFormatter.formatSignedPct(s.priceDeltaPct) : '—',
                           key: const ValueKey('price_matrix_delta_pct'),
+                          maxWidth: _priceColDelta,
                           style: cellStrong?.copyWith(color: s.priceDeltaPct < -5.0
                                 ? colorScheme.tertiary
                                 : (s.priceDeltaPct > 5.0 ? colorScheme.error : colorScheme.onSurfaceVariant)),
                         ),
                       ),
-                      DataCell(_priceCell(s.factoryUnitCost > 0 ? '${s.factoryUnitCost.toStringAsFixed(2)} ج.م' : '—', style: cellMuted)),
-                      DataCell(_priceCell(s.netCartonInvoiceCost > 0 ? '${s.netCartonInvoiceCost.toStringAsFixed(2)} ج.م' : '—', style: cellMuted)),
-                      DataCell(_priceCell(CurrencyFormatter.formatCompactEGP(s.totalNetRevenue), style: cellStrong?.copyWith(color: colorScheme.primary))),
+                      DataCell(_priceCell(s.factoryUnitCost > 0 ? '${s.factoryUnitCost.toStringAsFixed(2)} ج.م' : '—', style: cellMuted, maxWidth: _priceColFactory)),
+                      DataCell(_priceCell(s.netCartonInvoiceCost > 0 ? '${s.netCartonInvoiceCost.toStringAsFixed(2)} ج.م' : '—', style: cellMuted, maxWidth: _priceColNetCarton)),
+                      DataCell(_priceCell(CurrencyFormatter.formatCompactEGP(s.totalNetRevenue), style: cellStrong?.copyWith(color: colorScheme.primary), maxWidth: _priceColNetSales)),
                       DataCell(
                         ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 90.0),
@@ -3375,7 +3400,7 @@ onChanged: m3Legacy<int>((v) {
     Widget card4,
   ) {
     // Same equal-height grid and 16dp gutters as the dashboard KPI row.
-    final columns = maxWidth >= 960 ? 4 : (maxWidth >= 580 ? 2 : 1);
+    final columns = M3KpiGridColumns.forWidth(maxWidth);
     return M3EqualHeightGrid(
       key: const ValueKey('kpi_cards_row'),
       columns: columns,

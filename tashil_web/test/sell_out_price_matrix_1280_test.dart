@@ -17,6 +17,7 @@ import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/features/navigation/presentation/desktop_sidebar.dart';
 import 'package:tashil_web/features/sell_out_analytics/data/sell_out_explorer_repository.dart';
+import 'package:tashil_web/core/widgets/atomic_numeric_text.dart';
 import 'package:tashil_web/core/widgets/hyphenated_code_text.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
 
@@ -52,7 +53,7 @@ SellOutExplorerData _livePriceData() => SellOutExplorerData(
             avgSellingPrice: 224.59,
             priceDeltaPct: -44.0,
             factoryUnitCost: 180.25,
-            netCartonInvoiceCost: 520.40,
+            netCartonInvoiceCost: 1082.66,
             totalNetRevenue: 7588000,
             retailerGrossProfit: -4600000,
             retailerMarginPct: -60.3,
@@ -61,8 +62,8 @@ SellOutExplorerData _livePriceData() => SellOutExplorerData(
             itemCode: 'PRHC-0001-0001',
             skuName: kLiveLongName,
             unitsPerCarton: 3,
-            totalUnitsSold: 23709,
-            totalCartonsSold: 7903.0,
+            totalUnitsSold: 87233,
+            totalCartonsSold: 17446.6,
             officialConsumerRsp: 152.54,
             avgSellingPrice: 105.81,
             priceDeltaPct: -30.6,
@@ -223,12 +224,12 @@ void main() {
         // Live negative deltas keep the minus on the left.
         final delta = find.byKey(const ValueKey('price_matrix_delta_pct'));
         expect(delta, findsWidgets);
-        final texts = tester
-            .widgetList<Text>(delta)
-            .map((t) => t.data!)
+        final deltaTexts = tester
+            .widgetList<AtomicNumericText>(delta)
+            .map((t) => t.text)
             .toList();
-        expect(texts, contains(CurrencyFormatter.formatSignedPct(-44.0)));
-        expect(texts.any((t) => t.contains('-')), isFalse);
+        expect(deltaTexts, contains(CurrencyFormatter.formatSignedPct(-44.0)));
+        expect(deltaTexts.any((t) => t.contains('-')), isFalse);
 
         final dt = tester.widget<DataTable>(
             find.descendant(of: table, matching: find.byType(DataTable)));
@@ -284,6 +285,29 @@ void main() {
           isFalse,
           reason: 'هامش السلسلة ellipsized: $marginText',
         );
+
+        // Numbers must never wrap internally (11259.7, 17446.6, 1082.66).
+        for (final number in ['11259.7', '17446.6', '1082.66', '87,233']) {
+          final f = find.descendant(of: table, matching: find.textContaining(number));
+          expect(f, findsWidgets, reason: 'missing $number');
+          for (final e in f.evaluate()) {
+            final data = (e.widget as Text).data ?? '';
+            if (!data.contains(number)) continue;
+            final para = tester.renderObject<RenderParagraph>(
+                find.byElementPredicate((x) => x == e));
+            final start = data.indexOf(number);
+            final boxes = para.getBoxesForSelection(
+              TextSelection(baseOffset: start, extentOffset: start + number.length),
+            );
+            expect(boxes, isNotEmpty, reason: '$number not painted');
+            final tops = {for (final b in boxes) b.toRect().top.round()};
+            expect(tops, hasLength(1),
+                reason: '$number broke mid-number across lines in "$data"');
+          }
+        }
+        expect(find.text('11259.'), findsNothing);
+        expect(find.text('17446.'), findsNothing);
+        expect(find.text('1082.6'), findsNothing);
       },
           () => MockClient((req) async => http.Response.bytes(
                 utf8.encode(jsonEncode(req.url.path.contains('archive') ||

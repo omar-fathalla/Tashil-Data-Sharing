@@ -127,7 +127,7 @@ const kErrorsLiveIssues = [
     itemName: kLongSkuName2,
     foundValue: '2 صف',
     expectedValue: 'باركود فريد لكل صنف',
-    impactEgp: 601200,
+    impactEgp: 401000,
     status: kDqOpen,
     statusReason: '',
   ),

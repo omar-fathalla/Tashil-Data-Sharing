@@ -8,6 +8,7 @@ import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/atomic_numeric_text.dart';
 import '../../../../core/widgets/hyphenated_code_text.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/widgets/app_icons.dart';
@@ -608,7 +609,7 @@ class _IssuesTable extends StatelessWidget {
   //  - at 1024+sidebar (inner ~678) one-line SKUs plus the name floor
   //    cannot both fit, so hyphenated codes may wrap at '-' only
   static const _flex = [
-    58.0,
+    52.0,
     80.0,
     40.0,
     178.0,
@@ -616,7 +617,7 @@ class _IssuesTable extends StatelessWidget {
     232.0,
     54.0,
     88.0,
-    42.0,
+    48.0,
     72.0,
     42.0
   ];
@@ -779,11 +780,15 @@ class _IssuesTable extends StatelessWidget {
                         align: TextAlign.start)),
                     DataCell(cellText(6, i.foundValue)),
                     DataCell(cellText(7, i.expectedValue)),
-                    DataCell(cellText(
+                    DataCell(cellBox(
                       8,
-                      i.impactEgp == null
-                          ? '—'
-                          : CurrencyFormatter.formatCompactEGP(i.impactEgp!),
+                      AtomicNumericText(
+                        i.impactEgp == null
+                            ? '—'
+                            : CurrencyFormatter.formatCompactEGP(i.impactEgp!),
+                        maxWidth: colMax(8),
+                        textAlign: TextAlign.center,
+                      ),
                     )),
                     DataCell(cellBox(
                       9,

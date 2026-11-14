@@ -1499,13 +1499,11 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Live 1280+sidebar content is ~982 (3 columns). 1024+sidebar is
-        // ~726, the same band as Sell-Out's 2-column row, so cards stay 138.
-        final columns = constraints.maxWidth >= 1050
-            ? 5
-            : (constraints.maxWidth >= 900
-                ? 3
-                : (constraints.maxWidth >= 520 ? 2 : 1));
+        // Same 960/580 breakpoints as Sell-Out. Five cards at the live
+        // 1280+sidebar shell (~982) are 4+1, so width matches the 4-col
+        // reference (~233dp) and height stays 138. Five-in-a-row would
+        // be ~183dp and clip titles such as «الباركودات الفريدة».
+        final columns = M3KpiGridColumns.forWidth(constraints.maxWidth);
         final regularShare = summary.totalSkus > 0
             ? ((summary.regularSkusCount / summary.totalSkus) * 100)
                 .toStringAsFixed(1)
@@ -1520,7 +1518,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               key: const ValueKey('pm_kpi_card_Total Registered'),
               title: 'إجمالي الأصناف',
               titleMaxLines: 1,
-              subtitleMaxLines: 2,
+              subtitleMaxLines: 1,
               value: countSku(summary.totalSkus),
               subtitle: 'المعروض بالفلتر الحالي: ${countSku(filteredCount)}',
               icon: Icons.qr_code_scanner_rounded,
@@ -1531,7 +1529,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               key: const ValueKey('pm_kpi_card_Regular Catalog'),
               title: 'أصناف البيع العادي',
               titleMaxLines: 1,
-              subtitleMaxLines: 2,
+              subtitleMaxLines: 1,
               value: countSku(summary.regularSkusCount),
               subtitle: 'تمثل $regularShare% من إجمالي الكارتة',
               icon: Icons.check_circle_outline_rounded,
@@ -1541,7 +1539,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               key: const ValueKey('pm_kpi_card_Promos'),
               title: 'أصناف العروض',
               titleMaxLines: 1,
-              subtitleMaxLines: 2,
+              subtitleMaxLines: 1,
               value: '${_intFmt.format(summary.promoSkusCount)} عرض',
               subtitle: 'عروض وشرنك وباقات ترويجية',
               icon: Icons.local_offer_rounded,
@@ -1551,7 +1549,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               key: const ValueKey('pm_kpi_card_Unique Barcodes'),
               title: 'الباركودات الفريدة',
               titleMaxLines: 1,
-              subtitleMaxLines: 2,
+              subtitleMaxLines: 1,
               value: '${_intFmt.format(summary.uniqueBarcodesCount)} باركود',
               subtitle:
                   'متوسط سعة الكرتونة: ${summary.avgUnitsPerCarton.toStringAsFixed(1)} وحدة/كرتونة',
@@ -1562,7 +1560,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               key: const ValueKey('pm_kpi_card_Chain Coverage'),
               title: 'التغطية بالسلاسل',
               titleMaxLines: 1,
-              subtitleMaxLines: 2,
+              subtitleMaxLines: 1,
               value: '${_intFmt.format(summary.activeInChainsCount)} نشط',
               subtitle:
                   'غير مسحوب (فرصة توزيع): ${countSku(summary.unpulledSkusCount)}',

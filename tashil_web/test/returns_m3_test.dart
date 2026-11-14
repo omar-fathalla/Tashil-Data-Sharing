@@ -12,6 +12,7 @@ import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/data/available_years.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/core/utils/glue_hyphen_tokens.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/core/widgets/m3_toolbar_button.dart';
@@ -449,7 +450,7 @@ void main() {
           final found = find.descendant(
             of: matrix,
             matching: find.byWidgetPredicate(
-              (w) => w is Text && (w.data?.contains(compact) ?? false),
+              (w) => w is Text && (stripWordJoiners(w.data ?? '').contains(compact)),
             ),
           );
           expect(found, findsWidgets, reason: 'missing $compact in the matrix');
@@ -521,7 +522,7 @@ void main() {
         final found = find.descendant(
           of: matrix,
           matching: find.byWidgetPredicate(
-            (w) => w is Text && (w.data?.contains('993.0K') ?? false),
+            (w) => w is Text && (stripWordJoiners(w.data ?? '').contains('993.0K')),
           ),
         );
         expect(found, findsWidgets);

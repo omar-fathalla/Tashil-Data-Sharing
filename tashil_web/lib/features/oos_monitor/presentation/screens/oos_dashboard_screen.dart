@@ -330,9 +330,8 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
     final colorScheme = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 840.0
-            ? 3
-            : (constraints.maxWidth >= 580.0 ? 2 : 1);
+        // Same 960/580 breakpoints as Sell-Out (4+1 for five cards at 1280).
+        final columns = M3KpiGridColumns.forWidth(constraints.maxWidth);
         return M3EqualHeightGrid(
           key: const ValueKey('oos_kpi_grid'),
           columns: columns,
@@ -342,8 +341,9 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
             M3SummaryKpiCard(
               key: const ValueKey('osa_summary_card'),
               title: 'مؤشر التوافر على الرفوف OSA%',
-              titleMaxLines: 3,
-              subtitleMaxLines: 3,
+              titleMaxLines: 1,
+              subtitleMaxLines: 1,
+              scaleTitleToFit: true,
               value: '${osaRatePct.toStringAsFixed(1)}%',
               subtitle: 'كفاءة التوافر الفعلي عبر الفروع النشطة',
               icon: Icons.fact_check_rounded,
@@ -354,8 +354,9 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
             M3SummaryKpiCard(
               key: const ValueKey('kpi_card_Total OOS SKUs'),
               title: 'إجمالي الأصناف المنعدمة',
-              titleMaxLines: 3,
-              subtitleMaxLines: 3,
+              titleMaxLines: 1,
+              subtitleMaxLines: 1,
+              scaleTitleToFit: true,
               value: countSku(totalFilteredSKUs),
               subtitle: criticalCount == 0
                   ? 'لا توجد أصناف حرجة'
@@ -368,8 +369,9 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
             M3SummaryKpiCard(
               key: const ValueKey('kpi_card_Impacted Branches'),
               title: 'الفروع المتأثرة بالنواقص',
-              titleMaxLines: 3,
-              subtitleMaxLines: 3,
+              titleMaxLines: 1,
+              subtitleMaxLines: 1,
+              scaleTitleToFit: true,
               value: countBranches(impactedBranchesCount),
               subtitle: 'فروع وهايبر ماركت بها عجز على الرف',
               icon: Icons.store_rounded,
@@ -380,8 +382,9 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
             M3SummaryKpiCard(
               key: const ValueKey('kpi_card_Daily Lost Revenue'),
               title: 'الخسارة اليومية المقدرة',
-              titleMaxLines: 3,
-              subtitleMaxLines: 3,
+              titleMaxLines: 1,
+              subtitleMaxLines: 1,
+              scaleTitleToFit: true,
               value: CurrencyFormatter.formatCompactEGP(totalLostCost),
               subtitle: 'فاقد مبيعات يومي بسبب نفاد المخزون',
               icon: Icons.trending_down_rounded,
@@ -392,8 +395,9 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
             M3SummaryKpiCard(
               key: const ValueKey('kpi_card_Monthly Projected Loss'),
               title: 'الخسارة الشهرية المتوقعة',
-              titleMaxLines: 3,
-              subtitleMaxLines: 3,
+              titleMaxLines: 1,
+              subtitleMaxLines: 1,
+              scaleTitleToFit: true,
               value: CurrencyFormatter.formatCompactEGP(totalLostCost * 30.0),
               subtitle: 'تقدير الفاقد الشهري في حال تأخر التوريد',
               icon: Icons.calendar_month_rounded,

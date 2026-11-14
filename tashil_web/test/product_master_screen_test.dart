@@ -388,7 +388,7 @@ void main() {
 
   testWidgets('ProductMasterScreen renders KPIs, filters by Item Code / Barcode, and switches tabs',
       (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.physicalSize = const Size(1440, 1800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
@@ -436,7 +436,7 @@ void main() {
   testWidgets(
       'ProductMasterScreen displays price change indicators, filters by price changes, opens Diff Summary modal, and manages File Sheets with rollback on delete',
       (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.physicalSize = const Size(1440, 1800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();

@@ -2,12 +2,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
 
 void main() {
+  const wj = CurrencyFormatter.scaleJoiner;
+
   group('formatCompactEGP', () {
-    test('default (KPI cards) output is unchanged', () {
-      expect(CurrencyFormatter.formatCompactEGP(127.14e6), '127.14M ج.م');
-      expect(CurrencyFormatter.formatCompactEGP(1.45e6), '1.45M ج.م');
-      expect(CurrencyFormatter.formatCompactEGP(250e3), '250.0K ج.م');
-      expect(CurrencyFormatter.formatCompactEGP(1e9), '1000.00M ج.م');
+    test('default (KPI cards) uses compact K/M scaling', () {
+      expect(CurrencyFormatter.formatCompactEGP(127.14e6), '127.14${wj}M ج.م');
+      expect(CurrencyFormatter.formatCompactEGP(1.45e6), '1.45${wj}M ج.م');
+      expect(CurrencyFormatter.formatCompactEGP(250e3), '250.0${wj}K ج.م');
+      expect(CurrencyFormatter.formatCompactEGP(1e9), '1000.00${wj}M ج.م');
       expect(CurrencyFormatter.formatCompactEGP(512), '512 ج.م');
     });
 
@@ -41,7 +43,7 @@ void main() {
       // isolate:true on a negative still uses a single LRI, not a nested FSI.
       expect(
           CurrencyFormatter.formatCompactEGP(-2500, isolate: true),
-          '${lri}${minus}2.5K ج.م${pdi}');
+          '${lri}${minus}2.5${wj}K ج.م${pdi}');
     });
 
     test('formatEGP negatives isolate the minus; positives stay unchanged', () {
@@ -50,6 +52,12 @@ void main() {
       expect(
           CurrencyFormatter.formatEGP(-847.4, showDecimals: true),
           '\u2066\u2212847.40 ج.م\u2069');
+    });
+
+    test('K/M suffix is bound to the number with a word joiner', () {
+      expect(CurrencyFormatter.formatCompactEGP(401000), '401.0${wj}K ج.م');
+      expect(CurrencyFormatter.formatCompactEGP(401000).contains('401.0K'), isFalse);
+      expect(CurrencyFormatter.formatCompactUnits(45200), '45.2${wj}K قطعة');
     });
 
     test('formatNumber negatives isolate the minus; positives stay unchanged', () {

@@ -8,6 +8,7 @@ import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
+import 'package:tashil_web/core/widgets/m3_equal_height_grid.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/features/oos_monitor/presentation/screens/oos_dashboard_screen.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
@@ -160,6 +161,16 @@ void main() {
         width: width,
       );
       expect(find.byKey(const ValueKey('oos_kpi_grid')), findsOneWidget);
+      if (width >= 960) {
+        expect(
+          tester
+              .widget<M3EqualHeightGrid>(
+                  find.byKey(const ValueKey('oos_kpi_grid')))
+              .columns,
+          4,
+          reason: 'OOS must use Sell-Out 4-col breakpoints at ${width.toInt()}',
+        );
+      }
       expect(_cutBeforeThreeLines(tester, find.byKey(const ValueKey('oos_kpi_grid'))),
           isEmpty);
       expect(find.byKey(const ValueKey('oos_sku_name')), findsWidgets);
@@ -277,4 +288,45 @@ void main() {
       }
     });
   }
+
+
+  testWidgets('OOS KPI grid is 4+1 at 1280+sidebar like Sell-Out', (tester) async {
+    await pumpOos(
+      tester,
+      Row(
+        children: [
+          const SizedBox(width: 250, child: ColoredBox(color: Color(0xFF1A1C19))),
+          Expanded(
+            child: OOSDashboardScreen(apiClient: OosShotApiClient()),
+          ),
+        ],
+      ),
+      width: 1280,
+    );
+
+    final grid = tester.widget<M3EqualHeightGrid>(
+        find.byKey(const ValueKey('oos_kpi_grid')));
+    expect(grid.columns, 4);
+    expect(grid.children, hasLength(5));
+    final cardFinders = [
+      'osa_summary_card',
+      'kpi_card_Total OOS SKUs',
+      'kpi_card_Impacted Branches',
+      'kpi_card_Daily Lost Revenue',
+      'kpi_card_Monthly Projected Loss',
+    ];
+    final ys = [
+      for (final k in cardFinders)
+        tester.getTopLeft(find.byKey(ValueKey(k))).dy
+    ];
+    expect(ys[0], closeTo(ys[1], 1.0));
+    expect(ys[0], closeTo(ys[2], 1.0));
+    expect(ys[0], closeTo(ys[3], 1.0));
+    expect(ys[4], greaterThan(ys[0] + 100),
+        reason: '5th OOS card should sit on the second row (4+1)');
+    for (final k in cardFinders) {
+      expect(tester.getSize(find.byKey(ValueKey(k))).height, closeTo(138.0, 1.0),
+          reason: k);
+    }
+  });
 }

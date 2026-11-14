@@ -23,7 +23,7 @@ bool _clusterMayHaveEmptyBox(String text, int i) {
 Finder findTextLoose(String expected, {Finder? scope}) {
   final pred = find.byWidgetPredicate((w) {
     if (w is! Text || w.data == null) return false;
-    return stripWordJoiners(w.data!) == expected;
+    return stripWordJoiners(w.data!) == stripWordJoiners(expected);
   });
   return scope == null ? pred : find.descendant(of: scope, matching: pred);
 }
@@ -80,7 +80,7 @@ bool labelFullyVisible(
   final textEl = texts.evaluate().first;
   final text = textEl.widget as Text;
   final displayed = text.data ?? '';
-  if (stripWordJoiners(displayed) != expected) return false;
+  if (stripWordJoiners(displayed) != stripWordJoiners(expected)) return false;
   if ((text.maxLines ?? 99) < minMaxLines) return false;
   final para = _paragraphForText(tester, textEl);
   if (para == null) return false;
@@ -125,7 +125,7 @@ bool shortWordUnsplit(WidgetTester tester, String word, {Finder? scope}) {
   if (texts.evaluate().isEmpty) return false;
   for (final e in texts.evaluate()) {
     final data = (e.widget as Text).data;
-    if (data == null || stripWordJoiners(data) != word) continue;
+    if (data == null || stripWordJoiners(data) != stripWordJoiners(word)) continue;
     final para = _paragraphForText(tester, e);
     if (para == null) return false;
     final boxes = para.getBoxesForSelection(
