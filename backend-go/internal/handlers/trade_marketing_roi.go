@@ -46,7 +46,17 @@ type MonthlyChainRoiSummary struct {
 	// YoYAvailable is false when the same month last year has no Sell-Out;
 	// YoYGrowthPct is then 0 and the UI shows "—" instead of +0.0%.
 	YoYAvailable bool `json:"yoy_available"`
-	RomiMultiple              float64                   `json:"romi_multiple"`
+	// Campaign-free baseline and incremental ROMI (see domain.ComputeRoiLift).
+	BaselineSalesEGP   *float64 `json:"baseline_sales_egp"`
+	BaselineAvailable  bool     `json:"baseline_available"`
+	BaselineMethod     string   `json:"baseline_method"`
+	OrganicYoYRatio    *float64 `json:"organic_yoy_ratio"`
+	OrganicMonthsUsed  int      `json:"organic_months_used"`
+	IncrementalLiftEGP *float64 `json:"incremental_lift_egp"`
+	LiftVsBaselinePct  *float64 `json:"lift_vs_baseline_pct"`
+	RomiMultiple       *float64 `json:"romi_multiple"`
+	NetRoiPct          *float64 `json:"net_roi_pct"`
+	BaselineMethodAR   string   `json:"baseline_method_ar"`
 }
 
 // normChain makes "Beet El Gomla", "beet-elgomla" and "BEET_ELGOMLA" compare equal.
@@ -122,17 +132,101 @@ func pct(cur, base float64) float64 {
 	return (cur - base) / base * 100
 }
 
-// romi mirrors the Flutter romiMultiple getter (MoM lift, falling back to positive YoY lift).
-func romi(spend, cur, prev, ly float64) float64 {
-	if spend <= 0 {
-		return 0
+func ymKey(year, month int) string { return fmt.Sprintf("%d-%d", year, month) }
+
+func dateYearMonth(d string) (int, int, bool) {
+	if len(d) < 7 {
+		return 0, 0, false
 	}
-	mom, yoy := cur-prev, cur-ly
-	lift := mom
-	if mom < 0 && yoy > 0 {
-		lift = yoy
+	t, err := time.Parse("2006-01-02", d[:10])
+	if err != nil {
+		// Accept YYYY-MM
+		t, err = time.Parse("2006-01", d[:7])
+		if err != nil {
+			return 0, 0, false
+		}
 	}
-	return lift / spend
+	return t.Year(), int(t.Month()), true
+}
+
+// loadSellOutWindow fills a.out for every month in [from, to] inclusive
+// with one GetSellOutRecords call (same NetRevenue sum as sellOut).
+func (a *salesAgg) loadSellOutWindow(from, to domain.RoiMonthKey) error {
+	start, _ := monthBounds(from.Year, from.Month)
+	_, end := monthBounds(to.Year, to.Month)
+	recs, _, err := a.src.GetSellOutRecords(a.ctx, a.tenant, bigquery.RecordFilter{StartDate: start, EndDate: end})
+	if err != nil {
+		return err
+	}
+	for _, r := range recs {
+		y, m, ok := dateYearMonth(r.TransactionDate)
+		if !ok {
+			continue
+		}
+		key := ymKey(y, m)
+		if a.out[key] == nil {
+			a.out[key] = map[string]float64{}
+		}
+		a.out[key][normChain(r.RetailerChain)] += r.NetRevenue
+	}
+	// Ensure every month in the window has a map so later lookups are cheap.
+	for cur := from; ; {
+		key := ymKey(cur.Year, cur.Month)
+		if a.out[key] == nil {
+			a.out[key] = map[string]float64{}
+		}
+		if cur == to {
+			break
+		}
+		if cur.Month == 12 {
+			cur = domain.RoiMonthKey{Year: cur.Year + 1, Month: 1}
+		} else {
+			cur = domain.RoiMonthKey{Year: cur.Year, Month: cur.Month + 1}
+		}
+	}
+	return nil
+}
+
+func (a *salesAgg) chainSalesMap(chain string) map[domain.RoiMonthKey]float64 {
+	nc := normChain(chain)
+	out := map[domain.RoiMonthKey]float64{}
+	for key, m := range a.out {
+		var y, mo int
+		if _, err := fmt.Sscanf(key, "%d-%d", &y, &mo); err != nil {
+			continue
+		}
+		if v := m[nc]; v != 0 {
+			out[domain.RoiMonthKey{Year: y, Month: mo}] = v
+		}
+	}
+	return out
+}
+
+func applyLift(s *MonthlyChainRoiSummary, sales map[domain.RoiMonthKey]float64, campaigns map[domain.RoiMonthKey]bool) {
+	res := domain.ComputeRoiLift(
+		s.CurrentMonthSalesEGP,
+		s.LastYearSameMonthSalesEGP,
+		s.MarketingSpendEGP,
+		domain.RoiMonthKey{Year: s.Year, Month: s.Month},
+		sales,
+		campaigns,
+	)
+	s.BaselineAvailable = res.Available
+	s.BaselineMethod = res.Method
+	s.OrganicMonthsUsed = res.OrganicMonthsUsed
+	s.BaselineMethodAR = res.MethodAR
+	s.RomiMultiple = res.RomiMultiple
+	s.NetRoiPct = res.NetRoiPct
+	if res.Available {
+		b, lift, pct := res.BaselineSalesEGP, res.IncrementalLiftEGP, res.LiftVsBaselinePct
+		s.BaselineSalesEGP = &b
+		s.IncrementalLiftEGP = &lift
+		s.LiftVsBaselinePct = &pct
+		if res.Method == domain.RoiBaselineMethodYoyTrend {
+			r := res.OrganicYoYRatio
+			s.OrganicYoYRatio = &r
+		}
+	}
 }
 
 // HandleGetROI serves GET /api/v1/trade-marketing/roi?year=&month=&chain=
@@ -163,10 +257,23 @@ func (h *TradeMarketingHandler) HandleGetROI(w http.ResponseWriter, r *http.Requ
 	if k := kamChain(c); k != "" {
 		chain = k
 	}
-	items, err := h.repo.ListMarketingExpenses(r.Context(), c.TenantID, domain.MarketingExpenseFilter{Year: year, Month: month})
+	// All expenses (not just the requested month) so campaign months can
+	// be excluded from the organic-trend window. Output is still filtered
+	// to the requested year/month/chain below.
+	allItems, err := h.repo.ListMarketingExpenses(r.Context(), c.TenantID, domain.MarketingExpenseFilter{})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "failed to list expenses")
 		return
+	}
+	items := make([]domain.MarketingExpense, 0, len(allItems))
+	for _, e := range allItems {
+		if year > 0 && e.Year != year {
+			continue
+		}
+		if month > 0 && e.Month != month {
+			continue
+		}
+		items = append(items, e)
 	}
 	type gkey struct {
 		y, m int
@@ -197,26 +304,69 @@ func (h *TradeMarketingHandler) HandleGetROI(w http.ResponseWriter, r *http.Requ
 			order = append(order, k)
 		}
 	}
+	// Campaign months by chain (spend > 0), used to exclude promoted
+	// months from the organic YoY trend and the prior-organic average.
+	campaignsByChain := map[string]map[domain.RoiMonthKey]bool{}
+	for _, e := range allItems {
+		if e.AmountEGP <= 0 {
+			continue
+		}
+		nc := normChain(e.ChainName)
+		if campaignsByChain[nc] == nil {
+			campaignsByChain[nc] = map[domain.RoiMonthKey]bool{}
+		}
+		campaignsByChain[nc][domain.RoiMonthKey{Year: e.Year, Month: e.Month}] = true
+	}
+
 	agg := &salesAgg{src: h.sales, tenant: c.TenantID, ctx: r.Context(), out: map[string]map[string]float64{}, in: map[string]map[string]float64{}}
+	// One window covering last-year comparables and a 12-month lookback
+	// for every summary month (~24 months).
+	if len(order) > 0 {
+		from, to := domain.RoiMonthKey{Year: order[0].y, Month: order[0].m}, domain.RoiMonthKey{Year: order[0].y, Month: order[0].m}
+		for _, k := range order {
+			cur := domain.RoiMonthKey{Year: k.y, Month: k.m}
+			start := domain.RoiMonthKey{Year: k.y - 2, Month: k.m} // lookback + last-year of those months
+			if start.Year < from.Year || (start.Year == from.Year && start.Month < from.Month) {
+				from = start
+			}
+			if cur.Year > to.Year || (cur.Year == to.Year && cur.Month > to.Month) {
+				to = cur
+			}
+		}
+		if err := agg.loadSellOutWindow(from, to); err != nil {
+			writeErr(w, http.StatusInternalServerError, "failed to load sales data")
+			return
+		}
+	}
 	out := make([]MonthlyChainRoiSummary, 0, len(order))
 	for _, k := range order {
 		s := groups[k]
 		py, pm := prevMonth(s.Year, s.Month)
-		var errs [4]error
-		s.CurrentMonthSalesEGP, errs[0] = agg.sellOut(s.Year, s.Month, s.ChainName)
-		s.PreviousMonthSalesEGP, errs[1] = agg.sellOut(py, pm, s.ChainName)
-		s.LastYearSameMonthSalesEGP, errs[2] = agg.sellOut(s.Year-1, s.Month, s.ChainName)
-		s.CurrentMonthSellInEGP, errs[3] = agg.sellIn(s.Year, s.Month, s.ChainName)
-		for _, e := range errs {
-			if e != nil {
-				writeErr(w, http.StatusInternalServerError, "failed to load sales data")
-				return
-			}
+		var err error
+		s.CurrentMonthSalesEGP, err = agg.sellOut(s.Year, s.Month, s.ChainName)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, "failed to load sales data")
+			return
+		}
+		s.PreviousMonthSalesEGP, err = agg.sellOut(py, pm, s.ChainName)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, "failed to load sales data")
+			return
+		}
+		s.LastYearSameMonthSalesEGP, err = agg.sellOut(s.Year-1, s.Month, s.ChainName)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, "failed to load sales data")
+			return
+		}
+		s.CurrentMonthSellInEGP, err = agg.sellIn(s.Year, s.Month, s.ChainName)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, "failed to load sales data")
+			return
 		}
 		s.MoMGrowthPct = pct(s.CurrentMonthSalesEGP, s.PreviousMonthSalesEGP)
 		s.YoYGrowthPct = pct(s.CurrentMonthSalesEGP, s.LastYearSameMonthSalesEGP)
 		s.YoYAvailable = s.LastYearSameMonthSalesEGP > 0
-		s.RomiMultiple = romi(s.MarketingSpendEGP, s.CurrentMonthSalesEGP, s.PreviousMonthSalesEGP, s.LastYearSameMonthSalesEGP)
+		applyLift(s, agg.chainSalesMap(s.ChainName), campaignsByChain[normChain(s.ChainName)])
 		out = append(out, *s)
 	}
 	sort.Slice(out, func(i, j int) bool {

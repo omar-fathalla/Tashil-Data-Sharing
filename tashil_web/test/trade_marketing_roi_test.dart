@@ -8,6 +8,7 @@ import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/utils/web_file_helper.dart';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:tashil_web/features/trade_marketing/domain/roi_lift.dart';
 import 'package:tashil_web/features/trade_marketing/data/trade_marketing_repository.dart';
 import 'package:tashil_web/features/trade_marketing/domain/trade_marketing_models.dart';
 import 'package:tashil_web/features/trade_marketing/presentation/screens/trade_marketing_roi_screen.dart';
@@ -41,29 +42,61 @@ class FakeTradeMarketingRepository implements TradeMarketingRepository {
       {int? year, int? month, String? chain}) async {
     roiCalls++;
     final seen = <String>{};
-    final out = <TradeMarketingSalesBaseline>[];
+    final keys = <({int year, int month, String chain})>[];
+    final spendBy = <String, double>{};
     for (final e in items) {
-      if (!seen.add('${e.year}_${e.month}_${e.chainName}')) continue;
-      final spend = items
-          .where((x) =>
-              x.year == e.year &&
-              x.month == e.month &&
-              x.chainName == e.chainName)
-          .fold<double>(0, (a, x) => a + x.amountEgp);
+      final k = '${e.year}_${e.month}_${e.chainName}';
+      spendBy[k] = (spendBy[k] ?? 0) + e.amountEgp;
+      if (seen.add(k)) {
+        keys.add((year: e.year, month: e.month, chain: e.chainName));
+      }
+    }
+    final salesByChain = <String, Map<RoiMonthKey, double>>{};
+    final campaignsByChain = <String, Set<RoiMonthKey>>{};
+    final snapshots = <String, Map<String, double>>{};
+    for (final k in keys) {
+      final spend = spendBy['${k.year}_${k.month}_${k.chain}'] ?? 0;
       final s = TradeMarketingSeedData.getMonthlySalesSnapshot(
-          chainName: e.chainName,
-          year: e.year,
-          month: e.month,
+          chainName: k.chain,
+          year: k.year,
+          month: k.month,
           totalMarketingSpendInMonth: spend);
+      snapshots['${k.year}_${k.month}_${k.chain}'] = s;
+      final chainSales =
+          salesByChain.putIfAbsent(k.chain, () => <RoiMonthKey, double>{});
+      final target = RoiMonthKey(k.year, k.month);
+      chainSales[target] = s['currentSales']!;
+      chainSales[target.previous] = s['previousMonthSales']!;
+      chainSales[target.lastYear] = s['lastYearSales']!;
+      if (spend > 0) {
+        campaignsByChain
+            .putIfAbsent(k.chain, () => <RoiMonthKey>{})
+            .add(target);
+      }
+    }
+    final out = <TradeMarketingSalesBaseline>[];
+    for (final k in keys) {
+      final spend = spendBy['${k.year}_${k.month}_${k.chain}'] ?? 0;
+      final s = snapshots['${k.year}_${k.month}_${k.chain}']!;
+      final target = RoiMonthKey(k.year, k.month);
+      final lift = computeRoiLift(
+        currentSalesEgp: s['currentSales']!,
+        lastYearSameMonthSalesEgp: s['lastYearSales']!,
+        marketingSpendEgp: spend,
+        target: target,
+        salesByMonth: salesByChain[k.chain] ?? const {},
+        campaignMonths: campaignsByChain[k.chain] ?? const {},
+      );
       out.add(TradeMarketingSalesBaseline(
-        year: e.year,
-        month: e.month,
-        chainName: e.chainName,
+        year: k.year,
+        month: k.month,
+        chainName: k.chain,
         currentMonthSalesEgp: s['currentSales']!,
         previousMonthSalesEgp: s['previousMonthSales']!,
         lastYearSameMonthSalesEgp: s['lastYearSales']!,
         currentMonthSellInEgp: s['currentSellIn']!,
         marketingSpendEgp: spend,
+        lift: lift,
       ));
     }
     return out;
