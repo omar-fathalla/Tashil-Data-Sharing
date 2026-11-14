@@ -577,4 +577,102 @@ void main() {
       }
     }
   });
+
+  testWidgets(
+    'empty tier KPIs show «—» + Arabic note, not fake 0 ج.م',
+    (tester) async {
+      final onlyA = [
+        StoreBenchmarkItem(
+          storeId: 's1',
+          storeName: 'فرع سموحة',
+          retailerChain: 'fathalla',
+          region: 'شرق الإسكندرية',
+          tier: 'Tier A',
+          totalRevenue: 1200000,
+          totalUnits: 9000,
+          velocityUnitsPerDay: 90.0,
+          rank: 1,
+        ),
+      ];
+      await pumpStoreMatrix(
+        tester,
+        repository: StoreMatrixFixtureRepo(ApiClient(), items: onlyA),
+      );
+      expect(tester.widget<Text>(find.byKey(const ValueKey('kpi_value_Tier B'))).data,
+          '—');
+      expect(tester.widget<Text>(find.byKey(const ValueKey('kpi_value_Tier C'))).data,
+          '—');
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('kpi_subtitle_Tier B'))).data,
+        'لا توجد فروع في هذه الفئة',
+      );
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('kpi_subtitle_Tier C'))).data,
+        'لا توجد فروع في هذه الفئة',
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('kpi_card_Tier B')),
+          matching: find.textContaining('0 ج.م'),
+        ),
+        findsNothing,
+      );
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('kpi_value_Tier A'))).data,
+        isNot('—'),
+      );
+    },
+  );
+
+  testWidgets(
+    'zero velocity shows «—» + note, not fake 0.0 / يوم',
+    (tester) async {
+      final items = [
+        StoreBenchmarkItem(
+          storeId: 's1',
+          storeName: 'فرع سموحة',
+          retailerChain: 'fathalla',
+          region: 'شرق الإسكندرية',
+          tier: 'Tier A',
+          totalRevenue: 500000,
+          totalUnits: 0,
+          velocityUnitsPerDay: 0,
+          rank: 1,
+        ),
+        StoreBenchmarkItem(
+          storeId: 's2',
+          storeName: 'فرع المنشية',
+          retailerChain: 'fathalla',
+          region: 'غرب الإسكندرية',
+          tier: 'Tier B',
+          totalRevenue: 400000,
+          totalUnits: 1200,
+          velocityUnitsPerDay: 40.0,
+          rank: 2,
+        ),
+      ];
+      await pumpStoreMatrix(
+        tester,
+        repository: StoreMatrixFixtureRepo(ApiClient(), items: items),
+      );
+      expect(find.text('0.0 / يوم'), findsNothing);
+      expect(find.text('0.0'), findsNothing);
+      expect(find.text('لا توجد بيانات سرعة'), findsOneWidget);
+      expect(find.text('وحدة / يوم'), findsOneWidget);
+      expect(find.text('40.0'), findsOneWidget);
+      expect(find.text('—'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'sort meta chip is short word + description under M3ChipSurface',
+    (tester) async {
+      await pumpStoreMatrix(tester);
+      expect(find.byKey(const ValueKey('store_matrix_sort_chip')), findsOneWidget);
+      expect(find.byKey(const ValueKey('store_matrix_period_chip')), findsOneWidget);
+      expect(find.text('ترتيب'), findsOneWidget);
+      expect(find.text('حسب إجمالي المبيعات تنازلياً'), findsOneWidget);
+      expect(find.text('الترتيب حسب إجمالي المبيعات تنازلياً'), findsNothing);
+    },
+  );
 }

@@ -14,6 +14,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_section_title.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
@@ -190,8 +191,9 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
       }),
       failure: (error) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text('تعذر تحميل بيانات مقارنة الفروع: $error')),
+        M3Feedback.showError(
+          context,
+          'تعذر تحميل بيانات مقارنة الفروع: $error',
         );
       },
     );
@@ -624,36 +626,30 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                     spacing: M3Spacing.sm,
                     runSpacing: M3Spacing.sm,
                     children: [
-                      M3SummaryKpiCard(
-                        key: const ValueKey('kpi_card_Tier A'),
-                        valueKey: const ValueKey('kpi_value_Tier A'),
+                      _buildTierKpiCard(
+                        context,
+                        tierKey: 'Tier A',
                         title: 'Tier A (الفئة الأولى - الرائدة)',
-                        titleMaxLines: 3,
-                        subtitleMaxLines: 3,
-                        value: CurrencyFormatter.formatCompactEGP(tierARevenue),
-                        subtitle: countBranches(tierAStores.length),
+                        stores: tierAStores,
+                        revenue: tierARevenue,
                         icon: Icons.star_rounded,
                         color: colorScheme.primary,
                       ),
-                      M3SummaryKpiCard(
-                        key: const ValueKey('kpi_card_Tier B'),
-                        valueKey: const ValueKey('kpi_value_Tier B'),
+                      _buildTierKpiCard(
+                        context,
+                        tierKey: 'Tier B',
                         title: 'Tier B (الفئة المتوسطة)',
-                        titleMaxLines: 3,
-                        subtitleMaxLines: 3,
-                        value: CurrencyFormatter.formatCompactEGP(tierBRevenue),
-                        subtitle: countBranches(tierBStores.length),
+                        stores: tierBStores,
+                        revenue: tierBRevenue,
                         icon: Icons.storefront_rounded,
                         color: colorScheme.secondary,
                       ),
-                      M3SummaryKpiCard(
-                        key: const ValueKey('kpi_card_Tier C'),
-                        valueKey: const ValueKey('kpi_value_Tier C'),
+                      _buildTierKpiCard(
+                        context,
+                        tierKey: 'Tier C',
                         title: 'Tier C (الفئة القياسية / الناشئة)',
-                        titleMaxLines: 3,
-                        subtitleMaxLines: 3,
-                        value: CurrencyFormatter.formatCompactEGP(tierCRevenue),
-                        subtitle: countBranches(tierCStores.length),
+                        stores: tierCStores,
+                        revenue: tierCRevenue,
                         icon: Icons.store_mall_directory_rounded,
                         color: colorScheme.tertiary,
                       ),
@@ -709,60 +705,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                   spacing: 8.0,
                                   runSpacing: 4.0,
                                   crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10.0,
-                                        vertical: 4.0,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: colorScheme.primaryContainer
-                                            .withOpacity(0.4),
-                                        borderRadius: M3Shape.radiusMd,
-                                        border: Border.all(
-                                          color: colorScheme.primary
-                                              .withOpacity(0.2),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.calendar_today_rounded,
-                                            size: 13.0,
-                                            color: colorScheme.primary,
-                                          ),
-                                          const SizedBox(width: 4.0),
-                                          Text(
-                                            _activePeriodLabel,
-                                            style: theme.textTheme.labelSmall
-                                                ?.copyWith(
-                                              color: colorScheme.primary,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10.0,
-                                        vertical: 4.0,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color:
-                                            colorScheme.surfaceContainerHighest,
-                                        borderRadius: M3Shape.radiusMd,
-                                      ),
-                                      child: Text(
-                                        'الترتيب حسب إجمالي المبيعات تنازلياً',
-                                        style: theme.textTheme.labelSmall
-                                            ?.copyWith(
-                                          color: colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                  children: _buildTableMetaChips(context),
                                 ),
                               ],
                             );
@@ -791,61 +734,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                               Wrap(
                                 spacing: 8.0,
                                 runSpacing: 4.0,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10.0,
-                                      vertical: 4.0,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.primaryContainer
-                                          .withOpacity(0.4),
-                                      borderRadius: M3Shape.radiusMd,
-                                      border: Border.all(
-                                        color: colorScheme.primary.withOpacity(
-                                          0.2,
-                                        ),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.calendar_today_rounded,
-                                          size: 13.0,
-                                          color: colorScheme.primary,
-                                        ),
-                                        const SizedBox(width: 4.0),
-                                        Text(
-                                          _activePeriodLabel,
-                                          style: theme.textTheme.labelSmall
-                                              ?.copyWith(
-                                            color: colorScheme.primary,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10.0,
-                                      vertical: 4.0,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          colorScheme.surfaceContainerHighest,
-                                      borderRadius: M3Shape.radiusMd,
-                                    ),
-                                    child: Text(
-                                      'الترتيب حسب إجمالي المبيعات تنازلياً',
-                                      style:
-                                          theme.textTheme.labelSmall?.copyWith(
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                children: _buildTableMetaChips(context),
                               ),
                             ],
                           );
@@ -1198,49 +1087,9 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                                           ),
                                                         ],
                                                       ),
-                                                      Container(
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                          horizontal: 8.0,
-                                                          vertical: 4.0,
-                                                        ),
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color: colorScheme
-                                                              .secondaryContainer
-                                                              .withOpacity(0.5),
-                                                          borderRadius:
-                                                              M3Shape.radiusSm,
-                                                        ),
-                                                        child: Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.min,
-                                                          children: [
-                                                            Icon(
-                                                              Icons
-                                                                  .trending_up_rounded,
-                                                              size: 14.0,
-                                                              color: colorScheme
-                                                                  .onSecondaryContainer,
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 4.0,
-                                                            ),
-                                                            Text(
-                                                              '${store.velocityUnitsPerDay.toStringAsFixed(1)} / يوم',
-                                                              style: TextStyle(
-                                                                fontSize: M3FontSize
-                                                                    .labelSmallPlus,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w700,
-                                                                color: colorScheme
-                                                                    .onSecondaryContainer,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
+                                                      _buildVelocityChip(
+                                                        context,
+                                                        store.velocityUnitsPerDay,
                                                       ),
                                                     ],
                                                   ),
@@ -1474,29 +1323,148 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
         ),
         DataCell(
           Center(
-            child: M3ChipSurface(
-              color: colorScheme.secondaryContainer.withOpacity(0.5),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.trending_up_rounded,
-                    size: 14.0,
-                    color: colorScheme.onSecondaryContainer,
-                  ),
-                  const SizedBox(width: 4.0),
-                  Text(
-                    '${store.velocityUnitsPerDay.toStringAsFixed(1)} / يوم',
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: colorScheme.onSecondaryContainer,
-                    ),
-                  ),
-                ],
+            child: _buildVelocityChip(context, store.velocityUnitsPerDay),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Tier KPI: skeleton while loading; «—» + Arabic note when the tier has
+  /// no stores (never fake `0 ج.م` / `0 فرع`).
+  Widget _buildTierKpiCard(
+    BuildContext context, {
+    required String tierKey,
+    required String title,
+    required List<StoreBenchmarkItem> stores,
+    required double revenue,
+    required IconData icon,
+    required Color color,
+  }) {
+    final empty = stores.isEmpty;
+    return M3SummaryKpiCard(
+      key: ValueKey('kpi_card_$tierKey'),
+      valueKey: ValueKey('kpi_value_$tierKey'),
+      subtitleKey: ValueKey('kpi_subtitle_$tierKey'),
+      loadingKey: ValueKey('kpi_loading_$tierKey'),
+      title: title,
+      titleMaxLines: 3,
+      subtitleMaxLines: 3,
+      value: empty ? '—' : CurrencyFormatter.formatCompactEGP(revenue),
+      textValue: empty,
+      subtitle: empty ? 'لا توجد فروع في هذه الفئة' : countBranches(stores.length),
+      icon: icon,
+      color: color,
+      isLoading: _isLoading,
+    );
+  }
+
+  /// Period + sort chips share M3ChipSurface geometry with Sell-Out / TM.
+  List<Widget> _buildTableMetaChips(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return [
+      M3ChipSurface(
+        key: const ValueKey('store_matrix_period_chip'),
+        color: colorScheme.primaryContainer.withOpacity(0.4),
+        borderColor: colorScheme.primary.withOpacity(0.2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.calendar_today_rounded,
+              size: 13.0,
+              color: colorScheme.primary,
+            ),
+            const SizedBox(width: 4.0),
+            Flexible(
+              child: Text(
+                _activePeriodLabel,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
+          ],
+        ),
+      ),
+      Column(
+        key: const ValueKey('store_matrix_sort_chip'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          M3ChipSurface(
+            color: colorScheme.surfaceContainerHighest,
+            child: Text(
+              'ترتيب',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2.0),
+          Text(
+            'حسب إجمالي المبيعات تنازلياً',
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  /// Short rate chip + «وحدة / يوم» description; «—» when velocity is absent.
+  Widget _buildVelocityChip(BuildContext context, double velocity) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final missing = velocity <= 0;
+    final chipColor = missing
+        ? colorScheme.surfaceContainerHighest
+        : colorScheme.secondaryContainer.withOpacity(0.5);
+    final fg = missing
+        ? colorScheme.onSurfaceVariant
+        : colorScheme.onSecondaryContainer;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        M3ChipSurface(
+          color: chipColor,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!missing) ...[
+                Icon(Icons.trending_up_rounded, size: 14.0, color: fg),
+                const SizedBox(width: 4.0),
+              ],
+              Text(
+                missing ? '—' : velocity.toStringAsFixed(1),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 2.0),
+        Text(
+          missing ? 'لا توجد بيانات سرعة' : 'وحدة / يوم',
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
       ],
