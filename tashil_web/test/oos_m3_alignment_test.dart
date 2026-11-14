@@ -7,9 +7,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
 import 'package:tashil_web/core/widgets/m3_equal_height_grid.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
+import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 import 'package:tashil_web/features/oos_monitor/presentation/screens/oos_dashboard_screen.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
 
@@ -327,6 +329,124 @@ void main() {
     for (final k in cardFinders) {
       expect(tester.getSize(find.byKey(ValueKey(k))).height, closeTo(138.0, 1.0),
           reason: k);
+    }
+  });
+
+  testWidgets(
+      'unavailable OOS/executive data: KPIs show «—» notes, not fake 96.8%/0',
+      (tester) async {
+    await pumpOos(
+      tester,
+      OOSDashboardScreen(apiClient: OosUnavailableApiClient()),
+      width: 1024,
+    );
+
+    expect(tester.widget<Text>(find.byKey(const ValueKey('kpi_value_OSA'))).data,
+        '—');
+    expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('kpi_subtitle_OSA')))
+            .data,
+        'لا توجد بيانات للتوافر');
+    expect(
+        tester
+            .widget<Text>(
+                find.byKey(const ValueKey('kpi_value_Daily Lost Revenue')))
+            .data,
+        '—');
+    expect(
+        tester
+            .widget<Text>(find.byKey(
+                const ValueKey('kpi_subtitle_Daily Lost Revenue')))
+            .data,
+        'لا توجد بيانات للفاقد');
+    expect(
+        tester
+            .widget<Text>(find.byKey(
+                const ValueKey('kpi_value_Monthly Projected Loss')))
+            .data,
+        '—');
+    expect(find.textContaining('96.8%'), findsNothing);
+    expect(find.textContaining('+0.0%'), findsNothing);
+    expect(find.textContaining('0.0%'), findsNothing);
+  });
+
+  testWidgets(
+      'empty successful monitor: real OSA, no invented +0.0%; short severity chips',
+      (tester) async {
+    await pumpOos(
+      tester,
+      OOSDashboardScreen(apiClient: OosEmptyApiClient()),
+      width: 1024,
+    );
+    expect(tester.widget<Text>(find.byKey(const ValueKey('kpi_value_OSA'))).data,
+        '100.0%');
+    expect(find.textContaining('+0.0%'), findsNothing);
+    expect(find.text('لا توجد نواقص مطابقة للفلاتر المحددة'), findsOneWidget);
+  });
+
+  testWidgets(
+      'alert severity uses short M3ChipSurface word + description under',
+      (tester) async {
+    await pumpOos(
+      tester,
+      OOSDashboardScreen(apiClient: OosShotApiClient()),
+      width: 1280,
+    );
+
+    expect(find.byType(M3ChipSurface), findsWidgets);
+    final criticalChip =
+        find.byKey(const ValueKey('oos_severity_oos_fix_001'));
+    final highChip = find.byKey(const ValueKey('oos_severity_oos_fix_002'));
+    expect(criticalChip, findsOneWidget);
+    expect(highChip, findsOneWidget);
+    expect(find.descendant(of: criticalChip, matching: find.text('حرج')),
+        findsOneWidget);
+    expect(find.descendant(of: highChip, matching: find.text('مرتفع')),
+        findsOneWidget);
+    expect(
+        find.descendant(
+            of: criticalChip,
+            matching: find.text('انعدام ممتد يؤثر على المبيعات اليومية')),
+        findsOneWidget);
+    expect(
+        find.descendant(
+            of: highChip,
+            matching: find.text('نواقص تحتاج إعادة توريد سريع')),
+        findsOneWidget);
+    // Full filter wording stays in the dropdown, not inside the status chip.
+    expect(find.descendant(of: criticalChip, matching: find.text('حرج جداً')),
+        findsNothing);
+    expect(
+        find.descendant(of: highChip, matching: find.text('أولوية مرتفعة')),
+        findsNothing);
+  });
+
+  testWidgets(
+      'branch matrix table is full-width with no horizontal scroll at 1024',
+      (tester) async {
+    await pumpOos(
+      tester,
+      OOSDashboardScreen(apiClient: OosShotApiClient()),
+      width: 1024,
+    );
+    await tester.tap(find.text('مصفوفة الفروع والنواقص'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TableScrollContainer), findsWidgets);
+    final scrollables = find.descendant(
+      of: find.byType(TableScrollContainer),
+      matching: find.byWidgetPredicate(
+          (w) => w is Scrollable && w.axisDirection != AxisDirection.down),
+    );
+    expect(scrollables, findsWidgets);
+    for (final s in scrollables.evaluate()) {
+      final extent =
+          tester.state<ScrollableState>(find.byElementPredicate((e) => e == s))
+              .position
+              .maxScrollExtent;
+      expect(extent, closeTo(0.0, 0.5),
+          reason: 'matrix must fit without horizontal scroll');
     }
   });
 }

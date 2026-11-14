@@ -159,6 +159,71 @@ class OosShotApiClient extends ApiClient {
   }
 }
 
+/// Both executive KPIs and the OOS monitor fail — UI must show «—», never
+/// invented OSA% / 0 ج.م placeholders.
+class OosUnavailableApiClient extends ApiClient {
+  OosUnavailableApiClient()
+      : super(tenantId: 'tenant-adeco', allowMockFallback: false);
+
+  @override
+  Future<ExecutiveKPIsModel> getExecutiveKPIs({
+    String period = 'MTD',
+    String? startDate,
+    String? endDate,
+    String? chain,
+  }) async {
+    throw Exception('executive KPIs unavailable');
+  }
+
+  @override
+  Future<OOSMonitorResponseModel> getOOSMonitorReport() async {
+    throw Exception('OOS monitor unavailable');
+  }
+}
+
+/// Successful empty monitor + executive KPIs with a real OSA — zeros are
+/// legitimate counts, not missing-data inventing.
+class OosEmptyApiClient extends ApiClient {
+  OosEmptyApiClient()
+      : super(tenantId: 'tenant-adeco', allowMockFallback: false);
+
+  @override
+  Future<ExecutiveKPIsModel> getExecutiveKPIs({
+    String period = 'MTD',
+    String? startDate,
+    String? endDate,
+    String? chain,
+  }) async {
+    return ExecutiveKPIsModel(
+      totalRevenue: 0,
+      revenueGrowthPct: 0,
+      totalUnitsSold: 0,
+      unitsGrowthPct: 0,
+      activeStoresCount: 0,
+      oosRatePct: 0,
+      osaRatePct: 100.0,
+      totalOOSIncidents: 0,
+      estimatedLostRevenue: 0,
+      currency: 'EGP',
+      reportingPeriod: '2026-10',
+      chainShares: const [],
+      dailyTrends: const [],
+    );
+  }
+
+  @override
+  Future<OOSMonitorResponseModel> getOOSMonitorReport() async {
+    return OOSMonitorResponseModel(
+      totalIncidents: 0,
+      totalLostDailyCost: 0,
+      alerts: const [],
+      brandSummaries: const [],
+      branchSummaries: const [],
+      aiAnalysis: null,
+    );
+  }
+}
+
 Future<void> pumpOos(
   WidgetTester tester,
   Widget page, {
