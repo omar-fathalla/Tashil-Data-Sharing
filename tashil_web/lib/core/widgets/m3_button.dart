@@ -198,6 +198,8 @@ class M3ActionButtonGroup extends StatelessWidget {
 /// M3PageHeader: unified Tashil Portal page header.
 /// - [title]: Arabic page title (`headlineSmall`, onSurface).
 /// - [subtitle]: optional secondary line (`bodyMedium`, onSurfaceVariant).
+/// - [description]: optional third line under [subtitle] (same bodyMedium),
+///   for long copy demoted from a wrapping headline.
 /// - [actions]: trailing controls; below [stackActionsBelow] they drop under
 ///   the title as their own row, otherwise they sit at the end of the title row.
 ///
@@ -206,6 +208,7 @@ class M3ActionButtonGroup extends StatelessWidget {
 class M3PageHeader extends StatelessWidget {
   final String title;
   final String? subtitle;
+  final String? description;
   final Widget? actions;
   final Widget? leading;
   final double stackActionsBelow;
@@ -216,6 +219,7 @@ class M3PageHeader extends StatelessWidget {
     String? subtitle,
     String? subtitleAr,
     String? titleEn,
+    this.description,
     this.actions,
     this.leading,
     this.stackActionsBelow = 600.0,
@@ -245,7 +249,7 @@ class M3PageHeader extends StatelessWidget {
             style: theme.textTheme.headlineSmall
                 ?.copyWith(color: colorScheme.onSurface),
             softWrap: true,
-            maxLines: 3,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -260,6 +264,17 @@ class M3PageHeader extends StatelessWidget {
           const SizedBox(height: M3Spacing.xxs),
           Text(
             subtitle!,
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: colorScheme.onSurfaceVariant),
+            softWrap: true,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+        if (description != null && description!.isNotEmpty) ...[
+          const SizedBox(height: M3Spacing.xxs),
+          Text(
+            description!,
             style: theme.textTheme.bodyMedium
                 ?.copyWith(color: colorScheme.onSurfaceVariant),
             softWrap: true,

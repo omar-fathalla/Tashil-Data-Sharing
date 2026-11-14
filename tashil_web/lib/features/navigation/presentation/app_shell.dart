@@ -450,12 +450,30 @@ class _AppShellState extends State<AppShell> {
 
     // 1. Desktop Experience (Expanded, Large, Extra Large >= 840dp)
     if (layout.isDesktop) {
+      // Physical LTR row: content | sidebar. Shell chrome stays RTL visually
+      // (sidebar on the right) while the sidebar is last in the Row so it
+      // wins hit-tests if page overflow ever escapes ClipRect. Fade-through
+      // outgoing pages are IgnorePointer; content is ClipRect-clipped.
       return Scaffold(
         body: Directionality(
           textDirection: shellDirection,
           child: Row(
+            textDirection: TextDirection.ltr,
             children: [
-              // Sidebar sits on the start side (right in RTL).
+              Expanded(
+                child: Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: ColoredBox(
+                    color: colorScheme.surface,
+                    child: ClipRect(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: currentScreen,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               DesktopSidebar(
                 selectedIndex: _navHighlightIndex ?? -1,
                 onDestinationSelected: (index) => _selectPage(index),
@@ -466,23 +484,6 @@ class _AppShellState extends State<AppShell> {
                 onNavigateToAdmin: widget.onNavigateToAdmin,
                 isSuperAdmin: widget.apiClient.currentUser?.isSuperAdmin == true,
               ),
-              // Main Content Area with Background (RTL preserved for Arabic dashboard and metrics)
-              // Clip so page overflow (e.g. Product Master tabs) cannot
-              // paint/hit-test over the sidebar and swallow nav taps.
-              Expanded(
-                child: Directionality(
-                  textDirection: TextDirection.rtl,
-                  child: ColoredBox(
-                    color: colorScheme.surface,
-                    child: ClipRect(
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: currentScreen,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -491,109 +492,107 @@ class _AppShellState extends State<AppShell> {
 
     // 2. Medium Tablet Experience (600 - 839dp) - Slim Navigation Rail
     if (layout.isMedium) {
+      final rail = NavigationRail(
+        selectedIndex: _navHighlightIndex,
+        onDestinationSelected: (index) => _selectPage(index),
+        labelType: NavigationRailLabelType.all,
+        backgroundColor: colorScheme.surfaceContainer,
+        leading: Padding(
+          padding: const EdgeInsets.only(top: 8.0, bottom: 12.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const DataSharingLogo(size: 38.0, showShadow: false),
+              const SizedBox(height: 6.0),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 2.0,
+                ),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: M3Shape.radiusFull,
+                ),
+                child: Text(
+                  widget.activeTenant.toUpperCase(),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: M3FontSize.microPlus,
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        trailing: Expanded(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.onNavigateToAdmin != null &&
+                      widget.apiClient.currentUser?.isSuperAdmin == true)
+                    IconButton(
+                      icon: const Icon(Icons.admin_panel_settings_rounded),
+                      tooltip: 'Super Admin Portal',
+                      onPressed: widget.onNavigateToAdmin,
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.manage_accounts_rounded),
+                    tooltip: 'Profile & Account',
+                    onPressed: _openUserProfile,
+                  ),
+                  if (widget.onLogout != null)
+                    TestSemantics(
+                      identifier: TestIds.logout,
+                      label: 'Log Out',
+                      button: true,
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.logout_rounded,
+                          color: colorScheme.error,
+                        ),
+                        tooltip: 'Log Out',
+                        onPressed: widget.onLogout,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Exactly one Semantics identifier per nav destination (on
+        // `label` only — never also on icon/selectedIcon). Label stays
+        // mounted for both selected and unselected states.
+        destinations: _destinations
+            .map(
+              (d) {
+                final navId = TestIds.navIdForIndex(d.index);
+                final Widget label = navId == null
+                    ? Text(d.shortLabel)
+                    : TestSemantics.navTarget(
+                        identifier: navId,
+                        label: d.shortLabel,
+                        child: Text(d.shortLabel),
+                      );
+                return NavigationRailDestination(
+                  icon: Icon(d.icon),
+                  selectedIcon: Icon(d.selectedIcon),
+                  label: label,
+                );
+              },
+            )
+            .toList(),
+      );
       return Scaffold(
         body: Directionality(
           textDirection: shellDirection,
           child: Row(
+            textDirection: TextDirection.ltr,
             children: [
-              // Sidebar sits on the start side (right in RTL).
-              NavigationRail(
-                selectedIndex: _navHighlightIndex,
-                onDestinationSelected: (index) => _selectPage(index),
-                labelType: NavigationRailLabelType.all,
-                backgroundColor: colorScheme.surfaceContainer,
-                leading: Padding(
-                  padding: const EdgeInsets.only(top: 8.0, bottom: 12.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const DataSharingLogo(size: 38.0, showShadow: false),
-                      const SizedBox(height: 6.0),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8.0,
-                          vertical: 2.0,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          borderRadius: M3Shape.radiusFull,
-                        ),
-                        child: Text(
-                          widget.activeTenant.toUpperCase(),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            fontSize: M3FontSize.microPlus,
-                            fontWeight: FontWeight.w800,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                trailing: Expanded(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (widget.onNavigateToAdmin != null &&
-                              widget.apiClient.currentUser?.isSuperAdmin == true)
-                            IconButton(
-                              icon: const Icon(Icons.admin_panel_settings_rounded),
-                              tooltip: 'Super Admin Portal',
-                              onPressed: widget.onNavigateToAdmin,
-                            ),
-                          IconButton(
-                            icon: const Icon(Icons.manage_accounts_rounded),
-                            tooltip: 'Profile & Account',
-                            onPressed: _openUserProfile,
-                          ),
-                          if (widget.onLogout != null)
-                            TestSemantics(
-                              identifier: TestIds.logout,
-                              label: 'Log Out',
-                              button: true,
-                              child: IconButton(
-                                icon: Icon(
-                                  Icons.logout_rounded,
-                                  color: colorScheme.error,
-                                ),
-                                tooltip: 'Log Out',
-                                onPressed: widget.onLogout,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                // Exactly one Semantics identifier per nav destination (on
-                // `label` only — never also on icon/selectedIcon). Label stays
-                // mounted for both selected and unselected states.
-                destinations: _destinations
-                    .map(
-                      (d) {
-                        final navId = TestIds.navIdForIndex(d.index);
-                        final Widget label = navId == null
-                            ? Text(d.shortLabel)
-                            : TestSemantics.navTarget(
-                                identifier: navId,
-                                label: d.shortLabel,
-                                child: Text(d.shortLabel),
-                              );
-                        return NavigationRailDestination(
-                          icon: Icon(d.icon),
-                          selectedIcon: Icon(d.selectedIcon),
-                          label: label,
-                        );
-                      },
-                    )
-                    .toList(),
-              ),
-              const VerticalDivider(thickness: 1, width: 1),
-              // Main Content Area with Background (RTL preserved for Arabic dashboard and metrics)
               Expanded(
                 child: Directionality(
                   textDirection: TextDirection.rtl,
@@ -608,6 +607,8 @@ class _AppShellState extends State<AppShell> {
                   ),
                 ),
               ),
+              const VerticalDivider(thickness: 1, width: 1),
+              rail,
             ],
           ),
         ),

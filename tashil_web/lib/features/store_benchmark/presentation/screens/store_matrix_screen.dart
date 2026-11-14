@@ -275,8 +275,9 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
             children: [
               // Header Section (Unified M3 Left English Title + Right Arabic Subtitle)
               M3PageHeader(
-                titleEn: 'Store Matrix Benchmarking',
-                subtitleAr:
+                title: 'مصفوفة الفروع',
+                subtitle: 'Store Matrix Benchmarking',
+                description:
                     'مقارنة الأداء المعياري وتصنيف الفروع إلى فئات (Tier A / B / C) ومعدلات سرعة البيع اليومية',
                 actions: M3Button.tonal(
                   label: 'تحديث',

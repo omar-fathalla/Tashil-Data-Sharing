@@ -16,19 +16,40 @@ abstract final class M3KpiGridColumns {
       ? 4
       : (width >= twoColMinWidth ? 2 : 1);
 
+  /// Minimum card width when [forWidthAndCount] may step above [forWidth]
+  /// to hit an exact divisor (e.g. 6 cards → 3+3 at ~880, not 2-col only).
+  static const double minEvenCardWidth = 200.0;
+
   /// Column count that keeps card width in the Sell-Out family while
   /// maximizing how full the last row is (same card size, evenly filled).
   ///
   /// Examples at ≥960: 4 cards → 4; 3 cards → 3; 5 cards → 3 (3+2, not 4+1).
+  /// At ~880: 6 cards → 3 (3+3); exact divisors preferred when cards stay
+  /// ≥ [minEvenCardWidth].
   static int forWidthAndCount(double width, int childCount) {
     final maxCols = forWidth(width);
     if (childCount <= 1) return 1;
     if (childCount <= maxCols) return childCount;
-    for (var c = maxCols; c >= 2; c--) {
+
+    // May rise above [forWidth] when an exact divisor keeps cards wide enough
+    // (6 @ ~880 → 3), but never past Sell-Out's 4-col cap, and never when
+    // [forWidth] already says single-column (< twoColMinWidth).
+    final byMinWidth = width >= minEvenCardWidth
+        ? (width / minEvenCardWidth).floor()
+        : 1;
+    final allowed = maxCols < 2
+        ? maxCols
+        : math.min(
+            childCount,
+            math.min(4, math.max(maxCols, byMinWidth)),
+          );
+
+    for (var c = allowed; c >= 2; c--) {
       if (childCount % c == 0) return c;
     }
     var best = maxCols;
     var bestLast = childCount % maxCols;
+    if (maxCols < 2) return 1;
     for (var c = maxCols - 1; c >= 2; c--) {
       final last = childCount % c;
       if (last > bestLast) {

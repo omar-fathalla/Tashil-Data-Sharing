@@ -253,8 +253,10 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
           children: [
             // Page Header (MD3 Standard)
             M3PageHeader(
-              titleEn: 'Out-of-Stock Alarm Monitor',
-              subtitleAr: 'نظام المراقبة الاستباقية للنواقص ومحرك الذكاء الاصطناعي (Gemini Root-Cause AI)',
+              title: 'مراقب النواقص',
+              subtitle: 'Out-of-Stock Alarm Monitor',
+              description:
+                  'نظام المراقبة الاستباقية للنواقص ومحرك الذكاء الاصطناعي (Gemini Root-Cause AI)',
               actions: M3ButtonGroup(
                 items: [
                   M3GroupItem(

@@ -806,9 +806,11 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
 
   Widget _buildHeader() {
     return M3PageHeader(
-      titleEn: 'CPFR & Inventory Replenishment',
-      subtitleAr:
-          rtlEnd('منظومة التخطيط المشترك ومطابقة التوريد (${ltrIsolate('Sell-\u2060In')}) مع مبيعات الكاشير (${ltrIsolate('Sell-\u2060Out')}) وحساب دوران المخزون وأوامر التوريد لجميع السلاسل'),
+      title: 'التخطيط المشترك وأوامر التوريد',
+      subtitle: 'CPFR & Inventory Replenishment',
+      description: rtlEnd(
+        'منظومة التخطيط المشترك ومطابقة التوريد (${ltrIsolate('Sell-\u2060In')}) مع مبيعات الكاشير (${ltrIsolate('Sell-\u2060Out')}) وحساب دوران المخزون وأوامر التوريد لجميع السلاسل',
+      ),
       actions: M3ButtonGroup(
         maxVisibleCompact: 2,
         items: [
@@ -1308,7 +1310,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Spotlight KPI Cards for Multi-Chain / Selected Chain Reconciliation
+        // Six spotlight KPIs in one even-fill grid (3+3 at ≥~600, not 4+2).
         _buildResponsiveCardGrid([
           M3SummaryKpiCard(
             key: const ValueKey('kpi_card_Sell-In'),
@@ -1350,11 +1352,6 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
             icon: Icons.warehouse_rounded,
             color: colorScheme.tertiary,
           ),
-        ]),
-        const SizedBox(height: M3Spacing.sm),
-
-        // Sell-In symmetry: chain margin + YoY — «—» when cost / last-year missing.
-        _buildResponsiveCardGrid([
           M3SummaryKpiCard(
             key: const ValueKey('kpi_card_Chain Margin'),
             valueKey: const ValueKey('kpi_value_Chain Margin'),

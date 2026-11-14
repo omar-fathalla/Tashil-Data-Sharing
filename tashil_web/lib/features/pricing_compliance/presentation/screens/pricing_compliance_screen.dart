@@ -284,8 +284,9 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
             children: [
               // Unified M3 Page Header (English Left, Arabic Right)
               M3PageHeader(
-                titleEn: 'Pricing & Promos',
-                subtitleAr:
+                title: 'الأسعار والعروض',
+                subtitle: 'Pricing & Promos',
+                description:
                     'كشف الفروق السعرية عن السعر الاسترشادي (RRP) وكارتة أسعار المصنع وتتبع الأثر البيعي للعروض',
                 actions: M3ActionButtonGroup(
                   actions: [
