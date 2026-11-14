@@ -348,6 +348,14 @@ class TenantUserModel {
   // Mirrors chainWriteRoles in backend-go (legacy 'admin' dropped).
   bool get canManageChains => isSuperAdmin || role == 'vendor_admin';
 
+  /// Approve / reject / merge Sell-In customers. Mirrors dataQualityWriteRoles.
+  bool get canWriteCustomerRegistry =>
+      isSuperAdmin ||
+      role == 'vendor_admin' ||
+      role == 'admin' ||
+      role == 'national_sales_manager' ||
+      role == 'executive';
+
   TenantUserModel copyWith({
     String? userId,
     String? tenantId,

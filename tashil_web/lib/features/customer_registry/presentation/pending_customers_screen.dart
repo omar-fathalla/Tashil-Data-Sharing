@@ -128,6 +128,158 @@ class _PendingCustomersScreenState extends State<PendingCustomersScreen> {
     if (ok == true) await _decide('approve', e, chain: chainCtl.text.trim());
   }
 
+  bool get _canWrite =>
+      widget.apiClient == null ||
+      (widget.apiClient!.currentUser?.canWriteCustomerRegistry ?? false);
+
+  bool _sameChain(RegistryEntry a, RegistryEntry b) {
+    final ca = a.displayChain.trim();
+    final cb = b.displayChain.trim();
+    return ca == cb;
+  }
+
+  String _countLabel(RegistryEntry e) {
+    final rows = e.displayRows;
+    final value = CurrencyFormatter.formatCompactEGP(e.displayValue);
+    if (rows <= 0) return 'مفيش صفوف محسوبة';
+    return '$rows صف، $value';
+  }
+
+  Future<List<RegistryEntry>> _mergeTargets(RegistryEntry source) async {
+    final approved = await _ds.list(status: 'approved', includeSeed: true);
+    final pending = await _ds.list(status: 'pending');
+    final seen = <String>{};
+    final out = <RegistryEntry>[];
+    for (final e in [...approved, ...pending]) {
+      if (e.name == source.name) continue;
+      if (e.status == 'rejected') continue;
+      if (!_sameChain(source, e)) continue;
+      if (!seen.add(e.name)) continue;
+      out.add(e);
+    }
+    out.sort((a, b) => a.name.compareTo(b.name));
+    return out;
+  }
+
+  Future<void> _merge(RegistryEntry source) async {
+    setState(() => _busyName = source.name);
+    List<RegistryEntry> targets;
+    try {
+      targets = await _mergeTargets(source);
+    } catch (err) {
+      if (mounted) M3Feedback.showError(context, '$err');
+      if (mounted) setState(() => _busyName = null);
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _busyName = null);
+
+    final query = ValueNotifier('');
+    final picked = await showDialog<RegistryEntry>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        key: const Key('merge_picker_dialog'),
+        icon: const Icon(AppIcons.merge),
+        title: const Text('اختار العميل اللي هنضمّ عليه'),
+        content: SizedBox(
+          width: 460,
+          height: 420,
+          child: AnimatedBuilder(
+            animation: query,
+            builder: (context, _) {
+              final q = query.value.trim();
+              final filtered = [
+                for (final t in targets)
+                  if (q.isEmpty || t.name.contains(q)) t,
+              ];
+              final Widget listChild;
+              if (targets.isEmpty) {
+                listChild = const Padding(
+                  padding: EdgeInsets.symmetric(vertical: M3Spacing.md),
+                  child: Text('مفيش عميل تاني في نفس السلسلة نقدر نضمّ عليه'),
+                );
+              } else if (filtered.isEmpty) {
+                listChild = const Padding(
+                  padding: EdgeInsets.symmetric(vertical: M3Spacing.md),
+                  child: Text('مفيش نتيجة للبحث ده'),
+                );
+              } else {
+                listChild = ListView.builder(
+                  itemCount: filtered.length,
+                  itemBuilder: (context, i) {
+                    final t = filtered[i];
+                    return ListTile(
+                      key: Key('merge_pick_${t.name}'),
+                      title: Text(t.name),
+                      subtitle: Text(_countLabel(t)),
+                      onTap: () => Navigator.of(ctx).pop(t),
+                    );
+                  },
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    key: const Key('merge_picker_search'),
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'دور باسم العميل',
+                      hintText: 'دور باسم العميل',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                    onChanged: (v) => query.value = v,
+                  ),
+                  const SizedBox(height: M3Spacing.sm),
+                  Expanded(child: listChild),
+                ],
+              );
+            },
+          ),
+        ),
+        actions: [
+          OutlinedButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('إلغاء')),
+        ],
+      ),
+    );
+    query.dispose();
+    if (picked == null || !mounted) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        key: const Key('merge_confirm_dialog'),
+        icon: const Icon(AppIcons.merge),
+        title: const Text('تأكيد دمج العملاء'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Text(
+            '"${source.name}" (${_countLabel(source)}) هيتسجل كاسم تاني لـ '
+            '"${picked.name}" (${_countLabel(picked)}). '
+            'الصفوف هتتضم لنفس العميل من غير ما الإجمالي يتغير، وممكن ترجع عن القرار بعدين.',
+          ),
+        ),
+        actions: [
+          OutlinedButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('إلغاء')),
+          FilledButton(
+            key: const Key('merge_confirm'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('تأكيد الدمج'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await _decide(
+        'approve',
+        source,
+        chain: source.displayChain,
+        aliasOf: picked.name,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -188,37 +340,49 @@ class _PendingCustomersScreenState extends State<PendingCustomersScreen> {
               Expanded(child: Text(e.name, style: theme.textTheme.titleMedium)),
               Chip(label: Text(_statusLabels[e.status] ?? e.status)),
             ]),
-            if (e.rows > 0)
-              Text('${e.rows} صف • ${CurrencyFormatter.formatCompactEGP(e.value)} برّه الإجماليات'
-                  '${e.months.isEmpty ? '' : ' • ${e.months.join('، ')}'}'),
-            if (e.chain.isNotEmpty) Text('السلسلة: ${e.chain}'),
+            if (e.displayRows > 0)
+              Text(
+                e.status == 'approved'
+                    ? '${e.displayRows} صف • ${CurrencyFormatter.formatCompactEGP(e.displayValue)}'
+                    : '${e.displayRows} صف • ${CurrencyFormatter.formatCompactEGP(e.displayValue)} برّه الإجماليات'
+                        '${e.months.isEmpty ? '' : ' • ${e.months.join('، ')}'}',
+              ),
+            if (e.displayChain.isNotEmpty) Text('السلسلة: ${e.displayChain}'),
             if (e.aliasOf.isNotEmpty) Text('متسجل كاسم تاني لـ: ${e.aliasOf}'),
             if (e.suggestedName.isNotEmpty)
               Text('اسم قريب (اقتراح بس): ${e.suggestedName}', style: theme.textTheme.bodySmall),
             const SizedBox(height: M3Spacing.xs),
-            Wrap(spacing: M3Spacing.xs, runSpacing: M3Spacing.xs, children: [
-              if (e.status != 'approved')
-                FilledButton.icon(
-                  key: Key('approve_${e.name}'),
-                  onPressed: busy ? null : () => _approve(e),
-                  icon: const Icon(AppIcons.check),
-                  label: const Text('تأكيد'),
-                ),
-              if (e.status != 'rejected')
-                OutlinedButton.icon(
-                  key: Key('reject_${e.name}'),
-                  onPressed: busy ? null : () => _decide('reject', e),
-                  icon: const Icon(AppIcons.block),
-                  label: const Text('رفض'),
-                ),
-              if (e.status != 'pending')
-                OutlinedButton.icon(
-                  key: Key('unmerge_${e.name}'),
-                  onPressed: busy ? null : () => _decide('unmerge', e),
-                  icon: const Icon(AppIcons.undo),
-                  label: const Text('رجوع عن القرار'),
-                ),
-            ]),
+            if (_canWrite)
+              Wrap(spacing: M3Spacing.xs, runSpacing: M3Spacing.xs, children: [
+                if (e.status != 'approved')
+                  FilledButton.icon(
+                    key: Key('approve_${e.name}'),
+                    onPressed: busy ? null : () => _approve(e),
+                    icon: const Icon(AppIcons.check),
+                    label: const Text('تأكيد'),
+                  ),
+                if (e.status == 'pending' || e.status == 'approved')
+                  OutlinedButton.icon(
+                    key: Key('merge_${e.name}'),
+                    onPressed: busy ? null : () => _merge(e),
+                    icon: const Icon(AppIcons.merge),
+                    label: const Text('دمج مع عميل آخر'),
+                  ),
+                if (e.status != 'rejected')
+                  OutlinedButton.icon(
+                    key: Key('reject_${e.name}'),
+                    onPressed: busy ? null : () => _decide('reject', e),
+                    icon: const Icon(AppIcons.block),
+                    label: const Text('رفض'),
+                  ),
+                if (e.status != 'pending')
+                  OutlinedButton.icon(
+                    key: Key('unmerge_${e.name}'),
+                    onPressed: busy ? null : () => _decide('unmerge', e),
+                    icon: const Icon(AppIcons.undo),
+                    label: const Text('رجوع عن القرار'),
+                  ),
+              ]),
           ],
         ),
       ),

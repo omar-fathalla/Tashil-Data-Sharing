@@ -104,6 +104,7 @@ class AppIcons {
   static const IconData tableChart = Icons.table_chart_rounded;
   static const IconData productMatchReview = Icons.qr_code_scanner_rounded;
   static const IconData undo = Icons.undo_rounded;
+  static const IconData merge = Icons.merge_rounded;
   static const IconData block = Icons.block_rounded;
   static const IconData collapseAll = Icons.unfold_less_rounded;
   static const IconData expandAll = Icons.unfold_more_rounded;
