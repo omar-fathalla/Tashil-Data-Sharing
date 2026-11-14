@@ -77,6 +77,13 @@ const compareLongOwnName =
 const compareLongCompetitorName =
     'منظف أرضيات منافس تجريبي برائحة الليمون الأخضر المنعش عبوة عائلية 3 كجم';
 
+String _pricePosition(double price, {double own = 160}) {
+  final pct = own > 0 ? (price - own) / own * 100 : 0.0;
+  if (pct > 1.5) return 'higher';
+  if (pct < -1.5) return 'lower';
+  return 'equal';
+}
+
 CompetitorSkuComparisonModel _competitor(int i, String name, double price) =>
     CompetitorSkuComparisonModel(
       skuName: name,
@@ -91,7 +98,7 @@ CompetitorSkuComparisonModel _competitor(int i, String name, double price) =>
       pricePerUnitVolume: price / 3,
       priceDiffEgp: price - 160,
       priceDiffPct: (price - 160) / 160 * 100,
-      pricePosition: price < 160 ? 'cheaper' : 'more_expensive',
+      pricePosition: _pricePosition(price),
       unitsSold: 200 + i,
       netRevenue: price * (200 + i),
       categorySharePct: 10.0 + i,
@@ -100,8 +107,14 @@ CompetitorSkuComparisonModel _competitor(int i, String name, double price) =>
     );
 
 List<OwnSkuCompetitiveGroupModel> compareFixtureGroups() {
-  OwnSkuCompetitiveGroupModel g(int i, String name, List<CompetitorSkuComparisonModel> comps) {
-    final monthly = compareFixtureSeries(150.0 + i);
+  OwnSkuCompetitiveGroupModel g(
+    int i,
+    String name,
+    List<CompetitorSkuComparisonModel> comps, {
+    List<SkuMonthlyPricePointModel>? monthlyPrices,
+  }) {
+    final monthly = monthlyPrices ?? compareFixtureSeries(150.0 + i);
+    final hasComps = comps.isNotEmpty;
     return OwnSkuCompetitiveGroupModel(
       ownBarcode: '62200000000$i',
       ownSkuName: name,
@@ -116,10 +129,10 @@ List<OwnSkuCompetitiveGroupModel> compareFixtureGroups() {
       ownUnitsSold: 300 + i,
       ownNetRevenue: 48000,
       ownCategorySharePct: 30,
-      avgCompetitorPrice: 150,
-      minCompetitorPrice: 140,
-      maxCompetitorPrice: 170,
-      priceIndex: 106.7,
+      avgCompetitorPrice: hasComps ? 150 : 0,
+      minCompetitorPrice: hasComps ? 140 : 0,
+      maxCompetitorPrice: hasComps ? 170 : 0,
+      priceIndex: hasComps ? 106.7 : 100.0,
       ownChainPrices: const {'fathalla': 160},
       competitors: comps,
       monthlyPrices: monthly,
@@ -138,6 +151,35 @@ List<OwnSkuCompetitiveGroupModel> compareFixtureGroups() {
     g(2, 'مبيض ملابس تجريبي شديد الفعالية للألوان البيضاء عبوة عائلية', const []),
   ];
 }
+
+/// Own SKU with no competitors and a single month of prices (period change N/A).
+List<OwnSkuCompetitiveGroupModel> compareUnmappedShortSeriesGroups() => [
+      OwnSkuCompetitiveGroupModel(
+        ownBarcode: '62200000999',
+        ownSkuName: 'صنف بلا منافسين',
+        ownBrand: 'علامة تجريبية',
+        category: 'منظفات أرضيات',
+        packSizeLabel: '3 كجم',
+        packVolumeUnits: 3,
+        volumeUnitLabel: 'كجم',
+        ownUnitPrice: 160,
+        ownRecommendedPrice: 160,
+        ownPricePerUnitVolume: 53.3,
+        ownUnitsSold: 100,
+        ownNetRevenue: 16000,
+        ownCategorySharePct: 10,
+        avgCompetitorPrice: 0,
+        minCompetitorPrice: 0,
+        maxCompetitorPrice: 0,
+        priceIndex: 100.0,
+        ownChainPrices: const {'fathalla': 160},
+        competitors: const [],
+        monthlyPrices: compareFixtureSeries(160, throughMonth: 1),
+        allMonthlyPrices: compareFixtureSeries(160, throughMonth: 1),
+        selectedYear: 2026,
+        selectedMonth: 0,
+      ),
+    ];
 
 OwnSkuCompetitiveGroupModel _scaleGroup(int i,
         {required List<SkuMonthlyPricePointModel> monthly,
@@ -237,7 +279,7 @@ List<OwnSkuCompetitiveGroupModel> compareGappyCompetitorGroups() {
             pricePerUnitVolume: comp.pricePerUnitVolume,
             priceDiffEgp: comp.priceDiffEgp,
             priceDiffPct: comp.priceDiffPct,
-            pricePosition: 'more_expensive',
+            pricePosition: 'higher',
             unitsSold: comp.unitsSold,
             netRevenue: comp.netRevenue,
             categorySharePct: comp.categorySharePct,

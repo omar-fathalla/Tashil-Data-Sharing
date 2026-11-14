@@ -136,12 +136,15 @@ void main() {
       gate.complete();
       await tester.pumpAndSettle();
 
-      // After an empty competitive-monthly response, real zeros are allowed.
+      // After an empty competitive-monthly response, real zeros are allowed
+      // for counts — but the competitive index must be «—», never fake 100%.
       expect(find.byKey(const ValueKey('compare_kpi_skeleton')), findsNothing);
       // KPI value «0 أصناف» (+ detail «… في 0 أصناف»).
       expect(find.text('0 أصناف'), findsOneWidget);
       expect(find.textContaining('0 من 0'), findsOneWidget);
-      expect(find.textContaining('100.0%'), findsOneWidget);
+      expect(find.textContaining('100.0%'), findsNothing);
+      expect(find.text('—'), findsWidgets);
+      expect(find.text('لا توجد أصناف'), findsOneWidget);
     },
   );
 

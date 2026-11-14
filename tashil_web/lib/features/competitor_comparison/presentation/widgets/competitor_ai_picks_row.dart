@@ -4,6 +4,7 @@ import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_shape.dart';
 import 'package:tashil_web/core/theme/m3_spacing.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
+import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 
 /// Compact AI top-3 competitor cards shown under spotlight KPI metrics.
 /// Clicking a card selects it for head-to-head compare (no approve required).
@@ -151,21 +152,14 @@ class _AiPickCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.12),
-                      borderRadius: M3Shape.radiusSm,
-                    ),
+                  M3ChipSurface(
+                    color: accent.withValues(alpha: 0.12),
                     child: Text(
                       'اختيار AI',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: accent,
                         fontWeight: FontWeight.w800,
-                        fontSize: M3FontSize.tiny,
+                        fontSize: M3FontSize.labelSmallPlus,
                       ),
                     ),
                   ),

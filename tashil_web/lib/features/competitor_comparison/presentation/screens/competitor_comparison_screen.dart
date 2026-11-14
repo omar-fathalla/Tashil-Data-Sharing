@@ -23,6 +23,8 @@ import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
+import '../../../../core/widgets/m3_dropdown.dart';
+import '../../../../core/widgets/m3_responsive_tab_bar.dart';
 import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
@@ -637,23 +639,30 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     int priceDecreasedSkusCount = 0;
     double sumPriceIndex = 0.0;
 
+    var mappedWithCompPrice = 0;
     for (final g in _allGroups) {
       totalCompetitorSkus += g.competitors.length;
-      sumPriceIndex += g.priceIndex;
-      if (g.ownUnitPrice < g.avgCompetitorPrice) {
+      if (g.competitors.isNotEmpty && g.avgCompetitorPrice > 0) {
+        sumPriceIndex += g.priceIndex;
+        mappedWithCompPrice++;
+      }
+      if (g.avgCompetitorPrice > 0 && g.ownUnitPrice < g.avgCompetitorPrice) {
         advantageSkusCount++;
       }
       if (g.lowerPricedCompetitorsCount > 0) {
         undercutRiskSkusCount++;
       }
-      if (g.periodPriceChangePct > 0.5) {
-        priceIncreasedSkusCount++;
-      } else if (g.periodPriceChangePct < -0.5) {
-        priceDecreasedSkusCount++;
+      if (g.monthlyPrices.length >= 2) {
+        if (g.periodPriceChangePct > 0.5) {
+          priceIncreasedSkusCount++;
+        } else if (g.periodPriceChangePct < -0.5) {
+          priceDecreasedSkusCount++;
+        }
       }
     }
-    final avgPriceIndex =
-        totalOwnSkus > 0 ? sumPriceIndex / totalOwnSkus : 100.0;
+    // Never invent 100.0% when there are no competitor prices to index.
+    final double? avgPriceIndex =
+        mappedWithCompPrice > 0 ? sumPriceIndex / mappedWithCompPrice : null;
 
     final selectedGroup = _selectedGroup;
 
@@ -704,21 +713,26 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
 
             M3Spacing.gapMD,
 
-            SegmentedButton<int>(
-              segments: const [
-                ButtonSegment<int>(
+            M3ResponsiveTabBar<int>(
+              key: const ValueKey('compare_main_tabs'),
+              textDirection: TextDirection.rtl,
+              selectedValue: _mainTab,
+              items: const [
+                M3ResponsiveTabItem<int>(
                   value: 0,
-                  label: Text('مقارنة الأسعار'),
-                  icon: Icon(Icons.compare_arrows_rounded, size: 18),
+                  icon: Icons.compare_arrows_rounded,
+                  selectedIcon: Icons.compare_arrows_rounded,
+                  label: 'مقارنة الأسعار',
                 ),
-                ButtonSegment<int>(
+                M3ResponsiveTabItem<int>(
                   value: 1,
-                  label: Text('اقتراحات المنافسين (بانتظار الموافقة)'),
-                  icon: Icon(Icons.rate_review_rounded, size: 18),
+                  icon: Icons.rate_review_rounded,
+                  selectedIcon: Icons.rate_review_rounded,
+                  label: 'اقتراحات المنافسين',
+                  subtitle: 'بانتظار الموافقة',
                 ),
               ],
-              selected: {_mainTab},
-              onSelectionChanged: (s) => setState(() => _mainTab = s.first),
+              onChanged: (next) => setState(() => _mainTab = next),
             ),
 
             M3Spacing.gapMD,
@@ -772,9 +786,14 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                   _buildKpiCard(
                     context: context,
                     title: 'مؤشر السعر التنافسي',
-                    value: '${avgPriceIndex.toStringAsFixed(1)}%',
-                    subtitle:
-                        'تهديد سعري مباشر في ${countSku(undercutRiskSkusCount)}',
+                    value: avgPriceIndex == null
+                        ? '—'
+                        : '${avgPriceIndex.toStringAsFixed(1)}%',
+                    subtitle: avgPriceIndex == null
+                        ? (totalOwnSkus == 0
+                            ? 'لا توجد أصناف'
+                            : 'لا توجد أسعار منافسين للمقارنة')
+                        : 'تهديد سعري مباشر في ${countSku(undercutRiskSkusCount)}',
                     icon: Icons.speed_rounded,
                     color: colorScheme.secondary,
                     isLoading: _isLoading,
@@ -934,8 +953,17 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final categories = _availableCategories;
+    final yearOptions = _yearOptions;
+    final monthOptions = _monthOptions;
+    final selectedYear = yearOptions.any((y) => y.year == _selectedYear)
+        ? _selectedYear
+        : (yearOptions.isNotEmpty ? yearOptions.first.year : _selectedYear);
+    final selectedMonth = monthOptions.any((m) => m.month == _selectedMonth)
+        ? _selectedMonth
+        : (monthOptions.isNotEmpty ? monthOptions.first.month : 0);
 
     return Container(
+      key: const ValueKey('compare_filter_toolbar'),
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
@@ -947,250 +975,153 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Row 1: Temporal Logic (Year Selector + Month Selector)
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 14.0,
-              vertical: 10.0,
-            ),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-              borderRadius: M3Shape.radiusMd,
-              border: Border.all(
-                color: colorScheme.primary.withValues(alpha: 0.25),
-              ),
-            ),
-            child: Wrap(
-              spacing: 16.0,
-              runSpacing: 10.0,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              alignment: WrapAlignment.spaceBetween,
-              children: [
-                Wrap(
-                  spacing: 8.0,
-                  runSpacing: 8.0,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.event_note_rounded,
-                      size: 19.0,
-                      color: colorScheme.primary,
-                    ),
-                    Text(
-                      'السنة المالية:',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    for (final yr in _yearOptions)
-                      ChoiceChip(
-                        label: Text(
-                          yr.labelAr,
-                          style: TextStyle(
-                            fontWeight: _selectedYear == yr.year
-                                ? FontWeight.w900
-                                : FontWeight.w600,
-                          ),
-                        ),
-                        selected: _selectedYear == yr.year,
-                        onSelected: (sel) {
-                          if (!sel || _selectedYear == yr.year) return;
-                          setState(() {
-                            _selectedYear = yr.year;
-                            _yearTouched = true;
-                            _selectedMonth = 0;
-                            _simulatedOwnPrice = null;
-                            _monthsLoadFinished = false;
-                          });
-                          _loadAvailableMonths();
-                          _loadCompetitiveData();
-                        },
-                      ),
-                  ],
-                ),
-                Wrap(
-                  spacing: 6.0,
-                  runSpacing: 6.0,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.timeline_rounded,
-                      size: 18.0,
-                      color: colorScheme.primary,
-                    ),
-                    Text(
-                      'الشهور:',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (_monthOptions.isEmpty)
-                      // Avoid brief empty-state flash while months / compare data still load.
-                      if (_monthsLoadFinished && !_isLoading)
-                        Text(
-                          'لا توجد شهور بيانات لهذه السنة',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        )
-                      else
-                        const SizedBox.shrink()
-                    else
-                      for (final m in _monthOptions)
-                        ChoiceChip(
-                          label: Text(m.labelAr),
-                          selected: _selectedMonth == m.month,
-                          onSelected: (sel) {
-                            if (!sel || _selectedMonth == m.month) return;
-                            setState(() {
-                              _selectedMonth = m.month;
-                              _simulatedOwnPrice = null;
-                            });
-                            _loadCompetitiveData();
-                          },
-                        ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 12.0),
-
-          // Row 2: Search Input + Real Uploaded Chain Badge
+          // Same 40dp M3Dropdown filters as Sell-Out / Trade Marketing.
           Wrap(
             spacing: 12.0,
             runSpacing: 12.0,
             crossAxisAlignment: WrapCrossAlignment.center,
-            alignment: WrapAlignment.spaceBetween,
             children: [
-              M3SearchFieldWidth(
-                hintText: 'ابحث باسم الصنف، الباركود، أو المنافس...',
-                hintStyle: theme.textTheme.bodyMedium,
-                width: 340.0,
-                child: TextField(
-                  key: const ValueKey('compare_search_field'),
-                  controller: _searchController,
-                  onChanged: (val) {
+              M3Dropdown<int>(
+                key: const ValueKey('compare_year_dropdown'),
+                leadingIcon: Icons.event_note_rounded,
+                width: kYearDropdownWidth,
+                fitOptions: true,
+                value: selectedYear,
+                options: [
+                  for (final yr in yearOptions)
+                    M3DropdownOption(yr.year, yr.labelAr),
+                ],
+                onChanged: (yr) {
+                  if (yr == _selectedYear) return;
+                  setState(() {
+                    _selectedYear = yr;
+                    _yearTouched = true;
+                    _selectedMonth = 0;
+                    _simulatedOwnPrice = null;
+                    _monthsLoadFinished = false;
+                  });
+                  _loadAvailableMonths();
+                  _loadCompetitiveData();
+                },
+              ),
+              if (monthOptions.isEmpty)
+                if (_monthsLoadFinished && !_isLoading)
+                  Text(
+                    'لا توجد شهور بيانات لهذه السنة',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  )
+                else
+                  const SizedBox.shrink()
+              else
+                M3Dropdown<int>(
+                  key: const ValueKey('compare_month_dropdown'),
+                  leadingIcon: Icons.timeline_rounded,
+                  fitOptions: true,
+                  value: selectedMonth,
+                  options: [
+                    for (final m in monthOptions)
+                      M3DropdownOption(m.month, m.labelAr),
+                  ],
+                  onChanged: (month) {
+                    if (month == _selectedMonth) return;
                     setState(() {
-                      _searchQuery = val;
+                      _selectedMonth = month;
+                      _simulatedOwnPrice = null;
+                    });
+                    _loadCompetitiveData();
+                  },
+                ),
+              M3Dropdown<String>(
+                key: const ValueKey('compare_chain_dropdown'),
+                leadingIcon: Icons.storefront_rounded,
+                fitOptions: true,
+                value: _selectedChain,
+                options: [
+                  for (final ch in _chainOptions)
+                    M3DropdownOption(ch.code, ch.labelAr),
+                ],
+                onChanged: (code) {
+                  if (code == _selectedChain) return;
+                  setState(() => _selectedChain = code);
+                  _loadCompetitiveData();
+                },
+              ),
+              if (categories.length > 1)
+                M3Dropdown<String>(
+                  key: const ValueKey('compare_category_dropdown'),
+                  leadingIcon: Icons.category_rounded,
+                  fitOptions: true,
+                  value: categories.contains(_selectedCategory)
+                      ? _selectedCategory
+                      : categories.first,
+                  options: [
+                    for (final cat in categories) M3DropdownOption(cat, cat),
+                  ],
+                  onChanged: (cat) {
+                    setState(() {
+                      _selectedCategory = cat;
                       _applyLocalFilters();
                     });
                   },
-                  style: theme.textTheme.bodyMedium,
-                  decoration: InputDecoration(
-                    hintText: 'ابحث باسم الصنف، الباركود، أو المنافس...',
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20.0),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 18.0),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _searchQuery = '';
-                                _applyLocalFilters();
-                              });
-                            },
-                          )
-                        : null,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12.0,
-                      vertical: 8.0,
-                    ),
-                    constraints: const BoxConstraints(
-                      maxHeight: M3ToolbarButton.height,
-                    ),
-                    filled: true,
-                    fillColor: colorScheme.surface,
-                    border: OutlineInputBorder(
-                      borderRadius: M3Shape.radiusMd,
-                      borderSide: BorderSide(color: colorScheme.outlineVariant),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: M3Shape.radiusMd,
-                      borderSide: BorderSide(color: colorScheme.outlineVariant),
-                    ),
-                  ),
                 ),
-              ),
-              Wrap(
-                spacing: 8.0,
-                runSpacing: 8.0,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.verified_rounded,
-                    size: 18.0,
-                    color: M3Palette.onSuccessSurface,
-                  ),
-                  Text(
-                    'السلسلة التجارية المعتمدة:',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  for (final ch in _chainOptions)
-                    ChoiceChip(
-                      avatar: const Icon(
-                        Icons.storefront_rounded,
-                        size: 16.0,
-                      ),
-                      label: Text(ch.labelAr),
-                      selected: _selectedChain == ch.code,
-                      onSelected: (sel) {
-                        if (!sel) return;
-                        setState(() => _selectedChain = ch.code);
-                        _loadCompetitiveData();
-                      },
-                    ),
-                ],
-              ),
             ],
           ),
 
-          if (categories.length > 1) ...[
-            const SizedBox(height: 12.0),
-            const Divider(height: 1.0),
-            const SizedBox(height: 10.0),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.category_rounded,
-                    size: 18.0,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 8.0),
-                  Text(
-                    'الفئة:',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(width: 8.0),
-                  for (final cat in categories)
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(end: 8.0),
-                      child: FilterChip(
-                        label: Text(cat),
-                        selected: _selectedCategory == cat,
-                        onSelected: (_) {
+          const SizedBox(height: 12.0),
+
+          M3SearchFieldWidth(
+            hintText: 'ابحث باسم الصنف، الباركود، أو المنافس...',
+            hintStyle: theme.textTheme.bodyMedium,
+            width: 340.0,
+            child: TextField(
+              key: const ValueKey('compare_search_field'),
+              controller: _searchController,
+              onChanged: (val) {
+                setState(() {
+                  _searchQuery = val;
+                  _applyLocalFilters();
+                });
+              },
+              style: theme.textTheme.bodyMedium,
+              decoration: InputDecoration(
+                hintText: 'ابحث باسم الصنف، الباركود، أو المنافس...',
+                prefixIcon: const Icon(Icons.search_rounded, size: 20.0),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 18.0),
+                        onPressed: () {
+                          _searchController.clear();
                           setState(() {
-                            _selectedCategory = cat;
+                            _searchQuery = '';
                             _applyLocalFilters();
                           });
                         },
-                      ),
-                    ),
-                ],
+                      )
+                    : null,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12.0,
+                  vertical: 8.0,
+                ),
+                constraints: const BoxConstraints(
+                  maxHeight: M3ToolbarButton.height,
+                ),
+                filled: true,
+                fillColor: colorScheme.surface,
+                border: OutlineInputBorder(
+                  borderRadius: M3Shape.radiusMd,
+                  borderSide: BorderSide(color: colorScheme.outlineVariant),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: M3Shape.radiusMd,
+                  borderSide: BorderSide(color: colorScheme.outlineVariant),
+                ),
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -1408,33 +1339,50 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    final hasCompAvg =
+        group.competitors.isNotEmpty && group.avgCompetitorPrice > 0;
     final vsAvgDiffEgp = group.ownUnitPrice - group.avgCompetitorPrice;
-    final vsAvgDiffPct = group.avgCompetitorPrice > 0
+    final vsAvgDiffPct = hasCompAvg
         ? (vsAvgDiffEgp / group.avgCompetitorPrice) * 100.0
         : 0.0;
 
-    final bool weAreCheaper = vsAvgDiffPct < -1.5;
-    final bool weAreMoreExpensive = vsAvgDiffPct > 1.5;
+    final bool weAreCheaper = hasCompAvg && vsAvgDiffPct < -1.5;
+    final bool weAreMoreExpensive = hasCompAvg && vsAvgDiffPct > 1.5;
+    final bool uncompared = !hasCompAvg;
 
-    final Color badgeBg = weAreCheaper
-        ? M3Palette.successSurface
-        : weAreMoreExpensive
-            ? M3Palette.dangerSurface
-            : colorScheme.secondaryContainer;
-    final Color badgeFg = weAreCheaper
-        ? M3Palette.onSuccessSurface
-        : weAreMoreExpensive
-            ? M3Palette.onDangerSurface
-            : colorScheme.onSecondaryContainer;
-    final String badgeText = weAreCheaper
-        ? 'أرخص من السوق بـ ${vsAvgDiffPct.abs().toStringAsFixed(1)}%'
-        : weAreMoreExpensive
-            ? 'أغلى من السوق بـ ${CurrencyFormatter.formatSignedPct(vsAvgDiffPct)}'
-            : 'مساوي لمتوسط السوق';
+    final Color badgeBg = uncompared
+        ? colorScheme.surfaceContainerHighest
+        : weAreCheaper
+            ? M3Palette.successSurface
+            : weAreMoreExpensive
+                ? M3Palette.dangerSurface
+                : colorScheme.secondaryContainer;
+    final Color badgeFg = uncompared
+        ? colorScheme.onSurfaceVariant
+        : weAreCheaper
+            ? M3Palette.onSuccessSurface
+            : weAreMoreExpensive
+                ? M3Palette.onDangerSurface
+                : colorScheme.onSecondaryContainer;
+    final String badgeShort = uncompared
+        ? 'غير مقارن'
+        : weAreCheaper
+            ? 'أرخص'
+            : weAreMoreExpensive
+                ? 'أغلى'
+                : 'مساوٍ';
+    final String badgeDetail = uncompared
+        ? 'لم يتم تحديد المنافسين بعد'
+        : weAreCheaper
+            ? 'من السوق بـ ${vsAvgDiffPct.abs().toStringAsFixed(1)}%'
+            : weAreMoreExpensive
+                ? 'من السوق بـ ${CurrencyFormatter.formatSignedPct(vsAvgDiffPct)}'
+                : 'لمتوسط السوق';
 
+    final bool hasPeriodChange = group.monthlyPrices.length >= 2;
     final double momPct = group.periodPriceChangePct;
-    final bool priceRose = momPct > 0.5;
-    final bool priceDropped = momPct < -0.5;
+    final bool priceRose = hasPeriodChange && momPct > 0.5;
+    final bool priceDropped = hasPeriodChange && momPct < -0.5;
 
     return Material(
       color: isSelected ? M3Palette.successSurface : colorScheme.surface,
@@ -1478,17 +1426,10 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                           spacing: 6.0,
                           runSpacing: 4.0,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8.0,
-                                vertical: 2.0,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? _ownBrandGreen
-                                    : colorScheme.surfaceContainerHighest,
-                                borderRadius: M3Shape.radiusSm,
-                              ),
+                            M3ChipSurface(
+                              color: isSelected
+                                  ? _ownBrandGreen
+                                  : colorScheme.surfaceContainerHighest,
                               child: Text(
                                 group.ownBrand,
                                 style: theme.textTheme.labelSmall?.copyWith(
@@ -1499,16 +1440,9 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                                 ),
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8.0,
-                                vertical: 2.0,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerHighest
-                                    .withValues(alpha: 0.7),
-                                borderRadius: M3Shape.radiusSm,
-                              ),
+                            M3ChipSurface(
+                              color: colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.7),
                               child: Text(
                                 group.packSizeLabel,
                                 style: theme.textTheme.labelSmall?.copyWith(
@@ -1517,23 +1451,16 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                               ),
                             ),
                             if (priceRose || priceDropped)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7.0,
-                                  vertical: 2.0,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: priceRose
-                                      ? M3Palette.warningSurface
-                                      : M3Palette.infoSurface,
-                                  borderRadius: M3Shape.radiusSm,
-                                ),
+                              M3ChipSurface(
+                                color: priceRose
+                                    ? M3Palette.warningSurface
+                                    : M3Palette.infoSurface,
                                 child: Text(
                                   priceRose
                                       ? '▲ ${CurrencyFormatter.formatSignedPct(momPct)} في $_selectedYear'
                                       : '▼ ${CurrencyFormatter.formatSignedPct(momPct)} في $_selectedYear',
                                   style: TextStyle(
-                                    fontSize: M3FontSize.tiny,
+                                    fontSize: M3FontSize.labelSmallPlus,
                                     fontWeight: FontWeight.w800,
                                     color: priceRose
                                         ? M3Palette.onWarningSurface
@@ -1582,22 +1509,34 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8.0,
-                      vertical: 3.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: badgeBg,
-                      borderRadius: M3ChipStyle.radius,
-                    ),
-                    child: Text(
-                      badgeText,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: badgeFg,
-                        fontSize: M3FontSize.tinyPlus,
-                      ),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        M3ChipSurface(
+                          key: ValueKey(
+                              'compare_own_badge_${group.ownBarcode}'),
+                          color: badgeBg,
+                          child: Text(
+                            badgeShort,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: badgeFg,
+                              fontSize: M3FontSize.labelSmallPlus,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: M3Spacing.s2),
+                        Text(
+                          badgeDetail,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   Row(
@@ -1958,11 +1897,16 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             ? M3Palette.onDangerSurface
             : colorScheme.onSecondaryContainer;
 
-    final String priceStatusText = isCompHigher
-        ? 'أغلى منك بـ +${competitor.priceDiffEgp.abs().toStringAsFixed(1)} ج (${CurrencyFormatter.formatSignedPct(competitor.priceDiffPct.abs())})'
+    final String statusShort = isCompHigher
+        ? 'أغلى'
         : isCompLower
-            ? 'أرخص منك بـ -${competitor.priceDiffEgp.abs().toStringAsFixed(1)} ج (${CurrencyFormatter.formatSignedPct(-competitor.priceDiffPct.abs())})'
-            : 'مساوي لسعرك';
+            ? 'أرخص'
+            : 'مساوٍ';
+    final String statusDetail = isCompHigher
+        ? 'منك بـ +${competitor.priceDiffEgp.abs().toStringAsFixed(1)} ج (${CurrencyFormatter.formatSignedPct(competitor.priceDiffPct.abs())})'
+        : isCompLower
+            ? 'منك بـ -${competitor.priceDiffEgp.abs().toStringAsFixed(1)} ج (${CurrencyFormatter.formatSignedPct(-competitor.priceDiffPct.abs())})'
+            : 'لسعرك';
 
     const Color activeAccent = M3Palette.dangerAccent;
 
@@ -2034,17 +1978,10 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                         ),
                       ),
                       const SizedBox(width: 8.0),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10.0,
-                          vertical: 4.0,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? activeAccent
-                              : colorScheme.surfaceContainerHighest,
-                          borderRadius: M3ChipStyle.radius,
-                        ),
+                      M3ChipSurface(
+                        color: isSelected
+                            ? activeAccent
+                            : colorScheme.surfaceContainerHighest,
                         child: Text(
                           competitor.packSizeLabel,
                           style: theme.textTheme.labelSmall?.copyWith(
@@ -2127,43 +2064,50 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                     ],
                   ),
                   const SizedBox(height: 10.0),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10.0,
-                      vertical: 6.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusBg,
-                      borderRadius: M3Shape.radiusSm,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          isCompHigher
-                              ? Icons.arrow_upward_rounded
-                              : isCompLower
-                                  ? Icons.arrow_downward_rounded
-                                  : Icons.drag_handle_rounded,
-                          size: 15.0,
-                          color: statusFg,
-                        ),
-                        const SizedBox(width: 4.0),
-                        Flexible(
-                          child: Text(
-                            priceStatusText,
-                            style: TextStyle(
-                              fontSize: M3FontSize.labelSmallPlus,
-                              fontWeight: FontWeight.w900,
-                              color: statusFg,
-                            ),
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Align(
+                        alignment: AlignmentDirectional.center,
+                        child: M3ChipSurface(
+                          color: statusBg,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isCompHigher
+                                    ? Icons.arrow_upward_rounded
+                                    : isCompLower
+                                        ? Icons.arrow_downward_rounded
+                                        : Icons.drag_handle_rounded,
+                                size: 16.0,
+                                color: statusFg,
+                              ),
+                              M3Spacing.hGapXS,
+                              Text(
+                                statusShort,
+                                style: TextStyle(
+                                  fontSize: M3FontSize.labelSmallPlus,
+                                  fontWeight: FontWeight.w800,
+                                  color: statusFg,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: M3Spacing.s2),
+                      Text(
+                        statusDetail,
+                        textAlign: TextAlign.center,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -2305,11 +2249,12 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
               ),
 
               FilterChip(
+                key: const ValueKey('compare_timeline_toggle'),
                 avatar: Icon(
                   _showFullTwoYearTimeline
                       ? Icons.visibility_rounded
                       : Icons.date_range_rounded,
-                  size: 16.0,
+                  size: 18.0,
                 ),
                 label: Text(
                   _showFullTwoYearTimeline
@@ -2317,6 +2262,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                       : 'دمج مسار السنتين (كل الشهور المتاحة)',
                 ),
                 selected: _showFullTwoYearTimeline,
+                visualDensity: VisualDensity.standard,
+                materialTapTargetSize: MaterialTapTargetSize.padded,
                 onSelected: (v) {
                   setState(() => _showFullTwoYearTimeline = v);
                 },
@@ -2558,7 +2505,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       if (pt.trendDirection == 'down') {
         return '▼ ${CurrencyFormatter.formatSignedPct(pt.priceChangePct)}';
       }
-      return '• مستقر (0%)';
+      // Flat / unavailable — never advertise a fake measured 0%.
+      return '• مستقر';
     }
 
     Color deltaColor(SkuMonthlyPricePointModel pt) {
@@ -2612,39 +2560,58 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                   Flexible(
                     child: Align(
                       alignment: AlignmentDirectional.centerEnd,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8.0,
-                          vertical: 2.0,
-                        ),
-                        decoration: BoxDecoration(
-                          color: compHigher
-                              ? M3Palette.successSurface
-                              : compLower
-                                  ? M3Palette.dangerSurface
-                                  : colorScheme.surfaceContainerHighest,
-                          borderRadius: M3Shape.radiusSm,
-                        ),
-                        child: Text(
-                          compHigher
-                              ? 'المنافس +${gapEgp.toStringAsFixed(1)} ج'
-                              : compLower
-                                  ? 'المنافس ${gapEgp.toStringAsFixed(1)} ج'
-                                  : compPoint == null
-                                      ? '—'
-                                      : 'سعر متقارب',
-                          style: TextStyle(
-                            fontSize: M3FontSize.tinyPlus,
-                            fontWeight: FontWeight.w900,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          M3ChipSurface(
                             color: compHigher
-                                ? M3Palette.onSuccessSurface
+                                ? M3Palette.successSurface
                                 : compLower
-                                    ? M3Palette.onDangerSurface
-                                    : colorScheme.onSurfaceVariant,
+                                    ? M3Palette.dangerSurface
+                                    : colorScheme.surfaceContainerHighest,
+                            child: Text(
+                              compPoint == null
+                                  ? '—'
+                                  : compHigher
+                                      ? 'أغلى'
+                                      : compLower
+                                          ? 'أرخص'
+                                          : 'متقارب',
+                              style: TextStyle(
+                                fontSize: M3FontSize.labelSmallPlus,
+                                fontWeight: FontWeight.w800,
+                                color: compHigher
+                                    ? M3Palette.onSuccessSurface
+                                    : compLower
+                                        ? M3Palette.onDangerSurface
+                                        : colorScheme.onSurfaceVariant,
+                              ),
+                            ),
                           ),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                          if (compPoint == null) ...[
+                            const SizedBox(height: M3Spacing.s2),
+                            Text(
+                              'لا يوجد سعر للمنافس',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ] else if (compHigher || compLower) ...[
+                            const SizedBox(height: M3Spacing.s2),
+                            Text(
+                              '${compHigher ? '+' : ''}${gapEgp.toStringAsFixed(1)} ج',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
@@ -2898,15 +2865,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                       runSpacing: 6.0,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10.0,
-                            vertical: 4.0,
-                          ),
-                          decoration: const BoxDecoration(
-                            color: _ownBrandGreen,
-                            borderRadius: M3ChipStyle.radius,
-                          ),
+                        M3ChipSurface(
+                          color: _ownBrandGreen,
                           child: Text(
                             'صنفنا الافتراضي ($_activePeriodLabelAr)',
                             style: theme.textTheme.labelSmall?.copyWith(
@@ -2915,15 +2875,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                             ),
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10.0,
-                            vertical: 4.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surface,
-                            borderRadius: M3ChipStyle.radius,
-                          ),
+                        M3ChipSurface(
+                          color: colorScheme.surface,
                           child: Text(
                             'الفئة: ${group.category}',
                             style: theme.textTheme.labelSmall?.copyWith(
@@ -2931,15 +2884,8 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                             ),
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10.0,
-                            vertical: 4.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surface,
-                            borderRadius: M3ChipStyle.radius,
-                          ),
+                        M3ChipSurface(
+                          color: colorScheme.surface,
                           child: Text(
                             'العبوة: ${group.packSizeLabel}',
                             style: theme.textTheme.labelSmall?.copyWith(
@@ -2976,18 +2922,28 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                   ),
                   _buildSpotlightMetricBox(
                     context,
+                    key: const ValueKey('compare_spotlight_avg_comp'),
                     label: 'متوسط سعر المنافسين',
-                    value: '${group.avgCompetitorPrice.toStringAsFixed(2)} ج.م',
-                    subValue:
-                        'المدى: ${group.minCompetitorPrice.toStringAsFixed(0)} - ${group.maxCompetitorPrice.toStringAsFixed(0)} ج.م',
+                    value: group.competitors.isEmpty ||
+                            group.avgCompetitorPrice <= 0
+                        ? '—'
+                        : '${group.avgCompetitorPrice.toStringAsFixed(2)} ج.م',
+                    subValue: group.competitors.isEmpty ||
+                            group.avgCompetitorPrice <= 0
+                        ? 'لم يتم تحديد المنافسين بعد'
+                        : 'المدى: ${group.minCompetitorPrice.toStringAsFixed(0)} - ${group.maxCompetitorPrice.toStringAsFixed(0)} ج.م',
                   ),
                   _buildSpotlightMetricBox(
                     context,
+                    key: const ValueKey('compare_spotlight_period_change'),
                     label: 'التغير السعري في $_selectedYear',
-                    value:
-                        CurrencyFormatter.formatSignedPct(group.periodPriceChangePct),
-                    subValue:
-                        '${group.periodPriceChangeEgp >= 0 ? '+' : ''}${group.periodPriceChangeEgp.toStringAsFixed(1)} ج.م (${_monthRangeLabel.replaceFirst(' - ', ' ← ')})',
+                    value: group.monthlyPrices.length < 2
+                        ? '—'
+                        : CurrencyFormatter.formatSignedPct(
+                            group.periodPriceChangePct),
+                    subValue: group.monthlyPrices.length < 2
+                        ? 'لا توجد بيانات كافية لحساب التغير'
+                        : '${group.periodPriceChangeEgp >= 0 ? '+' : ''}${group.periodPriceChangeEgp.toStringAsFixed(1)} ج.م (${_monthRangeLabel.replaceFirst(' - ', ' ← ')})',
                   ),
                   _buildSpotlightMetricBox(
                     context,
@@ -3017,36 +2973,42 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
           Wrap(
             spacing: 8.0,
             runSpacing: 8.0,
-            crossAxisAlignment: WrapCrossAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.start,
             children: [
-              Text(
-                'الموقف التنافسي وحركة السعر:',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
+              Padding(
+                padding: const EdgeInsets.only(top: 6.0),
+                child: Text(
+                  'الموقف التنافسي وحركة السعر:',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
               _buildStatusCountPill(
-                label: 'أنت أرخص من ${countCompetitors(higherCount)}',
+                shortLabel: 'أرخص',
+                description: 'من ${countCompetitors(higherCount)}',
                 bgColor: M3Palette.successSurface,
                 fgColor: M3Palette.onSuccessSurface,
                 icon: Icons.arrow_upward_rounded,
               ),
               _buildStatusCountPill(
-                label: 'أنت أغلى من ${countCompetitors(lowerCount)}',
+                shortLabel: 'أغلى',
+                description: 'من ${countCompetitors(lowerCount)}',
                 bgColor: M3Palette.dangerSurface,
                 fgColor: M3Palette.onDangerSurface,
                 icon: Icons.arrow_downward_rounded,
               ),
               if (equalCount > 0)
                 _buildStatusCountPill(
-                  label: 'سعرك مساوٍ لـ ${countCompetitors(equalCount)}',
+                  shortLabel: 'مساوٍ',
+                  description: 'لـ ${countCompetitors(equalCount)}',
                   bgColor: colorScheme.secondaryContainer,
                   fgColor: colorScheme.onSecondaryContainer,
                   icon: Icons.drag_handle_rounded,
                 ),
               _buildStatusCountPill(
                 key: const ValueKey('compare_movement_chip'),
-                label: movementChip,
+                shortLabel: movementChip,
                 bgColor: movementBg,
                 fgColor: movementFg,
                 icon: movementIcon,
@@ -3072,6 +3034,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
 
   Widget _buildSpotlightMetricBox(
     BuildContext context, {
+    Key? key,
     required String label,
     required String value,
     required String subValue,
@@ -3081,6 +3044,7 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     final colorScheme = theme.colorScheme;
 
     return Container(
+      key: key,
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
       decoration: BoxDecoration(
         color: isHighlighted ? _ownBrandGreen : colorScheme.surface,
@@ -3118,9 +3082,11 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
             style: theme.textTheme.labelSmall?.copyWith(
               color: isHighlighted
                   ? Colors.white.withValues(alpha: 0.85)
-                  : _ownBrandGreen,
+                  : (value == '—'
+                      ? colorScheme.onSurfaceVariant
+                      : _ownBrandGreen),
               fontWeight: FontWeight.w700,
-              fontSize: M3FontSize.tinyPlus,
+              fontSize: M3FontSize.labelSmallPlus,
             ),
           ),
         ],
@@ -3128,35 +3094,55 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
     );
   }
 
+  /// Short status chip + optional smaller description underneath (TM pattern).
   Widget _buildStatusCountPill({
     Key? key,
-    required String label,
+    required String shortLabel,
+    String? description,
     required Color bgColor,
     required Color fgColor,
     required IconData icon,
   }) {
-    return M3ChipSurface(
+    return Column(
       key: key,
-      color: bgColor,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16.0, color: fgColor),
-          M3Spacing.hGapXS,
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: fgColor,
-                fontWeight: FontWeight.w800,
-                fontSize: M3FontSize.bodySmall,
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        M3ChipSurface(
+          color: bgColor,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16.0, color: fgColor),
+              M3Spacing.hGapXS,
+              Text(
+                shortLabel,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: fgColor,
+                  fontWeight: FontWeight.w800,
+                  fontSize: M3FontSize.labelSmallPlus,
+                ),
               ),
+            ],
+          ),
+        ),
+        if (description != null && description.isNotEmpty) ...[
+          const SizedBox(height: M3Spacing.s2),
+          Text(
+            description,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              fontSize: M3FontSize.bodySmall,
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 
