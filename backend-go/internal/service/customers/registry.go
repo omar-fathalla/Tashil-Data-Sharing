@@ -102,6 +102,10 @@ type Entry struct {
 	UploadChain      string     `json:"upload_chain,omitempty" firestore:"upload_chain"`
 	FirstSeenFile    string     `json:"first_seen_file,omitempty" firestore:"first_seen_file"`
 	Quarantine       []FileStat `json:"quarantine,omitempty" firestore:"quarantine"`
+	// MergedRecordIDs / MergedFromBranch track Sell-In rows remapped by an alias_of merge so
+	// «رجوع عن القرار» can restore attribution without re-parsing archives. Empty until apply.
+	MergedRecordIDs  []string   `json:"merged_record_ids,omitempty" firestore:"merged_record_ids,omitempty"`
+	MergedFromBranch string     `json:"merged_from_branch,omitempty" firestore:"merged_from_branch,omitempty"`
 	FirstSeenAt      time.Time  `json:"first_seen_at" firestore:"first_seen_at"`
 	UpdatedAt        time.Time  `json:"updated_at" firestore:"updated_at"`
 	DecidedBy        string     `json:"decided_by,omitempty" firestore:"decided_by"`
@@ -624,6 +628,11 @@ func (r *Registry) Decide(ctx context.Context, tenantID, name, status, chain, al
 		e.AliasOf = root
 	}
 	e.DecidedBy, e.DecidedAt, e.UpdatedAt = by, &now, now
+	// A fresh alias_of target replaces prior merge-attribution meta; clearing alias_of
+	// (unmerge) keeps MergedRecordIDs so RestoreAliasAttribution can reverse the remap.
+	if status == StatusApproved && strings.TrimSpace(aliasOf) != "" {
+		e.MergedRecordIDs, e.MergedFromBranch = nil, ""
+	}
 	cp := *e
 	st.UpdatedAt = now
 	if err := r.store.SaveCustomerRegistry(ctx, st); err != nil {
@@ -631,6 +640,37 @@ func (r *Registry) Decide(ctx context.Context, tenantID, name, status, chain, al
 		return nil, err
 	}
 	return &cp, nil
+}
+
+// SetAliasMergeMeta records which Sell-In rows were remapped for an alias_of merge.
+func (r *Registry) SetAliasMergeMeta(ctx context.Context, tenantID, name string, recordIDs []string, fromBranch string) error {
+	key := NormalizeName(name)
+	if key == "" {
+		return fmt.Errorf("اسم العميل فاضي")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.cache, tenantID)
+	st := r.stateLocked(ctx, tenantID)
+	i := findEntry(st, key)
+	if i < 0 {
+		return fmt.Errorf("العميل مش متسجل")
+	}
+	e := &st.Entries[i]
+	e.MergedRecordIDs = append([]string(nil), recordIDs...)
+	e.MergedFromBranch = strings.TrimSpace(fromBranch)
+	e.UpdatedAt = r.now().UTC()
+	st.UpdatedAt = e.UpdatedAt
+	if err := r.store.SaveCustomerRegistry(ctx, st); err != nil {
+		delete(r.cache, tenantID)
+		return err
+	}
+	return nil
+}
+
+// ClearAliasMergeMeta drops merge-attribution bookkeeping after a successful undo.
+func (r *Registry) ClearAliasMergeMeta(ctx context.Context, tenantID, name string) error {
+	return r.SetAliasMergeMeta(ctx, tenantID, name, nil, "")
 }
 
 // EntryChain is the explicit approval chain, else the upload chain, else the

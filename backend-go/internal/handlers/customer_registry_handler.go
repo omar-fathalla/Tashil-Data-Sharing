@@ -20,6 +20,8 @@ import (
 type CustomerRegistryProcessor interface {
 	CustomerRegistry() *customers.Registry
 	ReapplySellInFiles(ctx context.Context, tenantID string, files []string, chains []string) ([]ingestion.ReapplyResult, []string)
+	ApplyCustomerAliasAttributions(ctx context.Context, tenantID string) ingestion.AliasRemapResult
+	RestoreCustomerAliasAttribution(ctx context.Context, tenantID, sourceName string) ingestion.AliasRemapResult
 	SellInYears(tenantID string) []int
 	SellOutMonths(tenantID string, year int) []int
 }
@@ -270,6 +272,7 @@ func (h *CustomerRegistryHandler) decideWith(w http.ResponseWriter, r *http.Requ
 			return
 		}
 	}
+	wasMergeUnmerge := action == "customer_registry_unmerge" && status == customers.StatusApproved
 	entry, err := reg.Decide(r.Context(), c.TenantID, req.Name, status, req.Chain, req.AliasOf, c.Email)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
@@ -277,8 +280,31 @@ func (h *CustomerRegistryHandler) decideWith(w http.ResponseWriter, r *http.Requ
 	}
 	var applied []ingestion.ReapplyResult
 	var errs []string
+	var remapped, restored int
 	switch status {
 	case customers.StatusApproved:
+		if strings.TrimSpace(entry.AliasOf) != "" {
+			// Already-counted (live / seed) merges: remap attribution directly from the
+			// recorded alias_of decision. Archive re-parse is too heavy under the HTTP
+			// write timeout and left decisions saved with BQ/RAM unchanged (Kafr v171).
+			ar := h.p.ApplyCustomerAliasAttributions(r.Context(), c.TenantID)
+			remapped = ar.Remapped
+			errs = append(errs, ar.Errors...)
+			if remapped > 0 {
+				break
+			}
+			// No live rows under the source spelling (quarantine-only merge): fall back
+			// to archive re-apply so held-out rows enter totals under the canonical name.
+		}
+		if wasMergeUnmerge {
+			ar := h.p.RestoreCustomerAliasAttribution(r.Context(), c.TenantID, entry.Name)
+			restored = ar.Restored
+			errs = append(errs, ar.Errors...)
+			if restored > 0 {
+				break
+			}
+			// Legacy merge without merge-meta: restore via archive re-apply below.
+		}
 		if entry.Chain != "" {
 			// An explicit chain on approval moves the rows there; that chain is rewritten too.
 			chainSet[reg.ChainOfName(entry.Name, entry.Chain)] = true
@@ -291,7 +317,7 @@ func (h *CustomerRegistryHandler) decideWith(w http.ResponseWriter, r *http.Requ
 			chains = append(chains, ch)
 		}
 		sort.Strings(chains)
-		if len(files) == 0 && strings.TrimSpace(entry.AliasOf) == "" && len(chains) == 0 {
+		if len(files) == 0 && strings.TrimSpace(entry.AliasOf) == "" && !wasMergeUnmerge && len(chains) == 0 {
 			break
 		}
 		if len(chains) == 0 {
@@ -302,11 +328,16 @@ func (h *CustomerRegistryHandler) decideWith(w http.ResponseWriter, r *http.Requ
 		// every archived Sell-In file on the shared chain so attribution updates
 		// without a manual re-upload. Dedup / replacement rules stay as at upload.
 		runFiles := files
-		if len(files) == 0 && strings.TrimSpace(entry.AliasOf) != "" {
+		if len(files) == 0 && (strings.TrimSpace(entry.AliasOf) != "" || wasMergeUnmerge) {
 			runFiles = nil
 		}
 		applied, errs = h.p.ReapplySellInFiles(r.Context(), c.TenantID, runFiles, chains)
 	case customers.StatusPending:
+		if ar := h.p.RestoreCustomerAliasAttribution(r.Context(), c.TenantID, entry.Name); ar.Restored > 0 {
+			restored = ar.Restored
+			errs = append(errs, ar.Errors...)
+			break
+		}
 		applied, errs = h.p.ReapplySellInFiles(r.Context(), c.TenantID, nil, nil)
 	}
 	if h.audit != nil {
@@ -321,6 +352,12 @@ func (h *CustomerRegistryHandler) decideWith(w http.ResponseWriter, r *http.Requ
 			details += " reason=" + req.Reason
 		}
 		details += " reapplied=" + strconv.Itoa(len(applied))
+		if remapped > 0 {
+			details += " remapped=" + strconv.Itoa(remapped)
+		}
+		if restored > 0 {
+			details += " restored=" + strconv.Itoa(restored)
+		}
 		for _, a := range applied {
 			details += " file=" + a.File + " batch=" + a.BatchID
 		}
@@ -334,7 +371,10 @@ func (h *CustomerRegistryHandler) decideWith(w http.ResponseWriter, r *http.Requ
 	for _, a := range applied {
 		names = append(names, a.File)
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"entry": entry, "reapplied_files": names, "reapplied": applied, "errors": errs})
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"entry": entry, "reapplied_files": names, "reapplied": applied,
+		"remapped_rows": remapped, "restored_rows": restored, "errors": errs,
+	})
 }
 
 // ensureLiveCanonicalApproved records the merge target as approved when it is
