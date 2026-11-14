@@ -63,6 +63,8 @@ class _GatedRepo implements CompetitorComparisonSource {
 }
 
 OwnSkuCompetitiveGroupModel _sampleGroup() {
+  // Must include a competitor so mapped-only price-index averaging keeps
+  // the real 106.7% (empty competitors → «—», not a fake index).
   return const OwnSkuCompetitiveGroupModel(
     ownBarcode: '6223000239438',
     ownSkuName: 'فيبا 3 كجم',
@@ -82,7 +84,26 @@ OwnSkuCompetitiveGroupModel _sampleGroup() {
     maxCompetitorPrice: 150,
     priceIndex: 106.7,
     ownChainPrices: {'fathalla': 160},
-    competitors: [],
+    competitors: [
+      CompetitorSkuComparisonModel(
+        skuName: 'منافس تجريبي 3 كجم',
+        barcode: '9990000000001',
+        supplierName: 'مورد تجريبي',
+        brand: 'منافس تجريبي',
+        category: 'صابون سائل اطباق',
+        packSizeLabel: '3 كجم',
+        packVolumeUnits: 3,
+        volumeUnitLabel: 'كجم',
+        unitPrice: 150,
+        pricePerUnitVolume: 50,
+        priceDiffEgp: -10,
+        priceDiffPct: -6.3,
+        pricePosition: 'lower',
+        unitsSold: 200,
+        netRevenue: 30000,
+        categorySharePct: 20,
+      ),
+    ],
     monthlyPrices: [],
     allMonthlyPrices: [],
     selectedYear: 2026,
@@ -136,12 +157,15 @@ void main() {
       gate.complete();
       await tester.pumpAndSettle();
 
-      // After an empty competitive-monthly response, real zeros are allowed.
+      // After an empty competitive-monthly response, real zeros are allowed
+      // for counts — but the competitive index must be «—», never fake 100%.
       expect(find.byKey(const ValueKey('compare_kpi_skeleton')), findsNothing);
       // KPI value «0 أصناف» (+ detail «… في 0 أصناف»).
       expect(find.text('0 أصناف'), findsOneWidget);
       expect(find.textContaining('0 من 0'), findsOneWidget);
-      expect(find.textContaining('100.0%'), findsOneWidget);
+      expect(find.textContaining('100.0%'), findsNothing);
+      expect(find.text('—'), findsWidgets);
+      expect(find.text('لا توجد أصناف'), findsOneWidget);
     },
   );
 

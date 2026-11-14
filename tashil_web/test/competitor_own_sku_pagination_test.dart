@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/data/available_months.dart';
+import 'package:tashil_web/core/data/available_years.dart';
 import 'package:tashil_web/core/data/result.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/widgets/app_icons.dart';
 import 'package:tashil_web/features/competitor_comparison/data/competitor_comparison_repository.dart';
 import 'package:tashil_web/features/competitor_comparison/presentation/screens/competitor_comparison_screen.dart';
+
+import 'helpers/m3_dropdown_tester.dart';
 
 class _FakeRepo implements CompetitorComparisonSource {
   _FakeRepo(this.groups);
@@ -128,8 +131,36 @@ Future<void> _pumpCompare(
   await tester.pumpAndSettle();
 }
 
+/// Scroll the page control into view, assert it is enabled, then tap.
+Future<void> _tapPagination(
+  WidgetTester tester,
+  Key key, {
+  required bool expectEnabled,
+}) async {
+  final finder = find.byKey(key);
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  final btn = tester.widget<IconButton>(finder);
+  if (expectEnabled) {
+    expect(btn.onPressed, isNotNull, reason: '$key must be enabled');
+  } else {
+    expect(btn.onPressed, isNull, reason: '$key must be disabled');
+  }
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
+
 void main() {
-  setUp(AvailableMonths.clearForTest);
+  setUp(() {
+    AvailableMonths.clearForTest();
+    AvailableYears.setForTest(
+      const YearOptions(years: [2026], defaultYear: 2026),
+    );
+    AvailableMonths.setForTest(
+      const MonthOptions(year: 2026, months: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+    );
+  });
+  tearDown(AvailableMonths.clearForTest);
 
   testWidgets('own-SKU list shows 10 per page with Arabic indicators', (tester) async {
     final groups = [for (var i = 1; i <= 25; i++) _group(index: i)];
@@ -143,14 +174,17 @@ void main() {
     expect(find.text('صنف اختبار رقم 10'), findsOneWidget);
     expect(find.text('صنف اختبار رقم 11'), findsNothing);
 
-    // Prev disabled on first page.
+    // Prev disabled on first page; Next enabled and reachable under the header.
     final prev = tester.widget<IconButton>(
       find.byKey(const ValueKey('own_sku_pagination_prev_btn')),
     );
     expect(prev.onPressed, isNull);
 
-    await tester.tap(find.byKey(const ValueKey('own_sku_pagination_next_btn')));
-    await tester.pumpAndSettle();
+    await _tapPagination(
+      tester,
+      const ValueKey('own_sku_pagination_next_btn'),
+      expectEnabled: true,
+    );
 
     expect(find.text('صفحة 2 من 3'), findsOneWidget);
     expect(find.text('11–20 من 25'), findsOneWidget);
@@ -159,8 +193,11 @@ void main() {
     // Default selection (item 1) remains selected off-page → still in spotlight.
     expect(find.text('صنف اختبار رقم 1'), findsWidgets);
 
-    await tester.tap(find.byKey(const ValueKey('own_sku_pagination_next_btn')));
-    await tester.pumpAndSettle();
+    await _tapPagination(
+      tester,
+      const ValueKey('own_sku_pagination_next_btn'),
+      expectEnabled: true,
+    );
 
     expect(find.text('صفحة 3 من 3'), findsOneWidget);
     expect(find.text('21–25 من 25'), findsOneWidget);
@@ -172,8 +209,11 @@ void main() {
     );
     expect(next.onPressed, isNull);
 
-    await tester.tap(find.byKey(const ValueKey('own_sku_pagination_prev_btn')));
-    await tester.pumpAndSettle();
+    await _tapPagination(
+      tester,
+      const ValueKey('own_sku_pagination_prev_btn'),
+      expectEnabled: true,
+    );
     expect(find.text('صفحة 2 من 3'), findsOneWidget);
   });
 
@@ -185,13 +225,19 @@ void main() {
     ];
     await _pumpCompare(tester, groups: groups);
 
-    await tester.tap(find.byKey(const ValueKey('own_sku_pagination_next_btn')));
-    await tester.pumpAndSettle();
+    await _tapPagination(
+      tester,
+      const ValueKey('own_sku_pagination_next_btn'),
+      expectEnabled: true,
+    );
     expect(find.text('صفحة 2 من 2'), findsOneWidget);
 
-    // Category filter → page 1 of the filtered subset (3 floor cleaners).
-    await tester.tap(find.widgetWithText(FilterChip, 'منظف ارضيات'));
-    await tester.pumpAndSettle();
+    // Category filter (M3Dropdown) → page 1 of the filtered subset (3 floor cleaners).
+    await selectM3Option(
+      tester,
+      find.byKey(const ValueKey('compare_category_dropdown')),
+      'منظف ارضيات',
+    );
 
     expect(find.text('صفحة 1 من 1'), findsOneWidget);
     expect(find.text('1–3 من 3'), findsOneWidget);
@@ -203,8 +249,11 @@ void main() {
     final groups = [for (var i = 1; i <= 22; i++) _group(index: i)];
     await _pumpCompare(tester, groups: groups);
 
-    await tester.tap(find.byKey(const ValueKey('own_sku_pagination_next_btn')));
-    await tester.pumpAndSettle();
+    await _tapPagination(
+      tester,
+      const ValueKey('own_sku_pagination_next_btn'),
+      expectEnabled: true,
+    );
     expect(find.text('صفحة 2 من 3'), findsOneWidget);
 
     // Unique match for a single item that lived on page 2 of the unfiltered list.
@@ -229,8 +278,11 @@ void main() {
     // even after leaving its page.
     expect(find.text('صنف اختبار رقم 2'), findsWidgets);
 
-    await tester.tap(find.byKey(const ValueKey('own_sku_pagination_next_btn')));
-    await tester.pumpAndSettle();
+    await _tapPagination(
+      tester,
+      const ValueKey('own_sku_pagination_next_btn'),
+      expectEnabled: true,
+    );
 
     // Page 2 no longer lists item 2 in the master list, but detail still shows it.
     expect(find.text('صنف اختبار رقم 11'), findsOneWidget);
@@ -244,8 +296,11 @@ void main() {
     // Detail / spotlight still references the selected own SKU.
     expect(find.text('صنف اختبار رقم 2'), findsWidgets);
 
-    await tester.tap(find.byKey(const ValueKey('own_sku_pagination_prev_btn')));
-    await tester.pumpAndSettle();
+    await _tapPagination(
+      tester,
+      const ValueKey('own_sku_pagination_prev_btn'),
+      expectEnabled: true,
+    );
     expect(find.text('صنف اختبار رقم 2'), findsWidgets);
   });
 

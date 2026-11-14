@@ -123,10 +123,14 @@ void main() {
         final detail = find.byKey(const ValueKey('compare_movement_detail'));
         expect(detail, findsOneWidget);
         expect(_clipped(tester, detail), isFalse);
-        // Status chips use the shared 8dp chip surface and Arabic plurals.
-        expect(find.text('أنت أرخص من منافس واحد'), findsOneWidget);
-        expect(find.text('أنت أغلى من منافس واحد'), findsOneWidget);
+        // Status chips: short word in the chip + count description underneath.
+        expect(find.text('أرخص'), findsWidgets);
+        expect(find.text('أغلى'), findsWidgets);
+        expect(find.text('من منافس واحد'), findsNWidgets(2));
         expect(find.byType(M3ChipSurface), findsWidgets);
+        expect(find.byKey(const ValueKey('compare_year_dropdown')),
+            findsOneWidget);
+        expect(find.byKey(const ValueKey('compare_main_tabs')), findsOneWidget);
       });
 
       testWidgets('KPI titles/details never clipped, counted nouns',
