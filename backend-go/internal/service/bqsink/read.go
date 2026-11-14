@@ -134,6 +134,17 @@ func DecodeSellOutRow(row map[string]bigquery.Value) (domain.SellOutFact, error)
 	if err := json.Unmarshal(b, &f); err != nil {
 		return domain.SellOutFact{}, fmt.Errorf("decode sell_out row: %w", err)
 	}
+	// Meta columns are dropped from the JSON map (names differ from the struct).
+	if strings.TrimSpace(f.IngestionBatchID) == "" {
+		if s, ok := row[ColBatchID].(string); ok {
+			f.IngestionBatchID = s
+		}
+	}
+	if strings.TrimSpace(f.SourceFilename) == "" {
+		if s, ok := row[ColSourceFile].(string); ok {
+			f.SourceFilename = s
+		}
+	}
 	return f, nil
 }
 

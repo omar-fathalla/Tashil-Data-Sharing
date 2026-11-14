@@ -7,7 +7,8 @@ import 'package:tashil_web/core/network/http_swr_cache.dart';
 void main() {
   final url = Uri.parse('https://x/api/v1/analytics/records');
 
-  test('serves cached instantly, revalidates with ETag, bumps only on change', () async {
+  test('serves cached instantly, revalidates with ETag, bumps only on change',
+      () async {
     var now = DateTime(2026);
     final cache = HttpSwrCache(clock: () => now);
     var calls = 0;
@@ -40,7 +41,8 @@ void main() {
     expect((await cache.get(url, {}, send)).body, 'v2');
   });
 
-  test('invalidateAll drops entries and notifies; other sessions isolated', () async {
+  test('invalidateAll drops entries and notifies; other sessions isolated',
+      () async {
     final cache = HttpSwrCache();
     var calls = 0;
     Future<http.Response> send(Map<String, String>? h) async {
@@ -57,7 +59,8 @@ void main() {
     expect(calls, 3);
   });
 
-  test('304 without a cached entry is retried unconditionally, never surfaced', () async {
+  test('304 without a cached entry is retried unconditionally, never surfaced',
+      () async {
     final cache = HttpSwrCache();
     final seen = <String?>[];
     Future<http.Response> send(Map<String, String>? h) async {
@@ -72,7 +75,8 @@ void main() {
     expect(seen.last, isNull);
   });
 
-  test('generation change mid-flight: 304 is retried, inFlight cleared', () async {
+  test('generation change mid-flight: 304 is retried, inFlight cleared',
+      () async {
     var now = DateTime(2026);
     final cache = HttpSwrCache(clock: () => now);
     var calls = 0;
@@ -98,7 +102,8 @@ void main() {
     expect((await cache.get(url, {}, send)).statusCode, 200);
   });
 
-  test('expireAll keeps bodies and revalidates with ETag before serving', () async {
+  test('expireAll keeps bodies and revalidates with ETag before serving',
+      () async {
     final cache = HttpSwrCache();
     var calls = 0;
     Future<http.Response> send(Map<String, String>? h) async {
@@ -114,5 +119,23 @@ void main() {
     expect(r.body, 'a');
     expect(calls, 2);
     expect(cache.revision.value, 0);
+  });
+
+  test('invalidateUrl drops that URL and next read is unconditional', () async {
+    final cache = HttpSwrCache();
+    var calls = 0;
+    Future<http.Response> send(Map<String, String>? h) async {
+      calls++;
+      if (h?['If-None-Match'] != null) {
+        fail(
+            'invalidateUrl must not send If-None-Match, got ${h?['If-None-Match']}');
+      }
+      return http.Response('body$calls', 200, headers: {'etag': '"$calls"'});
+    }
+
+    expect((await cache.get(url, {}, send)).body, 'body1');
+    cache.invalidateUrl(url);
+    expect((await cache.get(url, {}, send)).body, 'body2');
+    expect(calls, 2);
   });
 }

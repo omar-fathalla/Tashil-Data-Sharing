@@ -358,6 +358,28 @@ func (r *Registry) PartitionLayout(ctx context.Context, tenantID, filename, uplo
 			if e.Chain != "" {
 				rec.RetailerChain = e.Chain
 			}
+			// Owner-approved alias_of: attach this spelling to the canonical approved customer.
+			// Seed aliases (item-7) stay layout-gated above; registry aliases apply whenever
+			// the entry itself is approved so a later re-ingest honors the merge.
+			if can := strings.TrimSpace(e.AliasOf); can != "" {
+				canKey := NormalizeName(can)
+				if canKey != "" && canKey != key {
+					if canEntry, canOK := r.resolveLocked(st, tenantID, canKey); canOK {
+						rec.CustomerName = canEntry.Name
+						if canEntry.Name == "" {
+							rec.CustomerName = can
+						}
+						if strings.TrimSpace(canEntry.BranchCode) != "" {
+							rec.CustomerBranchCode = canEntry.BranchCode
+						} else {
+							rec.CustomerBranchCode = "" // filled by ingest with the canonical name
+						}
+						if canEntry.Chain != "" {
+							rec.RetailerChain = canEntry.Chain
+						}
+					}
+				}
+			}
 			kept = append(kept, rec)
 			continue
 		}

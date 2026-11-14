@@ -548,6 +548,7 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			TransactionDate:  rec.TransactionDate,
 			IngestionBatchID: batchID,
 			IngestedAt:       now,
+			SourceFilename:   filename,
 		}
 
 		if p.bqRepo != nil && (rec.IsOwnBrand || strings.TrimSpace(rec.Supplier) == "") {
@@ -1409,6 +1410,13 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 	var mappingConfidence float64
 	if parseReport != nil && parseReport.MonthCheck != "" {
 		warnings = append(warnings, UploadIssue{Code: "month_column_mismatch", Severity: "info", MessageAR: parseReport.MonthCheck})
+	}
+	if parseReport != nil && parseReport.QtyUOMFallbackRows > 0 {
+		warnings = append(warnings, UploadIssue{
+			Code:      "qty_uom_fallback",
+			Severity:  "info",
+			MessageAR: fmt.Sprintf("%d صف استخدم UnitsPerCarton من كارتة الأصناف لأن عمود U of M2 كان فاضي", parseReport.QtyUOMFallbackRows),
+		})
 	}
 	if err != nil || len(records) == 0 {
 		// Intelligent fallback: use Gemini / Wide-Matrix multi-sheet parser so any Excel workbook format works seamlessly in Sell-In!

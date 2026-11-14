@@ -313,6 +313,12 @@ func (p *Processor) quarantineSellIn(ctx context.Context, tenantID, filename, ch
 		return records, nil, nil
 	}
 	kept, held := p.customers.PartitionLayout(ctx, tenantID, filename, chain, layout, records, persist)
+	for i := range kept {
+		if strings.TrimSpace(kept[i].CustomerBranchCode) == "" && strings.TrimSpace(kept[i].CustomerName) != "" {
+			st := gemini.BuildBranchStoreMetadata(kept[i].RetailerChain, kept[i].CustomerName)
+			kept[i].CustomerBranchCode = st.ID
+		}
+	}
 	if len(held) == 0 {
 		return kept, nil, nil
 	}

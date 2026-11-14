@@ -22,6 +22,8 @@ import '../../../../core/data/result.dart';
 import '../../data/target_repository.dart';
 import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/backend_http.dart';
+import '../../domain/archive_delete_copy.dart';
 import '../../../../core/testing/test_semantics.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -217,11 +219,11 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     }
   }
 
-  Future<void> _loadAllData() async {
+  Future<void> _loadAllData({bool forceRefresh = false}) async {
     await Future.wait([
       _loadSellInRecords(),
       _loadStockReconciliationReport(),
-      _loadSellInArchive(),
+      _loadSellInArchive(forceRefresh: forceRefresh),
     ]);
   }
 
@@ -333,11 +335,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     }
   }
 
-  Future<void> _loadSellInArchive() async {
+  Future<void> _loadSellInArchive({bool forceRefresh = false}) async {
+    if (forceRefresh) {
+      _repo.invalidateAll();
+    }
     if (mounted) setState(() => _isLoadingArchive = true);
     try {
       final res = await widget.apiClient.getUploadedFilesArchive(
         fileType: 'sell_in',
+        forceRefresh: forceRefresh,
       );
       if (mounted) {
         setState(() {
@@ -473,7 +479,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
           '$actionLabel (${picked.name}): ${res.validRows} صف • ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)}',
         );
       }
-      await _loadAllData();
+      await _loadAllData(forceRefresh: true);
     } catch (e) {
       // Stop the spinner first, then show the server's Arabic reason (or the wait-timeout) in a dialog.
       if (!mounted) return;
@@ -484,7 +490,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       // Wait-timeout is not a rejection: refresh the files list in case the job already finished.
       if (isUploadWaitTimeout(e)) {
         try {
-          await _loadAllData();
+          await _loadAllData(forceRefresh: true);
         } catch (_) {}
         if (!mounted) return;
       }
@@ -548,7 +554,12 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
               ),
               const SizedBox(height: 10.0),
               Text(
-                rtlEnd('سيُعاد حساب المخزون، ولن تتأثر باقي الشهور ولا بيانات ${ltrIsolate('Sell-Out')}.'),
+                sellInDeleteConsequenceText(
+                  coversAllMonths: archiveFileCoversAllMonths(
+                    file.targetMonth,
+                    isLastFile: _archivedSellInFiles.length <= 1,
+                  ),
+                ),
                 style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(fontSize: M3FontSize.bodySmall, color: cs.onSurfaceVariant)),
               ),
             ],
@@ -598,14 +609,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       );
       _repo.invalidateAll();
       _repo.cache.invalidatePrefix(CacheStore.prefix(widget.apiClient.tenantId, TargetRepository.feature));
-      await _loadAllData();
+      BackendHttp.cache.invalidateAll();
+      await _loadAllData(forceRefresh: true);
     } catch (e) {
       if (!mounted) return;
       final msg = e is ArchiveDeleteException
           ? e.message
           : 'تعذّر حذف الملف.';
       M3Feedback.showError(context, msg);
-      await _loadAllData();
+      await _loadAllData(forceRefresh: true);
     } finally {
       if (mounted) {
         setState(() => _deletingFileId = null);
@@ -657,7 +669,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
         item: matched,
         onUpdated: (_) {
           _repo.invalidateAll();
-          _loadAllData();
+          _loadAllData(forceRefresh: true);
         },
       );
     } catch (e) {
@@ -916,7 +928,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                 if (next == 1) {
                   _loadStockReconciliationReport();
                 } else if (next == 3) {
-                  _loadSellInArchive();
+                  _loadSellInArchive(forceRefresh: true);
                 }
               },
             ),
@@ -3408,7 +3420,7 @@ onChanged: m3Legacy<int>((v) {
                         ),
                       ),
                       OutlinedButton.icon(
-                        onPressed: _isLoadingArchive ? null : _loadSellInArchive,
+                        onPressed: _isLoadingArchive ? null : () => _loadSellInArchive(forceRefresh: true),
                         icon: const Icon(Icons.refresh_rounded, size: 18.0),
                         label: const Text('تحديث'),
                       ),
@@ -3448,7 +3460,7 @@ onChanged: m3Legacy<int>((v) {
                           key: const ValueKey('sell_in_archive_load_error'),
                           title: 'تعذّر تحميل الملفات المرفوعة',
                           message: 'الخادم مشغول أو الاتصال انقطع. حاول مرة أخرى بعد لحظات.',
-                          onRetry: _loadSellInArchive,
+                          onRetry: () => _loadSellInArchive(forceRefresh: true),
                         ),
                       )
                 : _archivedSellInFiles.isEmpty

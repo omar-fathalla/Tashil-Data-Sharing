@@ -38,6 +38,8 @@ type Repository interface {
 	RemoveBatchRecords(ctx context.Context, tenantID, batchID, chain string) error
 	RemoveSellInRecords(ctx context.Context, tenantID string) error
 	RemoveSellInFileRecords(ctx context.Context, tenantID, batchID, filename, chain string) error
+	RemoveSellOutFileRecords(ctx context.Context, tenantID, batchID, filename, chain string) error
+	ClearSellOutFacts(ctx context.Context, tenantID string) error
 	GetExecutiveKPIs(ctx context.Context, tenantID, period string, dateRange ...string) (*domain.ExecutiveKPIs, error)
 	GetSellOutRecords(ctx context.Context, tenantID string, filter RecordFilter) ([]domain.SellOutFact, int, error)
 	GetChainShares(ctx context.Context, tenantID, period string, dateRange ...string) ([]domain.ChainShareSummary, error)
@@ -1511,6 +1513,82 @@ func (c *Client) RemoveBatchRecords(ctx context.Context, tenantID, batchID, chai
 		}
 	}
 
+	return nil
+}
+
+// RemoveSellOutFileRecords drops in-memory Sell-Out facts for one archived file.
+// A fact is removed when its ingestion batch matches, or when its source filename
+// matches (same chain when chain is set) — the same fallback Sell-In uses.
+func (c *Client) RemoveSellOutFileRecords(ctx context.Context, tenantID, batchID, filename, chain string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.invalidateKPICache()
+
+	normBatch := strings.TrimSpace(batchID)
+	normFile := strings.TrimSpace(filename)
+	normChain := strings.ToLower(strings.TrimSpace(chain))
+
+	var kept []domain.SellOutFact
+	for _, r := range c.records {
+		if !matchTenant(r.TenantID, tenantID) {
+			kept = append(kept, r)
+			continue
+		}
+		if normBatch != "" && r.IngestionBatchID == normBatch {
+			continue
+		}
+		if normFile != "" && strings.EqualFold(strings.TrimSpace(r.SourceFilename), normFile) {
+			if normChain == "" || strings.EqualFold(strings.TrimSpace(r.RetailerChain), normChain) {
+				continue
+			}
+		}
+		kept = append(kept, r)
+	}
+	c.records = kept
+
+	var keptPricing []domain.PricingComplianceItem
+	for _, item := range c.pricingItems {
+		if !matchTenant(item.TenantID, tenantID) {
+			keptPricing = append(keptPricing, item)
+			continue
+		}
+		if normChain != "" && strings.EqualFold(item.RetailerChain, normChain) && normBatch == "" && normFile == "" {
+			continue
+		}
+		keptPricing = append(keptPricing, item)
+	}
+	c.pricingItems = keptPricing
+	return nil
+}
+
+// ClearSellOutFacts removes every in-memory Sell-Out fact and pricing item for a tenant.
+// Sell-In records, product master and Firestore data are left untouched.
+func (c *Client) ClearSellOutFacts(ctx context.Context, tenantID string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.invalidateKPICache()
+
+	slug := normalizeBQTenantSlug(tenantID)
+	if c.cleanedTenants != nil && slug != "" {
+		c.cleanedTenants[slug] = true
+	}
+	delete(c.workbookMeta, slug)
+
+	var kept []domain.SellOutFact
+	for _, r := range c.records {
+		if !matchTenant(r.TenantID, tenantID) {
+			kept = append(kept, r)
+		}
+	}
+	c.records = kept
+
+	var keptPricing []domain.PricingComplianceItem
+	for _, item := range c.pricingItems {
+		if !matchTenant(item.TenantID, tenantID) {
+			keptPricing = append(keptPricing, item)
+		}
+	}
+	c.pricingItems = keptPricing
 	return nil
 }
 
