@@ -1201,7 +1201,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                           if (item.retailerMarginPct !=
                                                               0)
                                                             Text(
-                                                              'هامش السلسلة: ${item.retailerMarginPct.toStringAsFixed(1)}%',
+                                                              'هامش السلسلة: ${CurrencyFormatter.formatSignedPct(item.retailerMarginPct)}',
                                                               maxLines: 3,
                                                               textAlign:
                                                                   TextAlign

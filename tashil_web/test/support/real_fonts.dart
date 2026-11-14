@@ -27,4 +27,17 @@ Future<void> loadRealCairoFont() async {
   for (final family in families) {
     await (FontLoader(family)..addFont(Future.value(data))).load();
   }
+  await loadSymbolFallbackFont();
+}
+
+/// Registers the bundled Noto Sans Symbols 2 subset (▲ ▼ and zero-advance
+/// LRI/PDI isolates) under the same family name the app theme uses as
+/// [fontFamilyFallback].
+Future<void> loadSymbolFallbackFont() async {
+  final path = File('fonts/NotoSansSymbols2-Arrows.ttf').existsSync()
+      ? 'fonts/NotoSansSymbols2-Arrows.ttf'
+      : 'test/fonts/NotoSansSymbols2-Arrows.ttf';
+  final bytes = File(path).readAsBytesSync();
+  final data = ByteData.view(Uint8List.fromList(bytes).buffer);
+  await (FontLoader('NotoSansSymbols2')..addFont(Future.value(data))).load();
 }

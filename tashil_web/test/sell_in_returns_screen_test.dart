@@ -151,7 +151,7 @@ void main() {
 
     // Value ↔ % toggle is present.
     expect(find.text('قيمة'), findsWidgets);
-    expect(find.text('نسبة %'), findsOneWidget);
+    expect(find.text('نسبة\u00A0%'), findsOneWidget);
   });
 
   testWidgets('المرتجعات Excel export downloads matrix + top products CSV', (tester) async {

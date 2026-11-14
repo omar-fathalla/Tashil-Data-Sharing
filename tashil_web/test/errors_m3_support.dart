@@ -232,13 +232,7 @@ Future<void> loadErrorsFonts() async {
   for (final family in families) {
     await (FontLoader(family)..addFont(Future.value(data))).load();
   }
-  final arrows =
-      File('test/fonts/NotoSansSymbols2-Arrows.ttf').readAsBytesSync();
-  await (FontLoader('NotoSansSymbols2')
-        ..addFont(Future.value(ByteData.view(
-          Uint8List.fromList(arrows).buffer,
-        ))))
-      .load();
+  // NotoSansSymbols2 is already registered by loadRealCairoFont.
 }
 
 void ignoreGoogleFontLoadErrors() {

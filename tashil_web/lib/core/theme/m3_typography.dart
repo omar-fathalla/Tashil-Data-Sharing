@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// Font-size tokens aligned to the Material 3 type scale.
 ///
 /// Prefer `Theme.of(context).textTheme.<role>` for new code. Out-of-scale
@@ -36,4 +38,45 @@ abstract final class M3FontSize {
   static const double headlineMedium = 28.0;
   @Deprecated('use textTheme.displayLarge (57)')
   static const double displayHero = 68.0;
+}
+
+/// Bundled CanvasKit fallback for glyphs Cairo does not ship.
+///
+/// Flutter web (CanvasKit) will not use the browser's system fonts, so ▲ ▼
+/// (U+25B2 / U+25BC) painted as .notdef tofu on Compare and chart callouts
+/// until this family is registered in pubspec and applied as
+/// [fontFamilyFallback]. U+2066…U+2069 are in the same font as zero-advance
+/// glyphs so LRI/PDI isolates never paint a box.
+abstract final class AppFontFallback {
+  static const symbolFamily = 'NotoSansSymbols2';
+  static const families = <String>[symbolFamily];
+
+  static TextStyle applyStyle(TextStyle style) {
+    final existing = style.fontFamilyFallback ?? const <String>[];
+    if (existing.contains(symbolFamily)) return style;
+    return style.copyWith(
+      fontFamilyFallback: [...existing, symbolFamily],
+    );
+  }
+
+  static TextTheme apply(TextTheme theme) {
+    TextStyle? f(TextStyle? s) => s == null ? null : applyStyle(s);
+    return theme.copyWith(
+      displayLarge: f(theme.displayLarge),
+      displayMedium: f(theme.displayMedium),
+      displaySmall: f(theme.displaySmall),
+      headlineLarge: f(theme.headlineLarge),
+      headlineMedium: f(theme.headlineMedium),
+      headlineSmall: f(theme.headlineSmall),
+      titleLarge: f(theme.titleLarge),
+      titleMedium: f(theme.titleMedium),
+      titleSmall: f(theme.titleSmall),
+      bodyLarge: f(theme.bodyLarge),
+      bodyMedium: f(theme.bodyMedium),
+      bodySmall: f(theme.bodySmall),
+      labelLarge: f(theme.labelLarge),
+      labelMedium: f(theme.labelMedium),
+      labelSmall: f(theme.labelSmall),
+    );
+  }
 }

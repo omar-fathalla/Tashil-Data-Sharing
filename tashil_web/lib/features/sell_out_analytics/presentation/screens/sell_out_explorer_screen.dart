@@ -1,3 +1,4 @@
+import 'package:tashil_web/core/widgets/hyphenated_code_text.dart';
 import 'package:tashil_web/core/widgets/m3_search_field.dart';
 import 'package:tashil_web/core/widgets/m3_states.dart';
 import 'package:tashil_web/core/widgets/m3_menu_filter.dart';
@@ -95,7 +96,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     String text, {
     TextStyle? style,
     Key? key,
-    double maxWidth = 52,
+    double maxWidth = 46,
     int maxLines = 3,
     TextAlign textAlign = TextAlign.center,
   }) {
@@ -114,24 +115,25 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   }
 
   static List<DataColumn> get _priceMatrixColumns => [
-        _priceHeading('كود الصنف', numeric: false, maxWidth: 88),
+        _priceHeading('كود الصنف', numeric: false, maxWidth: 116),
         _priceHeading('الصنف الرسمي', numeric: false, center: false, maxWidth: 220),
-        _priceHeading('وحدات/كرتونة', maxWidth: 52),
-        _priceHeading('الوحدات', maxWidth: 52),
-        _priceHeading('الكراتين', maxWidth: 52),
-        _priceHeading('سعر القائمة (شامل الضريبة)', maxWidth: 52),
-        _priceHeading('سعر البيع الفعلي', maxWidth: 52),
-        _priceHeading('فرق السعر %', maxWidth: 52),
-        _priceHeading('تكلفة المصنع للقطعة', maxWidth: 52),
-        _priceHeading('صافي سعر الكرتونة (فاتورة)', maxWidth: 52),
-        _priceHeading('صافي المبيعات', maxWidth: 52),
-        _priceHeading('هامش السلسلة', maxWidth: 56),
+        _priceHeading('وحدات/كرتونة', maxWidth: 46),
+        _priceHeading('الوحدات', maxWidth: 46),
+        _priceHeading('الكراتين', maxWidth: 46),
+        _priceHeading('سعر القائمة (شامل الضريبة)', maxWidth: 46),
+        _priceHeading('سعر البيع الفعلي', maxWidth: 46),
+        _priceHeading('فرق السعر %', maxWidth: 46),
+        _priceHeading('تكلفة المصنع للقطعة', maxWidth: 46),
+        _priceHeading('صافي سعر الكرتونة (فاتورة)', maxWidth: 46),
+        _priceHeading('صافي المبيعات', maxWidth: 46),
+        _priceHeading('هامش السلسلة', maxWidth: 90),
       ];
 
   /// Flex shares for the price matrix at the live 1280+sidebar width.
-  /// Name gets the most room; numeric columns stay compact and wrap ≤3.
+  /// Code stays wide enough for a one-line hyphenated SKU; margin is wide
+  /// enough for «خسارة 4.60M ج.م (60.3%)» wrapped ≤3 with no ellipsis.
   static const List<double> _priceMatrixFlex = [
-    10, 22, 6, 6, 6, 8, 8, 7, 7, 7, 6, 7,
+    116, 220, 46, 46, 46, 46, 46, 46, 46, 46, 46, 90,
   ];
 
   @override
@@ -1342,13 +1344,15 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                         InkWell(
                           onTap: () => _openProductIdCardForSummary(s),
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 88.0),
-                            child: Text(
+                            constraints: const BoxConstraints(maxWidth: 116.0),
+                            child: HyphenatedCodeText(
                               s.itemCode.isNotEmpty ? s.itemCode : s.barcode,
                               maxLines: 3,
-                              softWrap: true,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace', color: colorScheme.primary, decoration: TextDecoration.underline),
+                              maxWidth: 116,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.primary,
+                                decoration: TextDecoration.underline,
+                              ),
                             ),
                           ),
                         ),
@@ -1391,7 +1395,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                       DataCell(_priceCell(CurrencyFormatter.formatCompactEGP(s.totalNetRevenue), style: cellStrong?.copyWith(color: colorScheme.primary))),
                       DataCell(
                         ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 56.0),
+                          constraints: const BoxConstraints(maxWidth: 90.0),
                           child: M3WrapText(
                             s.retailerMarginPct != 0
                                 ? CurrencyFormatter.formatMarginSummary(s.retailerGrossProfit, s.retailerMarginPct)

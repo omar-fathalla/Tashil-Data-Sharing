@@ -82,7 +82,7 @@ class PricingShotApiClient extends ApiClient {
         actualPrice: 115.0,
         recommendedPrice: 100.0,
         factoryUnitCost: 38.0,
-        retailerMarginPct: 25.0,
+        retailerMarginPct: -5.0,
         unitsPerCarton: 12,
         priceDeltaPct: 15.0,
         violationType: 'price_gouging',

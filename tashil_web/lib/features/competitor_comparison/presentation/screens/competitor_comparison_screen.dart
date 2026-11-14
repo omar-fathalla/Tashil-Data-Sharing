@@ -3424,11 +3424,12 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: '${val.toStringAsFixed(0)} ج',
-          style: TextStyle(
+          style: AppFontFallback.applyStyle(TextStyle(
             color: textColor,
+            fontFamily: 'Cairo',
             fontSize: M3FontSize.labelSmall,
             fontWeight: FontWeight.w700,
-          ),
+          )),
         ),
         textDirection: TextDirection.rtl,
       )..layout();
@@ -3458,12 +3459,13 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
       TextPainter monthLabel(String text) => TextPainter(
             text: TextSpan(
               text: text,
-              style: TextStyle(
+              style: AppFontFallback.applyStyle(TextStyle(
                 color: isHighlightedMonth ? ownColor : textColor,
+                fontFamily: 'Cairo',
                 fontSize: M3FontSize.bodySmall,
                 fontWeight:
                     isHighlightedMonth ? FontWeight.w900 : FontWeight.w800,
-              ),
+              )),
             ),
             textDirection: TextDirection.rtl,
           )..layout();
@@ -3597,11 +3599,12 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: calloutText(pt),
-          style: TextStyle(
+          style: AppFontFallback.applyStyle(TextStyle(
             color: ownColor,
+            fontFamily: 'Cairo',
             fontSize: M3FontSize.labelSmall,
             fontWeight: FontWeight.w900,
-          ),
+          )),
         ),
         textDirection: TextDirection.rtl,
       )..layout();
@@ -3622,11 +3625,12 @@ class _MonthlyPriceTrajectoryPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: calloutText(pt),
-          style: TextStyle(
+          style: AppFontFallback.applyStyle(TextStyle(
             color: compColor,
+            fontFamily: 'Cairo',
             fontSize: M3FontSize.tinyPlus,
             fontWeight: FontWeight.w900,
-          ),
+          )),
         ),
         textDirection: TextDirection.rtl,
       )..layout();
