@@ -18,12 +18,17 @@ class CurrencyFormatter {
   static final NumberFormat _currencyFormat = NumberFormat('#,##0.00', 'en_US');
   static final NumberFormat _integerFormat = NumberFormat('#,##0', 'en_US');
 
-  /// Formats exact currency value: e.g. "14,500.50 ج.م"
+  /// Formats exact currency value: e.g. "14,500.50 ج.م".
+  /// A negative amount keeps U+2212 on the left of the digits in RTL
+  /// because the whole "−14,500 ج.م" sits in an LRI…PDI isolate.
   static String formatEGP(double amount, {bool showDecimals = false}) {
-    if (showDecimals) {
-      return '${_currencyFormat.format(amount)} ج.م';
-    }
-    return '${_integerFormat.format(amount.round())} ج.م';
+    final negative = amount < 0;
+    final value = amount.abs();
+    final body = showDecimals
+        ? _currencyFormat.format(value)
+        : _integerFormat.format(value.round());
+    final out = negative ? '\u2212$body ج.م' : '$body ج.م';
+    return negative ? '\u2066$out\u2069' : out;
   }
 
   /// Compact EGP for charts & cards, one place for spacing/rounding.
@@ -31,11 +36,13 @@ class CurrencyFormatter {
   /// - `words: true` → "19.1 مليون ج.م" / "950 ألف ج.م" / "1.2 مليار ج.م" (chart axes).
   /// Always a normal space between number, scale word and currency; [isolate]
   /// wraps the value in FSI…PDI so it never reorders inside RTL text.
+  /// A negative amount always wraps the signed value (U+2212 plus the
+  /// compact body, including "ج.م") in LRI…PDI so the minus stays on the
+  /// left of the digits in RTL; [isolate] is still applied to positives.
   static String formatCompactEGP(double amount,
       {bool words = false, int? decimals, bool isolate = false}) {
-    if (amount < 0) {
-      return '−${formatCompactEGP(-amount, words: words, decimals: decimals, isolate: isolate)}';
-    }
+    final negative = amount < 0;
+    amount = amount.abs();
     String trim(double v, int d) {
       final s = v.toStringAsFixed(d);
       return d > 0 && s.contains('.')
@@ -57,29 +64,42 @@ class CurrencyFormatter {
     } else {
       out = '${amount.toStringAsFixed(0)} ج.م';
     }
-    return isolate ? '\u2068$out\u2069' : out;
+    final signed = negative ? '\u2212$out' : out;
+    if (negative) return '\u2066$signed\u2069';
+    return isolate ? '\u2068$signed\u2069' : signed;
   }
 
-  /// Formats integer count with thousands separators: e.g. "125,400"
-  static String formatUnits(int count) {
-    return _integerFormat.format(count);
-  }
+  /// Formats integer count with thousands separators: e.g. "125,400".
+  /// Negatives use U+2212 inside LRI…PDI so the minus stays on the left
+  /// of the digits in RTL; positives are unchanged.
+  static String formatUnits(int count) => _signedInteger(count);
 
   /// Formats any numeric count (int or double) with thousands separators.
-  static String formatNumber(num count) {
-    return _integerFormat.format(count.round());
+  static String formatNumber(num count) => _signedInteger(count.round());
+
+  static String _signedInteger(int count) {
+    if (count < 0) {
+      return '\u2066\u2212${_integerFormat.format(count.abs())}\u2069';
+    }
+    return _integerFormat.format(count);
   }
 
   /// Compact formatting for unit quantities: e.g. "45.2K وحدة"
   static String formatCompactUnits(int count) {
-    if (count >= 1000000) {
-      final inM = count / 1000000.0;
-      return '${inM.toStringAsFixed(1)}M قطعة';
-    } else if (count >= 1000) {
-      final inK = count / 1000.0;
-      return '${inK.toStringAsFixed(1)}K قطعة';
+    final negative = count < 0;
+    final value = count.abs();
+    final String out;
+    if (value >= 1000000) {
+      final inM = value / 1000000.0;
+      out = '${inM.toStringAsFixed(1)}M قطعة';
+    } else if (value >= 1000) {
+      final inK = value / 1000.0;
+      out = '${inK.toStringAsFixed(1)}K قطعة';
+    } else {
+      out = '$value قطعة';
     }
-    return '$count قطعة';
+    final signed = negative ? '\u2212$out' : out;
+    return negative ? '\u2066$signed\u2069' : signed;
   }
 
   /// Chain margin amount. A loss reads "خسارة 21.36M ج.م" with no minus sign

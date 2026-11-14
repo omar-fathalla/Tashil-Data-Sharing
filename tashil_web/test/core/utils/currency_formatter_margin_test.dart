@@ -4,8 +4,9 @@ import 'package:tashil_web/core/utils/currency_formatter.dart';
 void main() {
   group('CurrencyFormatter margins', () {
     test('compact negative keeps M/K scaling instead of raw digits', () {
-      expect(CurrencyFormatter.formatCompactEGP(-21360308), '−21.36M ج.م');
-      expect(CurrencyFormatter.formatCompactEGP(-2500), '−2.5K ج.م');
+      expect(CurrencyFormatter.formatCompactEGP(-21360308),
+          '\u2066−21.36M ج.م\u2069');
+      expect(CurrencyFormatter.formatCompactEGP(-2500), '\u2066−2.5K ج.م\u2069');
     });
 
     test('loss reads خسارة with no minus sign', () {
