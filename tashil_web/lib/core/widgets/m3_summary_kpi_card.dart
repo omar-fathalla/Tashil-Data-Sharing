@@ -57,7 +57,7 @@ class M3SummaryKpiCard extends StatelessWidget {
     this.textValue = false,
     this.titleMaxLines = 1,
     this.subtitleMaxLines = 1,
-    this.scaleTitleToFit = false,
+    this.titleTooltip,
     this.isLoading = false,
     this.titleKey,
     this.valueKey,
@@ -75,9 +75,8 @@ class M3SummaryKpiCard extends StatelessWidget {
   /// null = wrap freely (never ellipsized).
   final int? titleMaxLines;
   final int subtitleMaxLines;
-  /// Shrink a one-line title just enough to stay fully visible at the
-  /// Sell-Out card width (used by OOS, whose titles are longer).
-  final bool scaleTitleToFit;
+  /// Optional tooltip with the full wording when the visible title is shortened.
+  final String? titleTooltip;
   final bool isLoading;
   final Key? titleKey;
   final Key? valueKey;
@@ -115,24 +114,25 @@ class M3SummaryKpiCard extends StatelessWidget {
               ),
               const SizedBox(width: M3SummaryKpiStyle.iconGap),
               Expanded(
-                child: scaleTitleToFit && titleMaxLines == 1
-                    ? FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: AlignmentDirectional.centerStart,
-                        child: M3SectionTitle(
-                          title,
-                          key: titleKey,
-                          maxLines: 1,
-                          overflow: TextOverflow.visible,
-                        ),
-                      )
-                    : M3SectionTitle(
+                child: titleTooltip == null
+                    ? M3SectionTitle(
                         title,
                         key: titleKey,
                         maxLines: titleMaxLines,
                         overflow: titleMaxLines == null
                             ? null
                             : TextOverflow.ellipsis,
+                      )
+                    : Tooltip(
+                        message: titleTooltip,
+                        child: M3SectionTitle(
+                          title,
+                          key: titleKey,
+                          maxLines: titleMaxLines,
+                          overflow: titleMaxLines == null
+                              ? null
+                              : TextOverflow.ellipsis,
+                        ),
                       ),
               ),
             ],

@@ -46,7 +46,7 @@ void main() {
 
       // Check OSA% KPI Card
       expect(find.byKey(const ValueKey('osa_summary_card')), findsOneWidget);
-      expect(find.text('مؤشر التوافر على الرفوف OSA%'), findsOneWidget);
+      expect(find.text('نسبة التوافر OSA%'), findsOneWidget);
 
       // Check Gemini AI Card
       expect(find.text('مستشار الذكاء الاصطناعي (Gemini AI Root-Cause Advisor)'), findsOneWidget);
