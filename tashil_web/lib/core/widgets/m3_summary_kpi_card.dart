@@ -205,6 +205,7 @@ class M3SummaryKpiCard extends StatelessWidget {
       waitDuration: const Duration(milliseconds: 300),
       showDuration: const Duration(seconds: 8),
       preferBelow: true,
+      constraints: const BoxConstraints(maxWidth: 360),
       child: card,
     );
   }

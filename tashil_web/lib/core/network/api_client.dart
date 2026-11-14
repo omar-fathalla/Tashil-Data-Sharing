@@ -2343,6 +2343,9 @@ class SellOutRecordsTruncatedException implements Exception {
 
 /// ApiClient communicates with the Cloud Run backend.
 /// Automatically injects JWT Bearer tokens and handles tenant RLS headers.
+/// Result of [ApiClient.verifySession].
+enum SessionVerifyResult { valid, unauthorized, unavailable }
+
 class ApiClient {
   String tenantId;
   String _authToken;
@@ -2405,22 +2408,25 @@ class ApiClient {
 
   /// Confirms the current token is still accepted by the backend.
   ///
-  /// Returns false only when the token is missing or the server answers 401
-  /// (expired, rotated secret, or otherwise rejected). Timeouts, network
-  /// errors, and other HTTP statuses return true so a brief outage does not
-  /// force a re-login; later 401s still go through [reportAuthStatus].
-  Future<bool> verifySession() async {
-    if (_authToken.isEmpty) return false;
+  /// Only HTTP 200 is [SessionVerifyResult.valid] — a 503 or timeout during a
+  /// Cloud Run revision start must not open the shell, or later requests can
+  /// 401 while the UI already looks logged in. 401 is [unauthorized].
+  /// Other failures are [unavailable] so a brief outage does not clear the
+  /// stored session; the app retries without showing the dashboard.
+  Future<SessionVerifyResult> verifySession() async {
+    if (_authToken.isEmpty) return SessionVerifyResult.unauthorized;
     try {
       final resp = await BackendHttp.get(
         Uri.parse(ApiEndpoints.sessionMe),
         headers: requestHeaders,
       ).timeout(sessionVerifyTimeout);
-      return resp.statusCode != 401;
+      if (resp.statusCode == 200) return SessionVerifyResult.valid;
+      if (resp.statusCode == 401) return SessionVerifyResult.unauthorized;
+      return SessionVerifyResult.unavailable;
     } on TimeoutException {
-      return true;
+      return SessionVerifyResult.unavailable;
     } catch (_) {
-      return true;
+      return SessionVerifyResult.unavailable;
     }
   }
   String? lastConnectionError;
