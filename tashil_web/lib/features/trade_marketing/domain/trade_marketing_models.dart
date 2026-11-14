@@ -183,6 +183,10 @@ class MonthlyChainRoiSummary {
   /// MoM incremental sales lift in EGP (Current Month - Previous Month)
   double get momLiftEgp => currentMonthSalesEgp - previousMonthSalesEgp;
 
+  /// True only when the previous month has Sell-Out; otherwise MoM is not a
+  /// real 0 and the UI shows "—" (no comparable month).
+  bool get hasMoM => previousMonthSalesEgp > 0;
+
   /// MoM growth percentage
   double get momGrowthPct => previousMonthSalesEgp > 0
       ? ((currentMonthSalesEgp - previousMonthSalesEgp) / previousMonthSalesEgp) * 100.0
