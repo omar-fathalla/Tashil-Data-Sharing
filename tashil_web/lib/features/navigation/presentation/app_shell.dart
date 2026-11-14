@@ -450,17 +450,21 @@ class _AppShellState extends State<AppShell> {
 
     // 1. Desktop Experience (Expanded, Large, Extra Large >= 840dp)
     if (layout.isDesktop) {
-      // Physical LTR row: content | sidebar. Shell chrome stays RTL visually
-      // (sidebar on the right) while the sidebar is last in the Row so it
-      // wins hit-tests if page overflow ever escapes ClipRect. Fade-through
-      // outgoing pages are IgnorePointer; content is ClipRect-clipped.
+      // Stack (not Row): sidebar is painted/hit-tested above clipped content
+      // so page overflow or web flt-semantics from Pricing (etc.) cannot
+      // swallow the Compare row. Fade-through outgoing pages stay IgnorePointer.
+      const sidebarWidth = 250.0;
       return Scaffold(
         body: Directionality(
           textDirection: shellDirection,
-          child: Row(
-            textDirection: TextDirection.ltr,
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              Expanded(
+              Positioned(
+                left: 0,
+                right: sidebarWidth,
+                top: 0,
+                bottom: 0,
                 child: Directionality(
                   textDirection: TextDirection.rtl,
                   child: ColoredBox(
@@ -474,15 +478,22 @@ class _AppShellState extends State<AppShell> {
                   ),
                 ),
               ),
-              DesktopSidebar(
-                selectedIndex: _navHighlightIndex ?? -1,
-                onDestinationSelected: (index) => _selectPage(index),
-                activeTenant: widget.activeTenant,
-                currentUser: widget.apiClient.currentUser,
-                onTenantChanged: widget.onTenantChanged,
-                onOpenProfile: _openUserProfile,
-                onNavigateToAdmin: widget.onNavigateToAdmin,
-                isSuperAdmin: widget.apiClient.currentUser?.isSuperAdmin == true,
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: sidebarWidth,
+                child: DesktopSidebar(
+                  selectedIndex: _navHighlightIndex ?? -1,
+                  onDestinationSelected: (index) => _selectPage(index),
+                  activeTenant: widget.activeTenant,
+                  currentUser: widget.apiClient.currentUser,
+                  onTenantChanged: widget.onTenantChanged,
+                  onOpenProfile: _openUserProfile,
+                  onNavigateToAdmin: widget.onNavigateToAdmin,
+                  isSuperAdmin:
+                      widget.apiClient.currentUser?.isSuperAdmin == true,
+                ),
               ),
             ],
           ),

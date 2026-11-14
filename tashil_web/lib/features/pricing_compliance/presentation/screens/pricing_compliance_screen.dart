@@ -396,9 +396,12 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
               M3Spacing.gapMD,
 
               // Filter Toolbar with Temporal (Year/Month), Chain, Status & Category Selectors
+              // Clip hard so wide dropdowns / chips cannot paint or publish
+              // flt-semantics past the content edge over the sidebar Compare row.
               Card(
                 elevation: 0,
                 color: colorScheme.surfaceContainerLow,
+                clipBehavior: Clip.hardEdge,
                 shape: RoundedRectangleBorder(
                   borderRadius: M3Shape.radiusLg,
                   side: BorderSide(
@@ -1972,69 +1975,74 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
           children: chunks.map((chunk) {
             return Padding(
               padding: const EdgeInsets.only(bottom: verticalSpacing),
-              child: Row(
-                children: [
-                  for (var col = 0; col < crossAxisCount; col++) ...[
-                    if (col > 0) const SizedBox(width: horizontalSpacing),
-                    if (col < chunk.length) ...[
-                      Expanded(
-                        child: LayoutBuilder(
-                          builder: (context, chipConstraints) {
-                            // FilterChip adds padding, labelPadding, and a
-                            // border around the label. 24dp was not enough at
-                            // the live 1030dp content width (1280 minus the
-                            // 250dp sidebar): the chip overflowed the slot and
-                            // clipped the start of long names. Reserve 48dp.
-                            const chrome = 48.0;
-                            final labelWidth = (chipConstraints.maxWidth - chrome)
-                                .clamp(8.0, chipConstraints.maxWidth);
-                            return SizedBox(
-                              width: chipConstraints.maxWidth,
-                              child: FilterChip(
-                              label: SizedBox(
-                                width: labelWidth,
-                                child: Text(
-                                  chunk[col],
-                                  maxLines: 3,
-                                  overflow: TextOverflow.clip,
-                                  softWrap: true,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    fontWeight: _selectedCategory == chunk[col]
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
+              child: ClipRect(
+                child: Row(
+                  children: [
+                    for (var col = 0; col < crossAxisCount; col++) ...[
+                      if (col > 0) const SizedBox(width: horizontalSpacing),
+                      if (col < chunk.length) ...[
+                        Expanded(
+                          child: LayoutBuilder(
+                            builder: (context, chipConstraints) {
+                              // FilterChip adds padding, labelPadding, and a
+                              // border around the label. 24dp was not enough at
+                              // the live 1030dp content width (1280 minus the
+                              // 250dp sidebar): the chip overflowed the slot and
+                              // clipped the start of long names. Reserve 48dp.
+                              const chrome = 48.0;
+                              final labelWidth =
+                                  (chipConstraints.maxWidth - chrome)
+                                      .clamp(8.0, chipConstraints.maxWidth);
+                              return SizedBox(
+                                width: chipConstraints.maxWidth,
+                                child: FilterChip(
+                                  label: SizedBox(
+                                    width: labelWidth,
+                                    child: Text(
+                                      chunk[col],
+                                      maxLines: 3,
+                                      overflow: TextOverflow.clip,
+                                      softWrap: true,
+                                      textAlign: TextAlign.center,
+                                      style:
+                                          theme.textTheme.labelLarge?.copyWith(
+                                        fontWeight:
+                                            _selectedCategory == chunk[col]
+                                                ? FontWeight.w700
+                                                : FontWeight.w500,
+                                      ),
+                                    ),
                                   ),
+                                  selected: _selectedCategory == chunk[col],
+                                  showCheckmark: false,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 4.0, vertical: 2.0),
+                                  labelPadding: const EdgeInsets.symmetric(
+                                      horizontal: 4.0),
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: M3Shape.radiusSm,
+                                  ),
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _selectedCategory = chunk[col];
+                                      _currentPage = 0;
+                                    });
+                                    _loadPricingCompliance();
+                                  },
                                 ),
-                              ),
-                              selected: _selectedCategory == chunk[col],
-                              showCheckmark: false,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 4.0, vertical: 2.0),
-                              labelPadding:
-                                  const EdgeInsets.symmetric(horizontal: 4.0),
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                              shape: const RoundedRectangleBorder(
-                                borderRadius: M3Shape.radiusSm,
-                              ),
-                              onSelected: (_) {
-                                setState(() {
-                                  _selectedCategory = chunk[col];
-                                  _currentPage = 0;
-                                });
-                                _loadPricingCompliance();
-                              },
-                            ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                    ] else ...[
-                      // Empty placeholder to preserve column alignment and width in the last row
-                      const Expanded(child: SizedBox()),
+                      ] else ...[
+                        // Empty placeholder to preserve column alignment and width in the last row
+                        const Expanded(child: SizedBox()),
+                      ],
                     ],
                   ],
-                ],
+                ),
               ),
             );
           }).toList(),
