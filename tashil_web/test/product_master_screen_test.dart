@@ -412,6 +412,9 @@ void main() {
     // Verify header, 5th KPI card, and SKUs are rendered
     expect(find.textContaining('كارتة الأصناف والأسعار المعتمدة'), findsOneWidget);
     expect(find.textContaining('التغطية بالسلاسل'), findsOneWidget);
+    expect(find.byKey(const ValueKey('product_master_tabs')), findsOneWidget);
+    expect(find.text('مسحوب'), findsWidgets);
+    expect(find.text('غير مسحوب'), findsWidgets);
     expect(itemCode('FGCL-0550-0001'), findsWidgets);
     expect(itemCode('PRCL-0102-0015'), findsWidgets);
 
