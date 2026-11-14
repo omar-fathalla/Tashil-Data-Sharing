@@ -1394,52 +1394,84 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     required String subText,
     required Color accentColor,
     required IconData icon,
+    String? labelTooltip,
+    bool expand = false,
   }) {
     final cs = Theme.of(context).colorScheme;
+    final labelStyle = Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(
+          fontSize: M3FontSize.bodySmall,
+          fontWeight: FontWeight.w700,
+          color: cs.onSurfaceVariant,
+        ));
+    final valueStyle = Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(
+          fontSize: M3FontSize.bodyLarge,
+          fontWeight: FontWeight.w900,
+          color: accentColor,
+        ));
+    final subStyle = Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(
+          fontSize: M3FontSize.bodySmall,
+          fontWeight: FontWeight.w600,
+          color: cs.onSurfaceVariant,
+        ));
+    Widget label = Text(
+      labelAr,
+      maxLines: 2,
+      overflow: TextOverflow.visible,
+      style: labelStyle,
+    );
+    if (labelTooltip != null) {
+      label = Tooltip(message: labelTooltip, child: label);
+    }
+    final texts = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        label,
+        const SizedBox(height: 2.0),
+        if (_isLoading) ...[
+          const M3SkeletonBox(
+              key: ValueKey('sell_in_waterfall_skeleton'),
+              width: 96.0,
+              height: 18.0),
+          const SizedBox(height: 4.0),
+          const M3SkeletonBox(width: 140.0, height: 10.0),
+        ] else ...[
+          Text(
+            valueText,
+            maxLines: 1,
+            overflow: TextOverflow.visible,
+            style: valueStyle,
+          ),
+          Text(
+            subText,
+            maxLines: 2,
+            overflow: TextOverflow.visible,
+            style: subStyle,
+          ),
+        ],
+      ],
+    );
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+      width: expand ? double.infinity : null,
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: M3Shape.radiusMd,
         border: Border.all(color: accentColor.withOpacity(0.35)),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(6.0),
             decoration: BoxDecoration(
               color: accentColor.withOpacity(0.12),
               borderRadius: M3Shape.radiusSm,
             ),
             child: Icon(icon, size: 18.0, color: accentColor),
           ),
-          const SizedBox(width: 10.0),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                labelAr,
-                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.bodySmall,                   fontWeight: FontWeight.w700,                   color: cs.onSurfaceVariant,                 )),
-              ),
-              const SizedBox(height: 2.0),
-              if (_isLoading) ...[
-                const M3SkeletonBox(key: ValueKey('sell_in_waterfall_skeleton'), width: 96.0, height: 18.0),
-                const SizedBox(height: 4.0),
-                const M3SkeletonBox(width: 140.0, height: 10.0),
-              ] else ...[
-                Text(
-                  valueText,
-                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.bodyLarge,                   fontWeight: FontWeight.w900,                   color: accentColor,                 )),
-                ),
-                Text(
-                  subText,
-                  style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                   fontSize: M3FontSize.bodySmall,                   fontWeight: FontWeight.w600,                   color: cs.onSurfaceVariant,                 )),
-                ),
-              ],
-            ],
-          ),
+          const SizedBox(width: 6.0),
+          if (expand) Expanded(child: texts) else texts,
         ],
       ),
     );
@@ -1481,12 +1513,12 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
           builder: (context, constraints) {
             final card1 = _buildSummaryCard(
               context,
-              titleAr: 'صافي التوريد بعد المرتجعات',
+              titleAr: 'صافي التوريد',
               titleEn: 'Net Sell-In after returns (excl. VAT)',
               titleTooltip: 'صافي التوريد بعد المرتجعات (غير شامل الضريبة)',
               value: CurrencyFormatter.formatCompactEGP(netExclVat),
               subtitle:
-                  'صافي بعد المرتجعات · شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(grossInclVat)} • ${_data.totalCount} صف',
+                  'شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(grossInclVat)} • ${CurrencyFormatter.formatUnits(_data.totalCount)} صف',
               icon: Icons.payments_rounded,
               color: colorScheme.primary,
             );
@@ -1514,11 +1546,12 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
             );
             final card4 = _buildSummaryCard(
               context,
-              titleAr: 'قيمة الفواتير شامل الضريبة',
+              titleAr: 'قيمة الفواتير',
               titleEn: 'Gross Sell-In (incl. VAT)',
+              titleTooltip: 'قيمة الفواتير شامل الضريبة',
               value: CurrencyFormatter.formatCompactEGP(grossInclVat),
               subtitle:
-                  'ضريبة القيمة المضافة: ${CurrencyFormatter.formatCompactEGP(vat14)} • المتوقع: ${CurrencyFormatter.formatCompactEGP(_data.totalExpectedEgp)}',
+                  'الضريبة: ${CurrencyFormatter.formatCompactEGP(vat14)} • المتوقع: ${CurrencyFormatter.formatCompactEGP(_data.totalExpectedEgp)}',
               icon: Icons.receipt_long_rounded,
               color: M3StatusColors.of(context).accents.caution,
             );
@@ -1583,84 +1616,109 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                 ],
               ),
               const SizedBox(height: 10.0),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  _buildWaterfallMetricPill(
-                    context,
-                    labelAr: '1. بالسعر الرسمي',
-                    valueText: CurrencyFormatter.formatCompactEGP(officialListExcl),
-                    subText: 'حسب قائمة الأسعار',
-                    accentColor: M3StatusColors.of(context).accents.neutral,
-                    icon: Icons.price_check_rounded,
-                  ),
-                  const SizedBox(width: 10.0),
-                  Icon(
-                    Icons.remove_circle_outline_rounded,
-                    size: 18.0,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 10.0),
-                  _buildWaterfallMetricPill(
-                    context,
-                    labelAr: '2. الخصم التجاري',
-                    valueText:
-                        '${CurrencyFormatter.formatCompactEGP(discountGranted)} (${discountPct.toStringAsFixed(1)}%)',
-                    subText:
-                        'الفرق بين السعر الرسمي وصافي الفاتورة: ${discountPct.toStringAsFixed(1)}%',
-                    accentColor: M3StatusColors.of(context).accents.alert,
-                    icon: Icons.discount_rounded,
-                  ),
-                  const SizedBox(width: 10.0),
-                  Icon(
-                    Icons.drag_handle_rounded,
-                    size: 18.0,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 10.0),
-                  _buildWaterfallMetricPill(
-                    context,
-                    labelAr: '3. صافي Sell-In بعد المرتجعات (بدون الضريبة)',
-                    valueText: CurrencyFormatter.formatCompactEGP(netExclVat),
-                    subText:
-                        '${CurrencyFormatter.formatNumber(_data.totalCases.round())} كرتونة • ${CurrencyFormatter.formatNumber(_data.totalUnitsPieces)} وحدة',
-                    accentColor: colorScheme.primary,
-                    icon: Icons.local_shipping_rounded,
-                  ),
-                  const SizedBox(width: 10.0),
-                  Icon(
-                    Icons.add_circle_outline_rounded,
-                    size: 18.0,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 10.0),
-                  _buildWaterfallMetricPill(
-                    context,
-                    labelAr: '4. ضريبة القيمة المضافة (14%)',
-                    valueText: CurrencyFormatter.formatCompactEGP(vat14),
-                    subText: '—',
-                    accentColor: M3StatusColors.of(context).accents.purple,
-                    icon: Icons.percent_rounded,
-                  ),
-                  const SizedBox(width: 10.0),
-                  Icon(
-                    AppIcons.arrowForward,
-                    size: 18.0,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 10.0),
-                  _buildWaterfallMetricPill(
-                    context,
-                    labelAr: '5. قيمة الفواتير',
-                    valueText: CurrencyFormatter.formatCompactEGP(grossInclVat),
-                    subText: 'إجمالي المطالبة المالية على السلسلة',
-                    accentColor: M3StatusColors.of(context).accents.tealStrong,
-                    icon: Icons.account_balance_wallet_rounded,
-                  ),
-                ],
-                ),
+              LayoutBuilder(
+                builder: (context, stripConstraints) {
+                  final fit = stripConstraints.maxWidth >= 800;
+                  Widget op(IconData icon) => Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                        child: Icon(
+                          icon,
+                          size: 18.0,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      );
+                  final pills = <Widget>[
+                    _buildWaterfallMetricPill(
+                      context,
+                      labelAr: '1. السعر الرسمي',
+                      labelTooltip: '1. بالسعر الرسمي',
+                      valueText: CurrencyFormatter.formatCompactEGP(
+                          officialListExcl),
+                      subText: 'حسب قائمة الأسعار',
+                      accentColor:
+                          M3StatusColors.of(context).accents.neutral,
+                      icon: Icons.price_check_rounded,
+                      expand: fit,
+                    ),
+                    op(Icons.remove_circle_outline_rounded),
+                    _buildWaterfallMetricPill(
+                      context,
+                      labelAr: '2. الخصم',
+                      labelTooltip: '2. الخصم التجاري',
+                      valueText:
+                          '${CurrencyFormatter.formatCompactEGP(discountGranted)} (${discountPct.toStringAsFixed(1)}%)',
+                      subText:
+                          'الفرق بين السعر الرسمي وصافي الفاتورة: ${discountPct.toStringAsFixed(1)}%',
+                      accentColor: M3StatusColors.of(context).accents.alert,
+                      icon: Icons.discount_rounded,
+                      expand: fit,
+                    ),
+                    op(Icons.drag_handle_rounded),
+                    _buildWaterfallMetricPill(
+                      context,
+                      labelAr: '3. صافي التوريد',
+                      labelTooltip:
+                          '3. صافي Sell-In بعد المرتجعات (بدون الضريبة)',
+                      valueText:
+                          CurrencyFormatter.formatCompactEGP(netExclVat),
+                      subText:
+                          '${CurrencyFormatter.formatNumber(_data.totalCases.round())} كرتونة • ${CurrencyFormatter.formatNumber(_data.totalUnitsPieces)} وحدة',
+                      accentColor: colorScheme.primary,
+                      icon: Icons.local_shipping_rounded,
+                      expand: fit,
+                    ),
+                    op(Icons.add_circle_outline_rounded),
+                    _buildWaterfallMetricPill(
+                      context,
+                      labelAr: '4. الضريبة 14%',
+                      labelTooltip: '4. ضريبة القيمة المضافة (14%)',
+                      valueText: CurrencyFormatter.formatCompactEGP(vat14),
+                      subText: '—',
+                      accentColor:
+                          M3StatusColors.of(context).accents.purple,
+                      icon: Icons.percent_rounded,
+                      expand: fit,
+                    ),
+                    op(AppIcons.arrowForward),
+                    _buildWaterfallMetricPill(
+                      context,
+                      labelAr: '5. الفواتير',
+                      labelTooltip: '5. قيمة الفواتير',
+                      valueText:
+                          CurrencyFormatter.formatCompactEGP(grossInclVat),
+                      subText: 'إجمالي المطالبة على السلسلة',
+                      accentColor:
+                          M3StatusColors.of(context).accents.tealStrong,
+                      icon: Icons.account_balance_wallet_rounded,
+                      expand: fit,
+                    ),
+                  ];
+                  if (stripConstraints.maxWidth < 800) {
+                    return Wrap(
+                      spacing: 6.0,
+                      runSpacing: 8.0,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: pills
+                          .map((w) => w is Padding
+                              ? w
+                              : SizedBox(
+                                  width: (stripConstraints.maxWidth - 12) /
+                                      (stripConstraints.maxWidth < 580
+                                          ? 1
+                                          : 2),
+                                  child: w,
+                                ))
+                          .toList(),
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      for (final w in pills)
+                        if (w is Padding) w else Expanded(child: w),
+                    ],
+                  );
+                },
               ),
             ],
           ),
@@ -2050,18 +2108,28 @@ onChanged: m3Legacy<int>((v) {
               // Short title like its sibling cards; the matched period moves
               // to the detail line so it is never cut at 1280.
               titleAr: useMatchedWindow
+                  ? 'Sell-In المطابق'
+                  : 'Sell-In منذ بداية العام',
+              titleTooltip: useMatchedWindow
                   ? 'Sell-In للفترة المطابقة'
                   : 'Sell-In منذ بداية العام',
               titleEn: useMatchedWindow ? 'Sell-In (matched period)' : 'Sell-In YTD',
               value: CurrencyFormatter.formatCompactEGP(displaySellInEgp),
-              subtitle:
-                  '${useMatchedWindow ? '$matchedLabel • ' : ''}${CurrencyFormatter.formatNumber(displaySellInCases.round())} كرتونة • شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(displaySellInGrossEgp)}',
+              subtitle: useMatchedWindow
+                  ? (matchedLabel.contains(' (')
+                      ? matchedLabel.split(' (').first
+                      : matchedLabel)
+                  : '${CurrencyFormatter.formatNumber(displaySellInCases.round())} كرتونة',
+              subtitleTooltip: useMatchedWindow
+                  ? '$matchedLabel • ${CurrencyFormatter.formatNumber(displaySellInCases.round())} كرتونة • شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(displaySellInGrossEgp)}'
+                  : '${CurrencyFormatter.formatNumber(displaySellInCases.round())} كرتونة • شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(displaySellInGrossEgp)}',
               icon: Icons.local_shipping_rounded,
               color: colorScheme.primary,
             );
             final card2 = _buildSummaryCard(
               context,
-              titleAr: 'Sell-Out (بتكلفة المصنع)',
+              titleAr: 'Sell-Out بالتكلفة',
+              titleTooltip: 'Sell-Out (بتكلفة المصنع)',
               titleEn: 'Sell-Out at Factory Cost',
               value: CurrencyFormatter.formatCompactEGP(displaySellOutPosEgp),
               subtitle:
@@ -2071,7 +2139,8 @@ onChanged: m3Legacy<int>((v) {
             );
             final card3 = _buildSummaryCard(
               context,
-              titleAr: 'المخزون المتبقي لدى السلسلة',
+              titleAr: 'المخزون المتبقي',
+              titleTooltip: 'المخزون المتبقي لدى السلسلة',
               titleEn: 'Remaining Stock',
               value: CurrencyFormatter.formatCompactEGP(remainingStockEgp),
               subtitle:
@@ -3947,6 +4016,7 @@ onChanged: m3Legacy<int>((v) {
     required IconData icon,
     required Color color,
     String? titleTooltip,
+    String? subtitleTooltip,
   }) {
     return M3SummaryKpiCard(
       key: ValueKey('kpi_card_$titleEn'),
@@ -3959,8 +4029,9 @@ onChanged: m3Legacy<int>((v) {
       icon: icon,
       color: color,
       titleTooltip: titleTooltip,
+      subtitleTooltip: subtitleTooltip,
       titleMaxLines: 1,
-      subtitleMaxLines: 3,
+      subtitleMaxLines: 1,
       isLoading: _isLoading,
     );
   }

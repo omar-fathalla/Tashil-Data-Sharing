@@ -58,6 +58,7 @@ class M3SummaryKpiCard extends StatelessWidget {
     this.titleMaxLines = 1,
     this.subtitleMaxLines = 1,
     this.titleTooltip,
+    this.subtitleTooltip,
     this.isLoading = false,
     this.titleKey,
     this.valueKey,
@@ -77,6 +78,8 @@ class M3SummaryKpiCard extends StatelessWidget {
   final int subtitleMaxLines;
   /// Optional tooltip with the full wording when the visible title is shortened.
   final String? titleTooltip;
+  /// Optional tooltip with the full wording when the visible subtitle is shortened.
+  final String? subtitleTooltip;
   final bool isLoading;
   final Key? titleKey;
   final Key? valueKey;
@@ -156,14 +159,26 @@ class M3SummaryKpiCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: M3SummaryKpiStyle.valueGap),
-            Text(
-              subtitle,
-              key: subtitleKey,
-              maxLines: subtitleMaxLines,
-              overflow: TextOverflow.ellipsis,
-              style: subtitleStyle,
-              strutStyle: M3SummaryKpiStyle.strut(subtitleStyle),
-            ),
+            subtitleTooltip == null
+                ? Text(
+                    subtitle,
+                    key: subtitleKey,
+                    maxLines: subtitleMaxLines,
+                    overflow: TextOverflow.ellipsis,
+                    style: subtitleStyle,
+                    strutStyle: M3SummaryKpiStyle.strut(subtitleStyle),
+                  )
+                : Tooltip(
+                    message: subtitleTooltip,
+                    child: Text(
+                      subtitle,
+                      key: subtitleKey,
+                      maxLines: subtitleMaxLines,
+                      overflow: TextOverflow.ellipsis,
+                      style: subtitleStyle,
+                      strutStyle: M3SummaryKpiStyle.strut(subtitleStyle),
+                    ),
+                  ),
           ],
         ],
       ),

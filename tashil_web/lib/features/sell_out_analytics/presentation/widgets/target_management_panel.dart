@@ -1012,9 +1012,8 @@ onChanged: m3Legacy<int>((v) {
             final neutral = colorScheme.onSurfaceVariant;
             final card1 = _buildKpiCard(
               context,
-              titleAr: _isSellIn
-                  ? 'مستهدف Sell-In'
-                  : 'مستهدف Sell-Out',
+              titleAr: _isSellIn ? 'مستهدف التوريد' : 'مستهدف المبيعات',
+              titleTooltip: _isSellIn ? 'مستهدف Sell-In' : 'مستهدف Sell-Out',
               titleEn: _isSellIn
                   ? 'Sell-In Target'
                   : 'Sell-Out Target',
@@ -1032,12 +1031,10 @@ onChanged: m3Legacy<int>((v) {
             );
             final card2 = _buildKpiCard(
               context,
-              titleAr: _isSellIn
-                  ? 'المحقق صافي بعد المرتجعات'
-                  : 'المحقق (Sell-Out)',
+              titleAr: _isSellIn ? 'صافي المحقق' : 'المحقق',
               titleTooltip: _isSellIn
                   ? 'المحقق صافي بعد المرتجعات (Sell-In)'
-                  : null,
+                  : 'المحقق (Sell-Out)',
               titleEn: _isSellIn
                   ? 'Actual net Sell-In after returns'
                   : 'Actual Sell-Out',
@@ -1055,7 +1052,8 @@ onChanged: m3Legacy<int>((v) {
             );
             final card3 = _buildKpiCard(
               context,
-              titleAr: 'نسبة التحقيق الإجمالية',
+              titleAr: 'نسبة التحقيق',
+              titleTooltip: 'نسبة التحقيق الإجمالية',
               titleEn: 'Overall Achievement %',
               value: '${summary.overallAchievementPct.toStringAsFixed(1)}%',
               subtitleAr: !hasTargets
@@ -3247,7 +3245,7 @@ onChanged: m3Legacy<String>((v) {
       color: color,
       titleTooltip: titleTooltip,
       titleMaxLines: 1,
-      subtitleMaxLines: 2,
+      subtitleMaxLines: 1,
     );
   }
 
