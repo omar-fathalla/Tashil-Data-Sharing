@@ -4,9 +4,12 @@ Stable identifiers for Playwright / Maestro / Patrol against the Flutter web
 accessibility tree (`flt-semantics-identifier`, plus `aria-label` / Semantics
 `label` where set).
 
-Enabled at startup on web via `SemanticsBinding.instance.ensureSemantics()` in
-`tashil_web/lib/main.dart` so nodes exist without manually enabling
-accessibility mode.
+Opt-in at startup on web via `SemanticsBinding.instance.ensureSemantics()` in
+`tashil_web/lib/main.dart` when the initial URL has `?semantics=1` or
+`?e2e=1` (Playwright uses `withAutomationSemantics()`). Forced semantics are
+**not** enabled for normal production loads — the flt-semantics DOM glass pane
+was swallowing native mouse clicks on sidebar Compare while on Pricing.
+Screen readers still enable semantics through the engine a11y path.
 
 ## Naming scheme
 
@@ -16,7 +19,7 @@ Kebab-case tokens. Prefer a short **area prefix**, then the control role.
 |---------|---------|----------|
 | `login-*` | Tenant login form | `login-email`, `login-password`, `login-submit` |
 | `logout` | Sign out | `logout` |
-| `nav-*` | Shell navigation destinations | `nav-sell-out`, `nav-sell-in` |
+| `nav-*` | Shell navigation destinations | `nav-sell-out`, `nav-sell-in`, `nav-pricing`, `nav-compare` |
 | `sellout-*` / `sellin-*` | Page-scoped upload controls / counters | `sellout-upload-button`, `sellin-uploaded-files` |
 | `upload-choose-file` | Smart Upload dropzone “choose file” | `upload-choose-file` |
 | `uploaded-files-list` | Uploaded-files table / list region | `uploaded-files-list` |

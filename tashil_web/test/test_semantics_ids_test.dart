@@ -65,6 +65,8 @@ void main() {
       expect(TestIds.logout, 'logout');
       expect(TestIds.navSellOut, 'nav-sell-out');
       expect(TestIds.navSellIn, 'nav-sell-in');
+      expect(TestIds.navPricing, 'nav-pricing');
+      expect(TestIds.navCompare, 'nav-compare');
       expect(TestIds.selloutUploadButton, 'sellout-upload-button');
       expect(TestIds.fileInput, 'tashil-file-input');
       expect(TestIds.uploadCommitConfirm, 'upload-commit-confirm');
@@ -74,6 +76,8 @@ void main() {
       expect(TestIds.navIdForIndex(1), TestIds.navSellOut);
       expect(TestIds.navIdForIndex(2), TestIds.navSellIn);
       expect(TestIds.navIdForIndex(3), TestIds.navReturns);
+      expect(TestIds.navIdForIndex(6), TestIds.navPricing);
+      expect(TestIds.navIdForIndex(7), TestIds.navCompare);
       expect(TestIds.navIdForIndex(0), isNull);
       // file-delete ids are archiveId + '-' + slugified filename
       expect(

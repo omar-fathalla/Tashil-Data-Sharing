@@ -10,6 +10,7 @@ import 'core/data/app_cache.dart';
 import 'core/network/api_client.dart';
 import 'core/security/zero_trust_digest.dart';
 import 'core/storage/session_storage.dart';
+import 'core/testing/web_automation_semantics.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/m3_color_roles.dart';
 import 'core/theme/m3_motion.dart';
@@ -37,9 +38,12 @@ void main() {
   AppVersion.hydrateFromDocument();
   if (kIsWeb) {
     usePathUrlStrategy();
-    // Expose the semantics tree in the DOM (flt-semantics-*) for web
-    // automation (Playwright / Maestro / Patrol) without manual activation.
-    SemanticsBinding.instance.ensureSemantics();
+    // Opt-in only: Playwright passes ?semantics=1 (see e2e/helpers/flutter.ts).
+    // Screen readers still enable semantics via the engine a11y path.
+    // Forced glass pane was swallowing Pricing→Compare mouse clicks in prod.
+    if (webAutomationSemanticsRequested()) {
+      SemanticsBinding.instance.ensureSemantics();
+    }
     // Mount persistent #tashil-file-input after the first frame so it cannot
     // disturb Flutter web's initial semantics / hit-test host setup.
     WidgetsBinding.instance.addPostFrameCallback((_) {

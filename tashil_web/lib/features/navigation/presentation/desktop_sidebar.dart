@@ -83,12 +83,14 @@ class DesktopSidebar extends StatelessWidget {
         selectedIcon: Icons.price_change_rounded,
         label: 'Pricing & Promos',
         labelAr: 'التسعير والعروض',
+        semanticsIdentifier: TestIds.navPricing,
       ),
       _NavDestination(
         icon: Icons.compare_arrows_rounded,
         selectedIcon: Icons.compare_arrows_rounded,
         label: 'Compare',
         labelAr: 'مقارنة المنافسين',
+        semanticsIdentifier: TestIds.navCompare,
       ),
       _NavDestination(
         icon: Icons.campaign_rounded,
