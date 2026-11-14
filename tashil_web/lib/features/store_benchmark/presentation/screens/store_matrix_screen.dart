@@ -617,9 +617,10 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
               // Tier Summary KPI Cards — shared Sell-Out tokens
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final columns = constraints.maxWidth >= 840.0
-                      ? 3
-                      : (constraints.maxWidth >= 580.0 ? 2 : 1);
+                  final columns = M3KpiGridColumns.forWidthAndCount(
+                    constraints.maxWidth,
+                    3,
+                  );
                   return M3EqualHeightGrid(
                     key: const ValueKey('store_matrix_kpi_grid'),
                     columns: columns,
@@ -1135,6 +1136,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                               label: Text('الترتيب'),
                                             ),
                                             DataColumn(
+                                              headingRowAlignment:
+                                                  MainAxisAlignment.center,
                                               label: Text('اسم الفرع والسلسلة'),
                                             ),
                                             DataColumn(
@@ -1236,7 +1239,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: nameMaxWidth),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Tooltip(
@@ -1245,7 +1248,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                       _displayStoreName(store),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.start,
+                      textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -1253,6 +1256,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                   ),
                   const SizedBox(height: 2.0),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
                         width: 8.0,
@@ -1263,12 +1267,12 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                         ),
                       ),
                       const SizedBox(width: 6.0),
-                      Expanded(
+                      Flexible(
                         child: Text(
                           _getChainDisplayName(store.retailerChain),
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.start,
+                          textAlign: TextAlign.center,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w500,

@@ -284,7 +284,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
             children: [
               // Unified M3 Page Header (English Left, Arabic Right)
               M3PageHeader(
-                titleEn: 'Pricing & Promo Compliance',
+                titleEn: 'Pricing & Promos',
                 subtitleAr:
                     'كشف الفروق السعرية عن السعر الاسترشادي (RRP) وكارتة أسعار المصنع وتتبع الأثر البيعي للعروض',
                 actions: M3ActionButtonGroup(
@@ -314,9 +314,10 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
               // Missing data: «—» + Arabic note (never fake 100.0% / +0.0%).
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final columns = constraints.maxWidth >= 840.0
-                      ? 3
-                      : (constraints.maxWidth >= 580.0 ? 2 : 1);
+                  final columns = M3KpiGridColumns.forWidthAndCount(
+                    constraints.maxWidth,
+                    3,
+                  );
                   final hasItems = totalCount > 0;
                   final hasPromoUplift = hasItems && avgPromoUplift != 0.0;
                   final complianceValue = hasItems
@@ -1024,6 +1025,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                             ),
                                             columns: [
                                               DataColumn(
+                                                  headingRowAlignment:
+                                                      MainAxisAlignment.center,
                                                   label: cellBox(
                                                       0,
                                                       const Text(
@@ -1031,6 +1034,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                         maxLines: 3,
                                                         softWrap: true,
                                                         overflow: TextOverflow.clip,
+                                                        textAlign:
+                                                            TextAlign.center,
                                                       ))),
                                               DataColumn(
                                                   headingRowAlignment:
@@ -1110,7 +1115,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                       Column(
                                                         crossAxisAlignment:
                                                             CrossAxisAlignment
-                                                                .start,
+                                                                .center,
                                                         mainAxisAlignment:
                                                             MainAxisAlignment
                                                                 .center,
@@ -1121,7 +1126,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                                 'pricing_sku_name'),
                                                             maxLines: 3,
                                                             textAlign:
-                                                                TextAlign.start,
+                                                                TextAlign.center,
                                                             style: theme
                                                                 .textTheme
                                                                 .bodyMedium
@@ -1135,7 +1140,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                                             '${item.itemCode.isNotEmpty ? 'كود: ${item.itemCode} | ' : ''}GTIN: ${item.barcode} | ${item.category}${item.unitsPerCarton > 0 ? ' (${item.unitsPerCarton} ش)' : ''}',
                                                             maxLines: 3,
                                                             textAlign:
-                                                                TextAlign.start,
+                                                                TextAlign.center,
                                                             style: theme
                                                                 .textTheme
                                                                 .bodySmall

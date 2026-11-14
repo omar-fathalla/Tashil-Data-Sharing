@@ -1173,32 +1173,38 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   }
 
   /// Short status chip matching Sell-Out / Trade Marketing geometry.
-  Widget _statusChip(String label, Color color, {Key? key, IconData? icon}) =>
-      M3ChipSurface(
-        key: key,
-        color: color.withValues(alpha: 0.14),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 14.0, color: color),
-              const SizedBox(width: M3Spacing.xxs),
-            ],
-            Flexible(
-              child: M3WrapText(
-                label,
-                maxLines: 3,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: M3FontSize.labelSmallPlus,
-                  color: color,
-                ),
-              ),
+  /// Labels stay on one line (no mid-word split). When an icon is present and
+  /// the chip is squeezed (e.g. price col → 64dp inner), [Flexible] lets the
+  /// text fade instead of blowing the Row.
+  Widget _statusChip(String label, Color color, {Key? key, IconData? icon}) {
+    final style = TextStyle(
+      fontWeight: FontWeight.w800,
+      fontSize: M3FontSize.labelSmallPlus,
+      color: color,
+    );
+    final text = Text(
+      label,
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.fade,
+      textAlign: TextAlign.center,
+      style: style,
+    );
+    return M3ChipSurface(
+      key: key,
+      color: color.withValues(alpha: 0.14),
+      child: icon == null
+          ? text
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14.0, color: color),
+                const SizedBox(width: M3Spacing.xxs),
+                Flexible(child: text),
+              ],
             ),
-          ],
-        ),
-      );
+    );
+  }
 
   Widget _buildHeaderBanner(
     ThemeData theme,
@@ -1469,11 +1475,12 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Same 960/580 breakpoints as Sell-Out. Five cards at the live
-        // 1280+sidebar shell (~982) are 4+1, so width matches the 4-col
-        // reference (~233dp) and height stays 138. Five-in-a-row would
-        // be ~183dp and clip titles such as «الباركودات الفريدة».
-        final columns = M3KpiGridColumns.forWidth(constraints.maxWidth);
+        // Even fill: 5 cards → 3+2 at the live shell (not a lonely 4+1).
+        // Card height stays Sell-Out 138 via M3SummaryKpiCard + equal grid.
+        final columns = M3KpiGridColumns.forWidthAndCount(
+          constraints.maxWidth,
+          5,
+        );
         final regularShare = summary.totalSkus > 0
             ? ((summary.regularSkusCount / summary.totalSkus) * 100)
                 .toStringAsFixed(1)
@@ -1855,6 +1862,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                         label: box(1, _buildColHeader('كود الصنف', 'Item Code')),
                       ),
                       DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
                         label: box(2, _buildColHeader('اسم الصنف', 'Official SKU Name')),
                       ),
                       DataColumn(
@@ -1961,15 +1969,16 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                             ),
                             ),
                           ),
-                          // Official Name & Brand (wrap ≤3 like Sell-Out / TM)
+                          // Official Name & Brand (centered, wrap ≤3)
                           DataCell(
                             Column(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 M3WrapText(
                                   item.officialName,
                                   maxLines: 3,
+                                  textAlign: TextAlign.center,
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -1978,6 +1987,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                 M3WrapText(
                                   '${item.brand} • ${item.category}',
                                   maxLines: 2,
+                                  textAlign: TextAlign.center,
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: cs.onSurfaceVariant,
                                     fontSize: M3FontSize.tinyPlus,
@@ -2097,40 +2107,47 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                               ],
                             ),
                           ),
-                          // Item Type & Pull Status: short chip + description
+                          // Item Type & Pull Status: short chip + description.
+                          // box(9) locks the live 96 / compact 88 type floor so
+                          // «مسحوب» / «غير مسحوب» stay one line in-test and live.
                           DataCell(
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                _statusChip(
-                                  isPromo ? 'عرض' : 'عادي',
-                                  isPromo
-                                      ? M3Palette.amberDeep
-                                      : M3Palette.teal,
-                                ),
-                                const SizedBox(height: 4.0),
-                                _statusChip(
-                                  item.isActiveInChains ? 'مسحوب' : 'غير مسحوب',
-                                  item.isActiveInChains
-                                      ? M3Palette.info
-                                      : cs.onSurfaceVariant,
-                                ),
-                                const SizedBox(height: 2.0),
-                                M3WrapText(
-                                  item.isActiveInChains
-                                      ? (item.totalPosUnitsSold > 0
-                                          ? '${_intFmt.format(item.totalPosUnitsSold)} وحدة'
-                                          : 'نشط بالسلاسل')
-                                      : 'فرصة توزيع',
-                                  maxLines: 2,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    fontSize: M3FontSize.tiny,
-                                    color: cs.onSurfaceVariant,
+                            box(
+                              9,
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  _statusChip(
+                                    isPromo ? 'عرض' : 'عادي',
+                                    isPromo
+                                        ? M3Palette.amberDeep
+                                        : M3Palette.teal,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 4.0),
+                                  _statusChip(
+                                    item.isActiveInChains
+                                        ? 'مسحوب'
+                                        : 'غير مسحوب',
+                                    item.isActiveInChains
+                                        ? M3Palette.info
+                                        : cs.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(height: 2.0),
+                                  M3WrapText(
+                                    item.isActiveInChains
+                                        ? (item.totalPosUnitsSold > 0
+                                            ? '${_intFmt.format(item.totalPosUnitsSold)} وحدة'
+                                            : 'نشط بالسلاسل')
+                                        : 'فرصة توزيع',
+                                    maxLines: 2,
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      fontSize: M3FontSize.tiny,
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           // Actions
@@ -2221,14 +2238,16 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   /// one monospace line (e.g. FGCL-0550-0001, 13-digit barcodes), and
   /// the price headers «سعر الوحدة / السعر ش.ض / سعر الكرتونة» are
   /// not cut. Leftover width still goes to the name column.
+  // Type col (index 9) must fit one-line chips «مسحوب» / «غير مسحوب»
+  // (M3ChipSurface padding + Cairo) without wrapping mid-word.
   static const _catalogColMinsLive = <double>[
-    24, 130, 140, 120, 64, 80, 80, 88, 64, 52, 52,
+    24, 130, 140, 120, 64, 80, 80, 88, 64, 96, 52,
   ];
 
   /// Narrower shell (1024+sidebar ≈ 774dp): codes wrap at dashes, no
   /// horizontal scroll.
   static const _catalogColMinsCompact = <double>[
-    24, 92, 120, 92, 60, 52, 52, 52, 60, 60, 52,
+    24, 92, 120, 92, 60, 52, 52, 52, 60, 88, 52,
   ];
 
   /// Column content widths that fill [available] (table chrome included)
@@ -2248,14 +2267,19 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     if (leftover > 0) {
       widths[2] += leftover;
     } else if (leftover < 0) {
-      // Shrink the name column first, then the others, never below 85% of min.
-      for (final i in [2, 9, 4, 8, 1, 3, 10, 5, 6, 7, 0]) {
+      // Never shrink type (9): live 96 / compact 88 hold «مسحوب» / «غير مسحوب».
+      // Other columns: first to 85% of min, then harder (70%) so the table
+      // still fits the 1024+sidebar shell without horizontal scroll.
+      for (final floorFactor in [0.85, 0.70]) {
         if (leftover >= 0) break;
-        final reducible = widths[i] - mins[i] * 0.85;
-        if (reducible <= 0) continue;
-        final cut = reducible < -leftover ? reducible : -leftover;
-        widths[i] -= cut;
-        leftover += cut;
+        for (final i in [2, 4, 8, 1, 3, 10, 5, 6, 7, 0]) {
+          if (leftover >= 0) break;
+          final reducible = widths[i] - mins[i] * floorFactor;
+          if (reducible <= 0) continue;
+          final cut = reducible < -leftover ? reducible : -leftover;
+          widths[i] -= cut;
+          leftover += cut;
+        }
       }
     }
     return widths;
@@ -2838,9 +2862,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                     children: [
                       M3SummaryKpiCard(
                         key: const ValueKey('pm_calc_card_total_units'),
-                        title: 'إجمالي الوحدات بالطلبية',
-                        titleMaxLines: 2,
-                        subtitleMaxLines: 2,
+                        title: 'إجمالي الوحدات',
+                        titleTooltip: 'إجمالي الوحدات بالطلبية',
+                        titleMaxLines: 1,
+                        subtitleMaxLines: 1,
                         value: '${_intFmt.format(totalUnits)} وحدة',
                         subtitle: 'Total Units Ordered · ${sku.packagingType}',
                         icon: Icons.inventory_2_rounded,
@@ -2848,9 +2873,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                       ),
                       M3SummaryKpiCard(
                         key: const ValueKey('pm_calc_card_gross'),
-                        title: 'إجمالي القيمة قبل الضريبة',
-                        titleMaxLines: 2,
-                        subtitleMaxLines: 2,
+                        title: 'القيمة قبل الضريبة',
+                        titleTooltip: 'إجمالي القيمة قبل الضريبة',
+                        titleMaxLines: 1,
+                        subtitleMaxLines: 1,
                         value: '${_currFmt.format(grossExclVat)} ج.م',
                         subtitle: 'Gross Value Excl. VAT',
                         icon: Icons.payments_rounded,
@@ -2858,9 +2884,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                       ),
                       M3SummaryKpiCard(
                         key: const ValueKey('pm_calc_card_vat'),
-                        title: 'قيمة ضريبة القيمة المضافة (14%)',
-                        titleMaxLines: 2,
-                        subtitleMaxLines: 2,
+                        title: 'ضريبة القيمة المضافة',
+                        titleTooltip: 'قيمة ضريبة القيمة المضافة (14%)',
+                        titleMaxLines: 1,
+                        subtitleMaxLines: 1,
                         value: '${_currFmt.format(vatAmount)} ج.م',
                         subtitle: 'VAT Amount (14%)',
                         icon: Icons.receipt_long_rounded,
@@ -2868,9 +2895,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                       ),
                       M3SummaryKpiCard(
                         key: const ValueKey('pm_calc_card_discounts'),
-                        title: 'إجمالي قيمة الخصومات التجارية',
-                        titleMaxLines: 2,
-                        subtitleMaxLines: 2,
+                        title: 'الخصومات التجارية',
+                        titleTooltip: 'إجمالي قيمة الخصومات التجارية',
+                        titleMaxLines: 1,
+                        subtitleMaxLines: 1,
                         value: CurrencyFormatter.formatEGP(-totalDiscountEgp, showDecimals: true),
                         subtitle: 'Total Invoice & Extra Discounts',
                         icon: Icons.discount_rounded,
@@ -2878,26 +2906,28 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                       ),
                       M3SummaryKpiCard(
                         key: const ValueKey('pm_calc_card_net'),
-                        title: 'صافي الفاتورة المستحق لأدكو',
-                        titleMaxLines: 2,
-                        subtitleMaxLines: 2,
+                        title: 'صافي الفاتورة',
+                        titleTooltip: 'صافي الفاتورة المستحق لأدكو',
+                        titleMaxLines: 1,
+                        subtitleMaxLines: 1,
                         value: '${_currFmt.format(netPayable)} ج.م',
                         subtitle:
-                            'Net Payable Invoice Value · الوحدة: ${_currFmt.format(netUnitCost)}',
+                            'Net Payable · الوحدة: ${_currFmt.format(netUnitCost)}',
                         icon: Icons.account_balance_wallet_rounded,
                         color: M3Palette.teal,
                       ),
                       M3SummaryKpiCard(
                         key: const ValueKey('pm_calc_card_margin'),
-                        title: 'هامش ربح السلسلة المتوقع',
-                        titleMaxLines: 2,
-                        subtitleMaxLines: 2,
+                        title: 'هامش ربح السلسلة',
+                        titleTooltip: 'هامش ربح السلسلة المتوقع',
+                        titleMaxLines: 1,
+                        subtitleMaxLines: 1,
                         value: shelfMissing
                             ? '—'
                             : '${retailerMarginPct.toStringAsFixed(1)}%',
                         subtitle: shelfMissing
                             ? 'أدخل سعر بيع السلسلة لحساب الهامش'
-                            : 'Projected Retailer Shelf Margin · ${_currFmt.format(retailerProfitEgp)} ج.م',
+                            : 'Shelf Margin · ${_currFmt.format(retailerProfitEgp)} ج.م',
                         icon: Icons.trending_up_rounded,
                         color: M3Palette.indigo,
                         textValue: shelfMissing,

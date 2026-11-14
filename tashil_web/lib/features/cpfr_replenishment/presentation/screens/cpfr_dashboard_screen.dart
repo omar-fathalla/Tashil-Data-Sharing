@@ -1276,13 +1276,14 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
   Widget _buildResponsiveCardGrid(List<Widget> cards) {
     if (cards.isEmpty) return const SizedBox.shrink();
 
-    // Same breakpoints, gutters and equal-height behavior as Sell-Out / Sell-In.
+    // Same even-fill rule as Product Master / OOS / Store Matrix / Returns:
+    // 5 cards → 3+2 at ≥960 (not a lonely 4+1).
     return LayoutBuilder(
       builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth;
-        final columns = maxWidth >= 960
-            ? (cards.length >= 4 ? 4 : cards.length)
-            : (maxWidth >= 580 ? (cards.length >= 2 ? 2 : 1) : 1);
+        final columns = M3KpiGridColumns.forWidthAndCount(
+          constraints.maxWidth,
+          cards.length,
+        );
         return M3EqualHeightGrid(
           key: const ValueKey('kpi_cards_row'),
           columns: columns,

@@ -384,18 +384,13 @@ void main() {
       final dt =
           tester.widget<DataTable>(find.byKey(const ValueKey('dq_table')));
       for (final (i, c) in dt.columns.indexed) {
-        if (i == 5) {
-          expect(c.headingRowAlignment, isNot(MainAxisAlignment.center),
-              reason: 'item-name column');
-        } else {
-          expect(c.headingRowAlignment, MainAxisAlignment.center,
-              reason: 'column $i');
-        }
+        expect(c.headingRowAlignment, MainAxisAlignment.center,
+            reason: 'column $i');
       }
       for (final t in tester
           .widgetList<Text>(find.byKey(const ValueKey('dq_item_name')))) {
         expect(t.maxLines, 3);
-        expect(t.textAlign, TextAlign.start);
+        expect(t.textAlign, TextAlign.center);
       }
       expect(
         _cutBeforeThreeLines(

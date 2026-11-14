@@ -530,6 +530,9 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
 /// Centres the cells of every column whose heading uses
 /// `headingRowAlignment: MainAxisAlignment.center`, so header and content
 /// share one axis. For DataTables not wrapped in [TableScrollContainer].
+///
+/// [Center] sizes to the child (typically a tight-width [SizedBox] from the
+/// page's flex budget) so wrap width stays the column share.
 List<DataRow> centerCellsUnderCenteredHeadings(
     List<DataColumn> columns, List<DataRow> rows) {
   final centered = [

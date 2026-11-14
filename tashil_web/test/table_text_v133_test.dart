@@ -129,7 +129,7 @@ void main() {
   setUpAll(loadRealCairoFont);
   setUp(AppCache.clear);
 
-  testWidgets('Data Quality table: columns centred except the item name',
+  testWidgets('Data Quality table: every column centred including item name',
       (tester) async {
     await _pump(
         tester,
@@ -140,13 +140,8 @@ void main() {
     expect(table, findsOneWidget);
     final dt = tester.widget<DataTable>(table);
     for (final (i, c) in dt.columns.indexed) {
-      if (i == 5) {
-        expect(c.headingRowAlignment, isNot(MainAxisAlignment.center),
-            reason: 'item-name column');
-      } else {
-        expect(c.headingRowAlignment, MainAxisAlignment.center,
-            reason: 'column $i');
-      }
+      expect(c.headingRowAlignment, MainAxisAlignment.center,
+          reason: 'column $i');
     }
     for (final (head, cell) in [
       ('كود الصنف', find.byKey(const ValueKey('dq_item_code_TEST-0001'))),

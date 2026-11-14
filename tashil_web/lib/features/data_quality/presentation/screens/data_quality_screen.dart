@@ -350,12 +350,17 @@ class _SummaryRow extends StatelessWidget {
     // Defensive empty-state UI. Backend row totals when Runs are missing are
     // fixed in PR #86 / TDS-76 — keep this guard so 0 rows never show 100%.
     final hasRows = summary.totalRows > 0;
-    final cleanRows = hasRows ? summary.totalRows - summary.criticalRows : 0;
     final cleanlinessValue =
         hasRows ? '${summary.cleanlinessPct.toStringAsFixed(1)}%' : '—';
+    // Display-only clarification: formula is critical-rows only
+    // ((total − critical) / total). Open warnings do not lower it.
+    // Short on-card (≤1 line at 1024/4-col); full wording in tooltip.
     final cleanlinessSubtitle = hasRows
-        ? '$cleanRows من ${countRows(summary.totalRows)}'
+        ? 'حرجة فقط — ${summary.criticalRows} حرجة'
         : 'مفيش صفوف اتفحصت';
+    final cleanlinessSubtitleTooltip = hasRows
+        ? 'محسوبة على الأخطاء الحرجة فقط — ${summary.criticalRows} حرجة'
+        : null;
     final openSubtitle = countError(summary.open);
 
     return Column(
@@ -363,9 +368,10 @@ class _SummaryRow extends StatelessWidget {
       children: [
         LayoutBuilder(
           builder: (context, constraints) {
-            final columns = constraints.maxWidth >= 960.0
-                ? 4
-                : (constraints.maxWidth >= 580.0 ? 2 : 1);
+            final columns = M3KpiGridColumns.forWidthAndCount(
+              constraints.maxWidth,
+              4,
+            );
             return M3EqualHeightGrid(
               key: const ValueKey('dq_kpi_grid'),
               columns: columns,
@@ -381,8 +387,8 @@ class _SummaryRow extends StatelessWidget {
                   subtitleMaxLines: 1,
                   value: cleanlinessValue,
                   subtitle: cleanlinessSubtitle,
-                  icon: AppIcons.verified,
-                  color: !hasRows
+                  subtitleTooltip: cleanlinessSubtitleTooltip,
+                  icon: AppIcons.verified,                  color: !hasRows
                       ? cs.onSurfaceVariant
                       : (summary.cleanlinessPct >= 95
                           ? cs.primary
@@ -452,7 +458,9 @@ class _TypeChips extends StatelessWidget {
       children: [
         for (final t in types)
           ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 280.0),
+            // minWidth keeps the type description from shrink-wrapping to
+            // the short chip («ناقص») so «صنف مش موجود…» can use ≤3 lines.
+            constraints: const BoxConstraints(minWidth: 168.0, maxWidth: 280.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -637,36 +645,40 @@ class _Filters extends StatelessWidget {
 }
 
 class _IssuesTable extends StatelessWidget {
-  // Headers and cells centred; only the item name stays start-aligned.
+  // Headers and cells centred in every column (including اسم الصنف).
   // Pixel budget at the live 1030 shell (page padding 24, inner ~934
   // after xxs gutters), measured with real Cairo bodyMedium:
   //  - short words (الخطورة, مفتوحة, متجاهلة) never mid-word split
   //  - item codes stay on ONE line. Live v157 wrapped QA-NOT-IN-MASTER-999
   //    at flex 158: real Cairo bodyMedium advance is 159.7dp, not the
   //    earlier 154.7dp, so a 158.7dp column had no slack. Flex 178
-  //    (178/930×934 ≈ 178.7dp) leaves ≥16dp slack. Name keeps its 3-line
-  //    floor (232).
+  //    (178/930×934 ≈ 178.7dp) leaves ≥16dp slack.
+  //  - Name (centered) needs ≥250dp for the live long SKU in ≤3 lines
+  //    (233dp still didExceedMaxLines). Flex 256 ≈ 256/954×934 ≈ 250.6dp.
+  //  - Type label «صنف مش موجود في كارتة الأصناف» exceeds 3 lines at
+  //    ~80dp; flex 104 ≈ 104dp. Status stays 72 so «متجاهلة»+chip pad fits.
   //  - expected must fit the live phrase «الصنف يتضاف لكارتة الأصناف»
   //    in ≤3 lines. The wrapping bottleneck is «يتضاف لكارتة» (74.2dp);
   //    v158's flex 72 (72.3dp) clipped «الأصناف». Flex 88 (88.4dp) leaves
-  //    ~14dp slack. The share comes from severity / found / status, which
-  //    have slack beyond «الخطورة» / «الموجود» / the «متجاهلة» chip.
+  //    ~14dp slack. Type/name share comes from severity / row / barcode /
+  //    found / status / actions, which have slack beyond short chips.
   //  - Arabic space-separated "codes" wrap at words, ≤3 lines (see
   //    HyphenatedCodeText); they must not clip mid-word.
   //  - at 1024+sidebar (inner ~678) one-line SKUs plus the name floor
   //    cannot both fit, so hyphenated codes may wrap at '-' only
+  // Shares ≈ dp at the live ~934 inner width (sum 936).
   static const _flex = [
-    52.0,
-    80.0,
-    40.0,
-    178.0,
-    44.0,
-    232.0,
-    54.0,
-    88.0,
-    48.0,
-    72.0,
-    42.0
+    52.0, // الخطورة ≥46.5 one-line
+    104.0, // type «صنف مش موجود…» ≤3 (80dp exceeded)
+    36.0, // الصف
+    178.0, // item code one-line floor
+    36.0, // barcode
+    256.0, // name centered ≥250
+    50.0, // الموجود ≥47.8
+    88.0, // expected
+    36.0, // impact compact
+    72.0, // status chip «متجاهلة» + 16dp pad
+    28.0, // row actions
   ];
 
   final List<DataQualityIssue> issues;
@@ -753,8 +765,8 @@ class _IssuesTable extends StatelessWidget {
               headingRowAlignment: MainAxisAlignment.center,
               label: cellText(4, 'الباركود')),
           DataColumn(
-              headingRowAlignment: MainAxisAlignment.start,
-              label: cellText(5, 'اسم الصنف', align: TextAlign.start)),
+              headingRowAlignment: MainAxisAlignment.center,
+              label: cellText(5, 'اسم الصنف')),
           DataColumn(
               headingRowAlignment: MainAxisAlignment.center,
               label: cellText(6, 'الموجود')),
@@ -823,8 +835,7 @@ class _IssuesTable extends StatelessWidget {
                     )),
                     DataCell(cellText(4, i.barcode)),
                     DataCell(cellText(5, i.itemName,
-                        key: const ValueKey('dq_item_name'),
-                        align: TextAlign.start)),
+                        key: const ValueKey('dq_item_name'))),
                     DataCell(cellText(6, i.foundValue)),
                     DataCell(cellText(7, i.expectedValue)),
                     DataCell(cellBox(

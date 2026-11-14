@@ -108,17 +108,17 @@ void main() {
     expect(cards, findsNWidgets(5));
     final pmGrid = tester.widget<M3EqualHeightGrid>(
         find.byKey(const ValueKey('product_master_kpi_grid')));
-    expect(pmGrid.columns, 4,
-        reason: 'Product Master must use Sell-Out 4-col breakpoints at 1280+sidebar');
+    expect(pmGrid.columns, 3,
+        reason: '5 KPI cards fill evenly as 3+2 (not a lonely 4+1)');
     final cardYs = [
       for (final e in cards.evaluate())
         tester.getTopLeft(find.byWidget(e.widget)).dy
     ];
     expect(cardYs[0], closeTo(cardYs[1], 1.0));
     expect(cardYs[0], closeTo(cardYs[2], 1.0));
-    expect(cardYs[0], closeTo(cardYs[3], 1.0));
-    expect(cardYs[4], greaterThan(cardYs[0] + 100),
-        reason: '5th card should sit on the second row (4+1)');
+    expect(cardYs[3], closeTo(cardYs[4], 1.0));
+    expect(cardYs[3], greaterThan(cardYs[0] + 100),
+        reason: '2nd row holds cards 4–5 (3+2 even fill)');
     expect(find.text('إجمالي الأصناف'), findsWidgets);
     expect(find.text('أصناف العروض'), findsWidgets);
     expect(find.text('الباركودات الفريدة'), findsWidgets);
@@ -141,13 +141,11 @@ void main() {
     expect(_horizontalExtent(tester), lessThanOrEqualTo(2.0),
         reason: 'catalog still scrolls horizontally');
 
-    final export = find.text('تصدير Excel (CSV)');
-    expect(export, findsOneWidget);
-    final button = find.ancestor(
-      of: export,
-      matching: find.byType(OutlinedButton),
-    );
+    final button =
+        find.byKey(const ValueKey('product_master_export_csv_btn'));
     expect(button, findsOneWidget);
+    expect(find.descendant(of: button, matching: find.text('تصدير Excel (CSV)')),
+        findsOneWidget);
     final material =
         find.descendant(of: button, matching: find.byType(Material)).first;
     expect(
@@ -254,13 +252,15 @@ void main() {
       expect(m.size.height, closeTo(138.0, 1.0), reason: why);
     }
 
+    // Short on-card titles (full phrase lives in titleTooltip) so the
+    // 138 Sell-Out KPI height budget stays one line.
     for (final title in [
-      'إجمالي الوحدات بالطلبية',
-      'إجمالي القيمة قبل الضريبة',
-      'قيمة ضريبة القيمة المضافة (14%)',
-      'إجمالي قيمة الخصومات التجارية',
-      'صافي الفاتورة المستحق لأدكو',
-      'هامش ربح السلسلة المتوقع',
+      'إجمالي الوحدات',
+      'القيمة قبل الضريبة',
+      'ضريبة القيمة المضافة',
+      'الخصومات التجارية',
+      'صافي الفاتورة',
+      'هامش ربح السلسلة',
     ]) {
       final card = cards
           .evaluate()
@@ -275,7 +275,7 @@ void main() {
           tester,
           title,
           scope: find.byWidget(card),
-          minMaxLines: 2,
+          minMaxLines: 1,
         ),
         isTrue,
         reason: 'calculator title "$title" must sit fully inside the 138 card',

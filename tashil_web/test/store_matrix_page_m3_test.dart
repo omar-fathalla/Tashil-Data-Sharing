@@ -339,7 +339,7 @@ void main() {
         find.descendant(of: name, matching: find.byType(Text)).first,
       );
       expect(nameText.maxLines, 3);
-      expect(nameText.textAlign, TextAlign.start);
+      expect(nameText.textAlign, TextAlign.center);
       expect(nameText.data, kStrippedNames.first);
 
       final region = find.text('شرق الإسكندرية').first;

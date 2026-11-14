@@ -169,8 +169,8 @@ void main() {
               .widget<M3EqualHeightGrid>(
                   find.byKey(const ValueKey('oos_kpi_grid')))
               .columns,
-          4,
-          reason: 'OOS must use Sell-Out 4-col breakpoints at ${width.toInt()}',
+          3,
+          reason: '5 OOS cards fill evenly as 3+2 at ${width.toInt()}',
         );
       }
       expect(_cutBeforeThreeLines(tester, find.byKey(const ValueKey('oos_kpi_grid'))),
@@ -223,20 +223,15 @@ void main() {
       expect(find.byType(DataTable), findsWidgets);
       for (final dt in tester.widgetList<DataTable>(find.byType(DataTable))) {
         for (final (i, c) in dt.columns.indexed) {
-          if (i == 0) {
-            expect(c.headingRowAlignment, isNot(MainAxisAlignment.center),
-                reason: 'item-name column');
-          } else {
-            expect(c.headingRowAlignment, MainAxisAlignment.center,
-                reason: 'column $i');
-          }
+          expect(c.headingRowAlignment, MainAxisAlignment.center,
+              reason: 'column $i');
         }
       }
       final names = find.byKey(const ValueKey('oos_sku_name'));
       expect(names, findsWidgets);
       for (final t in tester.widgetList<Text>(names)) {
         expect(t.maxLines, 3);
-        expect(t.textAlign, TextAlign.start);
+        expect(t.textAlign, TextAlign.center);
       }
       expect(_cutBeforeThreeLines(tester, find.byType(DataTable)), isEmpty);
       expect(find.byKey(const ValueKey('oos_branch_name')), findsWidgets);
@@ -292,7 +287,7 @@ void main() {
   }
 
 
-  testWidgets('OOS KPI grid is 4+1 at 1280+sidebar like Sell-Out', (tester) async {
+  testWidgets('OOS KPI grid is 3+2 at 1280+sidebar (even fill)', (tester) async {
     await pumpOos(
       tester,
       Row(
@@ -308,7 +303,7 @@ void main() {
 
     final grid = tester.widget<M3EqualHeightGrid>(
         find.byKey(const ValueKey('oos_kpi_grid')));
-    expect(grid.columns, 4);
+    expect(grid.columns, 3);
     expect(grid.children, hasLength(5));
     final cardFinders = [
       'osa_summary_card',
@@ -323,9 +318,9 @@ void main() {
     ];
     expect(ys[0], closeTo(ys[1], 1.0));
     expect(ys[0], closeTo(ys[2], 1.0));
-    expect(ys[0], closeTo(ys[3], 1.0));
-    expect(ys[4], greaterThan(ys[0] + 100),
-        reason: '5th OOS card should sit on the second row (4+1)');
+    expect(ys[3], closeTo(ys[4], 1.0));
+    expect(ys[3], greaterThan(ys[0] + 100),
+        reason: '2nd row holds cards 4–5 (3+2 even fill)');
     for (final k in cardFinders) {
       expect(tester.getSize(find.byKey(ValueKey(k))).height, closeTo(138.0, 1.0),
           reason: k);

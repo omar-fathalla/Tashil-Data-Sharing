@@ -351,8 +351,11 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
     final lossAvailable = _hasMonitorReport;
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Same 960/580 breakpoints as Sell-Out (4+1 for five cards at 1280).
-        final columns = M3KpiGridColumns.forWidth(constraints.maxWidth);
+        // Even fill: 5 cards → 3+2 (not a lonely 4+1 last row).
+        final columns = M3KpiGridColumns.forWidthAndCount(
+          constraints.maxWidth,
+          5,
+        );
         return M3EqualHeightGrid(
           key: const ValueKey('oos_kpi_grid'),
           columns: columns,
@@ -1511,8 +1514,8 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
 
                     final columns = [
                       DataColumn(
-                        headingRowAlignment: MainAxisAlignment.start,
-                        label: cellText(0, 'الصنف', align: TextAlign.start),
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: cellText(0, 'الصنف'),
                       ),
                       DataColumn(
                         headingRowAlignment: MainAxisAlignment.center,
@@ -1548,8 +1551,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                                 DataRow(
                                   cells: [
                                     DataCell(cellText(0, item.skuName,
-                                        key: const ValueKey('oos_sku_name'),
-                                        align: TextAlign.start)),
+                                        key: const ValueKey('oos_sku_name'))),
                                     DataCell(cellText(1, item.brand)),
                                     DataCell(cellText(
                                         2, countDay(item.consecutiveDaysOOS))),

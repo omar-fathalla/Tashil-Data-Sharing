@@ -471,7 +471,7 @@ class _SellInReturnsScreenState extends State<SellInReturnsScreen>
 
     return LayoutBuilder(
       builder: (context, c) {
-        final columns = c.maxWidth >= 960 ? 4 : (c.maxWidth >= 580 ? 2 : 1);
+        final columns = M3KpiGridColumns.forWidthAndCount(c.maxWidth, cards.length);
         return M3EqualHeightGrid(
           key: const ValueKey('returns_kpi_cards_row'),
           columns: columns,
