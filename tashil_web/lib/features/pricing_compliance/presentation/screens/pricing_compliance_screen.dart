@@ -311,11 +311,28 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
               M3Spacing.gapMD,
 
               // Summary KPI cards — shared M3SummaryCard (Sell-Out geometry).
+              // Missing data: «—» + Arabic note (never fake 100.0% / +0.0%).
               LayoutBuilder(
                 builder: (context, constraints) {
                   final columns = constraints.maxWidth >= 840.0
                       ? 3
                       : (constraints.maxWidth >= 580.0 ? 2 : 1);
+                  final hasItems = totalCount > 0;
+                  final hasPromoUplift = hasItems && avgPromoUplift != 0.0;
+                  final complianceValue = hasItems
+                      ? '${complianceRate.toStringAsFixed(1)}%'
+                      : '—';
+                  final complianceSubtitle = hasItems
+                      ? '$compliantCount من أصل ${countSku(totalCount)} مطابق'
+                      : 'لا توجد أصناف لحساب الالتزام';
+                  final promoValue = hasPromoUplift
+                      ? CurrencyFormatter.formatSignedPct(avgPromoUplift)
+                      : '—';
+                  final promoSubtitle = hasPromoUplift
+                      ? 'زيادة في حجم المبيعات خلال فترات العروض'
+                      : (hasItems
+                          ? 'لا توجد عروض نشطة للمقارنة'
+                          : 'لا توجد أصناف لحساب الأثر الترويجي');
                   return M3EqualHeightGrid(
                     key: const ValueKey('pricing_kpi_grid'),
                     columns: columns,
@@ -327,11 +344,12 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                         title: 'معدل الالتزام السعري',
                         titleMaxLines: 3,
                         subtitleMaxLines: 3,
-                        value: '${complianceRate.toStringAsFixed(1)}%',
-                        subtitle:
-                            '$compliantCount من أصل ${countSku(totalCount)} مطابق',
+                        value: complianceValue,
+                        subtitle: complianceSubtitle,
                         icon: Icons.verified_rounded,
                         color: colorScheme.primary,
+                        textValue: !hasItems,
+                        isLoading: _isLoading,
                         valueKey: const ValueKey('kpi_value_Compliance Rate'),
                         subtitleKey:
                             const ValueKey('kpi_subtitle_Compliance Rate'),
@@ -342,9 +360,13 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                         titleMaxLines: 3,
                         subtitleMaxLines: 3,
                         value: countViolation(violationCount),
-                        subtitle: 'حالات حرق أسعار وزيادة غير معتمدة',
+                        subtitle: hasItems
+                            ? 'حالات حرق أسعار وزيادة غير معتمدة'
+                            : 'لا توجد أصناف للمراجعة',
                         icon: Icons.error_outline_rounded,
                         color: colorScheme.error,
+                        textValue: true,
+                        isLoading: _isLoading,
                         valueKey: const ValueKey('kpi_value_Price Violations'),
                         subtitleKey:
                             const ValueKey('kpi_subtitle_Price Violations'),
@@ -354,10 +376,12 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                         title: 'متوسط الأثر الترويجي',
                         titleMaxLines: 3,
                         subtitleMaxLines: 3,
-                        value: CurrencyFormatter.formatSignedPct(avgPromoUplift),
-                        subtitle: 'زيادة في حجم المبيعات خلال فترات العروض',
+                        value: promoValue,
+                        subtitle: promoSubtitle,
                         icon: Icons.rocket_launch_rounded,
                         color: colorScheme.tertiary,
+                        textValue: !hasPromoUplift,
+                        isLoading: _isLoading,
                         valueKey: const ValueKey('kpi_value_Avg Promo Uplift'),
                         subtitleKey:
                             const ValueKey('kpi_subtitle_Avg Promo Uplift'),
@@ -1466,6 +1490,11 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
     if (!item.isPromoActive) {
       return _buildShortStatus(context, 'بدون عرض', 'لا يوجد عرض ترويجي نشط');
     }
+    // Measured uplift only — never invent +0.0% when the series is absent.
+    if (item.promoUpliftPct == 0.0) {
+      return _buildShortStatus(
+          context, 'أثر ترويجي', 'لا توجد بيانات كافية لحساب الأثر');
+    }
     return _buildShortStatus(
       context,
       'أثر ترويجي',
@@ -1473,8 +1502,8 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
     );
   }
 
-  /// Short 8dp-radius chip with a grey description underneath (Sell-Out /
-  /// Sell-In monthly-status pattern). Neutral fill, no early ellipsis.
+  /// Short 8dp-radius chip ([M3ChipSurface]) with a grey description underneath
+  /// — same Sell-Out / Trade Marketing status pattern.
   Widget _buildShortStatus(
       BuildContext context, String short, String description) {
     final theme = Theme.of(context);
@@ -1483,19 +1512,16 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Container(
-          padding: M3ChipStyle.padding,
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
-            borderRadius: M3ChipStyle.radius,
-          ),
+        M3ChipSurface(
+          color: colorScheme.surfaceContainerHighest,
           child: Text(
             short,
             maxLines: 2,
             textAlign: TextAlign.center,
             style: theme.textTheme.labelLarge?.copyWith(
               color: colorScheme.onSurface,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
+              fontSize: M3FontSize.labelSmallPlus,
             ),
           ),
         ),
@@ -1567,19 +1593,18 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                   ),
                 ),
                 if (_selectedChain != 'all' || _selectedYear > 0)
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 8.0),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10.0, vertical: 4.0),
-                    decoration: BoxDecoration(
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: M3ChipSurface(
                       color: colorScheme.secondaryContainer.withOpacity(0.6),
-                      borderRadius: M3Shape.radiusMd,
-                    ),
-                    child: Text(
-                      '${_selectedChain != 'all' ? _getChainDisplayName(_selectedChain) : 'كافة السلاسل'} • ${_selectedYear > 0 ? '$_selectedYear' : 'كل السنوات'}',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSecondaryContainer,
-                        fontWeight: FontWeight.bold,
+                      child: Text(
+                        '${_selectedChain != 'all' ? _getChainDisplayName(_selectedChain) : 'كافة السلاسل'} • ${_selectedYear > 0 ? '$_selectedYear' : 'كل السنوات'}',
+                        maxLines: 2,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSecondaryContainer,
+                          fontWeight: FontWeight.w700,
+                          fontSize: M3FontSize.labelSmallPlus,
+                        ),
                       ),
                     ),
                   ),
@@ -1721,32 +1746,48 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
                                   ),
                                 ],
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8.0, vertical: 3.0),
-                                decoration: BoxDecoration(
-                                  color: isRevUp
-                                      ? colorScheme.primaryContainer
-                                      : (isRevDown
-                                          ? colorScheme.errorContainer
-                                          : colorScheme
-                                              .surfaceContainerHighest),
-                                  borderRadius: M3Shape.radiusSm,
-                                ),
-                                child: Text(
-                                  point.revenueChangePct == 0
-                                      ? 'مستقر'
-                                      : '${isRevUp ? '▲ ' : '▼ '}${CurrencyFormatter.formatSignedPct(point.revenueChangePct)} إيراد',
-                                  style: TextStyle(
-                                    fontSize: M3FontSize.labelSmall,
-                                    fontWeight: FontWeight.bold,
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  M3ChipSurface(
                                     color: isRevUp
-                                        ? colorScheme.onPrimaryContainer
+                                        ? colorScheme.primaryContainer
                                         : (isRevDown
-                                            ? colorScheme.onErrorContainer
-                                            : colorScheme.onSurfaceVariant),
+                                            ? colorScheme.errorContainer
+                                            : colorScheme
+                                                .surfaceContainerHighest),
+                                    child: Text(
+                                      point.revenueChangePct == 0
+                                          ? 'مستقر'
+                                          : (isRevUp
+                                              ? 'نمو إيراد'
+                                              : 'تراجع إيراد'),
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        fontSize: M3FontSize.labelSmallPlus,
+                                        fontWeight: FontWeight.w700,
+                                        color: isRevUp
+                                            ? colorScheme.onPrimaryContainer
+                                            : (isRevDown
+                                                ? colorScheme.onErrorContainer
+                                                : colorScheme
+                                                    .onSurfaceVariant),
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  if (point.revenueChangePct != 0) ...[
+                                    const SizedBox(height: 2.0),
+                                    Text(
+                                      CurrencyFormatter.formatSignedPct(
+                                          point.revenueChangePct),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                        fontSize: M3FontSize.labelSmall,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ],
                           ),

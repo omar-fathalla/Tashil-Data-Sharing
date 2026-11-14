@@ -147,6 +147,104 @@ class PricingShotApiClient extends ApiClient {
   }
 }
 
+/// Empty pricing response — used to assert «—» KPIs (no fake 100.0% / +0.0%).
+class PricingEmptyApiClient extends ApiClient {
+  PricingEmptyApiClient()
+      : super(tenantId: 'tenant-adeco', allowMockFallback: false);
+
+  @override
+  Future<List<PricingComplianceItem>> getPricingCompliance({
+    String? chain,
+    String? category,
+    bool? violationOnly,
+    bool? promoOnly,
+    int? year,
+    int? month,
+    int? limit,
+    int? offset,
+    String? search,
+  }) async {
+    // Mirror the cleared-tenant / empty-ingest meta the API returns, including
+    // the historically fake 100.0% / 0.0 fields — the UI must still show «—».
+    lastPricingComplianceMeta = const PricingCompliancePageResult(
+      items: [],
+      totalCount: 0,
+      summaryTotalCount: 0,
+      limit: 25,
+      offset: 0,
+      compliantCount: 0,
+      violationCount: 0,
+      complianceRatePct: 100.0,
+      avgPromoUpliftPct: 0.0,
+      availableCategories: [],
+    );
+    return const [];
+  }
+}
+
+/// Items present but no active promo uplift — avg uplift must be «—», not 0.0%.
+class PricingNoPromoApiClient extends PricingShotApiClient {
+  @override
+  Future<List<PricingComplianceItem>> getPricingCompliance({
+    String? chain,
+    String? category,
+    bool? violationOnly,
+    bool? promoOnly,
+    int? year,
+    int? month,
+    int? limit,
+    int? offset,
+    String? search,
+  }) async {
+    final items = await super.getPricingCompliance(
+      chain: chain,
+      category: category,
+      violationOnly: violationOnly,
+      promoOnly: promoOnly,
+      year: year,
+      month: month,
+      limit: limit,
+      offset: offset,
+      search: search,
+    );
+    final withoutPromo = items
+        .map((i) => PricingComplianceItem(
+              itemCode: i.itemCode,
+              skuName: i.skuName,
+              barcode: i.barcode,
+              category: i.category,
+              retailerChain: i.retailerChain,
+              storeName: i.storeName,
+              actualPrice: i.actualPrice,
+              recommendedPrice: i.recommendedPrice,
+              factoryUnitCost: i.factoryUnitCost,
+              retailerMarginPct: i.retailerMarginPct,
+              unitsPerCarton: i.unitsPerCarton,
+              priceDeltaPct: i.priceDeltaPct,
+              violationType: i.violationType,
+              isPromoActive: false,
+              promoUpliftPct: 0.0,
+            ))
+        .toList();
+    final meta = lastPricingComplianceMeta!;
+    lastPricingComplianceMeta = PricingCompliancePageResult(
+      items: withoutPromo,
+      totalCount: withoutPromo.length,
+      summaryTotalCount: withoutPromo.length,
+      limit: meta.limit,
+      offset: meta.offset,
+      compliantCount: meta.compliantCount,
+      violationCount: meta.violationCount,
+      complianceRatePct: meta.complianceRatePct,
+      avgPromoUpliftPct: 0.0,
+      availableCategories: meta.availableCategories,
+      monthlyElasticity: meta.monthlyElasticity,
+      elasticitySummary: meta.elasticitySummary,
+    );
+    return withoutPromo;
+  }
+}
+
 Future<void> pumpPricing(
   WidgetTester tester,
   Widget page, {
