@@ -16,6 +16,9 @@ import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/arabic_plural.dart';
+import '../../../../core/utils/bidi_text.dart';
+import '../../../../core/utils/app_date_format.dart';
+import '../../../../core/widgets/hyphenated_code_text.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
 import '../../../../core/widgets/m3_search_field.dart';
@@ -400,7 +403,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
             style: TextStyle(fontWeight: FontWeight.w900),
           ),
           content: Text(
-            'هل أنت متأكد من حذف الملف "${file.fileName}"؟\nسيتم إزالة جميع تحديثات الأسعار والأصناف التي تمت من خلال هذا الشيت والرجوع تلقائياً إلى النسخة السابقة.',
+            'هل أنت متأكد من حذف الملف ${quotedLtr(file.fileName)}؟\nسيتم إزالة جميع تحديثات الأسعار والأصناف التي تمت من خلال هذا الشيت والرجوع تلقائياً إلى النسخة السابقة.',
           ),
           actions: [
             TextButton(
@@ -956,14 +959,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     );
   }
 
-  String _formatUploadDate(String raw) {
-    if (raw.isEmpty) return 'غير محدد';
-    final dt = DateTime.tryParse(raw);
-    if (dt != null) {
-      return DateFormat('yyyy-MM-dd HH:mm').format(dt.toLocal());
-    }
-    return raw;
-  }
+  String _formatUploadDate(String raw) =>
+      AppDateFormat.tryFormat(raw, withTime: true);
 
   void _exportFilteredCatalogToCsv() {
     final items = _filteredItems;
@@ -1974,9 +1971,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                     color: cs.primary.withValues(alpha: 0.35),
                                   ),
                                 ),
-                                child: M3WrapText(
+                                child: HyphenatedCodeText(
                                   item.itemCode,
                                   maxLines: 2,
+                                  maxWidth: w[1],
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     fontFamily: 'monospace',
@@ -2028,9 +2026,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                       .withValues(alpha: 0.6),
                                   borderRadius: M3Shape.radiusSm,
                                 ),
-                                child: M3WrapText(
+                                child: HyphenatedCodeText(
                                   item.barcode,
                                   maxLines: 2,
+                                  maxWidth: w[3],
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     fontFamily: 'monospace',
@@ -2495,21 +2494,16 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   }
 
   Widget _buildColHeader(String ar, String en) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          ar,
-          style: const TextStyle(
-              fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmall),
-        ),
-        Text(
-          en,
-          style: const TextStyle(
-              fontWeight: FontWeight.w500, fontSize: M3FontSize.tiny),
-        ),
-      ],
+    return Tooltip(
+      message: en,
+      child: Text(
+        ar,
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.visible,
+        style: const TextStyle(
+            fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmall),
+      ),
     );
   }
 
@@ -2891,7 +2885,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                         title: 'إجمالي قيمة الخصومات التجارية',
                         titleMaxLines: 2,
                         subtitleMaxLines: 2,
-                        value: '-${_currFmt.format(totalDiscountEgp)} ج.م',
+                        value: CurrencyFormatter.formatEGP(-totalDiscountEgp, showDecimals: true),
                         subtitle: 'Total Invoice & Extra Discounts',
                         icon: Icons.discount_rounded,
                         color: M3Palette.danger,
@@ -3020,7 +3014,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 subtitle: M3WrapText(
-                  '${countSku(file.rowsIngested)} • تاريخ الرفع: ${file.uploadedAt}',
+                  '${countSku(file.rowsIngested)} • تاريخ الرفع: ${AppDateFormat.tryFormat(file.uploadedAt)}',
                   maxLines: 2,
                 ),
                 trailing: Row(
@@ -3180,13 +3174,13 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'بطاقة تعريف الصنف الرسمية (Product ID Card)',
+                    'بطاقة تعريف الصنف الرسمية',
                     style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: M3FontSize.bodyLarge),
                   ),
                   Text(
-                    'كود الصنف: ${i.itemCode} • الباركود: ${i.barcode}',
+                    'كود الصنف: ${ltrIsolate(i.itemCode)} • الباركود: ${ltrIsolate(i.barcode)}',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: cs.onSurfaceVariant,
                     ),
@@ -3263,7 +3257,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                       child: TextField(
                         controller: _itemCodeCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'كود الصنف (Item Code)',
+                          labelText: 'كود الصنف',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -3273,7 +3267,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                       child: TextField(
                         controller: _barcodeCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'الباركود (Barcode GTIN)',
+                          labelText: 'الباركود',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -3284,8 +3278,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                 TextField(
                   controller: _nameCtrl,
                   decoration: const InputDecoration(
-                    labelText:
-                        'الاسم الرسمي للصنف في كارتة أدكو (Official Name)',
+                    labelText: 'الاسم الرسمي للصنف',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -3296,7 +3289,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                       child: TextField(
                         controller: _brandCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'العلامة التجارية (Brand)',
+                          labelText: 'العلامة التجارية',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -3306,7 +3299,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                       child: TextField(
                         controller: _packagingCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'نوع التعبئة (Packaging)',
+                          labelText: 'نوع التعبئة',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -3321,7 +3314,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                         controller: _unitsPerCartonCtrl,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
-                          labelText: 'عدد الوحدات بالكرتونة (Units/Carton)',
+                          labelText: 'الوحدات / كرتونة',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -3332,7 +3325,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                         controller: _unitPriceInclVatCtrl,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
-                          labelText: 'سعر الوحدة شامل الضريبة (Unit Incl VAT)',
+                          labelText: 'سعر الوحدة شامل الضريبة',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -3343,7 +3336,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                         controller: _discountPctCtrl,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
-                          labelText: 'خصم الفاتورة % (Discount %)',
+                          labelText: 'خصم الفاتورة %',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -3353,7 +3346,7 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
                 const SizedBox(height: 12.0),
                 M3Dropdown<String>(
                   value: _itemType,
-                  label: 'نوع الصنف (Item Type)',
+                  label: 'نوع الصنف',
                   options: m3OptionsFromMenuItems<String>([
                     const DropdownMenuItem(
                       value: 'عادي',

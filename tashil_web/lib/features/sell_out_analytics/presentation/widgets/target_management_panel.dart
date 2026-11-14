@@ -22,6 +22,7 @@ import '../../../../core/widgets/m3_section_title.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
 
 /// TargetManagementPanel provides a unified Target entry, Excel upload, and
 /// real-time Actual vs. Target achievement comparison experience for both
@@ -1032,8 +1033,11 @@ onChanged: m3Legacy<int>((v) {
             final card2 = _buildKpiCard(
               context,
               titleAr: _isSellIn
-                  ? 'المحقق صافي بعد المرتجعات (Sell-In)'
+                  ? 'المحقق صافي بعد المرتجعات'
                   : 'المحقق (Sell-Out)',
+              titleTooltip: _isSellIn
+                  ? 'المحقق صافي بعد المرتجعات (Sell-In)'
+                  : null,
               titleEn: _isSellIn
                   ? 'Actual net Sell-In after returns'
                   : 'Actual Sell-Out',
@@ -1085,7 +1089,7 @@ onChanged: m3Legacy<int>((v) {
               titleEn: 'Variance',
               value: !hasTargets
                   ? '—'
-                  : '${summary.totalVarianceEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatCompactEGP(summary.totalVarianceEgp)}',
+                  : _signedCompactEgp(summary.totalVarianceEgp),
               subtitleAr: !hasTargets
                   ? noTargets
                   : _isSellIn && summary.totalBranchesCovered > 0
@@ -1110,7 +1114,7 @@ onChanged: m3Legacy<int>((v) {
             // card is not taller than its siblings.
             return M3EqualHeightGrid(
               key: const ValueKey('targets_kpi_grid'),
-              columns: width >= 1100 ? 4 : (width >= 650 ? 2 : 1),
+              columns: M3KpiGridColumns.forWidth(width),
               spacing: M3Spacing.sm,
               runSpacing: M3Spacing.sm,
               children: [card1, card2, card3, card4],
@@ -3232,96 +3236,25 @@ onChanged: m3Legacy<String>((v) {
     required Color color,
     double? progressPct,
     bool reserveProgress = false,
+    String? titleTooltip,
   }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return Container(
+    return M3SummaryKpiCard(
       key: ValueKey('targets_kpi_card_$titleAr'),
-      constraints: const BoxConstraints(minHeight: 145.0),
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: M3Shape.radiusLg,
-        border: Border.all(
-          color: colorScheme.outlineVariant.withOpacity(0.5),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(9.0),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  borderRadius: M3Shape.radiusMd,
-                ),
-                child: Icon(icon, color: color, size: 24.0),
-              ),
-              const SizedBox(width: 10.0),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      titleAr,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: colorScheme.onSurface,
-                        letterSpacing: -0.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12.0),
-          Text(
-            value,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          if (progressPct == null && reserveProgress)
-            const SizedBox(height: 14.0)
-          else if (progressPct != null) ...[
-            const SizedBox(height: 8.0),
-            ClipRRect(
-              borderRadius: M3Shape.radiusFull,
-              child: LinearProgressIndicator(
-                value: (progressPct / 100.0).clamp(0.0, 1.0),
-                minHeight: 6.0,
-                backgroundColor: colorScheme.surfaceContainerHighest,
-                color: color,
-              ),
-            ),
-          ],
-          const SizedBox(height: 6.0),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  subtitleAr,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: M3FontSize.bodySmall,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+      title: titleAr,
+      value: value,
+      subtitle: subtitleAr,
+      icon: icon,
+      color: color,
+      titleTooltip: titleTooltip,
+      titleMaxLines: 1,
+      subtitleMaxLines: 2,
     );
   }
+
+  static String _signedCompactEgp(double amount) {
+    if (amount < 0) return CurrencyFormatter.formatCompactEGP(amount);
+    if (amount == 0) return CurrencyFormatter.formatCompactEGP(0);
+    return '\u2066+${CurrencyFormatter.formatCompactEGP(amount)}\u2069';
+  }
+
 }

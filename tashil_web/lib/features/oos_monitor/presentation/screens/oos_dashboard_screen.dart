@@ -9,6 +9,7 @@ import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/utils/shared_display_prefix.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/bidi_text.dart';
 import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
@@ -250,9 +251,11 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                     label: 'إصدار أمر توريد طارئ',
                     icon: Icons.flash_on_rounded,
                     isPrimary: true,
-                    onPressed: () {
-                      _showEmergencyPOModal(context);
-                    },
+                    onPressed: isLoading
+                        ? null
+                        : () {
+                            _showEmergencyPOModal(context);
+                          },
                   ),
                 ],
               ),
@@ -1574,7 +1577,11 @@ onChanged: m3Legacy<String>((val) {
             children: [
               Icon(Icons.flash_on_rounded, color: colorScheme.primary),
               const SizedBox(width: 8.0),
-              const Text('إصدار أمر توريد طارئ (Emergency PO)'),
+              Expanded(
+                child: Text(
+                  rtlEnd('إصدار أمر توريد طارئ (${ltrIsolate('Emergency PO')})'),
+                ),
+              ),
             ],
           ),
           content: SizedBox(
@@ -1583,35 +1590,55 @@ onChanged: m3Legacy<String>((val) {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'سيتم إرسال أمر توريد استثنائي فوري يشمل ${filtered.length} أصناف منعدمة في الفروع المتأثرة.',
-                  style: theme.textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 12.0),
-                Container(
-                  padding: const EdgeInsets.all(12.0),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest,
-                    borderRadius: M3Shape.radiusSm,
+                if (isLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24.0),
+                    child: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else if (filtered.isEmpty)
+                  Text(
+                    'لا توجد أصناف منعدمة',
+                    style: theme.textTheme.bodyMedium,
+                  )
+                else ...[
+                  Text(
+                    rtlEnd(
+                      'سيتم إرسال أمر توريد استثنائي فوري يشمل ${ltrIsolate(CurrencyFormatter.formatUnits(filtered.length))} أصناف منعدمة في الفروع المتأثرة.',
+                    ),
+                    style: theme.textTheme.bodyMedium,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'إجمالي الفاقد اليومي المستهدف استعادته:',
-                        style: theme.textTheme.labelMedium,
-                      ),
-                      const SizedBox(height: 4.0),
-                      Text(
-                        CurrencyFormatter.formatEGP(filtered.fold<double>(0.0, (s, a) => s + a.estimatedLostDailyCost)),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.primary,
+                  const SizedBox(height: 12.0),
+                  Container(
+                    padding: const EdgeInsets.all(12.0),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: M3Shape.radiusSm,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'إجمالي الفاقد اليومي المستهدف استعادته:',
+                          style: theme.textTheme.labelMedium,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4.0),
+                        Text(
+                          CurrencyFormatter.formatEGP(
+                            filtered.fold<double>(
+                                0.0, (s, a) => s + a.estimatedLostDailyCost),
+                            isolate: true,
+                          ),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -1623,7 +1650,9 @@ onChanged: m3Legacy<String>((val) {
             FilledButton.icon(
               icon: const Icon(Icons.send_rounded, size: 16.0),
               label: const Text('تأكيد وإرسال الأمر'),
-              onPressed: () {
+              onPressed: (isLoading || filtered.isEmpty)
+                  ? null
+                  : () {
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(

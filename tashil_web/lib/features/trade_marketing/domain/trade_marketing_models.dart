@@ -248,6 +248,65 @@ class MonthlyChainRoiSummary {
   }
 }
 
+/// Simulator-only average of historical campaign ROMI values (spend > 0
+/// and a positive [MonthlyChainRoiSummary.romiMultiple]). Returns null
+/// when there is no campaign basis — the simulator must not fall back
+/// to a hardcoded multiple. Does not change [MonthlyChainRoiSummary.romiMultiple].
+double? averageHistoricalRomi(Iterable<MonthlyChainRoiSummary> rows) {
+  final usable = rows
+      .where((s) => s.marketingSpendEgp > 0 && s.romiMultiple > 0)
+      .toList();
+  if (usable.isEmpty) return null;
+  return usable.fold<double>(0, (a, s) => a + s.romiMultiple) / usable.length;
+}
+
+/// What-if projection used by [_openRoiSimulatorDialog].
+///
+/// When [historicalRomi] is null, every projected figure is null so the
+/// UI can show «—». When previous-month or last-year sales are missing
+/// the corresponding growth % is also null («—») instead of 0.0%.
+/// The lift formula itself (`budget * historicalRomi`) is unchanged
+/// when a historical multiple exists.
+class RoiSimulatorProjection {
+  final double? historicalRomi;
+  final double previousMonthSalesEgp;
+  final double lastYearSalesEgp;
+  final double budgetEgp;
+
+  const RoiSimulatorProjection({
+    required this.historicalRomi,
+    required this.previousMonthSalesEgp,
+    required this.lastYearSalesEgp,
+    required this.budgetEgp,
+  });
+
+  bool get hasHistoricalRomi =>
+      historicalRomi != null && historicalRomi! > 0;
+
+  double? get projectedSalesEgp => hasHistoricalRomi
+      ? previousMonthSalesEgp + budgetEgp * historicalRomi!
+      : null;
+
+  double? get momLiftEgp =>
+      hasHistoricalRomi ? budgetEgp * historicalRomi! : null;
+
+  double? get momGrowthPct =>
+      (hasHistoricalRomi && previousMonthSalesEgp > 0)
+          ? (momLiftEgp! / previousMonthSalesEgp) * 100.0
+          : null;
+
+  double? get yoyLiftEgp =>
+      hasHistoricalRomi ? projectedSalesEgp! - lastYearSalesEgp : null;
+
+  double? get yoyGrowthPct =>
+      (hasHistoricalRomi && lastYearSalesEgp > 0)
+          ? (yoyLiftEgp! / lastYearSalesEgp) * 100.0
+          : null;
+
+  double? get romiMultiple =>
+      hasHistoricalRomi && budgetEgp > 0 ? momLiftEgp! / budgetEgp : null;
+}
+
 /// Provides initial realistic FMCG trade marketing campaigns and monthly sales baselines
 class TradeMarketingSeedData {
   static List<MarketingExpenseItem> getInitialExpenses(String tenantSlug) {

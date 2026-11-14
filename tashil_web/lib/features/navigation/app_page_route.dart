@@ -33,9 +33,8 @@ class AppPageRoute {
     return i < 0 ? 0 : i;
   }
 
-  /// Extracts the page slug from a URL path like `/adeco/sell-in` or
-  /// `/portal/adeco/sell-in`. Returns '' when there is none.
-  static String pageSlugFromPath(String path) {
+  /// Path segments after stripping a leading `/portal/` prefix.
+  static List<String> _segments(String path) {
     final segments = path
         .toLowerCase()
         .split('/')
@@ -44,9 +43,35 @@ class AppPageRoute {
     if (segments.isNotEmpty && segments.first == 'portal') {
       segments.removeAt(0);
     }
+    return segments;
+  }
+
+  /// Extracts the page slug from a URL path like `/adeco/sell-in` or
+  /// `/portal/adeco/sell-in`. Returns '' when there is none or the
+  /// segment is not a known page (see [unknownPageSlugFromPath]).
+  static String pageSlugFromPath(String path) {
+    final segments = _segments(path);
     if (segments.length < 2) return '';
     final candidate = segments[1].trim();
     return pageSlugs.contains(candidate) ? candidate : '';
+  }
+
+  /// The unknown page segment of `/{tenant}/{slug}` (or `/portal/...`),
+  /// or null when the path has no page or the page is a known slug.
+  /// `/adeco` and `/adeco/` are valid Dashboard URLs, not unknown.
+  static String? unknownPageSlugFromPath(String path) {
+    final segments = _segments(path);
+    if (segments.length < 2) return null;
+    final candidate = segments[1].trim();
+    if (candidate.isEmpty || pageSlugs.contains(candidate)) return null;
+    return candidate;
+  }
+
+  /// Known page slug, or the unknown segment if present, so a refresh
+  /// or a post-login redirect can keep `/adeco/nope` on the Not Found
+  /// page instead of silently rewriting to Dashboard.
+  static String slugToPreserveFromPath(String path) {
+    return unknownPageSlugFromPath(path) ?? pageSlugFromPath(path);
   }
 
   /// Builds the browser path for [tenant] and optional [pageSlug].

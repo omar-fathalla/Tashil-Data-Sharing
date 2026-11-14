@@ -30,5 +30,34 @@ void main() {
           '/adeco');
       expect(AppPageRoute.pathFor('adeco', 'sell-in'), '/adeco/sell-in');
     });
+
+    test('unknownPageSlugFromPath is null for Dashboard and known pages', () {
+      expect(AppPageRoute.unknownPageSlugFromPath('/adeco'), isNull);
+      expect(AppPageRoute.unknownPageSlugFromPath('/adeco/'), isNull);
+      expect(AppPageRoute.unknownPageSlugFromPath('/'), isNull);
+      expect(AppPageRoute.unknownPageSlugFromPath('/adeco/sell-in'), isNull);
+      expect(AppPageRoute.unknownPageSlugFromPath('/portal/adeco/sell-out'),
+          isNull);
+      expect(AppPageRoute.unknownPageSlugFromPath('/admin'), isNull);
+    });
+
+    test('unknownPageSlugFromPath returns the bad segment', () {
+      expect(AppPageRoute.unknownPageSlugFromPath('/adeco/nope'), 'nope');
+      expect(
+        AppPageRoute.unknownPageSlugFromPath('/portal/adeco/this-page-does-not-exist'),
+        'this-page-does-not-exist',
+      );
+      expect(AppPageRoute.unknownPageSlugFromPath('/ADECO/NoPe/'), 'nope');
+    });
+
+    test('slugToPreserveFromPath keeps unknown slugs and known pages', () {
+      expect(AppPageRoute.slugToPreserveFromPath('/adeco'), '');
+      expect(AppPageRoute.slugToPreserveFromPath('/adeco/sell-in'), 'sell-in');
+      expect(AppPageRoute.slugToPreserveFromPath('/adeco/nope'), 'nope');
+      expect(
+        AppPageRoute.slugToPreserveFromPath('/portal/adeco/this-page-does-not-exist'),
+        'this-page-does-not-exist',
+      );
+    });
   });
 }

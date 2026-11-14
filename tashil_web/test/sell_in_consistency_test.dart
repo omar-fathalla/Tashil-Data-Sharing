@@ -181,6 +181,8 @@ List<String> _violations(WidgetTester tester) {
         (e.widget as Text).textSpan?.toPlainText() ??
         '';
     final stripped = t
+        // Display-only bidi isolates and word joiners are not copy.
+        .replaceAll(RegExp(r'[\u2066\u2067\u2068\u2069\u2060\u200F]'), '')
         // Chain/tenant brand names stay as they are.
         .replaceAll(
             RegExp(

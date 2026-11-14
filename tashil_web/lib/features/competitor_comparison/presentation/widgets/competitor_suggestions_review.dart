@@ -619,7 +619,7 @@ class CompetitorSuggestionsReviewState
                       M3Spacing.gapXXS,
                       Text(
                         ownName,
-                        style: theme.textTheme.titleSmall?.copyWith(
+                        style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -697,13 +697,14 @@ class CompetitorSuggestionsReviewState
                   children: [
                     Text(
                       'المنافس المقترح',
-                      style: theme.textTheme.labelSmall?.copyWith(
+                      style: theme.textTheme.labelMedium?.copyWith(
                         color: cs.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     Text(
                       name,
-                      style: theme.textTheme.bodyMedium?.copyWith(
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),

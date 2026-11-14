@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
+import '../../../../core/utils/bidi_text.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/widgets/m3_feedback.dart';
@@ -137,7 +138,7 @@ class _RegisterChainDialogState extends State<RegisterChainDialog> {
                 decoration: InputDecoration(
                   labelText: 'الكود',
                   hintText: 'zahran',
-                  helperText: 'حروف إنجليزي صغيرة وأرقام و _ أو -',
+                  helperText: rtlEnd('حروف إنجليزي صغيرة وأرقام و ${ltrIsolate('_')} أو ${ltrIsolate('-')}'),
                   errorText: _code.text.isEmpty || isValidChainCode(_code.text)
                       ? null
                       : 'كود مش صالح',

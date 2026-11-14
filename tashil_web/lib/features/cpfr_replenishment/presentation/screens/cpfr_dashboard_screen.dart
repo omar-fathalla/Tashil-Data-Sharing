@@ -9,6 +9,7 @@ import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/bidi_text.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/widgets/m3_button.dart';
@@ -165,7 +166,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
       if (!mounted) return;
       M3Feedback.showSuccess(
         context,
-        'تم تحديث بيانات التوريد والمخزون (${res.validRows} سجل - ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)})',
+        'تم تحديث بيانات التوريد والمخزون (${CurrencyFormatter.formatUnits(res.validRows)} سجل - ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)})',
       );
       await _loadDashboard();
     } catch (e) {
@@ -231,7 +232,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
       });
       M3Feedback.showSuccess(
         context,
-        'تم رفع ومعالجة ملف التوريد (Sell-In): ${picked.name} (${res.validRows} سجل بإجمالي ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)})',
+        rtlEnd('تم رفع ومعالجة ملف التوريد (${ltrIsolate('Sell-\u2060In')}): ${ltrIsolate(picked.name)} (${CurrencyFormatter.formatUnits(res.validRows)} سجل بإجمالي ${CurrencyFormatter.formatCompactEGP(res.totalRevenue)})'),
       );
       await _loadDashboard();
     } catch (e) {
@@ -549,10 +550,12 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
           children: [
             Icon(Icons.menu_book_rounded, color: colorScheme.primary),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: Text(
-                'دليل البيانات المطلوبة لمحرك CPFR (Sell-In & Sell-Out)',
-                style: TextStyle(
+                rtlEnd(
+                  'دليل البيانات المطلوبة لمحرك ${ltrIsolate('CPFR')} (${ltrIsolate('Sell-\u2060In')} & ${ltrIsolate('Sell-\u2060Out')})',
+                ),
+                style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: M3FontSize.titleMediumPlus,
                 ),
@@ -798,7 +801,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
     return M3PageHeader(
       titleEn: 'CPFR & Inventory Replenishment',
       subtitleAr:
-          'منظومة التخطيط المشترك ومطابقة التوريد (Sell-In) مع مبيعات الكاشير (Sell-Out) وحساب دوران المخزون وأوامر التوريد لجميع السلاسل',
+          rtlEnd('منظومة التخطيط المشترك ومطابقة التوريد (${ltrIsolate('Sell-\u2060In')}) مع مبيعات الكاشير (${ltrIsolate('Sell-\u2060Out')}) وحساب دوران المخزون وأوامر التوريد لجميع السلاسل'),
       actions: M3ButtonGroup(
         maxVisibleCompact: 2,
         items: [
@@ -994,7 +997,7 @@ class _CPFRDashboardScreenState extends State<CPFRDashboardScreen>
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'مصدر بيانات التوريد النشط: $activeFile (${_data?.totalRecords ?? 0} سجل)',
+                    'مصدر بيانات التوريد النشط: ${ltrIsolate(activeFile)} (${CurrencyFormatter.formatUnits(_data?.totalRecords ?? 0)} سجل)',
                     style: theme.textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: colorScheme.onSurfaceVariant,

@@ -9,6 +9,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_motion.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/bidi_text.dart';
 import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/widgets/archive_actions_group.dart';
 import '../../../../core/widgets/m3_button.dart';
@@ -315,9 +316,6 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
                     Text('تعديل سلسلة التجزئة',
                         style: theme.textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold)),
-                    Text('Edit Retail Chain (Arabic / English)',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -335,7 +333,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
                     controller: arCtrl,
                     textDirection: TextDirection.rtl,
                     decoration: InputDecoration(
-                      labelText: 'اسم السلسلة بالعربية (Arabic)',
+                      labelText: 'اسم السلسلة بالعربية',
                       hintText: 'مثال: الوكالة، أسواق فتح الله...',
                       prefixIcon:
                           const Icon(Icons.language_rounded, size: 18.0),
@@ -351,7 +349,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
                     controller: enCtrl,
                     textDirection: TextDirection.ltr,
                     decoration: InputDecoration(
-                      labelText: 'اسم السلسلة بالإنجليزية (English)',
+                      labelText: 'اسم السلسلة بالإنجليزية',
                       hintText: 'e.g. El Wakala, Fathalla Market...',
                       prefixIcon:
                           const Icon(Icons.translate_rounded, size: 18.0),
@@ -956,12 +954,12 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'هل أنت متأكد من رغبتك في حذف ملف "${file.fileName}"؟',
+              'هل أنت متأكد من رغبتك في حذف ملف ${quotedLtr(file.fileName)}؟',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10.0),
             Text(
-              'سيتم حذف هذا الشيت من التخزين (Storage) ومسح كافة البيانات والسجلات التحليلية المستوردة منه من قاعدة البيانات نهائياً.',
+              rtlEnd('سيتم حذف هذا الشيت من التخزين (${ltrIsolate('Storage')}) ومسح كافة البيانات والسجلات التحليلية المستوردة منه من قاعدة البيانات نهائياً.'),
               style: TextStyle(
                 color: Theme.of(dialogCtx).colorScheme.onSurfaceVariant,
                 fontSize: M3FontSize.labelMediumPlus,
@@ -1006,7 +1004,7 @@ class _UploadPortalScreenState extends State<UploadPortalScreen>
               foregroundColor: Theme.of(dialogCtx).colorScheme.onError,
             ),
             onPressed: () => Navigator.of(dialogCtx).pop(true),
-            child: const Text('حذف (Delete)'),
+            child: const Text('حذف'),
           ),
         ],
       ),

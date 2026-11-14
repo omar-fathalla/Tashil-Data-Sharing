@@ -1,8 +1,8 @@
 import 'package:tashil_web/core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_toolbar_button.dart';
-import '../../../../core/widgets/m3_section_title.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
+import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../../core/widgets/m3_table_surface.dart';
 import 'dart:async';
 import 'package:tashil_web/core/utils/sheet_name_utils.dart';
@@ -25,6 +25,8 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/testing/test_semantics.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/bidi_text.dart';
+import '../../../../core/utils/app_date_format.dart';
 import '../../../../core/utils/shared_display_prefix.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
@@ -520,7 +522,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('سيتم حذف هذا الملف وبياناته من Sell-In.'),
+              Text(rtlEnd('سيتم حذف هذا الملف وبياناته من ${ltrIsolate('Sell-In')}.')),
               const SizedBox(height: 12.0),
               Container(
                 padding: const EdgeInsets.all(12.0),
@@ -533,6 +535,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                   children: [
                     Text(
                       file.fileName,
+                      textDirection: TextDirection.ltr,
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 4.0),
@@ -545,7 +548,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
               ),
               const SizedBox(height: 10.0),
               Text(
-                'سيُعاد حساب المخزون، ولن تتأثر باقي الشهور ولا بيانات Sell-Out.',
+                rtlEnd('سيُعاد حساب المخزون، ولن تتأثر باقي الشهور ولا بيانات ${ltrIsolate('Sell-Out')}.'),
                 style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(fontSize: M3FontSize.bodySmall, color: cs.onSurfaceVariant)),
               ),
             ],
@@ -1478,8 +1481,9 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
           builder: (context, constraints) {
             final card1 = _buildSummaryCard(
               context,
-              titleAr: 'صافي التوريد بعد المرتجعات (غير شامل الضريبة)',
+              titleAr: 'صافي التوريد بعد المرتجعات',
               titleEn: 'Net Sell-In after returns (excl. VAT)',
+              titleTooltip: 'صافي التوريد بعد المرتجعات (غير شامل الضريبة)',
               value: CurrencyFormatter.formatCompactEGP(netExclVat),
               subtitle:
                   'صافي بعد المرتجعات · شامل الضريبة: ${CurrencyFormatter.formatCompactEGP(grossInclVat)} • ${_data.totalCount} صف',
@@ -2120,8 +2124,9 @@ onChanged: m3Legacy<int>((v) {
             );
             final yoyCard = _buildSummaryCard(
               context,
-              titleAr: 'نمو Sell-Out مقارنة بالعام السابق',
+              titleAr: 'النمو عن العام السابق',
               titleEn: 'Sell-Out Growth YoY',
+              titleTooltip: 'نمو Sell-Out مقارنة بالعام السابق',
               // No matched month with last-year data: "—", not a fake +0.0%.
               value: d.matchedYoyAvailable
                   ? '${CurrencyFormatter.formatSignedPct(d.matchedYoyValueGrowthPct)} بالقيمة'
@@ -2292,7 +2297,11 @@ onChanged: m3Legacy<String>((v) {
                         ),
                         const SizedBox(height: 2.0),
                         Text(
-                          'رصيد آخر الشهر = رصيد أول الشهر + Sell-In − Sell-Out',
+                          rtlEnd(
+                            'رصيد آخر الشهر = رصيد أول الشهر + ${ltrIsolate('Sell-\u2060In')} − ${ltrIsolate('Sell-\u2060Out')}',
+                          ),
+                          maxLines: 3,
+                          overflow: TextOverflow.visible,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -3524,19 +3533,18 @@ onChanged: m3Legacy<int>((v) {
                                   ),
                                 ),
                                 DataCell(
-                                  // Date and time wrap onto 2 centred lines so the
-                                  // table fits 1030dp next to the pinned actions.
-                                  ConstrainedBox(
-                                    constraints: const BoxConstraints(maxWidth: 76.0),
+                                  Tooltip(
+                                    message: AppDateFormat.tryFormat(file.uploadedAt),
                                     child: Text(
-                                    textAlign: TextAlign.center,
-                                    file.uploadedAt.length >= 16
-                                        ? file.uploadedAt
-                                            .substring(0, 16)
-                                            .replaceAll('T', ' ')
-                                        : file.uploadedAt,
-                                    style: M3TextVariants.cell.copyWith(color: colorScheme.onSurfaceVariant),
-                                  ),
+                                      AppDateFormat.tryFormat(file.uploadedAt, withTime: false),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      overflow: TextOverflow.visible,
+                                      style: M3TextVariants.cell.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -3920,7 +3928,7 @@ onChanged: m3Legacy<int>((v) {
     String id = 'main',
   }) {
     // Same equal-height grid and gutters as the Sell-Out KPI row.
-    final columns = maxWidth >= 960 ? 4 : (maxWidth >= 580 ? 2 : 1);
+    final columns = M3KpiGridColumns.forWidth(maxWidth);
     return M3EqualHeightGrid(
       key: ValueKey('sellin_kpi_grid_$id'),
       columns: columns,
@@ -3938,79 +3946,22 @@ onChanged: m3Legacy<int>((v) {
     required String subtitle,
     required IconData icon,
     required Color color,
+    String? titleTooltip,
   }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return Container(
+    return M3SummaryKpiCard(
       key: ValueKey('kpi_card_$titleEn'),
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: M3Shape.radiusLg,
-        border: Border.all(
-          color: colorScheme.outlineVariant.withOpacity(0.5),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  borderRadius: M3Shape.radiusMd,
-                ),
-                child: Icon(icon, color: color, size: 20.0),
-              ),
-              const SizedBox(width: 8.0),
-              // Arabic-only title; [titleEn] is kept as the stable key id.
-              Expanded(
-                // Two lines so long Arabic titles are not cut at 1280–1440dp.
-                child: M3SectionTitle(
-                  titleAr,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          M3Spacing.gapSM,
-          // Never show the previous filter's numbers while a new response is loading.
-          if (_isLoading) ...[
-            const M3SkeletonBox(key: ValueKey('sell_in_kpi_skeleton'), width: 120.0, height: 28.0),
-            const SizedBox(height: 8.0),
-            const M3SkeletonBox(width: 180.0, height: 12.0),
-          ] else ...[
-            // Up to 2 lines; the full value is always in the tooltip.
-            Tooltip(
-              message: value,
-              child: Text(
-                value,
-                key: ValueKey('kpi_value_$titleEn'),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-            ),
-            const SizedBox(height: 4.0),
-            // Detail line wraps up to 3 lines (owner rule), never cut early.
-            Text(
-              subtitle,
-              key: ValueKey('kpi_subtitle_$titleEn'),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ],
-      ),
+      valueKey: ValueKey('kpi_value_$titleEn'),
+      subtitleKey: ValueKey('kpi_subtitle_$titleEn'),
+      loadingKey: const ValueKey('sell_in_kpi_skeleton'),
+      title: titleAr,
+      value: value,
+      subtitle: subtitle,
+      icon: icon,
+      color: color,
+      titleTooltip: titleTooltip,
+      titleMaxLines: 1,
+      subtitleMaxLines: 3,
+      isLoading: _isLoading,
     );
   }
 }

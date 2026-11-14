@@ -60,6 +60,12 @@ void main() {
       expect(CurrencyFormatter.formatCompactUnits(45200), '45.2${wj}K قطعة');
     });
 
+    test('formatEGP isolate wraps a positive so RTL does not flip ج.م', () {
+      expect(CurrencyFormatter.formatEGP(0, isolate: true), '\u20660 ج.م\u2069');
+      expect(CurrencyFormatter.formatEGP(14500, isolate: true),
+          '\u206614,500 ج.م\u2069');
+    });
+
     test('formatNumber negatives isolate the minus; positives stay unchanged', () {
       expect(CurrencyFormatter.formatNumber(125400), '125,400');
       expect(CurrencyFormatter.formatNumber(-125400), '\u2066\u2212125,400\u2069');
