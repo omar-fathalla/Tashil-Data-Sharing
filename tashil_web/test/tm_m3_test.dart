@@ -200,6 +200,7 @@ void main() {
         )
         .first);
     expect(tooltip.message, kRoiLiftMethodExplainerAr);
+    expect(tooltip.constraints?.maxWidth, 360);
     final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
     await gesture.addPointer(
         location: tester.getCenter(find.byKey(const ValueKey('tm_kpi_romi'))));

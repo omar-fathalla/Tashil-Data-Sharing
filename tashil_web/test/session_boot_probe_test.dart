@@ -1,7 +1,8 @@
 
 // After a JWT rotation, a stored (still unexpired) token is not a valid
-// session. The boot probe hits GET /api/v1/me once; only a 401 is treated
-// as "log in again". Other failures must not bounce a valid user.
+// session. The boot probe hits GET /api/v1/me; only HTTP 200 is a valid
+// session. A 401 forces a re-login. 503 / network errors are "unavailable"
+// so the shell stays closed (no partial 401 storm) without clearing the token.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -20,7 +21,7 @@ void main() {
     ApiClient.onSessionExpired = null;
   });
 
-  Future<bool> probe(Object script, {String token = 'fresh-token'}) {
+  Future<SessionVerifyResult> probe(Object script, {String token = 'fresh-token'}) {
     return http.runWithClient(() {
       final api = ApiClient(
         tenantId: 'tenant-adeco',
@@ -52,22 +53,25 @@ void main() {
 
   test('empty token is not a valid session', () async {
     final api = ApiClient(authToken: '', allowMockFallback: false);
-    expect(await api.verifySession(), isFalse);
+    expect(await api.verifySession(), SessionVerifyResult.unauthorized);
   });
 
   test('401 from /me is a rejected session', () async {
-    expect(await probe(401), isFalse);
+    expect(await probe(401), SessionVerifyResult.unauthorized);
   });
 
   test('200 from /me is a valid session', () async {
-    expect(await probe(200), isTrue);
+    expect(await probe(200), SessionVerifyResult.valid);
   });
 
-  test('503 from /me does not force a re-login', () async {
-    expect(await probe(503), isTrue);
+  test('503 from /me is unavailable — not a valid session and not a logout',
+      () async {
+    expect(await probe(503), SessionVerifyResult.unavailable);
   });
 
-  test('network error does not force a re-login', () async {
-    expect(await probe(http.ClientException('offline')), isTrue);
+  test('network error is unavailable — not a valid session and not a logout',
+      () async {
+    expect(await probe(http.ClientException('offline')),
+        SessionVerifyResult.unavailable);
   });
 }

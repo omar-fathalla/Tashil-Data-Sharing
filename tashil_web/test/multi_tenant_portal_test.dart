@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/core/network/backend_http.dart';
 import 'package:tashil_web/core/storage/session_storage.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/theme/m3_color_roles.dart';
@@ -439,8 +442,18 @@ void main() {
         ),
       );
 
-      await tester.pumpWidget(const TashilDataSharingApp());
-      await tester.pumpAndSettle();
+      await http.runWithClient(() async {
+        BackendHttp.cache.clear();
+        await tester.pumpWidget(const TashilDataSharingApp());
+        await tester.pumpAndSettle();
+      }, () => MockClient((req) async {
+        if (req.url.path.endsWith('/api/v1/me')) {
+          return http.Response(
+              '{"user_id":"user-unilever-admin","tenant_id":"tenant-unilever"}',
+              200);
+        }
+        return http.Response('{}', 200);
+      }));
 
       expect(find.textContaining('Unilever'), findsWidgets);
     });

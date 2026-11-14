@@ -60,6 +60,7 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
   bool _isLoginMode = false;
   bool _isGenericCompanyPortal = true;
   bool _verifyingSession = false;
+  bool _sessionVerifyRetryable = false;
   late ApiClient _apiClient;
 
   @override
@@ -332,14 +333,35 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
     });
   }
 
+  static const int _sessionVerifyAttempts = 4;
+  static const Duration _sessionVerifyRetry = Duration(milliseconds: 800);
+
   Future<void> _verifyStoredCompanySession() async {
-    final ok = await _apiClient.verifySession();
+    var result = SessionVerifyResult.unavailable;
+    for (var i = 0; i < _sessionVerifyAttempts; i++) {
+      result = await _apiClient.verifySession();
+      if (!mounted) return;
+      if (result != SessionVerifyResult.unavailable) break;
+      if (i < _sessionVerifyAttempts - 1) {
+        await Future<void>.delayed(_sessionVerifyRetry);
+        if (!mounted || !_verifyingSession) return;
+      }
+    }
     if (!mounted) return;
-    if (!ok) {
+    if (result == SessionVerifyResult.valid) {
+      setState(() {
+        _verifyingSession = false;
+        _sessionVerifyRetryable = false;
+      });
+      return;
+    }
+    if (result == SessionVerifyResult.unauthorized) {
       _logout();
       return;
     }
-    setState(() => _verifyingSession = false);
+    // Still unavailable after the bounded retries: keep the splash (do not
+    // open a partial shell). The stored token is kept; the user can retry.
+    setState(() => _sessionVerifyRetryable = true);
   }
 
   void _logout() {
@@ -348,6 +370,7 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
     SessionStorage.clearSession();
     setState(() {
       _verifyingSession = false;
+      _sessionVerifyRetryable = false;
       _isLoginMode = true;
       _isGenericCompanyPortal = true;
       _apiClient.currentUser = null;
@@ -402,9 +425,29 @@ class _TashilDataSharingAppState extends State<TashilDataSharingApp> {
     if (_isAdminMode) {
       screen = _buildAdminGateOrScreen();
     } else if (_verifyingSession) {
-      screen = const Scaffold(
-        key: ValueKey('session_verifying'),
-        body: Center(child: CircularProgressIndicator()),
+      screen = Scaffold(
+        key: const ValueKey('session_verifying'),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              if (_sessionVerifyRetryable) ...[
+                const SizedBox(height: 16),
+                const Text('تعذر التحقق من الجلسة'),
+                const SizedBox(height: 8),
+                FilledButton(
+                  key: const ValueKey('session_verify_retry'),
+                  onPressed: () {
+                    setState(() => _sessionVerifyRetryable = false);
+                    unawaited(_verifyStoredCompanySession());
+                  },
+                  child: const Text('إعادة المحاولة'),
+                ),
+              ],
+            ],
+          ),
+        ),
       );
     } else if (_isLoginMode) {
       screen = TenantLoginScreen(
