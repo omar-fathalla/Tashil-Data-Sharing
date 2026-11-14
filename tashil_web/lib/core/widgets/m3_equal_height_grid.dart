@@ -8,6 +8,8 @@ import 'package:flutter/widgets.dart';
 /// Sell-Out is the reference KPI row: 4 columns at ≥960, 2 at ≥580, else 1.
 /// Prefer [forWidthAndCount] so pages with 3 or 5 cards fill rows evenly
 /// (3 across, or 3+2) instead of leaving a lonely last card (4+1).
+/// [M3EqualHeightGrid] stretches an incomplete last row so 3+2 has no empty
+/// third slot (the two trailing cards share the full row width).
 abstract final class M3KpiGridColumns {
   static const double fourColMinWidth = 960.0;
   static const double twoColMinWidth = 580.0;
@@ -25,7 +27,8 @@ abstract final class M3KpiGridColumns {
   ///
   /// Examples at ≥960: 4 cards → 4; 3 cards → 3; 5 cards → 3 (3+2, not 4+1).
   /// At ~880: 6 cards → 3 (3+3); exact divisors preferred when cards stay
-  /// ≥ [minEvenCardWidth].
+  /// ≥ [minEvenCardWidth]. Incomplete last rows are stretched by
+  /// [M3EqualHeightGrid] so they fill the full width.
   static int forWidthAndCount(double width, int childCount) {
     final maxCols = forWidth(width);
     if (childCount <= 1) return 1;
@@ -182,21 +185,31 @@ class RenderM3EqualHeightGrid extends RenderBox
     return out;
   }
 
-  List<double> _columnWidths(double width) {
-    final usable = math.max(0.0, width - _spacing * (_columns - 1));
+  List<double> _columnWidths(double width, {required int countInRow}) {
+    assert(countInRow > 0 && countInRow <= _columns);
+    final usable = math.max(0.0, width - _spacing * (countInRow - 1));
     final f = _flex ?? List<double>.filled(_columns, 1.0);
-    final total = f.fold<double>(0.0, (a, b) => a + b);
-    return [for (final v in f) usable * v / total];
+    final used = f.take(countInRow).toList();
+    final total = used.fold<double>(0.0, (a, b) => a + b);
+    return [for (final v in used) usable * v / total];
   }
 
   int get _rows => (childCount + _columns - 1) ~/ _columns;
 
+  int _countInRow(int row, int kidCount) {
+    final start = row * _columns;
+    return math.min(_columns, kidCount - start);
+  }
+
   double _cardHeight(double width, double Function(RenderBox, double) measure) {
-    final widths = _columnWidths(width);
     var h = 0.0;
     final kids = _kids;
     for (var i = 0; i < kids.length; i++) {
-      h = math.max(h, measure(kids[i], widths[i % _columns]));
+      final row = i ~/ _columns;
+      final col = i % _columns;
+      final widths =
+          _columnWidths(width, countInRow: _countInRow(row, kids.length));
+      h = math.max(h, measure(kids[i], widths[col]));
     }
     return h;
   }
@@ -231,12 +244,15 @@ class RenderM3EqualHeightGrid extends RenderBox
   @override
   void performLayout() {
     final width = constraints.maxWidth;
-    final widths = _columnWidths(width);
     final kids = _kids;
-    // Pass 1: natural heights.
+    // Pass 1: natural heights (incomplete last row is stretched full-width).
     var cardH = 0.0;
     for (var i = 0; i < kids.length; i++) {
-      final w = widths[i % _columns];
+      final row = i ~/ _columns;
+      final col = i % _columns;
+      final widths =
+          _columnWidths(width, countInRow: _countInRow(row, kids.length));
+      final w = widths[col];
       kids[i].layout(
         BoxConstraints(minWidth: w, maxWidth: w),
         parentUsesSize: true,
@@ -248,6 +264,8 @@ class RenderM3EqualHeightGrid extends RenderBox
     for (var i = 0; i < kids.length; i++) {
       final col = i % _columns;
       final row = i ~/ _columns;
+      final widths =
+          _columnWidths(width, countInRow: _countInRow(row, kids.length));
       final w = widths[col];
       // Not tight (no max height), so a child never becomes a
       // relayout boundary: when its content changes the grid re-measures.
