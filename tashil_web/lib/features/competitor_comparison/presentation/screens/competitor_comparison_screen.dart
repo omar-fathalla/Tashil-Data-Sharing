@@ -1235,6 +1235,21 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
               ],
             ),
           ),
+          // Pagination sits under the header (before the SKU cards) so Next/Prev
+          // stay reachable — taller M3ChipSurface cards used to push the bar
+          // past a 3200dp test surface (~y 4300) and leave Next untappable.
+          if (totalCount > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12.0, 12.0, 12.0, 0.0),
+              child: _buildOwnSkuPaginationBar(
+                context,
+                safePage: safePage,
+                totalPages: totalPages,
+                startIndex: startIndex,
+                endIndex: endIndex,
+                totalCount: totalCount,
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Column(
@@ -1248,17 +1263,6 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                       isSelected: group.ownBarcode == selectedGroup.ownBarcode,
                     ),
                   ),
-                if (totalCount > 0) ...[
-                  const SizedBox(height: 4.0),
-                  _buildOwnSkuPaginationBar(
-                    context,
-                    safePage: safePage,
-                    totalPages: totalPages,
-                    startIndex: startIndex,
-                    endIndex: endIndex,
-                    totalCount: totalCount,
-                  ),
-                ],
               ],
             ),
           ),
