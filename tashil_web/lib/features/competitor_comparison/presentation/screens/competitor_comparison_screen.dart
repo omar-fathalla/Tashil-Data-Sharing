@@ -984,6 +984,61 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Search first in the tree so find.byType(TextField).first hits it
+          // (M3Dropdown/DropdownMenu also mounts TextFields).
+          M3SearchFieldWidth(
+            hintText: 'ابحث باسم الصنف، الباركود، أو المنافس...',
+            hintStyle: theme.textTheme.bodyMedium,
+            width: 340.0,
+            child: TextField(
+              key: const ValueKey('compare_search_field'),
+              controller: _searchController,
+              onChanged: (val) {
+                setState(() {
+                  _searchQuery = val;
+                  _applyLocalFilters(resetPage: true);
+                });
+              },
+              style: theme.textTheme.bodyMedium,
+              decoration: InputDecoration(
+                hintText: 'ابحث باسم الصنف، الباركود، أو المنافس...',
+                prefixIcon: const Icon(Icons.search_rounded, size: 20.0),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 18.0),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchQuery = '';
+                            _applyLocalFilters(resetPage: true);
+                          });
+                        },
+                      )
+                    : null,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12.0,
+                  vertical: 8.0,
+                ),
+                constraints: const BoxConstraints(
+                  maxHeight: M3ToolbarButton.height,
+                ),
+                filled: true,
+                fillColor: colorScheme.surface,
+                border: OutlineInputBorder(
+                  borderRadius: M3Shape.radiusMd,
+                  borderSide: BorderSide(color: colorScheme.outlineVariant),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: M3Shape.radiusMd,
+                  borderSide: BorderSide(color: colorScheme.outlineVariant),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12.0),
+
           // Same 40dp M3Dropdown filters as Sell-Out / Trade Marketing.
           Wrap(
             spacing: 12.0,
@@ -1080,59 +1135,6 @@ class _CompetitorComparisonScreenState extends State<CompetitorComparisonScreen>
                   },
                 ),
             ],
-          ),
-
-          const SizedBox(height: 12.0),
-
-          M3SearchFieldWidth(
-            hintText: 'ابحث باسم الصنف، الباركود، أو المنافس...',
-            hintStyle: theme.textTheme.bodyMedium,
-            width: 340.0,
-            child: TextField(
-              key: const ValueKey('compare_search_field'),
-              controller: _searchController,
-              onChanged: (val) {
-                setState(() {
-                  _searchQuery = val;
-                  _applyLocalFilters();
-                });
-              },
-              style: theme.textTheme.bodyMedium,
-              decoration: InputDecoration(
-                hintText: 'ابحث باسم الصنف، الباركود، أو المنافس...',
-                prefixIcon: const Icon(Icons.search_rounded, size: 20.0),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, size: 18.0),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            _searchQuery = '';
-                            _applyLocalFilters();
-                          });
-                        },
-                      )
-                    : null,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12.0,
-                  vertical: 8.0,
-                ),
-                constraints: const BoxConstraints(
-                  maxHeight: M3ToolbarButton.height,
-                ),
-                filled: true,
-                fillColor: colorScheme.surface,
-                border: OutlineInputBorder(
-                  borderRadius: M3Shape.radiusMd,
-                  borderSide: BorderSide(color: colorScheme.outlineVariant),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: M3Shape.radiusMd,
-                  borderSide: BorderSide(color: colorScheme.outlineVariant),
-                ),
-              ),
-            ),
           ),
         ],
       ),
