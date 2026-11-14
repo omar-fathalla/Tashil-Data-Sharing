@@ -71,10 +71,11 @@ _CardMetrics _metrics(WidgetTester tester, Finder card) {
       matching: find.byType(Text)));
   final values = find.descendant(
       of: card,
-      matching: find.byWidgetPredicate((w) =>
-          w is Text &&
-          (w).key is ValueKey &&
-          (w.key as ValueKey).value.toString().startsWith('kpi_value_')));
+      matching: find.byWidgetPredicate((w) {
+        if (w is! Text) return false;
+        return w.key is ValueKey &&
+            (w.key as ValueKey).value.toString().startsWith('kpi_value_');
+      }));
   // Fall back to the first headline-ish text after the title.
   Text? value;
   if (values.evaluate().isNotEmpty) {
