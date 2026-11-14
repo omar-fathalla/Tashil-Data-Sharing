@@ -1518,8 +1518,14 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
         summaries.fold<double>(0.0, (s, e) => s + e.lastYearSameMonthSalesEgp);
 
     final totalMomLift = totalCurrentSales - totalPrevSales;
+    // MoM needs a previous-month Sell-Out baseline (and thus at least one
+    // campaign row). Empty expenses → fake +0.0% must not be shown.
+    final totalMomAvailable = totalPrevSales > 0;
     final totalMomPct =
-        totalPrevSales > 0 ? (totalMomLift / totalPrevSales) * 100.0 : 0.0;
+        totalMomAvailable ? (totalMomLift / totalPrevSales) * 100.0 : 0.0;
+    final momUnavailableNote = summaries.isEmpty
+        ? 'لا توجد حملات للمقارنة'
+        : 'لا توجد بيانات للمقارنة';
 
     // YoY compares the same months only: current sales count only for
     // rows whose same month last year has Sell-Out.
@@ -1582,6 +1588,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                   activitiesCount: expenses.length,
                   totalMomLift: totalMomLift,
                   totalMomPct: totalMomPct,
+                  totalMomAvailable: totalMomAvailable,
+                  momUnavailableNote: momUnavailableNote,
                   totalYoyLift: totalYoyLift,
                   totalYoyPct: totalYoyPct,
                   totalYoyAvailable: totalYoyAvailable,
@@ -1659,6 +1667,8 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
     required int activitiesCount,
     required double totalMomLift,
     required double totalMomPct,
+    required bool totalMomAvailable,
+    required String momUnavailableNote,
     required double totalYoyLift,
     required double totalYoyPct,
     required bool totalYoyAvailable,
@@ -1685,12 +1695,22 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
       M3SummaryKpiCard(
         key: const ValueKey('tm_kpi_mom'),
         valueKey: const ValueKey('tm_kpi_mom_value'),
+        subtitleKey: const ValueKey('tm_kpi_mom_detail'),
         title: 'النمو عن الشهر السابق',
-        value:
-            '${momUp ? '+' : ''}${CurrencyFormatter.formatCompactEGP(totalMomLift)}',
-        subtitle: '${pct(totalMomPct)} عن الشهر السابق',
-        icon: momUp ? Icons.trending_up_rounded : Icons.trending_down_rounded,
-        color: momUp ? M3Palette.success : M3Palette.danger,
+        value: totalMomAvailable
+            ? '${momUp ? '+' : ''}${CurrencyFormatter.formatCompactEGP(totalMomLift)}'
+            : '—',
+        subtitle: totalMomAvailable
+            ? '${pct(totalMomPct)} عن الشهر السابق'
+            : momUnavailableNote,
+        icon: !totalMomAvailable
+            ? Icons.trending_flat_rounded
+            : (momUp
+                ? Icons.trending_up_rounded
+                : Icons.trending_down_rounded),
+        color: !totalMomAvailable
+            ? M3Palette.info
+            : (momUp ? M3Palette.success : M3Palette.danger),
       ),
       M3SummaryKpiCard(
         key: const ValueKey('tm_kpi_yoy'),

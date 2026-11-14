@@ -10,31 +10,42 @@ const tmLongVendor = 'وكالة الدعاية والإعلان التجريب�
 const tmLongBrand = 'علامة تجريبية بريميوم للعناية المنزلية';
 
 class TmLiveScaleRepo implements TradeMarketingRepository {
-  TmLiveScaleRepo({this.withLastYear = true});
+  TmLiveScaleRepo({
+    this.withLastYear = true,
+    this.withExpenses = true,
+    this.withPreviousMonth = true,
+  });
 
   /// false: last-year same-month sales are missing (YoY must show «—»).
   final bool withLastYear;
 
+  /// false: no campaigns/expenses (MoM/ROMI must show «—», not fake +0).
+  final bool withExpenses;
+
+  /// false: previous-month Sell-Out missing (MoM must show «—»).
+  final bool withPreviousMonth;
+
   static const chains = ['Fathalla', 'Kazyon', 'Seoudi'];
 
   late final List<MarketingExpenseItem> items = [
-    for (var m = 1; m <= 10; m++)
-      for (var c = 0; c < chains.length; c++)
-        for (var k = 0; k < MarketingExpenseCategory.values.length; k++)
-          MarketingExpenseItem(
-            id: 'tm_${m}_${c}_$k',
-            year: 2026,
-            month: m,
-            chainName: chains[c],
-            category: MarketingExpenseCategory.values[k],
-            brandName: k.isEven ? tmLongBrand : 'علامة تجريبية',
-            campaignTitle:
-                k == 0 ? tmLongCampaignTitle : 'حملة تجريبية رقم $m-$c-$k',
-            vendorOrAgency: k == 1 ? tmLongVendor : 'مورد تجريبي $k',
-            amountEgp: 185000.0 + 12500.0 * m + 7300.0 * k + 3100.0 * c,
-            notes: 'ملاحظة تجريبية',
-            createdAt: DateTime(2026, m, 3),
-          ),
+    if (withExpenses)
+      for (var m = 1; m <= 10; m++)
+        for (var c = 0; c < chains.length; c++)
+          for (var k = 0; k < MarketingExpenseCategory.values.length; k++)
+            MarketingExpenseItem(
+              id: 'tm_${m}_${c}_$k',
+              year: 2026,
+              month: m,
+              chainName: chains[c],
+              category: MarketingExpenseCategory.values[k],
+              brandName: k.isEven ? tmLongBrand : 'علامة تجريبية',
+              campaignTitle:
+                  k == 0 ? tmLongCampaignTitle : 'حملة تجريبية رقم $m-$c-$k',
+              vendorOrAgency: k == 1 ? tmLongVendor : 'مورد تجريبي $k',
+              amountEgp: 185000.0 + 12500.0 * m + 7300.0 * k + 3100.0 * c,
+              notes: 'ملاحظة تجريبية',
+              createdAt: DateTime(2026, m, 3),
+            ),
   ];
 
   @override
@@ -51,6 +62,7 @@ class TmLiveScaleRepo implements TradeMarketingRepository {
   Future<List<TradeMarketingSalesBaseline>> getRoi(
       {int? year, int? month, String? chain}) async {
     final out = <TradeMarketingSalesBaseline>[];
+    if (!withExpenses) return out;
     for (var m = 1; m <= 10; m++) {
       if (month != null && month != 0 && month != m) continue;
       for (var c = 0; c < chains.length; c++) {
@@ -64,7 +76,8 @@ class TmLiveScaleRepo implements TradeMarketingRepository {
           month: m,
           chainName: chains[c],
           currentMonthSalesEgp: cur,
-          previousMonthSalesEgp: cur - 1850000.0,
+          previousMonthSalesEgp:
+              withPreviousMonth ? cur - 1850000.0 : 0,
           lastYearSameMonthSalesEgp: withLastYear ? cur * 0.82 : 0,
           currentMonthSellInEgp: cur * 0.9,
           marketingSpendEgp: spend,

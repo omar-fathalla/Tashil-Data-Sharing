@@ -1,7 +1,7 @@
 // Trade Marketing & ROI full pass: KPI cards = Sell-Out (shared card and
 // grid), tables fit 1280-with-sidebar (≈1024 content) with no horizontal
-// scroll and wrap ≤3 lines, «—» + «لا توجد بيانات للعام السابق» without
-// last-year data, Arabic plurals. Real Cairo font; made-up fixtures.
+// scroll and wrap ≤3 lines, «—» for missing YoY/MoM baselines (no fake
+// +0.0%), Arabic plurals. Real Cairo font; made-up fixtures.
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -45,9 +45,18 @@ Future<void> _pump(WidgetTester tester, double width, Widget page) async {
   }
 }
 
-Widget _tm({bool withLastYear = true}) => TradeMarketingRoiScreen(
-    apiClient: ApiClient(),
-    repository: TmLiveScaleRepo(withLastYear: withLastYear));
+Widget _tm({
+  bool withLastYear = true,
+  bool withExpenses = true,
+  bool withPreviousMonth = true,
+}) =>
+    TradeMarketingRoiScreen(
+        apiClient: ApiClient(),
+        repository: TmLiveScaleRepo(
+          withLastYear: withLastYear,
+          withExpenses: withExpenses,
+          withPreviousMonth: withPreviousMonth,
+        ));
 
 const _kpiKeys = ['tm_kpi_spend', 'tm_kpi_mom', 'tm_kpi_yoy', 'tm_kpi_romi'];
 
@@ -119,6 +128,38 @@ void main() {
     // Matrix YoY cells: «—» with the description under it, no chip.
     expect(find.text('لا توجد بيانات للعام السابق'), findsWidgets);
     expect(find.textContaining('% YoY'), findsNothing);
+  });
+
+  testWidgets(
+      'no campaigns: MoM shows «—» + «لا توجد حملات للمقارنة», not fake +0',
+      (tester) async {
+    await _pump(tester, 1024, _tm(withExpenses: false));
+    final value =
+        tester.widget<Text>(find.byKey(const ValueKey('tm_kpi_mom_value')));
+    expect(value.data, '—');
+    final detail =
+        tester.widget<Text>(find.byKey(const ValueKey('tm_kpi_mom_detail')));
+    expect(detail.data, 'لا توجد حملات للمقارنة');
+    expect(find.textContaining('+0'), findsNothing);
+    expect(find.textContaining('+0.0%'), findsNothing);
+    // Card geometry stays identical to the other KPI cards.
+    final mom = tester.getSize(find.byKey(const ValueKey('tm_kpi_mom')));
+    final yoy = tester.getSize(find.byKey(const ValueKey('tm_kpi_yoy')));
+    expect(mom.height, closeTo(yoy.height, 0.5));
+    expect(mom.width, closeTo(yoy.width, 0.5));
+  });
+
+  testWidgets(
+      'campaigns without previous-month sales: MoM «—» + «لا توجد بيانات للمقارنة»',
+      (tester) async {
+    await _pump(tester, 1024, _tm(withPreviousMonth: false));
+    final value =
+        tester.widget<Text>(find.byKey(const ValueKey('tm_kpi_mom_value')));
+    expect(value.data, '—');
+    final detail =
+        tester.widget<Text>(find.byKey(const ValueKey('tm_kpi_mom_detail')));
+    expect(detail.data, 'لا توجد بيانات للمقارنة');
+    expect(find.textContaining('+0.0% عن الشهر السابق'), findsNothing);
   });
 
   testWidgets(
