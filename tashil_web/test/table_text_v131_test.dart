@@ -248,10 +248,26 @@ void main() {
       }
       final table = find.byKey(const ValueKey('price_matrix_table'));
       expect(_cutBeforeThreeLines(tester, table), isEmpty);
+      String? colLabel(DataColumn c) {
+        Widget w = c.label;
+        while (true) {
+          if (w is Text) return w.data;
+          if (w is ConstrainedBox && w.child != null) {
+            w = w.child!;
+            continue;
+          }
+          if (w is Align && w.child != null) {
+            w = w.child!;
+            continue;
+          }
+          return null;
+        }
+      }
+
       final dt = tester.widget<DataTable>(
           find.descendant(of: table, matching: find.byType(DataTable)));
       for (final (i, c) in dt.columns.indexed) {
-        final label = (c.label as Text).data;
+        final label = colLabel(c);
         expect(
             c.headingRowAlignment,
             label == 'الصنف الرسمي'

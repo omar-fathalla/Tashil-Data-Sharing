@@ -953,7 +953,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                             const SizedBox(height: 6.0),
                             _buildSimMetricRow(
                               'الزيادة المتوقعة عن الشهر السابق (MoM Lift):',
-                              '+${CurrencyFormatter.formatEGP(momLift)} (+${momPct.toStringAsFixed(1)}%)',
+                              '${CurrencyFormatter.formatEGP(momLift)} (${CurrencyFormatter.formatSignedPct(momPct)})',
                               M3Palette.success,
                               isBold: true,
                             ),
@@ -961,7 +961,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                             _buildSimMetricRow(
                               'الزيادة المتوقعة عن العام السابق (YoY Lift):',
                               lastYearSales > 0
-                                  ? '+${CurrencyFormatter.formatEGP(yoyLift)} (+${yoyPct.toStringAsFixed(1)}%)'
+                                  ? '${CurrencyFormatter.formatEGP(yoyLift)} (${CurrencyFormatter.formatSignedPct(yoyPct)})'
                                   : '— لا توجد بيانات للعام السابق',
                               M3Palette.info,
                               isBold: true,
@@ -1095,7 +1095,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                           value:
                               '${summary.momLiftEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(summary.momLiftEgp)}',
                           sub:
-                              '${summary.momGrowthPct >= 0 ? '+' : ''}${summary.momGrowthPct.toStringAsFixed(1)}% MoM Growth',
+                              '${CurrencyFormatter.formatSignedPct(summary.momGrowthPct)} MoM Growth',
                           color: summary.momGrowthPct >= 0
                               ? M3Palette.success
                               : M3Palette.danger,
@@ -1109,7 +1109,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                               ? '${summary.yoyLiftEgp >= 0 ? '+' : ''}${CurrencyFormatter.formatEGP(summary.yoyLiftEgp)}'
                               : '—',
                           sub: summary.hasYoY
-                              ? '${summary.yoyGrowthPct >= 0 ? '+' : ''}${summary.yoyGrowthPct.toStringAsFixed(1)}% YoY Growth'
+                              ? '${CurrencyFormatter.formatSignedPct(summary.yoyGrowthPct)} YoY Growth'
                               : 'لا توجد بيانات للعام السابق',
                           color: summary.yoyGrowthPct >= 0
                               ? M3Palette.info
@@ -1512,8 +1512,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
     required double overallRomi,
     required double spendRatioPct,
   }) {
-    String signed(double v) => v >= 0 ? '+' : '';
-    String pct(double v) => '${signed(v)}${v.toStringAsFixed(1)}%';
+    String pct(double v) => CurrencyFormatter.formatSignedPct(v);
     final momUp = totalMomLift >= 0;
     final yoyUp = totalYoyLift >= 0;
     // Shared Sell-Out KPI card + grid (same geometry, fonts and icon size).
@@ -2097,7 +2096,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                       ]))),
                       DataCell(_cell(_lines([
                         _chip(
-                            '${momPositive ? '+' : ''}${s.momGrowthPct.toStringAsFixed(1)}% MoM',
+                            '${CurrencyFormatter.formatSignedPct(s.momGrowthPct)} MoM',
                             momColor),
                         const SizedBox(height: M3Spacing.s2),
                         _txt('${momPositive ? '+' : ''}${_money(s.momLiftEgp)}',
@@ -2109,7 +2108,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                       DataCell(_cell(s.hasYoY
                           ? _lines([
                               _chip(
-                                  '${yoyPositive ? '+' : ''}${s.yoyGrowthPct.toStringAsFixed(1)}% YoY',
+                                  '${CurrencyFormatter.formatSignedPct(s.yoyGrowthPct)} YoY',
                                   yoyColor),
                               const SizedBox(height: M3Spacing.s2),
                               _txt(
@@ -2132,7 +2131,7 @@ class _TradeMarketingRoiScreenState extends State<TradeMarketingRoiScreen>
                                 fontSize: M3FontSize.bodyMediumPlus,
                                 color: s.verdictColor)),
                         _txt(
-                            'ROI ${s.netRoiPct >= 0 ? '+' : ''}${s.netRoiPct.toStringAsFixed(0)}%',
+                            'ROI ${CurrencyFormatter.formatSignedPct(s.netRoiPct, decimals: 0)}',
                             style: small),
                       ]))),
                       DataCell(_cell(_lines([

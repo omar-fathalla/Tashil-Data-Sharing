@@ -39,6 +39,7 @@ import '../../../../core/data/data_refresh_mixin.dart';
 import '../../../../core/widgets/m3_toolbar_button.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../../core/widgets/m3_section_title.dart';
+import '../../../../core/widgets/m3_wrap_text.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
 import '../../../../core/widgets/m3_table_surface.dart';
@@ -66,20 +67,72 @@ class SellOutExplorerScreen extends StatefulWidget {
 
 class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with DataRefreshMixin<SellOutExplorerScreen> {
   // Headers and cells centred; the item name stays start-aligned.
-  static const List<DataColumn> _priceMatrixColumns = [
-                  DataColumn(headingRowAlignment: MainAxisAlignment.center, label: Text('كود الصنف')),
-                  DataColumn(label: Text('الصنف الرسمي')),
-                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('وحدات/كرتونة')),
-                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('الوحدات')),
-                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('الكراتين')),
-                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('سعر القائمة (شامل الضريبة)')),
-                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('سعر البيع الفعلي')),
-                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('فرق السعر %')),
-                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('تكلفة المصنع للقطعة')),
-                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('صافي سعر الكرتونة (فاتورة)')),
-                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('صافي المبيعات')),
-                  DataColumn(numeric: true, headingRowAlignment: MainAxisAlignment.center, label: Text('هامش السلسلة')),
-                ];
+  /// Two-line wrapped heading so the 12-column price table fits the live
+  /// 1280+sidebar shell without horizontal scrolling.
+  static DataColumn _priceHeading(
+    String label, {
+    bool numeric = true,
+    bool center = true,
+    double maxWidth = 88,
+  }) {
+    return DataColumn(
+      numeric: numeric,
+      headingRowAlignment: center ? MainAxisAlignment.center : null,
+      label: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Text(
+          label,
+          maxLines: 3,
+          softWrap: true,
+          textAlign: center ? TextAlign.center : TextAlign.start,
+        ),
+      ),
+    );
+  }
+
+
+  static Widget _priceCell(
+    String text, {
+    TextStyle? style,
+    Key? key,
+    double maxWidth = 52,
+    int maxLines = 3,
+    TextAlign textAlign = TextAlign.center,
+  }) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: Text(
+        text,
+        key: key,
+        maxLines: maxLines,
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
+        textAlign: textAlign,
+        style: style,
+      ),
+    );
+  }
+
+  static List<DataColumn> get _priceMatrixColumns => [
+        _priceHeading('كود الصنف', numeric: false, maxWidth: 88),
+        _priceHeading('الصنف الرسمي', numeric: false, center: false, maxWidth: 220),
+        _priceHeading('وحدات/كرتونة', maxWidth: 52),
+        _priceHeading('الوحدات', maxWidth: 52),
+        _priceHeading('الكراتين', maxWidth: 52),
+        _priceHeading('سعر القائمة (شامل الضريبة)', maxWidth: 52),
+        _priceHeading('سعر البيع الفعلي', maxWidth: 52),
+        _priceHeading('فرق السعر %', maxWidth: 52),
+        _priceHeading('تكلفة المصنع للقطعة', maxWidth: 52),
+        _priceHeading('صافي سعر الكرتونة (فاتورة)', maxWidth: 52),
+        _priceHeading('صافي المبيعات', maxWidth: 52),
+        _priceHeading('هامش السلسلة', maxWidth: 56),
+      ];
+
+  /// Flex shares for the price matrix at the live 1280+sidebar width.
+  /// Name gets the most room; numeric columns stay compact and wrap ≤3.
+  static const List<double> _priceMatrixFlex = [
+    10, 22, 6, 6, 6, 8, 8, 7, 7, 7, 6, 7,
+  ];
 
   @override
   void onBackendDataChanged() {
@@ -1266,18 +1319,17 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               onSelected: (v) => setState(() => _priceMatrixFilter = v),
             ),
             M3Spacing.gapSM,
-            LayoutBuilder(
+            TableScrollContainer(
               key: const ValueKey('price_matrix_table'),
-              builder: (context, constraints) => SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                  child: DataTable(
-                headingRowHeight: 48.0,
+              showSwipeHint: false,
+              columnFlex: _priceMatrixFlex,
+              child: DataTable(
+                headingRowHeight: 64.0,
                 dataRowMinHeight: 52.0,
                 // Room for a 3-line item name (owner table rule).
                 dataRowMaxHeight: 80.0,
-                columnSpacing: 24.0,
+                columnSpacing: M3Spacing.xs,
+                horizontalMargin: M3Spacing.xs,
                 headingTextStyle: headStyle,
                 dataTextStyle: cellStyle,
                 columns: _priceMatrixColumns,
@@ -1289,9 +1341,15 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                       DataCell(
                         InkWell(
                           onTap: () => _openProductIdCardForSummary(s),
-                          child: Text(
-                            s.itemCode.isNotEmpty ? s.itemCode : s.barcode,
-                            style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace', color: colorScheme.primary, decoration: TextDecoration.underline),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 88.0),
+                            child: Text(
+                              s.itemCode.isNotEmpty ? s.itemCode : s.barcode,
+                              maxLines: 3,
+                              softWrap: true,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace', color: colorScheme.primary, decoration: TextDecoration.underline),
+                            ),
                           ),
                         ),
                       ),
@@ -1299,7 +1357,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                         InkWell(
                           onTap: () => _openProductIdCardForSummary(s),
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 260.0),
+                            constraints: const BoxConstraints(maxWidth: 220.0),
                             child: Tooltip(
                               message: s.skuName,
                               child: Text(
@@ -1307,19 +1365,20 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                                 key: const ValueKey('price_matrix_sku_name'),
                                 maxLines: 3,
                                 overflow: TextOverflow.ellipsis,
+                                softWrap: true,
                                 style: cellStrong,
                               ),
                             ),
                           ),
                         ),
                       ),
-                      DataCell(Text('${s.unitsPerCarton}', style: cellMuted)),
-                      DataCell(Text(CurrencyFormatter.formatNumber(s.totalUnitsSold), style: cellStrong)),
-                      DataCell(Text(s.totalCartonsSold.toStringAsFixed(1), style: cellStrong)),
-                      DataCell(Text(s.officialConsumerRsp > 0 ? '${s.officialConsumerRsp.toStringAsFixed(2)} ج.م' : '—', style: cellMuted)),
-                      DataCell(Text('${s.avgSellingPrice.toStringAsFixed(2)} ج.م', style: cellStrong)),
+                      DataCell(_priceCell('${s.unitsPerCarton}', style: cellMuted)),
+                      DataCell(_priceCell(CurrencyFormatter.formatNumber(s.totalUnitsSold), style: cellStrong)),
+                      DataCell(_priceCell(s.totalCartonsSold.toStringAsFixed(1), style: cellStrong)),
+                      DataCell(_priceCell(s.officialConsumerRsp > 0 ? '${s.officialConsumerRsp.toStringAsFixed(2)} ج.م' : '—', style: cellMuted)),
+                      DataCell(_priceCell('${s.avgSellingPrice.toStringAsFixed(2)} ج.م', style: cellStrong)),
                       DataCell(
-                        Text(
+                        _priceCell(
                           s.officialConsumerRsp > 0 ? CurrencyFormatter.formatSignedPct(s.priceDeltaPct) : '—',
                           key: const ValueKey('price_matrix_delta_pct'),
                           style: cellStrong?.copyWith(color: s.priceDeltaPct < -5.0
@@ -1327,22 +1386,25 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                                 : (s.priceDeltaPct > 5.0 ? colorScheme.error : colorScheme.onSurfaceVariant)),
                         ),
                       ),
-                      DataCell(Text(s.factoryUnitCost > 0 ? '${s.factoryUnitCost.toStringAsFixed(2)} ج.م' : '—', style: cellMuted)),
-                      DataCell(Text(s.netCartonInvoiceCost > 0 ? '${s.netCartonInvoiceCost.toStringAsFixed(2)} ج.م' : '—', style: cellMuted)),
-                      DataCell(Text(CurrencyFormatter.formatCompactEGP(s.totalNetRevenue), style: cellStrong?.copyWith(color: colorScheme.primary))),
+                      DataCell(_priceCell(s.factoryUnitCost > 0 ? '${s.factoryUnitCost.toStringAsFixed(2)} ج.م' : '—', style: cellMuted)),
+                      DataCell(_priceCell(s.netCartonInvoiceCost > 0 ? '${s.netCartonInvoiceCost.toStringAsFixed(2)} ج.م' : '—', style: cellMuted)),
+                      DataCell(_priceCell(CurrencyFormatter.formatCompactEGP(s.totalNetRevenue), style: cellStrong?.copyWith(color: colorScheme.primary))),
                       DataCell(
-                        Text(
-                          s.retailerMarginPct != 0
-                              ? CurrencyFormatter.formatMarginSummary(s.retailerGrossProfit, s.retailerMarginPct)
-                              : '—',
-                          style: cellStrong?.copyWith(color: marginColor),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 56.0),
+                          child: M3WrapText(
+                            s.retailerMarginPct != 0
+                                ? CurrencyFormatter.formatMarginSummary(s.retailerGrossProfit, s.retailerMarginPct)
+                                : '—',
+                            maxLines: 3,
+                            textAlign: TextAlign.center,
+                            style: cellStrong?.copyWith(color: marginColor),
+                          ),
                         ),
                       ),
                     ],
                   );
                 }).toList()),
-              ),
-                ),
               ),
             ),
           ],
