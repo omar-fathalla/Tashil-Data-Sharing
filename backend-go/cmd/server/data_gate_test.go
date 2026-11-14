@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -52,5 +53,28 @@ func TestWaitForDataArchiveListWaitsForArchiveRestore(t *testing.T) {
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/v1/ingest/archive", nil).WithContext(ctx))
 	if served {
 		t.Fatal("archive list must wait until the archive is restored")
+	}
+}
+
+func TestWaitForDataCancelledContextWritesJSON503(t *testing.T) {
+	dataReady := make(chan struct{}) // never closed
+	archiveReady := make(chan struct{})
+	h := waitForData(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("must not reach next when cancelled while waiting")
+	}), dataReady, archiveReady)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/data-quality/summary", nil).WithContext(ctx)
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Fatalf("code=%d want 503 body=%q", rr.Code, rr.Body.String())
+	}
+	if rr.Header().Get("Retry-After") == "" {
+		t.Fatal("Retry-After missing")
+	}
+	if !strings.Contains(rr.Body.String(), "cancelled") {
+		t.Fatalf("body=%q", rr.Body.String())
 	}
 }

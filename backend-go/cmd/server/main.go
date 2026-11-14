@@ -475,7 +475,13 @@ func waitForData(next http.Handler, ready, archiveReady <-chan struct{}) http.Ha
 		case <-gate:
 			next.ServeHTTP(w, r)
 		case <-r.Context().Done():
-			return
+			// Always write a JSON body so CORS middleware has a real response. A silent
+			// return after Cloud Run / client cancel looks like a CORS failure in the
+			// browser (no Access-Control-Allow-Origin on the empty/aborted transfer).
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Retry-After", "5")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprint(w, `{"status":"cancelled","error":"Request cancelled while data was still loading"}`)
 		case <-time.After(dataReadyWait):
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", "10")
