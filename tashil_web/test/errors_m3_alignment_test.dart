@@ -847,7 +847,7 @@ void main() {
   });
 
   testWidgets(
-      'التأثير keeps the compact suffix on the number (401.0K) at 1280+sidebar',
+      'التأثير keeps «401.0K ج.م» on one line in the impact chip at 1280+sidebar',
       (tester) async {
     await _pumpPageWithSidebar(tester);
     final table = find.byKey(const ValueKey('dq_table'));
@@ -855,40 +855,41 @@ void main() {
     final compact = CurrencyFormatter.formatCompactEGP(401000);
     expect(compact, contains(CurrencyFormatter.scaleJoiner));
     expect(compact.contains('401.0K'), isFalse);
+    expect(compact.split(' ').last, 'ج.م');
 
-    final (prefix, suffix) = (
-      compact.split(' ').first,
-      compact.split(' ').last,
+    final chip = find.descendant(
+      of: table,
+      matching: find.byKey(const ValueKey('dq_impact_chip_e2')),
     );
-    expect(prefix.contains('401.0'), isTrue);
-    expect(prefix.contains('K'), isTrue);
-    expect(suffix, 'ج.م');
-
-    // The bound prefix is painted on one line; currency may be on the next.
-    final prefixFinder = find.descendant(of: table, matching: find.textContaining('401.0'));
-    expect(prefixFinder, findsWidgets);
-    for (final e in prefixFinder.evaluate()) {
-      final data = (e.widget as Text).data ?? '';
-      if (!data.contains('K')) continue;
-      expect(data.contains('401.0K'), isFalse,
-          reason: 'K must be bound with a word joiner, got "$data"');
-      final para = tester.renderObject<RenderParagraph>(
-          find.byElementPredicate((x) => x == e));
-      final numStart = data.indexOf('401.0');
-      final kEnd = data.indexOf('K', numStart) + 1;
-      expect(kEnd, greaterThan(numStart));
-      final boxes = para.getBoxesForSelection(
-        TextSelection(baseOffset: numStart, extentOffset: kEnd),
-      );
-      expect(boxes, isNotEmpty);
-      expect({for (final b in boxes) b.toRect().top.round()}, hasLength(1),
-          reason: '401.0 and K must share one line in "$data"');
-      expect(data.contains('401.0'), isTrue);
-      expect(data.contains('K'), isTrue);
-    }
+    expect(chip, findsOneWidget);
+    final amount = find.descendant(of: chip, matching: find.byType(Text));
+    expect(amount, findsOneWidget);
+    final text = tester.widget<Text>(amount);
+    expect(text.data, compact);
+    expect(text.maxLines, 1);
+    expect(text.softWrap, isFalse);
+    expect(_valueIsOneLine(tester, amount), isTrue,
+        reason: 'full «401.0K ج.م» must stay one painted line');
     expect(find.textContaining('401.0K'), findsNothing);
     expect(
         _hScrollExtent(tester, find.byKey(const ValueKey('dq_table_scroll'))),
         lessThanOrEqualTo(2.0));
+  });
+
+  testWidgets(
+      'chip captions use bodyMedium (page-header subtitle role)',
+      (tester) async {
+    await _pumpPage(tester, width: 1280);
+    final theme = Theme.of(tester.element(find.byType(DataQualityScreen)));
+    final expected = theme.textTheme.bodyMedium!.fontSize;
+
+    final typeDesc = tester.widget<Text>(
+        find.byKey(const ValueKey('dq_type_desc_missing_sku')));
+    expect(typeDesc.style?.fontSize, expected);
+
+    // KPI detail line stays bodySmall so 138px height parity holds.
+    final cleanlinessSub = tester.widget<Text>(
+        find.byKey(const ValueKey('dq_cleanliness_subtitle')));
+    expect(cleanlinessSub.style?.fontSize, theme.textTheme.bodySmall!.fontSize);
   });
 }

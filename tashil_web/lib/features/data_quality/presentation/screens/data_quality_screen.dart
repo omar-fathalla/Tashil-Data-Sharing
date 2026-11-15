@@ -7,10 +7,8 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/theme/m3_status_colors.dart';
-import '../../../../core/theme/m3_typography.dart';
 import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/utils/currency_formatter.dart';
-import '../../../../core/widgets/atomic_numeric_text.dart';
 import '../../../../core/widgets/hyphenated_code_text.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/widgets/app_icons.dart';
@@ -491,9 +489,8 @@ class _TypeChips extends StatelessWidget {
                     softWrap: true,
                     overflow: TextOverflow.clip,
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontSize: M3FontSize.labelSmallPlus,
-                      fontWeight: FontWeight.w800,
+                    style: M3ChipStyle.labelStyle(
+                      context,
                       color: t.severity == kDqCritical
                           ? cs.onErrorContainer
                           : cs.onTertiaryContainer,
@@ -508,9 +505,7 @@ class _TypeChips extends StatelessWidget {
                   softWrap: true,
                   overflow: TextOverflow.clip,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+                  style: M3ChipStyle.captionStyle(context),
                 ),
                 Text(
                   [
@@ -523,9 +518,7 @@ class _TypeChips extends StatelessWidget {
                   softWrap: true,
                   overflow: TextOverflow.clip,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+                  style: M3ChipStyle.captionStyle(context),
                 ),
               ],
             ),
@@ -671,29 +664,33 @@ class _IssuesTable extends StatelessWidget {
   //  - Name (centered) needs ≥250dp for the live long SKU in ≤3 lines
   //    (233dp still didExceedMaxLines). Flex 256 ≈ 256/954×934 ≈ 250.6dp.
   //  - Type short chip («ناقص» / «باركود ناقص») must stay ONE line with
-  //    M3ChipStyle pad; flex 120 ≈ 120dp at live ~934 leaves room for the
-  //    longest short label. Description underneath still wraps ≤3.
+  //    M3ChipStyle pad; flex 120 ≈ 120dp at live ~934. Description ≤3.
   //  - expected must fit the live phrase «الصنف يتضاف لكارتة الأصناف»
   //    in ≤3 lines. The wrapping bottleneck is «يتضاف لكارتة» (74.2dp);
-  //    flex 80 (≈79.8dp) keeps ~5dp slack. Type width comes from
-  //    impact / barcode micro-slack (not name or item-code floors).
+  //    flex 80 (≈79.8dp) keeps ~5dp slack.
+  //  - Impact («1.85M ج.م») stays ONE line in an M3ChipSurface (same label
+  //    style as type/status). FittedBox.scaleDown keeps the full string on
+  //    one line inside the flex share without widening the table (no
+  //    UnconstrainedBox — that caused h-scroll). Flex 56 (was 28) from
+  //    barcode/actions micro-slack; not from name (≥250) or item-code
+  //    (≥16dp slack) floors.
   //  - Arabic space-separated "codes" wrap at words, ≤3 lines (see
   //    HyphenatedCodeText); they must not clip mid-word.
   //  - at 1024+sidebar (inner ~678) one-line SKUs plus the name floor
   //    cannot both fit, so hyphenated codes may wrap at '-' only
-  // Shares ≈ dp at the live ~934 inner width (sum 936).
+  // Shares ≈ dp at the live ~934 inner width.
   static const _flex = [
     52.0, // الخطورة ≥46.5 one-line
     120.0, // type short chip one-line + ≤3 desc
     36.0, // الصف
     178.0, // item code one-line floor
-    28.0, // barcode (was 36; slack to type)
+    20.0, // barcode (was 28; slack to impact)
     256.0, // name centered ≥250
     50.0, // الموجود ≥47.8
     80.0, // expected (≥74.2 bottleneck)
-    28.0, // impact compact (was 36; slack to type)
+    56.0, // impact one-line chip + FittedBox
     72.0, // status chip «متجاهلة» + 16dp pad
-    28.0, // row actions
+    20.0, // row actions (was 28; slack to impact)
   ];
 
   final List<DataQualityIssue> issues;
@@ -756,11 +753,7 @@ class _IssuesTable extends StatelessWidget {
                 softWrap: true,
                 overflow: TextOverflow.clip,
                 textAlign: TextAlign.center,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: onColor,
-                  fontSize: M3FontSize.labelSmallPlus,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: M3ChipStyle.labelStyle(context, color: onColor),
               ),
             ),
           );
@@ -810,11 +803,7 @@ class _IssuesTable extends StatelessWidget {
                           softWrap: true,
                           overflow: TextOverflow.clip,
                           textAlign: TextAlign.center,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: chipFg,
-                            fontSize: M3FontSize.labelSmallPlus,
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: M3ChipStyle.labelStyle(context, color: chipFg),
                         ),
                       ),
                     ),
@@ -825,9 +814,7 @@ class _IssuesTable extends StatelessWidget {
                       softWrap: true,
                       overflow: TextOverflow.clip,
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
+                      style: M3ChipStyle.captionStyle(context),
                     ),
                   ],
                 ),
@@ -941,12 +928,29 @@ class _IssuesTable extends StatelessWidget {
                     DataCell(cellText(7, i.expectedValue)),
                     DataCell(cellBox(
                       8,
-                      AtomicNumericText(
-                        i.impactEgp == null
-                            ? '—'
-                            : CurrencyFormatter.formatCompactEGP(i.impactEgp!),
-                        maxWidth: colMax(8),
-                        textAlign: TextAlign.center,
+                      // One-line impact chip (type/status geometry). FittedBox
+                      // keeps «401.0K ج.م» on a single line inside the flex
+                      // share without forcing table h-scroll.
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: M3ChipSurface(
+                          key: ValueKey('dq_impact_chip_${i.id}'),
+                          color: cs.surfaceContainerHighest,
+                          child: Text(
+                            i.impactEgp == null
+                                ? '—'
+                                : CurrencyFormatter.formatCompactEGP(
+                                    i.impactEgp!),
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.clip,
+                            textAlign: TextAlign.center,
+                            style: M3ChipStyle.labelStyle(
+                              context,
+                              color: cs.onSurface,
+                            ),
+                          ),
+                        ),
                       ),
                     )),
                     DataCell(cellBox(
@@ -979,11 +983,8 @@ class _IssuesTable extends StatelessWidget {
                                 softWrap: true,
                                 overflow: TextOverflow.clip,
                                 textAlign: TextAlign.center,
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  color: fg,
-                                  fontSize: M3FontSize.labelSmallPlus,
-                                  fontWeight: FontWeight.w800,
-                                ),
+                                style:
+                                    M3ChipStyle.labelStyle(context, color: fg),
                               ),
                             ),
                             if (statusDesc.isNotEmpty)
@@ -992,9 +993,7 @@ class _IssuesTable extends StatelessWidget {
                                 maxLines: 3,
                                 overflow: TextOverflow.clip,
                                 textAlign: TextAlign.center,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: cs.onSurfaceVariant,
-                                ),
+                                style: M3ChipStyle.captionStyle(context),
                               ),
                           ],
                         );
