@@ -76,6 +76,7 @@ SellOutExplorerData _sampleData({required double factoryCost, required double ma
     stores: const [],
     currentBranchMatrix: const [],
     prevBranchMatrix: const [],
+    yoyCurrentBranchMatrix: const [],
   );
 }
 

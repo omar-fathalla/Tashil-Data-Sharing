@@ -347,5 +347,49 @@ void main() {
     expect(prev[2].queryParameters['month'], '4');
     expect(prev[2].queryParameters.containsKey('same_months_as'), isFalse,
         reason: 'a picked month already compares the same month');
+
+    // With no month/range: current-year YoY matrix is also trimmed to months
+    // present last year (intersection). Display current matrix stays untrimmed.
+    final cur2026 = seen
+        .where((u) =>
+            u.path.endsWith('/store-matrix') &&
+            u.queryParameters['year'] == '2026')
+        .toList();
+    final noMonthLoad = cur2026
+        .where((u) =>
+            !u.queryParameters.containsKey('month') &&
+            !u.queryParameters.containsKey('start_date'))
+        .toList();
+    expect(
+      noMonthLoad.where((u) => u.queryParameters['same_months_as'] == '2025'),
+      isNotEmpty,
+      reason: 'YoY current must request same_months_as=compYear',
+    );
+    expect(
+      noMonthLoad.where((u) => !u.queryParameters.containsKey('same_months_as')),
+      isNotEmpty,
+      reason: 'displayed current totals stay full-period (no same_months_as)',
+    );
+  });
+
+  test('E7. like-for-like YoY: 2026 Jan–Oct vs 2025 Jan–Apr → ~+26.1% / +15.6%',
+      () {
+    // Owner fixture numbers (own-brand). Displayed full 2026 would be ~127.14M
+    // and a naive YoY vs 32.18M looks like +295%; growth must use Jan–Apr only.
+    const curL4LRev = 40564794.35;
+    const prevL4LRev = 32179040.57;
+    const curL4LUnits = 551555.0;
+    const prevL4LUnits = 476948.0;
+    final revPct = likeForLikeYoyPct(curL4LRev, prevL4LRev)!;
+    final unitsPct = likeForLikeYoyPct(curL4LUnits, prevL4LUnits)!;
+    expect(revPct, closeTo(26.1, 0.05));
+    expect(unitsPct, closeTo(15.6, 0.05));
+    expect(likeForLikeYoyPct(127140000, 0), isNull);
+    expect(sellOutNeedsYoyMonthIntersect(month: null), isTrue);
+    expect(sellOutNeedsYoyMonthIntersect(month: 4), isFalse);
+    expect(
+        sellOutNeedsYoyMonthIntersect(
+            startDate: '2026-03-01', endDate: '2026-03-31'),
+        isFalse);
   });
 }

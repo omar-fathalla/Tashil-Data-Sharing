@@ -10,8 +10,18 @@ class SellOutExplorerData {
   /// Server summary captured right after the records call (null if the server sent none).
   final SellOutRecordsSummaryModel? summary;
   final List<Map<String, dynamic>> stores;
+
+  /// Full selected-period branch matrix (drives displayed totals / charts).
   final List<StoreBenchmarkItem> currentBranchMatrix;
+
+  /// Previous-year matrix trimmed to months present in the selected year
+  /// (and/or the shifted custom date range).
   final List<StoreBenchmarkItem> prevBranchMatrix;
+
+  /// Selected-year matrix trimmed to months present last year — used ONLY for
+  /// like-for-like YoY growth. Displayed current-year totals stay on
+  /// [currentBranchMatrix] / the records summary.
+  final List<StoreBenchmarkItem> yoyCurrentBranchMatrix;
 
   const SellOutExplorerData({
     required this.records,
@@ -19,6 +29,7 @@ class SellOutExplorerData {
     required this.stores,
     required this.currentBranchMatrix,
     required this.prevBranchMatrix,
+    required this.yoyCurrentBranchMatrix,
     this.sideError,
   });
 
@@ -40,6 +51,21 @@ String? shiftDateByYears(String? date, int years) {
   final nd = d > lastDay ? lastDay : d;
   String two(int v) => v.toString().padLeft(2, '0');
   return '${ny.toString().padLeft(4, '0')}-${two(m)}-${two(nd)}${date.substring(10)}';
+}
+
+/// Like-for-like YoY growth percent. Null when there is no overlapping
+/// prior-year base (UI shows «—» / «لا توجد بيانات للعام السابق»).
+double? likeForLikeYoyPct(double currentLikeForLike, double previousLikeForLike) {
+  if (previousLikeForLike <= 0) return null;
+  return ((currentLikeForLike - previousLikeForLike) / previousLikeForLike) * 100.0;
+}
+
+/// True when the explorer should trim each YoY side to months present in the
+/// other year (no explicit month / custom range already pins the period).
+bool sellOutNeedsYoyMonthIntersect({int? month, String? startDate, String? endDate}) {
+  final hasMonth = month != null && month > 0;
+  final hasRange = (startDate != null && startDate.isNotEmpty) || (endDate != null && endDate.isNotEmpty);
+  return !hasMonth && !hasRange;
 }
 
 /// Filter combo used both for the request and as the cache key.
@@ -114,6 +140,12 @@ class SellOutExplorerRepository {
                 sideError ??= e;
                 return empty;
               });
+          final intersect = sellOutNeedsYoyMonthIntersect(
+            month: q.month,
+            startDate: q.startDate,
+            endDate: q.endDate,
+          );
+          final refYearForPrev = q.matrixYear ?? (q.compYear + 1);
           final results = await Future.wait([
             side<Object>(api.getStores(), const <Map<String, dynamic>>[]),
             side<Object>(
@@ -132,21 +164,39 @@ class SellOutExplorerRepository {
                 year: q.compYear,
                 month: q.month,
                 // Same period last year: the date range is shifted one year
-                // and, with no month picked, only the months present in the
-                // compared year are counted (Jan-Oct vs Jan-Oct).
+                // and, with no month picked, only months present in the
+                // selected year are kept (aligns prev side of the intersection).
                 startDate: shiftDateByYears(q.startDate, -1),
                 endDate: shiftDateByYears(q.endDate, -1),
-                sameMonthsAs: q.compYear + 1,
+                sameMonthsAs: intersect ? refYearForPrev : null,
               ),
               const <StoreBenchmarkItem>[],
             ),
+            // Like-for-like CURRENT year for YoY only: months that exist last
+            // year. Displayed totals keep the full current matrix above.
+            side<Object>(
+              intersect
+                  ? api.getStoreBenchmarkMatrix(
+                      chain: q.matrixChain,
+                      year: q.matrixYear,
+                      month: q.month,
+                      startDate: q.startDate,
+                      endDate: q.endDate,
+                      sameMonthsAs: q.compYear,
+                    )
+                  : Future<List<StoreBenchmarkItem>>.value(const <StoreBenchmarkItem>[]),
+              const <StoreBenchmarkItem>[],
+            ),
           ]);
+          final current = results[1] as List<StoreBenchmarkItem>;
+          final yoyCurrentRaw = results[3] as List<StoreBenchmarkItem>;
           return SellOutExplorerData(
             records: records,
             summary: summary,
             stores: results[0] as List<Map<String, dynamic>>,
-            currentBranchMatrix: results[1] as List<StoreBenchmarkItem>,
+            currentBranchMatrix: current,
             prevBranchMatrix: results[2] as List<StoreBenchmarkItem>,
+            yoyCurrentBranchMatrix: intersect ? yoyCurrentRaw : current,
             sideError: sideError,
           );
         }));

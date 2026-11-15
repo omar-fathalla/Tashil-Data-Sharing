@@ -187,6 +187,7 @@ SellOutExplorerData _priceData() => const SellOutExplorerData(
       stores: [],
       currentBranchMatrix: [],
       prevBranchMatrix: [],
+      yoyCurrentBranchMatrix: [],
     );
 
 class _OneShotRepo extends SellOutExplorerRepository {

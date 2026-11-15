@@ -111,8 +111,10 @@ type StoreMatrixFilter struct {
 	StartDate     string
 	EndDate       string
 	// SameMonthsAsYear (with Month == 0) keeps only the calendar months that
-	// have data in that year, so a previous-year matrix compares the same
-	// months as a partial current year (e.g. Jan-Oct vs Jan-Oct).
+	// have data in that reference year. YoY like-for-like uses it both ways:
+	// previous year with SameMonthsAsYear=current, and current year (for the
+	// growth numerator only) with SameMonthsAsYear=previous, so a partial
+	// prior year (e.g. Jan-Apr) is never compared to a longer current span.
 	SameMonthsAsYear int
 }
 
