@@ -245,16 +245,38 @@ class ChainSharePie extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        M3ChipSurface(
-                          color: colorScheme.surfaceContainerLowest,
-                          borderColor: colorScheme.outlineVariant,
-                          child: Text(
-                            '${item.marketShare.toStringAsFixed(1)}%',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSurface,
-                              fontWeight: FontWeight.w600,
+                        const SizedBox(height: 2.0),
+                        // Short % chip + description (Errors / Pricing / Pareto).
+                        Column(
+                          key: ValueKey(
+                              'chain_share_chip_${item.retailerChain}'),
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            M3ChipSurface(
+                              color: colorScheme.surfaceContainerLowest,
+                              borderColor: colorScheme.outlineVariant,
+                              child: Text(
+                                '${item.marketShare.toStringAsFixed(1)}%',
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.clip,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onSurface,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 2.0),
+                            Text(
+                              'حصة السلسلة',
+                              maxLines: 2,
+                              overflow: TextOverflow.clip,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
