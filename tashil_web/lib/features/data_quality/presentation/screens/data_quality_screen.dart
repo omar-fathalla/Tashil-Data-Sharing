@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/data/data_refresh_mixin.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/theme/m3_typography.dart';
@@ -22,6 +23,7 @@ import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_states.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_tonal_surface.dart';
 import '../../../../core/widgets/m3_toolbar_button.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../customer_registry/presentation/pending_customers_screen.dart';
@@ -436,7 +438,17 @@ class _SummaryRow extends StatelessWidget {
         ),
         if (summary.types.where((t) => t.total > 0).isNotEmpty) ...[
           M3Spacing.gapSM,
-          _TypeChips(types: summary.types.where((t) => t.total > 0).toList()),
+          // Same tonal strip geometry as filter toolbars / other pages —
+          // chips must not float bare under the KPI row.
+          M3TonalSurface(
+            key: const ValueKey('dq_type_summary_strip'),
+            color: cs.surfaceContainerLow,
+            borderRadius: M3Shape.radiusMd,
+            padding: const EdgeInsets.all(M3Spacing.s12),
+            child: _TypeChips(
+              types: summary.types.where((t) => t.total > 0).toList(),
+            ),
+          ),
         ],
       ],
     );
@@ -453,7 +465,7 @@ class _TypeChips extends StatelessWidget {
     final cs = theme.colorScheme;
     return Wrap(
       spacing: M3Spacing.sm,
-      runSpacing: M3Spacing.xs,
+      runSpacing: M3Spacing.sm,
       crossAxisAlignment: WrapCrossAlignment.start,
       children: [
         for (final t in types)
@@ -750,45 +762,54 @@ class _IssuesTable extends StatelessWidget {
         }
 
         // Type: short chip + full label underneath (TM / summary-chip pattern).
-        // UnconstrainedBox keeps the chip at intrinsic width so short words
-        // never mid-split inside the 104-flex column.
+        // Centered in the cell with vertical/horizontal padding so the
+        // ≤3-line description never hugs the row edges. UnconstrainedBox
+        // keeps the chip at intrinsic width so short words never mid-split
+        // inside the 104-flex column.
         Widget wrapType(int i, DataQualityIssue issue) {
           return cellBox(
             i,
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                UnconstrainedBox(
-                  child: M3ChipSurface(
-                    color: cs.surfaceContainerLowest,
-                    borderColor: cs.outlineVariant,
-                    child: Text(
-                      dqTypeShort(issue.type, issue.typeLabel),
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.clip,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: cs.onSurfaceVariant,
-                        fontSize: M3FontSize.labelSmallPlus,
-                        fontWeight: FontWeight.w800,
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: M3Spacing.xxs,
+                vertical: M3Spacing.xs,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  UnconstrainedBox(
+                    child: M3ChipSurface(
+                      color: cs.surfaceContainerLowest,
+                      borderColor: cs.outlineVariant,
+                      child: Text(
+                        dqTypeShort(issue.type, issue.typeLabel),
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.clip,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontSize: M3FontSize.labelSmallPlus,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: M3Spacing.xxs),
-                Text(
-                  issue.typeLabel,
-                  maxLines: 3,
-                  softWrap: true,
-                  overflow: TextOverflow.clip,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
+                  const SizedBox(height: M3Spacing.xxs),
+                  Text(
+                    issue.typeLabel,
+                    maxLines: 3,
+                    softWrap: true,
+                    overflow: TextOverflow.clip,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         }
@@ -840,7 +861,8 @@ class _IssuesTable extends StatelessWidget {
               key: const ValueKey('dq_table'),
               columnSpacing: spacing,
               horizontalMargin: margin,
-              dataRowMinHeight: 52.0,
+              // Chip (32) + gap + ≤3-line description + vertical pad.
+              dataRowMinHeight: 72.0,
               dataRowMaxHeight: double.infinity,
               headingRowHeight: 72.0,
               headingTextStyle: theme.textTheme.labelLarge

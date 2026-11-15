@@ -86,4 +86,39 @@ void main() {
     expect(y.left, 274);
     expect(x.height, 40);
   });
+
+  testWidgets('incomplete last row stretches to full width (3+2)',
+      (tester) async {
+    await tester.pumpWidget(const Directionality(
+      textDirection: TextDirection.ltr,
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: SizedBox(
+          width: 624,
+          child: M3EqualHeightGrid(
+            columns: 3,
+            spacing: 24,
+            children: [
+              SizedBox(key: ValueKey('a'), height: 40),
+              SizedBox(key: ValueKey('b'), height: 40),
+              SizedBox(key: ValueKey('c'), height: 40),
+              SizedBox(key: ValueKey('d'), height: 40),
+              SizedBox(key: ValueKey('e'), height: 40),
+            ],
+          ),
+        ),
+      ),
+    ));
+    final a = tester.getRect(find.byKey(const ValueKey('a')));
+    final d = tester.getRect(find.byKey(const ValueKey('d')));
+    final e = tester.getRect(find.byKey(const ValueKey('e')));
+    // Full row: (624 - 2×24) / 3 = 192.
+    expect(a.width, closeTo(192.0, 0.5));
+    // Stretched last row: (624 - 24) / 2 = 300 — no empty third slot.
+    expect(d.width, closeTo(300.0, 0.5));
+    expect(e.width, closeTo(300.0, 0.5));
+    expect(d.left, 0);
+    expect(e.left, closeTo(324.0, 0.5));
+    expect(d.top, closeTo(a.bottom + 0, 0.5)); // runSpacing default 0
+  });
 }

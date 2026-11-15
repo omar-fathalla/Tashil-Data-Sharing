@@ -118,6 +118,21 @@ void main() {
     expect(cardYs[3], closeTo(cardYs[4], 1.0));
     expect(cardYs[3], greaterThan(cardYs[0] + 100),
         reason: '2nd row holds cards 4–5 (3+2 even fill)');
+    // Incomplete last row is stretched — no empty third slot.
+    final gridWidth =
+        tester.getSize(find.byKey(const ValueKey('product_master_kpi_grid')))
+            .width;
+    final row1 = [
+      for (final e in cards.evaluate().skip(3))
+        tester.getSize(find.byWidget(e.widget)).width
+    ];
+    expect(row1, hasLength(2));
+    expect(row1[0], closeTo(row1[1], 1.0));
+    expect(row1[0] + row1[1] + pmGrid.spacing, closeTo(gridWidth, 2.0),
+        reason: 'last-row cards share the full grid width');
+    final row0W = tester.getSize(find.byWidget(cards.evaluate().first.widget)).width;
+    expect(row1[0], greaterThan(row0W + 10),
+        reason: 'stretched last-row cards are wider than 1/3 columns');
     expect(find.text('إجمالي الأصناف'), findsWidgets);
     expect(find.text('أصناف العروض'), findsWidgets);
     expect(find.text('الباركودات الفريدة'), findsWidgets);

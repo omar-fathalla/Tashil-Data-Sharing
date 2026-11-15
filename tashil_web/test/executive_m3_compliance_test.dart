@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -10,6 +11,7 @@ import 'package:http/testing.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/core/theme/m3_status_colors.dart';
+import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/core/widgets/m3_feedback.dart';
 import 'package:tashil_web/core/widgets/kpi_card.dart';
 import 'package:tashil_web/core/widgets/m3_segment_label.dart';
@@ -432,6 +434,140 @@ void main() {
           find.descendant(of: find.byWidget(t), matching: find.byType(RichText)));
       expect(rp.size.height, lessThanOrEqualTo(16.0 + 0.5));
     }
+  });
+
+  testWidgets(
+      'monthly trend hover tooltip: value + growth lines, no ellipsis',
+      (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const revenue = 9537095.0;
+    final trends = [
+      DailyTrendItem(
+        date: '2026-01-31',
+        monthKey: '2026-01',
+        monthLabel: 'يناير 26',
+        revenue: revenue,
+        units: 1000,
+        storeCount: 3,
+        chainRevenues: const {'fathalla': revenue},
+        chainUnits: const {'fathalla': 1000},
+        chainDetails: [
+          ChainTrendValueItem(
+            retailerChain: 'fathalla',
+            displayName: 'أسواق فتح الله (Fathalla)',
+            revenue: revenue,
+            units: 1000,
+            growthPct: 0.0, // first month → «لا توجد بيانات للنمو»
+          ),
+        ],
+      ),
+      DailyTrendItem(
+        date: '2026-02-28',
+        monthKey: '2026-02',
+        monthLabel: 'فبراير 26',
+        revenue: revenue * 1.1,
+        units: 1100,
+        storeCount: 3,
+        chainRevenues: const {'fathalla': revenue * 1.1},
+        chainUnits: const {'fathalla': 1100},
+        chainDetails: [
+          ChainTrendValueItem(
+            retailerChain: 'fathalla',
+            displayName: 'أسواق فتح الله (Fathalla)',
+            revenue: revenue * 1.1,
+            units: 1100,
+            growthPct: 12.4,
+          ),
+        ],
+      ),
+    ];
+
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      home: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          body: SingleChildScrollView(
+            child: SelloutTrendChart(
+              trends: trends,
+              sellInByChain: const {
+                'fathalla': {'2026-01': 10.0e6, '2026-02': 11.0e6},
+              },
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final region = find.descendant(
+      of: find.byType(SelloutTrendChart),
+      matching: find.byType(MouseRegion),
+    );
+    expect(region, findsOneWidget);
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    // Enter from outside so MouseRegion.onHover fires (addPointer alone
+    // does not synthesize a hover move on the chart canvas).
+    await gesture.addPointer(location: const Offset(1, 1));
+    addTearDown(gesture.removePointer);
+    await tester.pump();
+    final chartBox = tester.getRect(region);
+    // Hover the first month band (left/start half) for null-growth copy.
+    await gesture.moveTo(Offset(
+      chartBox.left + chartBox.width * 0.2,
+      chartBox.center.dy,
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    final tip = find.byKey(const ValueKey('trend_hover_tooltip'));
+    expect(tip, findsOneWidget);
+
+    final valueLine = find.descendant(
+      of: tip,
+      matching: find.textContaining('Sell-Out:'),
+    );
+    expect(valueLine, findsOneWidget);
+    final valueText = tester.widget<Text>(valueLine);
+    expect(valueText.data, contains(CurrencyFormatter.formatEGP(revenue)));
+    expect(valueText.data, isNot(contains('لا توجد بيانات للنمو')));
+    expect(valueText.data, isNot(contains('...')));
+    expect(valueText.overflow, isNot(TextOverflow.ellipsis));
+
+    final growthLine = find.descendant(
+      of: tip,
+      matching: find.text('— · لا توجد بيانات للنمو'),
+    );
+    expect(growthLine, findsOneWidget);
+    expect(tester.widget<Text>(growthLine).overflow,
+        isNot(TextOverflow.ellipsis));
+    expect(tester.widget<Text>(growthLine).style?.fontWeight, FontWeight.w400);
+
+    final sellInLine = find.descendant(
+      of: tip,
+      matching: find.textContaining('Sell-In'),
+    );
+    expect(sellInLine, findsOneWidget);
+    expect(tester.widget<Text>(sellInLine).overflow,
+        isNot(TextOverflow.ellipsis));
+
+    for (final t in tester.widgetList<Text>(
+        find.descendant(of: tip, matching: find.byType(Text)))) {
+      expect(t.overflow, isNot(TextOverflow.ellipsis), reason: '${t.data}');
+      final rp = tester.renderObject<RenderParagraph>(
+        find.descendant(of: find.byWidget(t), matching: find.byType(RichText)),
+      );
+      expect(rp.didExceedMaxLines, isFalse, reason: '${t.data}');
+      expect(t.data, isNot(contains('...')), reason: '${t.data}');
+    }
+
+    final tipBox = tester.getSize(tip);
+    expect(tipBox.width, greaterThanOrEqualTo(220.0));
+    expect(tipBox.width, lessThanOrEqualTo(320.0));
   });
 
   testWidgets('v2 M3TonalSurface(onTap): button semantics, 48dp, focus ring',

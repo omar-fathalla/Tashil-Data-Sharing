@@ -1316,7 +1316,8 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         // Even fill: 5 cards → 3+2 at the live shell (not a lonely 4+1).
-        // Card height stays Sell-Out 138 via M3SummaryKpiCard + equal grid.
+        // Incomplete last row is stretched full-width by M3EqualHeightGrid
+        // (no empty third slot). Height stays Sell-Out 138.
         final columns = M3KpiGridColumns.forWidthAndCount(
           constraints.maxWidth,
           5,

@@ -353,7 +353,8 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
     final lossAvailable = _hasMonitorReport;
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Even fill: 5 cards → 3+2 (not a lonely 4+1 last row).
+        // Even fill: 5 cards → 3+2 (not a lonely 4+1). Keep 3+2 rather than
+        // 5-across so long single-line Arabic titles stay uncut at ≤1024.
         final columns = M3KpiGridColumns.forWidthAndCount(
           constraints.maxWidth,
           5,

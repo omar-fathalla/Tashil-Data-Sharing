@@ -485,8 +485,15 @@ void main() {
       'Type chips use short word + description (TM pattern) at 1280',
       (tester) async {
     await _pumpPage(tester, width: 1280);
+    final strip = find.byKey(const ValueKey('dq_type_summary_strip'));
+    expect(strip, findsOneWidget);
+    expect(_onScreen(tester, strip), isTrue);
+
     final chip = find.byKey(const ValueKey('dq_type_chip_missing_sku'));
     expect(chip, findsOneWidget);
+    expect(
+        find.descendant(of: strip, matching: chip), findsOneWidget,
+        reason: 'type chips live inside the summary strip container');
     expect(_onScreen(tester, chip), isTrue);
     final chipText = tester.widget<Text>(
         find.descendant(of: chip, matching: find.byType(Text)).first);
@@ -616,6 +623,29 @@ void main() {
         find.descendant(of: table, matching: find.text(kLongTypeMissing)),
         findsWidgets);
     expect(find.textContaining('+0.0%'), findsNothing);
+
+    final dt =
+        tester.widget<DataTable>(find.byKey(const ValueKey('dq_table')));
+    expect(dt.dataRowMinHeight, greaterThanOrEqualTo(72.0));
+
+    // Type cell: chip + ≤3-line description centered under the short chip.
+    final typeDesc = find.descendant(
+      of: table,
+      matching: find.text(kLongTypeMissing),
+    );
+    expect(typeDesc, findsWidgets);
+    final descText = tester.widget<Text>(typeDesc.first);
+    expect(descText.maxLines, 3);
+    expect(descText.textAlign, TextAlign.center);
+    expect(descText.overflow, isNot(TextOverflow.ellipsis));
+    final typeChip = find.descendant(of: table, matching: find.text('ناقص'));
+    expect(typeChip, findsWidgets);
+    final chipBox = tester.getRect(typeChip.first);
+    final descBox = tester.getRect(typeDesc.first);
+    expect(descBox.top, greaterThan(chipBox.bottom - 0.5),
+        reason: 'description sits under the type chip');
+    expect((descBox.center.dx - chipBox.center.dx).abs(), lessThan(4.0),
+        reason: 'chip and description share a centered axis');
   });
 
   testWidgets(

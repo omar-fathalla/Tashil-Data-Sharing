@@ -593,15 +593,23 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
         item.date.isNotEmpty &&
         item.monthLabel.trim() != item.date.trim();
 
+    // Wide enough for «Sell-Out: 9,537,095 ج.م» + growth on a 2nd line
+    // without ellipsis; clamp keeps the bubble inside the chart.
+    const tooltipMaxW = 320.0;
+    const tooltipMinW = 220.0;
     return Positioned(
-      left: (x - 95).clamp(0.0, math.max(0.0, width - 210.0)),
-      top: (y - 95).clamp(0.0, math.max(0.0, height - 135.0)),
+      left: (x - 140).clamp(0.0, math.max(0.0, width - tooltipMaxW)),
+      top: (y - 110).clamp(0.0, math.max(0.0, height - 170.0)),
       child: IgnorePointer(
         child: M3TonalSurface(
+          key: const ValueKey('trend_hover_tooltip'),
           color: colorScheme.inverseSurface,
           borderRadius: M3Shape.radiusSm,
-          padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-          constraints: const BoxConstraints(minWidth: 175.0, maxWidth: 230.0),
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          constraints: const BoxConstraints(
+            minWidth: tooltipMinW,
+            maxWidth: tooltipMaxW,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -620,34 +628,36 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                     color: colorScheme.onInverseSurface,
                   ),
                 ),
-              const SizedBox(height: 5.0),
+              const SizedBox(height: 6.0),
               ...seriesList.map((s) {
                 final val = idx < s.values.length ? s.values[idx] : 0.0;
                 final growth =
                     idx < s.growthPcts.length ? s.growthPcts[idx] : null;
-                final String growthStr;
+                // Value on its own line; growth (or empty-growth copy) on a
+                // smaller second line — never concatenate into one truncated row.
+                final String? growthLine;
                 if (val <= 0) {
-                  growthStr = '';
+                  growthLine = null;
                 } else if (growth == null) {
-                  growthStr = ' (— · لا توجد بيانات للنمو)';
+                  growthLine = '— · لا توجد بيانات للنمو';
                 } else {
-                  growthStr =
-                      ' (${CurrencyFormatter.formatSignedPct(growth)})';
+                  growthLine = CurrencyFormatter.formatSignedPct(growth);
                 }
-                final sellOutText = val > 0
-                    ? '${CurrencyFormatter.formatEGP(val)}$growthStr'
+                final valueOnly = val > 0
+                    ? CurrencyFormatter.formatEGP(val)
                     : 'لم تُرفع بيانات بعد';
-                final valueLabel =
-                    showSellIn ? 'Sell-Out: $sellOutText' : sellOutText;
+                final valueLabel = showSellIn
+                    ? '\u2068Sell-Out:\u2069 $valueOnly'
+                    : valueOnly;
                 final sellIn =
                     idx < s.sellInValues.length ? s.sellInValues[idx] : null;
                 final sellInLabel =
-                    'Sell-In (صافي بعد المرتجعات): ${sellIn != null ? CurrencyFormatter.formatEGP(sellIn) : 'لا توجد بيانات'}';
+                    '\u2068Sell-In\u2069 (صافي بعد المرتجعات): ${sellIn != null ? CurrencyFormatter.formatEGP(sellIn) : 'لا توجد بيانات'}';
+                final onInv = colorScheme.onInverseSurface;
                 final parts = ChainSharePie.splitBilingualLabel(s.displayName);
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 5.0),
+                  padding: const EdgeInsets.only(bottom: 6.0),
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(
@@ -657,8 +667,8 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                             backgroundColor:
                                 val > 0 ? s.color : colorScheme.outline),
                       ),
-                      const SizedBox(width: 5.0),
-                      Flexible(
+                      const SizedBox(width: 6.0),
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
@@ -666,45 +676,53 @@ class _SelloutTrendChartState extends State<SelloutTrendChart> {
                             Text(
                               parts.ar,
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: val > 0
-                                    ? colorScheme.onInverseSurface
-                                    : colorScheme.onInverseSurface,
+                                color: onInv,
                                 fontWeight: FontWeight.w600,
                               ),
-                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
                             ),
                             if (parts.en != null)
                               Text(
                                 parts.en!,
                                 style: theme.textTheme.labelSmall?.copyWith(
-                                  color: colorScheme.onInverseSurface,
+                                  color: onInv,
                                 ),
-                                overflow: TextOverflow.ellipsis,
+                                softWrap: true,
                               ),
-                            const SizedBox(height: 2.0),
+                            const SizedBox(height: 3.0),
                             Text(
                               valueLabel,
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: val > 0
-                                    ? colorScheme.onInverseSurface
-                                    : colorScheme.onInverseSurface,
+                                color: onInv,
                                 fontWeight: val > 0 ? FontWeight.w600 : null,
                               ),
-                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
                             ),
-                            if (showSellIn)
+                            if (growthLine != null) ...[
+                              const SizedBox(height: 2.0),
+                              Text(
+                                growthLine,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: onInv,
+                                  fontWeight: FontWeight.w400,
+                                  height: 1.25,
+                                ),
+                                softWrap: true,
+                              ),
+                            ],
+                            if (showSellIn) ...[
+                              const SizedBox(height: 3.0),
                               Text(
                                 sellInLabel,
                                 style: theme.textTheme.labelSmall?.copyWith(
-                                  color: sellIn != null
-                                      ? colorScheme.onInverseSurface
-                                      : colorScheme.onInverseSurface,
+                                  color: onInv,
                                   fontWeight: sellIn != null
                                       ? FontWeight.w600
                                       : FontWeight.normal,
                                 ),
-                                overflow: TextOverflow.ellipsis,
+                                softWrap: true,
                               ),
+                            ],
                           ],
                         ),
                       ),
