@@ -23,6 +23,7 @@ import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_states.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/m3_tonal_surface.dart';
 import '../../../../core/widgets/m3_toolbar_button.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
@@ -484,7 +485,9 @@ class _TypeChips extends StatelessWidget {
                       : cs.tertiaryContainer,
                   child: Text(
                     dqTypeShort(t.type, t.typeLabel),
-                    maxLines: 3,
+                    // One-line short word; softWrap stays true so shared
+                    // visibility helpers (labelFullyVisible) still apply.
+                    maxLines: 1,
                     softWrap: true,
                     overflow: TextOverflow.clip,
                     textAlign: TextAlign.center,
@@ -667,13 +670,13 @@ class _IssuesTable extends StatelessWidget {
   //    (178/930×934 ≈ 178.7dp) leaves ≥16dp slack.
   //  - Name (centered) needs ≥250dp for the live long SKU in ≤3 lines
   //    (233dp still didExceedMaxLines). Flex 256 ≈ 256/954×934 ≈ 250.6dp.
-  //  - Type label «صنف مش موجود في كارتة الأصناف» exceeds 3 lines at
-  //    ~80dp; flex 104 ≈ 104dp. Status stays 72 so «متجاهلة»+chip pad fits.
+  //  - Type short chip («ناقص» / «باركود ناقص») must stay ONE line with
+  //    M3ChipStyle pad; flex 120 ≈ 120dp at live ~934 leaves room for the
+  //    longest short label. Description underneath still wraps ≤3.
   //  - expected must fit the live phrase «الصنف يتضاف لكارتة الأصناف»
   //    in ≤3 lines. The wrapping bottleneck is «يتضاف لكارتة» (74.2dp);
-  //    v158's flex 72 (72.3dp) clipped «الأصناف». Flex 88 (88.4dp) leaves
-  //    ~14dp slack. Type/name share comes from severity / row / barcode /
-  //    found / status / actions, which have slack beyond short chips.
+  //    flex 80 (≈79.8dp) keeps ~5dp slack. Type width comes from
+  //    impact / barcode micro-slack (not name or item-code floors).
   //  - Arabic space-separated "codes" wrap at words, ≤3 lines (see
   //    HyphenatedCodeText); they must not clip mid-word.
   //  - at 1024+sidebar (inner ~678) one-line SKUs plus the name floor
@@ -681,14 +684,14 @@ class _IssuesTable extends StatelessWidget {
   // Shares ≈ dp at the live ~934 inner width (sum 936).
   static const _flex = [
     52.0, // الخطورة ≥46.5 one-line
-    104.0, // type «صنف مش موجود…» ≤3 (80dp exceeded)
+    120.0, // type short chip one-line + ≤3 desc
     36.0, // الصف
     178.0, // item code one-line floor
-    36.0, // barcode
+    28.0, // barcode (was 36; slack to type)
     256.0, // name centered ≥250
     50.0, // الموجود ≥47.8
-    88.0, // expected
-    36.0, // impact compact
+    80.0, // expected (≥74.2 bottleneck)
+    28.0, // impact compact (was 36; slack to type)
     72.0, // status chip «متجاهلة» + 16dp pad
     28.0, // row actions
   ];
@@ -709,6 +712,8 @@ class _IssuesTable extends StatelessWidget {
             ? constraints.maxWidth
             : MediaQuery.sizeOf(context).width;
         final flexSum = _flex.fold<double>(0, (a, b) => a + b);
+        // No pad on the tonal wrapper — every dp of the live 1030 shell is
+        // spoken for (item-code ≥16dp slack). Colour alone marks the surface.
         final inner =
             availableWidth - (2 * margin) - ((_flex.length - 1) * spacing);
         // No per-column min clamp: 11 columns at the live 1030 content
@@ -762,11 +767,20 @@ class _IssuesTable extends StatelessWidget {
         }
 
         // Type: short chip + full label underneath (TM / summary-chip pattern).
-        // Centered in the cell with vertical/horizontal padding so the
-        // ≤3-line description never hugs the row edges. UnconstrainedBox
-        // keeps the chip at intrinsic width so short words never mid-split
-        // inside the 104-flex column.
+        // Severity-tonal chip colours match the summary strip so each row
+        // shows a clear per-type accent (neutral outline chips washed out at
+        // wide shells). A 4dp start-edge strip mirrors other pages' tonal
+        // accents without offsetting the centered chip/description axis.
+        // UnconstrainedBox + maxLines:1 keep «ناقص» / «باركود ناقص» on one
+        // line inside the 120-flex column (softWrap stays true for shared
+        // visibility helpers).
         Widget wrapType(int i, DataQualityIssue issue) {
+          final critical = issue.severity == kDqCritical;
+          final chipBg =
+              critical ? cs.errorContainer : cs.tertiaryContainer;
+          final chipFg =
+              critical ? cs.onErrorContainer : cs.onTertiaryContainer;
+          final short = dqTypeShort(issue.type, issue.typeLabel);
           return cellBox(
             i,
             Padding(
@@ -774,41 +788,49 @@ class _IssuesTable extends StatelessWidget {
                 horizontal: M3Spacing.xxs,
                 vertical: M3Spacing.xs,
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  UnconstrainedBox(
-                    child: M3ChipSurface(
-                      color: cs.surfaceContainerLowest,
-                      borderColor: cs.outlineVariant,
-                      child: Text(
-                        dqTypeShort(issue.type, issue.typeLabel),
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: TextOverflow.clip,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: cs.onSurfaceVariant,
-                          fontSize: M3FontSize.labelSmallPlus,
-                          fontWeight: FontWeight.w800,
+              child: DecoratedBox(
+                key: ValueKey('dq_row_type_strip_${issue.id}'),
+                decoration: BoxDecoration(
+                  border: BorderDirectional(
+                    start: BorderSide(color: chipBg, width: 4.0),
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    UnconstrainedBox(
+                      child: M3ChipSurface(
+                        key: ValueKey('dq_row_type_chip_${issue.id}'),
+                        color: chipBg,
+                        child: Text(
+                          short,
+                          maxLines: 1,
+                          softWrap: true,
+                          overflow: TextOverflow.clip,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: chipFg,
+                            fontSize: M3FontSize.labelSmallPlus,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: M3Spacing.xxs),
-                  Text(
-                    issue.typeLabel,
-                    maxLines: 3,
-                    softWrap: true,
-                    overflow: TextOverflow.clip,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
+                    const SizedBox(height: M3Spacing.xxs),
+                    Text(
+                      issue.typeLabel,
+                      maxLines: 3,
+                      softWrap: true,
+                      overflow: TextOverflow.clip,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
@@ -851,26 +873,38 @@ class _IssuesTable extends StatelessWidget {
               label: cellBox(10, const SizedBox.shrink())),
         ];
 
+        // Sell-Out / TM symmetry: table sits on a tonal surface so rows are
+        // not bare white at wide shells (~1920 device / 1280 logical).
         return SizedBox(
           width: availableWidth,
-          child: TableScrollContainer(
-            key: const ValueKey('dq_table_scroll'),
-            showSwipeHint: true,
-            columnFlex: _flex,
-            child: DataTable(
-              key: const ValueKey('dq_table'),
-              columnSpacing: spacing,
-              horizontalMargin: margin,
-              // Chip (32) + gap + ≤3-line description + vertical pad.
-              dataRowMinHeight: 72.0,
-              dataRowMaxHeight: double.infinity,
-              headingRowHeight: 72.0,
-              headingTextStyle: theme.textTheme.labelLarge
-                  ?.copyWith(fontWeight: FontWeight.w700),
-              columns: columns,
-              rows: centerCellsUnderCenteredHeadings(
-                columns,
-                issues.map((i) {
+          child: Container(
+            key: const ValueKey('dq_table_tonal_surface'),
+            decoration: BoxDecoration(
+              color: M3TableSurface.color(cs),
+              borderRadius: M3Shape.radiusLg,
+              border: Border.all(
+                color: cs.outlineVariant.withValues(alpha: 0.5),
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: TableScrollContainer(
+              key: const ValueKey('dq_table_scroll'),
+              showSwipeHint: true,
+              columnFlex: _flex,
+              child: DataTable(
+                key: const ValueKey('dq_table'),
+                columnSpacing: spacing,
+                horizontalMargin: margin,
+                // Chip (32) + gap + ≤3-line description + vertical pad.
+                dataRowMinHeight: 72.0,
+                dataRowMaxHeight: double.infinity,
+                headingRowHeight: 72.0,
+                headingTextStyle: theme.textTheme.labelLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+                columns: columns,
+                rows: centerCellsUnderCenteredHeadings(
+                  columns,
+                  issues.map((i) {
                   final critical = i.severity == kDqCritical;
                   final statusDesc = [
                     if (i.autoClosed) 'تلقائي',
@@ -984,6 +1018,7 @@ class _IssuesTable extends StatelessWidget {
                 }).toList(),
               ),
             ),
+          ),
           ),
         );
       },

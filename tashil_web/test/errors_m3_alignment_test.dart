@@ -498,7 +498,7 @@ void main() {
     final chipText = tester.widget<Text>(
         find.descendant(of: chip, matching: find.byType(Text)).first);
     expect(chipText.data, 'ناقص');
-    expect(chipText.maxLines, greaterThanOrEqualTo(1));
+    expect(chipText.maxLines, 1);
     expect(chipText.overflow, isNot(TextOverflow.ellipsis));
     expect(chipText.softWrap, isTrue);
 
@@ -646,6 +646,106 @@ void main() {
         reason: 'description sits under the type chip');
     expect((descBox.center.dx - chipBox.center.dx).abs(), lessThan(4.0),
         reason: 'chip and description share a centered axis');
+  });
+
+  testWidgets(
+      'Errors table tonal surface + per-row type strip visible at 1920 shell',
+      (tester) async {
+    // Live captures are 1920 device px at 150% zoom → 1280 logical; also
+    // pump a true 1920 logical shell so the strip stays visible when wide.
+    for (final width in [1280.0, 1920.0]) {
+      await _pumpPage(tester, width: width);
+      final surface = find.byKey(const ValueKey('dq_table_tonal_surface'));
+      expect(surface, findsOneWidget, reason: 'tonal surface @ $width');
+      expect(_onScreen(tester, surface, width: width), isTrue,
+          reason: 'tonal surface on screen @ $width');
+
+      final strip = find.byKey(const ValueKey('dq_row_type_strip_e1'));
+      expect(strip, findsOneWidget, reason: 'row type strip @ $width');
+      expect(_onScreen(tester, strip, width: width), isTrue,
+          reason: 'row type strip on screen @ $width');
+      final stripBox = tester.widget<DecoratedBox>(strip);
+      final deco = stripBox.decoration as BoxDecoration;
+      final border = deco.border! as BorderDirectional;
+      expect(border.start.width, 4.0,
+          reason: '4dp per-type tonal strip @ $width');
+      expect(border.start.color.a, greaterThan(0.0),
+          reason: 'strip colour must be opaque enough to see @ $width');
+
+      final rowChip = find.byKey(const ValueKey('dq_row_type_chip_e1'));
+      expect(rowChip, findsOneWidget, reason: 'row type chip @ $width');
+      final chipTextFinder =
+          find.descendant(of: rowChip, matching: find.byType(Text)).first;
+      final chipText = tester.widget<Text>(chipTextFinder);
+      expect(chipText.data, 'ناقص');
+      expect(chipText.maxLines, 1);
+      expect(chipText.softWrap, isTrue);
+      expect(_valueIsOneLine(tester, chipTextFinder), isTrue,
+          reason: '«ناقص» chip stays one line @ $width');
+      final table = find.byKey(const ValueKey('dq_table'));
+      expect(shortWordUnsplit(tester, 'ناقص', scope: table), isTrue,
+          reason: '«ناقص» must not mid-split @ $width');
+      // Longer short-label: give the type column room so it stays one line.
+      expect(tester.getSize(rowChip).height, lessThanOrEqualTo(40.0),
+          reason: 'type chip height stays single-line @ $width');
+    }
+  });
+
+  testWidgets(
+      'long type short-chip «باركود ناقص» stays one line in the type column',
+      (tester) async {
+    await pumpErrors(
+      tester,
+      DataQualityScreen(
+        dataSource: ErrorsShotSource(
+          sum: DataQualitySummary(
+            types: const [
+              DataQualityTypeSummary(
+                source: 'product_master',
+                type: 'missing_barcode',
+                typeLabel: 'باركود الصنف ناقص',
+                severity: kDqWarning,
+                total: 3,
+                open: 3,
+                impactEgp: 0,
+              ),
+            ],
+            totalRows: 10,
+            criticalRows: 0,
+            cleanlinessPct: 100,
+            open: 3,
+            updatedAt: DateTime.utc(2026, 11, 15),
+          ),
+          list: const [
+            DataQualityIssue(
+              id: 'mb1',
+              source: 'product_master',
+              type: 'missing_barcode',
+              typeLabel: 'باركود الصنف ناقص',
+              severity: kDqWarning,
+              itemCode: 'BC-MISS-1',
+              itemName: 'صنف بدون باركود',
+              status: kDqOpen,
+            ),
+          ],
+        ),
+        pollInterval: const Duration(hours: 1),
+      ),
+      width: kLiveContentWidth,
+    );
+    final rowChip = find.byKey(const ValueKey('dq_row_type_chip_mb1'));
+    expect(rowChip, findsOneWidget);
+    final chipText = tester.widget<Text>(
+        find.descendant(of: rowChip, matching: find.byType(Text)).first);
+    expect(chipText.data, 'باركود ناقص');
+    expect(chipText.maxLines, 1);
+    expect(_valueIsOneLine(
+            tester, find.descendant(of: rowChip, matching: find.byType(Text)).first),
+        isTrue,
+        reason: '«باركود ناقص» must stay one painted line');
+    expect(tester.getSize(rowChip).height, lessThanOrEqualTo(40.0));
+    expect(find.byKey(const ValueKey('dq_row_type_strip_mb1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('dq_table_tonal_surface')), findsOneWidget);
   });
 
   testWidgets(
