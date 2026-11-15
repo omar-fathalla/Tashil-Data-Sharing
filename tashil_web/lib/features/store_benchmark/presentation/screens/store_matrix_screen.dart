@@ -80,12 +80,39 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
   List<StoreBenchmarkItem> get _visibleStores {
     final q = _searchQuery.trim();
     if (q.isEmpty) return _stores;
+    final qLower = q.toLowerCase();
+    // English branchnorm aliases → Arabic substrings present in Sell-Out store names.
+    // «Kafr El Dawar» must find «فرع فتح الله - كفر الدوار» (KED2 is Sell-In-only, so absent here).
+    const enAliases = <String, String>{
+      'kafr el dawar': 'كفر الدوار',
+      'kafr el-dawar': 'كفر الدوار',
+      'kafr eldawar': 'كفر الدوار',
+    };
+    final aliasAr = enAliases[qLower];
     bool matches(StoreBenchmarkItem s) {
-      return s.storeName.contains(q) ||
-          _displayStoreName(s).contains(q) ||
-          s.region.contains(q) ||
-          s.tier.contains(q) ||
-          _getChainDisplayName(s.retailerChain).contains(q);
+      final name = s.storeName;
+      final display = _displayStoreName(s);
+      final region = s.region;
+      final tier = s.tier;
+      final chain = _getChainDisplayName(s.retailerChain);
+      if (name.contains(q) ||
+          display.contains(q) ||
+          region.contains(q) ||
+          tier.contains(q) ||
+          chain.contains(q)) {
+        return true;
+      }
+      // Latin queries: case-insensitive contains on name/display/chain.
+      if (name.toLowerCase().contains(qLower) ||
+          display.toLowerCase().contains(qLower) ||
+          chain.toLowerCase().contains(qLower)) {
+        return true;
+      }
+      if (aliasAr != null &&
+          (name.contains(aliasAr) || display.contains(aliasAr))) {
+        return true;
+      }
+      return false;
     }
 
     return _stores.where(matches).toList();

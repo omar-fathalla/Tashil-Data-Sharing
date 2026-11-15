@@ -13,14 +13,16 @@ import (
 
 // AliasRemapResult summarizes one apply/restore pass.
 type AliasRemapResult struct {
-	Remapped int      `json:"remapped"`
-	Restored int      `json:"restored"`
-	Sources  []string `json:"sources,omitempty"`
-	Errors   []string `json:"errors,omitempty"`
+	Remapped  int      `json:"remapped"`
+	Restored  int      `json:"restored"`
+	Decisions int      `json:"decisions,omitempty"`
+	Sources   []string `json:"sources,omitempty"`
+	Errors    []string `json:"errors,omitempty"`
 }
 
 type sellInAttributionWriter interface {
 	RemapSellInCustomer(ctx context.Context, tenantID, chain, fromName, toName, toBranch string) *bqsink.Result
+	RemapSellInCustomerWithBranch(ctx context.Context, tenantID, chain, fromName, fromBranch, toName, toBranch string) *bqsink.Result
 	RestoreSellInCustomerByIDs(ctx context.Context, tenantID, toName, toBranch string, recordIDs []string) *bqsink.Result
 }
 
@@ -45,6 +47,7 @@ func (p *Processor) ApplyCustomerAliasAttributions(ctx context.Context, tenantID
 		return out
 	}
 	decisions := p.aliasDecisions(ctx, tenantID)
+	out.Decisions = len(decisions)
 	if len(decisions) == 0 {
 		return out
 	}
@@ -52,26 +55,43 @@ func (p *Processor) ApplyCustomerAliasAttributions(ctx context.Context, tenantID
 	targetBranch := targetBranchCodes(recs, decisions)
 	changed := false
 	for _, d := range decisions {
-		ids, fromBranch, n := remapRecords(recs, d, targetBranch[d.canKey])
+		srcBranch := gemini.BuildBranchStoreMetadata(d.chain, d.sourceName).ID
+		ids, fromBranch, fromNames, n := remapRecords(recs, d, srcBranch, targetBranch[d.canKey])
 		if n == 0 {
+			log.Printf("[customer-alias] decision present but no rows tenant=%s source=%q → %q branch=%s", tenantID, d.sourceName, d.canonicalName, srcBranch)
 			continue
 		}
 		changed = true
 		out.Remapped += n
 		out.Sources = append(out.Sources, d.sourceName)
+		if fromBranch == "" {
+			fromBranch = srcBranch
+		}
 		if err := p.customers.SetAliasMergeMeta(ctx, tenantID, d.sourceName, ids, fromBranch); err != nil {
 			out.Errors = append(out.Errors, err.Error())
 		}
 		if w, ok := p.sink.(sellInAttributionWriter); ok && p.sinkActive() {
 			c, cancel := sinkCtx(ctx)
-			res := w.RemapSellInCustomer(c, tenantID, d.chain, d.sourceName, d.canonicalName, targetBranch[d.canKey])
+			// Branch-aware DML covers registry spelling + rows still on the source fat_auto code.
+			res := w.RemapSellInCustomerWithBranch(c, tenantID, d.chain, d.sourceName, srcBranch, d.canonicalName, targetBranch[d.canKey])
+			// Also remap every distinct live spelling NormalizeName equated to the source
+			// (e.g. glued vs spaced digit) when it differs from the registry Name.
+			for _, spell := range fromNames {
+				if spell == "" || spell == d.sourceName {
+					continue
+				}
+				r2 := w.RemapSellInCustomerWithBranch(c, tenantID, d.chain, spell, "", d.canonicalName, targetBranch[d.canKey])
+				if r2 != nil && r2.Failed() {
+					out.Errors = append(out.Errors, "BigQuery remap "+spell+": "+r2.Error)
+				}
+			}
 			cancel()
 			p.noteSellInWritten(ctx, tenantID, res)
 			if res != nil && res.Failed() {
 				out.Errors = append(out.Errors, "BigQuery remap "+d.sourceName+": "+res.Error)
 			}
 		}
-		log.Printf("[customer-alias] apply tenant=%s source=%q → %q chain=%s rows=%d", tenantID, d.sourceName, d.canonicalName, d.chain, n)
+		log.Printf("[customer-alias] apply tenant=%s source=%q → %q chain=%s rows=%d spellings=%v", tenantID, d.sourceName, d.canonicalName, d.chain, n, fromNames)
 	}
 	if changed {
 		repl.ReplaceSellInRecords(tenantID, recs)
@@ -228,9 +248,14 @@ func targetBranchCodes(recs []domain.SellInRecord, decisions []aliasDecision) ma
 	return out
 }
 
-func remapRecords(recs []domain.SellInRecord, d aliasDecision, toBranch string) (ids []string, fromBranch string, n int) {
+func remapRecords(recs []domain.SellInRecord, d aliasDecision, sourceBranch, toBranch string) (ids []string, fromBranch string, fromNames []string, n int) {
+	seenName := map[string]bool{}
 	for i := range recs {
-		if customers.NormalizeName(recs[i].CustomerName) != d.sourceKey {
+		nameKey := customers.NormalizeName(recs[i].CustomerName)
+		code := strings.TrimSpace(recs[i].CustomerBranchCode)
+		byName := nameKey == d.sourceKey
+		byCode := sourceBranch != "" && code == sourceBranch
+		if !byName && !byCode {
 			continue
 		}
 		ch := storedChain(recs[i])
@@ -238,7 +263,11 @@ func remapRecords(recs []domain.SellInRecord, d aliasDecision, toBranch string) 
 			continue // never cross-chain
 		}
 		if fromBranch == "" {
-			fromBranch = strings.TrimSpace(recs[i].CustomerBranchCode)
+			fromBranch = code
+		}
+		if spell := strings.TrimSpace(recs[i].CustomerName); spell != "" && !seenName[spell] {
+			seenName[spell] = true
+			fromNames = append(fromNames, spell)
 		}
 		if id := strings.TrimSpace(recs[i].RecordID); id != "" {
 			ids = append(ids, id)
@@ -251,5 +280,5 @@ func remapRecords(recs []domain.SellInRecord, d aliasDecision, toBranch string) 
 		}
 		n++
 	}
-	return ids, fromBranch, n
+	return ids, fromBranch, fromNames, n
 }

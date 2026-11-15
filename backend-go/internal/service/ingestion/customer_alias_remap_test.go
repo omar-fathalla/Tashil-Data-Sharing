@@ -188,3 +188,74 @@ func TestKafrFatAutoCodesMatchLiveBug(t *testing.T) {
 	t.Logf("no-2 pair: %s=%s %s=%s", otherA, gemini.BuildBranchStoreMetadata("fathalla", otherA).ID,
 		otherB, gemini.BuildBranchStoreMetadata("fathalla", otherB).ID)
 }
+
+// Live failure regression: BQ/UI may show «كفر الدوار 2» (spaced) while the registry decision
+// recorded the in26 spelling «كفر الدوار2» (glued). NormalizeName + branch-code match must remap.
+func TestApplyCustomerAliasAttributionsMatchesSpacedDigitVariant(t *testing.T) {
+	ctx := context.Background()
+	bq := bigquery.NewClient("test-proj", "test-dataset", true)
+	p := NewProcessor(gemini.NewAgent("", "m", true), bq, firestore.NewClient("db", true)).WithArchiveDir(t.TempDir())
+	reg := customers.New(&customers.MemoryStore{})
+	p.SetCustomerRegistry(reg)
+	tenant := "tenant-adeco"
+
+	canonical := "عائله فتح الله ماركت - كفر الدوار 2"
+	aliasDecision := "عائله فتح الله ماركت مواد عناية - كفر الدوار2" // registry / in26 (glued)
+	aliasLive := "عائله فتح الله ماركت مواد عناية - كفر الدوار 2"    // spaced digit in live rows
+	canCode := gemini.BuildBranchStoreMetadata("fathalla", canonical).ID
+	aliasCode := gemini.BuildBranchStoreMetadata("fathalla", aliasDecision).ID
+
+	bq.ReplaceSellInRecords(tenant, []domain.SellInRecord{
+		{RecordID: "live-1", TenantID: tenant, RetailerChain: "fathalla", Year: 2026, MonthNum: 3,
+			CustomerName: aliasLive, CustomerBranchCode: aliasCode, ItemName: "صنف", NetValueEGP: 50, NetQtyCases: 1},
+		{RecordID: "can-1", TenantID: tenant, RetailerChain: "fathalla", Year: 2026, MonthNum: 3,
+			CustomerName: canonical, CustomerBranchCode: canCode, ItemName: "صنف", NetValueEGP: 10, NetQtyCases: 1},
+	})
+	if _, err := reg.Decide(ctx, tenant, canonical, customers.StatusApproved, "fathalla", "", "admin"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reg.Decide(ctx, tenant, aliasDecision, customers.StatusApproved, "fathalla", canonical, "admin"); err != nil {
+		t.Fatal(err)
+	}
+
+	ar := p.ApplyCustomerAliasAttributions(ctx, tenant)
+	if ar.Decisions != 1 || ar.Remapped != 1 || len(ar.Errors) != 0 {
+		t.Fatalf("apply spaced variant: %+v", ar)
+	}
+	byName := map[string]int{}
+	byCode := map[string]int{}
+	for _, r := range bq.SellInRecordsSnapshot(tenant) {
+		byName[r.CustomerName]++
+		byCode[r.CustomerBranchCode]++
+	}
+	if byName[aliasLive] != 0 || byName[aliasDecision] != 0 {
+		t.Fatalf("source spellings still present: %v", byName)
+	}
+	if byName[canonical] != 2 || byCode[canCode] != 2 || byCode[aliasCode] != 0 {
+		t.Fatalf("after remap names=%v codes=%v", byName, byCode)
+	}
+
+	// Simulate OnRebuilt durable sync restoring pre-merge BQ rows, then re-apply.
+	bq.ReplaceSellInRecords(tenant, []domain.SellInRecord{
+		{RecordID: "live-1", TenantID: tenant, RetailerChain: "fathalla", Year: 2026, MonthNum: 3,
+			CustomerName: aliasLive, CustomerBranchCode: aliasCode, ItemName: "صنف", NetValueEGP: 50, NetQtyCases: 1},
+		{RecordID: "can-1", TenantID: tenant, RetailerChain: "fathalla", Year: 2026, MonthNum: 3,
+			CustomerName: canonical, CustomerBranchCode: canCode, ItemName: "صنف", NetValueEGP: 10, NetQtyCases: 1},
+	})
+	ar2 := p.ApplyCustomerAliasAttributions(ctx, tenant)
+	if ar2.Remapped != 1 {
+		t.Fatalf("re-apply after durable wipe remapped=%d want 1", ar2.Remapped)
+	}
+}
+
+func TestNormalizeNameUnifiesGluedBranchDigits(t *testing.T) {
+	a := customers.NormalizeName("عائله فتح الله ماركت مواد عناية - كفر الدوار2")
+	b := customers.NormalizeName("عائله فتح الله ماركت مواد عناية - كفر الدوار 2")
+	if a != b {
+		t.Fatalf("glued/spaced digits must share key:\n%q\n%q", a, b)
+	}
+	// Numbered branch stays distinct from the unnumbered sibling.
+	if customers.NormalizeName("عائله فتح الله ماركت - كفر الدوار") == customers.NormalizeName("عائله فتح الله ماركت - كفر الدوار 2") {
+		t.Fatal("كفر الدوار vs كفر الدوار 2 must stay distinct")
+	}
+}

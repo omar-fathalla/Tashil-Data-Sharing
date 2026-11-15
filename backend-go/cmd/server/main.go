@@ -158,7 +158,14 @@ func main() {
 		f, err := tfs.ExportSnapshot()
 		return b, f, err
 	}).OnRebuilt(func() {
+		// Background rebuild swaps archive-replayed state (pre-merge spellings). Converge on
+		// BigQuery, then re-apply recorded alias_of decisions before warming caches — otherwise
+		// a successful startup remap is wiped and Returns shows both كفر الدوار 2 spellings again.
 		ingestProcessor.SyncDurableFromStore(context.Background(), "tenant-adeco", true)
+		ar := ingestProcessor.ApplyCustomerAliasAttributions(context.Background(), "tenant-adeco")
+		if ar.Decisions > 0 || ar.Remapped > 0 || len(ar.Errors) > 0 {
+			log.Printf("[customer-alias] on-rebuilt tenant=tenant-adeco decisions=%d remapped=%d sources=%v errs=%v", ar.Decisions, ar.Remapped, ar.Sources, ar.Errors)
+		}
 		bqRepo.WarmCommonTenantAnalytics(context.Background(), []string{"tenant-adeco"})
 		dqService.OnSourceChanged()
 	})
@@ -202,10 +209,11 @@ func main() {
 		ingestProcessor.SyncDurableFromStore(context.Background(), "tenant-adeco", true)
 		// Re-apply recorded alias_of merges (e.g. Kafr El-Dawar decision saved before
 		// attribution remapped). Idempotent; never invents a merge without a decision.
+		// Must run again after OnRebuilt (background snapshot rebuild) — see that callback.
 		for _, t := range durableTenants {
 			ar := ingestProcessor.ApplyCustomerAliasAttributions(context.Background(), t)
-			if ar.Remapped > 0 || len(ar.Errors) > 0 {
-				log.Printf("[customer-alias] startup tenant=%s remapped=%d sources=%v errs=%v", t, ar.Remapped, ar.Sources, ar.Errors)
+			if ar.Decisions > 0 || ar.Remapped > 0 || len(ar.Errors) > 0 {
+				log.Printf("[customer-alias] startup tenant=%s decisions=%d remapped=%d sources=%v errs=%v", t, ar.Decisions, ar.Remapped, ar.Sources, ar.Errors)
 			}
 		}
 		// Fill kpiCache + sell-in-returns cache before serving so cold-start YTD
