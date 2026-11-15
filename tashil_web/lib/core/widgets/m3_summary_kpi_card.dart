@@ -38,7 +38,9 @@ abstract final class M3SummaryKpiStyle {
       ? null
       : StrutStyle.fromTextStyle(style, forceStrutHeight: true);
 
-  /// Detail line: bodySmall onSurfaceVariant.
+  /// Detail line: bodySmall onSurfaceVariant. Kept on bodySmall so cards with
+  /// [subtitleMaxLines] > 1 (Compare / Returns) stay at the Sell-Out 138px
+  /// height; chip-under captions use [M3ChipStyle.captionStyle] (bodyMedium).
   static TextStyle? subtitleStyle(BuildContext context) =>
       Theme.of(context).textTheme.bodySmall?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,

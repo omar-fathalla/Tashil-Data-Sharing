@@ -277,7 +277,7 @@ class _TableScrollContainerState extends State<TableScrollContainer> {
                                 const SizedBox(height: 2.0),
                                 Text(
                                   widget.subtitle!,
-                                  style: theme.textTheme.bodySmall?.copyWith(
+                                  style: theme.textTheme.bodyMedium?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
