@@ -894,7 +894,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                   onTap: () => widget.onCategorySelected(cat.category),
                   color: isSelected
                       ? colorScheme.secondaryContainer
-                      : colorScheme.surface,
+                      : colorScheme.surfaceContainerLow,
                   borderColor: isSelected ? null : colorScheme.outlineVariant,
                   borderRadius: M3Shape.radiusSm,
                   padding: const EdgeInsets.symmetric(
@@ -1331,8 +1331,9 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: M3Spacing.xs),
                           child: M3TonalSurface(
-                            // Calm outlined rows; class A shows via its info tag.
-                            color: colorScheme.surface,
+                            // Tonal row strip (surfaceContainerLow) so rows stay
+                            // visible at wide shells — Errors / Returns / Pricing.
+                            color: colorScheme.surfaceContainerLow,
                             borderColor: colorScheme.outlineVariant,
                             borderRadius: M3Shape.radiusSm,
                             padding: const EdgeInsets.symmetric(

@@ -16,6 +16,7 @@ import '../../../../core/theme/m3_status_colors.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../cpfr_replenishment/domain/cpfr_models.dart';
 
 /// Market Share + Sell In vs Sell Out overview, shown above the existing
@@ -773,105 +774,128 @@ class _StockCard extends StatelessWidget {
                 keyName: 'stock_per_sku_empty',
               )
             else
-              Table(
-                columnWidths: const {
-                  // SKU names get the most room (up to 3 lines + tooltip).
-                  // Status uses flex, not IntrinsicColumnWidth, so the 6
-                  // columns fit the live 1280+sidebar table width (~500–900dp)
-                  // without a horizontal scroll.
-                  0: FlexColumnWidth(3.6),
-                  1: FlexColumnWidth(1.1),
-                  2: FlexColumnWidth(1.1),
-                  3: FlexColumnWidth(1.1),
-                  4: FlexColumnWidth(1.4),
-                  5: FlexColumnWidth(2.0),
-                },
-                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-                children: [
-                  TableRow(
-                    children: [
-                      for (final (i, h) in const [
-                        'الصنف',
-                        'Sell-In',
-                        'Sell-Out',
-                        'الفرق',
-                        'نسبة التصريف',
-                        'الحالة',
-                      ].indexed)
-                        // Headers and cells centered in every column
-                        // (including الصنف), wrap ≤3.
-                        Padding(
-                          padding: const EdgeInsets.only(
-                            left: M3Spacing.xxs,
-                            right: M3Spacing.xxs,
-                            bottom: M3Spacing.xs,
-                          ),
-                          child: Text(
-                            h,
-                            key: ValueKey('stock_head_$i'),
-                            style: label,
-                            maxLines: 2,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                    ],
+              // Sell-Out / Errors symmetry: full-width table on a tonal
+              // surface so rows stay readable at wide shells; status cells
+              // keep a 4dp start-edge strip matching the chip colour.
+              Container(
+                key: const ValueKey('stock_table_tonal_surface'),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: M3TableSurface.color(cs),
+                  borderRadius: M3Shape.radiusLg,
+                  border: Border.all(
+                    color: cs.outlineVariant.withValues(alpha: 0.5),
                   ),
-                  for (final r in top)
+                ),
+                clipBehavior: Clip.antiAlias,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: M3Spacing.xs,
+                  vertical: M3Spacing.xs,
+                ),
+                child: Table(
+                  columnWidths: const {
+                    // SKU names get the most room (up to 3 lines + tooltip).
+                    // Status uses flex, not IntrinsicColumnWidth, so the 6
+                    // columns fit the live 1280+sidebar table width (~500–900dp)
+                    // without a horizontal scroll.
+                    0: FlexColumnWidth(3.6),
+                    1: FlexColumnWidth(1.1),
+                    2: FlexColumnWidth(1.1),
+                    3: FlexColumnWidth(1.1),
+                    4: FlexColumnWidth(1.4),
+                    5: FlexColumnWidth(2.0),
+                  },
+                  defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                  children: [
                     TableRow(
-                      decoration: ShapeDecoration(
-                        shape: Border(
-                          top: BorderSide(color: cs.outlineVariant),
-                        ),
-                      ),
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: M3Spacing.xs,
+                        for (final (i, h) in const [
+                          'الصنف',
+                          'Sell-In',
+                          'Sell-Out',
+                          'الفرق',
+                          'نسبة التصريف',
+                          'الحالة',
+                        ].indexed)
+                          // Headers and cells centered in every column
+                          // (including الصنف), wrap ≤3.
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: M3Spacing.xxs,
+                              right: M3Spacing.xxs,
+                              bottom: M3Spacing.xs,
+                            ),
+                            child: Text(
+                              h,
+                              key: ValueKey('stock_head_$i'),
+                              style: label,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                            ),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Tooltip(
-                                message: r.name,
-                                child: Text(
-                                  r.name,
-                                  key: const ValueKey('stock_sku_name'),
-                                  maxLines: 3,
-                                  overflow: TextOverflow.clip,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    color: cs.onSurface,
-                                  ),
-                                ),
-                              ),
-                              if (r.category.isNotEmpty)
-                                Text(
-                                  r.category,
-                                  maxLines: 3,
-                                  overflow: TextOverflow.clip,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        num(_fmtInt(r.sIn)),
-                        num(_fmtInt(r.sOut)),
-                        num(formatSignedUnits(r.sIn - r.sOut)),
-                        num(_pct(r.sIn > 0 ? r.sOut / r.sIn * 100.0 : 0.0)),
-                        Padding(
-                          padding: numPad,
-                          child: Align(
-                            alignment: Alignment.center,
-                            child: _StatusChip(status: r.status),
-                          ),
-                        ),
                       ],
                     ),
-                ],
+                    for (final (rowIndex, r) in top.indexed)
+                      TableRow(
+                        decoration: ShapeDecoration(
+                          shape: Border(
+                            top: BorderSide(color: cs.outlineVariant),
+                          ),
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: M3Spacing.xs,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Tooltip(
+                                  message: r.name,
+                                  child: Text(
+                                    r.name,
+                                    key: const ValueKey('stock_sku_name'),
+                                    maxLines: 3,
+                                    overflow: TextOverflow.clip,
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      color: cs.onSurface,
+                                    ),
+                                  ),
+                                ),
+                                if (r.category.isNotEmpty)
+                                  Text(
+                                    r.category,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.clip,
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          num(_fmtInt(r.sIn)),
+                          num(_fmtInt(r.sOut)),
+                          num(formatSignedUnits(r.sIn - r.sOut)),
+                          num(_pct(r.sIn > 0 ? r.sOut / r.sIn * 100.0 : 0.0)),
+                          Padding(
+                            padding: numPad,
+                            child: Align(
+                              alignment: Alignment.center,
+                              child: _StatusChip(
+                                key: ValueKey('stock_row_status_strip_$rowIndex'),
+                                status: r.status,
+                                showTonalStrip: true,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
               ),
           ],
         ),
@@ -889,8 +913,15 @@ class _StockCard extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status});
+  const _StatusChip({
+    super.key,
+    required this.status,
+    this.showTonalStrip = false,
+  });
   final String status;
+
+  /// When true, paint a 4dp start-edge strip (Errors / Sell-Out row accent).
+  final bool showTonalStrip;
   @override
   Widget build(BuildContext context) {
     // Short chip + description underneath (OOS / TM / Errors finishing pass).
@@ -925,7 +956,7 @@ class _StatusChip extends StatelessWidget {
           cs.onSurfaceVariant,
         ),
     };
-    return Column(
+    final column = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -955,6 +986,18 @@ class _StatusChip extends StatelessWidget {
           ),
         ),
       ],
+    );
+    if (!showTonalStrip) return column;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: BorderDirectional(
+          start: BorderSide(color: bg, width: 4.0),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.only(start: M3Spacing.xs),
+        child: column,
+      ),
     );
   }
 }

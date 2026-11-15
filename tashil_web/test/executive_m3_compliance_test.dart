@@ -198,6 +198,13 @@ void main() {
     expect(find.byType(MarketShareSection), findsOneWidget);
     final stock = find.byKey(const ValueKey('stock_per_sku_table'));
     expect(stock, findsOneWidget);
+    // Full-width tonal table surface (Errors / Sell-Out symmetry).
+    final tonal = find.byKey(const ValueKey('stock_table_tonal_surface'));
+    expect(tonal, findsOneWidget);
+    final tonalBox = tester.widget<Container>(tonal);
+    final csTable = Theme.of(tester.element(tonal)).colorScheme;
+    expect((tonalBox.decoration as BoxDecoration).color,
+        csTable.surfaceContainerLow);
     // Short chip labels + descriptions underneath (OOS / TM pattern).
     for (final label in ['سليم', 'زائد', 'تموين']) {
       expect(find.descendant(of: stock, matching: find.text(label)),
@@ -208,6 +215,24 @@ void main() {
       expect(find.descendant(of: stock, matching: find.text(desc)),
           findsOneWidget,
           reason: 'status description "$desc"');
+    }
+    // 4dp start-edge tonal strip on each status cell (Errors row accent).
+    for (var i = 0; i < 3; i++) {
+      final strip =
+          find.byKey(ValueKey('stock_row_status_strip_$i'));
+      expect(strip, findsOneWidget, reason: 'status strip $i');
+      final deco = tester.widgetList<DecoratedBox>(
+          find.descendant(of: strip, matching: find.byType(DecoratedBox)));
+      expect(
+        deco.any((w) {
+          final b = w.decoration;
+          return b is BoxDecoration &&
+              b.border is BorderDirectional &&
+              (b.border as BorderDirectional).start.width == 4.0;
+        }),
+        isTrue,
+        reason: '4dp tonal strip on status row $i',
+      );
     }
     final chips = find.descendant(
         of: find.descendant(of: stock, matching: find.byType(Table)),
@@ -223,6 +248,14 @@ void main() {
     ]) {
       expect(_contrast(fg, bg), greaterThanOrEqualTo(4.5));
     }
+  });
+
+  testWidgets('below-fold cards mount after KPI first paint', (tester) async {
+    await _pump(tester, const Size(1440, 1400));
+    expect(find.byKey(const ValueKey('exec_kpi_grid')), findsOneWidget);
+    expect(find.byKey(const ValueKey('exec_below_fold_placeholder')),
+        findsNothing);
+    expect(find.byType(SelloutTrendChart), findsOneWidget);
   });
 
   // ---------------------------------------------------------------- v2 ----

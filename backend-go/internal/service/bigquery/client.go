@@ -1654,6 +1654,11 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 	filteredOwnMonthRev := make(map[string]float64)
 	filteredOwnMonthUnits := make(map[string]int)
 	catNormCache := make(map[string]string, 64)
+	// Fold chain-share into the same own-brand pass (same filters as
+	// getChainSharesLocked) so cold KPI loads skip a second full scan.
+	// Totals / dedup / SUM semantics are unchanged.
+	chainShareMap := make(map[string]*domain.ChainShareSummary)
+	var chainShareGrandTotal float64
 
 	for _, r := range c.records {
 		if !matchTenant(r.TenantID, tenantID) {
@@ -1726,6 +1731,18 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 		totalRevenue += r.NetRevenue
 		totalUnits += r.QuantitySold
 		storeMap[r.StoreID] = true
+		chainShareGrandTotal += r.NetRevenue
+		if chainSum, ok := chainShareMap[r.RetailerChain]; ok {
+			chainSum.TotalRevenue += r.NetRevenue
+			chainSum.TotalUnits += r.QuantitySold
+		} else {
+			chainShareMap[r.RetailerChain] = &domain.ChainShareSummary{
+				RetailerChain: r.RetailerChain,
+				DisplayName:   getRetailChainDisplayName(r.RetailerChain),
+				TotalRevenue:  r.NetRevenue,
+				TotalUnits:    r.QuantitySold,
+			}
+		}
 		if skuID != "" {
 			ownSKUSet[skuID] = true
 		}
@@ -1851,7 +1868,19 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 		paretoSKUs = paretoSKUs[:100]
 	}
 
-	chainShares, _ := c.getChainSharesLocked(ctx, tenantID, period, dateRange...)
+	chainShares := make([]domain.ChainShareSummary, 0, len(chainShareMap))
+	for _, s := range chainShareMap {
+		s.TotalRevenue = math.Round(s.TotalRevenue*100) / 100
+		if chainShareGrandTotal > 0 {
+			s.MarketShare = math.Round((s.TotalRevenue/chainShareGrandTotal)*10000) / 100
+		}
+		chainShares = append(chainShares, *s)
+	}
+	sort.Slice(chainShares, func(i, j int) bool {
+		return chainShares[i].TotalRevenue > chainShares[j].TotalRevenue
+	})
+	// Daily trends keep their own period expansion (MTD → full year); left
+	// as a second pass so chart months stay identical.
 	dailyTrends, _ := c.getDailyTrendsLocked(ctx, tenantID, period, dateRange...)
 
 	if totalMarketRevenue < totalRevenue {
