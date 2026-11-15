@@ -675,4 +675,60 @@ void main() {
       expect(find.text('الترتيب حسب إجمالي المبيعات تنازلياً'), findsNothing);
     },
   );
+
+  testWidgets(
+    'Store Matrix tonal surface + per-row tier strip visible at 1280/1920',
+    (tester) async {
+      // Live shells are often 1920 device px; also pump a true 1920 logical
+      // shell so the strip stays visible when wide (Errors #195 parity).
+      for (final width in [1280.0, 1920.0]) {
+        await pumpStoreMatrix(tester, width: width);
+        final surface =
+            find.byKey(const ValueKey('store_matrix_table_tonal_surface'));
+        expect(surface, findsOneWidget, reason: 'tonal surface @ $width');
+        final surfaceRect = tester.getRect(surface);
+        expect(surfaceRect.left, greaterThanOrEqualTo(-0.5),
+            reason: 'tonal surface on screen @ $width');
+        expect(surfaceRect.right, lessThanOrEqualTo(width + 0.5),
+            reason: 'tonal surface on screen @ $width');
+
+        final strip = find.byKey(const ValueKey('store_matrix_tier_strip_s1'));
+        expect(strip, findsOneWidget, reason: 'tier strip @ $width');
+        final stripBox = tester.widget<DecoratedBox>(strip);
+        final deco = stripBox.decoration as BoxDecoration;
+        final border = deco.border! as BorderDirectional;
+        expect(border.start.width, 4.0,
+            reason: '4dp per-tier tonal strip @ $width');
+        expect(border.start.color.a, greaterThan(0.0),
+            reason: 'strip colour must be opaque enough to see @ $width');
+
+        final rowChip =
+            find.byKey(const ValueKey('store_matrix_tier_chip_s1'));
+        expect(rowChip, findsOneWidget, reason: 'tier chip @ $width');
+        final chipText = tester.widget<Text>(
+          find.descendant(of: rowChip, matching: find.byType(Text)).first,
+        );
+        expect(chipText.data, 'Tier A');
+        expect(chipText.maxLines, 1);
+        expect(find.text('الفئة الأولى - الرائدة'), findsWidgets);
+      }
+    },
+  );
+
+  testWidgets(
+    'tier short chip + description stay centered under the strip',
+    (tester) async {
+      await pumpStoreMatrix(tester, width: 1280);
+      final chip = find.byKey(const ValueKey('store_matrix_tier_chip_s1'));
+      final desc = find.text('الفئة الأولى - الرائدة').first;
+      expect(chip, findsOneWidget);
+      expect(desc, findsOneWidget);
+      final chipBox = tester.getRect(chip);
+      final descBox = tester.getRect(desc);
+      expect(descBox.top, greaterThan(chipBox.bottom - 0.5),
+          reason: 'description sits under the tier chip');
+      expect((descBox.center.dx - chipBox.center.dx).abs(), lessThan(6.0),
+          reason: 'chip and description share a centered axis');
+    },
+  );
 }
