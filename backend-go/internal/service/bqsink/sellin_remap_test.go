@@ -15,6 +15,7 @@ func TestRemapSellInCustomerSQLIsExactAndTenantScoped(t *testing.T) {
 		"customer_name = @from_name",
 		"customer_name = @to_name",
 		"customer_branch_code = @to_branch",
+		"IFNULL(customer_branch_code, '') = @from_branch",
 		"IFNULL(chain_key, '') = @chain",
 	} {
 		if !strings.Contains(sql, must) {

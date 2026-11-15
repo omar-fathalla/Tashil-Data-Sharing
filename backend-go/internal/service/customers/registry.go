@@ -175,7 +175,8 @@ func (m *MemoryStore) SaveCustomerRegistry(_ context.Context, s *State) error {
 }
 
 // NormalizeName is the only transformation allowed before an exact match: Arabic letter variants
-// (أ إ آ → ا, ة → ه, ى → ي), tatweel, Arabic/Latin digits, dash spacing and repeated spaces.
+// (أ إ آ → ا, ة → ه, ى → ي), tatweel, Arabic/Latin digits, dash spacing, letter↔digit spacing
+// (so «كفر الدوار2» and «كفر الدوار 2» share a key), and repeated spaces.
 func NormalizeName(s string) string {
 	s = strings.NewReplacer("أ", "ا", "إ", "ا", "آ", "ا", "ة", "ه", "ى", "ي", "ـ", "", "–", "-", "—", "-").Replace(s)
 	var b strings.Builder
@@ -186,7 +187,26 @@ func NormalizeName(s string) string {
 		b.WriteRune(unicode.ToLower(r))
 	}
 	s = strings.ReplaceAll(b.String(), "-", " - ")
+	s = spaceLetterDigit(s)
 	return strings.Join(strings.Fields(s), " ")
+}
+
+// spaceLetterDigit inserts a space between a letter and a digit (either order) so glued
+// branch numbers like «الدوار2» normalize with «الدوار 2». Does not merge distinct numbers
+// (طنطا vs طنطا 2 stay different).
+func spaceLetterDigit(s string) string {
+	var b strings.Builder
+	var prev rune
+	for i, r := range s {
+		if i > 0 {
+			if (unicode.IsLetter(prev) && unicode.IsDigit(r)) || (unicode.IsDigit(prev) && unicode.IsLetter(r)) {
+				b.WriteByte(' ')
+			}
+		}
+		b.WriteRune(r)
+		prev = r
+	}
+	return b.String()
 }
 
 // Registry resolves customer names to approved entries.

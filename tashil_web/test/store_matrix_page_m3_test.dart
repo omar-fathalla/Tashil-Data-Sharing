@@ -731,4 +731,54 @@ void main() {
           reason: 'chip and description share a centered axis');
     },
   );
+
+  testWidgets(
+    'search Kafr El Dawar finds Arabic كفر الدوار Sell-Out branch',
+    (tester) async {
+      final items = [
+        StoreBenchmarkItem(
+          storeId: 'fat_kafr_eldawar',
+          storeName: 'فرع فتح الله - كفر الدوار',
+          retailerChain: 'fathalla',
+          region: 'الدلتا والبحيرة',
+          tier: 'Tier B',
+          totalRevenue: 1118669.75,
+          totalUnits: 12000,
+          velocityUnitsPerDay: 40.0,
+          rank: 1,
+        ),
+        StoreBenchmarkItem(
+          storeId: 'fat_smouha',
+          storeName: 'فرع فتح الله - سموحة',
+          retailerChain: 'fathalla',
+          region: 'شرق الإسكندرية',
+          tier: 'Tier A',
+          totalRevenue: 2000000,
+          totalUnits: 20000,
+          velocityUnitsPerDay: 80.0,
+          rank: 2,
+        ),
+      ];
+      await pumpStoreMatrix(
+        tester,
+        repository: StoreMatrixFixtureRepo(ApiClient(), items: items),
+      );
+      expect(find.text('كفر الدوار'), findsWidgets);
+      await tester.enterText(
+        find.byKey(const ValueKey('store_matrix_search')),
+        'Kafr El Dawar',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('كفر الدوار'), findsWidgets);
+      expect(find.text('سموحة'), findsNothing);
+      expect(find.byKey(const ValueKey('store_matrix_empty')), findsNothing);
+      await tester.enterText(
+        find.byKey(const ValueKey('store_matrix_search')),
+        'كفر الدوار',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('كفر الدوار'), findsWidgets);
+      expect(find.byKey(const ValueKey('store_matrix_empty')), findsNothing);
+    },
+  );
 }
