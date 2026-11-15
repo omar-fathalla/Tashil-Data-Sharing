@@ -24,6 +24,35 @@ import '../../../../core/widgets/m3_toolbar_button.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 
+/// Lowercases Latin search text and collapses hyphens/underscores to spaces.
+String normalizeStoreMatrixLatinQuery(String q) {
+  return q
+      .toLowerCase()
+      .replaceAll(RegExp(r'[-_]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
+/// English branchnorm aliases → Arabic substrings present in Sell-Out store names.
+///
+/// Matching is prefix-aware (not exact-key-only): «Kafr», «kafr el», and
+/// «kafr el dawar» all resolve to «كفر الدوار». KED2 is Sell-In-only, so it is
+/// correctly absent from Store Matrix results.
+String? storeMatrixArabicFromEnglishQuery(String qLatin) {
+  if (qLatin.length < 3) return null;
+  const enAliases = <String, String>{
+    'kafr el dawar': 'كفر الدوار',
+    'kafr eldawar': 'كفر الدوار',
+  };
+  for (final e in enAliases.entries) {
+    final en = normalizeStoreMatrixLatinQuery(e.key);
+    if (en == qLatin || en.startsWith(qLatin) || qLatin.startsWith(en)) {
+      return e.value;
+    }
+  }
+  return null;
+}
+
 /// StoreMatrixScreen displays store benchmarking across Egyptian retail regions,
 /// tier categorization (Tier A/B/C), and sales velocity metrics.
 class StoreMatrixScreen extends StatefulWidget {
@@ -81,14 +110,11 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
     final q = _searchQuery.trim();
     if (q.isEmpty) return _stores;
     final qLower = q.toLowerCase();
-    // English branchnorm aliases → Arabic substrings present in Sell-Out store names.
-    // «Kafr El Dawar» must find «فرع فتح الله - كفر الدوار» (KED2 is Sell-In-only, so absent here).
-    const enAliases = <String, String>{
-      'kafr el dawar': 'كفر الدوار',
-      'kafr el-dawar': 'كفر الدوار',
-      'kafr eldawar': 'كفر الدوار',
-    };
-    final aliasAr = enAliases[qLower];
+    // Prefix-aware English→Arabic: «Kafr» and «kafr el dawar» both → «كفر الدوار».
+    // PR #201 used exact map keys only, so live English «Kafr» returned zero rows.
+    final aliasAr = storeMatrixArabicFromEnglishQuery(
+      normalizeStoreMatrixLatinQuery(q),
+    );
     bool matches(StoreBenchmarkItem s) {
       final name = s.storeName;
       final display = _displayStoreName(s);

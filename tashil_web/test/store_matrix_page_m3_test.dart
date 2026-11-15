@@ -732,8 +732,20 @@ void main() {
     },
   );
 
+  test('English Kafr prefixes map to Arabic كفر الدوار', () {
+    expect(storeMatrixArabicFromEnglishQuery('kafr'), 'كفر الدوار');
+    expect(storeMatrixArabicFromEnglishQuery('kafr el dawar'), 'كفر الدوار');
+    expect(
+      storeMatrixArabicFromEnglishQuery(
+        normalizeStoreMatrixLatinQuery('Kafr El-Dawar'),
+      ),
+      'كفر الدوار',
+    );
+    expect(storeMatrixArabicFromEnglishQuery('smouha'), isNull);
+  });
+
   testWidgets(
-    'search Kafr El Dawar finds Arabic كفر الدوار Sell-Out branch',
+    'search Kafr and kafr el dawar find both Arabic كفر الدوار Sell-Out rows',
     (tester) async {
       final items = [
         StoreBenchmarkItem(
@@ -748,6 +760,17 @@ void main() {
           rank: 1,
         ),
         StoreBenchmarkItem(
+          storeId: 'fat_kafr_eldawar_mall',
+          storeName: 'فرع فتح الله - كفر الدوار - مول',
+          retailerChain: 'fathalla',
+          region: 'الدلتا والبحيرة',
+          tier: 'Tier B',
+          totalRevenue: 1761058.25,
+          totalUnits: 15000,
+          velocityUnitsPerDay: 50.0,
+          rank: 2,
+        ),
+        StoreBenchmarkItem(
           storeId: 'fat_smouha',
           storeName: 'فرع فتح الله - سموحة',
           retailerChain: 'fathalla',
@@ -756,29 +779,41 @@ void main() {
           totalRevenue: 2000000,
           totalUnits: 20000,
           velocityUnitsPerDay: 80.0,
-          rank: 2,
+          rank: 3,
         ),
       ];
       await pumpStoreMatrix(
         tester,
         repository: StoreMatrixFixtureRepo(ApiClient(), items: items),
       );
-      expect(find.text('كفر الدوار'), findsWidgets);
-      await tester.enterText(
-        find.byKey(const ValueKey('store_matrix_search')),
-        'Kafr El Dawar',
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('كفر الدوار'), findsWidgets);
-      expect(find.text('سموحة'), findsNothing);
-      expect(find.byKey(const ValueKey('store_matrix_empty')), findsNothing);
-      await tester.enterText(
-        find.byKey(const ValueKey('store_matrix_search')),
-        'كفر الدوار',
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('كفر الدوار'), findsWidgets);
-      expect(find.byKey(const ValueKey('store_matrix_empty')), findsNothing);
+
+      Future<void> expectBothKafrRows() async {
+        await tester.pumpAndSettle();
+        // Assert via store_name_* keys — Arabic query also fills the search field.
+        expect(
+          find.byKey(const ValueKey('store_name_fat_kafr_eldawar')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('store_name_fat_kafr_eldawar_mall')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('store_name_fat_smouha')),
+          findsNothing,
+        );
+        expect(find.byKey(const ValueKey('store_matrix_empty')), findsNothing);
+      }
+
+      final search = find.byKey(const ValueKey('store_matrix_search'));
+      await tester.enterText(search, 'Kafr');
+      await expectBothKafrRows();
+
+      await tester.enterText(search, 'kafr el dawar');
+      await expectBothKafrRows();
+
+      await tester.enterText(search, 'كفر الدوار');
+      await expectBothKafrRows();
     },
   );
 }
