@@ -198,6 +198,13 @@ void main() {
     expect(find.byType(MarketShareSection), findsOneWidget);
     final stock = find.byKey(const ValueKey('stock_per_sku_table'));
     expect(stock, findsOneWidget);
+    // Full-width tonal table surface (Errors / Sell-Out symmetry).
+    final tonal = find.byKey(const ValueKey('stock_table_tonal_surface'));
+    expect(tonal, findsOneWidget);
+    final tonalBox = tester.widget<Container>(tonal);
+    final csTable = Theme.of(tester.element(tonal)).colorScheme;
+    expect((tonalBox.decoration as BoxDecoration).color,
+        csTable.surfaceContainerLow);
     // Short chip labels + descriptions underneath (OOS / TM pattern).
     for (final label in ['سليم', 'زائد', 'تموين']) {
       expect(find.descendant(of: stock, matching: find.text(label)),
@@ -208,6 +215,24 @@ void main() {
       expect(find.descendant(of: stock, matching: find.text(desc)),
           findsOneWidget,
           reason: 'status description "$desc"');
+    }
+    // 4dp start-edge tonal strip on each status cell (Errors row accent).
+    for (var i = 0; i < 3; i++) {
+      final strip =
+          find.byKey(ValueKey('stock_row_status_strip_$i'));
+      expect(strip, findsOneWidget, reason: 'status strip $i');
+      final deco = tester.widgetList<DecoratedBox>(
+          find.descendant(of: strip, matching: find.byType(DecoratedBox)));
+      expect(
+        deco.any((w) {
+          final b = w.decoration;
+          return b is BoxDecoration &&
+              b.border is BorderDirectional &&
+              (b.border as BorderDirectional).start.width == 4.0;
+        }),
+        isTrue,
+        reason: '4dp tonal strip on status row $i',
+      );
     }
     final chips = find.descendant(
         of: find.descendant(of: stock, matching: find.byType(Table)),
@@ -223,6 +248,14 @@ void main() {
     ]) {
       expect(_contrast(fg, bg), greaterThanOrEqualTo(4.5));
     }
+  });
+
+  testWidgets('below-fold cards mount after KPI first paint', (tester) async {
+    await _pump(tester, const Size(1440, 1400));
+    expect(find.byKey(const ValueKey('exec_kpi_grid')), findsOneWidget);
+    expect(find.byKey(const ValueKey('exec_below_fold_placeholder')),
+        findsNothing);
+    expect(find.byType(SelloutTrendChart), findsOneWidget);
   });
 
   // ---------------------------------------------------------------- v2 ----
@@ -393,6 +426,85 @@ void main() {
     expect(find.textContaining('+12.1%'), findsNothing);
     expect(find.textContaining('+9.8%'), findsNothing);
     expect(find.textContaining('+0.0%'), findsNothing);
+  });
+
+  testWidgets('empty OOS KPI is — + Arabic note, never fake 0.0%',
+      (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final kpis = ExecutiveKPIsModel(
+      totalRevenue: 0,
+      revenueGrowthPct: 0,
+      revenueMomPct: 0,
+      revenueYoyPct: 0,
+      yoyAvailable: false,
+      totalUnitsSold: 0,
+      unitsGrowthPct: 0,
+      unitsMomPct: 0,
+      unitsYoyPct: 0,
+      activeStoresCount: 0,
+      oosRatePct: 0,
+      osaRatePct: 100,
+      totalOOSIncidents: 0,
+      estimatedLostRevenue: 0,
+      currency: 'EGP',
+      reportingPeriod: '2026',
+      chainShares: const [],
+      dailyTrends: const [],
+    );
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(
+        body: Directionality(
+          textDirection: TextDirection.rtl,
+          child: BentoKpiGrid(kpis: kpis),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final oos = find.byKey(const ValueKey('kpi_card_exec_oos'));
+    expect(oos, findsOneWidget);
+    expect(
+      find.descendant(of: oos, matching: find.text('—')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+          of: oos, matching: find.text(BentoKpiGrid.noOosDataLabel)),
+      findsOneWidget,
+    );
+    expect(find.descendant(of: oos, matching: find.textContaining('0.0%')),
+        findsNothing);
+    expect(find.descendant(of: oos, matching: find.textContaining('100.0%')),
+        findsNothing);
+  });
+
+  testWidgets('chain share % chip has description underneath', (tester) async {
+    await _pump(tester, const Size(1440, 1400), rtl: true);
+    // Mock KPI fixtures include chain shares; description under short %.
+    expect(find.text('حصة السلسلة'), findsWidgets);
+    final chip = find.byKey(const ValueKey('chain_share_chip_fathalla'));
+    // Fall back: any chain_share_chip_* key if fixture chain differs.
+    final keyed = chip.evaluate().isEmpty
+        ? find.byWidgetPredicate(
+            (w) =>
+                w.key is ValueKey<String> &&
+                (w.key as ValueKey<String>).value.startsWith('chain_share_chip_'))
+        : chip;
+    expect(keyed, findsWidgets);
+    expect(
+      find.descendant(of: keyed.first, matching: find.text('حصة السلسلة')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+          of: find.descendant(
+              of: keyed.first, matching: find.byType(M3ChipSurface)),
+          matching: find.text('حصة السلسلة')),
+      findsNothing,
+    );
   });
 
   testWidgets('v2 trend chart: axis labels are one line with a space',

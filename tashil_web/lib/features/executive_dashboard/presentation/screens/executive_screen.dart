@@ -66,6 +66,10 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
   int _loadRequestId = 0;
   late ExecutiveDashboardRepository _repo;
 
+  /// Below-fold cards (trend / chain pie / Pareto) mount after the first KPI
+  /// paint so the summary grid is interactive sooner on cold loads.
+  bool _belowFoldReady = false;
+
   static const List<
           ({int number, String shortName, String fullName, String nameAr})>
       _months = [
@@ -154,17 +158,22 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
     widget.apiClient.getRetailChains().then((_) {
       if (mounted) setState(() {});
     });
-    _loadData();
-    // Year filter: data years + current year; default = latest year with data.
-    AvailableYears.load(widget.apiClient).then((o) {
-      if (!mounted) return;
-      if (!_yearTouched && o.defaultYear != selectedYear) {
-        setState(() => selectedYear = o.defaultYear);
-        _loadData();
-      } else {
-        setState(() {});
-      }
-    });
+    // Resolve the data default year once, then load KPIs — avoids a cold
+    // calendar-year fetch followed by a second fetch when years arrive.
+    _bootstrap();
+  }
+
+  /// Loads [AvailableYears] (cached after first call) then kicks off the
+  /// dashboard fetch with the correct default year.
+  Future<void> _bootstrap() async {
+    final years = await AvailableYears.load(widget.apiClient);
+    if (!mounted) return;
+    if (!_yearTouched && years.defaultYear != selectedYear) {
+      setState(() => selectedYear = years.defaultYear);
+    } else {
+      setState(() {});
+    }
+    await _loadData();
   }
 
   @override
@@ -209,6 +218,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
     }
 
     final effectiveChain = selectedChain == 'all' ? null : selectedChain;
+    // Secondary fetches stay parallel with KPIs (warm cache / multi-request)
+    // but never block first paint of the summary grid.
     _loadCpfr();
     _loadSellInMonthly();
     final cached = _repo.peekFresh(
@@ -227,17 +238,26 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
       setState(() {
         kpis = cached;
         isLoading = false;
+        _belowFoldReady = true;
       });
     } else if (kpis == null) {
-      setState(() => isLoading = true);
+      setState(() {
+        isLoading = true;
+        _belowFoldReady = false;
+      });
     }
 
+    final sw = Stopwatch()..start();
     final loaded = await _repo.loadKpis(
       period: selectedPeriod,
       startDate: startDate,
       endDate: endDate,
       chain: effectiveChain,
     );
+    sw.stop();
+    debugPrint(
+        'Executive dashboard KPIs in ${sw.elapsedMilliseconds}ms '
+        '(period=$selectedPeriod year=$selectedYear chain=${effectiveChain ?? 'all'})');
     if (!mounted || requestId != _loadRequestId) return;
     final error = loaded.errorOrNull;
     if (error != null) {
@@ -256,6 +276,8 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
       kpis = result;
       isLoading = false;
       loadError = null;
+      // Defer heavy cards until after this frame so KPI cards paint first.
+      _belowFoldReady = false;
       if (selectedChain != 'all') {
         final chains = _availableChains;
         if (chains.every(
@@ -263,6 +285,10 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
           selectedChain = 'all';
         }
       }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || requestId != _loadRequestId) return;
+      setState(() => _belowFoldReady = true);
     });
   }
 
@@ -645,28 +671,42 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
                               year: selectedYear,
                             ),
 
-                            // Full-width Monthly Sell-Out Trend Chart (100% width for all 12 months)
-                            SelloutTrendChart(
-                              trends: kpis!.dailyTrends,
-                              sellInByChain: _sellInMonthly,
-                            ),
+                            if (_belowFoldReady) ...[
+                              // Full-width Monthly Sell-Out Trend Chart (100% width for all 12 months)
+                              SelloutTrendChart(
+                                trends: kpis!.dailyTrends,
+                                sellInByChain: _sellInMonthly,
+                              ),
 
-                            M3Spacing.gapMD,
+                              M3Spacing.gapMD,
 
-                            // Chain Market Share section directly below the trend chart
-                            ChainSharePie(chainShares: kpis!.chainShares),
+                              // Chain Market Share section directly below the trend chart
+                              ChainSharePie(chainShares: kpis!.chainShares),
 
-                            M3Spacing.gapMD,
+                              M3Spacing.gapMD,
 
-                            // Category Contribution, Market Share vs Competitors & Pareto 80/20 Power SKUs
-                            ParetoCategorySection(
-                              categories: kpis!.categoryContributions,
-                              paretoSkus: kpis!.paretoSkus,
-                              supplierShares: kpis!.supplierShares,
-                              totalMarketRevenue: kpis!.totalMarketRevenue,
-                              tenantMarketSharePct: kpis!.tenantMarketSharePct,
-                              competitorsCount: kpis!.competitorsCount,
-                            ),
+                              // Category Contribution, Market Share vs Competitors & Pareto 80/20 Power SKUs
+                              ParetoCategorySection(
+                                categories: kpis!.categoryContributions,
+                                paretoSkus: kpis!.paretoSkus,
+                                supplierShares: kpis!.supplierShares,
+                                totalMarketRevenue: kpis!.totalMarketRevenue,
+                                tenantMarketSharePct:
+                                    kpis!.tenantMarketSharePct,
+                                competitorsCount: kpis!.competitorsCount,
+                              ),
+                            ] else
+                              const Padding(
+                                key: ValueKey('exec_below_fold_placeholder'),
+                                padding: EdgeInsets.symmetric(vertical: 48.0),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 240.0,
+                                    child: LinearProgressIndicator(
+                                        year2023: false),
+                                  ),
+                                ),
+                              ),
                           ],
                         )
                       : Padding(

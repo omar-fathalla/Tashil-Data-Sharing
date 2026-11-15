@@ -211,6 +211,24 @@ void main() {
     for (final c in tester.widgetList<M3ChipSurface>(find.byType(M3ChipSurface))) {
       expect(c.color, isNot(cs.surfaceContainerHigh));
     }
+    // Short % chip + description underneath (not inside the chip).
+    final shareChip = find.byKey(const ValueKey('chain_share_chip_chain_a'));
+    expect(shareChip, findsOneWidget);
+    expect(
+      find.descendant(
+          of: find.descendant(
+              of: shareChip, matching: find.byType(M3ChipSurface)),
+          matching: find.text('حصة السلسلة')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: shareChip, matching: find.text('حصة السلسلة')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: shareChip, matching: find.text('100.0%')),
+      findsOneWidget,
+    );
   });
 
   for (final width in [1920.0, 1440.0]) {

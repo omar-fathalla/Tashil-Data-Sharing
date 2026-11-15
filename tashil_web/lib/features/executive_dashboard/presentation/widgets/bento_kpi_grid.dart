@@ -17,6 +17,12 @@ class BentoKpiGrid extends StatelessWidget {
   /// Shown on the detail line when there is no last-year data to compare.
   static const String noLastYearLabel = 'لا توجد بيانات للعام السابق';
 
+  /// Shown when OOS has no basis in the selected period (no stores / incidents).
+  static const String noOosDataLabel = 'لا توجد بيانات نفاد لهذه الفترة';
+
+  static bool _oosEmpty(ExecutiveKPIsModel kpis) =>
+      kpis.activeStoresCount == 0 && kpis.totalOOSIncidents == 0;
+
   static String _formatSignedPct(double pct) =>
       CurrencyFormatter.formatSignedPct(pct);
 
@@ -134,9 +140,14 @@ class BentoKpiGrid extends StatelessWidget {
               valueKey: const ValueKey('kpi_value_exec_oos'),
               subtitleKey: const ValueKey('kpi_subtitle_exec_oos'),
               title: 'نسبة النفاد',
-              value: '${kpis.oosRatePct.toStringAsFixed(1)}%',
-              subtitle:
-                  'OSA ${kpis.osaRatePct.toStringAsFixed(1)}% · نفاد المخزون ${kpis.oosRatePct.toStringAsFixed(1)}%',
+              // No active stores and no OOS incidents → honest «—», never
+              // advertise a fabricated 0.0% / 100.0% OSA (Pricing / Errors).
+              value: _oosEmpty(kpis)
+                  ? '—'
+                  : '${kpis.oosRatePct.toStringAsFixed(1)}%',
+              subtitle: _oosEmpty(kpis)
+                  ? noOosDataLabel
+                  : 'OSA ${kpis.osaRatePct.toStringAsFixed(1)}% · نفاد المخزون ${kpis.oosRatePct.toStringAsFixed(1)}%',
               icon: AppIcons.warning,
               color: colorScheme.error,
             ),

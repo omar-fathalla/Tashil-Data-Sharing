@@ -409,33 +409,12 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                                     ),
                                 ],
                               ),
-                              // 3. Barcode Count Chip
-                              M3ChipSurface(
-                                color: colorScheme.surfaceContainerLowest,
-                                borderColor: colorScheme.outlineVariant,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      AppIcons.barcode,
-                                      size: 14.0,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                    const SizedBox(width: 8.0),
-                                    Flexible(
-                                      child: Text(
-                                        countSku(sup.skuCount),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.labelSmall
-                                            ?.copyWith(
-                                          color: colorScheme.onSurfaceVariant,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              // 3. SKU count: short number + «أصناف» (TM / Errors).
+                              _ShortChipWithDesc(
+                                key: ValueKey(
+                                    'pareto_supplier_sku_count_$rank'),
+                                shortLabel: '${sup.skuCount}',
+                                description: 'أصناف',
                               ),
                               // 4. Leader status: short chip + description (TM pattern).
                               if (isTenant)
@@ -894,7 +873,7 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                   onTap: () => widget.onCategorySelected(cat.category),
                   color: isSelected
                       ? colorScheme.secondaryContainer
-                      : colorScheme.surface,
+                      : colorScheme.surfaceContainerLow,
                   borderColor: isSelected ? null : colorScheme.outlineVariant,
                   borderRadius: M3Shape.radiusSm,
                   padding: const EdgeInsets.symmetric(
@@ -924,15 +903,11 @@ class _CategoryContributionCardState extends State<_CategoryContributionCard> {
                                   maxLines: 3,
                                   overflow: TextOverflow.clip,
                                 ),
-                                M3ChipSurface(
-                                  color: colorScheme.surfaceContainerLowest,
-                                  borderColor: colorScheme.outlineVariant,
-                                  child: Text(
-                                    countSku(cat.skuCount),
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
+                                _ShortChipWithDesc(
+                                  key: ValueKey(
+                                      'pareto_cat_sku_count_${cat.category}'),
+                                  shortLabel: '${cat.skuCount}',
+                                  description: 'أصناف',
                                 ),
                                 if (cat.tenantCategorySharePct > 0)
                                   _ShortChipWithDesc(
@@ -1331,8 +1306,9 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: M3Spacing.xs),
                           child: M3TonalSurface(
-                            // Calm outlined rows; class A shows via its info tag.
-                            color: colorScheme.surface,
+                            // Tonal row strip (surfaceContainerLow) so rows stay
+                            // visible at wide shells — Errors / Returns / Pricing.
+                            color: colorScheme.surfaceContainerLow,
                             borderColor: colorScheme.outlineVariant,
                             borderRadius: M3Shape.radiusSm,
                             padding: const EdgeInsets.symmetric(
