@@ -19,6 +19,7 @@ import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_section_title.dart';
 import '../../../../core/widgets/m3_segmented_button_group.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/m3_toolbar_button.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
@@ -293,7 +294,7 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
               // Filter Toolbar (Temporal, Chain, Regional & Tier Selectors)
               Card(
                 elevation: 0,
-                color: colorScheme.surfaceContainerLow,
+                color: M3TableSurface.color(colorScheme),
                 shape: RoundedRectangleBorder(
                   borderRadius: M3Shape.radiusLg,
                   side: BorderSide(
@@ -662,10 +663,11 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
 
               M3Spacing.gapMD,
 
-              // Comparative Store Ranking Table Card
+              // Comparative Store Ranking Table Card — same tonal surface
+              // role as Sell-Out / Errors so rows are not bare white.
               Card(
                 elevation: 0,
-                color: colorScheme.surfaceContainerLow,
+                color: M3TableSurface.color(colorScheme),
                 shape: RoundedRectangleBorder(
                   borderRadius: M3Shape.radiusLg,
                   side: BorderSide(
@@ -800,7 +802,9 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                               padding:
                                                   const EdgeInsets.all(14.0),
                                               decoration: BoxDecoration(
-                                                color: colorScheme.surface,
+                                                color: M3TableSurface.color(
+                                                  colorScheme,
+                                                ),
                                                 borderRadius: M3Shape.radiusMd,
                                                 border: Border.all(
                                                   color: colorScheme
@@ -999,6 +1003,8 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                                             _buildTierBadge(
                                                               context,
                                                               store.tier,
+                                                              storeId:
+                                                                  store.storeId,
                                                             ),
                                                           ],
                                                         ),
@@ -1114,67 +1120,106 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
                                               (nameFlex + otherFlex))
                                           .clamp(140.0, 420.0);
 
-                                      return TableScrollContainer(
-                                        key: const ValueKey(
-                                            'store_matrix_table'),
-                                        showSwipeHint: true,
-                                        columnFlex: _tableColumnFlex,
-                                        child: DataTable(
-                                          columnSpacing: spacing,
-                                          horizontalMargin: spacing,
-                                          dataRowMinHeight: _tableRowHeight,
-                                          dataRowMaxHeight: _tableRowHeight,
-                                          headingRowHeight: _tableHeadingHeight,
-                                          headingRowColor:
-                                              WidgetStateProperty.all(
-                                            colorScheme.surfaceContainerHighest
-                                                .withOpacity(0.4),
+                                      // Errors / Sell-Out symmetry: table sits
+                                      // on an explicit M3TableSurface so the
+                                      // tonal strip stays visible at wide
+                                      // shells (~1920), not washed-out white.
+                                      return SizedBox(
+                                        width: availableWidth,
+                                        child: Container(
+                                          key: const ValueKey(
+                                            'store_matrix_table_tonal_surface',
                                           ),
-                                          columns: const [
-                                            DataColumn(
-                                              headingRowAlignment:
-                                                  MainAxisAlignment.center,
-                                              label: Text('الترتيب'),
+                                          decoration: BoxDecoration(
+                                            color: M3TableSurface.color(
+                                              colorScheme,
                                             ),
-                                            DataColumn(
-                                              headingRowAlignment:
-                                                  MainAxisAlignment.center,
-                                              label: Text('اسم الفرع والسلسلة'),
+                                            borderRadius: M3Shape.radiusLg,
+                                            border: Border.all(
+                                              color: colorScheme.outlineVariant
+                                                  .withOpacity(0.5),
                                             ),
-                                            DataColumn(
-                                              headingRowAlignment:
-                                                  MainAxisAlignment.center,
-                                              label: Text('المنطقة الجغرافية'),
+                                          ),
+                                          clipBehavior: Clip.antiAlias,
+                                          child: TableScrollContainer(
+                                            key: const ValueKey(
+                                              'store_matrix_table',
                                             ),
-                                            DataColumn(
-                                              headingRowAlignment:
-                                                  MainAxisAlignment.center,
-                                              label: Text('تصنيف الفئة'),
-                                            ),
-                                            DataColumn(
-                                              headingRowAlignment:
-                                                  MainAxisAlignment.center,
-                                              label: Text('إجمالي المبيعات'),
-                                            ),
-                                            DataColumn(
-                                              headingRowAlignment:
-                                                  MainAxisAlignment.center,
-                                              label: Text('إجمالي الوحدات'),
-                                            ),
-                                            DataColumn(
-                                              headingRowAlignment:
-                                                  MainAxisAlignment.center,
-                                              label: Text('معدل السرعة اليومي'),
-                                            ),
-                                          ],
-                                          rows: [
-                                            for (final store in visible)
-                                              _buildStoreDataRow(
-                                                context,
-                                                store,
-                                                nameMaxWidth: nameMaxWidth,
+                                            showSwipeHint: true,
+                                            columnFlex: _tableColumnFlex,
+                                            child: DataTable(
+                                              key: const ValueKey(
+                                                'store_matrix_data_table',
                                               ),
-                                          ],
+                                              columnSpacing: spacing,
+                                              horizontalMargin: spacing,
+                                              dataRowMinHeight: _tableRowHeight,
+                                              dataRowMaxHeight: _tableRowHeight,
+                                              headingRowHeight:
+                                                  _tableHeadingHeight,
+                                              headingRowColor:
+                                                  WidgetStateProperty.all(
+                                                colorScheme
+                                                    .surfaceContainerHighest
+                                                    .withOpacity(0.4),
+                                              ),
+                                              columns: const [
+                                                DataColumn(
+                                                  headingRowAlignment:
+                                                      MainAxisAlignment.center,
+                                                  label: Text('الترتيب'),
+                                                ),
+                                                DataColumn(
+                                                  headingRowAlignment:
+                                                      MainAxisAlignment.center,
+                                                  label: Text(
+                                                    'اسم الفرع والسلسلة',
+                                                  ),
+                                                ),
+                                                DataColumn(
+                                                  headingRowAlignment:
+                                                      MainAxisAlignment.center,
+                                                  label: Text(
+                                                    'المنطقة الجغرافية',
+                                                  ),
+                                                ),
+                                                DataColumn(
+                                                  headingRowAlignment:
+                                                      MainAxisAlignment.center,
+                                                  label: Text('تصنيف الفئة'),
+                                                ),
+                                                DataColumn(
+                                                  headingRowAlignment:
+                                                      MainAxisAlignment.center,
+                                                  label: Text(
+                                                    'إجمالي المبيعات',
+                                                  ),
+                                                ),
+                                                DataColumn(
+                                                  headingRowAlignment:
+                                                      MainAxisAlignment.center,
+                                                  label: Text(
+                                                    'إجمالي الوحدات',
+                                                  ),
+                                                ),
+                                                DataColumn(
+                                                  headingRowAlignment:
+                                                      MainAxisAlignment.center,
+                                                  label: Text(
+                                                    'معدل السرعة اليومي',
+                                                  ),
+                                                ),
+                                              ],
+                                              rows: [
+                                                for (final store in visible)
+                                                  _buildStoreDataRow(
+                                                    context,
+                                                    store,
+                                                    nameMaxWidth: nameMaxWidth,
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
                                         ),
                                       );
                                     },
@@ -1298,7 +1343,15 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
             ),
           ),
         ),
-        DataCell(Center(child: _buildTierBadge(context, store.tier))),
+        DataCell(
+          Center(
+            child: _buildTierBadge(
+              context,
+              store.tier,
+              storeId: store.storeId,
+            ),
+          ),
+        ),
         DataCell(
           Center(
             child: Text(
@@ -1476,7 +1529,13 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
     );
   }
 
-  Widget _buildTierBadge(BuildContext context, String tier) {
+  /// Short tier chip + description under; 4dp start-edge tonal strip (Errors
+  /// / TM pattern) so the status accent stays visible at wide shells.
+  Widget _buildTierBadge(
+    BuildContext context,
+    String tier, {
+    String? storeId,
+  }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -1503,32 +1562,53 @@ class _StoreMatrixScreenState extends State<StoreMatrixScreen>
         break;
     }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        M3ChipSurface(
-          color: bg,
-          child: Text(
-            tier,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: fg,
-              fontWeight: FontWeight.w700,
+    return DecoratedBox(
+      key: storeId == null
+          ? null
+          : ValueKey('store_matrix_tier_strip_$storeId'),
+      decoration: BoxDecoration(
+        border: BorderDirectional(
+          start: BorderSide(color: bg, width: 4.0),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.only(start: M3Spacing.xs),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            M3ChipSurface(
+              key: storeId == null
+                  ? null
+                  : ValueKey('store_matrix_tier_chip_$storeId'),
+              color: bg,
+              child: Text(
+                tier,
+                maxLines: 1,
+                softWrap: true,
+                overflow: TextOverflow.clip,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: fg,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
-          ),
+            const SizedBox(height: 2.0),
+            Text(
+              description,
+              maxLines: 3,
+              softWrap: true,
+              overflow: TextOverflow.clip,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 2.0),
-        Text(
-          description,
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
