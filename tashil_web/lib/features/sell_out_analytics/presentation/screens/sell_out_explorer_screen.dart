@@ -205,6 +205,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   List<StoreBenchmarkItem> _branchChartItems = const [];
   Map<String, StoreBenchmarkItem> _prevYearBranchMap = const {};
   double _prevYearTotalChainRevenue = 0.0;
+  /// Selected-year totals restricted to months present last year — YoY only.
+  Map<String, StoreBenchmarkItem> _yoyCurrentBranchMap = const {};
+  double _yoyCurrentTotalChainRevenue = 0.0;
 
   // Tab 1: Performance & Branch Analytics State
   String _perfChain = 'all';
@@ -311,6 +314,13 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
         _loadError = null;
         records = [];
         _recordsSummary = const SellOutRecordsSummaryModel();
+        // Drop stale year matrices so KPI subtitles/counts cannot mix years
+        // while a reload (e.g. 2025 → 2026) is in flight.
+        _branchChartItems = const [];
+        _prevYearBranchMap = const {};
+        _prevYearTotalChainRevenue = 0.0;
+        _yoyCurrentBranchMap = const {};
+        _yoyCurrentTotalChainRevenue = 0.0;
       });
       // clearSnackBars after the first frame — initState's first load cannot depend on
       // ScaffoldMessenger yet.
@@ -371,12 +381,19 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final dynamicStores = data.stores;
     final currentBranchMatrix = data.currentBranchMatrix;
     final prevBranchMatrix = data.prevBranchMatrix;
+    final yoyCurrentBranchMatrix = data.yoyCurrentBranchMatrix;
 
     final prevMap = <String, StoreBenchmarkItem>{};
     double prevTotalRev = 0.0;
     for (final b in prevBranchMatrix) {
       prevMap[b.storeId.isNotEmpty ? b.storeId : b.storeName] = b;
       prevTotalRev += b.totalRevenue;
+    }
+    final yoyCurMap = <String, StoreBenchmarkItem>{};
+    double yoyCurRev = 0.0;
+    for (final b in yoyCurrentBranchMatrix) {
+      yoyCurMap[b.storeId.isNotEmpty ? b.storeId : b.storeName] = b;
+      yoyCurRev += b.totalRevenue;
     }
 
     if (mounted) {
@@ -386,6 +403,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
         _branchChartItems = currentBranchMatrix;
         _prevYearBranchMap = prevMap;
         _prevYearTotalChainRevenue = prevTotalRev;
+        _yoyCurrentBranchMap = yoyCurMap;
+        _yoyCurrentTotalChainRevenue = yoyCurRev;
         if (_availableCategories.isEmpty || _chainStores.isEmpty) {
           final cats = <String>{};
           final storesByChain = <String, List<Map<String, String>>>{};
@@ -1030,12 +1049,23 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final double avgBranchRevenue = activeStoresCount > 0 ? (totalNetRevenue / activeStoresCount) : 0.0;
 
 
+    // Displayed revenue stays full-period; YoY uses like-for-like months only
+    // (intersection of months present in both years — same rule as GetExecutiveKPIs).
     String yoySubtitleSuffix = '';
-    if (_selectedYear == _currentYear && _prevYearTotalChainRevenue > 0 && totalNetRevenue > 0) {
-      final yoyPct = ((totalNetRevenue - _prevYearTotalChainRevenue) / _prevYearTotalChainRevenue) * 100.0;
-      yoySubtitleSuffix = ' • نمو ${CurrencyFormatter.formatSignedPct(yoyPct)} مقارنة بالعام السابق';
+    if (_selectedYear == _currentYear) {
+      final yoyPct = likeForLikeYoyPct(
+        _yoyCurrentTotalChainRevenue,
+        _prevYearTotalChainRevenue,
+      );
+      if (yoyPct != null) {
+        yoySubtitleSuffix =
+            ' • نمو ${CurrencyFormatter.formatSignedPct(yoyPct)} مقارنة بالعام السابق';
+      } else if (totalNetRevenue > 0 || _branchChartItems.isNotEmpty) {
+        yoySubtitleSuffix = ' • — · لا توجد بيانات للعام السابق';
+      }
     }
 
+    // Period label must mirror the selected data year (never the comparison year).
     final String shortYearAr = selectedDateRange != null
         ? '${_formatDate(selectedDateRange!.start)} – ${_formatDate(selectedDateRange!.end)}'
         : (_selectedYear > 0 ? 'سنة $_selectedYear' : 'كل السنوات');
@@ -1080,7 +1110,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               titleAr: 'الفروع النشطة',
               titleEn: 'Active Stores',
               value: '$activeStoresCount فرع',
+              // Explicit selected-year label (regression: must not show comp year).
               subtitle: shortYearAr,
+              subtitleKey: const ValueKey('kpi_subtitle_Active Stores'),
               icon: AppIcons.storeMatrix,
               color: colorScheme.secondary,
             );
@@ -1535,9 +1567,10 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     }
 
     final int compYear = (_selectedYear > 0 ? _selectedYear : _currentYear) - 1;
-    final double chainYoYPct = (_prevYearTotalChainRevenue > 0 && totalChainRev > 0 && _selectedYear > 0)
-        ? ((totalChainRev - _prevYearTotalChainRevenue) / _prevYearTotalChainRevenue) * 100.0
-        : 0.0;
+    // Ranking header keeps full-period إجمالي السلسلة; (+x% عن YYYY) is like-for-like.
+    final double? chainYoYPct = _selectedYear > 0
+        ? likeForLikeYoyPct(_yoyCurrentTotalChainRevenue, _prevYearTotalChainRevenue)
+        : null;
 
     return Container(
       key: const ValueKey('full_width_branch_sales_chart'),
@@ -1591,7 +1624,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                         const M3SectionTitle('ترتيب الفروع حسب المبيعات'),
                         const SizedBox(height: 4.0),
                         Text(
-                          '${_formatChainDisplayAr(activeChainCode)} • ${_selectedYear > 0 ? "سنة $_selectedYear" : "كل السنوات"} • ${rawBranches.length} فرع • إجمالي السلسلة: ${CurrencyFormatter.formatCompactEGP(totalChainRev)}${chainYoYPct != 0 ? " (${CurrencyFormatter.formatSignedPct(chainYoYPct)} عن $compYear)" : ""}',
+                          '${_formatChainDisplayAr(activeChainCode)} • ${_selectedYear > 0 ? "سنة $_selectedYear" : "كل السنوات"} • ${rawBranches.length} فرع • إجمالي السلسلة: ${CurrencyFormatter.formatCompactEGP(totalChainRev)}${chainYoYPct != null ? " (${CurrencyFormatter.formatSignedPct(chainYoYPct)} عن $compYear)" : (_selectedYear > 0 ? " (— عن $compYear)" : "")}',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -1821,9 +1854,14 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   final b = rawBranches[idx];
                   final ratio = maxBranchRev > 0 ? (b.totalRevenue / maxBranchRev).clamp(0.02, 1.0) : 0.0;
                   final sharePct = totalChainRev > 0 ? (b.totalRevenue / totalChainRev) * 100.0 : 0.0;
-                  final prevItem = _prevYearBranchMap[b.storeId.isNotEmpty ? b.storeId : b.storeName];
-                  final double? branchYoY = (prevItem != null && prevItem.totalRevenue > 0 && _selectedYear > 0)
-                      ? ((b.totalRevenue - prevItem.totalRevenue) / prevItem.totalRevenue) * 100.0
+                  final branchKey = b.storeId.isNotEmpty ? b.storeId : b.storeName;
+                  final prevItem = _prevYearBranchMap[branchKey];
+                  final yoyCurItem = _yoyCurrentBranchMap[branchKey];
+                  final double? branchYoY = _selectedYear > 0
+                      ? likeForLikeYoyPct(
+                          yoyCurItem?.totalRevenue ?? 0.0,
+                          prevItem?.totalRevenue ?? 0.0,
+                        )
                       : null;
                   final isSelected = selectedStoreId != null &&
                       (selectedStoreId == b.storeId || selectedStoreId == b.storeName);
@@ -2071,6 +2109,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final int currYearLabel = _selectedYear > 0 ? _selectedYear : _currentYear;
 
     // Build Branch YoY & MoM Growth Matrix
+    // Displayed current revenue stays full-period; YoY % uses like-for-like months.
     final branchGrowthMatrix = branchList.map((b) {
       StoreBenchmarkItem? prevItem = _prevYearBranchMap[b.storeId];
       if (prevItem == null) {
@@ -2081,12 +2120,20 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
           }
         }
       }
+      StoreBenchmarkItem? yoyCurItem = _yoyCurrentBranchMap[b.storeId];
+      if (yoyCurItem == null) {
+        for (final entry in _yoyCurrentBranchMap.values) {
+          if (entry.storeName == b.storeName) {
+            yoyCurItem = entry;
+            break;
+          }
+        }
+      }
       final prevRev = prevItem?.totalRevenue ?? 0.0;
       final prevUnits = prevItem?.totalUnits ?? 0;
-      final varianceEgp = b.revenue - prevRev;
-      final double? yoyGrowthPct = prevRev > 0
-          ? ((b.revenue - prevRev) / prevRev) * 100.0
-          : null;
+      final yoyCurRev = yoyCurItem?.totalRevenue ?? 0.0;
+      final varianceEgp = yoyCurRev - prevRev;
+      final double? yoyGrowthPct = likeForLikeYoyPct(yoyCurRev, prevRev);
       final String status = prevRev <= 0
           ? (b.revenue > 0 ? 'new_branch' : 'declining')
           : ((yoyGrowthPct ?? 0.0) >= 0 ? 'growing' : 'declining');
@@ -2125,12 +2172,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final growingBranchesCount = branchGrowthMatrix.where((b) => b.status == 'growing').length;
     final decliningBranchesCount = branchGrowthMatrix.where((b) => b.status == 'declining').length;
     final newBranchesCount = branchGrowthMatrix.where((b) => b.status == 'new_branch').length;
+    // Full-period current total for the strip value; YoY % is like-for-like.
     final totalCurrMatrixRev = branchGrowthMatrix.fold<double>(0.0, (s, b) => s + b.currentRevenue);
-    final totalPrevMatrixRev = branchGrowthMatrix.fold<double>(0.0, (s, b) => s + b.prevRevenue);
-    final totalMatrixVarianceEgp = totalCurrMatrixRev - totalPrevMatrixRev;
-    final double? totalMatrixYoYPct = totalPrevMatrixRev > 0
-        ? ((totalCurrMatrixRev - totalPrevMatrixRev) / totalPrevMatrixRev) * 100.0
-        : null;
+    final totalPrevMatrixRev = _prevYearTotalChainRevenue;
+    final totalMatrixVarianceEgp = _yoyCurrentTotalChainRevenue - totalPrevMatrixRev;
+    final double? totalMatrixYoYPct =
+        likeForLikeYoyPct(_yoyCurrentTotalChainRevenue, totalPrevMatrixRev);
 
     final growingSorted = branchGrowthMatrix
         .where((b) => b.yoyGrowthPct != null)
@@ -3432,12 +3479,14 @@ onChanged: m3Legacy<int>((v) {
     required IconData icon,
     required Color color,
     bool textValue = false,
+    Key? subtitleKey,
   }) {
     // Shared reference KPI card (Sell-Out is the reference; Compare mirrors it).
     // Arabic-only title; [titleEn] is kept as the stable key id.
     return M3SummaryKpiCard(
       key: ValueKey('kpi_card_$titleEn'),
       valueKey: ValueKey('kpi_value_$titleEn'),
+      subtitleKey: subtitleKey,
       title: titleAr,
       value: value,
       subtitle: subtitle,

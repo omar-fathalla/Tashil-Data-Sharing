@@ -155,6 +155,41 @@ void main() {
       expect(find.textContaining('سنة 2025'), findsWidgets);
     });
 
+    testWidgets('Active Stores KPI subtitle mirrors selected year (not comp year)',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: SellOutExplorerScreen(apiClient: apiClient),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final subtitle2026 = find.byKey(const ValueKey('kpi_subtitle_Active Stores'));
+      expect(subtitle2026, findsOneWidget);
+      expect(tester.widget<Text>(subtitle2026).data, 'سنة 2026');
+
+      final yearBtn = find.byKey(const ValueKey('branch_chart_year_dropdown'));
+      await tester.ensureVisible(yearBtn);
+      await tester.tap(yearBtn);
+      await tester.pumpAndSettle();
+      final yearMenu = find.ancestor(of: yearBtn, matching: find.byType(MenuAnchor)).first;
+      await tester.tap(find.descendant(of: yearMenu, matching: find.text('2025')));
+      await tester.pumpAndSettle();
+
+      final subtitle2025 = find.byKey(const ValueKey('kpi_subtitle_Active Stores'));
+      expect(tester.widget<Text>(subtitle2025).data, 'سنة 2025');
+    });
+
     testWidgets('switches to Tab 1 (Performance & Branch Analytics) and displays Pareto & Branch Velocity',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1280, 900);

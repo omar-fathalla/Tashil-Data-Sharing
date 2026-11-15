@@ -414,6 +414,7 @@ void main() {
           stores: [],
           currentBranchMatrix: [],
           prevBranchMatrix: [],
+          yoyCurrentBranchMatrix: [],
         );
 
     testWidgets(

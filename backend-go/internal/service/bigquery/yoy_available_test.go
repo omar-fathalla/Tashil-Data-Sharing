@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"testing"
 
@@ -86,6 +87,85 @@ func TestStoreBenchmarkSameMonthsAsYear(t *testing.T) {
 	// A picked month wins over the same-months set.
 	if got := sum(StoreMatrixFilter{Year: 2025, Month: 3, SameMonthsAsYear: 2026}); math.Abs(got-100) > 0.01 {
 		t.Fatalf("explicit month: want 100 got %v", got)
+	}
+}
+
+// Owner fixture: 2026 Jan–Oct vs 2025 Jan–Apr must compare Jan–Apr only
+// (+26.1% revenue / +15.6% units). Full 2026 stays larger for display totals.
+func TestStoreBenchmarkYoYLikeForLikePartialPriorYear(t *testing.T) {
+	ctx := context.Background()
+	c := NewClient("p", "d", true)
+	tn := "tenant-yoy-l4l"
+	const (
+		prevRev   = 32179040.57
+		prevUnits = 476948
+		curRev    = 40564794.35
+		curUnits  = 551555
+		// Extra 2026 May–Oct mass so a naive full-year YoY looks like ~+295%.
+		extraRev   = 86575205.65
+		extraUnits = 700000
+	)
+	facts := []domain.SellOutFact{
+		yoyFact(tn, "p1", "2025-01-15", prevRev/4, prevUnits/4),
+		yoyFact(tn, "p2", "2025-02-15", prevRev/4, prevUnits/4),
+		yoyFact(tn, "p3", "2025-03-15", prevRev/4, prevUnits/4),
+		yoyFact(tn, "p4", "2025-04-15", prevRev-3*(prevRev/4), prevUnits-3*(prevUnits/4)),
+		yoyFact(tn, "c1", "2026-01-15", curRev/4, curUnits/4),
+		yoyFact(tn, "c2", "2026-02-15", curRev/4, curUnits/4),
+		yoyFact(tn, "c3", "2026-03-15", curRev/4, curUnits/4),
+		yoyFact(tn, "c4", "2026-04-15", curRev-3*(curRev/4), curUnits-3*(curUnits/4)),
+	}
+	for i, mo := range []string{"05", "06", "07", "08", "09", "10"} {
+		facts = append(facts, yoyFact(tn, fmt.Sprintf("x%d", i),
+			fmt.Sprintf("2026-%s-15", mo), extraRev/6, extraUnits/6))
+	}
+	if err := c.ReplaceTenantFacts(ctx, tn, facts); err != nil {
+		t.Fatal(err)
+	}
+	sumRevUnits := func(f StoreMatrixFilter) (float64, int) {
+		items, err := c.GetStoreBenchmarkMatrix(ctx, tn, f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var rev float64
+		var units int
+		for _, it := range items {
+			rev += it.TotalRevenue
+			units += it.TotalUnits
+		}
+		return rev, units
+	}
+	fullCur, _ := sumRevUnits(StoreMatrixFilter{Year: 2026})
+	if fullCur < curRev+extraRev-1 {
+		t.Fatalf("full 2026 display total should include May–Oct: got %v", fullCur)
+	}
+	// Both directions of same_months_as → Jan–Apr intersection.
+	prevL4L, prevU := sumRevUnits(StoreMatrixFilter{Year: 2025, SameMonthsAsYear: 2026})
+	curL4L, curU := sumRevUnits(StoreMatrixFilter{Year: 2026, SameMonthsAsYear: 2025})
+	if math.Abs(prevL4L-prevRev) > 0.5 || prevU != prevUnits {
+		t.Fatalf("prev like-for-like: want %v/%d got %v/%d", prevRev, prevUnits, prevL4L, prevU)
+	}
+	if math.Abs(curL4L-curRev) > 0.5 || curU != curUnits {
+		t.Fatalf("cur like-for-like: want %v/%d got %v/%d", curRev, curUnits, curL4L, curU)
+	}
+	revYoY := math.Round(((curL4L-prevL4L)/prevL4L)*1000) / 10
+	unitsYoY := math.Round(((float64(curU)-float64(prevU))/float64(prevU))*1000) / 10
+	if math.Abs(revYoY-26.1) > 0.05 {
+		t.Fatalf("revenue YoY: want ~+26.1 got %v", revYoY)
+	}
+	if math.Abs(unitsYoY-15.6) > 0.05 {
+		t.Fatalf("units YoY: want ~+15.6 got %v", unitsYoY)
+	}
+	// ExecutiveKPIs must use the same intersection (not full Jan–Oct vs Jan–Apr).
+	k, err := c.GetExecutiveKPIs(ctx, tn, "CUSTOM", "2026-01-01", "2026-10-31")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !k.YoYAvailable || math.Abs(k.RevenueYoYPct-26.1) > 0.05 {
+		t.Fatalf("GetExecutiveKPIs revenue YoY: want ~+26.1 available, got %v available=%v", k.RevenueYoYPct, k.YoYAvailable)
+	}
+	if math.Abs(k.UnitsYoYPct-15.6) > 0.05 {
+		t.Fatalf("GetExecutiveKPIs units YoY: want ~+15.6 got %v", k.UnitsYoYPct)
 	}
 }
 
