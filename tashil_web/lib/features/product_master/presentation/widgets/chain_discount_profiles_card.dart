@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../data/chain_discount_repository.dart';
+import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/m3_wrap_text.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 
@@ -83,12 +84,12 @@ class ChainDiscountProfilesCard extends StatelessWidget {
       key: const ValueKey('chain_discount_profiles_card'),
       padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
+        color: M3TableSurface.color(cs),
         borderRadius: M3Shape.radiusLg,
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
@@ -134,68 +135,87 @@ class ChainDiscountProfilesCard extends StatelessWidget {
                       ?.copyWith(color: cs.onSurfaceVariant)),
             ),
           if (profiles.isNotEmpty)
-            TableScrollContainer(
-              showSwipeHint: false,
-              showControls: false,
-              child: DataTable(
-                headingRowHeight: 48.0,
-                dataRowMinHeight: 52.0,
-                dataRowMaxHeight: 88.0,
-                horizontalMargin: 12.0,
-                columnSpacing: 16.0,
-                columns: const [
-                  DataColumn(
-                      label: Text('السلسلة'),
-                      headingRowAlignment: MainAxisAlignment.center),
-                  DataColumn(
-                      label: Text('خصم الفاتورة %'),
-                      numeric: true,
-                      headingRowAlignment: MainAxisAlignment.center),
-                  DataColumn(
-                      label: Text('خصم إضافي %'),
-                      numeric: true,
-                      headingRowAlignment: MainAxisAlignment.center),
-                  DataColumn(
-                      label: Text('آخر تعديل'),
-                      headingRowAlignment: MainAxisAlignment.center),
-                  DataColumn(
-                      label: Text(''),
-                      headingRowAlignment: MainAxisAlignment.center),
-                ],
-                rows: [
-                  for (final p in profiles)
-                    DataRow(cells: [
-                      DataCell(M3WrapText(p.chain,
-                          maxLines: 3, textAlign: TextAlign.center)),
-                      DataCell(Text(_pct(p.invoiceDiscountPct),
-                          textAlign: TextAlign.center)),
-                      DataCell(Text(_pct(p.additionalDiscountPct),
-                          textAlign: TextAlign.center)),
-                      DataCell(M3WrapText(
-                        [
-                          if (p.updatedAt != null)
-                            p.updatedAt!.toLocal().toString().substring(0, 16),
-                          if (p.updatedBy.isNotEmpty) p.updatedBy,
-                        ].join(' • '),
-                        maxLines: 3,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.labelSmall,
-                      )),
-                      DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
-                        IconButton(
-                          tooltip: 'تعديل',
-                          icon: const Icon(AppIcons.edit),
-                          onPressed:
-                              saving ? null : () => _edit(context, existing: p),
-                        ),
-                        IconButton(
-                          tooltip: 'حذف',
-                          icon: Icon(AppIcons.delete, color: cs.error),
-                          onPressed: saving ? null : () => _delete(context, p),
-                        ),
-                      ])),
-                    ]),
-                ],
+            Container(
+              key: const ValueKey('pm_chain_discount_tonal_surface'),
+              decoration: BoxDecoration(
+                color: M3TableSurface.color(cs),
+                borderRadius: M3Shape.radiusMd,
+                border: Border.all(
+                    color: cs.outlineVariant.withValues(alpha: 0.4)),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: TableScrollContainer(
+                showSwipeHint: false,
+                showControls: false,
+                child: DataTable(
+                  key: const ValueKey('pm_chain_discount_table'),
+                  headingRowHeight: 48.0,
+                  dataRowMinHeight: 56.0,
+                  dataRowMaxHeight: 88.0,
+                  horizontalMargin: 12.0,
+                  columnSpacing: 16.0,
+                  columns: const [
+                    DataColumn(
+                        label: Text('السلسلة'),
+                        headingRowAlignment: MainAxisAlignment.center),
+                    DataColumn(
+                        label: Text('خصم الفاتورة %'),
+                        numeric: true,
+                        headingRowAlignment: MainAxisAlignment.center),
+                    DataColumn(
+                        label: Text('خصم إضافي %'),
+                        numeric: true,
+                        headingRowAlignment: MainAxisAlignment.center),
+                    DataColumn(
+                        label: Text('آخر تعديل'),
+                        headingRowAlignment: MainAxisAlignment.center),
+                    DataColumn(
+                        label: Text(''),
+                        headingRowAlignment: MainAxisAlignment.center),
+                  ],
+                  rows: [
+                    for (final p in profiles)
+                      DataRow(cells: [
+                        DataCell(M3WrapText(p.chain,
+                            maxLines: 3, textAlign: TextAlign.center)),
+                        DataCell(Text(_pct(p.invoiceDiscountPct),
+                            textAlign: TextAlign.center)),
+                        DataCell(Text(_pct(p.additionalDiscountPct),
+                            textAlign: TextAlign.center)),
+                        DataCell(M3WrapText(
+                          [
+                            if (p.updatedAt != null)
+                              p.updatedAt!
+                                  .toLocal()
+                                  .toString()
+                                  .substring(0, 16),
+                            if (p.updatedBy.isNotEmpty) p.updatedBy,
+                          ].join(' • '),
+                          maxLines: 3,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.labelSmall,
+                        )),
+                        DataCell(Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                tooltip: 'تعديل',
+                                icon: const Icon(AppIcons.edit),
+                                onPressed: saving
+                                    ? null
+                                    : () => _edit(context, existing: p),
+                              ),
+                              IconButton(
+                                tooltip: 'حذف',
+                                icon: Icon(AppIcons.delete, color: cs.error),
+                                onPressed:
+                                    saving ? null : () => _delete(context, p),
+                              ),
+                            ])),
+                      ]),
+                  ],
+                ),
               ),
             ),
         ],

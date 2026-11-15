@@ -55,13 +55,21 @@ void ignoreGoogleFontLoadErrors() {
 
 FakeProductMasterApiClient liveScaleProductMasterClient({
   bool includeLongName = true,
+  bool emptyCatalog = false,
 }) =>
-    FakeProductMasterApiClient(includeLongName: includeLongName);
+    FakeProductMasterApiClient(
+      includeLongName: includeLongName,
+      emptyCatalog: emptyCatalog,
+    );
 
 class FakeProductMasterApiClient extends ApiClient {
-  FakeProductMasterApiClient({this.includeLongName = true}) : super();
+  FakeProductMasterApiClient({
+    this.includeLongName = true,
+    this.emptyCatalog = false,
+  }) : super();
 
   final bool includeLongName;
+  final bool emptyCatalog;
 
   static const longOfficialName =
       'كلوريل أبيض مركز 1050 جم عبوة اقتصادية مع غطاء أمان للأطفال للتحقق من لف الاسم حتى ثلاثة أسطر دون قص';
@@ -77,6 +85,30 @@ class FakeProductMasterApiClient extends ApiClient {
     String? pullStatus,
     String? priceChange,
   }) async {
+    if (emptyCatalog) {
+      return const ProductMasterSummaryModel(
+        tenantId: 'tenant-adeco',
+        companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+        sheetDateLabel: 'تحديث فارغ',
+        sourceFilename: 'empty_product_master.xlsx',
+        totalSkus: 0,
+        regularSkusCount: 0,
+        promoSkusCount: 0,
+        uniqueBarcodesCount: 0,
+        activeInChainsCount: 0,
+        unpulledSkusCount: 0,
+        priceIncreasedCount: 0,
+        priceDecreasedCount: 0,
+        priceUnchangedCount: 0,
+        newSkusCount: 0,
+        avgUnitsPerCarton: 0.0,
+        defaultDiscountPct: 10.0,
+        availablePrefixes: [],
+        availableBrands: [],
+        availablePackaging: [],
+        items: [],
+      );
+    }
     final items = <ProductMasterItemModel>[
       const ProductMasterItemModel(
         serialNo: 1,
