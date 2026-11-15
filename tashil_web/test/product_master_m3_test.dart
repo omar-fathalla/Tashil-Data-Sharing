@@ -328,4 +328,111 @@ void main() {
     expect(marginCard.subtitle, contains('أدخل سعر بيع السلسلة'));
     expect(find.textContaining('0.0%'), findsNothing);
   });
+
+  bool onScreen(WidgetTester tester, Finder f, {double width = 1280}) {
+    expect(f, findsWidgets);
+    final box = tester.getRect(f.first);
+    return box.left < width - 1 &&
+        box.right > 1 &&
+        box.top < 8000 &&
+        box.bottom > 0;
+  }
+
+  testWidgets(
+      'catalog tonal surface + per-row type strip visible at 1280/1920',
+      (tester) async {
+    for (final width in [1280.0, 1920.0]) {
+      final errors = await pumpProductMaster(
+        tester,
+        width: width,
+        height: 2400,
+        withSidebar: width <= 1280,
+      );
+      expect(errors, isEmpty,
+          reason: errors.map((e) => e.exception).join('\n'));
+
+      final surface = find.byKey(const ValueKey('pm_catalog_tonal_surface'));
+      expect(surface, findsOneWidget, reason: 'tonal surface @ $width');
+      expect(onScreen(tester, surface, width: width), isTrue,
+          reason: 'tonal surface on screen @ $width');
+
+      final table = find.byKey(const ValueKey('pm_catalog_table'));
+      expect(table, findsOneWidget, reason: 'catalog table @ $width');
+      final dt = tester.widget<DataTable>(table);
+      expect(dt.dataRowMinHeight, greaterThanOrEqualTo(72.0),
+          reason: 'chip + description row budget @ $width');
+      for (final (i, c) in dt.columns.indexed) {
+        expect(c.headingRowAlignment, MainAxisAlignment.center,
+            reason: 'column $i centered @ $width');
+      }
+
+      final strip =
+          find.byKey(const ValueKey('pm_row_type_strip_FGCL-0550-0001'));
+      expect(strip, findsOneWidget, reason: 'row type strip @ $width');
+      expect(onScreen(tester, strip, width: width), isTrue,
+          reason: 'row type strip on screen @ $width');
+      final stripBox = tester.widget<DecoratedBox>(strip);
+      final deco = stripBox.decoration as BoxDecoration;
+      final border = deco.border! as BorderDirectional;
+      expect(border.start.width, 4.0,
+          reason: '4dp per-type tonal strip @ $width');
+      expect(border.start.color.a, greaterThan(0.0),
+          reason: 'strip colour visible @ $width');
+
+      final rowChip =
+          find.byKey(const ValueKey('pm_row_type_chip_FGCL-0550-0001'));
+      expect(rowChip, findsOneWidget, reason: 'row type chip @ $width');
+      final chipText = tester.widget<Text>(
+          find.descendant(of: rowChip, matching: find.byType(Text)).first);
+      expect(chipText.data, 'عادي');
+      expect(chipText.maxLines, 1);
+
+      // Short chip + description underneath (مسحوب + units / فرصة توزيع).
+      expect(find.descendant(of: table, matching: find.text('مسحوب')),
+          findsWidgets);
+      expect(find.descendant(of: table, matching: find.textContaining('وحدة')),
+          findsWidgets);
+      expect(
+          find.descendant(of: table, matching: find.text('فرصة توزيع')),
+          findsWidgets);
+
+      // Official name wrap ≤3 (text snapshot of long live-scale name).
+      final nameWraps = tester
+          .widgetList<M3WrapText>(find.byType(M3WrapText))
+          .where((w) => w.text.contains('كلوريل أبيض مركز'));
+      expect(nameWraps, isNotEmpty);
+      expect(nameWraps.every((w) => w.maxLines >= 3), isTrue);
+      expect(nameWraps.every((w) => w.textAlign == TextAlign.center), isTrue);
+    }
+  });
+
+  testWidgets(
+      'empty catalog KPIs show «—» + note, never fake 0% / 0.0 averages',
+      (tester) async {
+    final errors = await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 2400,
+      withSidebar: true,
+      apiClient: liveScaleProductMasterClient(emptyCatalog: true),
+    );
+    expect(errors, isEmpty, reason: errors.map((e) => e.exception).join('\n'));
+
+    for (final key in [
+      'pm_kpi_card_Total Registered',
+      'pm_kpi_card_Regular Catalog',
+      'pm_kpi_card_Promos',
+      'pm_kpi_card_Unique Barcodes',
+      'pm_kpi_card_Chain Coverage',
+    ]) {
+      final card =
+          tester.widget<M3SummaryKpiCard>(find.byKey(ValueKey(key)));
+      expect(card.value, '—', reason: key);
+      expect(card.textValue, isTrue, reason: key);
+      expect(card.subtitle, isNot(contains('0.0')), reason: key);
+      expect(card.subtitle, isNot(contains('تمثل 0%')), reason: key);
+    }
+    expect(find.text('لا توجد أصناف في الكارتة'), findsOneWidget);
+    expect(find.textContaining('0.0%'), findsNothing);
+  });
 }

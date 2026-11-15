@@ -28,6 +28,7 @@ import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_responsive_tab_bar.dart';
 import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/m3_toolbar_button.dart';
 import '../../../../core/widgets/m3_wrap_text.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
@@ -1322,10 +1323,12 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           constraints.maxWidth,
           5,
         );
-        final regularShare = summary.totalSkus > 0
+        // Empty catalog → «—» + note (never advertise fake 0% / 0.0 averages).
+        final emptyCatalog = summary.totalSkus <= 0;
+        final regularShare = !emptyCatalog
             ? ((summary.regularSkusCount / summary.totalSkus) * 100)
                 .toStringAsFixed(1)
-            : '0';
+            : null;
         return M3EqualHeightGrid(
           key: const ValueKey('product_master_kpi_grid'),
           columns: columns,
@@ -1337,53 +1340,72 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
               title: 'إجمالي الأصناف',
               titleMaxLines: 1,
               subtitleMaxLines: 1,
-              value: countSku(summary.totalSkus),
-              subtitle: 'المعروض بالفلتر الحالي: ${countSku(filteredCount)}',
+              value: emptyCatalog ? '—' : countSku(summary.totalSkus),
+              subtitle: emptyCatalog
+                  ? 'لا توجد أصناف في الكارتة'
+                  : 'المعروض بالفلتر الحالي: ${countSku(filteredCount)}',
               icon: Icons.qr_code_scanner_rounded,
               color: cs.primary,
               valueKey: const ValueKey('pm_kpi_value_Total Registered'),
+              textValue: emptyCatalog,
             ),
             M3SummaryKpiCard(
               key: const ValueKey('pm_kpi_card_Regular Catalog'),
               title: 'أصناف البيع العادي',
               titleMaxLines: 1,
               subtitleMaxLines: 1,
-              value: countSku(summary.regularSkusCount),
-              subtitle: 'تمثل $regularShare% من إجمالي الكارتة',
+              value: emptyCatalog ? '—' : countSku(summary.regularSkusCount),
+              subtitle: emptyCatalog
+                  ? 'لا توجد أصناف لحساب الحصة'
+                  : 'تمثل $regularShare% من إجمالي الكارتة',
               icon: Icons.check_circle_outline_rounded,
               color: M3Palette.teal,
+              textValue: emptyCatalog,
             ),
             M3SummaryKpiCard(
               key: const ValueKey('pm_kpi_card_Promos'),
               title: 'أصناف العروض',
               titleMaxLines: 1,
               subtitleMaxLines: 1,
-              value: '${_intFmt.format(summary.promoSkusCount)} عرض',
-              subtitle: 'عروض وشرنك وباقات ترويجية',
+              value: emptyCatalog
+                  ? '—'
+                  : '${_intFmt.format(summary.promoSkusCount)} عرض',
+              subtitle: emptyCatalog
+                  ? 'لا توجد عروض مسجّلة'
+                  : 'عروض وشرنك وباقات ترويجية',
               icon: Icons.local_offer_rounded,
               color: M3Palette.warning,
+              textValue: emptyCatalog,
             ),
             M3SummaryKpiCard(
               key: const ValueKey('pm_kpi_card_Unique Barcodes'),
               title: 'الباركودات الفريدة',
               titleMaxLines: 1,
               subtitleMaxLines: 1,
-              value: '${_intFmt.format(summary.uniqueBarcodesCount)} باركود',
-              subtitle:
-                  'متوسط السعة: ${summary.avgUnitsPerCarton.toStringAsFixed(1)} وحدة/كرتونة',
+              value: emptyCatalog
+                  ? '—'
+                  : '${_intFmt.format(summary.uniqueBarcodesCount)} باركود',
+              subtitle: emptyCatalog
+                  ? 'لا يوجد متوسط سعة للكرتونة'
+                  : 'متوسط السعة: ${summary.avgUnitsPerCarton.toStringAsFixed(1)} وحدة/كرتونة',
               icon: Icons.view_in_ar_rounded,
               color: M3Palette.indigo,
+              textValue: emptyCatalog,
             ),
             M3SummaryKpiCard(
               key: const ValueKey('pm_kpi_card_Chain Coverage'),
               title: 'التغطية بالسلاسل',
               titleMaxLines: 1,
               subtitleMaxLines: 1,
-              value: '${_intFmt.format(summary.activeInChainsCount)} نشط',
-              subtitle:
-                  'غير مسحوب (فرصة توزيع): ${countSku(summary.unpulledSkusCount)}',
+              value: emptyCatalog
+                  ? '—'
+                  : '${_intFmt.format(summary.activeInChainsCount)} نشط',
+              subtitle: emptyCatalog
+                  ? 'لا توجد تغطية سلاسل بعد'
+                  : 'غير مسحوب (فرصة توزيع): ${countSku(summary.unpulledSkusCount)}',
               icon: Icons.storefront_rounded,
               color: M3Palette.info,
+              textValue: emptyCatalog,
             ),
           ],
         );
@@ -1584,10 +1606,12 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         ),
         const SizedBox(height: 16.0),
 
-        // Table Header & Pagination Top Bar
+        // Sell-Out / Errors / TM symmetry: catalog sits on M3TableSurface so
+        // rows stay tonal (not bare white) at ~1920 device / 1280 logical.
         Container(
+          key: const ValueKey('pm_catalog_tonal_surface'),
           decoration: BoxDecoration(
-            color: cs.surfaceContainerLow,
+            color: M3TableSurface.color(cs),
             borderRadius: M3Shape.radiusLg,
             border:
                 Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
@@ -1684,12 +1708,15 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                   showSwipeHint: false,
                   showControls: false,
                   child: DataTable(
+                    key: const ValueKey('pm_catalog_table'),
                     headingRowColor: WidgetStateProperty.all(
                       cs.surfaceContainerHighest.withValues(alpha: 0.45),
                     ),
-                    dataRowMinHeight: 52.0,
+                    // Chip (32) + gap + ≤3-line description + vertical pad
+                    // (Errors / Pricing status-column budget).
+                    dataRowMinHeight: 72.0,
                     dataRowMaxHeight: 120.0,
-                    headingRowHeight: 44.0,
+                    headingRowHeight: 48.0,
                     columnSpacing: 6.0,
                     horizontalMargin: 8.0,
                     showCheckboxColumn: false,
@@ -1769,6 +1796,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                           DataCell(
                             Text(
                               item.serialNo.toString(),
+                              textAlign: TextAlign.center,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 fontWeight: FontWeight.w700,
                               ),
@@ -1921,11 +1949,11 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                               ),
                             ),
                           ),
-                          // Net Unit Cost
+                          // Net Unit Cost — centered like every other numeric col.
                           DataCell(
                             Column(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 M3WrapText(
                                   '${_currFmt.format(item.netUnitInvoiceCost)} ج.م',
@@ -1949,45 +1977,72 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                             ),
                           ),
                           // Item Type & Pull Status: short chip + description.
+                          // 4dp start-edge tonal strip (Errors symmetry) so the
+                          // type accent stays visible at wide shells (~1920).
                           // box(9) locks the live 96 / compact 88 type floor so
                           // «مسحوب» / «غير مسحوب» stay one line in-test and live.
                           DataCell(
                             box(
                               9,
-                              Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  _statusChip(
-                                    isPromo ? 'عرض' : 'عادي',
-                                    isPromo
-                                        ? M3Palette.amberDeep
-                                        : M3Palette.teal,
-                                  ),
-                                  const SizedBox(height: 4.0),
-                                  _statusChip(
-                                    item.isActiveInChains
-                                        ? 'مسحوب'
-                                        : 'غير مسحوب',
-                                    item.isActiveInChains
-                                        ? M3Palette.info
-                                        : cs.onSurfaceVariant,
-                                  ),
-                                  const SizedBox(height: 2.0),
-                                  M3WrapText(
-                                    item.isActiveInChains
-                                        ? (item.totalPosUnitsSold > 0
-                                            ? '${_intFmt.format(item.totalPosUnitsSold)} وحدة'
-                                            : 'نشط بالسلاسل')
-                                        : 'فرصة توزيع',
-                                    maxLines: 2,
-                                    textAlign: TextAlign.center,
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      fontSize: M3FontSize.tiny,
-                                      color: cs.onSurfaceVariant,
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: M3Spacing.xxs,
+                                  vertical: M3Spacing.xs,
+                                ),
+                                child: DecoratedBox(
+                                  key: ValueKey(
+                                      'pm_row_type_strip_${item.itemCode}'),
+                                  decoration: BoxDecoration(
+                                    border: BorderDirectional(
+                                      start: BorderSide(
+                                        color: (isPromo
+                                                ? M3Palette.amberDeep
+                                                : M3Palette.teal)
+                                            .withValues(alpha: 0.55),
+                                        width: 4.0,
+                                      ),
                                     ),
                                   ),
-                                ],
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      _statusChip(
+                                        isPromo ? 'عرض' : 'عادي',
+                                        isPromo
+                                            ? M3Palette.amberDeep
+                                            : M3Palette.teal,
+                                        key: ValueKey(
+                                            'pm_row_type_chip_${item.itemCode}'),
+                                      ),
+                                      const SizedBox(height: 4.0),
+                                      _statusChip(
+                                        item.isActiveInChains
+                                            ? 'مسحوب'
+                                            : 'غير مسحوب',
+                                        item.isActiveInChains
+                                            ? M3Palette.info
+                                            : cs.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(height: 2.0),
+                                      M3WrapText(
+                                        item.isActiveInChains
+                                            ? (item.totalPosUnitsSold > 0
+                                                ? '${_intFmt.format(item.totalPosUnitsSold)} وحدة'
+                                                : 'نشط بالسلاسل')
+                                            : 'فرصة توزيع',
+                                        maxLines: 2,
+                                        textAlign: TextAlign.center,
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                          fontSize: M3FontSize.tiny,
+                                          color: cs.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                           ),
