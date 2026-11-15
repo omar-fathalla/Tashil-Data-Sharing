@@ -19,6 +19,7 @@ import '../../../../core/widgets/m3_equal_height_grid.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_search_field.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
 
@@ -251,10 +252,10 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Page Header (MD3 Standard)
+            // Page Header (MD3 Standard) — same titleEn / subtitleAr as Errors / Returns.
             M3PageHeader(
-              title: 'مراقب النواقص',
-              subtitle: 'Out-of-Stock Alarm Monitor',
+              titleEn: 'OOS Monitor',
+              subtitleAr: 'مراقب النواقص',
               description:
                   'نظام المراقبة الاستباقية للنواقص ومحرك الذكاء الاصطناعي (Gemini Root-Cause AI)',
               actions: M3ButtonGroup(
@@ -489,10 +490,10 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
 
     return Card(
       elevation: 0,
-      color: colorScheme.primaryContainer.withOpacity(0.2),
+      color: colorScheme.primaryContainer.withValues(alpha: 0.2),
       shape: RoundedRectangleBorder(
         borderRadius: M3Shape.radiusLg,
-        side: BorderSide(color: colorScheme.primary.withOpacity(0.3), width: 1.2),
+        side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.3), width: 1.2),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -572,7 +573,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                 decoration: BoxDecoration(
                   color: colorScheme.surface,
                   borderRadius: M3Shape.radiusMd,
-                  border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -602,9 +603,9 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                   final rootCausesWidget = Container(
                     padding: const EdgeInsets.all(12.0),
                     decoration: BoxDecoration(
-                      color: colorScheme.errorContainer.withOpacity(0.2),
+                      color: colorScheme.errorContainer.withValues(alpha: 0.2),
                       borderRadius: M3Shape.radiusMd,
-                      border: Border.all(color: colorScheme.error.withOpacity(0.2)),
+                      border: Border.all(color: colorScheme.error.withValues(alpha: 0.2)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -649,9 +650,9 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                   final immediateActionsWidget = Container(
                     padding: const EdgeInsets.all(12.0),
                     decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer.withOpacity(0.3),
+                      color: colorScheme.primaryContainer.withValues(alpha: 0.3),
                       borderRadius: M3Shape.radiusMd,
-                      border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
+                      border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -763,9 +764,9 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: colorScheme.errorContainer.withOpacity(0.35),
+        color: colorScheme.errorContainer.withValues(alpha: 0.35),
         borderRadius: M3Shape.radiusLg,
-        border: Border.all(color: colorScheme.error.withOpacity(0.4), width: 1.2),
+        border: Border.all(color: colorScheme.error.withValues(alpha: 0.4), width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -796,7 +797,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                     Text(
                       'منعدمة حالياً في ${branches.length} فروع • إجمالي الفاقد اليومي المقدر: ${CurrencyFormatter.formatEGP(lostCost)} يومياً',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onErrorContainer.withOpacity(0.85),
+                        color: colorScheme.onErrorContainer.withValues(alpha: 0.85),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -830,7 +831,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
             children: branches.map((bName) {
               return M3ChipSurface(
                 color: colorScheme.surface,
-                borderColor: colorScheme.error.withOpacity(0.3),
+                borderColor: colorScheme.error.withValues(alpha: 0.3),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -869,7 +870,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: M3Shape.radiusLg,
-        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -885,7 +886,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                 onChanged: (val) => setState(() => _searchQuery = val),
                 decoration: InputDecoration(
                   hintText: searchHint,
-                  hintStyle: TextStyle(fontSize: M3FontSize.labelMediumPlus, color: colorScheme.onSurfaceVariant.withOpacity(0.6)),
+                  hintStyle: TextStyle(fontSize: M3FontSize.labelMediumPlus, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
                   prefixIcon: const Icon(Icons.search_rounded, size: 20.0),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
@@ -1139,53 +1140,63 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
     );
   }
 
-  /// Short chip ([M3ChipSurface]) + description underneath (TM / Compare).
+  /// Severity palette matching Errors summary/row strips (visible at wide shells).
+  (Color bg, Color fg) _severityColors(ColorScheme cs, bool critical) => critical
+      ? (cs.errorContainer, cs.onErrorContainer)
+      : (cs.tertiaryContainer, cs.onTertiaryContainer);
+
+  String _severityShort(bool critical) => critical ? 'حرج' : 'مرتفع';
+
+  String _severityDescription(bool critical) => critical
+      ? 'انعدام ممتد يؤثر على المبيعات اليومية'
+      : 'نواقص تحتاج إعادة توريد سريع';
+
+  /// Short chip ([M3ChipSurface]) + description underneath (TM / Errors).
+  /// No in-chip icon — Errors 52-flex budget / one-line short word.
   Widget _buildShortStatus(
     BuildContext context, {
     required String short,
     required String description,
     required Color bgColor,
     required Color fgColor,
-    IconData? icon,
     Key? key,
+    CrossAxisAlignment crossAxisAlignment = CrossAxisAlignment.start,
+    Key? chipKey,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     return Column(
       key: key,
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: crossAxisAlignment,
       children: [
-        M3ChipSurface(
-          color: bgColor,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 16.0, color: fgColor),
-                const SizedBox(width: M3Spacing.xxs),
-              ],
-              Flexible(
-                child: Text(
-                  short,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: fgColor,
-                    fontWeight: FontWeight.w800,
-                    fontSize: M3FontSize.labelSmallPlus,
-                  ),
-                ),
+        UnconstrainedBox(
+          child: M3ChipSurface(
+            key: chipKey,
+            color: bgColor,
+            child: Text(
+              short,
+              maxLines: 1,
+              softWrap: true,
+              overflow: TextOverflow.clip,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: fgColor,
+                fontWeight: FontWeight.w800,
+                fontSize: M3FontSize.labelSmallPlus,
               ),
-            ],
+            ),
           ),
         ),
-        const SizedBox(height: M3Spacing.s2),
+        const SizedBox(height: M3Spacing.xxs),
         Text(
           description,
           maxLines: 3,
-          overflow: TextOverflow.ellipsis,
+          softWrap: true,
+          overflow: TextOverflow.clip,
+          textAlign: crossAxisAlignment == CrossAxisAlignment.center
+              ? TextAlign.center
+              : TextAlign.start,
           style: TextStyle(
             color: colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w600,
@@ -1193,6 +1204,40 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
           ),
         ),
       ],
+    );
+  }
+
+  /// 4dp start-edge strip + short severity chip (Errors row-type strip).
+  Widget _buildSeverityStripCell(
+    BuildContext context, {
+    required String alertId,
+    required bool critical,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final (bg, fg) = _severityColors(cs, critical);
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: M3Spacing.xxs,
+        vertical: M3Spacing.xs,
+      ),
+      child: DecoratedBox(
+        key: ValueKey('oos_row_severity_strip_$alertId'),
+        decoration: BoxDecoration(
+          border: BorderDirectional(
+            start: BorderSide(color: bg, width: 4.0),
+          ),
+        ),
+        child: _buildShortStatus(
+          context,
+          key: ValueKey('oos_severity_$alertId'),
+          chipKey: ValueKey('oos_row_severity_chip_$alertId'),
+          short: _severityShort(critical),
+          description: _severityDescription(critical),
+          bgColor: bg,
+          fgColor: fg,
+          crossAxisAlignment: CrossAxisAlignment.center,
+        ),
+      ),
     );
   }
 
@@ -1210,22 +1255,15 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
       itemBuilder: (context, index) {
         final alert = list[index];
         final isCritical = alert.severity == 'critical';
+        final (sevBg, sevFg) = _severityColors(colorScheme, isCritical);
         final severityChip = _buildShortStatus(
           context,
           key: ValueKey('oos_severity_${alert.alertId}'),
-          short: isCritical ? 'حرج' : 'مرتفع',
-          description: isCritical
-              ? 'انعدام ممتد يؤثر على المبيعات اليومية'
-              : 'نواقص تحتاج إعادة توريد سريع',
-          bgColor: isCritical
-              ? M3Palette.dangerSurface
-              : M3Palette.warningSurface,
-          fgColor: isCritical
-              ? M3Palette.onDangerSurface
-              : M3Palette.onWarningSurface,
-          icon: isCritical
-              ? Icons.warning_rounded
-              : Icons.priority_high_rounded,
+          chipKey: ValueKey('oos_card_severity_chip_${alert.alertId}'),
+          short: _severityShort(isCritical),
+          description: _severityDescription(isCritical),
+          bgColor: sevBg,
+          fgColor: sevFg,
         );
         final brandChip = M3ChipSurface(
           color: colorScheme.primaryContainer,
@@ -1280,114 +1318,127 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
           shape: RoundedRectangleBorder(
             borderRadius: M3Shape.radiusLg,
             side: BorderSide(
-              color: isCritical ? colorScheme.error.withOpacity(0.3) : colorScheme.outlineVariant.withOpacity(0.5),
+              color: isCritical
+                  ? colorScheme.error.withValues(alpha: 0.3)
+                  : colorScheme.outlineVariant.withValues(alpha: 0.5),
             ),
           ),
-          child: Padding(
-            padding: isCompact ? M3Spacing.pSm : M3Spacing.pMd,
-            child: LayoutBuilder(
-              builder: (context, itemConstraints) {
-                final isMobileCard = itemConstraints.maxWidth < 620.0;
-                final iconWell = Container(
-                  padding: const EdgeInsets.all(8.0),
-                  decoration: BoxDecoration(
-                    color: isCritical ? colorScheme.errorContainer : colorScheme.tertiaryContainer,
-                    borderRadius: M3Shape.radiusMd,
-                  ),
-                  child: Icon(
-                    isCritical ? Icons.warning_rounded : Icons.info_outline_rounded,
-                    color: isCritical ? colorScheme.error : colorScheme.onTertiaryContainer,
-                    size: 20.0,
-                  ),
-                );
-                final poButton = OutlinedButton(
-                  onPressed: () {
-                    M3Feedback.showSuccess(
-                      context,
-                      'تم إنشاء طلب توريد سريع للصنف: ${alert.skuName} لفرع ${_displayBranch(alert.storeName)}',
-                    );
-                  },
-                  child: const Text('أمر توريد سريع'),
-                );
+          clipBehavior: Clip.antiAlias,
+          child: DecoratedBox(
+            key: ValueKey('oos_card_severity_strip_${alert.alertId}'),
+            decoration: BoxDecoration(
+              border: BorderDirectional(
+                start: BorderSide(color: sevBg, width: 4.0),
+              ),
+            ),
+            child: Padding(
+              padding: isCompact ? M3Spacing.pSm : M3Spacing.pMd,
+              child: LayoutBuilder(
+                builder: (context, itemConstraints) {
+                  final isMobileCard = itemConstraints.maxWidth < 620.0;
+                  final iconWell = Container(
+                    padding: const EdgeInsets.all(8.0),
+                    decoration: BoxDecoration(
+                      color: sevBg,
+                      borderRadius: M3Shape.radiusMd,
+                    ),
+                    child: Icon(
+                      isCritical
+                          ? Icons.warning_rounded
+                          : Icons.info_outline_rounded,
+                      color: sevFg,
+                      size: 20.0,
+                    ),
+                  );
+                  final poButton = OutlinedButton(
+                    onPressed: () {
+                      M3Feedback.showSuccess(
+                        context,
+                        'تم إنشاء طلب توريد سريع للصنف: ${alert.skuName} لفرع ${_displayBranch(alert.storeName)}',
+                      );
+                    },
+                    child: const Text('أمر توريد سريع'),
+                  );
 
-                if (isMobileCard) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          iconWell,
-                          const SizedBox(width: 10.0),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                skuTitle,
-                                const SizedBox(height: 8.0),
-                                Wrap(
-                                  spacing: M3Spacing.xs,
-                                  runSpacing: M3Spacing.xs,
-                                  children: [brandChip, severityChip],
-                                ),
-                              ],
+                  if (isMobileCard) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            iconWell,
+                            const SizedBox(width: 10.0),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  skuTitle,
+                                  const SizedBox(height: 8.0),
+                                  Wrap(
+                                    spacing: M3Spacing.xs,
+                                    runSpacing: M3Spacing.xs,
+                                    children: [brandChip, severityChip],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                        const SizedBox(height: 8.0),
+                        storeLine,
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8.0),
+                          child: Divider(height: 1.0),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(child: daysLine),
+                            const SizedBox(width: 8.0),
+                            Flexible(child: lossLine),
+                          ],
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      iconWell,
+                      const SizedBox(width: 8.0),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            skuTitle,
+                            const SizedBox(height: 8.0),
+                            Wrap(
+                              spacing: M3Spacing.xs,
+                              runSpacing: M3Spacing.xs,
+                              children: [brandChip, severityChip],
+                            ),
+                            const SizedBox(height: 8.0),
+                            storeLine,
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 8.0),
-                      storeLine,
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8.0),
-                        child: Divider(height: 1.0),
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      const SizedBox(width: 12.0),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Flexible(child: daysLine),
-                          const SizedBox(width: 8.0),
-                          Flexible(child: lossLine),
+                          lossLine,
+                          const SizedBox(height: 4.0),
+                          daysLine,
                         ],
                       ),
+                      const SizedBox(width: 12.0),
+                      poButton,
                     ],
                   );
-                }
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    iconWell,
-                    const SizedBox(width: 8.0),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          skuTitle,
-                          const SizedBox(height: 8.0),
-                          Wrap(
-                            spacing: M3Spacing.xs,
-                            runSpacing: M3Spacing.xs,
-                            children: [brandChip, severityChip],
-                          ),
-                          const SizedBox(height: 8.0),
-                          storeLine,
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12.0),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        lossLine,
-                        const SizedBox(height: 4.0),
-                        daysLine,
-                      ],
-                    ),
-                    const SizedBox(width: 12.0),
-                    poButton,
-                  ],
-                );
-              },
+                },
+              ),
             ),
           ),
         );
@@ -1408,13 +1459,17 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
         final branchTotalCost = branchAlerts.fold<double>(0.0, (s, a) => s + a.estimatedLostDailyCost);
         final distinctBrands = branchAlerts.map((a) => a.brand).toSet().toList();
 
+        // Card uses `surface` so the inner M3TableSurface
+        // (`surfaceContainerLow`) reads as a clear tonal table plane —
+        // same Sell-Out / Errors contrast, without a second border that
+        // would leave a 2dp horizontal scroll remainder at 1024.
         return Card(
           margin: const EdgeInsets.only(bottom: 16.0),
           elevation: 0,
-          color: colorScheme.surfaceContainerLow,
+          color: colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: M3Shape.radiusLg,
-            side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+            side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
@@ -1484,7 +1539,12 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                 const SizedBox(height: 8.0),
                 LayoutBuilder(
                   builder: (context, tableConstraints) {
-                    const flex = <double>[2.2, 0.9, 0.8, 0.9];
+                    // Severity + product + brand + days + loss — full-width
+                    // flex like Errors; severity column carries the tonal strip.
+                    // Branch card already draws the outer border — tonal surface
+                    // is fill-only so we do not add a second 1+1dp edge that
+                    // leaves a 2dp horizontal scroll remainder at 1024.
+                    const flex = <double>[1.15, 1.75, 0.8, 0.65, 0.8];
                     const spacing = M3Spacing.xs;
                     const margin = M3Spacing.xs;
                     final availableWidth = tableConstraints.maxWidth.isFinite
@@ -1495,7 +1555,7 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                         (2 * margin) -
                         ((flex.length - 1) * spacing);
                     double colMax(int i) =>
-                        (inner * flex[i] / flexSum).clamp(56.0, double.infinity);
+                        (inner * flex[i] / flexSum).clamp(48.0, double.infinity);
                     Widget cellBox(int i, Widget child) => SizedBox(
                           width: colMax(i),
                           child: child,
@@ -1518,54 +1578,82 @@ class _OOSDashboardScreenState extends State<OOSDashboardScreen> with DataRefres
                     final columns = [
                       DataColumn(
                         headingRowAlignment: MainAxisAlignment.center,
-                        label: cellText(0, 'الصنف'),
+                        label: cellText(0, 'الخطورة'),
                       ),
                       DataColumn(
                         headingRowAlignment: MainAxisAlignment.center,
-                        label: cellText(1, 'الماركة'),
+                        label: cellText(1, 'الصنف'),
                       ),
                       DataColumn(
                         headingRowAlignment: MainAxisAlignment.center,
-                        label: cellText(2, 'أيام الانعدام'),
+                        label: cellText(2, 'الماركة'),
                       ),
                       DataColumn(
                         headingRowAlignment: MainAxisAlignment.center,
-                        label: cellText(3, 'الفاقد اليومي'),
+                        label: cellText(3, 'أيام الانعدام'),
+                      ),
+                      DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        label: cellText(4, 'الفاقد اليومي'),
                       ),
                     ];
 
+                    // Sell-Out / Errors symmetry: tonal surface so rows are
+                    // not bare white at wide shells (~1920 / 1280 logical).
                     return SizedBox(
                       width: availableWidth,
-                      child: TableScrollContainer(
-                        key: ValueKey('oos_matrix_table_$branchName'),
-                        showSwipeHint: true,
-                        columnFlex: flex,
-                        child: DataTable(
-                          headingRowHeight: 56,
-                          dataRowMinHeight: 52,
-                          dataRowMaxHeight: double.infinity,
-                          columnSpacing: spacing,
-                          horizontalMargin: margin,
-                          columns: columns,
-                          rows: centerCellsUnderCenteredHeadings(
-                            columns,
-                            [
-                              for (final item in branchAlerts)
-                                DataRow(
-                                  cells: [
-                                    DataCell(cellText(0, item.skuName,
-                                        key: const ValueKey('oos_sku_name'))),
-                                    DataCell(cellText(1, item.brand)),
-                                    DataCell(cellText(
-                                        2, countDay(item.consecutiveDaysOOS))),
-                                    DataCell(cellText(
-                                      3,
-                                      CurrencyFormatter.formatCompactEGP(
-                                          item.estimatedLostDailyCost),
-                                    )),
-                                  ],
-                                ),
-                            ],
+                      child: Container(
+                        key: ValueKey('oos_matrix_tonal_surface_$branchName'),
+                        decoration: BoxDecoration(
+                          color: M3TableSurface.color(colorScheme),
+                          borderRadius: M3Shape.radiusLg,
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: TableScrollContainer(
+                          key: ValueKey('oos_matrix_table_$branchName'),
+                          showSwipeHint: true,
+                          columnFlex: flex,
+                          child: DataTable(
+                            key: ValueKey('oos_matrix_data_$branchName'),
+                            headingRowHeight: 72,
+                            // Chip + gap + ≤3-line description + vertical pad.
+                            dataRowMinHeight: 72,
+                            dataRowMaxHeight: double.infinity,
+                            columnSpacing: spacing,
+                            horizontalMargin: margin,
+                            headingTextStyle: theme.textTheme.labelLarge
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                            columns: columns,
+                            rows: centerCellsUnderCenteredHeadings(
+                              columns,
+                              [
+                                for (final item in branchAlerts)
+                                  DataRow(
+                                    cells: [
+                                      DataCell(cellBox(
+                                        0,
+                                        _buildSeverityStripCell(
+                                          context,
+                                          alertId: item.alertId,
+                                          critical:
+                                              item.severity == 'critical',
+                                        ),
+                                      )),
+                                      DataCell(cellText(1, item.skuName,
+                                          key: const ValueKey(
+                                              'oos_sku_name'))),
+                                      DataCell(cellText(2, item.brand)),
+                                      DataCell(cellText(3,
+                                          countDay(item.consecutiveDaysOOS))),
+                                      DataCell(cellText(
+                                        4,
+                                        CurrencyFormatter.formatCompactEGP(
+                                            item.estimatedLostDailyCost),
+                                      )),
+                                    ],
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

@@ -444,4 +444,94 @@ void main() {
           reason: 'matrix must fit without horizontal scroll');
     }
   });
+
+  testWidgets(
+      'alert cards expose per-severity tonal strip and short chip without icon',
+      (tester) async {
+    await pumpOos(
+      tester,
+      OOSDashboardScreen(apiClient: OosShotApiClient()),
+      width: 1280,
+    );
+
+    final cardStrip =
+        find.byKey(const ValueKey('oos_card_severity_strip_oos_fix_001'));
+    expect(cardStrip, findsOneWidget);
+    final deco =
+        tester.widget<DecoratedBox>(cardStrip).decoration as BoxDecoration;
+    final border = deco.border! as BorderDirectional;
+    expect(border.start.width, 4.0);
+    expect(border.start.color.a, greaterThan(0.0));
+
+    final chip =
+        find.byKey(const ValueKey('oos_card_severity_chip_oos_fix_001'));
+    expect(chip, findsOneWidget);
+    expect(find.descendant(of: chip, matching: find.byType(Icon)), findsNothing);
+    final chipText = tester.widget<Text>(
+        find.descendant(of: chip, matching: find.byType(Text)).first);
+    expect(chipText.data, 'حرج');
+    expect(chipText.maxLines, 1);
+  });
+
+  testWidgets(
+      'matrix tonal surface + per-row severity strip visible at 1280/1920',
+      (tester) async {
+    for (final width in [1280.0, 1920.0]) {
+      await pumpOos(
+        tester,
+        OOSDashboardScreen(apiClient: OosShotApiClient()),
+        width: width,
+      );
+      await tester.tap(find.text('مصفوفة الفروع والنواقص'));
+      await tester.pumpAndSettle();
+
+      final surface = find.byWidgetPredicate((w) =>
+          w is Container &&
+          w.key is ValueKey &&
+          (w.key as ValueKey).value.toString().startsWith(
+              'oos_matrix_tonal_surface_'));
+      expect(surface, findsWidgets, reason: 'tonal surface @ $width');
+
+      final strip =
+          find.byKey(const ValueKey('oos_row_severity_strip_oos_fix_001'));
+      expect(strip, findsOneWidget, reason: 'row severity strip @ $width');
+      final stripBox = tester.widget<DecoratedBox>(strip);
+      final deco = stripBox.decoration as BoxDecoration;
+      final border = deco.border! as BorderDirectional;
+      expect(border.start.width, 4.0,
+          reason: '4dp per-severity tonal strip @ $width');
+      expect(border.start.color.a, greaterThan(0.0),
+          reason: 'strip colour must be opaque enough to see @ $width');
+
+      final rowChip =
+          find.byKey(const ValueKey('oos_row_severity_chip_oos_fix_001'));
+      expect(rowChip, findsOneWidget, reason: 'row severity chip @ $width');
+      final chipText = tester.widget<Text>(
+          find.descendant(of: rowChip, matching: find.byType(Text)).first);
+      expect(chipText.data, 'حرج');
+      expect(chipText.maxLines, 1);
+      expect(
+          find.descendant(
+              of: find.byKey(const ValueKey('oos_severity_oos_fix_001')),
+              matching: find.text('انعدام ممتد يؤثر على المبيعات اليومية')),
+          findsOneWidget);
+
+      // Product names in matrix stay wrap≤3 and centered.
+      for (final t in tester.widgetList<Text>(find.byKey(const ValueKey('oos_sku_name')))) {
+        expect(t.maxLines, 3);
+        expect(t.textAlign, TextAlign.center);
+      }
+    }
+  });
+
+  testWidgets('OOS page header uses titleEn / subtitleAr like Errors',
+      (tester) async {
+    await pumpOos(
+      tester,
+      OOSDashboardScreen(apiClient: OosShotApiClient()),
+      width: 1280,
+    );
+    expect(find.text('مراقب النواقص'), findsOneWidget);
+    expect(find.text('OOS Monitor'), findsOneWidget);
+  });
 }
