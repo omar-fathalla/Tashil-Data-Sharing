@@ -40,8 +40,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Check Header
-      expect(find.text('Out-of-Stock Alarm Monitor'), findsOneWidget);
+      // Check Header (titleEn / subtitleAr — Errors / Returns symmetry)
+      expect(find.text('مراقب النواقص'), findsOneWidget);
+      expect(find.text('OOS Monitor'), findsOneWidget);
       expect(find.text('نظام المراقبة الاستباقية للنواقص ومحرك الذكاء الاصطناعي (Gemini Root-Cause AI)'), findsOneWidget);
 
       // Check OSA% KPI Card
