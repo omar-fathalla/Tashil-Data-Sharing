@@ -7,12 +7,16 @@ SMOKE="${ROOT}/scripts/deploy_backend_smoke.sh"
 chmod +x "$SMOKE"
 
 py_server="$(mktemp)"
+fake_curl_dir=""
 cleanup() {
   if [[ -n "${SERVER_PID:-}" ]]; then
     kill "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true
   fi
   rm -f "$py_server"
+  if [[ -n "$fake_curl_dir" ]]; then
+    rm -rf "$fake_curl_dir"
+  fi
 }
 trap cleanup EXIT
 
@@ -62,15 +66,19 @@ run_case() {
   port="$(pick_port)"
   python3 "$py_server" "$mode" "$port" &
   SERVER_PID=$!
-  # Wait until accepting
+  # Wait until accepting (no pipe-to-head; write code to a file).
   for _ in $(seq 1 50); do
-    if curl -fsS --max-time 1 "http://127.0.0.1:${port}/api/v1/version" >/dev/null 2>&1 \
-      || [[ "$mode" == "bad_version" ]]; then
-      # For bad_version, any response (incl 404) means server is up.
-      if curl -sS --max-time 1 -o /dev/null -w "%{http_code}" "http://127.0.0.1:${port}/api/v1/version" | grep -qE '^[0-9]+$'; then
-        break
-      fi
+    local probe_code_file
+    probe_code_file="$(mktemp "${TMPDIR:-/tmp}/smoke-probe.XXXXXX")"
+    set +e
+    curl -sS --max-time 1 -o /dev/null -w "%{http_code}" \
+      "http://127.0.0.1:${port}/api/v1/version" >"$probe_code_file" 2>/dev/null
+    set -e
+    if grep -qE '^[0-9]{3}$' "$probe_code_file" 2>/dev/null; then
+      rm -f "$probe_code_file"
+      break
     fi
+    rm -f "$probe_code_file"
     sleep 0.05
   done
 
@@ -94,10 +102,106 @@ run_case() {
       echo "FAIL mode=$mode expected failure, got success out=$out" >&2
       exit 1
     fi
+    # Must report a clean 3-digit code, never a concatenated fallback like 200000.
+    if echo "$out" | grep -qE 'got [0-9]{4,}'; then
+      echo "FAIL mode=$mode concatenated/invalid HTTP code in out=$out" >&2
+      exit 1
+    fi
     echo "PASS mode=$mode (hard-fail rc=$rc)"
   fi
 }
 
+# Regression: curl prints a real %{http_code} then exits non-zero (macOS curl 23).
+# Old pattern `code="$(curl … || echo 000)"` yielded "200000" and failed a healthy probe.
+run_curl_exit_23_still_200() {
+  fake_curl_dir="$(mktemp -d "${TMPDIR:-/tmp}/fake-curl.XXXXXX")"
+  cat >"${fake_curl_dir}/curl" <<'EOS'
+#!/usr/bin/env bash
+# Minimal curl stand-in: honor -o <file>, emit 200 via -w path (stdout), exit 23.
+out_file=""
+args=("$@")
+i=0
+while [[ $i -lt ${#args[@]} ]]; do
+  if [[ "${args[$i]}" == "-o" ]]; then
+    i=$((i + 1))
+    out_file="${args[$i]}"
+  fi
+  i=$((i + 1))
+done
+if [[ -n "$out_file" ]]; then
+  printf '%s' '{"status":"healthy"}' >"$out_file"
+fi
+printf '%s' '200'
+exit 23
+EOS
+  chmod +x "${fake_curl_dir}/curl"
+
+  export SMOKE_TIMEOUT=2 SMOKE_RETRIES=0 SMOKE_RETRY_DELAY=0
+  set +e
+  out="$(PATH="${fake_curl_dir}:$PATH" "$SMOKE" "http://127.0.0.1:9" 2>&1)"
+  rc=$?
+  set -e
+  rm -rf "$fake_curl_dir"
+  fake_curl_dir=""
+
+  if [[ "$rc" -ne 0 ]]; then
+    echo "FAIL curl_exit_23 expected success (HTTP 200 captured), rc=$rc out=$out" >&2
+    exit 1
+  fi
+  if echo "$out" | grep -q '200000'; then
+    echo "FAIL curl_exit_23 concatenated code 200000 in out=$out" >&2
+    exit 1
+  fi
+  echo "PASS curl_exit_23 (HTTP 200 kept; no 000 append)"
+}
+
+# Regression: empty/invalid code file must become 000 — not append onto garbage.
+run_curl_transport_failure() {
+  fake_curl_dir="$(mktemp -d "${TMPDIR:-/tmp}/fake-curl.XXXXXX")"
+  cat >"${fake_curl_dir}/curl" <<'EOS'
+#!/usr/bin/env bash
+# No http_code on stdout; non-zero exit (connect failure).
+exit 7
+EOS
+  chmod +x "${fake_curl_dir}/curl"
+
+  export SMOKE_TIMEOUT=2 SMOKE_RETRIES=0 SMOKE_RETRY_DELAY=0
+  set +e
+  out="$(PATH="${fake_curl_dir}:$PATH" "$SMOKE" "http://127.0.0.1:9" 2>&1)"
+  rc=$?
+  set -e
+  rm -rf "$fake_curl_dir"
+  fake_curl_dir=""
+
+  if [[ "$rc" -eq 0 ]]; then
+    echo "FAIL curl_transport expected failure, got success out=$out" >&2
+    exit 1
+  fi
+  if ! echo "$out" | grep -qE 'got 000'; then
+    echo "FAIL curl_transport expected got 000, out=$out" >&2
+    exit 1
+  fi
+  if echo "$out" | grep -qE 'got [0-9]{4,}'; then
+    echo "FAIL curl_transport concatenated code in out=$out" >&2
+    exit 1
+  fi
+  echo "PASS curl_transport (clean 000, no append)"
+}
+
+# Unit-level proof the old bash pattern concatenates (documents the bug we fixed).
+run_old_pattern_documents_bug() {
+  local code
+  code="$(printf '%s' '200'; false || echo '000')"
+  if [[ "$code" != "200000" ]]; then
+    echo "FAIL old_pattern expected 200000 got [$code] (test harness broken?)" >&2
+    exit 1
+  fi
+  echo "PASS old_pattern documents concat bug (200 + 000 → 200000)"
+}
+
+run_old_pattern_documents_bug
+run_curl_exit_23_still_200
+run_curl_transport_failure
 run_case ok 1
 run_case bad_livez 0
 run_case bad_health 0
