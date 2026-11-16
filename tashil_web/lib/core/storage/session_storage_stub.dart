@@ -19,3 +19,15 @@ void platformUpdateUrl(String path) {}
 void platformReplaceUrl(String path) {}
 
 String platformCurrentPath() => '';
+
+final Map<String, String> _memoryQuery = <String, String>{};
+
+String? platformQueryParam(String name) => _memoryQuery[name];
+
+void platformReplaceQueryParam(String name, String? value) {
+  if (value == null || value.isEmpty) {
+    _memoryQuery.remove(name);
+  } else {
+    _memoryQuery[name] = value;
+  }
+}

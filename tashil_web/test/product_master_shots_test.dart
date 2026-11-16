@@ -29,7 +29,7 @@ void main() {
     );
     await saveProductMasterShot(tester, '$dir/01-catalog-1280-sidebar.png');
 
-    final calc = find.textContaining('حاسبة الطلبيات');
+    final calc = find.text('حاسبة الطلبيات');
     if (calc.evaluate().isNotEmpty) {
       await tester.tap(calc.first);
       await tester.pumpAndSettle();
@@ -37,7 +37,7 @@ void main() {
           tester, '$dir/02-calculator-1280-sidebar.png');
     }
 
-    final sheets = find.textContaining('الشيتات');
+    final sheets = find.textContaining('الشيتات المرفوعة');
     if (sheets.evaluate().isNotEmpty) {
       await tester.tap(sheets.first);
       await tester.pumpAndSettle();

@@ -3,6 +3,7 @@ package firestore
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"sort"
 	"strings"
@@ -55,6 +56,7 @@ func ValidateChainDiscountProfiles(p []domain.ChainDiscountProfile) error {
 }
 
 // GetChainDiscountProfiles returns the tenant's profiles (empty list when none saved).
+// When Firestore fails or times out and this instance already holds a copy, that copy is returned.
 func (c *Client) GetChainDiscountProfiles(ctx context.Context, tenantID string) (*domain.ChainDiscountProfiles, error) {
 	slug := normalizeFirestoreTenantSlug(tenantID)
 	if c.fsClient != nil {
@@ -62,6 +64,10 @@ func (c *Client) GetChainDiscountProfiles(ctx context.Context, tenantID string) 
 		if err != nil {
 			if status.Code(err) == codes.NotFound {
 				return &domain.ChainDiscountProfiles{TenantID: slug, Profiles: []domain.ChainDiscountProfile{}}, nil
+			}
+			if cached, ok := c.cachedChainDiscountProfiles(slug); ok {
+				log.Printf("WARN [chain-discounts] tenant=%s firestore read failed, serving cached copy: %v", slug, err)
+				return cached, nil
 			}
 			return nil, fmt.Errorf("firestore get chain discounts: %w", err)
 		}
@@ -81,15 +87,22 @@ func (c *Client) GetChainDiscountProfiles(ctx context.Context, tenantID string) 
 		c.cdMu.Unlock()
 		return &d, nil
 	}
+	if cached, ok := c.cachedChainDiscountProfiles(slug); ok {
+		return cached, nil
+	}
+	return &domain.ChainDiscountProfiles{TenantID: slug, Profiles: []domain.ChainDiscountProfile{}}, nil
+}
+
+func (c *Client) cachedChainDiscountProfiles(slug string) (*domain.ChainDiscountProfiles, bool) {
 	c.cdMu.RLock()
 	d, ok := c.cdProfiles[slug]
 	c.cdMu.RUnlock()
 	if !ok {
-		return &domain.ChainDiscountProfiles{TenantID: slug, Profiles: []domain.ChainDiscountProfile{}}, nil
+		return nil, false
 	}
 	cp := d
 	cp.Profiles = append([]domain.ChainDiscountProfile{}, d.Profiles...)
-	return &cp, nil
+	return &cp, true
 }
 
 // SaveChainDiscountProfiles replaces the tenant's full profile list (PUT semantics).

@@ -1,18 +1,18 @@
-// Product Master: Sell-Out M3 treatment — live 1280+250dp sidebar, Cairo,
-// live-scale values, and the Noto Sans Symbols 2 fallback used for ▲▼.
+// Product Master M3 layout at the live 1280+250dp sidebar shell: title, then
+// fixed primary tabs (SKU card first), one toolbar row per tab, and a catalog
+// table that fits without horizontal scroll (merged barcode/code cell,
+// sticky header, column-visibility menu).
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/data/app_cache.dart';
-import 'package:tashil_web/core/network/api_client.dart';
-import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
-import 'package:tashil_web/core/widgets/m3_equal_height_grid.dart';
-import 'package:tashil_web/core/widgets/m3_responsive_tab_bar.dart';
+import 'package:tashil_web/core/storage/session_storage.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
-import 'package:tashil_web/core/widgets/m3_wrap_text.dart';
-import 'package:tashil_web/core/widgets/table_scroll_container.dart';
 import 'package:tashil_web/features/product_master/data/chain_discount_repository.dart';
 import 'package:tashil_web/features/product_master/presentation/screens/product_master_screen.dart';
-import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
+import 'package:tashil_web/features/product_master/presentation/widgets/pm_catalog_table.dart';
 
 import 'support/live_viewport.dart';
 import 'support/product_master_m3_support.dart';
@@ -32,64 +32,33 @@ class _MemoryChainRepository extends ChainDiscountRepository {
   }
 }
 
-class _KpiMetrics {
-  _KpiMetrics(this.size, this.padding, this.iconSize, this.fonts, this.weights);
-  final Size size;
-  final EdgeInsetsGeometry? padding;
-  final double? iconSize;
-  final List<double?> fonts;
-  final List<FontWeight?> weights;
+/// First load times out exactly like the live bug, the retry succeeds.
+class _TimeoutOnceChainRepository extends ChainDiscountRepository {
+  _TimeoutOnceChainRepository(super.api);
+  int loads = 0;
+
   @override
-  String toString() =>
-      'size=$size padding=$padding icon=$iconSize fonts=$fonts weights=$weights';
+  Future<List<ChainDiscountProfileModel>> load() async {
+    loads++;
+    if (loads == 1) {
+      throw ChainDiscountException(friendlyChainDiscountError(TimeoutException(
+          'Future not completed', const Duration(seconds: 10))));
+    }
+    return const [
+      ChainDiscountProfileModel(
+          chain: 'kazyon', invoiceDiscountPct: 12, additionalDiscountPct: 0),
+    ];
+  }
+
+  @override
+  Future<List<ChainDiscountProfileModel>> save(
+          List<ChainDiscountProfileModel> profiles) async =>
+      profiles;
 }
 
-_KpiMetrics _kpi(WidgetTester tester, Finder card) {
-  final texts = find.descendant(of: card, matching: find.byType(Text));
-  final styles = [
-    for (final e in texts.evaluate())
-      (find
-              .descendant(
-                  of: find.byWidget(e.widget), matching: find.byType(RichText))
-              .evaluate()
-              .first
-              .widget as RichText)
-          .text
-          .style,
-  ];
-  return _KpiMetrics(
-    tester.getSize(card),
-    tester
-        .widget<Container>(
-            find.descendant(of: card, matching: find.byType(Container)).first)
-        .padding,
-    tester
-        .widget<Icon>(
-            find.descendant(of: card, matching: find.byType(Icon)).first)
-        .size,
-    [for (final st in styles) st?.fontSize],
-    [for (final st in styles) st?.fontWeight],
-  );
-}
-
-double? _horizontalExtent(WidgetTester tester) {
-  final table = find.byType(TableScrollContainer);
-  if (table.evaluate().isEmpty) return null;
-  final hScroll = find.descendant(
-    of: table.first,
-    matching: find.byWidgetPredicate((w) =>
-        w is Scrollable &&
-        (w.axisDirection == AxisDirection.left ||
-            w.axisDirection == AxisDirection.right)),
-  );
-  if (hScroll.evaluate().isEmpty) return 0;
-  return tester.state<ScrollableState>(hScroll.first).position.maxScrollExtent;
-}
-
-Finder _pmCards() => find.byWidgetPredicate((w) =>
-    w is M3SummaryKpiCard &&
-    w.key is ValueKey<String> &&
-    (w.key as ValueKey<String>).value.startsWith('pm_kpi_card_'));
+Finder _header(String label) => find.descendant(
+    of: find.byKey(const ValueKey('pm_catalog_header')),
+    matching: find.text(label));
 
 void main() {
   ignoreGoogleFontLoadErrors();
@@ -97,151 +66,332 @@ void main() {
   setUp(AppCache.clear);
 
   testWidgets(
-      'live 1280 shell: KPI height matches Sell-Out 138, typography, no h-scroll',
+      'live 1280 shell: title, then fixed primary tabs (SKU card first), no header actions / KPIs / chips',
       (tester) async {
-    await pumpProductMaster(
-      tester,
-      width: kLiveViewportWidth,
-      height: 2400,
-      withSidebar: true,
-      page: SellOutExplorerScreen(apiClient: ApiClient()),
-    );
-    final ref = _kpi(
-      tester,
-      find.byKey(const ValueKey('kpi_card_Net Sales (EGP)')),
-    );
-
     final errors = await pumpProductMaster(
       tester,
       width: kLiveViewportWidth,
-      height: 2400,
+      height: 1600,
       withSidebar: true,
     );
     expect(errors, isEmpty, reason: errors.map((e) => e.exception).join('\n'));
 
-    final cards = _pmCards();
-    expect(cards, findsNWidgets(5));
-    final pmGrid = tester.widget<M3EqualHeightGrid>(
-        find.byKey(const ValueKey('product_master_kpi_grid')));
-    expect(pmGrid.columns, 3,
-        reason: '5 KPI cards fill evenly as 3+2 (not a lonely 4+1)');
-    final cardYs = [
-      for (final e in cards.evaluate())
-        tester.getTopLeft(find.byWidget(e.widget)).dy
-    ];
-    expect(cardYs[0], closeTo(cardYs[1], 1.0));
-    expect(cardYs[0], closeTo(cardYs[2], 1.0));
-    expect(cardYs[3], closeTo(cardYs[4], 1.0));
-    expect(cardYs[3], greaterThan(cardYs[0] + 100),
-        reason: '2nd row holds cards 4–5 (3+2 even fill)');
-    // Incomplete last row is stretched — no empty third slot.
-    final gridWidth =
-        tester.getSize(find.byKey(const ValueKey('product_master_kpi_grid')))
-            .width;
-    final row1 = [
-      for (final e in cards.evaluate().skip(3))
-        tester.getSize(find.byWidget(e.widget)).width
-    ];
-    expect(row1, hasLength(2));
-    expect(row1[0], closeTo(row1[1], 1.0));
-    expect(row1[0] + row1[1] + pmGrid.spacing, closeTo(gridWidth, 2.0),
-        reason: 'last-row cards share the full grid width');
-    final row0W = tester.getSize(find.byWidget(cards.evaluate().first.widget)).width;
-    expect(row1[0], greaterThan(row0W + 10),
-        reason: 'stretched last-row cards are wider than 1/3 columns');
-    expect(find.text('إجمالي الأصناف'), findsWidgets);
-    expect(find.text('أصناف العروض'), findsWidgets);
-    expect(find.text('الباركودات الفريدة'), findsWidgets);
-    expect(find.text('التغطية بالسلاسل'), findsWidgets);
-    expect(find.text('إجمالي الأصناف المسجلة بالكارتة'), findsNothing);
-    expect(find.text('الباركودات الفريدة وسعة الكرتونة'), findsNothing);
-
-    for (final e in cards.evaluate()) {
-      final m = _kpi(tester, find.byWidget(e.widget));
-      final why = 'live-shell ${e.widget.key}: $m\nsell-out: $ref';
-      expect(m.padding, ref.padding, reason: why);
-      expect(m.iconSize, ref.iconSize, reason: why);
-      expect(m.iconSize, M3SummaryKpiStyle.iconSize, reason: why);
-      expect(m.padding, M3SummaryKpiStyle.padding, reason: why);
-      expect(m.size.height, closeTo(ref.size.height, 0.5), reason: why);
-      expect(m.size.height, closeTo(138.0, 1.0), reason: why);
-    }
-
-    expect(find.textContaining('كلوريل أبيض مركز'), findsWidgets);
-    expect(_horizontalExtent(tester), lessThanOrEqualTo(2.0),
-        reason: 'catalog still scrolls horizontally');
-
-    // Sell-Out / Errors / OOS symmetry: M3PageHeader + tonal M3ButtonGroup.
-    expect(find.byKey(const ValueKey('product_master_page_header')),
-        findsOneWidget);
-    expect(find.text('Product Master & Price List'), findsOneWidget);
+    final header = find.byKey(const ValueKey('product_master_page_header'));
+    expect(header, findsOneWidget);
     expect(find.text('كارتة الأصناف والأسعار'), findsOneWidget);
-    final button =
-        find.byKey(const ValueKey('product_master_export_csv_btn'));
-    expect(button, findsOneWidget);
-    expect(find.descendant(of: button, matching: find.text('تصدير Excel (CSV)')),
-        findsOneWidget);
-    expect(find.byKey(const ValueKey('product_master_upload_btn')),
-        findsOneWidget);
-
-    expect(find.textContaining('البادئة'), findsWidgets);
-    expect(find.textContaining('العلامة'), findsWidgets);
-    expect(find.text('بحث بكود الصنف أو الباركود أو الاسم'), findsWidgets);
-
-    // Sell-Out / TM symmetry: responsive tabs + short M3 chips.
-    expect(find.byKey(const ValueKey('product_master_tabs')), findsOneWidget);
-    expect(find.byType(M3ResponsiveTabBar<int>), findsOneWidget);
-    expect(find.byType(M3ChipSurface), findsWidgets);
-    expect(find.text('مسحوب'), findsWidgets);
-    expect(find.text('غير مسحوب'), findsWidgets);
-    expect(find.textContaining('تغير السعر'), findsOneWidget);
-    expect(find.textContaining('زاد ↑'), findsOneWidget);
-
-    // Catalog name wrap ≤3 (Sell-Out / TM hard rule).
-    final nameWraps = tester
-        .widgetList<M3WrapText>(find.byType(M3WrapText))
-        .where((w) => w.text.contains('كلوريل أبيض مركز'));
-    expect(nameWraps, isNotEmpty);
-    expect(nameWraps.every((w) => w.maxLines >= 3), isTrue);
-  });
-
-  testWidgets('1024+sidebar: KPI height 138, no horizontal scroll, no overflow',
-      (tester) async {
-    await pumpProductMaster(
-      tester,
-      width: 1024,
-      height: 2400,
-      withSidebar: true,
-      page: SellOutExplorerScreen(apiClient: ApiClient()),
-    );
-    final ref = _kpi(
-      tester,
-      find.byKey(const ValueKey('kpi_card_Net Sales (EGP)')),
-    );
-    final errors = await pumpProductMaster(
-      tester,
-      width: 1024,
-      height: 2400,
-      withSidebar: true,
-    );
-    expect(errors, isEmpty, reason: errors.map((e) => e.exception).join('\n'));
-    final cards = _pmCards();
-    expect(cards, findsNWidgets(5));
-    for (final e in cards.evaluate()) {
-      final m = _kpi(tester, find.byWidget(e.widget));
-      final why = '1024 ${e.widget.key}: $m\nsell-out: $ref';
-      expect(m.padding, ref.padding, reason: why);
-      expect(m.iconSize, ref.iconSize, reason: why);
-      expect(m.size.height, closeTo(ref.size.height, 0.5), reason: why);
-      expect(m.size.height, closeTo(138.0, 1.0), reason: why);
+    expect(
+        find.descendant(of: header, matching: find.byType(ButtonStyleButton)),
+        findsNothing,
+        reason: 'nothing remains in the page header');
+    expect(find.byWidgetPredicate((w) => w is M3SummaryKpiCard), findsNothing);
+    for (final gone in [
+      'إجمالي الأصناف',
+      'أصناف البيع العادي',
+      'أصناف العروض',
+      'الباركودات الفريدة',
+      'التغطية بالسلاسل',
+      'تحديث 01-09-2026',
+      'خصم فاتورة 10%',
+      'ضريبة 14%',
+      'شيتات الأسعار (',
+      'File Sheets',
+      'رفع تحديث شيت الأسعار',
+      'إضافة صنف جديد',
+      'تصدير Excel (CSV)',
+    ]) {
+      expect(find.textContaining(gone), findsNothing, reason: gone);
     }
-    expect(_horizontalExtent(tester), lessThanOrEqualTo(2.0),
-        reason: 'catalog still scrolls horizontally at 1024');
-    expect(find.textContaining('كلوريل أبيض مركز'), findsWidgets);
+
+    final tabBar = tester
+        .widget<TabBar>(find.byKey(const ValueKey('product_master_tabs')));
+    expect(tabBar.isScrollable, isFalse);
+    expect(tabBar.dividerHeight, 1.0);
+    final catalog = find.byKey(const ValueKey('pm_tab_catalog'));
+    final sheets = find.byKey(const ValueKey('pm_tab_sheets'));
+    final calc = find.byKey(const ValueKey('pm_tab_calculator'));
+    expect(find.text('كارتة الأصناف (3)'), findsOneWidget);
+    expect(find.text('الشيتات المرفوعة (1)'), findsOneWidget);
+    expect(find.text('حاسبة الطلبيات'), findsOneWidget);
+    expect(find.textContaining('والخصومات'), findsNothing);
+    for (final t in [catalog, sheets, calc]) {
+      expect(tester.getSize(t).height, 48.0);
+    }
+    // RTL: first tab is the rightmost.
+    expect(
+        tester.getCenter(catalog).dx, greaterThan(tester.getCenter(sheets).dx));
+    expect(tester.getCenter(sheets).dx, greaterThan(tester.getCenter(calc).dx));
+    // Directly under the title (16dp gap).
+    final tabsTop =
+        tester.getTopLeft(find.byKey(const ValueKey('product_master_tabs'))).dy;
+    expect(tabsTop - tester.getBottomLeft(header).dy, closeTo(16.0, 0.5));
+
+    final selected = tester
+        .widget<TabBar>(find.byKey(const ValueKey('product_master_tabs')))
+        .controller!
+        .index;
+    expect(selected, 0, reason: 'SKU card is the default tab');
   });
 
   testWidgets(
-      'order-economics tab is a chain terms table: no SKU picker, no simulator cards',
+      'catalog toolbar: one 40dp row — search at start, chips, actions at end (filled «إضافة صنف»)',
+      (tester) async {
+    final errors = await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 1600,
+      withSidebar: true,
+    );
+    expect(errors, isEmpty, reason: errors.map((e) => e.exception).join('\n'));
+
+    final toolbar = find.byKey(const ValueKey('pm_catalog_toolbar'));
+    expect(tester.getSize(toolbar).height, 40.0);
+    final search = find.byKey(const ValueKey('product_master_search_input'));
+    final chips = find.byKey(const ValueKey('pm_catalog_filter_chips'));
+    final add = find.byKey(const ValueKey('product_master_add_sku_btn'));
+    final csv = find.byKey(const ValueKey('product_master_export_csv_btn'));
+    expect(tester.widget(add), isA<ButtonStyleButton>());
+    expect(find.descendant(of: toolbar, matching: find.byType(FilledButton)),
+        findsOneWidget,
+        reason: 'one filled button per tab');
+    expect(tester.widget<IconButton>(csv).tooltip, 'تصدير CSV');
+    // RTL order: search (right) → chips → actions (left).
+    expect(tester.getRect(search).left,
+        greaterThanOrEqualTo(tester.getRect(chips).right - 1));
+    expect(tester.getRect(chips).left,
+        greaterThanOrEqualTo(tester.getRect(csv).right - 1));
+    expect(tester.getRect(csv).left, greaterThan(tester.getRect(add).right));
+    // Toolbar sits 16dp below the tab divider.
+    final tabsBottom = tester
+        .getBottomLeft(find.byKey(const ValueKey('product_master_tabs')))
+        .dy;
+    expect(tester.getTopLeft(toolbar).dy - tabsBottom, closeTo(16.0, 0.5));
+
+    for (final label in [
+      'البادئة',
+      'العلامة',
+      'النوع',
+      'التعبئة',
+      'السحب',
+      'تغير السعر'
+    ]) {
+      expect(find.descendant(of: chips, matching: find.text(label)),
+          findsOneWidget,
+          reason: label);
+    }
+
+    // Filter via chip menu.
+    await tester.tap(find.byKey(const ValueKey('pm_filter_item_type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('pm_filter_item_type_عرض')));
+    await tester.pumpAndSettle();
+    expect(find.text('النوع: عرض'), findsOneWidget);
+    expect(find.byKey(const ValueKey('pm_catalog_row_PRCL-0102-0015')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey('pm_catalog_row_FGCL-0550-0001')),
+        findsNothing);
+
+    // Rare actions live in the overflow menu.
+    await tester.tap(find.byKey(const ValueKey('pm_catalog_more_btn')));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('product_master_reset_filters_btn')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('pm_catalog_row_FGCL-0550-0001')),
+        findsOneWidget);
+  });
+
+  testWidgets(
+      'barcode + code share one cell: barcode on top (bodyMedium), code below (bodySmall), LTR, tabular, never truncated',
+      (tester) async {
+    await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 1600,
+      withSidebar: true,
+    );
+    final cell = find.byKey(const ValueKey('pm_barcode_cell_FGCL-0550-0001'));
+    expect(cell, findsOneWidget);
+    final barcode =
+        find.descendant(of: cell, matching: find.text('6221133000181'));
+    final code =
+        find.descendant(of: cell, matching: find.text('FGCL-0550-0001'));
+    expect(barcode, findsOneWidget);
+    expect(code, findsOneWidget);
+    expect(tester.getTopLeft(code).dy,
+        greaterThan(tester.getBottomLeft(barcode).dy),
+        reason: 'code sits below the barcode');
+    final theme = Theme.of(tester.element(cell));
+    final bStyle = tester.widget<Text>(barcode).style!;
+    final cStyle = tester.widget<Text>(code).style!;
+    expect(bStyle.fontSize, theme.textTheme.bodyMedium!.fontSize);
+    expect(bStyle.color, theme.colorScheme.onSurface);
+    expect(cStyle.fontSize, theme.textTheme.bodySmall!.fontSize);
+    expect(cStyle.color, theme.colorScheme.onSurfaceVariant);
+    expect(bStyle.fontFeatures, contains(const FontFeature.tabularFigures()));
+    expect(Directionality.of(tester.element(barcode)), TextDirection.ltr);
+    // Not scaled down / not clipped at 1280.
+    expect(tester.getRect(barcode).width,
+        closeTo(tester.getSize(barcode).width, 0.5));
+    expect(
+        tester
+            .renderObject<RenderParagraph>(
+                find.descendant(of: barcode, matching: find.byType(RichText)))
+            .didExceedMaxLines,
+        isFalse);
+    // Single semantics label for the cell.
+    expect(find.bySemanticsLabel('باركود 6221133000181، كود FGCL-0550-0001'),
+        findsOneWidget);
+    // Old separate columns are gone.
+    expect(_header('كود الصنف'), findsNothing);
+    expect(_header('الباركود'), findsNothing);
+    expect(_header('الباركود / الكود'), findsOneWidget);
+
+    await tester.tap(cell);
+    await tester.pump();
+    expect(find.text('تم النسخ'), findsOneWidget);
+  });
+
+  for (final (width, sidebar) in [
+    (1280.0, true),
+    (1024.0, true),
+    (1920.0, false)
+  ]) {
+    testWidgets(
+        'catalog table fits ${width.toInt()}${sidebar ? '+sidebar' : ''}: no horizontal scroll, no overflow, 56dp header/rows',
+        (tester) async {
+      final errors = await pumpProductMaster(
+        tester,
+        width: width,
+        height: 1600,
+        withSidebar: sidebar,
+      );
+      expect(errors, isEmpty,
+          reason: errors.map((e) => e.exception).join('\n'));
+
+      final surface = find.byKey(const ValueKey('pm_catalog_tonal_surface'));
+      final headerRow = find.byKey(const ValueKey('pm_catalog_header'));
+      final contentLeft = sidebar ? 0.0 : 0.0;
+      final contentRight = width - (sidebar ? kLiveSidebarWidth : 0.0);
+      final hr = tester.getRect(headerRow);
+      expect(hr.left, greaterThanOrEqualTo(contentLeft + 24.0 - 0.5));
+      expect(hr.right, lessThanOrEqualTo(contentRight - 24.0 + 0.5));
+      expect(tester.getSize(headerRow).height, 57.0,
+          reason: '56dp header + 1dp divider');
+      expect(
+          find.descendant(
+              of: surface,
+              matching: find.byWidgetPredicate((w) =>
+                  w is Scrollable &&
+                  (w.axisDirection == AxisDirection.left ||
+                      w.axisDirection == AxisDirection.right))),
+          findsNothing,
+          reason: 'the table never scrolls horizontally');
+      expect(surface, findsOneWidget);
+
+      final row = find.byKey(const ValueKey('pm_catalog_row_FGCL-0550-0001'));
+      expect(tester.getSize(row).height, inInclusiveRange(56.0, 58.0));
+      expect(tester.getRect(row).right, lessThanOrEqualTo(hr.right + 0.5));
+
+      // Essentials always visible.
+      for (final label in [
+        'الباركود / الكود',
+        'اسم الصنف',
+        'السعر ش.ض',
+        'النوع / السحب'
+      ]) {
+        expect(_header(label), findsOneWidget, reason: '$label @ $width');
+      }
+      final name = tester
+          .getSize(find.byKey(const ValueKey('pm_row_name_FGCL-0550-0001')));
+      expect(name.width, greaterThanOrEqualTo(240.0 - 16.0 - 0.5),
+          reason: 'name column ≥ 240dp @ $width');
+      final nameText = tester.widget<Text>(
+          find.byKey(const ValueKey('pm_row_name_FGCL-0550-0001')));
+      expect(nameText.maxLines, 2);
+      expect(nameText.overflow, TextOverflow.ellipsis);
+
+      if (width >= 1920) {
+        for (final label in [
+          'سعر الوحدة',
+          'سعر الكرتونة',
+          'التعبئة',
+          'العلامة / الفئة'
+        ]) {
+          expect(_header(label), findsOneWidget, reason: '$label @ $width');
+        }
+      }
+    });
+  }
+
+  testWidgets('header stays pinned while the catalog scrolls', (tester) async {
+    await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 500,
+      withSidebar: true,
+    );
+    final scroll = find.byType(CustomScrollView);
+    await tester.drag(scroll, const Offset(0, -400));
+    await tester.pumpAndSettle();
+    final header = find.byKey(const ValueKey('pm_catalog_header'));
+    expect(header, findsOneWidget);
+    expect(tester.getTopLeft(header).dy, greaterThanOrEqualTo(0.0));
+    expect(tester.getTopLeft(header).dy, lessThan(500.0));
+  });
+
+  testWidgets(
+      'column menu brings back hidden columns (carton price) without overflow',
+      (tester) async {
+    final errors = await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 1600,
+      withSidebar: true,
+    );
+    expect(errors, isEmpty);
+    expect(_header('سعر الكرتونة'), findsNothing,
+        reason: 'lowest-priority columns hidden at 1280 so the table fits');
+
+    await tester.tap(find.byKey(const ValueKey('pm_columns_menu_btn')));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('pm_column_toggle_carton')).first);
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(_header('سعر الكرتونة'), findsOneWidget);
+    final hr = tester.getRect(find.byKey(const ValueKey('pm_catalog_header')));
+    expect(hr.right, lessThanOrEqualTo(kLiveContentWidth - 24.0 + 0.5));
+    expect(tester.takeException(), isNull);
+  });
+
+  test('column fitting: autoVisible by priority, widths fill the table', () {
+    const live = 982.0;
+    final auto = PmCatalogTableStyle.autoVisible(live);
+    expect(auto, containsAll([PmCatalogColumn.net, PmCatalogColumn.brand]));
+    expect(auto, isNot(contains(PmCatalogColumn.carton)));
+    final visible = PmCatalogTableStyle.visibleColumns(live, const {});
+    final w = PmCatalogTableStyle.widths(live, visible);
+    final total = w.values.fold<double>(0, (a, b) => a + b) +
+        PmCatalogTableStyle.outerExtra;
+    expect(total, closeTo(live, 0.01));
+    expect(w[PmCatalogColumn.barcode], 156.0);
+    expect(w[PmCatalogColumn.name], greaterThanOrEqualTo(240.0));
+
+    // Forcing every column on still fits; the barcode never shrinks.
+    final all = PmCatalogTableStyle.visibleColumns(live, {
+      for (final c in PmCatalogTableStyle.columns) c.id: true,
+    });
+    final wAll = PmCatalogTableStyle.widths(live, all);
+    expect(
+        wAll.values.fold<double>(0, (a, b) => a + b) +
+            PmCatalogTableStyle.outerExtra,
+        closeTo(live, 0.01));
+    expect(wAll[PmCatalogColumn.barcode], 156.0);
+  });
+
+  testWidgets(
+      'order calculator tab is a chain terms table: no SKU picker, no simulator cards',
       (tester) async {
     final errors = await pumpProductMaster(
       tester,
@@ -251,20 +401,16 @@ void main() {
     );
     expect(errors, isEmpty, reason: errors.map((e) => e.exception).join('\n'));
 
-    await tester.tap(find.textContaining('حاسبة الطلبيات والخصومات والهامش'));
+    await tester.tap(find.text('حاسبة الطلبيات'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('chain_discount_profiles_card')),
         findsOneWidget);
-    expect(find.byKey(const ValueKey('chain_discount_add_btn')), findsOneWidget);
-    // The single-SKU simulator is gone.
+    expect(
+        find.byKey(const ValueKey('chain_discount_add_btn')), findsOneWidget);
     expect(find.byKey(const ValueKey('pm_calc_result_grid')), findsNothing);
     expect(find.byKey(const ValueKey('calc_chain_dropdown')), findsNothing);
-    expect(find.byKey(const ValueKey('product_master_export_order_csv_btn')),
-        findsNothing);
     expect(find.textContaining('اختر الصنف'), findsNothing);
-    expect(find.textContaining('سعر بيع السلسلة للمستهلك'), findsNothing);
-    expect(find.textContaining('عدد الكراتين'), findsNothing);
   });
 
   testWidgets(
@@ -281,15 +427,15 @@ void main() {
           apiClient: api, chainRepository: _MemoryChainRepository(api)),
     );
     expect(errors, isEmpty, reason: errors.map((e) => e.exception).join('\n'));
-    await tester.tap(find.textContaining('حاسبة الطلبيات والخصومات والهامش'));
+    await tester.tap(find.text('حاسبة الطلبيات'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('chain_discount_add_btn')));
     await tester.pumpAndSettle();
-    // Defaults are prefilled: VAT 14, invoice 10, extra 0.
     expect(
         tester
-            .widget<TextField>(find.byKey(const ValueKey('chain_discount_vat_field')))
+            .widget<TextField>(
+                find.byKey(const ValueKey('chain_discount_vat_field')))
             .controller!
             .text,
         '14');
@@ -306,9 +452,6 @@ void main() {
 
     final row = find.byKey(const ValueKey('chain_terms_row_m3-chain'));
     expect(row, findsOneWidget);
-    for (final col in ['المؤسسة / السلسلة', 'الضريبة', 'خصم الفاتورة', 'الخصم الإضافي', 'آخر تحديث']) {
-      expect(find.text(col), findsOneWidget, reason: col);
-    }
     expect(find.text('5%'), findsOneWidget);
     expect(find.text('12%'), findsOneWidget);
     expect(find.text('20%'), findsOneWidget);
@@ -322,110 +465,101 @@ void main() {
     expect(find.text('8.50%'), findsOneWidget);
   });
 
-  bool onScreen(WidgetTester tester, Finder f, {double width = 1280}) {
-    expect(f, findsWidgets);
-    final box = tester.getRect(f.first);
-    return box.left < width - 1 &&
-        box.right > 1 &&
-        box.top < 8000 &&
-        box.bottom > 0;
-  }
-
   testWidgets(
-      'catalog tonal surface + per-row type strip visible at 1280/1920',
+      'chain terms load timeout: friendly Arabic error + retry, never the raw TimeoutException or «no chains»',
       (tester) async {
-    for (final width in [1280.0, 1920.0]) {
-      final errors = await pumpProductMaster(
-        tester,
-        width: width,
-        height: 2400,
-        withSidebar: width <= 1280,
-      );
-      expect(errors, isEmpty,
-          reason: errors.map((e) => e.exception).join('\n'));
+    final api = liveScaleProductMasterClient();
+    final repo = _TimeoutOnceChainRepository(api);
+    await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 1600,
+      withSidebar: true,
+      apiClient: api,
+      page: ProductMasterScreen(apiClient: api, chainRepository: repo),
+    );
+    await tester.tap(find.text('حاسبة الطلبيات'));
+    await tester.pumpAndSettle();
 
-      final surface = find.byKey(const ValueKey('pm_catalog_tonal_surface'));
-      expect(surface, findsOneWidget, reason: 'tonal surface @ $width');
-      expect(onScreen(tester, surface, width: width), isTrue,
-          reason: 'tonal surface on screen @ $width');
+    expect(find.byKey(const ValueKey('chain_discount_error_banner')),
+        findsOneWidget);
+    expect(find.text('تعذّر تحميل إعدادات السلاسل'), findsOneWidget);
+    expect(find.text(kChainDiscountTimeoutMessage), findsOneWidget);
+    expect(find.textContaining('TimeoutException'), findsNothing);
+    expect(find.textContaining('Future not completed'), findsNothing);
+    expect(find.textContaining('لا توجد سلاسل مضافة'), findsNothing);
 
-      final table = find.byKey(const ValueKey('pm_catalog_table'));
-      expect(table, findsOneWidget, reason: 'catalog table @ $width');
-      final dt = tester.widget<DataTable>(table);
-      expect(dt.dataRowMinHeight, greaterThanOrEqualTo(72.0),
-          reason: 'chip + description row budget @ $width');
-      for (final (i, c) in dt.columns.indexed) {
-        expect(c.headingRowAlignment, MainAxisAlignment.center,
-            reason: 'column $i centered @ $width');
-      }
+    await tester.tap(find.text('إعادة المحاولة'));
+    await tester.pumpAndSettle();
+    expect(repo.loads, 2);
+    expect(find.byKey(const ValueKey('chain_discount_error_banner')),
+        findsNothing);
+    expect(
+        find.byKey(const ValueKey('chain_terms_row_kazyon')), findsOneWidget);
+  });
 
-      final strip =
-          find.byKey(const ValueKey('pm_row_type_strip_FGCL-0550-0001'));
-      expect(strip, findsOneWidget, reason: 'row type strip @ $width');
-      expect(onScreen(tester, strip, width: width), isTrue,
-          reason: 'row type strip on screen @ $width');
-      final stripBox = tester.widget<DecoratedBox>(strip);
-      final deco = stripBox.decoration as BoxDecoration;
-      final border = deco.border! as BorderDirectional;
-      expect(border.start.width, 4.0,
-          reason: '4dp per-type tonal strip @ $width');
-      expect(border.start.color.a, greaterThan(0.0),
-          reason: 'strip colour visible @ $width');
+  testWidgets('selected tab persists in the ?tab= URL query', (tester) async {
+    SessionStorage.replaceBrowserQueryParam('tab', 'calculator');
+    await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 1600,
+      withSidebar: true,
+      resetTabQuery: false,
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('chain_discount_profiles_card')),
+        findsOneWidget,
+        reason: 'refresh with ?tab=calculator reopens the calculator');
 
-      final rowChip =
-          find.byKey(const ValueKey('pm_row_type_chip_FGCL-0550-0001'));
-      expect(rowChip, findsOneWidget, reason: 'row type chip @ $width');
-      final chipText = tester.widget<Text>(
-          find.descendant(of: rowChip, matching: find.byType(Text)).first);
-      expect(chipText.data, 'عادي');
-      expect(chipText.maxLines, 1);
+    await tester.tap(find.byKey(const ValueKey('pm_tab_sheets')));
+    await tester.pumpAndSettle();
+    expect(SessionStorage.browserQueryParam('tab'), 'sheets');
+    expect(find.byKey(const ValueKey('product_master_upload_btn')),
+        findsOneWidget);
 
-      // Short chip + description underneath (مسحوب + units / فرصة توزيع).
-      expect(find.descendant(of: table, matching: find.text('مسحوب')),
-          findsWidgets);
-      expect(find.descendant(of: table, matching: find.textContaining('وحدة')),
-          findsWidgets);
-      expect(
-          find.descendant(of: table, matching: find.text('فرصة توزيع')),
-          findsWidgets);
-
-      // Official name wrap ≤3 (text snapshot of long live-scale name).
-      final nameWraps = tester
-          .widgetList<M3WrapText>(find.byType(M3WrapText))
-          .where((w) => w.text.contains('كلوريل أبيض مركز'));
-      expect(nameWraps, isNotEmpty);
-      expect(nameWraps.every((w) => w.maxLines >= 3), isTrue);
-      expect(nameWraps.every((w) => w.textAlign == TextAlign.center), isTrue);
-    }
+    await tester.tap(find.byKey(const ValueKey('pm_tab_catalog')));
+    await tester.pumpAndSettle();
+    expect(SessionStorage.browserQueryParam('tab'), isNull,
+        reason: 'the default tab keeps a clean URL');
   });
 
   testWidgets(
-      'empty catalog KPIs show «—» + note, never fake 0% / 0.0 averages',
+      'uploaded-sheets tab: one toolbar row with the single filled upload button',
+      (tester) async {
+    await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 1600,
+      withSidebar: true,
+    );
+    await tester.tap(find.byKey(const ValueKey('pm_tab_sheets')));
+    await tester.pumpAndSettle();
+    final toolbar = find.byKey(const ValueKey('pm_sheets_toolbar'));
+    expect(tester.getSize(toolbar).height, 40.0);
+    expect(find.descendant(of: toolbar, matching: find.byType(FilledButton)),
+        findsOneWidget);
+    expect(find.text('رفع شيت أسعار'), findsOneWidget);
+    expect(
+        find.textContaining(
+            'adeco_product_master_2026_09_01_canonical_official_price_list'),
+        findsOneWidget);
+  });
+
+  testWidgets('empty catalog: empty table state, no fake KPI numbers',
       (tester) async {
     final errors = await pumpProductMaster(
       tester,
       width: kLiveViewportWidth,
-      height: 2400,
+      height: 1600,
       withSidebar: true,
       apiClient: liveScaleProductMasterClient(emptyCatalog: true),
     );
     expect(errors, isEmpty, reason: errors.map((e) => e.exception).join('\n'));
-
-    for (final key in [
-      'pm_kpi_card_Total Registered',
-      'pm_kpi_card_Regular Catalog',
-      'pm_kpi_card_Promos',
-      'pm_kpi_card_Unique Barcodes',
-      'pm_kpi_card_Chain Coverage',
-    ]) {
-      final card =
-          tester.widget<M3SummaryKpiCard>(find.byKey(ValueKey(key)));
-      expect(card.value, '—', reason: key);
-      expect(card.textValue, isTrue, reason: key);
-      expect(card.subtitle, isNot(contains('0.0')), reason: key);
-      expect(card.subtitle, isNot(contains('تمثل 0%')), reason: key);
-    }
-    expect(find.text('لا توجد أصناف في الكارتة'), findsOneWidget);
+    expect(find.text('لا توجد أصناف مطابقة لمعايير البحث الحالية'),
+        findsOneWidget);
+    expect(find.text('0 صنف'), findsOneWidget);
     expect(find.textContaining('0.0%'), findsNothing);
+    expect(find.byWidgetPredicate((w) => w is M3SummaryKpiCard), findsNothing);
   });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tashil_web/core/storage/session_storage.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/features/product_master/presentation/screens/product_master_screen.dart';
 
@@ -245,11 +246,14 @@ class _FakeProductMasterApiClient extends ApiClient {
   }
 }
 
-Finder itemCode(String code) => find.bySemanticsLabel(code);
+// The barcode/code cell carries one label: «باركود …، كود …».
+Finder itemCode(String code) =>
+    find.bySemanticsLabel(RegExp('كود ${RegExp.escape(code)}\$'));
 
 void main() {
 
   setUpAll(loadRealCairoFont);
+  setUp(() => SessionStorage.replaceBrowserQueryParam('tab', null));
 
   group('ProductMasterItemModel & ProductMasterSummaryModel JSON normalization', () {
     test('normalizes backend decimal discount ratios (0.10 -> 10.0%), price diffs, and preserves >1 percentages', () {
@@ -390,7 +394,7 @@ void main() {
     });
   });
 
-  testWidgets('ProductMasterScreen renders KPIs, filters by Item Code / Barcode, and switches tabs',
+  testWidgets('ProductMasterScreen renders title + tabs (no header actions / KPIs), filters by Item Code / Barcode, and switches tabs',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1440, 1800);
     tester.view.devicePixelRatio = 1.0;
@@ -409,12 +413,26 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify M3 page header, 5th KPI card, and SKUs are rendered
-    expect(find.byKey(const ValueKey('product_master_page_header')),
-        findsOneWidget);
+    // Title only: no header actions, no KPI cards, no summary chips.
+    final header = find.byKey(const ValueKey('product_master_page_header'));
+    expect(header, findsOneWidget);
     expect(find.text('Product Master & Price List'), findsOneWidget);
     expect(find.text('كارتة الأصناف والأسعار'), findsOneWidget);
-    expect(find.textContaining('التغطية بالسلاسل'), findsOneWidget);
+    expect(find.descendant(of: header, matching: find.byType(ButtonStyleButton)),
+        findsNothing);
+    for (final gone in [
+      'التغطية بالسلاسل',
+      'إجمالي الأصناف',
+      'الباركودات الفريدة',
+      'رفع تحديث شيت الأسعار',
+      'إضافة صنف جديد',
+      'تصدير Excel (CSV)',
+      'File Sheets',
+      'خصم فاتورة',
+      'شيتات الأسعار (',
+    ]) {
+      expect(find.textContaining(gone), findsNothing, reason: gone);
+    }
     expect(find.byKey(const ValueKey('product_master_tabs')), findsOneWidget);
     expect(find.text('مسحوب'), findsWidgets);
     expect(find.text('غير مسحوب'), findsWidgets);
@@ -437,8 +455,9 @@ void main() {
     expect(itemCode('FGCL-0550-0001'), findsWidgets);
     expect(itemCode('PRCL-0102-0015'), findsNothing);
 
-    // Switch to Tab 2 (chain terms) and verify the per-chain table with its add action
-    await tester.tap(find.textContaining('حاسبة الطلبيات والخصومات والهامش'));
+    // Switch to the order calculator tab (chain terms) and verify the per-chain table with its add action
+    expect(find.textContaining('حاسبة الطلبيات والخصومات'), findsNothing);
+    await tester.tap(find.text('حاسبة الطلبيات'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('chain_discount_profiles_card')), findsOneWidget);
     expect(find.byKey(const ValueKey('chain_discount_add_btn')), findsOneWidget);
@@ -479,30 +498,35 @@ void main() {
       findsOneWidget,
     );
 
-    // 2. Test Quick Price-Change Filter Chips (زاد السعر / انخفض السعر / أصناف جديدة)
-    await tester.tap(find.byKey(const ValueKey('price_filter_up')));
-    await tester.pumpAndSettle();
+    // 2. Price-change filter chip menu (زاد السعر / انخفض السعر / أصناف جديدة)
+    Future<void> pickPriceFilter(String key) async {
+      await tester.tap(find.byKey(const ValueKey('pm_filter_price_change')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+    }
+
+    await pickPriceFilter('price_filter_up');
     expect(itemCode('FGCL-0550-0001'), findsWidgets);
     expect(itemCode('PRCL-0102-0015'), findsNothing);
     expect(itemCode('FGDW-0200-0099'), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('price_filter_down')));
-    await tester.pumpAndSettle();
+    await pickPriceFilter('price_filter_down');
     expect(itemCode('PRCL-0102-0015'), findsWidgets);
     expect(itemCode('FGCL-0550-0001'), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('price_filter_new')));
-    await tester.pumpAndSettle();
+    await pickPriceFilter('price_filter_new');
     expect(itemCode('FGDW-0200-0099'), findsWidgets);
     expect(itemCode('FGCL-0550-0001'), findsNothing);
 
     // Reset back to all
-    await tester.tap(find.byKey(const ValueKey('price_filter_all')));
-    await tester.pumpAndSettle();
+    await pickPriceFilter('price_filter_all');
     expect(itemCode('FGCL-0550-0001'), findsWidgets);
     expect(itemCode('PRCL-0102-0015'), findsWidgets);
 
-    // 3. Open Diff Summary Modal and click "عرض الأصناف المتغيرة فقط في الجدول"
+    // 3. Open Diff Summary Modal (toolbar overflow menu) and click "عرض الأصناف المتغيرة فقط في الجدول"
+    await tester.tap(find.byKey(const ValueKey('pm_catalog_more_btn')));
+    await tester.pumpAndSettle();
     final diffBtn = find.byKey(const ValueKey('product_master_open_diff_summary_btn'));
     expect(diffBtn, findsOneWidget);
     await tester.tap(diffBtn);
@@ -512,18 +536,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('diff_dialog_filter_changed_btn')));
     await tester.pumpAndSettle();
 
-    // 4. Open File Sheets modal, verify sheet bubbles, and delete the latest sheet to trigger rollback
-    final fileSheetsBtn = find.byKey(const ValueKey('product_master_file_sheets_btn'));
-    expect(fileSheetsBtn, findsOneWidget);
-    await tester.tap(fileSheetsBtn);
+    // 4. Uploaded-sheets tab: delete the latest sheet to trigger rollback
+    await tester.tap(find.byKey(const ValueKey('pm_tab_sheets')));
     await tester.pumpAndSettle();
-
-    expect(find.textContaining('شيتات الأسعار المرفوعة (File Sheets)'), findsOneWidget);
+    expect(find.byKey(const ValueKey('product_master_upload_btn')), findsOneWidget);
     expect(find.text('adeco_product_master_2026_09_01.xlsx'), findsWidgets);
     expect(find.text('adeco_product_master_2026_08_01.xlsx'), findsWidgets);
 
-    // Delete the 2026-09-01 sheet bubble
-    await tester.tap(find.byKey(const ValueKey('delete_file_sheet_btn_pm-seed-2')));
+    await tester.tap(find.byKey(const ValueKey('archive_tab_delete_sheet_pm-seed-2')));
     await tester.pumpAndSettle();
 
     // Confirm deletion in confirmation dialog
@@ -531,9 +551,11 @@ void main() {
     await tester.tap(find.text('تأكيد الحذف واسترجاع الأسعار'));
     await tester.pumpAndSettle();
 
-    // Verify rollback occurred: sheet2Deleted is true, new SKU FGDW-0200-0099 is gone, and active sheet is 2026_08_01
+    // Rollback: sheet2Deleted is true, the 09-01 sheet is gone and new SKU FGDW-0200-0099 is gone
     expect(client.sheet2Deleted, isTrue);
+    expect(find.text('adeco_product_master_2026_09_01.xlsx'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('pm_tab_catalog')));
+    await tester.pumpAndSettle();
     expect(itemCode('FGDW-0200-0099'), findsNothing);
-    expect(find.textContaining('تحديث 01-08-2026'), findsWidgets);
   });
 }

@@ -103,7 +103,7 @@ void main() {
   setUp(AppCache.clear);
 
   testWidgets(
-      'OOS and Product Master KPI titles match Sell-Out text scale at 1280+sidebar, no ellipsis',
+      'OOS KPI titles match Sell-Out text scale at 1280+sidebar, no ellipsis (Product Master has none)',
       (tester) async {
     await _pumpSellOutShell(tester);
     final soCard = find.byKey(const ValueKey('kpi_card_Net Sales (EGP)'));
@@ -160,47 +160,15 @@ void main() {
       );
     }
 
-    // Product Master at the same live shell.
+    // Product Master has no KPI cards (owner decision): nothing to compare there.
     await pumpProductMaster(
       tester,
       width: kLiveViewportWidth,
       withSidebar: true,
     );
-    const pmKeys = [
-      'pm_kpi_card_Total Registered',
-      'pm_kpi_card_Regular Catalog',
-      'pm_kpi_card_Promos',
-      'pm_kpi_card_Unique Barcodes',
-      'pm_kpi_card_Chain Coverage',
-    ];
-    for (final k in pmKeys) {
-      final card = find.byKey(ValueKey(k));
-      expect(card, findsOneWidget, reason: k);
-      expect(tester.getSize(card).height, closeTo(138.0, 1.0), reason: k);
-      _assertCardTitleMatchesSellOut(
-        tester,
-        card: card,
-        sellOutTitle: sellOutStyle,
-        page: 'PM $k',
-      );
-    }
-
-    // Unique-barcodes subtitle must be fully visible (no ellipsis).
-    final barcodeCard = find.byKey(const ValueKey('pm_kpi_card_Unique Barcodes'));
-    final sub = find.descendant(
-      of: barcodeCard,
-      matching: find.byWidgetPredicate(
-        (w) => w is Text && (w.data?.contains('متوسط السعة') ?? false),
-      ),
-    );
-    expect(sub, findsOneWidget);
-    final subText = tester.widget<Text>(sub);
-    expect(subText.data, isNot(contains('…')));
-    expect(subText.data, isNot(contains('...')));
-    expect(subText.data, contains('وحدة/كرتونة'));
-    final subPara = tester.renderObject<RenderParagraph>(
-        find.descendant(of: sub, matching: find.byType(RichText)));
-    expect(subPara.didExceedMaxLines, isFalse,
-        reason: 'PM unique-barcodes subtitle ellipsized: ${subText.data}');
+    expect(find.byWidgetPredicate((w) =>
+        w.key is ValueKey<String> &&
+        (w.key as ValueKey<String>).value.startsWith('pm_kpi_card_')),
+        findsNothing);
   });
 }

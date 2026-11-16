@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/widgets/app_icons.dart';
+import '../../../../core/widgets/m3_states.dart';
 import '../../data/chain_discount_repository.dart';
 import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/m3_wrap_text.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 
-/// Product Master → «حاسبة الطلبيات والخصومات والهامش»: one row per chain with its VAT, invoice
+/// Product Master → «حاسبة الطلبيات»: one row per chain with its VAT, invoice
 /// discount and extra discount. Saved terms are the single source of truth for that chain's Sell-In
 /// everywhere (factory cost, chain margin, supply waterfall, VAT, invoices, totals).
 /// Chains without a row use VAT 14% / invoice 10% / extra 0%.
@@ -15,7 +16,12 @@ class ChainDiscountProfilesCard extends StatelessWidget {
   final List<ChainDiscountProfileModel> profiles;
   final bool loading;
   final bool saving;
+  /// Friendly Arabic message (never a raw exception string).
   final String? error;
+  final String errorTitle;
+
+  /// Shown as «إعادة المحاولة» on the error banner when set.
+  final VoidCallback? onRetry;
 
   /// Admin-only: when false the table is read-only.
   final bool canEdit;
@@ -28,6 +34,8 @@ class ChainDiscountProfilesCard extends StatelessWidget {
     this.loading = false,
     this.saving = false,
     this.error,
+    this.errorTitle = 'تعذّر تحميل إعدادات السلاسل',
+    this.onRetry,
     this.canEdit = true,
   });
 
@@ -110,13 +118,17 @@ class ChainDiscountProfilesCard extends StatelessWidget {
             ),
           const SizedBox(height: 12.0),
           if (loading || saving) const LinearProgressIndicator(),
-          if (error != null)
+          if (error != null && !loading)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Text(error!,
-                  style: theme.textTheme.bodySmall?.copyWith(color: cs.error)),
+              child: M3ErrorBanner(
+                key: const ValueKey('chain_discount_error_banner'),
+                title: errorTitle,
+                message: error,
+                onRetry: onRetry,
+              ),
             ),
-          if (!loading && profiles.isEmpty)
+          if (!loading && profiles.isEmpty && error == null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: Text(
