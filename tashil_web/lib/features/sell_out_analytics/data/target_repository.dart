@@ -2,6 +2,7 @@ import '../../../core/data/app_cache.dart';
 import '../../../core/data/cache_store.dart';
 import '../../../core/data/result.dart';
 import '../../../core/network/api_client.dart';
+import 'target_breakdown_models.dart';
 
 /// Read-side repository for the Target Management panel (sell_out / sell_in targets).
 /// Caches per target type + chain + year (tenant/role aware). Upserts and Excel uploads
@@ -40,5 +41,18 @@ class TargetRepository {
     final k = CacheStore.key(api.tenantId, feature, ['chains', ..._userParts]);
     if (forceRefresh) cache.invalidate(k);
     return Result.guard(() => cache.getOrLoad<List<RetailChainModel>>(k, () => api.getRetailChains()));
+  }
+
+  /// Branch / SKU distribution of one Sell-Out target (read-only, computed in BigQuery).
+  Future<Result<TargetBreakdownModel>> loadBreakdown(
+    String targetId, {
+    bool forceRefresh = false,
+  }) {
+    final k = CacheStore.key(api.tenantId, feature, ['breakdown', ..._userParts, targetId]);
+    if (forceRefresh) cache.invalidate(k);
+    return Result.guard(() => cache.getOrLoad<TargetBreakdownModel>(
+          k,
+          () async => TargetBreakdownModel.fromJson(await api.getTargetBreakdownJson(targetId)),
+        ));
   }
 }

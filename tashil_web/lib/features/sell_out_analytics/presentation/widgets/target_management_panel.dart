@@ -9,6 +9,8 @@ import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/data/result.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/target_repository.dart';
+import '../../domain/target_kpi.dart';
+import 'target_breakdown_dialog.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/shared_display_prefix.dart';
@@ -23,6 +25,7 @@ import '../../../../core/widgets/m3_chip_surface.dart';
 import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
+import '../../../../core/widgets/m3_table_text.dart';
 
 /// TargetManagementPanel provides a unified Target entry, Excel upload, and
 /// real-time Actual vs. Target achievement comparison experience for both
@@ -705,7 +708,7 @@ onChanged: m3Legacy<int>((v) {
         fileBytes: picked.bytes,
         targetType: widget.targetType,
         chain: _selectedChain != 'all' ? _selectedChain : 'fathalla',
-        year: _selectedYear > 0 ? _selectedYear : 2026,
+        year: _selectedYear > 0 ? _selectedYear : _baseCurrentYear,
       );
       if (!mounted) return;
       M3Feedback.showSuccess(
@@ -1009,7 +1012,21 @@ onChanged: m3Legacy<int>((v) {
             // of contradictory 'فوق المستهدف' / 'أقل من المستهدف'.
             final hasTargets = summary.items.isNotEmpty;
             const noTargets = 'لا توجد مستهدفات بعد';
+            const noSalesYet = 'لا توجد مبيعات بعد';
             final neutral = colorScheme.onSurfaceVariant;
+            // Sell-Out compares only periods that have sales: a 2027 target
+            // must not turn "كل السنوات" into 38% / −202M.
+            final kpis = TargetKpis.fromSummary(summary);
+            final onlyNoData = !_isSellIn && kpis.onlyNoData;
+            final includesNoData = !_isSellIn && kpis.includesNoData;
+            final double? achPct = _isSellIn
+                ? summary.overallAchievementPct
+                : (hasTargets ? kpis.achievementPct : summary.overallAchievementPct);
+            final double? variance = _isSellIn
+                ? summary.totalVarianceEgp
+                : (hasTargets ? kpis.gapRevenue : summary.totalVarianceEgp);
+            final targetUnitsText =
+                '${CurrencyFormatter.formatNumber(summary.totalTargetUnits.round())} $_unitLabelAr مستهدفة';
             final card1 = _buildKpiCard(
               context,
               titleAr: _isSellIn ? 'مستهدف التوريد' : 'مستهدف المبيعات',
@@ -1022,7 +1039,13 @@ onChanged: m3Legacy<int>((v) {
               ),
               subtitleAr: _isSellIn
                   ? '${CurrencyFormatter.formatNumber(summary.totalTargetUnits.round())} كرتونة • ${summary.totalTargetWeightTons.toStringAsFixed(1)} طن'
-                  : '${CurrencyFormatter.formatNumber(summary.totalTargetUnits.round())} $_unitLabelAr مستهدفة',
+                  : includesNoData
+                      ? 'يشمل مستهدفات سنوات قادمة'
+                      : targetUnitsText,
+              subtitleTooltip: includesNoData
+                  ? 'يشمل مستهدفات سنوات قادمة بدون مبيعات '
+                      '(${CurrencyFormatter.formatCompactEGP(kpis.noDataTargetRevenue)}) • $targetUnitsText'
+                  : null,
               subtitleEn: _isSellIn
                   ? '+ returns: ${CurrencyFormatter.formatNumber(summary.totalGrossTargetUnits.round())} cases'
                   : 'Target $_unitLabelEn',
@@ -1038,45 +1061,52 @@ onChanged: m3Legacy<int>((v) {
               titleEn: _isSellIn
                   ? 'Actual net Sell-In after returns'
                   : 'Actual Sell-Out',
-              value: CurrencyFormatter.formatCompactEGP(
-                summary.totalActualRevenueEgp,
-              ),
+              value: onlyNoData
+                  ? '—'
+                  : CurrencyFormatter.formatCompactEGP(
+                      summary.totalActualRevenueEgp,
+                    ),
               subtitleAr: _isSellIn
                   ? '${CurrencyFormatter.formatNumber(summary.totalActualUnits.round())} كرتونة • ${summary.totalActualWeightTons.toStringAsFixed(1)} طن'
-                  : '${CurrencyFormatter.formatNumber(summary.totalActualUnits.round())} $_unitLabelAr محققة',
+                  : onlyNoData
+                      ? noSalesYet
+                      : '${CurrencyFormatter.formatNumber(summary.totalActualUnits.round())} $_unitLabelAr محققة',
               subtitleEn: _isSellIn && summary.totalExpectedRevenueEgp > 0
                   ? 'Forecast: ${CurrencyFormatter.formatCompactEGP(summary.totalExpectedRevenueEgp)}'
                   : 'Actual $_unitLabelEn',
               icon: Icons.insights_rounded,
               color: M3StatusColors.of(context).accents.teal,
             );
+            final achBasisTooltip = includesNoData
+                ? 'محسوبة على الفترات التي بها مبيعات فقط؛ لا تشمل مستهدفات '
+                    'سنوات قادمة بدون مبيعات (${CurrencyFormatter.formatCompactEGP(kpis.noDataTargetRevenue)})'
+                : null;
             final card3 = _buildKpiCard(
               context,
               titleAr: 'نسبة التحقيق',
               titleTooltip: 'نسبة التحقيق الإجمالية',
               titleEn: 'Overall Achievement %',
-              value: '${summary.overallAchievementPct.toStringAsFixed(1)}%',
+              value: achPct == null ? '—' : '${achPct.toStringAsFixed(1)}%',
               subtitleAr: !hasTargets
                   ? noTargets
-                  : summary.overallAchievementPct >= 100
-                      ? 'فوق المستهدف'
-                      : (summary.overallAchievementPct >= 85
-                          ? 'قريب من المستهدف'
-                          : 'أقل من المستهدف'),
-              subtitleEn: summary.overallAchievementPct >= 100
+                  : achPct == null
+                      ? noSalesYet
+                      : achPct >= 100
+                          ? 'فوق المستهدف'
+                          : (achPct >= 85 ? 'قريب من المستهدف' : 'أقل من المستهدف'),
+              subtitleTooltip: achBasisTooltip,
+              subtitleEn: (achPct ?? 0) >= 100
                   ? 'Above target'
-                  : (summary.overallAchievementPct >= 85
-                      ? 'Near target'
-                      : 'Below target'),
+                  : ((achPct ?? 0) >= 85 ? 'Near target' : 'Below target'),
               icon: Icons.pie_chart_rounded,
-              color: !hasTargets
+              color: !hasTargets || achPct == null
                   ? neutral
-                  : summary.overallAchievementPct >= 100
-                  ? M3StatusColors.of(context).accents.positive
-                  : (summary.overallAchievementPct >= 85
-                      ? M3StatusColors.of(context).accents.caution
-                      : colorScheme.error),
-              progressPct: hasTargets ? summary.overallAchievementPct : null,
+                  : achPct >= 100
+                      ? M3StatusColors.of(context).accents.positive
+                      : (achPct >= 85
+                          ? M3StatusColors.of(context).accents.caution
+                          : colorScheme.error),
+              progressPct: hasTargets ? achPct : null,
               reserveProgress: true,
             );
             final card4 = _buildKpiCard(
@@ -1085,25 +1115,24 @@ onChanged: m3Legacy<int>((v) {
                   ? 'الفرق'
                   : 'الفرق',
               titleEn: 'Variance',
-              value: !hasTargets
+              value: !hasTargets || variance == null
                   ? '—'
-                  : _signedCompactEgp(summary.totalVarianceEgp),
+                  : _signedCompactEgp(variance),
               subtitleAr: !hasTargets
                   ? noTargets
-                  : _isSellIn && summary.totalBranchesCovered > 0
-                      ? 'موزع على ${summary.totalBranchesCovered} فرع • ${summary.totalSkusCovered} صنف'
-                      : (summary.totalVarianceEgp >= 0
-                          ? 'فوق المستهدف'
-                          : 'المتبقي للمستهدف'),
-              subtitleEn: summary.totalVarianceEgp >= 0
-                  ? 'Above target'
-                  : 'To go',
-              icon: summary.totalVarianceEgp >= 0
+                  : variance == null
+                      ? noSalesYet
+                      : _isSellIn && summary.totalBranchesCovered > 0
+                          ? 'موزع على ${summary.totalBranchesCovered} فرع • ${summary.totalSkusCovered} صنف'
+                          : (variance >= 0 ? 'فوق المستهدف' : 'المتبقي للمستهدف'),
+              subtitleTooltip: achBasisTooltip,
+              subtitleEn: (variance ?? 0) >= 0 ? 'Above target' : 'To go',
+              icon: (variance ?? 0) >= 0
                   ? Icons.trending_up_rounded
                   : Icons.account_tree_rounded,
-              color: !hasTargets
+              color: !hasTargets || variance == null
                   ? neutral
-                  : summary.totalVarianceEgp >= 0
+                  : variance >= 0
                       ? M3StatusColors.of(context).accents.positive
                       : M3StatusColors.of(context).accents.indigo,
             );
@@ -1291,6 +1320,14 @@ onChanged: m3Legacy<String>((v) {
 ),
                                 ],
                               ),
+                              if (!_isSellIn)
+                                Text(
+                                  'اضغط على المستهدف لعرض توزيعه على الفروع والأصناف.',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                               if (_isSellIn)
                                 Text(
                                   'اضغط على السلسلة لعرض الفروع والأصناف.',
@@ -1303,55 +1340,50 @@ onChanged: m3Legacy<String>((v) {
                           ),
                         ),
                         TableScrollContainer(
+                          key: const ValueKey('targets_main_table'),
                           showSwipeHint: true,
+                          columnFlex: _isSellIn
+                              ? const [1.3, 0.9, 1.3, 1.0, 1.0, 1.0, 1.2, 1.0, 1.3, 1.2]
+                              : const [1.2, 0.8, 1.5, 1.0, 1.1, 1.0, 1.3, 1.4, 1.2],
                           child: DataTable(
                             showCheckboxColumn: false,
                             headingRowColor: WidgetStatePropertyAll(
                               colorScheme.surfaceContainerHigh.withOpacity(0.5),
                             ),
                             columns: [
-                              const DataColumn(label: Text('السلسلة (Chain)')),
-                              const DataColumn(label: Text('الفترة (Period)')),
-                              const DataColumn(
-                                label: Text('النطاق'),
-                              ),
-                              const DataColumn(
-                                numeric: true,
-                                label: Text('المستهدف'),
-                              ),
-                              const DataColumn(
-                                numeric: true,
-                                label: Text('المحقق (ج.م)'),
-                              ),
-                              const DataColumn(
-                                numeric: true,
-                                label: Text('الفرق (ج.م)'),
-                              ),
-                              DataColumn(
-                                numeric: true,
-                                label: Text(
-                                  'الكمية ($_unitLabelAr: فعلي / مستهدف)',
+                              for (final h in [
+                                'السلسلة (Chain)',
+                                'الفترة (Period)',
+                                'النطاق',
+                                'المستهدف',
+                                'المحقق (ج.م)',
+                                'الفرق (ج.م)',
+                                'الكمية ($_unitLabelAr: فعلي / مستهدف)',
+                                if (_isSellIn) 'الوزن بالطن (فعلي / مستهدف)',
+                                'نسبة التحقيق %',
+                                'إجراءات',
+                              ])
+                                DataColumn(
+                                  headingRowAlignment: M3TableText.headingAlignment,
+                                  label: M3TableText(h, maxLines: 2),
                                 ),
-                              ),
-                              if (_isSellIn)
-                                const DataColumn(
-                                  numeric: true,
-                                  label: Text('الوزن بالطن (فعلي / مستهدف)'),
-                                ),
-                              const DataColumn(
-                                label: Text('نسبة التحقيق %'),
-                              ),
-                              const DataColumn(label: Text('إجراءات')),
                             ],
                             rows: summary.items.map((item) {
                               final isSelected = item.id == activeTarget?.id;
+                              // Future periods have no sales yet: «—», never 0.
+                              final noSales = !_isSellIn && !item.hasActuals;
                               final isPositive = item.varianceRevenueEgp >= 0;
-                              final badgeColor = item.achievementRevPct >= 100
-                                  ? M3StatusColors.of(context).accents.positive
-                                  : (item.achievementRevPct >= 85
-                                      ? M3StatusColors.of(context).accents.caution
-                                      : colorScheme.error);
+                              final badgeColor = noSales
+                                  ? colorScheme.onSurfaceVariant
+                                  : item.achievementRevPct >= 100
+                                      ? M3StatusColors.of(context).accents.positive
+                                      : (item.achievementRevPct >= 85
+                                          ? M3StatusColors.of(context).accents.caution
+                                          : colorScheme.error);
+                              Widget centered(Widget child) =>
+                                  Align(alignment: Alignment.center, child: child);
                               return DataRow(
+                                key: ValueKey('targets_row_${item.id}'),
                                 selected: isSelected,
                                 onSelectChanged: (_) {
                                   setState(() {
@@ -1361,180 +1393,240 @@ onChanged: m3Legacy<String>((v) {
                                           item.branches.first.branchName;
                                     }
                                   });
+                                  if (!_isSellIn) _openBreakdown(item);
                                 },
                                 cells: [
                                   DataCell(
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (isSelected && _isSellIn)
-                                          Padding(
-                                            padding: const EdgeInsetsDirectional
-                                                .only(end: 6.0),
-                                            child: Icon(
-                                              Icons.check_circle_rounded,
-                                              size: 18.0,
-                                              color: colorScheme.primary,
+                                    centered(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (isSelected && _isSellIn)
+                                            Padding(
+                                              padding: const EdgeInsetsDirectional
+                                                  .only(end: 6.0),
+                                              child: Icon(
+                                                Icons.check_circle_rounded,
+                                                size: 18.0,
+                                                color: colorScheme.primary,
+                                              ),
+                                            ),
+                                          Text(
+                                            item.chainDisplayName,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w800,
                                             ),
                                           ),
-                                        Text(
-                                          item.chainDisplayName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(centered(Text(item.monthLabel))),
+                                  DataCell(
+                                    centered(
+                                      _isSellIn && item.branchesCount > 0
+                                          ? Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 10.0,
+                                                vertical: 4.0,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: colorScheme
+                                                    .primaryContainer
+                                                    .withOpacity(0.5),
+                                                borderRadius: M3Shape.radiusSm,
+                                              ),
+                                              child: Text(
+                                                '${item.branchesCount} فرع • ${item.activeSkusCount} صنف',
+                                                style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.primary),
+                                              ),
+                                            )
+                                          : Text(
+                                              '${_displayBranch(item.branchName)} • ${item.category}',
+                                              textAlign: TextAlign.center,
+                                            ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    centered(
+                                      Text(
+                                        CurrencyFormatter.formatEGP(
+                                          item.targetRevenueEgp,
                                         ),
-                                      ],
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  DataCell(Text(item.monthLabel)),
                                   DataCell(
-                                    _isSellIn && item.branchesCount > 0
-                                        ? Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10.0,
-                                              vertical: 4.0,
+                                    centered(
+                                      noSales
+                                          ? Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  '—',
+                                                  key: ValueKey('targets_actual_dash_${item.id}'),
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w800,
+                                                    color: colorScheme.onSurfaceVariant,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'لا توجد مبيعات بعد',
+                                                  style: theme.textTheme.bodySmall?.copyWith(
+                                                    color: colorScheme.onSurfaceVariant,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : Text(
+                                              CurrencyFormatter.formatEGP(
+                                                item.actualRevenueEgp,
+                                              ),
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                color: colorScheme.primary,
+                                              ),
                                             ),
-                                            decoration: BoxDecoration(
-                                              color: colorScheme
-                                                  .primaryContainer
-                                                  .withOpacity(0.5),
-                                              borderRadius:
-                                                  M3Shape.radiusSm,
+                                    ),
+                                  ),
+                                  DataCell(
+                                    centered(
+                                      noSales
+                                          ? Text(
+                                              '—',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                color: colorScheme.onSurfaceVariant,
+                                              ),
+                                            )
+                                          : Text(
+                                              '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(item.varianceRevenueEgp)}',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                color: isPositive
+                                                    ? M3StatusColors.of(context).accents.positive
+                                                    : colorScheme.error,
+                                              ),
                                             ),
-                                            child: Text(
-                                              '${item.branchesCount} فرع • ${item.activeSkusCount} صنف',
-                                              style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.primary),
-                                            ),
-                                          )
-                                        : Text(
-                                            '${_displayBranch(item.branchName)} • ${item.category}',
-                                          ),
-                                  ),
-                                  DataCell(
-                                    Text(
-                                      CurrencyFormatter.formatEGP(
-                                        item.targetRevenueEgp,
-                                      ),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                      ),
                                     ),
                                   ),
                                   DataCell(
-                                    Text(
-                                      CurrencyFormatter.formatEGP(
-                                        item.actualRevenueEgp,
-                                      ),
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        color: colorScheme.primary,
-                                      ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Text(
-                                      '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(item.varianceRevenueEgp)}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        color: isPositive
-                                            ? M3StatusColors.of(context).accents.positive
-                                            : colorScheme.error,
-                                      ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Text(
-                                      '${CurrencyFormatter.formatNumber(item.actualUnits.round())} / ${CurrencyFormatter.formatNumber(item.targetUnits.round())} $_unitLabelAr',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
+                                    centered(
+                                      Text(
+                                        '${noSales ? '—' : CurrencyFormatter.formatNumber(item.actualUnits.round())} / ${CurrencyFormatter.formatNumber(item.targetUnits.round())} $_unitLabelAr',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                     ),
                                   ),
                                   if (_isSellIn)
                                     DataCell(
-                                      Text(
-                                        '${item.actualWeightTons.toStringAsFixed(1)} / ${item.targetWeightTons.toStringAsFixed(1)} طن',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: M3StatusColors.of(context).accents.indigo,
+                                      centered(
+                                        Text(
+                                          '${item.actualWeightTons.toStringAsFixed(1)} / ${item.targetWeightTons.toStringAsFixed(1)} طن',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            color: M3StatusColors.of(context).accents.indigo,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   DataCell(
-                                    M3ChipSurface(
-                      color: badgeColor.withOpacity(0.12),
-                      child: Text(
-                                        '${item.achievementRevPct.toStringAsFixed(1)}% (${item.statusAr})',
-                                        style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: badgeColor),
+                                    centered(
+                                      M3ChipSurface(
+                                        color: badgeColor.withOpacity(0.12),
+                                        child: Text(
+                                          noSales
+                                              ? '—'
+                                              : '${item.achievementRevPct.toStringAsFixed(1)}% (${item.statusAr})',
+                                          key: ValueKey('targets_achievement_${item.id}'),
+                                          style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: badgeColor),
+                                        ),
                                       ),
                                     ),
                                   ),
                                   DataCell(
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (_isSellIn)
-                                          TextButton.icon(
-                                            onPressed: () {
-                                              setState(() {
-                                                _selectedTargetId = item.id;
-                                                _drillSubTab = 0;
-                                                if (item.branches.isNotEmpty) {
-                                                  _selectedBranchName = item
-                                                      .branches
-                                                      .first
-                                                      .branchName;
-                                                }
-                                              });
-                                            },
+                                    centered(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (_isSellIn)
+                                            TextButton.icon(
+                                              onPressed: () {
+                                                setState(() {
+                                                  _selectedTargetId = item.id;
+                                                  _drillSubTab = 0;
+                                                  if (item.branches.isNotEmpty) {
+                                                    _selectedBranchName = item
+                                                        .branches
+                                                        .first
+                                                        .branchName;
+                                                  }
+                                                });
+                                              },
+                                              icon: const Icon(
+                                                Icons.account_tree_rounded,
+                                                size: 18.0,
+                                              ),
+                                              label: const Text('تفاصيل الفروع'),
+                                            )
+                                          else
+                                            IconButton(
+                                              key: ValueKey('targets_breakdown_${item.id}'),
+                                              tooltip: 'توزيع المستهدف على الفروع والأصناف',
+                                              icon: const Icon(
+                                                Icons.account_tree_rounded,
+                                                size: 18.0,
+                                              ),
+                                              onPressed: () => _openBreakdown(item),
+                                            ),
+                                          IconButton(
+                                            tooltip: 'تعديل المستهدف',
                                             icon: const Icon(
-                                              Icons.account_tree_rounded,
+                                              Icons.edit_rounded,
                                               size: 18.0,
                                             ),
-                                            label: const Text('تفاصيل الفروع'),
+                                            onPressed: () =>
+                                                _openTargetFormDialog(
+                                              existing: item,
+                                            ),
                                           ),
-                                        IconButton(
-                                          tooltip: 'تعديل المستهدف',
-                                          icon: const Icon(
-                                            Icons.edit_rounded,
-                                            size: 18.0,
+                                          IconButton(
+                                            tooltip: 'حذف المستهدف',
+                                            icon: Icon(
+                                              Icons.delete_outline_rounded,
+                                              size: 18.0,
+                                              color: colorScheme.error,
+                                            ),
+                                            onPressed: () async {
+                                              try {
+                                                await widget.apiClient
+                                                    .deleteTarget(
+                                                  id: item.id,
+                                                  targetType: widget.targetType,
+                                                );
+                                                if (!context.mounted) return;
+                                                M3Feedback.showSuccess(
+                                                  context,
+                                                  'تم حذف المستهدف بنجاح',
+                                                );
+                                                _repo.invalidateAll();
+                                                await _loadTargets();
+                                              } catch (e) {
+                                                if (!context.mounted) return;
+                                                M3Feedback.showError(
+                                                  context,
+                                                  'تعذّر حذف المستهدف. حاول مرة أخرى.',
+                                                );
+                                              }
+                                            },
                                           ),
-                                          onPressed: () =>
-                                              _openTargetFormDialog(
-                                            existing: item,
-                                          ),
-                                        ),
-                                        IconButton(
-                                          tooltip: 'حذف المستهدف',
-                                          icon: Icon(
-                                            Icons.delete_outline_rounded,
-                                            size: 18.0,
-                                            color: colorScheme.error,
-                                          ),
-                                          onPressed: () async {
-                                            try {
-                                              await widget.apiClient
-                                                  .deleteTarget(
-                                                id: item.id,
-                                                targetType: widget.targetType,
-                                              );
-                                              if (!context.mounted) return;
-                                              M3Feedback.showSuccess(
-                                                context,
-                                                'تم حذف المستهدف بنجاح',
-                                              );
-                                              _repo.invalidateAll();
-                                              await _loadTargets();
-                                            } catch (e) {
-                                              if (!context.mounted) return;
-                                              M3Feedback.showError(
-                                                context,
-                                                'تعذّر حذف المستهدف. حاول مرة أخرى.',
-                                              );
-                                            }
-                                          },
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -3223,6 +3315,14 @@ onChanged: m3Legacy<String>((v) {
     );
   }
 
+  Future<void> _openBreakdown(TargetComparisonModel item) {
+    return showTargetBreakdownDialog(
+      context,
+      repository: _repo,
+      target: item,
+    );
+  }
+
   Widget _buildKpiCard(
     BuildContext context, {
     required String titleAr,
@@ -3235,6 +3335,7 @@ onChanged: m3Legacy<String>((v) {
     double? progressPct,
     bool reserveProgress = false,
     String? titleTooltip,
+    String? subtitleTooltip,
   }) {
     return M3SummaryKpiCard(
       key: ValueKey('targets_kpi_card_$titleAr'),
@@ -3244,6 +3345,7 @@ onChanged: m3Legacy<String>((v) {
       icon: icon,
       color: color,
       titleTooltip: titleTooltip,
+      subtitleTooltip: subtitleTooltip,
       titleMaxLines: 1,
       subtitleMaxLines: 1,
     );
