@@ -13,6 +13,7 @@ import 'package:http/testing.dart';
 import 'package:tashil_web/core/data/result.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
+import 'package:tashil_web/core/theme/m3_spacing.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
 import 'package:tashil_web/core/widgets/m3_equal_height_grid.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
@@ -482,6 +483,76 @@ void main() {
 
         final v = _violations(tester).toSet().toList()..sort();
         expect(v, isEmpty, reason: v.join('\n'));
+      },
+          () => MockClient((req) async => http.Response.bytes(
+                utf8.encode(jsonEncode(req.url.path.contains('archive') ||
+                        req.url.path.contains('upload')
+                    ? <Object>[]
+                    : {'records': [], 'total_count': 0})),
+                200,
+                headers: {'content-type': 'application/json'},
+              )));
+    });
+
+    testWidgets(
+        'pricing table stays on sales data and is absent from branch performance',
+        (tester) async {
+      tester.view.physicalSize = const Size(1440, 4000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(
+          theme: AppTheme.light(),
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              body: SellOutExplorerScreen(
+                apiClient: ApiClient(
+                    tenantId: 'tenant-adeco', allowMockFallback: false),
+                repository: _OneShotRepo(data()),
+              ),
+            ),
+          ),
+        ));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.pumpAndSettle(const Duration(seconds: 1));
+
+        expect(find.byKey(const ValueKey('price_matrix_section')),
+            findsOneWidget);
+        expect(find.widgetWithText(M3SectionTitle, 'الأسعار وهامش السلسلة'),
+            findsOneWidget);
+
+        await tester.tap(find.text('أداء الفروع'));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('price_matrix_section')), findsNothing);
+        expect(find.widgetWithText(M3SectionTitle, 'الأسعار وهامش السلسلة'),
+            findsNothing);
+        expect(find.widgetWithText(M3SectionTitle, 'أداء الفروع'),
+            findsOneWidget);
+        expect(
+            find.byWidgetPredicate(
+                (w) => w is M3SectionTitle && w.text.startsWith('نمو الفروع')),
+            findsOneWidget);
+
+        // Remaining sections keep the same 24dp gap the price block used.
+        final kpis = tester.getRect(find.byKey(const ValueKey('kpi_cards_row')));
+        final filter =
+            tester.getRect(find.byKey(const ValueKey('perf_filter_bar')));
+        final velocity = tester
+            .getRect(find.byKey(const ValueKey('branch_velocity_section')));
+        final growth = tester.getRect(
+            find.byKey(const ValueKey('branch_growth_matrix_section')));
+        expect(filter.top - kpis.bottom, closeTo(M3Spacing.md, 0.5));
+        expect(velocity.top - filter.bottom, closeTo(M3Spacing.md, 0.5));
+        expect(growth.top - velocity.bottom, closeTo(M3Spacing.md, 0.5));
+
+        await tester.tap(find.text('بيانات المبيعات'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('price_matrix_section')),
+            findsOneWidget);
       },
           () => MockClient((req) async => http.Response.bytes(
                 utf8.encode(jsonEncode(req.url.path.contains('archive') ||

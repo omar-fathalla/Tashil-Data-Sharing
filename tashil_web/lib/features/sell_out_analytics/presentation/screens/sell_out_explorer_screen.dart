@@ -3038,10 +3038,6 @@ onChanged: m3Legacy<String>((v) {
             ],
           ),
         ),
-        if (_recordsSummary.skuSummaries.isNotEmpty) ...[
-          M3Spacing.gapMD,
-          _buildAdecoPriceAndMarginMatrixSection(context, theme, colorScheme),
-        ],
       ],
     );
   }
