@@ -105,3 +105,59 @@ func TestSellInTotalsSQLStageB(t *testing.T) {
 		t.Fatalf("params %+v", params)
 	}
 }
+
+// The waterfall splits list − net into invoice discount, the chain's extra discount and the remainder,
+// and VAT follows each row's (chain) rate.
+func TestSellInTotalsWaterfallSplitsExtraChainDiscount(t *testing.T) {
+	// List 1000, invoice 10% (=100), extra 20% of the remaining 900 (=180) → expected net 720; billed net 700.
+	tot := sellInTotalsFromRecords([]domain.SellInRecord{{
+		ItemCode: "A", ItemName: "a", NetValueEGP: 700, OfficialListValueExclEGP: 1000, DiscountGrantedEGP: 300,
+		InvoiceDiscountPct: 10, ExtraDiscountPct: 20, VATRate: 0.05, GrossValueInclVATEGP: 735, VATAmountEGP: 35,
+	}})
+	resp := buildSellInRecordsResponse(tot, nil, 1, 10, 0)
+	if resp.TotalInvoiceDiscountEGP != 100 || resp.TotalExtraChainDiscountEGP != 180 || resp.TotalOtherDifferenceEGP != 20 {
+		t.Fatalf("waterfall split: inv=%v extra=%v other=%v", resp.TotalInvoiceDiscountEGP, resp.TotalExtraChainDiscountEGP, resp.TotalOtherDifferenceEGP)
+	}
+	if resp.TotalDiscountGrantedEGP != 300 || resp.TotalVAT14EGP != 35 || resp.VATRatePct != 5 {
+		t.Fatalf("totals: disc=%v vat=%v vat%%=%v", resp.TotalDiscountGrantedEGP, resp.TotalVAT14EGP, resp.VATRatePct)
+	}
+	// Legacy rows store 0.10 for 10%.
+	legacy := sellInTotalsFromRecords([]domain.SellInRecord{{ItemCode: "A", NetValueEGP: 900, OfficialListValueExclEGP: 1000, InvoiceDiscountPct: 0.10}})
+	if legacy.InvDisc != 100 || legacy.ExtraDisc != 0 {
+		t.Fatalf("legacy fraction: %+v", legacy)
+	}
+}
+
+func TestSellInTotalsSQLCarriesChainProfiles(t *testing.T) {
+	vat := 0.05
+	totals, _, page, params := bqsink.SellInTotalsSQL("`p.d.sell_in_records`", bqsink.SellInTotalsQuery{
+		TenantID: "tenant-adeco", Chain: "fathalla",
+		Profiles: []bqsink.SellInChainProfile{
+			{Chain: " Fathalla ", InvoiceDiscountPct: 10, ExtraDiscountPct: 20, VATRate: &vat},
+			{Chain: "kazyon", InvoiceDiscountPct: 12},
+		},
+	})
+	for _, want := range []string{"WHEN chain_r = @pc0 THEN @pv0", "WHEN chain_r = @pc0 THEN @pi0", "WHEN chain_r = @pc0 THEN @pe0", "WHEN chain_r = @pc1 THEN @pi1", "AS inv_disc", "AS extra_disc"} {
+		if !strings.Contains(totals, want) {
+			t.Fatalf("totals SQL missing %q", want)
+		}
+	}
+	if strings.Contains(totals, "@pv1") {
+		t.Fatal("a profile without VAT must not override the row VAT")
+	}
+	if !strings.Contains(page, "ipct, epct") {
+		t.Fatal("page must not leak the derived discount columns")
+	}
+	got := map[string]interface{}{}
+	for _, p := range params {
+		got[p.Name] = p.Value
+	}
+	if got["pc0"] != "fathalla" || got["pv0"] != 0.05 || got["pi0"] != 10.0 || got["pe0"] != 20.0 || got["pc1"] != "kazyon" {
+		t.Fatalf("params %+v", got)
+	}
+	// Without profiles the SQL keeps the stored per-row VAT.
+	plain, _, _, _ := bqsink.SellInTotalsSQL("`p.d.t`", bqsink.SellInTotalsQuery{TenantID: "tenant-adeco"})
+	if strings.Contains(plain, "@pc0") || !strings.Contains(plain, "IF(matched AND IFNULL(vat_rate, 0) > 0, vat_rate, 0.14) AS vr") {
+		t.Fatal("no-profile SQL changed")
+	}
+}

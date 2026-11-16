@@ -37,7 +37,7 @@ func TestChainDiscountProfilesCRUDAuditAndTenantIsolation(t *testing.T) {
 
 	// Empty by default, with the 10% / 0% defaults reported.
 	rec, out := tmDo(t, mux, admin, "GET", "/api/v1/product-master/chain-discounts", nil)
-	if rec.Code != 200 || len(out["profiles"].([]interface{})) != 0 || out["default_invoice_discount_pct"].(float64) != 10 || out["default_additional_discount_pct"].(float64) != 0 {
+	if rec.Code != 200 || len(out["profiles"].([]interface{})) != 0 || out["default_invoice_discount_pct"].(float64) != 10 || out["default_additional_discount_pct"].(float64) != 0 || out["default_vat_rate_pct"].(float64) != 14 {
 		t.Fatalf("unexpected empty GET: %d %v", rec.Code, out)
 	}
 
@@ -102,5 +102,73 @@ func TestChainDiscountProfilesCRUDAuditAndTenantIsolation(t *testing.T) {
 	}
 	if !strings.Contains(joined, "added Kazyon") || !strings.Contains(joined, "deleted fathalla") || !strings.Contains(joined, "updated kazyon invoice 12.00%→15.00%") {
 		t.Fatalf("audit details missing changes:\n%s", joined)
+	}
+}
+
+func TestChainDiscountVATRateRoundTripValidationAndAudit(t *testing.T) {
+	fs := firestore.NewClient("", true)
+	app := &recordingApplier{}
+	mux := cdMux(NewChainDiscountHandler(fs, fs, app))
+	admin := &domain.UserClaims{UserID: "u1", Email: "admin@adeco.test", TenantID: "tenant-adeco", Role: domain.RoleAdmin}
+
+	put := func(profiles []map[string]interface{}) (int, map[string]interface{}) {
+		rec, out := tmDo(t, mux, admin, "PUT", "/api/v1/product-master/chain-discounts", map[string]interface{}{"profiles": profiles})
+		return rec.Code, out
+	}
+	code, out := put([]map[string]interface{}{
+		{"chain": "fathalla", "invoice_discount_pct": 10, "additional_discount_pct": 20, "vat_rate_pct": 5},
+		{"chain": "kazyon", "invoice_discount_pct": 10, "additional_discount_pct": 0}, // VAT not set -> default
+		{"chain": "zero", "invoice_discount_pct": 10, "additional_discount_pct": 0, "vat_rate_pct": 0},
+	})
+	if code != 200 {
+		t.Fatalf("PUT: %d %v", code, out)
+	}
+	byChain := map[string]map[string]interface{}{}
+	for _, p := range out["profiles"].([]interface{}) {
+		m := p.(map[string]interface{})
+		byChain[m["chain"].(string)] = m
+	}
+	if byChain["fathalla"]["vat_rate_pct"].(float64) != 5 {
+		t.Fatalf("VAT not stored: %v", byChain["fathalla"])
+	}
+	if _, set := byChain["kazyon"]["vat_rate_pct"]; set {
+		t.Fatalf("unset VAT must stay unset (default applies): %v", byChain["kazyon"])
+	}
+	if v, set := byChain["zero"]["vat_rate_pct"]; !set || v.(float64) != 0 {
+		t.Fatalf("an explicit 0%% VAT must be kept: %v", byChain["zero"])
+	}
+	if len(app.profiles) != 3 || app.profiles[0].VATRatePct == nil {
+		t.Fatalf("applier must receive VAT: %+v", app.profiles)
+	}
+
+	// Reload (GET) keeps it.
+	_, out = tmDo(t, mux, admin, "GET", "/api/v1/product-master/chain-discounts", nil)
+	if len(out["profiles"].([]interface{})) != 3 {
+		t.Fatalf("GET: %v", out)
+	}
+
+	// Changing only the VAT is a change (audited, applied).
+	before := app.calls
+	code, _ = put([]map[string]interface{}{{"chain": "fathalla", "invoice_discount_pct": 10, "additional_discount_pct": 20, "vat_rate_pct": 14}})
+	if code != 200 || app.calls != before+1 {
+		t.Fatalf("VAT-only change must apply: %d", code)
+	}
+	logs, _ := fs.GetAuditLogs(context.Background(), "tenant-adeco", "chain_discounts_update", 10)
+	joined := ""
+	for _, l := range logs {
+		joined += l.Details + "\n"
+	}
+	if !strings.Contains(joined, "vat 5.00%→14.00%") || !strings.Contains(joined, "vat=5.00%") {
+		t.Fatalf("audit must record VAT:\n%s", joined)
+	}
+
+	for _, bad := range []float64{-1, 100.5} {
+		if code, _ := put([]map[string]interface{}{{"chain": "a", "vat_rate_pct": bad}}); code != 400 {
+			t.Fatalf("vat_rate_pct %v must be rejected, got %d", bad, code)
+		}
+	}
+	// Any value in range is accepted ("editable to any number").
+	if code, _ := put([]map[string]interface{}{{"chain": "a", "invoice_discount_pct": 10, "vat_rate_pct": 22.5}}); code != 200 {
+		t.Fatalf("22.5%% VAT must be accepted, got %d", code)
 	}
 }
