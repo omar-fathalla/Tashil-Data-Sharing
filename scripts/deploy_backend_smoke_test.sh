@@ -20,12 +20,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Args: mode=ok|bad_livez|bad_health|bad_version
+# Args: mode=ok|bad_livez|bad_health|bad_version [listen_delay_sec]
 cat >"$py_server" <<'PY'
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 mode = sys.argv[1] if len(sys.argv) > 1 else "ok"
+port = int(sys.argv[2])
+delay = float(sys.argv[3]) if len(sys.argv) > 3 else 0.0
+if delay > 0:
+    time.sleep(delay)
 
 class H(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -46,7 +51,7 @@ class H(BaseHTTPRequestHandler):
     def log_message(self, *_args):
         return
 
-HTTPServer(("127.0.0.1", int(sys.argv[2])), H).serve_forever()
+HTTPServer(("127.0.0.1", port), H).serve_forever()
 PY
 
 pick_port() {
@@ -59,28 +64,80 @@ s.close()
 PY
 }
 
+# Wait until TCP accept is live on 127.0.0.1:port (not merely "curl wrote 000").
+# Curl reports %{http_code}=000 on connect failure; treating any 3-digit code as ready
+# races ahead of listen and flakes mode=ok (Deploy production #107 / curl_rc=7).
+wait_for_port() {
+  local port="$1"
+  local attempts="${2:-100}"
+  local sleep_s="${3:-0.05}"
+  local i
+  for i in $(seq 1 "$attempts"); do
+    if python3 - "$port" <<'PY'
+import socket
+import sys
+port = int(sys.argv[1])
+try:
+    with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+        pass
+except OSError:
+    sys.exit(1)
+sys.exit(0)
+PY
+    then
+      return 0
+    fi
+    sleep "$sleep_s"
+  done
+  echo "FAIL wait_for_port: 127.0.0.1:${port} never accepted connections" >&2
+  return 1
+}
+
+# Probe HTTP after listen: require a real status (1xx–5xx), never transport 000.
+wait_for_http_ready() {
+  local port="$1"
+  local path="${2:-/api/v1/version}"
+  local attempts="${3:-50}"
+  local i probe_code_file raw=""
+  for i in $(seq 1 "$attempts"); do
+    probe_code_file="$(mktemp "${TMPDIR:-/tmp}/smoke-probe.XXXXXX")"
+    set +e
+    curl -sS --connect-timeout 1 --max-time 1 -o /dev/null -w "%{http_code}" \
+      "http://127.0.0.1:${port}${path}" >"$probe_code_file" 2>/dev/null
+    set -e
+    raw="$(tr -d '[:space:]' <"$probe_code_file" 2>/dev/null || true)"
+    rm -f "$probe_code_file"
+    # Reject 000 (connect failure). Accept any real HTTP status so bad_* modes still proceed.
+    if [[ "$raw" =~ ^[1-5][0-9]{2}$ ]]; then
+      return 0
+    fi
+    sleep 0.05
+  done
+  echo "FAIL wait_for_http_ready: port ${port} never returned HTTP (last=${raw:-empty})" >&2
+  return 1
+}
+
 run_case() {
   local mode="$1"
   local expect_ok="$2"
+  local listen_delay="${3:-0}"
   local port
   port="$(pick_port)"
-  python3 "$py_server" "$mode" "$port" &
+  python3 "$py_server" "$mode" "$port" "$listen_delay" &
   SERVER_PID=$!
-  # Wait until accepting (no pipe-to-head; write code to a file).
-  for _ in $(seq 1 50); do
-    local probe_code_file
-    probe_code_file="$(mktemp "${TMPDIR:-/tmp}/smoke-probe.XXXXXX")"
-    set +e
-    curl -sS --max-time 1 -o /dev/null -w "%{http_code}" \
-      "http://127.0.0.1:${port}/api/v1/version" >"$probe_code_file" 2>/dev/null
-    set -e
-    if grep -qE '^[0-9]{3}$' "$probe_code_file" 2>/dev/null; then
-      rm -f "$probe_code_file"
-      break
-    fi
-    rm -f "$probe_code_file"
-    sleep 0.05
-  done
+  # TCP accept first, then a real HTTP code (not 000) before invoking smoke.
+  if ! wait_for_port "$port"; then
+    kill "$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+    SERVER_PID=
+    exit 1
+  fi
+  if ! wait_for_http_ready "$port"; then
+    kill "$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+    SERVER_PID=
+    exit 1
+  fi
 
   export SMOKE_TIMEOUT=2 SMOKE_RETRIES=1 SMOKE_RETRY_DELAY=0
   set +e
@@ -199,9 +256,34 @@ run_old_pattern_documents_bug() {
   echo "PASS old_pattern documents concat bug (200 + 000 → 200000)"
 }
 
+# Documents the readiness flake: curl connect-fail writes 000, which matches ^[0-9]{3}$.
+# Old harness treated that as "ready" and raced ahead of listen.
+run_readiness_rejects_transport_000() {
+  local raw="000"
+  if [[ "$raw" =~ ^[0-9]{3}$ ]]; then
+    : # old buggy predicate would accept this
+  else
+    echo "FAIL readiness_000: expected 000 to match naive 3-digit regex" >&2
+    exit 1
+  fi
+  if [[ "$raw" =~ ^[1-5][0-9]{2}$ ]]; then
+    echo "FAIL readiness_000: fixed predicate must reject transport 000" >&2
+    exit 1
+  fi
+  echo "PASS readiness_rejects_000 (000 ≠ HTTP ready)"
+}
+
+# Race coverage: mock sleeps before bind; wait_for_port + HTTP ready must hold until listen.
+run_case_delayed_listen() {
+  run_case ok 1 0.35
+  echo "PASS mode=ok delayed_listen (wait-for-port survived 0.35s bind delay)"
+}
+
 run_old_pattern_documents_bug
 run_curl_exit_23_still_200
 run_curl_transport_failure
+run_readiness_rejects_transport_000
+run_case_delayed_listen
 run_case ok 1
 run_case bad_livez 0
 run_case bad_health 0
