@@ -37,10 +37,16 @@ type chainDiscountResponse struct {
 	*domain.ChainDiscountProfiles
 	DefaultInvoiceDiscountPct    float64 `json:"default_invoice_discount_pct"`
 	DefaultAdditionalDiscountPct float64 `json:"default_additional_discount_pct"`
+	DefaultVATRatePct            float64 `json:"default_vat_rate_pct"`
 }
 
 func wrapChainDiscounts(d *domain.ChainDiscountProfiles) chainDiscountResponse {
-	return chainDiscountResponse{ChainDiscountProfiles: d, DefaultInvoiceDiscountPct: 10, DefaultAdditionalDiscountPct: 0}
+	return chainDiscountResponse{
+		ChainDiscountProfiles:        d,
+		DefaultInvoiceDiscountPct:    domain.DefaultChainInvoiceDiscountPct,
+		DefaultAdditionalDiscountPct: domain.DefaultChainAdditionalDiscountPct,
+		DefaultVATRatePct:            domain.DefaultChainVATRatePct,
+	}
 }
 
 // HandleGet serves GET /api/v1/product-master/chain-discounts.
@@ -95,7 +101,7 @@ func (h *ChainDiscountHandler) HandlePut(w http.ResponseWriter, r *http.Request)
 	for i := range body.Profiles {
 		p := &body.Profiles[i]
 		old, existed := prevBy[firestore.NormalizeChainKey(p.Chain)]
-		if existed && old.InvoiceDiscountPct == p.InvoiceDiscountPct && old.AdditionalDiscountPct == p.AdditionalDiscountPct {
+		if existed && sameChainTerms(old, *p) {
 			p.UpdatedAt, p.UpdatedBy = old.UpdatedAt, old.UpdatedBy
 			continue
 		}
@@ -114,6 +120,23 @@ func (h *ChainDiscountHandler) HandlePut(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, wrapChainDiscounts(doc))
 }
 
+func vatLabel(p domain.ChainDiscountProfile) string {
+	if p.VATRatePct == nil {
+		return "default"
+	}
+	return fmt.Sprintf("%.2f%%", *p.VATRatePct)
+}
+
+func sameChainTerms(a, b domain.ChainDiscountProfile) bool {
+	if a.InvoiceDiscountPct != b.InvoiceDiscountPct || a.AdditionalDiscountPct != b.AdditionalDiscountPct {
+		return false
+	}
+	if (a.VATRatePct == nil) != (b.VATRatePct == nil) {
+		return false
+	}
+	return a.VATRatePct == nil || *a.VATRatePct == *b.VATRatePct
+}
+
 func describeChainDiscountChange(prev map[string]domain.ChainDiscountProfile, next []domain.ChainDiscountProfile) string {
 	var parts []string
 	seen := map[string]bool{}
@@ -123,9 +146,9 @@ func describeChainDiscountChange(prev map[string]domain.ChainDiscountProfile, ne
 		old, ok := prev[k]
 		switch {
 		case !ok:
-			parts = append(parts, fmt.Sprintf("added %s invoice=%.2f%% additional=%.2f%%", p.Chain, p.InvoiceDiscountPct, p.AdditionalDiscountPct))
-		case old.InvoiceDiscountPct != p.InvoiceDiscountPct || old.AdditionalDiscountPct != p.AdditionalDiscountPct:
-			parts = append(parts, fmt.Sprintf("updated %s invoice %.2f%%→%.2f%% additional %.2f%%→%.2f%%", p.Chain, old.InvoiceDiscountPct, p.InvoiceDiscountPct, old.AdditionalDiscountPct, p.AdditionalDiscountPct))
+			parts = append(parts, fmt.Sprintf("added %s invoice=%.2f%% additional=%.2f%% vat=%s", p.Chain, p.InvoiceDiscountPct, p.AdditionalDiscountPct, vatLabel(p)))
+		case !sameChainTerms(old, p):
+			parts = append(parts, fmt.Sprintf("updated %s invoice %.2f%%→%.2f%% additional %.2f%%→%.2f%% vat %s→%s", p.Chain, old.InvoiceDiscountPct, p.InvoiceDiscountPct, old.AdditionalDiscountPct, p.AdditionalDiscountPct, vatLabel(old), vatLabel(p)))
 		}
 	}
 	for k, old := range prev {

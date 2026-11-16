@@ -332,10 +332,7 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			} else {
 				sellOutByYMRevWithCost[ym] += r.NetRevenue
 			}
-			vatRate := 0.14
-			if pmOk && pm.VATRate > 0 {
-				vatRate = pm.VATRate
-			}
+			vatRate := chainVATRate(prof, hasProf, pm, pmOk)
 			unitCostExcl := unitCostIncl / (1.0 + vatRate)
 			costIncl := float64(r.QuantitySold) * unitCostIncl
 			costExcl := float64(r.QuantitySold) * unitCostExcl
@@ -1024,6 +1021,14 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	var pendingFirstMonthAR, pendingLastMonthAR string
 	var pendingSellOutCases, pendingSellOutVal float64
 
+	// The matched / pending windows describe ONE year (the requested year, else the latest year with
+	// data). Without this, an unfiltered request summed the same months of every uploaded year into a
+	// card labelled with a single year (e.g. "Jan–Oct 2026").
+	windowYear := filter.Year
+	if windowYear <= 0 && len(sortedYMKeys) > 0 {
+		windowYear = sortedYMKeys[len(sortedYMKeys)-1].year
+	}
+
 	for _, ym := range sortedYMKeys {
 		ma := monthMap[ym]
 		m := ym.month
@@ -1104,8 +1109,9 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		chainMarginEGP := 0.0
 		chainMarginPct := 0.0
 		// Margin only over sales that have a real factory cost; sales without cost are excluded.
-		if sellOutValWithCost > 0 && sellOutFactoryCostIncl > 0 {
-			chainMarginEGP = round2(sellOutValWithCost - sellOutFactoryCostIncl) // may be negative (real loss)
+		// Both sides are on the excl-VAT basis (POS sheet revenue vs factory cost / (1 + chain VAT)).
+		if sellOutValWithCost > 0 && sellOutFactoryCostExcl > 0 {
+			chainMarginEGP = round2(sellOutValWithCost - sellOutFactoryCostExcl) // may be negative (real loss)
 			chainMarginPct = round2((chainMarginEGP / sellOutValWithCost) * 100.0)
 		}
 
@@ -1117,7 +1123,8 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			yoyGrowthPct = round2(((sellOutVal - prevVal) / prevVal) * 100.0)
 		}
 
-		if hasActualSellOut && (sellInCases > 0 || sellInVal > 0 || len(explicitSellIn) == 0) {
+		inWindow := yr == windowYear // other years stay in the monthly table but never enter the window cards
+		if inWindow && hasActualSellOut && (sellInCases > 0 || sellInVal > 0 || len(explicitSellIn) == 0) {
 			matchedMonthsCount++
 			if matchedFirstMonthAR == "" {
 				matchedFirstMonthAR = ma.monthAR
@@ -1142,7 +1149,7 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			if prevVal > 0 {
 				matchedYoYCurVal += sellOutVal
 			}
-		} else if sellInCases > 0 || sellInVal > 0 {
+		} else if inWindow && (sellInCases > 0 || sellInVal > 0) {
 			pendingMonthsCount++
 			if pendingFirstMonthAR == "" {
 				pendingFirstMonthAR = ma.monthAR
@@ -1251,8 +1258,8 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 	// Chain margin is computed only over POS sales with a real factory cost.
 	matchedChainMarginEGP := 0.0
 	matchedChainMarginPct := 0.0
-	if matchedSellOutValWithCost > 0 && matchedSellOutFactoryCostIncl > 0 {
-		matchedChainMarginEGP = round2(matchedSellOutValWithCost - matchedSellOutFactoryCostIncl) // may be negative (real loss)
+	if matchedSellOutValWithCost > 0 && matchedSellOutFactoryCostExcl > 0 {
+		matchedChainMarginEGP = round2(matchedSellOutValWithCost - matchedSellOutFactoryCostExcl) // may be negative (real loss)
 		matchedChainMarginPct = round2((matchedChainMarginEGP / matchedSellOutValWithCost) * 100.0)
 	}
 	matchedYoYUnitsGrowth := 0.0
@@ -1454,6 +1461,15 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		matchedActiveDays = math.Max(30.0, float64(len(monthMap))*30.0)
 	}
 
+	// A single-chain view prices the suggested PO with that chain's saved VAT and discounts.
+	var filterProf domain.ChainDiscountProfile
+	filterHasProf := false
+	poVATFactor := 1.0 + defaultVATRate
+	if chainFilter != "" {
+		filterProf, filterHasProf = c.chainDiscountProfile(normTenant, chainFilter)
+		poVATFactor = 1.0 + chainVATRate(filterProf, filterHasProf, domain.ProductMasterItem{}, false)
+	}
+
 	for _, sia := range skuInvMap {
 		if sia.sellInCases <= 0 {
 			continue
@@ -1469,16 +1485,19 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 			actualCasePrice = sia.sellInEGP / sia.sellInCases
 		}
 		poCasePriceExcl := sia.officialCartonExclVAT
-		if sia.netCartonInvoiceCost > 0 {
-			// NetCartonInvoiceCost is incl. 14% VAT after 10% discount; excl VAT equivalent = NetCartonInvoiceCost / 1.14
-			poCasePriceExcl = sia.netCartonInvoiceCost / 1.14
+		if filterHasProf && poCasePriceExcl > 0 {
+			// Saved chain terms: list excl VAT after the chain's invoice and extra discounts.
+			poCasePriceExcl = poCasePriceExcl * (1.0 - filterProf.InvoiceDiscountPct/100.0) * (1.0 - filterProf.AdditionalDiscountPct/100.0)
+		} else if sia.netCartonInvoiceCost > 0 {
+			// NetCartonInvoiceCost is incl. VAT after the invoice discount.
+			poCasePriceExcl = sia.netCartonInvoiceCost / poVATFactor
 		}
 		if poCasePriceExcl <= 0 {
 			poCasePriceExcl = actualCasePrice
 		}
-		poCasePriceIncl := sia.netCartonInvoiceCost
-		if poCasePriceIncl <= 0 {
-			poCasePriceIncl = poCasePriceExcl * 1.14
+		poCasePriceIncl := poCasePriceExcl * poVATFactor
+		if !filterHasProf && sia.netCartonInvoiceCost > 0 {
+			poCasePriceIncl = sia.netCartonInvoiceCost
 		}
 
 		caseTons := 0.012
@@ -1769,6 +1788,7 @@ func (c *Client) GetCPFRDashboard(ctx context.Context, tenantID string, filter C
 		MatchedSellOutCases:             round2(matchedSellOutCases),
 		MatchedSellOutPOSValueEGP:       round2(matchedSellOutPOSVal),
 		MatchedSellOutFactoryCostEGP:    round2(matchedSellOutFactoryCostIncl),
+		MatchedSellOutFactoryCostExclVATEGP: round2(matchedSellOutFactoryCostExcl),
 		MatchedRemainingCases:           matchedRemainingCases,
 		MatchedRemainingFactoryValueEGP: matchedRemainingFactoryVal,
 		MatchedSellThroughPct:           matchedSTR,

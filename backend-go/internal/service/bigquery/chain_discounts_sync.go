@@ -37,7 +37,11 @@ func chainProfilesFingerprint(profiles []domain.ChainDiscountProfile) string {
 	parts := make([]string, 0, len(profiles))
 	for _, p := range profiles {
 		if k := normChainKey(p.Chain); k != "" {
-			parts = append(parts, fmt.Sprintf("%s|%g|%g", k, p.InvoiceDiscountPct, p.AdditionalDiscountPct))
+			vat := "-"
+			if p.VATRatePct != nil {
+				vat = fmt.Sprintf("%g", *p.VATRatePct)
+			}
+			parts = append(parts, fmt.Sprintf("%s|%g|%g|%s", k, p.InvoiceDiscountPct, p.AdditionalDiscountPct, vat))
 		}
 	}
 	sort.Strings(parts)

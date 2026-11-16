@@ -1263,6 +1263,12 @@ func (c *Client) enrichSellInRecordLocked(r *domain.SellInRecord) {
 	}
 	r.ActualCasePriceExclEGP = actualCasePriceExcl
 
+	chainKey := normChainKey(r.RetailerChain)
+	if chainKey == "" {
+		chainKey = "fathalla"
+	}
+	prof, hasProf := c.chainDiscountProfile(normalizeTenantKey(r.TenantID), chainKey)
+
 	pm, ok := c.lookupProductMasterWithPriceLocked(r.TenantID, r.ItemCode, r.Barcode, r.ItemName, r.PromotionType, actualCasePriceExcl)
 	if ok {
 		r.ItemCode = pm.ItemCode
@@ -1287,21 +1293,24 @@ func (c *Client) enrichSellInRecordLocked(r *domain.SellInRecord) {
 		}
 		r.InvoiceDiscountPct = discPct
 		r.ExtraDiscountPct = additionalDiscountPct * 100 // set to zero by Mohamed
-		r.VATRate = pm.VATRate
-		if r.VATRate <= 0 {
-			r.VATRate = 0.14
-		}
 		r.CanonicalFamilyKey = CanonicalSellInFamilyKey(&pm, r.ItemName)
 	} else {
 		if r.UnitsPerCarton <= 0 {
 			r.UnitsPerCarton = 12
 		}
-		r.VATRate = 0.14
 		// No price-list match: the invoice discount is unknown. Leave it at 0 (UI shows "—")
 		// instead of inventing the old hardcoded 10%.
 		r.InvoiceDiscountPct = 0
+		r.ExtraDiscountPct = 0
 		r.PricingWaveStatus = "unmatched"
 		r.CanonicalFamilyKey = CanonicalSellInFamilyKey(nil, r.ItemName)
+	}
+	// The chain's saved terms are the single source of truth for VAT and discounts:
+	// chain setting, else Product Master column, else 14%.
+	r.VATRate = chainVATRate(prof, hasProf, pm, ok)
+	if hasProf {
+		r.InvoiceDiscountPct = prof.InvoiceDiscountPct
+		r.ExtraDiscountPct = prof.AdditionalDiscountPct
 	}
 
 	if r.SOPNeedsPackFallback && !r.SOPQtyConverted {

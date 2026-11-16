@@ -30,6 +30,16 @@ type SellInTotalsQuery struct {
 	Offset int
 	// Rules are the active customer->chain rules, env rules first (same order as the Go resolver).
 	Rules []SellInChainRule
+	// Profiles are the saved per-chain terms; they override the stored per-row VAT and discount rates.
+	Profiles []SellInChainProfile
+}
+
+// SellInChainProfile is one chain's saved terms (Product Master → chain discounts).
+type SellInChainProfile struct {
+	Chain              string
+	InvoiceDiscountPct float64  // percent, 10 = 10%
+	ExtraDiscountPct   float64  // percent
+	VATRate            *float64 // fraction (0.14); nil = not set on the profile
 }
 
 // SellInTotals are the Sell-In KPI/waterfall sums, before the handler's rounding.
@@ -44,6 +54,8 @@ type SellInTotals struct {
 	ListIncl    float64 `bigquery:"list_incl"`
 	NetWithList float64 `bigquery:"net_with_list"`
 	Discount    float64 `bigquery:"disc"`
+	InvDisc     float64 `bigquery:"inv_disc"`
+	ExtraDisc   float64 `bigquery:"extra_disc"`
 	VAT         float64 `bigquery:"vat"`
 	Gross       float64 `bigquery:"gross"`
 	MatchedSKUs int64   `bigquery:"matched_skus"`
@@ -110,6 +122,8 @@ func SellInTotalsSQL(tableRef string, q SellInTotalsQuery) (totals, groups, page
 	view := s[:strings.LastIndex(s, " ORDER BY ")]
 	chainExpr, params := sellInChainSQL(q.Rules)
 	params = append([]bigquery.QueryParameter{{Name: "tenant_id", Value: NormalizeTenant(q.TenantID)}}, params...)
+	vatSQL, ipctSQL, epctSQL, profParams := sellInProfileSQL(q.Profiles)
+	params = append(params, profParams...)
 
 	// Mirrors enrichSellInRecordLocked over the stored (write-time enriched) prices.
 	base := "WITH v AS (" + view + ")," +
@@ -120,7 +134,7 @@ func SellInTotalsSQL(tableRef string, q SellInTotalsQuery) (totals, groups, page
 		" IFNULL(official_unit_excl_vat_egp, 0) AS unit_px, IFNULL(official_carton_excl_vat_egp, 0) AS carton_px FROM v)," +
 		" b AS (SELECT *, (matched AND upc > 1 AND unit_px > 0 AND carton_px > 0 AND ABS(q0) >= 0.001 AND ABS(net0) >= 0.01" +
 		" AND ABS(LN(ABS(net0 / q0) / unit_px)) < ABS(LN(ABS(net0 / q0) / carton_px))) AS pcs," +
-		" IF(matched AND IFNULL(vat_rate, 0) > 0, vat_rate, 0.14) AS vr FROM a)," +
+		" " + vatSQL + " AS vr, " + ipctSQL + " AS ipct, " + epctSQL + " AS epct FROM a)," +
 		" c AS (SELECT *, IF(pcs, ROUND(q0 / upc, 4), q0) AS q FROM b)," +
 		" d AS (SELECT *, CAST(ROUND(q * upc) AS INT64) AS units_r," +
 		" ROUND(net0 * (1 + vr), 2) AS gross_r," +
@@ -135,13 +149,51 @@ func SellInTotalsSQL(tableRef string, q SellInTotalsQuery) (totals, groups, page
 		" IFNULL(SUM(list_r), 0) AS list_excl, IFNULL(SUM(disc_f), 0) AS disc"
 	totals = base + " SELECT " + sums + ", IFNULL(SUM(IFNULL(weight_tons, 0)), 0) AS tons, IFNULL(SUM(IFNULL(expected_value_egp, 0)), 0) AS expected," +
 		" IFNULL(SUM(list_r * (1 + vr)), 0) AS list_incl, IFNULL(SUM(IF(list_r > 0, net0, 0)), 0) AS net_with_list," +
+		" IFNULL(SUM(list_r * ipct / 100), 0) AS inv_disc, IFNULL(SUM((list_r - list_r * ipct / 100) * epct / 100), 0) AS extra_disc," +
 		" IFNULL(SUM(ROUND(gross_r - net0, 2)), 0) AS vat, IFNULL(SUM(gross_r), 0) AS gross," +
 		" COUNT(DISTINCT IF(IFNULL(item_code, '') != '', IFNULL(item_name, ''), NULL)) AS matched_skus FROM e"
 	groups = base + " SELECT IFNULL(year, 0) AS year, IFNULL(month_num, 0) AS month_num, chain_r AS chain, IFNULL(brand, '') AS brand, " +
 		sums + " FROM e GROUP BY 1, 2, 3, 4 ORDER BY 1, 2, 3, 4"
-	page = base + " SELECT * EXCEPT(chain_r, upc, matched, q0, net0, unit_px, carton_px, pcs, vr, q, units_r, gross_r, list_r, disc_r, disc_f)" +
+	page = base + " SELECT * EXCEPT(chain_r, upc, matched, q0, net0, unit_px, carton_px, pcs, vr, ipct, epct, q, units_r, gross_r, list_r, disc_r, disc_f)" +
 		" FROM e ORDER BY year DESC, month_num DESC, net_value_egp DESC, record_id LIMIT @limit OFFSET @offset"
 	return totals, groups, page, params
+}
+
+// sellInProfileSQL builds the per-row VAT / invoice-discount / extra-discount expressions. A saved chain
+// profile wins; otherwise the stored per-row value (write-time Product Master enrichment) applies, with
+// the 14% VAT default and no invented discount for unmatched rows. Mirrors enrichSellInRecordLocked.
+func sellInProfileSQL(profiles []SellInChainProfile) (vat, ipct, epct string, params []bigquery.QueryParameter) {
+	vat = "IF(matched AND IFNULL(vat_rate, 0) > 0, vat_rate, 0.14)"
+	ipct = "IF(matched, IF(IFNULL(invoice_discount_pct, 0) > 0 AND invoice_discount_pct <= 1, invoice_discount_pct * 100, IFNULL(invoice_discount_pct, 0)), 0)"
+	epct = "0"
+	var vw, iw, ew strings.Builder
+	n := 0
+	for _, p := range profiles {
+		key := strings.ToLower(strings.TrimSpace(p.Chain))
+		if key == "" {
+			continue
+		}
+		c, i, e := "pc"+strconv.Itoa(n), "pi"+strconv.Itoa(n), "pe"+strconv.Itoa(n)
+		params = append(params, bigquery.QueryParameter{Name: c, Value: key},
+			bigquery.QueryParameter{Name: i, Value: p.InvoiceDiscountPct},
+			bigquery.QueryParameter{Name: e, Value: p.ExtraDiscountPct})
+		iw.WriteString(" WHEN chain_r = @" + c + " THEN @" + i)
+		ew.WriteString(" WHEN chain_r = @" + c + " THEN @" + e)
+		if p.VATRate != nil {
+			v := "pv" + strconv.Itoa(n)
+			params = append(params, bigquery.QueryParameter{Name: v, Value: *p.VATRate})
+			vw.WriteString(" WHEN chain_r = @" + c + " THEN @" + v)
+		}
+		n++
+	}
+	if vw.Len() > 0 {
+		vat = "CASE" + vw.String() + " ELSE " + vat + " END"
+	}
+	if iw.Len() > 0 {
+		ipct = "CASE" + iw.String() + " ELSE " + ipct + " END"
+		epct = "CASE" + ew.String() + " ELSE " + epct + " END"
+	}
+	return vat, ipct, epct, params
 }
 
 func sellInWhere(q SellInTotalsQuery, params *[]bigquery.QueryParameter) string {

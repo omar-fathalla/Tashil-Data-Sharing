@@ -305,7 +305,8 @@ type CPFRDashboardPayload struct {
 	MatchedSellOutUnits             int     `json:"matched_sell_out_units"`               // إجمالي مبيعات الكاشير بالقطعة في الأشهر المتطابقة
 	MatchedSellOutCases             float64 `json:"matched_sell_out_cases"`               // إجمالي مبيعات الكاشير بالكرتونة (بشد الكارتة الحقيقي)
 	MatchedSellOutPOSValueEGP       float64 `json:"matched_sell_out_pos_value_egp"`       // إجمالي مبيعات الكاشير بسعر المستهلك بالجنيه
-	MatchedSellOutFactoryCostEGP    float64 `json:"matched_sell_out_factory_cost_egp"`    // تكلفة مبيعات الكاشير بسعر فاتورة المصنع
+	MatchedSellOutFactoryCostEGP    float64 `json:"matched_sell_out_factory_cost_egp"`    // تكلفة مبيعات الكاشير بسعر فاتورة المصنع (شامل الضريبة)
+	MatchedSellOutFactoryCostExclVATEGP float64 `json:"matched_sell_out_factory_cost_excl_vat_egp"` // نفس التكلفة بدون ضريبة السلسلة (أساس هامش السلسلة)
 	MatchedRemainingCases           float64 `json:"matched_remaining_cases"`              // الرصيد الدفتري الفعلي المتبقي بنهاية الفترة المتطابقة (كرتونة)
 	MatchedRemainingFactoryValueEGP float64 `json:"matched_remaining_factory_value_egp"`  // قيمة الرصيد الدفتري المتبقي بسعر المصنع (ج.م)
 	MatchedSellThroughPct           float64 `json:"matched_sell_through_pct"`             // نسبة التصريف الحقيقية بالكرتونة %
