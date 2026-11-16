@@ -234,7 +234,7 @@ void main() {
           closeTo(_glyphCenterX(tester, head), 2.0));
     });
 
-    testWidgets('pricing table: names wrap to 3 lines, cells centred',
+    testWidgets('pricing table: name ≤2 lines + nested code, cells centred',
         (tester) async {
       await _pump(
           tester,
@@ -245,10 +245,16 @@ void main() {
       final names = find.byKey(const ValueKey('price_matrix_sku_name'));
       expect(names, findsWidgets);
       for (final t in tester.widgetList<Text>(names)) {
-        expect(t.maxLines, 3);
+        expect(t.maxLines, 2);
       }
+      expect(find.byKey(const ValueKey('price_matrix_item_code')), findsWidgets);
       final table = find.byKey(const ValueKey('price_matrix_table'));
-      expect(_cutBeforeThreeLines(tester, table), isEmpty);
+      // Official name intentionally caps at 2 lines (+ code line = ≤3 total).
+      expect(
+        _cutBeforeThreeLines(tester, table,
+            only: (t) => t.key != const ValueKey('price_matrix_sku_name')),
+        isEmpty,
+      );
       String? colLabel(DataColumn c) {
         Widget w = c.label;
         while (true) {
